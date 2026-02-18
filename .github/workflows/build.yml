@@ -1,0 +1,80 @@
+name: Build Mac DMG
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create icon placeholder
+        run: |
+          mkdir -p assets
+          # Create a simple icon placeholder if none exists
+          if [ ! -f assets/icon.icns ]; then
+            # Use a system icon as placeholder
+            cp /System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/GenericApplicationIcon.icns assets/icon.icns 2>/dev/null || \
+            sips -s format icns /System/Library/CoreServices/Finder.app/Contents/Resources/Finder.icns --out assets/icon.icns 2>/dev/null || \
+            echo "Icon placeholder skipped"
+          fi
+
+      - name: Build Mac DMG (arm64 + x64)
+        run: npm run build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload DMG artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Fractal-AI-Builder-DMG
+          path: dist/*.dmg
+          retention-days: 30
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: v${{ github.run_number }}
+          name: "Fractal AI Builder v${{ github.run_number }}"
+          body: |
+            ## Fractal AI Builder
+
+            AI-powered preset builder for Fractal Audio FM3-Edit, Axe-Edit III, and AM4.
+
+            ### Download
+            - **Apple Silicon (M1/M2/M3/M4/M5):** Download the `arm64.dmg` file
+            - **Intel Mac:** Download the `x64.dmg` file
+
+            ### First-Time Setup
+            1. Download the correct `.dmg` for your Mac
+            2. Open it and drag **Fractal AI Builder** to Applications
+            3. Right-click → Open (first time only, to bypass Gatekeeper)
+            4. Grant **Screen Recording** permission when prompted
+            5. Enter your Anthropic API key
+            6. Open FM3-Edit or Axe-Edit III
+            7. Describe your preset and click **Start AI Session**
+          files: dist/*.dmg
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

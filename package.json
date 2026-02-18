@@ -1,0 +1,42 @@
+{
+  "name": "fractal-ai-builder",
+  "version": "1.0.0",
+  "description": "AI-powered preset builder for Fractal Audio FM3, Axe-Edit III, and AM4",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --mac --arm64 --x64",
+    "build:mac": "electron-builder --mac --arm64 --x64"
+  },
+  "build": {
+    "appId": "cloud.newbold.fractal-ai-builder",
+    "productName": "Fractal AI Builder",
+    "copyright": "Copyright © 2026 Justin Newbold",
+    "mac": {
+      "category": "public.app-category.music",
+      "icon": "assets/icon.icns",
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] }
+      ],
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "title": "Fractal AI Builder",
+      "backgroundColor": "#0d0d1a"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "styles.css",
+      "renderer.js",
+      "assets/**"
+    ]
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^29.0.0",
+    "electron-builder": "^24.13.3"
+  }
+}

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src https://api.anthropic.com;" />
+  <title>Fractal AI Builder</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- Title Bar -->
+  <div class="titlebar">
+    <div class="titlebar-drag"></div>
+    <div class="titlebar-title">
+      <svg class="logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#6c63ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Fractal AI Builder
+    </div>
+  </div>
+
+  <!-- Permission Banner -->
+  <div id="permissionBanner" class="permission-banner hidden">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="12" cy="12" r="10" stroke="#f59e0b" stroke-width="2"/>
+      <path d="M12 8v4M12 16h.01" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <span>Screen Recording permission required.</span>
+    <button id="openSettingsBtn" class="btn-warning">Open Privacy Settings</button>
+  </div>
+
+  <!-- Main Layout -->
+  <div class="app-layout">
+
+    <!-- Left: Settings Panel -->
+    <aside class="settings-panel">
+      <h3 class="panel-label">Configuration</h3>
+
+      <div class="form-group">
+        <label for="apiKey">Anthropic API Key</label>
+        <div class="input-with-toggle">
+          <input type="password" id="apiKey" placeholder="sk-ant-..." autocomplete="off" />
+          <button class="toggle-visibility" id="toggleKey" title="Show/hide key">
+            <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="modelSelect">AI Model</label>
+        <select id="modelSelect">
+          <option value="claude-sonnet-4-5-20251101">Sonnet 4.5 — Best Balance (~$0.50–1/session)</option>
+          <option value="claude-opus-4-6-20250205">Opus 4.6 — Most Capable (~$2–5/session)</option>
+          <option value="claude-haiku-4-5-20251001">Haiku 4.5 — Fastest/Cheapest (~$0.10–0.25/session)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="targetApp">Target App</label>
+        <select id="targetApp">
+          <option value="FM3-Edit">FM3-Edit</option>
+          <option value="Axe-Edit III">Axe-Edit III</option>
+          <option value="FM3-Edit,Axe-Edit III">FM3-Edit + Axe-Edit III</option>
+          <option value="AM4 Edit">AM4 Edit</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="maxSteps">Max Steps per Session</label>
+        <input type="number" id="maxSteps" value="50" min="10" max="200" />
+        <p class="field-hint">Each step = 1 screenshot + 1 action (~$0.013)</p>
+      </div>
+
+      <div class="form-group">
+        <label for="stepDelay">Step Delay (ms)</label>
+        <input type="number" id="stepDelay" value="600" min="200" max="3000" step="100" />
+        <p class="field-hint">Time to wait after each action for UI to update</p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="session-stats">
+        <h3 class="panel-label">Session Stats</h3>
+        <div class="stat-row">
+          <span>Steps taken</span>
+          <span id="statSteps">0</span>
+        </div>
+        <div class="stat-row">
+          <span>Input tokens</span>
+          <span id="statInputTokens">0</span>
+        </div>
+        <div class="stat-row">
+          <span>Output tokens</span>
+          <span id="statOutputTokens">0</span>
+        </div>
+        <div class="stat-row cost">
+          <span>Est. cost</span>
+          <span id="statCost">$0.000</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Right: Main Panel -->
+    <main class="main-panel">
+
+      <!-- Instruction Input -->
+      <div class="instruction-area">
+        <label for="instructions" class="instruction-label">
+          What should the AI build or do?
+        </label>
+        <textarea
+          id="instructions"
+          placeholder="Examples:
+• Build a high gain metal preset using a Friedman BE-100 amp block, Tube Screamer in the input chain, and a stereo delay + reverb at the end
+• Create a clean warm jazz tone with a Fender Deluxe amp, light compression, and spring reverb
+• Copy my current preset and save it to slot 5 with the name METAL LEAD
+• Set the amp gain to 7.5, presence to 6, and bass to 4 on my current preset"
+          rows="6"
+        ></textarea>
+        <div class="instruction-footer">
+          <p class="instruction-hint">
+            💡 Make sure <strong id="targetAppHint">FM3-Edit</strong> is open and visible on your screen before starting
+          </p>
+          <div class="action-buttons">
+            <button id="screenshotBtn" class="btn-secondary" title="Preview what the AI will see">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+              </svg>
+              Preview Screen
+            </button>
+            <button id="startBtn" class="btn-primary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="5 3 19 12 5 21 5 3"/>
+              </svg>
+              Start AI Session
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Status + Progress -->
+      <div id="statusArea" class="status-area hidden">
+        <div class="status-header">
+          <div class="status-indicator">
+            <span class="pulse-dot" id="pulseDot"></span>
+            <span id="statusText">Initializing…</span>
+          </div>
+          <button id="stopBtn" class="btn-danger">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="4" y="4" width="16" height="16" rx="2"/>
+            </svg>
+            Stop
+          </button>
+        </div>
+        <div class="progress-bar">
+          <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Screenshot Preview -->
+      <div id="previewArea" class="preview-area hidden">
+        <div class="preview-header">
+          <span>Screen Preview</span>
+          <button id="closePreview" class="btn-ghost">✕</button>
+        </div>
+        <img id="screenshotImg" src="" alt="Screen capture" />
+      </div>
+
+      <!-- Activity Log -->
+      <div class="log-section">
+        <div class="log-header">
+          <span>Activity Log</span>
+          <button id="clearLogBtn" class="btn-ghost">Clear</button>
+        </div>
+        <div id="activityLog" class="activity-log">
+          <div class="log-entry log-info">
+            <span class="log-icon">🎸</span>
+            <span>Welcome to Fractal AI Builder! Enter your API key and describe what you want to build.</span>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
