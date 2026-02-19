@@ -32,7 +32,7 @@ jobs:
             cp /System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/GenericApplicationIcon.icns assets/icon.icns 2>/dev/null || echo "Icon placeholder skipped"
           fi
 
-      - name: Build Mac DMG (arm64 + x64)
+      - name: Build Mac (arm64 zip + x64 DMG)
         run: npm run build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -41,12 +41,13 @@ jobs:
       - name: Make fix script executable
         run: chmod +x Fix-Fractal-AI-Builder.command
 
-      - name: Upload DMG artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Fractal-AI-Builder-DMG
+          name: Fractal-AI-Builder
           path: |
             dist/*.dmg
+            dist/*.zip
             Fix-Fractal-AI-Builder.command
           retention-days: 30
 
@@ -65,31 +66,36 @@ jobs:
 
             ### Download
 
-            | Mac Type | File |
+            | Mac Type | File to Download |
             |---|---|
-            | **Apple Silicon (M1–M5)** | `Fractal.AI.Builder-1.0.0-arm64.dmg` |
+            | **Apple Silicon (M1/M2/M3/M4/M5)** | `Fractal.AI.Builder-1.0.0-arm64-mac.zip` |
             | **Intel Mac** | `Fractal.AI.Builder-1.0.0.dmg` |
 
             ---
 
-            ### Fix the "Damaged" Warning
+            ### Install (Apple Silicon — ZIP file)
 
-            macOS blocks unsigned apps downloaded from the internet. Fix it in 3 steps:
+            1. Download `Fractal.AI.Builder-1.0.0-arm64-mac.zip`
+            2. Double-click it — a **Fractal AI Builder.app** file appears
+            3. Drag **Fractal AI Builder.app** into your **Applications** folder
+            4. Download **`Fix-Fractal-AI-Builder.command`** from the files below
+            5. Double-click the `.command` file → enter your Mac password → app launches ✅
 
-            1. Open the `.dmg` and drag the app to **Applications**
-            2. Download **`Fix-Fractal-AI-Builder.command`** (below)
-            3. Double-click it → enter your Mac password → done ✅
+            ### Install (Intel Mac — DMG file)
 
-            You only need to do this once.
+            1. Download `Fractal.AI.Builder-1.0.0.dmg`
+            2. Open it and drag the app to **Applications**
+            3. Download and run **`Fix-Fractal-AI-Builder.command`** the first time
 
             ---
 
             ### Setup
-            1. Enter your Anthropic API key in the settings panel
-            2. Open FM3-Edit or Axe-Edit III
-            3. Describe your preset → **Start AI Session**
+            1. Enter your Anthropic API key in the left settings panel
+            2. Open FM3-Edit, Axe-Edit III, or AM4 Edit on your Mac
+            3. Describe your preset → click **Start AI Session**
           files: |
             dist/*.dmg
+            dist/*.zip
             Fix-Fractal-AI-Builder.command
           draft: false
           prerelease: false
