@@ -28,12 +28,8 @@ jobs:
       - name: Create icon placeholder
         run: |
           mkdir -p assets
-          # Create a simple icon placeholder if none exists
           if [ ! -f assets/icon.icns ]; then
-            # Use a system icon as placeholder
-            cp /System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/GenericApplicationIcon.icns assets/icon.icns 2>/dev/null || \
-            sips -s format icns /System/Library/CoreServices/Finder.app/Contents/Resources/Finder.icns --out assets/icon.icns 2>/dev/null || \
-            echo "Icon placeholder skipped"
+            cp /System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/GenericApplicationIcon.icns assets/icon.icns 2>/dev/null || echo "Icon placeholder skipped"
           fi
 
       - name: Build Mac DMG (arm64 + x64)
@@ -42,11 +38,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
+      - name: Make fix script executable
+        run: chmod +x Fix-Fractal-AI-Builder.command
+
       - name: Upload DMG artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Fractal-AI-Builder-DMG
-          path: dist/*.dmg
+          path: |
+            dist/*.dmg
+            Fix-Fractal-AI-Builder.command
           retention-days: 30
 
       - name: Create Release
@@ -60,19 +61,36 @@ jobs:
 
             AI-powered preset builder for Fractal Audio FM3-Edit, Axe-Edit III, and AM4.
 
-            ### Download
-            - **Apple Silicon (M1/M2/M3/M4/M5):** Download the `arm64.dmg` file
-            - **Intel Mac:** Download the `x64.dmg` file
+            ---
 
-            ### First-Time Setup
-            1. Download the correct `.dmg` for your Mac
-            2. Open it and drag **Fractal AI Builder** to Applications
-            3. Right-click → Open (first time only, to bypass Gatekeeper)
-            4. Grant **Screen Recording** permission when prompted
-            5. Enter your Anthropic API key
-            6. Open FM3-Edit or Axe-Edit III
-            7. Describe your preset and click **Start AI Session**
-          files: dist/*.dmg
+            ### Download
+
+            | Mac Type | File |
+            |---|---|
+            | **Apple Silicon (M1–M5)** | `Fractal.AI.Builder-1.0.0-arm64.dmg` |
+            | **Intel Mac** | `Fractal.AI.Builder-1.0.0.dmg` |
+
+            ---
+
+            ### Fix the "Damaged" Warning
+
+            macOS blocks unsigned apps downloaded from the internet. Fix it in 3 steps:
+
+            1. Open the `.dmg` and drag the app to **Applications**
+            2. Download **`Fix-Fractal-AI-Builder.command`** (below)
+            3. Double-click it → enter your Mac password → done ✅
+
+            You only need to do this once.
+
+            ---
+
+            ### Setup
+            1. Enter your Anthropic API key in the settings panel
+            2. Open FM3-Edit or Axe-Edit III
+            3. Describe your preset → **Start AI Session**
+          files: |
+            dist/*.dmg
+            Fix-Fractal-AI-Builder.command
           draft: false
           prerelease: false
         env:
