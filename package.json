@@ -22,8 +22,9 @@
       "gatekeeperAssess": false
     },
     "dmg": {
-      "title": "Fractal AI Builder",
-      "backgroundColor": "#0d0d1a"
+      "title": "FractalAIBuilder",
+      "backgroundColor": "#0d0d1a",
+      "writeUpdateInfo": false
     },
     "files": [
       "main.js",
