@@ -1,44 +1,20 @@
 {
   "name": "fractal-ai-builder",
-  "version": "1.0.0",
-  "description": "AI-powered preset builder for Fractal Audio FM3, Axe-Edit III, and AM4",
-  "main": "main.js",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Describe a tone, get a preset written to your Fractal device. Cloud UI over the ForgeFX device API.",
   "scripts": {
-    "start": "electron .",
-    "build": "electron-builder --mac --arm64 --x64",
-    "build:mac": "electron-builder --mac --arm64 --x64"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
-  "build": {
-    "appId": "cloud.newbold.fractal-ai-builder",
-    "productName": "Fractal AI Builder",
-    "copyright": "Copyright © 2026 Justin Newbold",
-    "mac": {
-      "category": "public.app-category.music",
-      "icon": "assets/icon.icns",
-      "target": [
-        { "target": "dmg", "arch": ["x64"] },
-        { "target": "zip", "arch": ["arm64"] }
-      ],
-      "hardenedRuntime": false,
-      "gatekeeperAssess": false
-    },
-    "dmg": {
-      "title": "FractalAIBuilder",
-      "backgroundColor": "#0d0d1a",
-      "writeUpdateInfo": false
-    },
-    "files": [
-      "main.js",
-      "preload.js",
-      "index.html",
-      "styles.css",
-      "renderer.js",
-      "assets/**"
-    ]
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
-  "dependencies": {},
   "devDependencies": {
-    "electron": "^29.0.0",
-    "electron-builder": "^24.13.3"
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.11"
   }
 }
