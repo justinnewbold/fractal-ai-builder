@@ -1,44 +1,67 @@
 # Fractal AI Builder
 
-AI-powered preset builder for Fractal Audio FM3-Edit, Axe-Edit III, and AM4.
+Describe a tone in plain language and get a working preset written to your Fractal
+device.
 
-Uses Claude's Computer Use API to see your screen and control the Fractal Edit software automatically based on natural language instructions.
+## What changed in v2
 
-## How It Works
+v1 drove FM3-Edit with Claude's Computer Use API — screenshots in, mouse clicks
+out. That approach is retired. It was slow, cost about a dollar a session, only
+worked on macOS, and clicked in the wrong place on any display that wasn't
+exactly 2560px wide.
 
-1. You describe what you want: *"Build a high-gain metal preset with a Friedman BE-100, Tube Screamer, and stereo delay"*
-2. The app takes a screenshot of your screen
-3. Claude's AI analyzes the screenshot and decides what to click/type
-4. The app executes the action (click, type, scroll, etc.)
-5. Repeat until the task is done
+v2 talks to the device directly through [ForgeFX](https://github.com/sKuhLight/ForgeFX),
+an open-source HTTP API for Fractal hardware. No screenshots, no clicking.
 
-## Requirements
+## How it works
 
-- macOS 12+
-- Anthropic API key (get one at [platform.anthropic.com](https://platform.anthropic.com))
-- FM3-Edit, Axe-Edit III, or AM4 Edit installed and connected to your device
+The UI is a static site and can be hosted anywhere. Device calls go to ForgeFX
+running on the player's own machine, because that's where the USB cable is.
 
-## Download
+```
+browser (this app)  ──▶  ForgeFX @ localhost:5056  ──▶  FM3 over USB
+```
 
-See [Releases](../../releases) for the latest `.dmg` files.
+## Verified against hardware
 
-- **Apple Silicon (M1–M5):** Download the `arm64.dmg`
-- **Intel Mac:** Download the `x64.dmg`
+Confirmed on an FM3 running ForgeFX 0.6.29-beta:
 
-## First Time Setup
+- Blocks are addressed by **effect id** (the `page` field), not by slug. The
+  server README documents `:slug`; the router actually reads `:eid`.
+- Parameter writes take **real units** — `{"value": 9}` for a gain that runs
+  0–10, not a normalised 0–1.
+- `/preset/store` **works** even though `/device/detect` reports
+  `supportsSave: false`. The capability flag is wrong, not the feature.
 
-1. Download and install the app
-2. Right-click → Open (bypasses Gatekeeper on first launch)
-3. Grant **Screen Recording** permission in System Settings → Privacy & Security
-4. Enter your Anthropic API key in the Settings panel
-5. Open FM3-Edit (or your Fractal app of choice)
-6. Type your instructions and click **Start AI Session**
+## Running it
 
-## Cost
+```bash
+npm install
+npm run dev
+```
 
-Powered by Claude Sonnet 4.5 by default (~$0.50–1.00 per preset-building session).
-You can switch to Haiku 4.5 for even cheaper runs (~$0.10–0.25/session).
+You also need ForgeFX running locally on **Node 20**:
 
-## Built By
+```bash
+cd path/to/ForgeFX/server
+npm run dev
+```
 
-Justin Newbold — [newbold.cloud](https://newbold.cloud)
+ForgeFX needs its sibling codec repo checked out next to it — clone
+`sKuhLight/forgefx-midi` alongside `ForgeFX` and run `npm install && npm run build`
+in it first, or the server won't start.
+
+Quit FM3-Edit before starting. Only one program can hold the USB port.
+
+## Roadmap
+
+- [x] Phase 1 — device link, live routing grid, catalog grounding
+- [ ] Phase 2 — tone description to validated parameter set
+- [ ] Phase 3 — preset naming, save flow, scenes
+
+## Credits
+
+Device protocol by [ForgeFX](https://github.com/sKuhLight/ForgeFX) and
+[forgefx-midi](https://github.com/sKuhLight/forgefx-midi), both MIT/Apache-2.0 and
+independent of Fractal Audio Systems. "FM3", "Axe-Fx" and "FM9" are trademarks of
+Fractal Audio Systems, used here for identification only.
