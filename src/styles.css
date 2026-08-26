@@ -1898,3 +1898,22 @@ button.cell-btn.probed {
   padding-left: 12px;
   margin-top: 2px;
 }
+
+/* ---------- grid drag and drop ---------- */
+
+button.cell-btn[draggable='true'] {
+  cursor: grab;
+}
+
+button.cell-btn.lifting {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+
+/* The drop target is the empty cell, so it has to read as a destination
+   rather than as another block. */
+button.cell-btn.over {
+  border-style: solid;
+  border-color: var(--signal);
+  background: rgba(240, 167, 60, 0.12);
+}

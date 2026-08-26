@@ -71,12 +71,6 @@ export default function App() {
   const [dirty, setDirty] = useState(false)
   const [safety, setSafety] = useState(null)
 
-  // Anything written but not stored lives only in the edit buffer. Tracking it
-  // is what lets the app say "this is not saved yet" instead of leaving someone
-  // to wonder whether they just overwrote a preset.
-  const [dirty, setDirty] = useState(false)
-  const [safety, setSafety] = useState(null)
-
   // Fifteen stacked sections was a long scroll with the important things buried.
   // Grouped by what you're doing rather than by which endpoint it calls.
   const [view, setView] = useState('design')
