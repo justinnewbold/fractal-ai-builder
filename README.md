@@ -57,7 +57,21 @@ Quit FM3-Edit before starting. Only one program can hold the USB port.
 
 - [x] Phase 1 — device link, live routing grid, catalog grounding
 - [x] Phase 2 — tone description to validated parameter set, preview, write, save
-- [ ] Phase 3 — scenes, block placement, preset library
+- [x] Phase 3 — preset browser, rename, hand editing, change log, write verification
+- [ ] Phase 4 — scenes, channels, cab/IR picker, block placement and cabling, live meters
+- [ ] Phase 5 — .syx backup and restore, preset library with versions
+
+## Reads can lie
+
+ForgeFX caches block parameters and exposes no invalidation hook, so after a
+busy session a read can report a value the hardware does not hold. This cost us
+an evening: a preset that read `Amp1 Level = -80` and appeared silent was in
+fact fine, and a server restart showed the real value of `-8`.
+
+So writes are verified. After applying, the affected blocks are read back and
+anything that differs from what was sent is reported rather than assumed. If
+values look wrong and a restart changes them with no writes in between, that is
+the cache, not your preset.
 
 ## Generation
 

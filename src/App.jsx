@@ -2,16 +2,22 @@ import { useCallback, useEffect, useState } from 'react'
 import DeviceBar from './components/DeviceBar'
 import Grid from './components/Grid'
 import { ToneForm, Preview } from './components/Generate'
+import { PresetBar, ChangeLog, Thinking } from './components/PresetBar'
+import Editor from './components/Editor'
 import {
   detect,
   currentPreset,
   presetBlocks,
   readSchema,
   applyChanges,
+  verifyChanges,
   storePreset,
+  selectPreset,
+  setPresetName,
   getHost
 } from './lib/forgefx'
 import { validateSpec, countWrites } from './lib/validate'
+import { newEntry, append } from './lib/log'
 
 import ampTypes from './data/amp-types.json'
 import driveTypes from './data/drive-types.json'
@@ -32,6 +38,11 @@ export default function App() {
   const [progress, setProgress] = useState(null)
   const [applied, setApplied] = useState(null)
   const [slot, setSlot] = useState('')
+  const [log, setLog] = useState([])
+
+  const record = useCallback((kind, summary, detail = []) => {
+    setLog((prev) => append(prev, newEntry(kind, summary, detail)))
+  }, [])
 
   const read = useCallback(async () => {
     setBusy(true)
@@ -80,7 +91,12 @@ export default function App() {
       const spec = await res.json()
       if (!res.ok) throw new Error(spec.error || 'Generation failed.')
 
-      setResult(validateSpec(spec, schema))
+      const validated = validateSpec(spec, schema)
+      setResult(validated)
+      record('generate', `Designed "${validated.presetName || 'untitled'}" from: ${description}`, [
+        `${countWrites(validated.changes)} changes proposed`,
+        ...validated.problems
+      ])
     } catch (err) {
       setError(err.message)
     } finally {
@@ -96,7 +112,28 @@ export default function App() {
       const failures = await applyChanges(result.changes, (done, total, label) =>
         setProgress(`${done} of ${total} - ${label}`)
       )
-      setApplied({ failures, count: countWrites(result.changes) })
+
+      // ForgeFX caches block parameters with no invalidation hook, so a read can
+      // report a value the hardware doesn't hold. Check what actually stuck.
+      setProgress('Checking what landed...')
+      const mismatches = await verifyChanges(result.changes, (done, total, name) =>
+        setProgress(`Verifying ${name} - ${done} of ${total}`)
+      )
+
+      const count = countWrites(result.changes)
+      setApplied({ failures, count, mismatches })
+      record(
+        'write',
+        `Wrote ${count} changes to ${preset?.name || 'the working preset'}`,
+        [
+          ...result.changes.flatMap((c) => [
+            ...(c.typeName ? [`${c.name} model -> ${c.typeName}`] : []),
+            ...c.params.map((p) => `${c.name} - ${p.name} ${p.from} -> ${p.to}${p.unit}`)
+          ]),
+          ...failures,
+          ...mismatches.map((m) => `did not stick: ${m.block} ${m.param} wanted ${m.wanted}, reads ${m.got}`)
+        ]
+      )
       await read()
     } catch (err) {
       setError(err.message)
@@ -117,6 +154,37 @@ export default function App() {
     try {
       await storePreset(number)
       setApplied((prev) => ({ ...prev, savedTo: number }))
+      record('save', `Saved to slot ${number}`)
+      await read()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const jumpTo = async (number) => {
+    setBusy(true)
+    setError(null)
+    try {
+      await selectPreset(number)
+      record('select', `Loaded slot ${number}`)
+      setResult(null)
+      setApplied(null)
+      await read()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const rename = async (name) => {
+    setBusy(true)
+    setError(null)
+    try {
+      await setPresetName(name)
+      record('rename', `Renamed to "${name}"`, ['Not permanent until saved to a slot.'])
       await read()
     } catch (err) {
       setError(err.message)
@@ -136,7 +204,7 @@ export default function App() {
           </h1>
           <p className="tagline">Describe a tone. Get a preset on the unit.</p>
         </div>
-        <p className="silk-label">Phase 2 &middot; generation</p>
+        <p className="silk-label">Phase 3 &middot; control</p>
       </header>
 
       <DeviceBar status={status} device={device} onRetry={read} busy={busy} />
@@ -158,9 +226,11 @@ export default function App() {
 
       {status === 'live' ? (
         <>
+          <PresetBar preset={preset} onSelect={jumpTo} onRename={rename} busy={busy} />
+
           <ToneForm onGenerate={generate} busy={busy} disabled={status !== 'live'} />
 
-          {progress ? <p className="progress mono">{progress}</p> : null}
+          <Thinking message={progress} />
 
           {error ? (
             <div className="notice" data-kind="fault">
@@ -185,6 +255,20 @@ export default function App() {
                     </p>
                   ))
                 : null}
+              {applied.mismatches?.length ? (
+                <>
+                  <p className="mono problem">
+                    {applied.mismatches.length} value
+                    {applied.mismatches.length > 1 ? 's' : ''} read back different from what was
+                    sent:
+                  </p>
+                  {applied.mismatches.map((m, i) => (
+                    <p key={i} className="mono problem">
+                      {m.block} · {m.param} — wanted {m.wanted}, reads {m.got}
+                    </p>
+                  ))}
+                </>
+              ) : null}
               {applied.savedTo === undefined ? (
                 <div className="save-row">
                   <input
@@ -212,6 +296,17 @@ export default function App() {
           />
 
           {preset ? <Grid preset={preset} blocks={blocks} /> : null}
+
+          <Editor
+            blocks={blocks}
+            onWritten={(summary, detail) => {
+              record('edit', summary, detail)
+              read()
+            }}
+            onError={setError}
+          />
+
+          <ChangeLog log={log} onClear={() => setLog([])} />
         </>
       ) : null}
 
