@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { getWireLog, clearWireLog, BUILD } from '../lib/forgefx'
+import { getWireLog, clearWireLog } from '../lib/forgefx'
+import { FULL, BUILT_AT } from '../lib/version'
 import { fromNormalized } from '../lib/scale'
 
 /**
@@ -30,7 +31,9 @@ export default function Diagnostics() {
         <button className="chip" onClick={() => (open ? setOpen(false) : show())}>
           {open ? 'Hide what was sent' : 'What was sent'}
         </button>
-        <span className="hint mono">build {BUILD}</span>
+        <span className="hint mono">
+          {FULL} &middot; built {BUILT_AT} UTC
+        </span>
       </div>
 
       {open ? (

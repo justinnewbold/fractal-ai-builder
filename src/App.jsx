@@ -7,6 +7,7 @@ import Editor from './components/Editor'
 import Diagnostics from './components/Diagnostics'
 import Cost from './components/Cost'
 import { costOf } from './lib/cost'
+import { VERSION, COMMIT, BUILT_AT } from './lib/version'
 import {
   detect,
   currentPreset,
@@ -213,7 +214,13 @@ export default function App() {
           </h1>
           <p className="tagline">Describe a tone. Get a preset on the unit.</p>
         </div>
-        <p className="silk-label">Phase 3 &middot; control</p>
+        <div className="build-badge">
+          <span className="version mono">v{VERSION}</span>
+          <span className="silk-label">Phase 3 &middot; control</span>
+          <span className="build-meta mono" title={`built ${BUILT_AT} UTC`}>
+            {COMMIT}
+          </span>
+        </div>
       </header>
 
       <DeviceBar status={status} device={device} onRetry={read} busy={busy} />
