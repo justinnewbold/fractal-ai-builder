@@ -10,6 +10,7 @@
 //   - /preset/store commits to a slot even when capabilities report supportsSave:false
 
 import { EXCLUDED_BLOCKS, safeParams } from './guardrails'
+import { toNormalized } from './scale'
 
 const DEFAULT_HOST = 'http://localhost:5056'
 
@@ -81,25 +82,29 @@ export const blockParams = (eid) => request(`/preset/blocks/${eid}/params`)
 export const blockTypes = (slug) => request(`/blocks/${slug}/types`)
 
 /**
- * Set one parameter, in the parameter's own units.
+ * Set one parameter.
  *
- * `continuous: false` is load-bearing. ForgeFX has two write paths and the
- * route defaults to the wrong one for us:
+ * `value` is in the parameter's own units — that is what the generator produces
+ * and what the player sees. `param` carries the min/max/log the device reported,
+ * and is required, because the wire format is normalised 0-1 and there is no way
+ * to convert without the range.
  *
- *   continuous  → buildSetParameterContinuous(..., clamp01(value))
- *   discrete    → buildSetParameter(..., value)
- *
- * Continuous is for streaming knob drags: normalised 0-1, fire-and-forget.
- * Omitting the flag sends 7.5 through clamp01 to 1.0, which is full scale — so
- * every value above 1 lands pinned at its maximum. A gain of 7.5 reads 10, a
- * low cut of 80 Hz reads 2000. Discrete takes real units and is confirmed with
- * a rejection watch, which is what a deliberate write wants.
+ * This matters more than it looks: an out-of-range write does not error. It
+ * clamps and returns {"ok":true}. Sending 7.5 for a 0-10 gain pins it at 10 and
+ * reports success.
  */
-export const setParam = (eid, paramId, value) =>
-  request(`/preset/blocks/${eid}/params/${paramId}`, {
+export const setParam = (eid, paramId, value, param) => {
+  const norm = toNormalized(value, param)
+  if (norm === null) {
+    return Promise.reject(
+      new ForgeError(`No range known for parameter ${paramId}; refusing to write a guessed value.`)
+    )
+  }
+  return request(`/preset/blocks/${eid}/params/${paramId}`, {
     method: 'PUT',
-    body: JSON.stringify({ value, continuous: false })
+    body: JSON.stringify({ value: norm, continuous: false })
   })
+}
 
 /** Engage or bypass a block. */
 export const setBypass = (eid, bypassed) =>
@@ -151,6 +156,7 @@ export async function readSchema(blocks, onProgress) {
           value: p.value,
           min: p.min,
           max: p.max,
+          log: !!p.log,
           unit: p.unit || ''
         }))
       )
@@ -201,7 +207,7 @@ export async function applyChanges(changes, onProgress) {
     for (const param of change.params) {
       queue.push({
         label: `${change.name} · ${param.name} → ${param.to}${param.unit}`,
-        run: () => setParam(change.eid, param.id, param.to)
+        run: () => setParam(change.eid, param.id, param.to, param.range)
       })
     }
     if (change.bypassed !== undefined) {

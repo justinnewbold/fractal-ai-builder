@@ -83,7 +83,9 @@ export function validateSpec(spec, schema) {
         name: known_param.name,
         from: known_param.value,
         to: param.value,
-        unit: known_param.unit || ''
+        unit: known_param.unit || '',
+        // carried through to the write, which needs the range to normalise
+        range: { min: known_param.min, max: known_param.max, log: known_param.log }
       })
     }
 

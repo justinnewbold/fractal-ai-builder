@@ -28,11 +28,20 @@ Confirmed on an FM3 running ForgeFX 0.6.29-beta:
 
 - Blocks are addressed by **effect id** (the `page` field), not by slug. The
   server README documents `:slug`; the router actually reads `:eid`.
-- Parameter writes take **real units** — `{"value": 9}` for a gain that runs
-  0–10 — but only on the discrete path. The route defaults `continuous` to
-  `true`, which runs the value through `clamp01` and pins anything above 1 to
-  full scale. **Always send `continuous: false`** for a deliberate write; it
-  also gets you a rejection watch. Omitting it silently maxes every control.
+- **Reads return real units. Writes take normalised 0–1.** The asymmetry isn't
+  documented, and an out-of-range write doesn't error — it clamps and returns
+  `{"ok":true}`. Verified on Amp 1 Gain (range 0–10):
+
+  | sent | reads |
+  | --- | --- |
+  | `0.5` | 5 |
+  | `0.65` | 6.5 |
+  | `42597` | 0 (clamped; raw isn't accepted) |
+
+  So `{"value": 7.5}` for a gain pins it at 10 and reports success. Conversion
+  lives in `src/lib/scale.js` and uses each parameter's own reported range —
+  including `log: true` controls like frequencies, where linear interpolation
+  puts values nowhere near where the device shows them.
 - `/preset/store` **works** even though `/device/detect` reports
   `supportsSave: false`. The capability flag is wrong, not the feature.
 
