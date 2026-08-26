@@ -104,6 +104,10 @@ export const presetBlocks = async () => (mock ? (await tick(), mock.presetBlocks
 export const blockParams = async (eid) =>
   mock ? (await tick(), mock.blockParams(eid)) : request(`/preset/blocks/${eid}/params`)
 
+/** ForgeFX's own reference material for a block family. */
+export const blockHelp = (slug) =>
+  mock ? tick().then(() => null) : request(`/help/blocks/${slug}`)
+
 /** Model roster for a block family, e.g. 'amp' -> 331 amp models. */
 export const blockTypes = async (slug) =>
   mock ? (await tick(), mock.blockTypes(slug)) : request(`/blocks/${slug}/types`)
@@ -363,6 +367,7 @@ export async function readSchema(blocks, onProgress) {
 
   const editable = blocks.filter((b) => !EXCLUDED_BLOCKS.includes(b.slug))
   const typeCache = new Map()
+  const helpCache = new Map()
   const schema = []
 
   for (let i = 0; i < editable.length; i++) {
@@ -397,14 +402,33 @@ export async function readSchema(blocks, onProgress) {
     }
     models = typeCache.get(block.slug)
 
+    // ForgeFX ships reference copy for each block family and each of its
+    // parameters. Without it the generator is inferring what a control does from
+    // its name, which is how "Amp1 Level" got dialled like a tone control.
+    // Stable per family, so it caches with the rosters rather than costing
+    // tokens every run.
+    if (!helpCache.has(block.slug)) {
+      try {
+        helpCache.set(block.slug, await blockHelp(block.slug))
+      } catch {
+        helpCache.set(block.slug, null)
+      }
+    }
+    const help = helpCache.get(block.slug)
+
     schema.push({
       eid: block.effectId,
       name: block.name,
       slug: block.slug,
       bypassed: block.bypassed,
       channel: block.channel,
-      params,
-      models
+      params: params.map((p) => {
+        const blurb = help?.params?.[p.id]
+        const text = typeof blurb === 'string' ? blurb : blurb?.summary || blurb?.text
+        return text ? { ...p, does: text } : p
+      }),
+      models,
+      about: help?.summary || null
     })
   }
 
@@ -698,9 +722,6 @@ export const backupDevice = (label, from = 0, to = 511) =>
         body: JSON.stringify({ label, from, to })
       })
 
-/** ForgeFX's own reference material for a block family. */
-export const blockHelp = (slug) =>
-  mock ? tick().then(() => null) : request(`/help/blocks/${slug}`)
 
 /** Footswitch layout the unit reports. */
 export const fcModel = () => (mock ? tick().then(() => null) : request('/fc/model'))

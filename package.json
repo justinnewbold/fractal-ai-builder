@@ -1,6 +1,6 @@
 {
   "name": "fractal-ai-builder",
-  "version": "2.14.0",
+  "version": "2.15.0",
   "private": true,
   "type": "module",
   "description": "Describe a tone, get a preset written to your Fractal device. Cloud UI over the ForgeFX device API.",
