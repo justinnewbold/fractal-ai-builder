@@ -1395,3 +1395,28 @@ button.chip.more {
     transition: none;
   }
 }
+
+/* ---------- refine and compare ---------- */
+
+.refine,
+.compare {
+  margin-top: 26px;
+}
+
+.refine-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+input.refine-input {
+  flex: 1 1 280px;
+  font-family: var(--body);
+  font-size: 14px;
+}
+
+.compare .notice strong {
+  color: var(--signal);
+  font-weight: 600;
+}

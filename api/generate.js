@@ -111,7 +111,7 @@ export default async function handler(req, res) {
     return
   }
 
-  const { description, device, blocks } = req.body || {}
+  const { description, device, blocks, previous, mode } = req.body || {}
 
   if (!description || typeof description !== 'string') {
     res.status(400).json({ error: 'Describe the tone you want.' })
@@ -151,6 +151,17 @@ export default async function handler(req, res) {
     }))
   }
 
+  // Refining is a different job from designing. The player has heard the tone
+  // and is reacting to it — "too dark", "more bite" — so the previous spec is
+  // the subject and the instruction is an adjustment, not a fresh brief.
+  const task =
+    mode === 'refine' && previous
+      ? `You designed this preset:\n${JSON.stringify(previous)}\n\nThe player has now heard it ` +
+        `and wants a change: ${description}\n\nAdjust it. Return the full spec again, not just ` +
+        `the differences — keep everything that isn't being changed. Make a real, audible move in ` +
+        `the direction asked for rather than a token nudge, but change as little else as possible.`
+      : `Tone wanted: ${description}`
+
   try {
     const { object, usage, providerMetadata } = await generateObject({
       model,
@@ -170,9 +181,7 @@ export default async function handler(req, res) {
             },
             {
               type: 'text',
-              text: `Current state of the loaded preset:\n${JSON.stringify(
-                state
-              )}\n\nTone wanted: ${description}`
+              text: `Current state of the loaded preset:\n${JSON.stringify(state)}\n\n${task}`
             }
           ]
         }
