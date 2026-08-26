@@ -56,8 +56,29 @@ Quit FM3-Edit before starting. Only one program can hold the USB port.
 ## Roadmap
 
 - [x] Phase 1 — device link, live routing grid, catalog grounding
-- [ ] Phase 2 — tone description to validated parameter set
-- [ ] Phase 3 — preset naming, save flow, scenes
+- [x] Phase 2 — tone description to validated parameter set, preview, write, save
+- [ ] Phase 3 — scenes, block placement, preset library
+
+## Generation
+
+Set `ANTHROPIC_API_KEY` in the Vercel project settings. It is read only by the
+serverless function in `api/generate.js` and never reaches the browser.
+`GENERATOR_MODEL` optionally overrides the model.
+
+Nothing generated is trusted. At generation time the app reads the live model
+roster and parameter ranges off the attached unit, hands those to the model as
+the only legal vocabulary, then re-checks every value on the way back in
+`src/lib/validate.js`. A model number that doesn't exist, or a gain of 15 on a
+0–10 control, is dropped and reported rather than written.
+
+Writes are sequential because they all travel down one serial port. Model swaps
+go first, since changing a block's model resets its parameters.
+
+## Browser support
+
+Chrome works. **Safari does not** — it blocks a secure page from calling
+`http://localhost`, which is how the app reaches ForgeFX. Safari users need to
+run the app locally with `npm run dev`.
 
 ## Credits
 
