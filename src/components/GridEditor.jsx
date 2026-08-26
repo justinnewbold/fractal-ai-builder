@@ -30,6 +30,8 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
   const [choice, setChoice] = useState('')
   const [working, setWorking] = useState(null)
   const [probe, setProbe] = useState(null)
+  const [dragging, setDragging] = useState(null)
+  const [over, setOver] = useState(null)
 
   const [palette, setPalette] = useState([])
 
@@ -82,6 +84,49 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
       onError(err.message)
     } finally {
       setWorking(null)
+    }
+  }
+
+  /**
+   * Move a block to another cell.
+   *
+   * Order matters and the safe order isn't obvious. A block instance exists once
+   * — an FM3 has one Amp — so placing it in a second cell while it still
+   * occupies the first may be refused or may do something undefined. Clearing
+   * first avoids asking that question.
+   *
+   * The cost is a window where the block exists nowhere, so its id is held and
+   * put back if the placement fails. Losing a block to a half-finished move
+   * would be a worse bug than refusing the move outright.
+   */
+  const move = async (from, to) => {
+    const block = occupied.get(`${from.row}:${from.col}`)
+    if (!block) return
+    if (occupied.has(`${to.row}:${to.col}`)) {
+      onError('That cell is taken — clear it first.')
+      return
+    }
+
+    setWorking('moving')
+    try {
+      await clearCell(from.row, from.col)
+      const res = await placeBlock(to.row, to.col, block.effectId)
+      if (res?.ok === false) {
+        await placeBlock(from.row, from.col, block.effectId)
+        throw new Error('The unit refused that position — the block was put back.')
+      }
+      onChanged(
+        linear
+          ? `Moved ${block.name} to slot ${to.col}`
+          : `Moved ${block.name} to row ${to.row}, column ${to.col}`
+      )
+      setTarget(null)
+    } catch (err) {
+      onError(err.message)
+    } finally {
+      setWorking(null)
+      setDragging(null)
+      setOver(null)
     }
   }
 
@@ -180,8 +225,32 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
                 key={i}
                 className={`cell-btn ${here ? 'filled' : ''} ${selected ? 'selected' : ''} ${
                   probed ? 'probed' : ''
+                } ${over === `${row}:${col}` ? 'over' : ''} ${
+                  dragging?.row === row && dragging?.col === col ? 'lifting' : ''
                 }`}
                 onClick={() => setTarget({ row, col })}
+                draggable={!!here && !working}
+                onDragStart={(e) => {
+                  setDragging({ row, col })
+                  e.dataTransfer.effectAllowed = 'move'
+                  // Firefox won't start a drag without payload, even unused.
+                  e.dataTransfer.setData('text/plain', `${row}:${col}`)
+                }}
+                onDragEnd={() => {
+                  setDragging(null)
+                  setOver(null)
+                }}
+                onDragOver={(e) => {
+                  if (!dragging || here) return
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                  setOver(`${row}:${col}`)
+                }}
+                onDragLeave={() => setOver((o) => (o === `${row}:${col}` ? null : o))}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  if (dragging && !here) move(dragging, { row, col })
+                }}
                 title={`Row ${row}, column ${col}`}
               >
                 {here ? (
@@ -231,7 +300,31 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
             </>
           )}
 
-          <button className="chip" onClick={() => setTarget(null)}>
+          {occupied.has(`${target.row}:${target.col}`) ? (
+            <button
+              className="chip"
+              onClick={() => setDragging(dragging ? null : { ...target })}
+              disabled={busy || !!working}
+            >
+              {dragging ? 'Cancel move' : 'Move to…'}
+            </button>
+          ) : dragging ? (
+            <button
+              className="primary"
+              onClick={() => move(dragging, target)}
+              disabled={busy || !!working}
+            >
+              {working === 'moving' ? 'Moving…' : 'Move here'}
+            </button>
+          ) : null}
+
+          <button
+            className="chip"
+            onClick={() => {
+              setTarget(null)
+              setDragging(null)
+            }}
+          >
             Cancel
           </button>
         </div>
