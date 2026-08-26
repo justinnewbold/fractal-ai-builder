@@ -9,6 +9,7 @@ import Cost from './components/Cost'
 import Scenes from './components/Scenes'
 import History from './components/History'
 import { CabPicker, Backup, Meters } from './components/Hardware'
+import { Refine, Compare } from './components/Refine'
 import { savePreset } from './lib/history'
 import { costOf } from './lib/cost'
 import { VERSION, COMMIT, BUILT_AT } from './lib/version'
@@ -23,6 +24,8 @@ import {
   storePreset,
   selectPreset,
   setPresetName,
+  setChannel,
+  setScene,
   getHost
 } from './lib/forgefx'
 import { validateSpec, countWrites } from './lib/validate'
@@ -52,6 +55,7 @@ export default function App() {
   const [spend, setSpend] = useState({ total: 0, runs: 0 })
   const [lastPrompt, setLastPrompt] = useState('')
   const [historyKey, setHistoryKey] = useState(0)
+  const [compare, setCompare] = useState(null)
 
   const record = useCallback((kind, summary, detail = []) => {
     setLog((prev) => append(prev, newEntry(kind, summary, detail)))
@@ -84,6 +88,24 @@ export default function App() {
     read()
   }, [read])
 
+  /** One path to the model, so generate, refine and compare can't drift apart. */
+  const requestSpec = async (schema, description, previous) => {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        description,
+        device,
+        blocks: schema,
+        previous: previous || null,
+        mode: previous ? 'refine' : 'design'
+      })
+    })
+    const spec = await res.json()
+    if (!res.ok) throw new Error(spec.error || 'Generation failed.')
+    return spec
+  }
+
   const generate = async (description) => {
     setBusy(true)
     setError(null)
@@ -96,13 +118,7 @@ export default function App() {
       )
 
       setProgress('Designing the preset...')
-      const res = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description, device, blocks: schema })
-      })
-      const spec = await res.json()
-      if (!res.ok) throw new Error(spec.error || 'Generation failed.')
+      const spec = await requestSpec(schema, description)
 
       const validated = validateSpec(spec, schema)
       validated.spec = spec
@@ -274,6 +290,100 @@ export default function App() {
     }
   }
 
+  /**
+   * Adjust the tone that's currently proposed or written.
+   *
+   * Sends the previous spec as the subject rather than a fresh brief, so the
+   * model moves one thing instead of redesigning around a new sentence.
+   */
+  const refine = async (instruction) => {
+    const previous = result?.spec
+    if (!previous) return
+
+    setBusy(true)
+    setError(null)
+    try {
+      setProgress('Reading what the unit has loaded...')
+      const schema = await readSchema(blocks, (done, total, name) =>
+        setProgress(`Reading ${name} - ${done} of ${total}`)
+      )
+
+      setProgress(`Adjusting: ${instruction}`)
+      const spec = await requestSpec(schema, instruction, previous)
+
+      const validated = validateSpec(spec, schema)
+      validated.spec = spec
+      validated.description = instruction
+      setResult(validated)
+      setApplied(null)
+      if (validated.presetName) setSaveName(validated.presetName)
+
+      const runCost = costOf(validated.usage, validated.usage?.model)
+      if (runCost !== null) setSpend((p) => ({ total: p.total + runCost, runs: p.runs + 1 }))
+
+      record('refine', `Adjusted: ${instruction}`, [
+        `${countWrites(validated.changes)} changes proposed`,
+        ...validated.problems
+      ])
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setProgress(null)
+      setBusy(false)
+    }
+  }
+
+  /**
+   * Build two takes and put them on channels A and B.
+   *
+   * Channel first, then the writes — parameter values belong to whichever
+   * channel is active when they land, so switching after would write both
+   * variants onto the same one.
+   */
+  const buildComparison = async (description) => {
+    setBusy(true)
+    setError(null)
+    setCompare(null)
+    try {
+      setProgress('Reading what the unit has loaded...')
+      const schema = await readSchema(blocks, (done, total, name) =>
+        setProgress(`Reading ${name} - ${done} of ${total}`)
+      )
+
+      const withChannels = blocks.filter((b) => b.channel)
+      const takes = []
+
+      for (const [index, channel] of ['A', 'B'].entries()) {
+        setProgress(`Take ${index + 1} of 2 — designing...`)
+        const spec = await requestSpec(schema, description)
+        const validated = validateSpec(spec, schema)
+
+        setProgress(`Take ${index + 1} of 2 — switching to channel ${channel}...`)
+        for (const block of withChannels) await setChannel(block.effectId, channel)
+
+        setProgress(`Take ${index + 1} of 2 — writing to channel ${channel}...`)
+        await applyChanges(validated.changes, (done, total, label) =>
+          setProgress(`Take ${index + 1} · ${done} of ${total} - ${label}`)
+        )
+
+        takes.push(validated.summary || validated.presetName || `Take ${index + 1}`)
+
+        const runCost = costOf(validated.usage, validated.usage?.model)
+        if (runCost !== null) setSpend((p) => ({ total: p.total + runCost, runs: p.runs + 1 }))
+      }
+
+      await setScene(0)
+      setCompare({ done: true, a: takes[0], b: takes[1] })
+      record('compare', `Built two takes of "${description}" on channels A and B`, takes)
+      await read()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setProgress(null)
+      setBusy(false)
+    }
+  }
+
   const writeCount = result ? countWrites(result.changes) : 0
 
   return (
@@ -419,6 +529,10 @@ export default function App() {
             <Cost usage={result.usage} sessionTotal={spend.total} runs={spend.runs} />
           ) : null}
 
+          {result ? (
+            <Refine onRefine={refine} busy={busy} disabled={status !== 'live'} />
+          ) : null}
+
           <Preview
             result={result}
             writeCount={writeCount}
@@ -447,6 +561,14 @@ export default function App() {
               read()
             }}
             onError={setError}
+          />
+
+          <Compare
+            onCompare={buildComparison}
+            state={compare}
+            onClear={() => setCompare(null)}
+            busy={busy}
+            disabled={status !== 'live'}
           />
 
           <CabPicker
