@@ -31,13 +31,13 @@ export default function Diagnostics() {
       `${FULL} — built ${BUILT_AT} UTC`,
       `${current.length} writes`,
       '',
-      'parameter | wanted | sent | means | range',
+      'parameter | wanted | sent | means | range | encoding',
       ...current.map((r) => {
         const means = r.sent === null || !r.range ? '—' : round4(fromNormalized(r.sent, r.range))
         const range = r.range
           ? `${r.range.min}–${r.range.max}${r.range.log ? ' log' : ''}${r.outOfRange ? ' OUTSIDE' : ''}`
           : 'NO RANGE'
-        return `${r.name || '#' + r.paramId} | ${r.wanted} | ${r.sent === null ? 'refused' : round4(r.sent)} | ${means} | ${range}`
+        return `${r.name || '#' + r.paramId} | ${r.wanted} | ${r.sent === null ? 'refused' : round4(r.sent)} | ${means} | ${range} | ${r.continuous ? 'cont' : 'disc'}`
       })
     ]
     try {
@@ -99,6 +99,7 @@ export default function Diagnostics() {
                 <span>Sent</span>
                 <span>Means</span>
                 <span>Range</span>
+                <span>Enc</span>
               </div>
               {rows.map((row, i) => {
                 const extreme =
@@ -118,6 +119,7 @@ export default function Diagnostics() {
                           }`
                         : 'no range'}
                     </span>
+                    <span className="diag-range">{row.continuous ? 'cont' : 'disc'}</span>
                   </div>
                 )
               })}

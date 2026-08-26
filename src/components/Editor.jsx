@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { blockParams, blockTypes, setParam, setType, setBypass } from '../lib/forgefx'
+import { blockParams, blockTypes, setParamConfirmed, setType, setBypass } from '../lib/forgefx'
 import { isSilencingParam } from '../lib/guardrails'
 
 /**
@@ -87,7 +87,8 @@ export default function Editor({ blocks, onWritten, onError }) {
       }
       for (const change of pending) {
         const meta = params.find((x) => x.id === change.id)
-        await setParam(openEid, change.id, change.to, meta)
+        const res = await setParamConfirmed(openEid, change.id, change.to, meta)
+        if (!res.ok) detail.push(`${change.name} — device ignored both write encodings`)
         detail.push(`${active.name} · ${change.name} ${round(change.from)} → ${round(change.to)}${change.unit}`)
       }
       onWritten(`Edited ${active.name} by hand`, detail)

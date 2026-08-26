@@ -6,6 +6,7 @@ import { PresetBar, ChangeLog, Thinking } from './components/PresetBar'
 import Editor from './components/Editor'
 import Diagnostics from './components/Diagnostics'
 import Cost from './components/Cost'
+import Scenes from './components/Scenes'
 import { costOf } from './lib/cost'
 import { VERSION, COMMIT, BUILT_AT } from './lib/version'
 import {
@@ -225,7 +226,7 @@ export default function App() {
         </div>
         <div className="build-badge">
           <span className="version mono">v{VERSION}</span>
-          <span className="silk-label">Phase 3 &middot; control</span>
+          <span className="silk-label">Phase 4 &middot; depth</span>
           <span className="build-meta mono" title={`built ${BUILT_AT} UTC`}>
             {COMMIT}
           </span>
@@ -346,6 +347,17 @@ export default function App() {
           />
 
           {preset ? <Grid preset={preset} blocks={blocks} /> : null}
+
+          <Scenes
+            blocks={blocks}
+            count={device?.capabilities?.sceneCount || 8}
+            busy={busy}
+            onChanged={(summary) => {
+              record('scene', summary)
+              read()
+            }}
+            onError={setError}
+          />
 
           <Editor
             blocks={blocks}
