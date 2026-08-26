@@ -1048,3 +1048,39 @@ button.chip.active {
   max-width: 66ch;
   line-height: 1.55;
 }
+
+/* ---------- cost ---------- */
+
+.cost {
+  margin-top: 20px;
+  padding: 13px 16px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--live);
+  border-radius: 3px;
+}
+
+.cost-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.cost-figure {
+  font-size: 19px;
+  color: var(--live);
+}
+
+.cost-detail {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--silk-faint);
+}
+
+.cost-note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--silk-faint);
+  max-width: 56ch;
+}

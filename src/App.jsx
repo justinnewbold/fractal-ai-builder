@@ -5,6 +5,8 @@ import { ToneForm, Preview } from './components/Generate'
 import { PresetBar, ChangeLog, Thinking } from './components/PresetBar'
 import Editor from './components/Editor'
 import Diagnostics from './components/Diagnostics'
+import Cost from './components/Cost'
+import { costOf } from './lib/cost'
 import {
   detect,
   currentPreset,
@@ -40,6 +42,7 @@ export default function App() {
   const [applied, setApplied] = useState(null)
   const [slot, setSlot] = useState('')
   const [log, setLog] = useState([])
+  const [spend, setSpend] = useState({ total: 0, runs: 0 })
 
   const record = useCallback((kind, summary, detail = []) => {
     setLog((prev) => append(prev, newEntry(kind, summary, detail)))
@@ -94,6 +97,11 @@ export default function App() {
 
       const validated = validateSpec(spec, schema)
       setResult(validated)
+
+      const runCost = costOf(validated.usage, validated.usage?.model)
+      if (runCost !== null) {
+        setSpend((prev) => ({ total: prev.total + runCost, runs: prev.runs + 1 }))
+      }
       record('generate', `Designed "${validated.presetName || 'untitled'}" from: ${description}`, [
         `${countWrites(validated.changes)} changes proposed`,
         ...validated.problems
@@ -298,6 +306,10 @@ export default function App() {
                 </div>
               ) : null}
             </div>
+          ) : null}
+
+          {result?.usage ? (
+            <Cost usage={result.usage} sessionTotal={spend.total} runs={spend.runs} />
           ) : null}
 
           <Preview

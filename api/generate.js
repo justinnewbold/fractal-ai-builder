@@ -27,6 +27,8 @@ import { z } from 'zod'
  * Set ANTHROPIC_API_KEY for the direct path, or AI_GATEWAY_API_KEY (with
  * credit on the account) for the gateway.
  */
+const MODEL_NAME = process.env.GENERATOR_MODEL || 'claude-sonnet-5'
+
 function resolveModel() {
   if (process.env.ANTHROPIC_API_KEY) {
     const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -135,7 +137,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { object } = await generateObject({
+    const { object, usage } = await generateObject({
       model,
       schema: PresetSpec,
       schemaName: 'preset_spec',
@@ -145,7 +147,18 @@ export default async function handler(req, res) {
       )}`
     })
 
-    res.status(200).json(object)
+    // Token counts come back to the browser so the app can price the run. The
+    // input side is dominated by the model roster and block schema, which grow
+    // with the preset — worth seeing rather than assuming.
+    res.status(200).json({
+      ...object,
+      _usage: {
+        inputTokens: usage?.inputTokens ?? null,
+        outputTokens: usage?.outputTokens ?? null,
+        cachedInputTokens: usage?.cachedInputTokens ?? null,
+        model: typeof model === 'string' ? model : model?.modelId || MODEL_NAME
+      }
+    })
   } catch (err) {
     res.status(502).json({ error: `Generation failed: ${err.message}` })
   }

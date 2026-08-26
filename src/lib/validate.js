@@ -96,6 +96,7 @@ export function validateSpec(spec, schema) {
   }
 
   return {
+    usage: spec._usage || null,
     presetName: sanitizeName(spec.presetName),
     summary: typeof spec.summary === 'string' ? spec.summary : '',
     notes: typeof spec.notes === 'string' ? spec.notes : '',
