@@ -142,11 +142,16 @@ depends on pickups and room rather than on a text description. See
 Each generation is priced from the token counts the API returns and shown next
 to the result, with a running session total. Rates live in `src/lib/cost.js`.
 
-The input side is dominated by the model roster and the parameter schema for
-every placed block, so cost scales with how much of the preset gets sent — a
-larger preset is a more expensive run. Cached input reads bill at a tenth of
-the base rate; the roster is stable between runs and is the obvious candidate
-for prompt caching later.
+The request is split in two because the halves have very different lifetimes.
+Model rosters are around 11k tokens and identical on every run; parameter values
+and bypass states change constantly. Rosters go in their own content part marked
+for caching and sorted by slug so the text is byte-identical between runs and
+actually hits.
+
+Cached reads bill at a tenth of base, so after the first run of a session the
+bulk of the input is nearly free. The first run pays a write premium — the cost
+panel says so rather than looking like a regression. Measured live: a second
+identical run served 26,944 of 26,968 input tokens from cache.
 
 A model with no published rate on file shows a blank rather than a guess.
 

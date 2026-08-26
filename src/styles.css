@@ -1297,3 +1297,7 @@ button.history-title:hover {
   margin-top: 10px;
   max-width: 64ch;
 }
+
+.cost-saved {
+  color: var(--live);
+}

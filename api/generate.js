@@ -122,7 +122,23 @@ export default async function handler(req, res) {
     return
   }
 
-  const context = {
+  // The request splits in two because the halves have very different lifetimes.
+  //
+  // Model rosters are ~80% of the payload and identical on every run — the amp
+  // roster alone is around 11k tokens. Parameter values and bypass states change
+  // constantly. Sending them as one blob means paying full price for the same
+  // 11k tokens every generation.
+  //
+  // So rosters go in their own content part marked for caching, sorted by slug
+  // so the text is byte-identical between runs and actually hits. Cached reads
+  // bill at a tenth of base. The first run of a session pays a small write
+  // premium; every run after is much cheaper.
+  const rosters = {}
+  for (const block of [...blocks].sort((a, b) => a.slug.localeCompare(b.slug))) {
+    if (block.models?.length && !rosters[block.slug]) rosters[block.slug] = block.models
+  }
+
+  const state = {
     device: device?.name || 'FM3',
     grid: device?.capabilities?.grid,
     blocks: blocks.map((b) => ({
@@ -131,21 +147,39 @@ export default async function handler(req, res) {
       slug: b.slug,
       currentlyBypassed: b.bypassed,
       channel: b.channel,
-      models: b.models,
       params: b.params
     }))
   }
 
   try {
-    const { object, usage } = await generateObject({
+    const { object, usage, providerMetadata } = await generateObject({
       model,
       schema: PresetSpec,
       schemaName: 'preset_spec',
       system: SYSTEM,
-      prompt: `Tone wanted: ${description}\n\nWhat's on the unit right now:\n${JSON.stringify(
-        context
-      )}`
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: `Models available on this unit, by block family. The numeric "value" is what you must use when changing a model:\n${JSON.stringify(
+                rosters
+              )}`,
+              providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } }
+            },
+            {
+              type: 'text',
+              text: `Current state of the loaded preset:\n${JSON.stringify(
+                state
+              )}\n\nTone wanted: ${description}`
+            }
+          ]
+        }
+      ]
     })
+
+    const anthropicMeta = providerMetadata?.anthropic || {}
 
     // Token counts come back to the browser so the app can price the run. The
     // input side is dominated by the model roster and block schema, which grow
@@ -155,7 +189,19 @@ export default async function handler(req, res) {
       _usage: {
         inputTokens: usage?.inputTokens ?? null,
         outputTokens: usage?.outputTokens ?? null,
-        cachedInputTokens: usage?.cachedInputTokens ?? null,
+        // Reported in different places depending on provider and SDK version.
+        // Verified live: the gateway returns inputTokenDetails.cacheReadTokens,
+        // while the Anthropic provider reports cacheReadInputTokens in metadata.
+        // inputTokens is the total and already includes the cached portion.
+        cachedInputTokens:
+          usage?.cachedInputTokens ??
+          usage?.inputTokenDetails?.cacheReadTokens ??
+          anthropicMeta.cacheReadInputTokens ??
+          null,
+        cacheWriteTokens:
+          usage?.inputTokenDetails?.cacheWriteTokens ??
+          anthropicMeta.cacheCreationInputTokens ??
+          null,
         model: typeof model === 'string' ? model : model?.modelId || MODEL_NAME
       }
     })
