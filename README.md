@@ -29,7 +29,10 @@ Confirmed on an FM3 running ForgeFX 0.6.29-beta:
 - Blocks are addressed by **effect id** (the `page` field), not by slug. The
   server README documents `:slug`; the router actually reads `:eid`.
 - Parameter writes take **real units** — `{"value": 9}` for a gain that runs
-  0–10, not a normalised 0–1.
+  0–10 — but only on the discrete path. The route defaults `continuous` to
+  `true`, which runs the value through `clamp01` and pins anything above 1 to
+  full scale. **Always send `continuous: false`** for a deliberate write; it
+  also gets you a rejection watch. Omitting it silently maxes every control.
 - `/preset/store` **works** even though `/device/detect` reports
   `supportsSave: false`. The capability flag is wrong, not the feature.
 

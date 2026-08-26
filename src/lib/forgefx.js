@@ -80,11 +80,25 @@ export const blockParams = (eid) => request(`/preset/blocks/${eid}/params`)
 /** Model roster for a block family, e.g. 'amp' -> 331 amp models. */
 export const blockTypes = (slug) => request(`/blocks/${slug}/types`)
 
-/** Set one parameter. `value` is in the parameter's own units (see its min/max). */
+/**
+ * Set one parameter, in the parameter's own units.
+ *
+ * `continuous: false` is load-bearing. ForgeFX has two write paths and the
+ * route defaults to the wrong one for us:
+ *
+ *   continuous  → buildSetParameterContinuous(..., clamp01(value))
+ *   discrete    → buildSetParameter(..., value)
+ *
+ * Continuous is for streaming knob drags: normalised 0-1, fire-and-forget.
+ * Omitting the flag sends 7.5 through clamp01 to 1.0, which is full scale — so
+ * every value above 1 lands pinned at its maximum. A gain of 7.5 reads 10, a
+ * low cut of 80 Hz reads 2000. Discrete takes real units and is confirmed with
+ * a rejection watch, which is what a deliberate write wants.
+ */
 export const setParam = (eid, paramId, value) =>
   request(`/preset/blocks/${eid}/params/${paramId}`, {
     method: 'PUT',
-    body: JSON.stringify({ value })
+    body: JSON.stringify({ value, continuous: false })
   })
 
 /** Engage or bypass a block. */
