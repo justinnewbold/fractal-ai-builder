@@ -216,7 +216,7 @@ export default function App() {
       setResult(validated)
       setLastPrompt(description)
 
-      if (validated.presetName) setSaveName(validated.presetName)
+      setSaveName(validated.presetName || preset?.name?.trim() || '')
 
       const runCost = costOf(validated.usage, validated.usage?.model)
       if (runCost !== null) {
@@ -262,6 +262,18 @@ export default function App() {
       const mismatches = await verifyChanges(result.changes, (done, total, name) =>
         setProgress(`Verifying ${name} - ${done} of ${total}`)
       )
+
+      // Name it now rather than at save. The name is part of the preset in the
+      // edit buffer, so writing it here means the unit's screen shows what was
+      // just built — which is also the quickest confirmation the write landed.
+      const generatedName = (saveName || result.presetName || '').trim()
+      if (generatedName && generatedName !== preset?.name?.trim()) {
+        try {
+          await setPresetName(generatedName)
+        } catch {
+          // A device that refuses renames still gets the parameter changes.
+        }
+      }
 
       const count = countWrites(result.changes)
       setApplied({ failures, count, mismatches })
@@ -424,7 +436,7 @@ export default function App() {
       validated.description = instruction
       setResult(validated)
       setApplied(null)
-      if (validated.presetName) setSaveName(validated.presetName)
+      setSaveName(validated.presetName || preset?.name?.trim() || '')
 
       const runCost = costOf(validated.usage, validated.usage?.model)
       if (runCost !== null) setSpend((p) => ({ total: p.total + runCost, runs: p.runs + 1 }))
