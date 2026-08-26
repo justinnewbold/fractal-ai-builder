@@ -206,6 +206,22 @@ same reason: a threshold set too high mutes quiet playing, and the safe value
 depends on pickups and room rather than on a text description. See
 `src/lib/guardrails.js`.
 
+## Asking for changes
+
+`/api/command` takes an instruction in words — "move the drive before the amp",
+"turn up the gain a little and cut the bass" — and returns an ordered list of
+actions covering everything a player can do by hand: parameters, models, bypass,
+channels, block placement and moves, per-scene states, tempo and naming.
+
+The model chooses actions; it does not perform them. Every id is checked against
+what the device reported, every value against its real range, and the plan is
+shown before anything is written.
+
+Ordering is enforced in `src/lib/actions.js` rather than trusted from the model.
+Structure has to settle before the values that depend on it, and a model swap
+resets that block's parameters — a plan that sets gain and then swaps the amp
+silently discards the gain.
+
 ## Cost
 
 Each generation is priced from the token counts the API returns and shown next
