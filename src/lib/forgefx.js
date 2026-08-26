@@ -984,3 +984,53 @@ export async function setSceneBlock(sceneIndex, eid, { bypassed, channel } = {})
   }
   return { ok: true }
 }
+
+
+/**
+ * Serial and MIDI connections ForgeFX can see, with Fractal units flagged.
+ *
+ * Worth having when more than one unit is around: switching between an FM3 and
+ * an AM4 otherwise means stopping the server, swapping the cable and starting
+ * again.
+ */
+export const listPorts = () =>
+  mock ? tick().then(() => mock.ports()) : request('/ports')
+
+/**
+ * Choose which connection to talk to.
+ *
+ * `id` null clears back to auto-detect. `model` forces a device profile —
+ * useful when detection guesses wrong, and something to leave alone otherwise,
+ * since a forced profile that doesn't match the hardware writes frames the unit
+ * will refuse.
+ */
+export const selectPort = ({ transport = 'serial', id = null, inId, outId, model } = {}) =>
+  mock
+    ? tick().then(() => ({ ok: true }))
+    : request('/ports/select', {
+        method: 'POST',
+        body: JSON.stringify({ transport, id, inId, outId, model })
+      })
+
+/**
+ * Whether this page is being served from ForgeFX itself.
+ *
+ * It matters for reaching the server from another device. A browser lets an
+ * HTTPS page call http://localhost — that exemption is why the hosted app works
+ * on the machine with the cable — but it does not extend to a LAN address. So a
+ * phone loading the hosted app cannot reach http://10.0.0.x:5056 at all.
+ *
+ * Served from ForgeFX over plain HTTP, everything is same-origin and the phone
+ * works. This is the check that lets the UI explain that rather than leaving
+ * someone to discover it on stage.
+ */
+export function servedLocally() {
+  if (typeof window === 'undefined') return false
+  const here = window.location
+  if (here.protocol !== 'http:') return false
+  return getHost().includes(here.hostname)
+}
+
+export function pageIsSecure() {
+  return typeof window !== 'undefined' && window.location.protocol === 'https:'
+}

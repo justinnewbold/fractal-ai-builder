@@ -293,11 +293,28 @@ real failure, including the device's own reported norm values used as fixtures �
 71.999 Hz reads `norm 0.42866` on a 10–1000 log range, and the conversion has to
 agree.
 
-## Browser support
+## Browser support, and using it from a phone
 
 Chrome works. **Safari does not** — it blocks a secure page from calling
-`http://localhost`, which is how the app reaches ForgeFX. Safari users need to
-run the app locally with `npm run dev`.
+`http://localhost`, which is how the app reaches ForgeFX.
+
+The same rule is why the hosted app can't be used from a phone. Browsers make an
+exception letting an HTTPS page call `http://localhost` — that exemption is the
+only reason the hosted app works at all — and it does not extend to a LAN
+address. So a phone loading the hosted URL cannot reach ForgeFX on your Mac, and
+no app-side work changes that.
+
+ForgeFX can serve the app itself, which makes everything same-origin and
+sidesteps the rule:
+
+```bash
+npm run build
+FORGEFX_STATIC=/path/to/fractal-ai-builder/dist npm run dev   # in ForgeFX/server
+```
+
+Then browse to `http://<your-machine-ip>:5056` from the phone. Gig mode works
+from there. `/remote/enable` looks like it should help and doesn't — it belongs
+to Axis's cloud relay and returns 503 in the plain server runtime.
 
 ## Credits
 

@@ -17,6 +17,7 @@ import { Modifiers, SceneMatrix, TempoTuner } from './components/Modifiers'
 import { Versions, DeviceBackup } from './components/Versions'
 import Footswitches from './components/Footswitches'
 import GridEditor from './components/GridEditor'
+import Ports from './components/Ports'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
 import {
   getTempo,
@@ -1076,6 +1077,15 @@ export default function App() {
           device?.capabilities?.telemetry?.outputMeters !== false ? (
             <Meters active={status === 'live'} />
           ) : null}
+
+          <Ports
+            busy={busy}
+            onError={setError}
+            onChanged={(summary) => {
+              record('port', summary)
+              read()
+            }}
+          />
 
           {device?.capabilities?.fc?.model !== false ? (
             <Footswitches onError={setError} />
