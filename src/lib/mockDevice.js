@@ -326,6 +326,16 @@ export function createMockDevice() {
 
     bindModifier: () => ({ ok: true }),
 
+    sceneStateNow: () =>
+      state.blocks
+        .filter((b) => !['input', 'output'].includes(b.slug))
+        .map((b) => ({
+          effectId: b.effectId,
+          bypassed:
+            state.scene === 0 ? b.bypassed : (b.effectId + state.scene) % 3 === 0,
+          channel: b.channel
+        })),
+
     sceneState: () => ({
       scenes: state.sceneNames.map((name, i) => ({
         index: i,

@@ -657,7 +657,7 @@ export const bindModifier = (slot, targetEffectId, targetParam, source) =>
 
 /** Which blocks are engaged in each scene, and on which channel. */
 export const sceneState = () =>
-  mock ? tick().then(() => mock.sceneState()) : request('/preset/scene-state')
+  mock ? tick().then(() => mock.sceneStateNow()) : request('/preset/scene-state')
 
 /** Preset tempo in BPM. Delays and modulation sync to it. */
 export const getTempo = () => (mock ? tick().then(() => mock.tempo()) : request('/tempo'))
@@ -923,4 +923,64 @@ export async function readSceneNames(number) {
   }
 
   return []
+}
+
+
+/**
+ * Read what every scene does, by visiting each one.
+ *
+ * There's no query for "scene 3's state" — sceneState() reports the scene that
+ * is currently active. So building a picture of all of them means switching to
+ * each in turn and reading, then returning to where you started.
+ *
+ * That is audible. Every switch changes the sound coming out of the amp, which
+ * is fine at a bench and not fine mid-song, so callers warn before doing it.
+ */
+export async function readAllScenes(count, onProgress) {
+  const started = (await getScene())?.index ?? 0
+  const scenes = []
+
+  try {
+    for (let i = 0; i < count; i++) {
+      onProgress?.(i + 1, count)
+      await setScene(i)
+      // The unit needs a moment to settle before its state reads back true.
+      await new Promise((r) => setTimeout(r, 90))
+      let blocks = []
+      try {
+        blocks = (await sceneState()) || []
+      } catch {
+        // A device without per-scene state reporting yields an empty row rather
+        // than aborting the whole walk.
+      }
+      scenes.push({ index: i, blocks })
+    }
+  } finally {
+    // Always come back, even if a read threw. Leaving someone on scene 6
+    // because a query failed would be its own bug.
+    await setScene(started).catch(() => {})
+  }
+
+  return { scenes, returnedTo: started }
+}
+
+/**
+ * Change what a block does in one particular scene.
+ *
+ * Bypass and channel are per-scene on this hardware — that IS what a scene is —
+ * so setting them means being in that scene when the write lands.
+ */
+export async function setSceneBlock(sceneIndex, eid, { bypassed, channel } = {}) {
+  const started = (await getScene())?.index ?? 0
+  try {
+    if (started !== sceneIndex) {
+      await setScene(sceneIndex)
+      await new Promise((r) => setTimeout(r, 90))
+    }
+    if (typeof bypassed === 'boolean') await setBypass(eid, bypassed)
+    if (channel) await setChannel(eid, channel)
+  } finally {
+    if (started !== sceneIndex) await setScene(started).catch(() => {})
+  }
+  return { ok: true }
 }

@@ -2621,3 +2621,47 @@ input.preset-filter {
 .scene-title.unnamed {
   color: var(--silk-faint);
 }
+
+/* ---------- scene matrix cells ---------- */
+
+button.dot-btn {
+  padding: 5px;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  line-height: 0;
+}
+
+button.dot-btn:hover:not(:disabled) {
+  background: var(--panel-hi);
+  border: none;
+}
+
+button.dot-btn:disabled {
+  opacity: 0.3;
+}
+
+button.dot-btn.busy .dot {
+  animation: pulse 700ms ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+button.dot-btn.on .dot {
+  background: var(--signal);
+  border-color: var(--signal);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button.dot-btn.busy .dot {
+    animation: none;
+  }
+}

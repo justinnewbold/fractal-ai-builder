@@ -1011,7 +1011,17 @@ export default function App() {
             }}
           />
 
-          <SceneMatrix onError={setError} />
+          <SceneMatrix
+            blocks={blocks}
+            count={device?.capabilities?.sceneCount || 8}
+            names={sceneNames}
+            busy={busy}
+            onError={setError}
+            onChanged={(summary) => {
+              record('scene', summary)
+              setDirty(true)
+            }}
+          />
 
           <TempoTuner
             busy={busy}

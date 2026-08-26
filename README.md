@@ -124,6 +124,18 @@ model built from that hardware, and says in the summary which one it matched. If
 nothing in the roster is a close counterpart it says so, because a player who
 knows the reference would rather hear that than be handed a substitute.
 
+### Scenes can only be read by visiting them
+
+A scene isn't a saved set of values — it's which blocks are engaged and which
+channel each is on. `GET /preset/scene-state` reports the scene that is
+*currently active*; there is no query for a scene you aren't in.
+
+So the scene map is built by switching to each scene, reading, and returning to
+where you started. That is audible, which is why it happens on request rather
+than on load, and why editing a cell announces that it will switch. It always
+returns to the starting scene, including when a read throws — leaving someone on
+scene 6 because a query failed would be its own bug.
+
 ### Discrete selectors are not knobs
 
 `GET /preset/blocks/{eid}/params` returns `enums` alongside `named`. Enums carry

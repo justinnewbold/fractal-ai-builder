@@ -146,69 +146,134 @@ export function Modifiers({ blocks, onError, onChanged, busy }) {
 }
 
 /**
- * Which blocks are on in each scene.
+ * Per-scene editing.
  *
- * Scenes were switchable but opaque — you could jump to scene 4 without knowing
- * what it does. This is the grid that makes "one preset covers the whole set"
- * legible: eight columns, one row per block, engaged or not.
+ * A scene isn't a saved set of values — it's which blocks are engaged and which
+ * channel each is on. Eight of those per preset is how one preset covers a
+ * whole set, and until now they were switchable but not editable.
+ *
+ * Reading them means visiting each scene, because there's no query for a scene
+ * you aren't in. That's audible, so it happens on request rather than on load.
  */
-export function SceneMatrix({ onError }) {
-  const [state, setState] = useState(null)
-  const [open, setOpen] = useState(false)
+export function SceneMatrix({ blocks, count = 8, names = [], onError, onChanged, busy }) {
+  const [scenes, setScenes] = useState(null)
+  const [reading, setReading] = useState(null)
+  const [writing, setWriting] = useState(null)
+
+  const editable = blocks.filter((b) => !['input', 'output'].includes(b.slug))
 
   const load = async () => {
+    setReading({ done: 0, total: count })
     try {
-      const res = await sceneState()
-      setState(res?.error ? null : res)
-      setOpen(true)
+      const { readAllScenes } = await import('../lib/forgefx')
+      const res = await readAllScenes(count, (done, total) => setReading({ done, total }))
+      setScenes(res.scenes)
     } catch (err) {
       onError(err.message)
+    } finally {
+      setReading(null)
     }
   }
 
-  const scenes = state?.scenes || []
-  const blockRows = scenes[0]?.blocks || []
+  const toggle = async (sceneIndex, block, currentlyBypassed) => {
+    const key = `${sceneIndex}:${block.effectId}`
+    setWriting(key)
+    try {
+      const { setSceneBlock } = await import('../lib/forgefx')
+      await setSceneBlock(sceneIndex, block.effectId, { bypassed: !currentlyBypassed })
+
+      setScenes((prev) =>
+        prev.map((scene) =>
+          scene.index !== sceneIndex
+            ? scene
+            : {
+                ...scene,
+                blocks: scene.blocks.map((b) =>
+                  b.effectId === block.effectId ? { ...b, bypassed: !currentlyBypassed } : b
+                )
+              }
+        )
+      )
+      onChanged(
+        `${block.name} ${!currentlyBypassed ? 'off' : 'on'} in scene ${sceneIndex + 1}`
+      )
+    } catch (err) {
+      onError(err.message)
+    } finally {
+      setWriting(null)
+    }
+  }
+
+  const stateFor = (sceneIndex, eid) =>
+    scenes?.find((s) => s.index === sceneIndex)?.blocks.find((b) => b.effectId === eid)
 
   return (
     <section className="scene-matrix">
-      <div className="log-head">
-        <button className="chip" onClick={() => (open ? setOpen(false) : load())}>
-          {open ? 'Hide scene map' : 'Scene map'}
-        </button>
+      <div className="history-head">
+        <p className="silk-label">Scene map</p>
+        <div className="history-actions">
+          <button className="chip" onClick={load} disabled={busy || !!reading}>
+            {reading ? `Reading scene ${reading.done} of ${reading.total}…` : scenes ? 'Re-read' : 'Read scenes'}
+          </button>
+        </div>
       </div>
 
-      {open && scenes.length ? (
-        <div className="grid-scroll">
-          <table className="matrix">
-            <thead>
-              <tr>
-                <th className="silk-label">Block</th>
-                {scenes.map((s) => (
-                  <th key={s.index} className="silk-label" title={s.name}>
-                    {s.index + 1}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {blockRows.map((row, i) => (
-                <tr key={row.eid}>
-                  <td className="matrix-name">{row.name}</td>
-                  {scenes.map((s) => {
-                    const cell = s.blocks[i]
-                    return (
-                      <td key={s.index}>
-                        <span className={`dot ${cell?.bypassed ? '' : 'on'}`} />
-                      </td>
-                    )
-                  })}
+      {!scenes && !reading ? (
+        <p className="hint">
+          Reading the map visits each scene in turn — there&rsquo;s no way to ask about a scene
+          you&rsquo;re not in, so you&rsquo;ll hear it switch. It returns to where you started.
+        </p>
+      ) : null}
+
+      {scenes ? (
+        <>
+          <div className="grid-scroll">
+            <table className="matrix">
+              <thead>
+                <tr>
+                  <th className="silk-label">Block</th>
+                  {scenes.map((s) => (
+                    <th key={s.index} className="silk-label" title={names[s.index] || ''}>
+                      {s.index + 1}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : open ? (
-        <p className="hint">This unit didn&rsquo;t return per-scene state.</p>
+              </thead>
+              <tbody>
+                {editable.map((block) => (
+                  <tr key={block.effectId}>
+                    <td className="matrix-name">{block.name}</td>
+                    {scenes.map((s) => {
+                      const cell = stateFor(s.index, block.effectId)
+                      const on = cell ? !cell.bypassed : false
+                      const key = `${s.index}:${block.effectId}`
+                      return (
+                        <td key={s.index}>
+                          <button
+                            className={`dot-btn ${on ? 'on' : ''} ${writing === key ? 'busy' : ''}`}
+                            onClick={() => toggle(s.index, block, !on)}
+                            disabled={busy || !!writing || !cell}
+                            aria-label={`${block.name} in scene ${s.index + 1}: ${
+                              on ? 'engaged' : 'bypassed'
+                            }`}
+                            title={cell ? (on ? 'Engaged' : 'Bypassed') : 'No state reported'}
+                          >
+                            <span className="dot" />
+                          </button>
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="hint">
+            Click a dot to turn a block on or off in that scene. Each change switches to that
+            scene to write, then switches back &mdash; so you&rsquo;ll hear it.
+          </p>
+        </>
       ) : null}
     </section>
   )
