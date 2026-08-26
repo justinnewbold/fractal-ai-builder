@@ -256,6 +256,18 @@ export function createMockDevice() {
           level: Math.random() * 0.7 + 0.15
         })),
 
+    ports: () => ({
+      serial: [
+        { id: '/dev/cu.usbmodem1104', fractal: true, model: 'FM3' },
+        { id: '/dev/cu.usbmodem2201', fractal: true, model: 'AM4' },
+        { id: '/dev/cu.Bluetooth-Incoming-Port', fractal: false }
+      ],
+      midiIn: [],
+      midiOut: [],
+      chosen: { transport: 'serial', id: '/dev/cu.usbmodem1104' },
+      override: null
+    }),
+
     blockCatalog: () =>
       LAYOUT.filter((l) => !['input', 'output'].includes(l.slug)).map((l) => ({
         slug: l.slug,

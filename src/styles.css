@@ -2665,3 +2665,55 @@ button.dot-btn.on .dot {
     animation: none;
   }
 }
+
+/* ---------- connection ---------- */
+
+.ports {
+  margin-top: 30px;
+}
+
+.port-list {
+  margin-top: 8px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+button.port-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: none;
+  border-bottom: 1px solid var(--rule);
+  border-left: 2px solid transparent;
+  border-radius: 0;
+}
+
+button.port-row:last-child {
+  border-bottom: none;
+}
+
+button.port-row.current {
+  border-left-color: var(--live);
+}
+
+.port-model {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+button.port-row.current .port-model {
+  color: var(--live);
+}
+
+.port-id {
+  font-size: 10.5px;
+  color: var(--silk-faint);
+}
