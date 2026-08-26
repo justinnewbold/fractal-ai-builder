@@ -150,6 +150,34 @@ for prompt caching later.
 
 A model with no published rate on file shows a blank rather than a guess.
 
+## Demo mode
+
+There's a simulated FM3 built from data captured off a real unit — the 331 amp
+models, the drive and cab rosters, and the amp block's 98 named parameters with
+their real ranges and log flags. Toggle it in the device bar, or from the
+connection failure state.
+
+It reproduces the write semantics deliberately, not just the shapes: writes take
+normalised 0–1 while reads return real units, an out-of-range write clamps
+silently and reports success, and a model swap resets that block's parameters
+and can shift their ranges. Those three behaviours produced presets that looked
+correct and were wrong, and none of them were reproducible away from the amp
+until now.
+
+Demo mode routes through the same exported functions as the real client, so
+there's no second code path to drift.
+
+## Tests
+
+```bash
+npm test
+```
+
+Covers the conversion, guardrail and validation logic. Every case comes from a
+real failure, including the device's own reported norm values used as fixtures —
+71.999 Hz reads `norm 0.42866` on a 10–1000 log range, and the conversion has to
+agree.
+
 ## Browser support
 
 Chrome works. **Safari does not** — it blocks a secure page from calling

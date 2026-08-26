@@ -9,6 +9,7 @@ import Cost from './components/Cost'
 import Scenes from './components/Scenes'
 import { costOf } from './lib/cost'
 import { VERSION, COMMIT, BUILT_AT } from './lib/version'
+import { isDemo, setDemo } from './lib/forgefx'
 import {
   detect,
   currentPreset,
@@ -235,6 +236,13 @@ export default function App() {
 
       <DeviceBar status={status} device={device} onRetry={read} busy={busy} />
 
+      {isDemo() && status === 'live' ? (
+        <p className="demo-banner">
+          Simulated FM3 &mdash; nothing here reaches hardware. Real models and parameter ranges,
+          real write behaviour including the silent clamp.
+        </p>
+      ) : null}
+
       {status === 'fault' ? (
         <div className="notice" data-kind="fault">
           <h2>No connection</h2>
@@ -246,6 +254,19 @@ export default function App() {
           <p>
             Safari blocks a secure page from calling <code>localhost</code>. Use Chrome, or run
             this app locally with <code>npm run dev</code>.
+          </p>
+          <p>
+            No unit to hand?{' '}
+            <button
+              className="chip"
+              onClick={() => {
+                setDemo(true)
+                read()
+              }}
+            >
+              Try demo mode
+            </button>{' '}
+            runs against a simulated FM3 built from real captured device data.
           </p>
         </div>
       ) : null}

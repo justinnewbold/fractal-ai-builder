@@ -6,7 +6,7 @@
  * parameter's own range. Anything that fails is dropped and reported, not sent.
  */
 
-import { isSilencingParam } from './guardrails'
+import { isSilencingParam } from './guardrails.js'
 
 export function validateSpec(spec, schema) {
   const problems = []

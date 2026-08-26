@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getHost, setHost } from '../lib/forgefx'
+import { getHost, setHost, isDemo, setDemo } from '../lib/forgefx'
 
 export default function DeviceBar({ status, device, onRetry, busy }) {
   const [editing, setEditing] = useState(false)
@@ -8,6 +8,13 @@ export default function DeviceBar({ status, device, onRetry, busy }) {
   const save = () => {
     setHost(draft)
     setEditing(false)
+    onRetry()
+  }
+
+  const demo = isDemo()
+
+  const toggleDemo = () => {
+    setDemo(!demo)
     onRetry()
   }
 
@@ -20,7 +27,7 @@ export default function DeviceBar({ status, device, onRetry, busy }) {
 
   return (
     <div className="device-bar">
-      <div className="lamp" data-state={status} />
+      <div className="lamp" data-state={demo ? 'demo' : status} />
       <div className="device-name">{label}</div>
 
       {status === 'live' && device ? (
@@ -46,8 +53,9 @@ export default function DeviceBar({ status, device, onRetry, busy }) {
         </>
       ) : (
         <>
-          <span className="device-meta mono">{getHost()}</span>
-          <button onClick={() => setEditing(true)}>Change address</button>
+          <span className="device-meta mono">{demo ? 'simulated' : getHost()}</span>
+          <button onClick={toggleDemo}>{demo ? 'Use real device' : 'Demo mode'}</button>
+          {!demo ? <button onClick={() => setEditing(true)}>Change address</button> : null}
           <button onClick={onRetry} disabled={busy}>
             {busy ? 'Reading…' : 'Reconnect'}
           </button>
