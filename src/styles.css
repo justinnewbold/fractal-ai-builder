@@ -1694,3 +1694,44 @@ table.matrix th:first-child,
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---------- footswitches ---------- */
+
+.footswitches {
+  margin-top: 30px;
+}
+
+.fc-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.fc-switch {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+}
+
+.fc-num {
+  font-size: 10.5px;
+  color: var(--silk-faint);
+}
+
+.fc-label {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.fc-fn {
+  font-size: 10.5px;
+  color: var(--live);
+}

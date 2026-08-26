@@ -13,6 +13,7 @@ import { Refine, Compare } from './components/Refine'
 import Gig from './components/Gig'
 import { Modifiers, SceneMatrix, TempoTuner } from './components/Modifiers'
 import { Versions, DeviceBackup } from './components/Versions'
+import Footswitches from './components/Footswitches'
 import { savePreset } from './lib/history'
 import { costOf } from './lib/cost'
 import { VERSION, COMMIT, BUILT_AT } from './lib/version'
@@ -653,6 +654,8 @@ export default function App() {
           />
 
           <Meters active={status === 'live'} />
+
+          <Footswitches onError={setError} />
         </>
       ) : null}
 

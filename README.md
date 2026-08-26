@@ -96,6 +96,15 @@ So the shape, scene count, and channel names all come from `/device/detect`
 rather than from an assumption about which unit is plugged in. A device that
 reports no scenes doesn't get scene buttons.
 
+### The generator reads the device's own manual
+
+ForgeFX ships reference copy for every block family and every parameter, keyed
+by param id. Without it the generator infers what a control does from its name —
+which is exactly how "Amp1 Level" came to be dialled like a tone control.
+
+That reference now goes in with the rosters, in the cached half of the request,
+so it grounds every generation without costing tokens on repeat runs.
+
 ### References are grounded in real gear
 
 Every model in the roster carries `manufacturer` and `basedOn` — the actual amp

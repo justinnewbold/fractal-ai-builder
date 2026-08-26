@@ -147,8 +147,16 @@ export default async function handler(req, res) {
   // bill at a tenth of base. The first run of a session pays a small write
   // premium; every run after is much cheaper.
   const rosters = {}
+  const reference = {}
   for (const block of [...blocks].sort((a, b) => a.slug.localeCompare(b.slug))) {
     if (block.models?.length && !rosters[block.slug]) rosters[block.slug] = block.models
+    if (!reference[block.slug]) {
+      const params = {}
+      for (const p of block.params || []) if (p.does) params[p.name] = p.does
+      if (block.about || Object.keys(params).length) {
+        reference[block.slug] = { about: block.about || undefined, params }
+      }
+    }
   }
 
   const state = {
@@ -160,7 +168,7 @@ export default async function handler(req, res) {
       slug: b.slug,
       currentlyBypassed: b.bypassed,
       channel: b.channel,
-      params: b.params
+      params: (b.params || []).map(({ does, ...rest }) => rest)
     }))
   }
 
@@ -187,9 +195,11 @@ export default async function handler(req, res) {
           content: [
             {
               type: 'text',
-              text: `Models available on this unit, by block family. The numeric "value" is what you must use when changing a model:\n${JSON.stringify(
-                rosters
-              )}`,
+              text:
+                `Models available on this unit, by block family. The numeric "value" is what ` +
+                `you must use when changing a model:\n${JSON.stringify(rosters)}\n\n` +
+                `What each block and control actually does, from the device's own reference:\n` +
+                `${JSON.stringify(reference)}`,
               providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } }
             },
             {
