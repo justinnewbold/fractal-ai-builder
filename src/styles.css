@@ -1202,3 +1202,98 @@ button.scene.current .scene-num {
   border: 1px dashed var(--rule);
   border-radius: 3px;
 }
+
+/* ---------- saved presets ---------- */
+
+.history {
+  margin-top: 34px;
+}
+
+.history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.history-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.history-list {
+  margin-top: 10px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+}
+
+.history-entry {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.history-entry:last-child {
+  border-bottom: none;
+}
+
+.history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+button.history-title {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex: 1;
+  text-align: left;
+  padding: 0;
+  background: none;
+  border: none;
+}
+
+button.history-title:hover {
+  border: none;
+}
+
+.history-name {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.history-when {
+  font-size: 10.5px;
+  color: var(--silk-faint);
+}
+
+.history-desc {
+  margin: 5px 0 0;
+  font-size: 12.5px;
+  color: var(--silk-dim);
+  max-width: 62ch;
+}
+
+.history-detail {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--rule);
+}
+
+.history-meta {
+  font-size: 10.5px;
+  color: var(--silk-faint);
+  margin-top: 6px;
+}
+
+.history-note {
+  margin-top: 10px;
+  max-width: 64ch;
+}

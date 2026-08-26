@@ -150,6 +150,18 @@ for prompt caching later.
 
 A model with no published rate on file shows a blank rather than a guess.
 
+## Saved presets
+
+Every preset that gets written is saved locally and can be reloaded onto any
+preset later, with export and import for moving them between machines.
+
+What's stored is the generated **spec** — blocks, models and target values — not
+the diff that was applied. A diff only means anything against the preset it was
+computed from; replaying one elsewhere would write values derived from ranges
+that no longer apply. Reloading re-validates the spec against whatever is on the
+unit now and stops at the preview, so a saved tone meeting a different block
+layout is caught by the same checks as a fresh generation.
+
 ## Demo mode
 
 There's a simulated FM3 built from data captured off a real unit — the 331 amp
