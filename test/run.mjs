@@ -132,4 +132,26 @@ test('counts writes including model and bypass', () => {
   assert.equal(countWrites(r.changes), 3)
 })
 
+
+
+console.log('suggestions')
+
+const { suggest, totalSuggestions } = await import('../src/lib/suggestions.js')
+
+test('returns the requested number', () => assert.equal(suggest(4).length, 4))
+
+test('returns a spread, not four of the same thing', () => {
+  const picks = suggest(4)
+  assert.equal(new Set(picks).size, 4)
+})
+
+test('avoids what has already been seen', () => {
+  const first = suggest(4)
+  const second = suggest(4, new Set(first))
+  const overlap = second.filter((s) => first.includes(s))
+  assert.equal(overlap.length, 0, `repeated: ${overlap.join(', ')}`)
+})
+
+test('has a pool worth shuffling', () => assert.ok(totalSuggestions >= 30))
+
 console.log(`\n${passed} passed\n`)
