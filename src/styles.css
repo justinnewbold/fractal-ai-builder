@@ -1306,3 +1306,92 @@ button.chip.more {
   color: var(--signal);
   border-style: dashed;
 }
+
+/* ---------- cab, backup, meters ---------- */
+
+.cab,
+.backup,
+.meters {
+  margin-top: 30px;
+}
+
+.cab-slots {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.cab-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 13px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--signal);
+  border-radius: 3px;
+  min-width: 150px;
+}
+
+.cab-ir {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.cab-bank {
+  font-size: 10.5px;
+  color: var(--silk-faint);
+}
+
+.cab-mode {
+  font-size: 10.5px;
+  color: var(--live);
+}
+
+.meter-list {
+  margin-top: 10px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+}
+
+.meter-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.meter-row:last-child {
+  border-bottom: none;
+}
+
+.meter-row .diff-label {
+  min-width: 110px;
+  font-size: 12px;
+}
+
+.meter-track {
+  flex: 1;
+  height: 6px;
+  background: var(--chassis);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  background: var(--signal);
+  transition: width 180ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meter-fill {
+    transition: none;
+  }
+}

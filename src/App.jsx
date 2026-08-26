@@ -8,6 +8,7 @@ import Diagnostics from './components/Diagnostics'
 import Cost from './components/Cost'
 import Scenes from './components/Scenes'
 import History from './components/History'
+import { CabPicker, Backup, Meters } from './components/Hardware'
 import { savePreset } from './lib/history'
 import { costOf } from './lib/cost'
 import { VERSION, COMMIT, BUILT_AT } from './lib/version'
@@ -447,6 +448,25 @@ export default function App() {
             }}
             onError={setError}
           />
+
+          <CabPicker
+            blocks={blocks}
+            busy={busy}
+            onError={setError}
+            onChanged={(summary) => record('cab', summary)}
+          />
+
+          <Backup
+            preset={preset}
+            busy={busy}
+            onError={setError}
+            onChanged={(summary) => {
+              record('backup', summary)
+              read()
+            }}
+          />
+
+          <Meters active={status === 'live'} />
 
           <History key={historyKey} onReload={reload} busy={busy} />
 
