@@ -85,6 +85,26 @@ wrong, isn't a trade worth making yet.
 
 Adding `dryRun` upstream is the unblocking move.
 
+### The UI follows the device, not the FM3
+
+Fractal units don't agree on what a preset is. The FM3 and Axe-Fx III lay one out
+on a matrix where routing is part of the picture; the AM4 is a straight chain of
+four slots with no routing at all. Rendering a 4×12 grid for an AM4 would be
+inventing structure the hardware doesn't have.
+
+So the shape, scene count, and channel names all come from `/device/detect`
+rather than from an assumption about which unit is plugged in. A device that
+reports no scenes doesn't get scene buttons.
+
+### References are grounded in real gear
+
+Every model in the roster carries `manufacturer` and `basedOn` — the actual amp
+or pedal it was modelled on. That's what makes "the mid-80s Mark IIC+ sound" a
+answerable request rather than a vibe: the generator matches the reference to the
+model built from that hardware, and says in the summary which one it matched. If
+nothing in the roster is a close counterpart it says so, because a player who
+knows the reference would rather hear that than be handed a substitute.
+
 ### Discrete selectors are not knobs
 
 `GET /preset/blocks/{eid}/params` returns `enums` alongside `named`. Enums carry

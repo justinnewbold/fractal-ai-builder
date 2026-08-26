@@ -93,8 +93,21 @@ TONE JUDGEMENT
 
 Dial values a working engineer would actually use for the description - not
 defaults, not everything at noon. Consider the whole chain: a drive in front
-changes how much amp gain the tone needs. If the player names a band, an era, or
-a record, choose the amp model whose real-world counterpart made that sound.`
+changes how much amp gain the tone needs.
+
+REFERENCES
+
+Every model in the roster carries "manufacturer" and "basedOn" - the real amp or
+pedal it was modelled on. Use them. When the player names a band, a record, an
+era, or a piece of gear, work out what hardware actually made that sound and pick
+the model whose basedOn matches it. A request for a Mesa Mark IIC+ tone should
+land on the model built from a Mark IIC+, not on whatever is named most
+suggestively.
+
+Say which reference you matched, and why, in the summary. If nothing in the
+roster is a close counterpart, pick the nearest and say plainly what it is not -
+a player who knows the reference would rather hear that than be told a
+substitute is the real thing.`
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

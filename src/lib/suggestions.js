@@ -53,6 +53,16 @@ const POOL = {
     'Dark cinematic pad, almost synth-like',
     'Psychedelic swirl with modulation doing the work'
   ],
+  reference: [
+    'That mid-80s Mark IIC+ rhythm sound',
+    'Plexi cranked into a boost, Hendrix territory',
+    'AC30 through a Rangemaster — early British invasion',
+    'Dumble-style clean with the overdrive just kissing it',
+    'Rectifier scoop from the mid-90s',
+    'The Diezel VH4 sound — thick and German',
+    'Tweed Bassman with a Tele, played hard',
+    '5150 rhythm tone, no boost, all amp'
+  ],
   practical: [
     'Something that sits under a vocal without fighting it',
     'A tone I can practise on quietly at 11pm',

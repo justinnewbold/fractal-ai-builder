@@ -1,14 +1,89 @@
 import { useState } from 'react'
 
 /**
- * The routing grid, read live off the device.
+ * The signal path, read live off the device.
  *
- * The FM3 lays a preset out on a 4-row by 12-column matrix. That matrix is the
- * most characteristic thing about the instrument, so it is what this app leads
- * with — not a form, not a list of effects. Engaged blocks carry the signal
- * colour on their leading edge; bypassed blocks recede to an outline.
+ * Fractal units don't agree on what a preset looks like. The FM3 and Axe-Fx III
+ * lay one out on a matrix — four rows by twelve columns — where routing is part
+ * of the picture. The AM4 is a straight chain of four slots with no routing at
+ * all. Rendering a 4x12 matrix for an AM4 would be inventing structure the
+ * device doesn't have.
+ *
+ * So the shape comes from the device's own capability report rather than from
+ * an assumption about which unit is plugged in.
  */
-export default function Grid({ preset, blocks, rows = 4, cols = 12 }) {
+export default function Grid({ preset, blocks, capabilities }) {
+  const linear = capabilities?.slotModel === 'linear'
+  const rows = capabilities?.grid?.rows ?? 4
+  const cols = capabilities?.grid?.cols ?? 12
+
+  if (linear) return <Chain preset={preset} blocks={blocks} />
+
+  return <Matrix preset={preset} blocks={blocks} rows={rows} cols={cols} />
+}
+
+/** A straight signal chain — the AM4's four slots, in order. */
+function Chain({ preset, blocks }) {
+  return (
+    <section className="grid-section">
+      <Head preset={preset} />
+      <div className="grid-scroll">
+        <div className="chain">
+          {blocks.map((block, i) => (
+            <div key={block.effectId ?? i} className="chain-link">
+              <div className="block" data-bypassed={String(block.bypassed)}>
+                <div className="block-name">{block.name}</div>
+                <div className="block-meta">
+                  <span>{block.effectId}</span>
+                  {block.channel ? <span className="chan">CH {block.channel}</span> : null}
+                </div>
+              </div>
+              {i < blocks.length - 1 ? <span className="chain-arrow">→</span> : null}
+            </div>
+          ))}
+        </div>
+      </div>
+      <Legend blocks={blocks} />
+    </section>
+  )
+}
+
+function Head({ preset }) {
+  return (
+    <div className="grid-head">
+      <div>
+        <p className="silk-label">Loaded preset</p>
+        <h2 className="preset-name">{preset?.name?.trim() || 'Untitled'}</h2>
+      </div>
+      <div className="preset-slot mono">
+        {typeof preset?.number === 'number' ? `SLOT ${preset.number}` : ''}
+      </div>
+    </div>
+  )
+}
+
+function Legend({ blocks, children }) {
+  return (
+    <div className="grid-legend">
+      <div className="legend-item">
+        <div className="swatch" />
+        <span>Engaged</span>
+      </div>
+      <div className="legend-item">
+        <div className="swatch" data-kind="bypassed" />
+        <span>Bypassed</span>
+      </div>
+      <div className="legend-item">
+        <span className="mono" style={{ fontSize: '11px', color: 'var(--silk-faint)' }}>
+          {blocks.length} blocks placed
+        </span>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function Matrix({ preset, blocks, rows, cols }) {
   const [showAll, setShowAll] = useState(false)
 
   // Most presets live on row 1. Showing four rows of empty cells by default
@@ -51,42 +126,26 @@ export default function Grid({ preset, blocks, rows = 4, cols = 12 }) {
 
   return (
     <section className="grid-section">
-      <div className="grid-head">
-        <div>
-          <p className="silk-label">Loaded preset</p>
-          <h2 className="preset-name">{preset?.name?.trim() || 'Untitled'}</h2>
-        </div>
-        <div className="preset-slot mono">
-          {typeof preset?.number === 'number' ? `SLOT ${preset.number}` : ''}
-        </div>
-      </div>
+      <Head preset={preset} />
 
       <div className="grid-scroll">
-        <div className="grid" role="table" aria-label="Preset routing grid">
+        <div
+          className="grid"
+          role="table"
+          aria-label="Preset routing grid"
+          style={{ gridTemplateColumns: `repeat(${cols}, minmax(94px, 1fr))` }}
+        >
           {cells}
         </div>
       </div>
 
-      <div className="grid-legend">
-        <div className="legend-item">
-          <div className="swatch" />
-          <span>Engaged</span>
-        </div>
-        <div className="legend-item">
-          <div className="swatch" data-kind="bypassed" />
-          <span>Bypassed</span>
-        </div>
-        <div className="legend-item">
-          <span className="mono" style={{ fontSize: '11px', color: 'var(--silk-faint)' }}>
-            {blocks.length} blocks placed
-          </span>
-        </div>
+      <Legend blocks={blocks}>
         {hiddenRows > 0 || showAll ? (
           <button className="chip" onClick={() => setShowAll(!showAll)}>
             {showAll ? 'Collapse empty rows' : `Show all ${rows} rows`}
           </button>
         ) : null}
-      </div>
+      </Legend>
     </section>
   )
 }

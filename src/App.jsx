@@ -541,11 +541,15 @@ export default function App() {
             onDiscard={() => setResult(null)}
           />
 
-          {preset ? <Grid preset={preset} blocks={blocks} /> : null}
+          {preset ? (
+            <Grid preset={preset} blocks={blocks} capabilities={device?.capabilities} />
+          ) : null}
 
           <Scenes
             blocks={blocks}
             count={device?.capabilities?.sceneCount || 8}
+            channelNames={device?.capabilities?.channelNames}
+            hasScenes={device?.capabilities?.hasScenes !== false}
             busy={busy}
             onChanged={(summary) => {
               record('scene', summary)

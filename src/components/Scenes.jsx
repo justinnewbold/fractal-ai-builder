@@ -12,7 +12,18 @@ import { getScene, setScene, setSceneName, setChannel } from '../lib/forgefx'
  * its settings, so an amp can carry a clean and a lead voicing without a second
  * block.
  */
-export default function Scenes({ blocks, count = 8, onChanged, onError, busy }) {
+export default function Scenes({
+  blocks,
+  count = 8,
+  channelNames,
+  hasScenes = true,
+  onChanged,
+  onError,
+  busy
+}) {
+  // Not every Fractal unit has both. Rendering eight scene buttons for a device
+  // that reports none would be inventing hardware.
+  const channels = channelNames?.length ? channelNames : ['A', 'B', 'C', 'D']
   const [current, setCurrent] = useState(null)
   const [names, setNames] = useState([])
   const [renaming, setRenaming] = useState(null)
@@ -68,11 +79,13 @@ export default function Scenes({ blocks, count = 8, onChanged, onError, busy }) 
 
   const channelled = blocks.filter((b) => b.channel)
 
+  if (!hasScenes && !channelled.length) return null
+
   return (
     <section className="scenes">
-      <p className="silk-label">Scenes</p>
-      <div className="scene-row">
-        {Array.from({ length: count }, (_, i) => (
+      {hasScenes ? <p className="silk-label">Scenes</p> : null}
+      <div className="scene-row" hidden={!hasScenes}>
+        {Array.from({ length: hasScenes ? count : 0 }, (_, i) => (
           <div key={i} className="scene-cell">
             <button
               className={`scene ${i === current ? 'current' : ''}`}
@@ -117,7 +130,7 @@ export default function Scenes({ blocks, count = 8, onChanged, onError, busy }) 
               <div className="channel-row" key={block.effectId}>
                 <span className="diff-label">{block.name}</span>
                 <div className="channel-buttons">
-                  {['A', 'B', 'C', 'D'].map((ch) => (
+                  {channels.map((ch) => (
                     <button
                       key={ch}
                       className={`chip ${block.channel === ch ? 'active' : ''}`}
