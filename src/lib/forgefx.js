@@ -882,3 +882,45 @@ export async function scanAllPresets(total, onProgress, shouldStop) {
   }
   return cachedPresetNames()
 }
+
+
+/**
+ * Scene names.
+ *
+ * Not available from GET /scene on either device — that returns the active
+ * index and nothing else, which is why the list showed dashes. Names live in
+ * the preset body and only appear once a dump is decoded, and the two families
+ * expose that decode differently: gen-3 as `scenes` on the preset summary, the
+ * AM4 as `sceneNames` on its backup.
+ *
+ * Both are heavier reads than a scene query, so this is called on preset change
+ * rather than on every poll.
+ */
+export async function readSceneNames(number) {
+  if (mock) {
+    await tick()
+    return mock.getScene().names
+  }
+
+  if (typeof number === 'number') {
+    try {
+      const summary = await presetSummary(number)
+      const names = summary?.scenes
+      if (Array.isArray(names) && names.some((n) => (n || '').trim())) {
+        return names.map((n) => (n || '').trim())
+      }
+    } catch {
+      // Not every device serves a summary; fall through to the dump.
+    }
+  }
+
+  try {
+    const dump = await backupPreset(number)
+    const names = dump?.sceneNames
+    if (Array.isArray(names)) return names.map((n) => (n || '').trim())
+  } catch {
+    // Neither path worked — the caller shows scene numbers alone.
+  }
+
+  return []
+}

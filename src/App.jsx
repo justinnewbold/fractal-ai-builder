@@ -24,7 +24,8 @@ import {
   setTuner,
   subscribeEvents,
   scanAllPresets,
-  cachedPresetNames
+  cachedPresetNames,
+  readSceneNames
 } from './lib/forgefx'
 import { savePreset } from './lib/history'
 import { costOf } from './lib/cost'
@@ -124,12 +125,18 @@ export default function App() {
         return list.find((x) => x.slug === 'amp')?.effectId ?? list[0]?.effectId ?? null
       })
 
+      // The active index is a cheap query; the names require decoding the
+      // preset body, so they're fetched separately and only when the preset
+      // changes rather than on every refresh.
       getScene()
-        .then((sc) => {
-          setSceneIdx(sc?.index ?? 0)
-          setSceneNames(Array.isArray(sc?.names) ? sc.names : [])
-        })
+        .then((sc) => typeof sc?.index === 'number' && sc.index >= 0 && setSceneIdx(sc.index))
         .catch(() => {})
+
+      if (typeof p?.number === 'number') {
+        readSceneNames(p.number)
+          .then((names) => setSceneNames(names))
+          .catch(() => setSceneNames([]))
+      }
 
       getTempo()
         .then((t) => typeof t?.bpm === 'number' && setBpm(t.bpm))
@@ -727,7 +734,9 @@ export default function App() {
                         }}
                       >
                         <span className="scene-tag">S{i + 1}</span>
-                        <span className="scene-title">{sceneNames[i] || '—'}</span>
+                        <span className={`scene-title ${sceneNames[i] ? '' : 'unnamed'}`}>
+                          {sceneNames[i] || `Scene ${i + 1}`}
+                        </span>
                       </button>
                     ))}
                   </div>
