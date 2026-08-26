@@ -17,6 +17,8 @@ import { Modifiers, SceneMatrix, TempoTuner } from './components/Modifiers'
 import { Versions, DeviceBackup } from './components/Versions'
 import Footswitches from './components/Footswitches'
 import GridEditor from './components/GridEditor'
+import { Chain, PresetList, BlockPanel } from './components/Console'
+import { presetRange, getTempo, tapTempo, setTuner } from './lib/forgefx'
 import { savePreset } from './lib/history'
 import { costOf } from './lib/cost'
 import { VERSION, COMMIT, BUILT_AT } from './lib/version'
@@ -30,9 +32,10 @@ import {
   verifyChanges,
   storePreset,
   selectPreset,
+  getScene,
+  setScene,
   setPresetName,
   setChannel,
-  setScene,
   revertPreset,
   backupPreset,
   getHost
@@ -73,7 +76,15 @@ export default function App() {
 
   // Fifteen stacked sections was a long scroll with the important things buried.
   // Grouped by what you're doing rather than by which endpoint it calls.
-  const [view, setView] = useState('design')
+  const [view, setView] = useState('console')
+  const [selectedBlock, setSelectedBlock] = useState(null)
+  const [slots, setSlots] = useState([])
+  const [scanning, setScanning] = useState(false)
+  const [scene, setSceneIdx] = useState(0)
+  const [sceneNames, setSceneNames] = useState([])
+  const [bpm, setBpm] = useState(null)
+  const [tunerOn, setTunerOn] = useState(false)
+  const [editTab, setEditTab] = useState('fx')
 
   const record = useCallback((kind, summary, detail = []) => {
     setLog((prev) => append(prev, newEntry(kind, summary, detail)))
@@ -92,8 +103,27 @@ export default function App() {
       }
       const [p, b] = await Promise.all([currentPreset(), presetBlocks()])
       setPreset(p)
-      setBlocks(Array.isArray(b) ? b : [])
+      const list = Array.isArray(b) ? b : []
+      setBlocks(list)
       setStatus('live')
+
+      // Keep a sensible selection: the amp if nothing is chosen, and drop a
+      // selection that no longer exists rather than showing a stale panel.
+      setSelectedBlock((current) => {
+        if (current && list.some((x) => x.effectId === current)) return current
+        return list.find((x) => x.slug === 'amp')?.effectId ?? list[0]?.effectId ?? null
+      })
+
+      getScene()
+        .then((sc) => {
+          setSceneIdx(sc?.index ?? 0)
+          setSceneNames(Array.isArray(sc?.names) ? sc.names : [])
+        })
+        .catch(() => {})
+
+      getTempo()
+        .then((t) => typeof t?.bpm === 'number' && setBpm(t.bpm))
+        .catch(() => {})
 
       // Read off the attached unit rather than from committed data. An AM4
       // offers a different roster from an FM3 — 250 amp models against 331, one
@@ -527,6 +557,7 @@ export default function App() {
       {status === 'live' ? (
         <nav className="views" aria-label="Sections">
           {[
+            ['console', 'Console'],
             ['design', 'Design'],
             ['bench', 'Bench'],
             ['library', 'Library'],
@@ -542,6 +573,205 @@ export default function App() {
             </button>
           ))}
         </nav>
+      ) : null}
+
+      {status === 'live' && view === 'console' ? (
+        <>
+          <div className="device-strip">
+            <span className="lamp" data-state={isDemo() ? 'demo' : 'live'} />
+            <span className="device-name">{device?.short || device?.name}</span>
+            <span className="device-meta mono">
+              gen {device?.gen} · {device?.capabilities?.slotModel === 'linear'
+                ? `${device?.capabilities?.slotCount} slots`
+                : `${device?.capabilities?.grid?.rows}×${device?.capabilities?.grid?.cols}`}
+            </span>
+
+            <div className="strip-right">
+              <button
+                className={`strip-btn ${tunerOn ? 'armed' : ''}`}
+                onClick={async () => {
+                  try {
+                    await setTuner(!tunerOn)
+                    setTunerOn(!tunerOn)
+                  } catch (err) {
+                    setError(err.message)
+                  }
+                }}
+              >
+                Tuner
+              </button>
+              <button
+                className="strip-btn"
+                onClick={async () => {
+                  try {
+                    const r = await tapTempo()
+                    if (typeof r?.bpm === 'number') setBpm(r.bpm)
+                  } catch (err) {
+                    setError(err.message)
+                  }
+                }}
+              >
+                Tap
+              </button>
+              {bpm !== null ? <span className="bpm-box">{bpm} BPM</span> : null}
+              {dirty ? (
+                <button className="strip-btn armed" onClick={revert} disabled={busy}>
+                  Revert
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="console">
+            <PresetList
+              slots={slots}
+              current={preset?.number}
+              deviceSlots={device?.capabilities?.presets?.count}
+              scanning={scanning}
+              onScan={async () => {
+                setScanning(true)
+                try {
+                  const from = Math.max(0, (preset?.number ?? 0) - 8)
+                  setSlots(await presetRange(from, 20))
+                } catch (err) {
+                  setError(err.message)
+                } finally {
+                  setScanning(false)
+                }
+              }}
+              onSelect={jumpTo}
+            />
+
+            <div className="center-panel">
+              <p className="panel-title" style={{ padding: 0 }}>
+                Preset name
+              </p>
+              <div className="preset-name-field">
+                <span className="num">{preset?.number}</span>
+                <span className="name">{preset?.name?.trim() || 'Untitled'}</span>
+                <span className="step-btns">
+                  <button
+                    className="icon-btn"
+                    onClick={() => jumpTo(Math.max(0, (preset?.number ?? 0) - 1))}
+                    disabled={busy}
+                  >
+                    ◁
+                  </button>
+                  <button
+                    className="icon-btn"
+                    onClick={() => jumpTo((preset?.number ?? 0) + 1)}
+                    disabled={busy}
+                  >
+                    ▷
+                  </button>
+                </span>
+              </div>
+
+              {device?.capabilities?.hasScenes !== false ? (
+                <>
+                  <p className="panel-title" style={{ padding: '14px 0 0' }}>
+                    Scenes
+                  </p>
+                  <div className="scene-list">
+                    {Array.from({ length: device?.capabilities?.sceneCount || 8 }, (_, i) => (
+                      <button
+                        key={i}
+                        className={`scene-line ${i === scene ? 'current' : ''}`}
+                        onClick={async () => {
+                          setSceneIdx(i)
+                          try {
+                            await setScene(i)
+                          } catch (err) {
+                            setError(err.message)
+                          }
+                        }}
+                      >
+                        <span className="scene-tag">S{i + 1}</span>
+                        <span className="scene-title">{sceneNames[i] || '—'}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+
+              <div className="edit-tabs">
+                {[
+                  ['fx', 'FX Edit'],
+                  ['ai', 'Design with AI'],
+                  ['build', 'Quick Build']
+                ].map(([id, label]) => (
+                  <button
+                    key={id}
+                    className={`edit-tab ${editTab === id ? 'current' : ''}`}
+                    onClick={() => setEditTab(id)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {editTab === 'ai' ? (
+                <>
+                  <ToneForm onGenerate={generate} busy={busy} disabled={status !== 'live'} />
+                  <Thinking message={progress} />
+                  {thinking ? (
+                    <div className="thinking" role="status" aria-live="polite">
+                      <span className="thinking-bars" aria-hidden="true">
+                        <i />
+                        <i />
+                        <i />
+                        <i />
+                      </span>
+                      <Stages active={thinking} />
+                    </div>
+                  ) : null}
+                  <LiveGeneration
+                    partial={partial}
+                    open={liveOpen}
+                    onToggle={() => setLiveOpen(!liveOpen)}
+                  />
+                  {result ? (
+                    <Refine onRefine={refine} busy={busy} disabled={status !== 'live'} />
+                  ) : null}
+                  <Preview
+                    result={result}
+                    writeCount={writeCount}
+                    busy={busy}
+                    onApply={apply}
+                    onDiscard={() => setResult(null)}
+                  />
+                </>
+              ) : null}
+
+              {editTab === 'build' ? (
+                <GridEditor
+                  blocks={blocks}
+                  capabilities={device?.capabilities}
+                  busy={busy}
+                  onError={setError}
+                  onChanged={(summary) => {
+                    record('grid', summary)
+                    read()
+                  }}
+                />
+              ) : null}
+            </div>
+
+            <Chain blocks={blocks} selected={selectedBlock} onSelect={setSelectedBlock} />
+
+            <BlockPanel
+              block={blocks.find((b) => b.effectId === selectedBlock)}
+              channels={device?.capabilities?.channelNames}
+              busy={busy}
+              onError={setError}
+              onChanged={(summary) => {
+                record('edit', summary)
+                setDirty(true)
+                read()
+              }}
+            />
+          </div>
+        </>
       ) : null}
 
       {status === 'live' && view === 'gig' ? (
