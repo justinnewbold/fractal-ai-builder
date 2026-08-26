@@ -23,7 +23,9 @@ export default function Diagnostics() {
     setOpen(true)
   }
 
-  const suspicious = rows.filter((r) => r.sent === null || r.sent === 0 || r.sent === 1)
+  const suspicious = rows.filter(
+    (r) => r.sent === null || r.sent === 0 || r.sent === 1 || r.outOfRange
+  )
 
   return (
     <section className="diagnostics">
@@ -70,7 +72,8 @@ export default function Diagnostics() {
                 <span>Range</span>
               </div>
               {rows.map((row, i) => {
-                const extreme = row.sent === null || row.sent === 0 || row.sent === 1
+                const extreme =
+                  row.sent === null || row.sent === 0 || row.sent === 1 || row.outOfRange
                 return (
                   <div className="diag-row mono" key={i} data-extreme={extreme}>
                     <span className="diag-name">{row.name || `#${row.paramId}`}</span>
@@ -81,7 +84,9 @@ export default function Diagnostics() {
                     </span>
                     <span className="diag-range">
                       {row.range
-                        ? `${row.range.min}–${row.range.max}${row.range.log ? ' log' : ''}`
+                        ? `${row.range.min}–${row.range.max}${row.range.log ? ' log' : ''}${
+                            row.outOfRange ? ' · OUTSIDE' : ''
+                          }`
                         : 'no range'}
                     </span>
                   </div>
