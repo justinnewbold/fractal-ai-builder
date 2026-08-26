@@ -1917,3 +1917,578 @@ button.cell-btn.over {
   border-color: var(--signal);
   background: rgba(240, 167, 60, 0.12);
 }
+
+/* ==================================================================
+   Console layout
+
+   Modelled on FM3-Edit and AM4-Edit: a preset list down the left, the
+   preset and its scenes in the middle, the signal chain top right, and
+   the selected block's controls across the bottom. The arrangement is
+   the point — it's how these units are actually worked on, and it puts
+   the chain and the block you're editing on screen together.
+   ================================================================== */
+
+.console {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr) minmax(300px, 0.9fr);
+  grid-template-rows: auto auto;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.console > .preset-panel {
+  grid-row: 1 / span 2;
+}
+
+.console > .block-panel {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 1000px) {
+  .console {
+    grid-template-columns: 1fr;
+  }
+  .console > .preset-panel {
+    grid-row: auto;
+  }
+}
+
+/* ---------- device strip ---------- */
+
+.device-strip {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 9px 14px;
+  background: linear-gradient(180deg, #1b1f26, #14171c);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+}
+
+.strip-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.strip-btn {
+  font-family: var(--display);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+}
+
+.strip-btn.armed {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: #14100a;
+}
+
+.bpm-box {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 5px 10px;
+  background: var(--chassis);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  min-width: 76px;
+  text-align: center;
+}
+
+.cpu-meter {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.cpu-track {
+  width: 78px;
+  height: 8px;
+  background: var(--chassis);
+  border: 1px solid var(--rule);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.cpu-fill {
+  height: 100%;
+  background: var(--silk-dim);
+}
+
+.cpu-fill[data-hot='true'] {
+  background: var(--fault);
+}
+
+/* ---------- panels ---------- */
+
+.preset-panel,
+.fx-panel,
+.center-panel,
+.block-panel {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.panel-title {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--silk-dim);
+  margin: 0;
+  padding: 9px 12px 0;
+}
+
+.panel-head .panel-title {
+  padding: 0;
+}
+
+.icon-btn {
+  padding: 3px 8px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.pad {
+  padding: 10px 12px;
+}
+
+/* ---------- preset list ---------- */
+
+.preset-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+button.preset-row {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  border-left: 2px solid transparent;
+}
+
+button.preset-row.bank-start {
+  border-top: 1px solid var(--rule);
+}
+
+button.preset-row:hover:not(:disabled) {
+  background: var(--panel-hi);
+  border-left-color: var(--rule);
+}
+
+button.preset-row.current {
+  background: #1d2a3a;
+  border-left-color: var(--live);
+  color: var(--live);
+}
+
+.preset-id {
+  font-size: 11px;
+  color: var(--silk-faint);
+  min-width: 26px;
+}
+
+button.preset-row.current .preset-id {
+  color: var(--live);
+}
+
+.preset-title {
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- chain tiles ---------- */
+
+.chain-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  padding: 26px 14px 30px;
+}
+
+.io-arrow {
+  color: var(--silk-faint);
+  font-size: 13px;
+}
+
+button.fx-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 62px;
+  height: 62px;
+  padding: 0;
+  border-radius: 6px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tile) 88%, white), var(--tile));
+  border: 2px solid transparent;
+  color: #fff;
+}
+
+button.fx-tile.selected {
+  border-color: var(--signal);
+}
+
+button.fx-tile.bypassed {
+  background: none;
+  border: 2px dashed color-mix(in srgb, var(--tile) 60%, var(--rule));
+  color: var(--silk-faint);
+}
+
+.fx-abbr {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+}
+
+.fx-chan {
+  font-family: var(--mono);
+  font-size: 10px;
+  opacity: 0.85;
+}
+
+/* ---------- centre panel ---------- */
+
+.center-panel {
+  padding: 12px;
+}
+
+.preset-name-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  margin-top: 8px;
+  background: var(--chassis);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+}
+
+.preset-name-field .num {
+  font-family: var(--mono);
+  font-size: 15px;
+  color: var(--signal);
+}
+
+.preset-name-field .name {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 19px;
+  letter-spacing: 0.03em;
+  color: var(--signal);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.step-btns {
+  display: flex;
+  gap: 4px;
+}
+
+.scene-list {
+  margin-top: 12px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+button.scene-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  background: var(--chassis);
+  border: none;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+}
+
+button.scene-line:last-child {
+  border-bottom: none;
+}
+
+.scene-tag {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  padding: 3px 7px;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  color: var(--silk-faint);
+}
+
+button.scene-line.current .scene-tag {
+  border-color: var(--live);
+  color: var(--live);
+}
+
+button.scene-line.current {
+  background: var(--panel-hi);
+}
+
+.scene-title {
+  font-size: 12.5px;
+}
+
+/* ---------- edit tabs ---------- */
+
+.edit-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+button.edit-tab {
+  font-size: 11px;
+  padding: 6px 11px;
+  color: var(--silk-dim);
+}
+
+button.edit-tab.current {
+  color: var(--signal);
+  border-color: var(--signal);
+}
+
+/* ---------- block panel ---------- */
+
+.block-panel {
+  display: grid;
+  grid-template-columns: 190px 76px minmax(0, 1fr) auto;
+  gap: 0;
+  min-height: 210px;
+}
+
+.block-panel.empty {
+  display: block;
+  min-height: 0;
+}
+
+.block-side {
+  padding: 12px;
+  border-right: 1px solid var(--rule);
+}
+
+.block-heading {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin: 0 0 10px;
+}
+
+.block-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tile) 88%, white), var(--tile));
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff;
+  margin-bottom: 12px;
+}
+
+.chan-row {
+  display: flex;
+  gap: 4px;
+  margin: 5px 0 12px;
+}
+
+button.chan-btn {
+  flex: 1;
+  padding: 6px 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--chassis);
+}
+
+button.chan-btn.current {
+  border-color: var(--live);
+  color: var(--live);
+}
+
+.type-select {
+  width: 100%;
+  margin: 5px 0 12px;
+  padding: 7px 8px;
+  font-family: var(--body);
+  font-size: 12px;
+  color: var(--silk);
+  background: var(--chassis);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+}
+
+.bypass-btn {
+  width: 100%;
+  font-size: 11.5px;
+}
+
+.bypass-btn.off {
+  color: var(--silk-faint);
+}
+
+.block-tabs {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--rule);
+  padding-top: 12px;
+}
+
+.block-tabs button {
+  background: none;
+  border: none;
+  border-radius: 0;
+  border-left: 2px solid transparent;
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--silk-faint);
+}
+
+.block-tabs button.current {
+  color: var(--silk);
+  border-left-color: var(--signal);
+  background: var(--panel-hi);
+}
+
+.knob-deck {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 22px;
+  align-content: flex-start;
+  padding: 18px 20px;
+}
+
+.knob-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 84px;
+}
+
+.knob-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.knob-label {
+  font-size: 10.5px;
+  color: var(--silk-dim);
+  text-align: center;
+  max-width: 84px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knob {
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.knob:focus-visible {
+  outline: 2px solid var(--live);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+
+.knob.dragging {
+  cursor: grabbing;
+}
+
+.knob-track {
+  fill: none;
+  stroke: var(--rule);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.knob-arc {
+  fill: none;
+  stroke: var(--live);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.knob-body {
+  fill: #2a2f37;
+  stroke: #10131a;
+}
+
+.knob-dot {
+  fill: var(--signal);
+}
+
+.knob-readout {
+  font-size: 11px;
+  padding: 3px 7px;
+  min-width: 62px;
+  text-align: center;
+  background: var(--chassis);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+}
+
+.level-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 18px 18px;
+  border-left: 1px solid var(--rule);
+}
+
+@media (max-width: 860px) {
+  .block-panel {
+    grid-template-columns: 1fr;
+  }
+  .block-side,
+  .block-tabs,
+  .level-column {
+    border-right: none;
+    border-left: none;
+    border-bottom: 1px solid var(--rule);
+  }
+  .block-tabs {
+    flex-direction: row;
+  }
+}
