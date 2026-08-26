@@ -36,12 +36,7 @@ import {
 import { validateSpec, countWrites } from './lib/validate'
 import { newEntry, append } from './lib/log'
 
-import ampTypes from './data/amp-types.json'
-import driveTypes from './data/drive-types.json'
-import cabTypes from './data/cab-types.json'
-import blockCatalog from './data/blocks.json'
-
-const totalParams = blockCatalog.reduce((sum, b) => sum + (b.paramCount || 0), 0)
+import { blockCatalog } from './lib/forgefx'
 
 export default function App() {
   const [status, setStatus] = useState('idle')
@@ -61,6 +56,7 @@ export default function App() {
   const [lastPrompt, setLastPrompt] = useState('')
   const [historyKey, setHistoryKey] = useState(0)
   const [compare, setCompare] = useState(null)
+  const [catalog, setCatalog] = useState(null)
 
   // Fifteen stacked sections was a long scroll with the important things buried.
   // Grouped by what you're doing rather than by which endpoint it calls.
@@ -85,6 +81,14 @@ export default function App() {
       setPreset(p)
       setBlocks(Array.isArray(b) ? b : [])
       setStatus('live')
+
+      // Read off the attached unit rather than from committed data. An AM4
+      // offers a different roster from an FM3 — 250 amp models against 331, one
+      // instance per family — and showing the FM3's numbers while an AM4 is
+      // plugged in would be stating something false about the thing in the room.
+      blockCatalog()
+        .then((res) => setCatalog(Array.isArray(res) ? res : null))
+        .catch(() => setCatalog(null))
     } catch (err) {
       setStatus('fault')
       setError(err.message)
@@ -710,36 +714,48 @@ export default function App() {
 
       <section hidden={status === 'live' && view !== 'library'}>
         <p className="silk-label" style={{ marginTop: 34 }}>
-          Catalog loaded for generation
+          {catalog ? `Read from your ${device?.short || device?.name}` : 'Catalog'}
         </p>
-        <div className="stats">
-          <div className="stat">
-            <div className="value">{ampTypes.length}</div>
-            <div className="silk-label label">Amp models</div>
-          </div>
-          <div className="stat">
-            <div className="value">{driveTypes.length}</div>
-            <div className="silk-label label">Drive pedals</div>
-          </div>
-          <div className="stat">
-            <div className="value">{cabTypes.length}</div>
-            <div className="silk-label label">Cabinets</div>
-          </div>
-          <div className="stat">
-            <div className="value">{blockCatalog.length}</div>
-            <div className="silk-label label">Block slots</div>
-          </div>
-          <div className="stat">
-            <div className="value">{totalParams.toLocaleString()}</div>
-            <div className="silk-label label">Parameters</div>
-          </div>
-        </div>
+        {catalog ? (
+          <>
+            <div className="stats">
+              <div className="stat">
+                <div className="value">{catalog.length}</div>
+                <div className="silk-label label">Block families</div>
+              </div>
+              <div className="stat">
+                <div className="value">
+                  {catalog.reduce((n, b) => n + (b.typeCount || 0), 0).toLocaleString()}
+                </div>
+                <div className="silk-label label">Models</div>
+              </div>
+              <div className="stat">
+                <div className="value">
+                  {catalog.reduce((n, b) => n + (b.paramCount || 0), 0).toLocaleString()}
+                </div>
+                <div className="silk-label label">Parameters</div>
+              </div>
+              <div className="stat">
+                <div className="value">
+                  {catalog.find((b) => b.slug === 'amp')?.typeCount ?? '—'}
+                </div>
+                <div className="silk-label label">Amp models</div>
+              </div>
+              <div className="stat">
+                <div className="value">{device?.capabilities?.presets?.count ?? '—'}</div>
+                <div className="silk-label label">Preset slots</div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <p className="hint">Connect a device to read its catalog.</p>
+        )}
       </section>
 
       <p className="footnote" hidden={status === 'live' && view === 'gig'}>
-        Models and parameter ranges are read off your own hardware at generation time, so the
-        designer can only pick models your unit has and only set values inside each control&rsquo;s
-        real range. Anything outside it is rejected before a single write goes out. Device access
+        Models and parameter ranges are read off the attached unit at generation time, so the
+        designer can only pick models that unit actually has and only set values inside each
+        control&rsquo;s real range. Anything outside it is rejected before a single write goes out. Device access
         via{' '}
         <a href="https://github.com/sKuhLight/ForgeFX" target="_blank" rel="noreferrer">
           ForgeFX
