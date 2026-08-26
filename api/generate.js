@@ -41,7 +41,12 @@ function resolveModel() {
 }
 
 const PresetSpec = z.object({
-  presetName: z.string().describe('Short name, 12 characters or fewer, uppercase.'),
+  presetName: z
+    .string()
+    .describe(
+      'Name for the preset, 31 characters or fewer. Mixed case is fine. Make it descriptive of ' +
+        'the sound rather than generic — a player scrolling a list of 512 should know what this is.'
+    ),
   summary: z.string().describe('One sentence on the approach taken.'),
   blocks: z
     .array(

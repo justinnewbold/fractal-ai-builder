@@ -1105,10 +1105,9 @@ button.chip.active {
 }
 
 .save-row input.name-field {
-  min-width: 170px;
+  min-width: 200px;
   font-family: var(--display);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 /* ---------- scenes and channels ---------- */

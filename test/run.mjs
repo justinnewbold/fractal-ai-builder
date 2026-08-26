@@ -118,10 +118,23 @@ test('drops an unknown block', () => {
   assert.match(r.problems[0], /no such block/)
 })
 
-test('uppercases and truncates the preset name', () => {
-  const r = validateSpec({ presetName: 'a very long preset name indeed', blocks: [] }, schema)
-  assert.equal(r.presetName.length, 12)
-  assert.equal(r.presetName, r.presetName.toUpperCase())
+test('keeps preset names within the 31-char hardware limit', () => {
+  const long = validateSpec(
+    { presetName: 'a preset name far longer than any Fractal unit will store', blocks: [] },
+    schema
+  )
+  assert.equal(long.presetName.length, 31)
+})
+
+test('preserves case and normal punctuation in preset names', () => {
+  // Units ship with names like "Leon's Live AM4" — mixed case, apostrophes.
+  const r = validateSpec({ presetName: "Leon's Live AM4", blocks: [] }, schema)
+  assert.equal(r.presetName, "Leon's Live AM4")
+})
+
+test('strips characters the hardware will not store', () => {
+  const r = validateSpec({ presetName: 'Drop A  <metal>\n rhythm', blocks: [] }, schema)
+  assert.equal(r.presetName, 'Drop A metal rhythm')
 })
 
 test('counts writes including model and bypass', () => {

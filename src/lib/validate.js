@@ -105,10 +105,18 @@ export function validateSpec(spec, schema) {
   }
 }
 
-/** Fractal preset names are short and uppercase on the hardware display. */
+/**
+ * Clean a generated preset name.
+ *
+ * Fractal preset names run to 31 characters and are mixed case — the units ship
+ * with "Leon's Live AM4" and the like. An earlier 12-character uppercase limit
+ * was taken from how the AM4's small display renders them, which is a display
+ * convention rather than a constraint, and it mangled anything longer than two
+ * words.
+ */
 function sanitizeName(name) {
   if (typeof name !== 'string') return ''
-  return name.replace(/[^\w \-']/g, '').trim().slice(0, 12).toUpperCase()
+  return name.replace(/[^\w \-'&.]/g, '').replace(/\s+/g, ' ').trim().slice(0, 31)
 }
 
 /** How many individual hardware writes a validated spec will cost. */
