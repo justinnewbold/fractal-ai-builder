@@ -107,3 +107,102 @@ export const storePreset = (number) =>
   })
 
 export { ForgeError }
+
+/**
+ * Build the generation context: for every placed block, its live parameters and
+ * the model roster its family offers.
+ *
+ * Read from the device rather than from a committed catalog, so it always
+ * matches the firmware in front of the player. Sequential on purpose — the
+ * transport is a single serial port and parallel reads collide.
+ */
+export async function readSchema(blocks, onProgress) {
+  const editable = blocks.filter((b) => !['input', 'output', 'looper'].includes(b.slug))
+  const typeCache = new Map()
+  const schema = []
+
+  for (let i = 0; i < editable.length; i++) {
+    const block = editable[i]
+    onProgress?.(i + 1, editable.length, block.name)
+
+    let params = []
+    try {
+      const res = await blockParams(block.effectId)
+      params = (res?.named || []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        value: p.value,
+        min: p.min,
+        max: p.max,
+        unit: p.unit || ''
+      }))
+    } catch {
+      // A block with no readable parameters is not a failure — skip it.
+    }
+
+    let models = []
+    if (!typeCache.has(block.slug)) {
+      try {
+        typeCache.set(block.slug, (await blockTypes(block.slug)) || [])
+      } catch {
+        typeCache.set(block.slug, [])
+      }
+    }
+    models = typeCache.get(block.slug)
+
+    schema.push({
+      eid: block.effectId,
+      name: block.name,
+      slug: block.slug,
+      bypassed: block.bypassed,
+      channel: block.channel,
+      params,
+      models
+    })
+  }
+
+  return schema
+}
+
+/**
+ * Apply a validated set of changes, one write at a time.
+ *
+ * Sequential is a requirement, not a style choice: these all travel down one
+ * serial port. Model swaps go first, since changing a model resets that block's
+ * parameters and would otherwise undo the values we just wrote.
+ */
+export async function applyChanges(changes, onProgress) {
+  const queue = []
+
+  for (const change of changes) {
+    if (change.type !== undefined) {
+      queue.push({ label: `${change.name} → ${change.typeName}`, run: () => setType(change.eid, change.type) })
+    }
+  }
+  for (const change of changes) {
+    for (const param of change.params) {
+      queue.push({
+        label: `${change.name} · ${param.name} → ${param.to}${param.unit}`,
+        run: () => setParam(change.eid, param.id, param.to)
+      })
+    }
+    if (change.bypassed !== undefined) {
+      queue.push({
+        label: `${change.name} ${change.bypassed ? 'bypassed' : 'engaged'}`,
+        run: () => setBypass(change.eid, change.bypassed)
+      })
+    }
+  }
+
+  const failures = []
+  for (let i = 0; i < queue.length; i++) {
+    const step = queue[i]
+    onProgress?.(i + 1, queue.length, step.label)
+    try {
+      await step.run()
+    } catch (err) {
+      failures.push(`${step.label} — ${err.message}`)
+    }
+  }
+  return failures
+}

@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 /**
  * The routing grid, read live off the device.
  *
@@ -7,6 +9,15 @@
  * colour on their leading edge; bypassed blocks recede to an outline.
  */
 export default function Grid({ preset, blocks, rows = 4, cols = 12 }) {
+  const [showAll, setShowAll] = useState(false)
+
+  // Most presets live on row 1. Showing four rows of empty cells by default
+  // buries the actual signal path in whitespace, so collapse to the rows in use.
+  const usedRows = new Set(blocks.map((b) => b.row))
+  const lastUsed = usedRows.size ? Math.max(...usedRows) : 1
+  const visibleRows = showAll ? rows : lastUsed
+  const hiddenRows = rows - visibleRows
+
   const byPosition = new Map()
   for (const b of blocks) {
     // rows come back 1-indexed from ForgeFX, columns 0-indexed
@@ -14,7 +25,7 @@ export default function Grid({ preset, blocks, rows = 4, cols = 12 }) {
   }
 
   const cells = []
-  for (let row = 1; row <= rows; row++) {
+  for (let row = 1; row <= visibleRows; row++) {
     for (let col = 0; col < cols; col++) {
       const block = byPosition.get(`${row}:${col}`)
       cells.push(
@@ -70,6 +81,11 @@ export default function Grid({ preset, blocks, rows = 4, cols = 12 }) {
             {blocks.length} blocks placed
           </span>
         </div>
+        {hiddenRows > 0 || showAll ? (
+          <button className="chip" onClick={() => setShowAll(!showAll)}>
+            {showAll ? 'Collapse empty rows' : `Show all ${rows} rows`}
+          </button>
+        ) : null}
       </div>
     </section>
   )
