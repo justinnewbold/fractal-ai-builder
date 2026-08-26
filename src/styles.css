@@ -1536,7 +1536,7 @@ button.view-tab.current {
 
 .gig-scenes {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: 8px;
   margin-top: 12px;
 }
@@ -1546,9 +1546,9 @@ button.gig-scene {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  min-height: 76px;
-  padding: 10px;
+  gap: 4px;
+  min-height: 88px;
+  padding: 12px 10px;
   background: var(--panel);
 }
 
@@ -1562,14 +1562,40 @@ button.gig-scene.current {
   font-size: 21px;
 }
 
+/* When a scene has a name, the name is what you're looking for — the number
+   drops to an index. Unnamed, the number is all there is, so it stays large. */
+button.gig-scene.named .gig-scene-num {
+  font-size: 12px;
+  color: var(--silk-faint);
+}
+
+button.gig-scene.named.current .gig-scene-num {
+  color: rgba(20, 16, 10, 0.6);
+}
+
 .gig-scene-name {
-  font-size: 10.5px;
-  letter-spacing: 0.06em;
+  font-size: 11px;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
+  color: var(--silk-faint);
+}
+
+button.gig-scene.named .gig-scene-name {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--silk);
+  white-space: normal;
+  line-height: 1.15;
+}
+
+button.gig-scene.current .gig-scene-name,
+button.gig-scene.named.current .gig-scene-name {
+  color: inherit;
 }
 
 @media (prefers-reduced-motion: reduce) {
