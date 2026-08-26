@@ -1451,3 +1451,130 @@ input.refine-input {
   color: var(--silk-faint);
   font-size: 13px;
 }
+
+/* ---------- view tabs ---------- */
+
+.views {
+  display: flex;
+  gap: 2px;
+  margin-top: 22px;
+  border-bottom: 1px solid var(--rule);
+}
+
+button.view-tab {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--silk-faint);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 10px 16px;
+}
+
+button.view-tab:hover:not(:disabled) {
+  color: var(--silk-dim);
+  border-color: var(--rule);
+}
+
+button.view-tab.current {
+  color: var(--silk);
+  border-bottom-color: var(--signal);
+}
+
+/* ---------- gig mode ---------- */
+
+/* Big targets, high contrast, nothing that designs anything. */
+.gig {
+  margin-top: 26px;
+}
+
+.gig-preset {
+  padding: 22px 20px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--signal);
+  border-radius: 3px;
+}
+
+.gig-name {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(30px, 9vw, 52px);
+  letter-spacing: 0.02em;
+  line-height: 1.05;
+  margin: 6px 0 0;
+}
+
+.gig-signal {
+  height: 5px;
+  margin-top: 10px;
+  background: var(--panel);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.gig-signal-fill {
+  height: 100%;
+  background: var(--live);
+  transition: width 200ms linear;
+}
+
+.gig-nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.gig-nav button {
+  padding: 18px;
+  font-size: 15px;
+}
+
+.gig-scenes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+button.gig-scene {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 76px;
+  padding: 10px;
+  background: var(--panel);
+}
+
+button.gig-scene.current {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: #14100a;
+}
+
+.gig-scene-num {
+  font-size: 21px;
+}
+
+.gig-scene-name {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gig-signal-fill {
+    transition: none;
+  }
+}

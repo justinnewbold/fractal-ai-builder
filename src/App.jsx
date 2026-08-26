@@ -10,6 +10,7 @@ import Scenes from './components/Scenes'
 import History from './components/History'
 import { CabPicker, Backup, Meters } from './components/Hardware'
 import { Refine, Compare } from './components/Refine'
+import Gig from './components/Gig'
 import { savePreset } from './lib/history'
 import { costOf } from './lib/cost'
 import { VERSION, COMMIT, BUILT_AT } from './lib/version'
@@ -56,6 +57,10 @@ export default function App() {
   const [lastPrompt, setLastPrompt] = useState('')
   const [historyKey, setHistoryKey] = useState(0)
   const [compare, setCompare] = useState(null)
+
+  // Fifteen stacked sections was a long scroll with the important things buried.
+  // Grouped by what you're doing rather than by which endpoint it calls.
+  const [view, setView] = useState('design')
 
   const record = useCallback((kind, summary, detail = []) => {
     setLog((prev) => append(prev, newEntry(kind, summary, detail)))
@@ -442,6 +447,36 @@ export default function App() {
       ) : null}
 
       {status === 'live' ? (
+        <nav className="views" aria-label="Sections">
+          {[
+            ['design', 'Design'],
+            ['bench', 'Bench'],
+            ['library', 'Library'],
+            ['gig', 'Gig']
+          ].map(([id, label]) => (
+            <button
+              key={id}
+              className={`view-tab ${view === id ? 'current' : ''}`}
+              onClick={() => setView(id)}
+              aria-current={view === id}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      ) : null}
+
+      {status === 'live' && view === 'gig' ? (
+        <Gig
+          preset={preset}
+          device={device}
+          capabilities={device?.capabilities}
+          onError={setError}
+          onChanged={read}
+        />
+      ) : null}
+
+      {status === 'live' && view === 'design' ? (
         <>
           <PresetBar preset={preset} onSelect={jumpTo} onRename={rename} busy={busy} />
 
@@ -544,6 +579,14 @@ export default function App() {
           {preset ? (
             <Grid preset={preset} blocks={blocks} capabilities={device?.capabilities} />
           ) : null}
+        </>
+      ) : null}
+
+      {status === 'live' && view === 'bench' ? (
+        <>
+          {preset ? (
+            <Grid preset={preset} blocks={blocks} capabilities={device?.capabilities} />
+          ) : null}
 
           <Scenes
             blocks={blocks}
@@ -593,7 +636,11 @@ export default function App() {
           />
 
           <Meters active={status === 'live'} />
+        </>
+      ) : null}
 
+      {status === 'live' && view === 'library' ? (
+        <>
           <History key={historyKey} onReload={reload} busy={busy} />
 
           <ChangeLog log={log} onClear={() => setLog([])} />
@@ -602,7 +649,7 @@ export default function App() {
         </>
       ) : null}
 
-      <section>
+      <section hidden={status === 'live' && view !== 'library'}>
         <p className="silk-label" style={{ marginTop: 34 }}>
           Catalog loaded for generation
         </p>
@@ -630,7 +677,7 @@ export default function App() {
         </div>
       </section>
 
-      <p className="footnote">
+      <p className="footnote" hidden={status === 'live' && view === 'gig'}>
         Models and parameter ranges are read off your own hardware at generation time, so the
         designer can only pick models your unit has and only set values inside each control&rsquo;s
         real range. Anything outside it is rejected before a single write goes out. Device access
