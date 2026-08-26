@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import DeviceBar from './components/DeviceBar'
 import Grid from './components/Grid'
 import { ToneForm, Preview } from './components/Generate'
@@ -17,8 +17,15 @@ import { Modifiers, SceneMatrix, TempoTuner } from './components/Modifiers'
 import { Versions, DeviceBackup } from './components/Versions'
 import Footswitches from './components/Footswitches'
 import GridEditor from './components/GridEditor'
-import { Chain, PresetList, BlockPanel } from './components/Console'
-import { presetRange, getTempo, tapTempo, setTuner } from './lib/forgefx'
+import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
+import {
+  getTempo,
+  tapTempo,
+  setTuner,
+  subscribeEvents,
+  scanAllPresets,
+  cachedPresetNames
+} from './lib/forgefx'
 import { savePreset } from './lib/history'
 import { costOf } from './lib/cost'
 import { VERSION, COMMIT, BUILT_AT } from './lib/version'
@@ -84,6 +91,9 @@ export default function App() {
   const [sceneNames, setSceneNames] = useState([])
   const [bpm, setBpm] = useState(null)
   const [tunerOn, setTunerOn] = useState(false)
+  const [tuning, setTuning] = useState(null)
+  const [scanProgress, setScanProgress] = useState(null)
+  const stopScan = useRef(false)
   const [editTab, setEditTab] = useState('fx')
 
   const record = useCallback((kind, summary, detail = []) => {
@@ -143,6 +153,20 @@ export default function App() {
   useEffect(() => {
     read()
   }, [read])
+
+  // The tuner pushes readings over SSE rather than answering requests, so the
+  // subscription is what makes the button do anything visible.
+  useEffect(() => {
+    if (!tunerOn || status !== 'live') return
+    const unsubscribe = subscribeEvents((event) => {
+      if (event?.type === 'tuner' || event?.note !== undefined) setTuning(event)
+      if (event?.type === 'tempo' && typeof event.bpm === 'number') setBpm(event.bpm)
+    })
+    return () => {
+      unsubscribe()
+      setTuning(null)
+    }
+  }, [tunerOn, status])
 
   /** One path to the model, so generate, refine and compare can't drift apart. */
   const requestSpec = async (schema, description, previous) => {
@@ -622,21 +646,37 @@ export default function App() {
             </div>
           </div>
 
+          <Tuner reading={tuning} on={tunerOn} />
+
           <div className="console">
             <PresetList
-              slots={slots}
+              slots={slots.length ? slots : cachedPresetNames()}
               current={preset?.number}
               deviceSlots={device?.capabilities?.presets?.count}
               scanning={scanning}
+              progress={scanProgress}
+              onStop={() => {
+                stopScan.current = true
+              }}
               onScan={async () => {
                 setScanning(true)
+                stopScan.current = false
+                const total = device?.capabilities?.presets?.count ?? 512
                 try {
-                  const from = Math.max(0, (preset?.number ?? 0) - 8)
-                  setSlots(await presetRange(from, 20))
+                  const found = await scanAllPresets(
+                    total,
+                    (done, all, partial) => {
+                      setScanProgress({ done, total: all, pct: Math.round((done / all) * 100) })
+                      setSlots(partial)
+                    },
+                    () => stopScan.current
+                  )
+                  setSlots(found)
                 } catch (err) {
                   setError(err.message)
                 } finally {
                   setScanning(false)
+                  setScanProgress(null)
                 }
               }}
               onSelect={jumpTo}

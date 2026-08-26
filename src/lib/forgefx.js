@@ -805,3 +805,80 @@ export const blockCatalog = () =>
  * flash, so the edit buffer is discarded — which is the whole of revert.
  */
 export const revertPreset = (number) => selectPreset(number)
+
+
+/**
+ * Subscribe to the device event stream.
+ *
+ * Tuner readings, meters, tempo and change notices are pushed here, not polled.
+ * POST /tuner only starts the poll timer inside ForgeFX — the readings arrive
+ * over this stream, so turning the tuner on without subscribing gives you a
+ * running timer and nothing to look at.
+ *
+ * Returns an unsubscribe function.
+ */
+export function subscribeEvents(onEvent) {
+  if (mock) {
+    const id = setInterval(() => {
+      const cents = Math.round((Math.random() - 0.5) * 30)
+      onEvent({ type: 'tuner', note: ['E', 'A', 'D', 'G', 'B'][Math.floor(Math.random() * 5)], octave: 2, cents })
+    }, 400)
+    return () => clearInterval(id)
+  }
+
+  let source
+  try {
+    source = new EventSource(`${getHost()}/events`)
+  } catch {
+    return () => {}
+  }
+
+  source.onmessage = (message) => {
+    try {
+      onEvent(JSON.parse(message.data))
+    } catch {
+      // Heartbeats and comments arrive as non-JSON; ignore them.
+    }
+  }
+  source.onerror = () => {
+    // EventSource reconnects on its own. Failing loudly here would mean an
+    // error toast every time the server restarts.
+  }
+
+  return () => source.close()
+}
+
+/**
+ * Read every preset name on the unit, in pages.
+ *
+ * 512 sequential reads down one serial port is slow, so this reports progress
+ * and can be stopped. Names are cached for the session — they only change when
+ * something is stored, and re-reading 512 slots to redraw a list would be
+ * absurd.
+ */
+const nameCache = new Map()
+
+export function cachedPresetNames() {
+  return [...nameCache.entries()]
+    .map(([number, name]) => ({ number, name }))
+    .sort((a, b) => a.number - b.number)
+}
+
+export function forgetPresetName(number) {
+  nameCache.delete(number)
+}
+
+export async function scanAllPresets(total, onProgress, shouldStop) {
+  for (let number = 0; number < total; number++) {
+    if (shouldStop?.()) break
+    if (nameCache.has(number)) continue
+    try {
+      const res = await presetName(number)
+      nameCache.set(number, (res?.name || '').trim())
+    } catch {
+      nameCache.set(number, null)
+    }
+    if (number % 4 === 0 || number === total - 1) onProgress?.(number + 1, total, cachedPresetNames())
+  }
+  return cachedPresetNames()
+}

@@ -104,25 +104,67 @@ export function Chain({ blocks, selected, onSelect }) {
   )
 }
 
-/** Bank-grouped preset list, the way the hardware numbers them. */
-export function PresetList({ slots, current, onSelect, onScan, scanning, deviceSlots }) {
+/**
+ * Bank-grouped preset list.
+ *
+ * Names are read one slot at a time down a serial port, so the whole list can't
+ * arrive at once — it fills in as it scans, and the scan can be stopped. A
+ * filter box matters more here than in most lists: 512 presets is a lot to
+ * scroll, and half of them are called some variation of "Lead".
+ */
+export function PresetList({ slots, current, onSelect, onScan, onStop, scanning, progress, deviceSlots }) {
+  const [filter, setFilter] = useState('')
+
+  const needle = filter.trim().toLowerCase()
+  const shown = needle
+    ? slots.filter(
+        (s) => (s.name || '').toLowerCase().includes(needle) || String(s.number) === needle
+      )
+    : slots
+
   return (
     <div className="preset-panel">
       <div className="panel-head">
         <p className="panel-title">Presets</p>
-        <button className="icon-btn" onClick={onScan} disabled={scanning} title="Read names">
-          {scanning ? '…' : '⟳'}
+        <button
+          className="icon-btn"
+          onClick={scanning ? onStop : onScan}
+          title={scanning ? 'Stop' : 'Read all names'}
+        >
+          {scanning ? '■' : '⟳'}
         </button>
       </div>
+
+      <input
+        type="text"
+        className="preset-filter"
+        value={filter}
+        placeholder="Filter"
+        onChange={(e) => setFilter(e.target.value)}
+        aria-label="Filter presets"
+      />
+
+      {scanning && progress ? (
+        <div className="scan-bar">
+          <div className="scan-fill" style={{ width: `${progress.pct}%` }} />
+          <span className="scan-text mono">
+            {progress.done} / {progress.total}
+          </span>
+        </div>
+      ) : null}
 
       <div className="preset-scroll">
         {slots.length === 0 ? (
           <p className="hint pad">Press ⟳ to read preset names off the unit.</p>
+        ) : shown.length === 0 ? (
+          <p className="hint pad">Nothing matches “{filter}”.</p>
         ) : (
-          slots.map((slot, i) => {
+          shown.map((slot, i) => {
             const bank = String.fromCharCode(65 + Math.floor(slot.number / 4))
             const within = (slot.number % 4) + 1
-            const newBank = i === 0 || Math.floor(slot.number / 4) !== Math.floor(slots[i - 1].number / 4)
+            const newBank =
+              !needle &&
+              (i === 0 || Math.floor(slot.number / 4) !== Math.floor(shown[i - 1].number / 4))
             return (
               <button
                 key={slot.number}
@@ -141,7 +183,11 @@ export function PresetList({ slots, current, onSelect, onScan, scanning, deviceS
           })
         )}
       </div>
-      {deviceSlots ? <p className="hint pad">{deviceSlots} slots on this unit</p> : null}
+      {deviceSlots ? (
+        <p className="hint pad">
+          {slots.length} of {deviceSlots} read
+        </p>
+      ) : null}
     </div>
   )
 }
@@ -358,4 +404,48 @@ function fmt(n) {
   if (typeof n !== 'number') return '—'
   if (Math.abs(n) >= 1000) return Math.round(n).toLocaleString()
   return n.toFixed(2)
+}
+
+
+/**
+ * Tuner readout.
+ *
+ * Readings arrive over the event stream rather than on request, so this shows
+ * whatever last came through. The bar is centre-out because that's the only
+ * thing you look at while tuning — a number in cents is precise and useless
+ * mid-string.
+ */
+export function Tuner({ reading, on }) {
+  if (!on) return null
+
+  const cents = reading?.cents ?? 0
+  const inTune = Math.abs(cents) <= 3
+  const offset = Math.max(-50, Math.min(50, cents))
+
+  return (
+    <div className="tuner-panel">
+      <div className="tuner-note">
+        {reading?.note ? (
+          <>
+            <span className={`note ${inTune ? 'in' : ''}`}>{reading.note}</span>
+            {reading.octave !== undefined ? <span className="octave mono">{reading.octave}</span> : null}
+          </>
+        ) : (
+          <span className="note waiting">—</span>
+        )}
+      </div>
+
+      <div className="tuner-bar">
+        <div className="tuner-centre" />
+        <div
+          className={`tuner-needle ${inTune ? 'in' : ''}`}
+          style={{ left: `calc(50% + ${offset}%)` }}
+        />
+      </div>
+
+      <div className="tuner-cents mono">
+        {reading?.note ? `${cents > 0 ? '+' : ''}${cents} cents` : 'Play a string'}
+      </div>
+    </div>
+  )
 }
