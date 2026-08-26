@@ -193,6 +193,21 @@ identical run served 26,944 of 26,968 input tokens from cache.
 
 A model with no published rate on file shows a blank rather than a guess.
 
+## Snapshots vs saved presets
+
+Two different things, and the difference decides which one answers your question.
+
+A **saved preset** stores a generated spec — an intent. It can be replayed
+against any preset, re-validated against whatever ranges are current. That
+answers *"do that again."*
+
+A **snapshot** is a raw `.syx` dump of one slot at one moment, taken by ForgeFX
+before it overwrites anything. That answers *"put it back how it was"* — and only
+it can, because only it knows what "it was" actually contained.
+
+Snapshots can be played into the edit buffer without occupying a slot, or written
+back to the slot they came from.
+
 ## Saved presets
 
 Every preset that gets written is saved locally and can be reloaded onto any

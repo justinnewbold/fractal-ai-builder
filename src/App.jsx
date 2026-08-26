@@ -12,6 +12,7 @@ import { CabPicker, Backup, Meters } from './components/Hardware'
 import { Refine, Compare } from './components/Refine'
 import Gig from './components/Gig'
 import { Modifiers, SceneMatrix, TempoTuner } from './components/Modifiers'
+import { Versions, DeviceBackup } from './components/Versions'
 import { savePreset } from './lib/history'
 import { costOf } from './lib/cost'
 import { VERSION, COMMIT, BUILT_AT } from './lib/version'
@@ -657,6 +658,22 @@ export default function App() {
 
       {status === 'live' && view === 'library' ? (
         <>
+          <Versions
+            preset={preset}
+            busy={busy}
+            onError={setError}
+            onChanged={(summary) => {
+              record('version', summary)
+              read()
+            }}
+          />
+
+          <DeviceBackup
+            busy={busy}
+            onError={setError}
+            onChanged={(summary) => record('backup', summary)}
+          />
+
           <History key={historyKey} onReload={reload} busy={busy} />
 
           <ChangeLog log={log} onClear={() => setLog([])} />
