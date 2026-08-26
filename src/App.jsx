@@ -42,6 +42,7 @@ export default function App() {
   const [progress, setProgress] = useState(null)
   const [applied, setApplied] = useState(null)
   const [slot, setSlot] = useState('')
+  const [saveName, setSaveName] = useState('')
   const [log, setLog] = useState([])
   const [spend, setSpend] = useState({ total: 0, runs: 0 })
 
@@ -98,6 +99,8 @@ export default function App() {
 
       const validated = validateSpec(spec, schema)
       setResult(validated)
+
+      if (validated.presetName) setSaveName(validated.presetName)
 
       const runCost = costOf(validated.usage, validated.usage?.model)
       if (runCost !== null) {
@@ -162,9 +165,15 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
+      // Name first: /preset/name writes the working buffer, and storePreset is
+      // what makes it permanent. Doing it the other way round saves the old name.
+      const name = saveName.trim()
+      if (name && name !== preset?.name?.trim()) {
+        await setPresetName(name)
+      }
       await storePreset(number)
       setApplied((prev) => ({ ...prev, savedTo: number }))
-      record('save', `Saved to slot ${number}`)
+      record('save', `Saved "${name || preset?.name}" to slot ${number}`)
       await read()
     } catch (err) {
       setError(err.message)
@@ -301,9 +310,18 @@ export default function App() {
                 <div className="save-row">
                   <input
                     type="text"
+                    className="name-field"
+                    value={saveName}
+                    maxLength={31}
+                    onChange={(e) => setSaveName(e.target.value)}
+                    placeholder="Preset name"
+                    aria-label="Name to save the preset under"
+                  />
+                  <input
+                    type="text"
                     value={slot}
                     onChange={(e) => setSlot(e.target.value.replace(/[^0-9]/g, ''))}
-                    placeholder="Slot number"
+                    placeholder="Slot"
                     aria-label="Preset slot to save into"
                   />
                   <button onClick={save} disabled={busy || !slot}>

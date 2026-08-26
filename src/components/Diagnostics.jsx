@@ -23,6 +23,32 @@ export default function Diagnostics() {
     setOpen(true)
   }
 
+  const [copied, setCopied] = useState(false)
+
+  const copy = async () => {
+    const current = getWireLog()
+    const lines = [
+      `${FULL} — built ${BUILT_AT} UTC`,
+      `${current.length} writes`,
+      '',
+      'parameter | wanted | sent | means | range',
+      ...current.map((r) => {
+        const means = r.sent === null || !r.range ? '—' : round4(fromNormalized(r.sent, r.range))
+        const range = r.range
+          ? `${r.range.min}–${r.range.max}${r.range.log ? ' log' : ''}${r.outOfRange ? ' OUTSIDE' : ''}`
+          : 'NO RANGE'
+        return `${r.name || '#' + r.paramId} | ${r.wanted} | ${r.sent === null ? 'refused' : round4(r.sent)} | ${means} | ${range}`
+      })
+    ]
+    try {
+      await navigator.clipboard.writeText(lines.join('\n'))
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    } catch {
+      setCopied(false)
+    }
+  }
+
   const suspicious = rows.filter(
     (r) => r.sent === null || r.sent === 0 || r.sent === 1 || r.outOfRange
   )
@@ -43,6 +69,9 @@ export default function Diagnostics() {
           <div className="diag-actions">
             <button className="chip" onClick={refresh}>
               Refresh
+            </button>
+            <button className="chip" onClick={copy}>
+              {copied ? 'Copied' : 'Copy all as text'}
             </button>
             <button
               className="chip"

@@ -1103,3 +1103,10 @@ button.chip.active {
   font-size: 10.5px;
   color: var(--silk-faint);
 }
+
+.save-row input.name-field {
+  min-width: 170px;
+  font-family: var(--display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
