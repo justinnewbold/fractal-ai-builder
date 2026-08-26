@@ -85,7 +85,7 @@ export default function App() {
 
   // Fifteen stacked sections was a long scroll with the important things buried.
   // Grouped by what you're doing rather than by which endpoint it calls.
-  const [view, setView] = useState('console')
+  const [view, setView] = useState('design')
   const [selectedBlock, setSelectedBlock] = useState(null)
   const [slots, setSlots] = useState([])
   const [scanning, setScanning] = useState(false)
@@ -96,7 +96,7 @@ export default function App() {
   const [tuning, setTuning] = useState(null)
   const [scanProgress, setScanProgress] = useState(null)
   const stopScan = useRef(false)
-  const [editTab, setEditTab] = useState('fx')
+  const [editTab, setEditTab] = useState('ai')
 
   const record = useCallback((kind, summary, detail = []) => {
     setLog((prev) => append(prev, newEntry(kind, summary, detail)))
@@ -589,8 +589,8 @@ export default function App() {
       {status === 'live' ? (
         <nav className="views" aria-label="Sections">
           {[
-            ['console', 'Console'],
             ['design', 'Design'],
+            ['console', 'Console'],
             ['bench', 'Bench'],
             ['library', 'Library'],
             ['gig', 'Gig']
@@ -746,8 +746,8 @@ export default function App() {
 
               <div className="edit-tabs">
                 {[
-                  ['fx', 'FX Edit'],
                   ['ai', 'Design with AI'],
+                  ['fx', 'FX Edit'],
                   ['build', 'Quick Build']
                 ].map(([id, label]) => (
                   <button
@@ -856,8 +856,6 @@ export default function App() {
 
       {status === 'live' && view === 'design' ? (
         <>
-          <PresetBar preset={preset} onSelect={jumpTo} onRename={rename} busy={busy} />
-
           {blocks.length === 0 ? (
             <div className="notice">
               <h2>This preset is empty</h2>
@@ -895,6 +893,8 @@ export default function App() {
             open={liveOpen}
             onToggle={() => setLiveOpen(!liveOpen)}
           />
+
+          <PresetBar preset={preset} onSelect={jumpTo} onRename={rename} busy={busy} />
 
           {error ? (
             <div className="notice" data-kind="fault">
