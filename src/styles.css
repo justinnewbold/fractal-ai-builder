@@ -2492,3 +2492,128 @@ button.chan-btn.current {
     flex-direction: row;
   }
 }
+
+/* ---------- preset scan and filter ---------- */
+
+input.preset-filter {
+  width: calc(100% - 20px);
+  margin: 8px 10px;
+  min-width: 0;
+  padding: 6px 8px;
+  font-family: var(--body);
+  font-size: 12px;
+}
+
+.scan-bar {
+  position: relative;
+  height: 14px;
+  margin: 0 10px 6px;
+  background: var(--chassis);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.scan-fill {
+  height: 100%;
+  background: var(--live);
+  opacity: 0.35;
+  transition: width 200ms linear;
+}
+
+.scan-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9.5px;
+  color: var(--silk-dim);
+}
+
+/* ---------- tuner ---------- */
+
+/* Centre-out, because that is the only thing anyone looks at while tuning. */
+.tuner-panel {
+  margin-top: 10px;
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--live);
+  border-radius: 3px;
+}
+
+.tuner-note {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+}
+
+.tuner-note .note {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 40px;
+  line-height: 1;
+  color: var(--silk);
+}
+
+.tuner-note .note.in {
+  color: var(--live);
+}
+
+.tuner-note .note.waiting {
+  color: var(--silk-faint);
+}
+
+.tuner-note .octave {
+  font-size: 13px;
+  color: var(--silk-faint);
+}
+
+.tuner-bar {
+  position: relative;
+  height: 8px;
+  margin: 12px auto 6px;
+  max-width: 420px;
+  background: var(--chassis);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+}
+
+.tuner-centre {
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  bottom: -3px;
+  width: 1px;
+  background: var(--silk-faint);
+}
+
+.tuner-needle {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 3px;
+  margin-left: -1.5px;
+  background: var(--signal);
+  border-radius: 1px;
+  transition: left 90ms linear;
+}
+
+.tuner-needle.in {
+  background: var(--live);
+}
+
+.tuner-cents {
+  text-align: center;
+  font-size: 11px;
+  color: var(--silk-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tuner-needle,
+  .scan-fill {
+    transition: none;
+  }
+}
