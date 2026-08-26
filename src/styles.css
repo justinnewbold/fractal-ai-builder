@@ -2617,3 +2617,7 @@ input.preset-filter {
     transition: none;
   }
 }
+
+.scene-title.unnamed {
+  color: var(--silk-faint);
+}
