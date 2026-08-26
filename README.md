@@ -212,6 +212,20 @@ identical run served 26,944 of 26,968 input tokens from cache.
 
 A model with no published rate on file shows a blank rather than a guess.
 
+## Nothing is permanent until you save it
+
+Everything this app writes lands in the **edit buffer**. `/preset/store` is the
+only call that commits to a slot. So a generated preset is already there to play
+before you decide anything, and switching presets discards it.
+
+That makes revert one call: reselecting the same slot reloads it from flash and
+throws the edit buffer away. The app shows a bar whenever the buffer differs
+from what's stored, so "am I playing something I've saved?" is never a guess.
+
+For the case revert can't reach — changing your mind *after* saving — a verbatim
+`.syx` copy of the slot is taken before the first write of a session and can be
+pushed back into the edit buffer.
+
 ## Snapshots vs saved presets
 
 Two different things, and the difference decides which one answers your question.

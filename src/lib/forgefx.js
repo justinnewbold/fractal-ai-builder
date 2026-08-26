@@ -795,3 +795,13 @@ export const readGrid = () =>
  */
 export const blockCatalog = () =>
   mock ? tick().then(() => mock.blockCatalog()) : request('/blocks')
+
+
+/**
+ * Throw away unsaved edits and reload the preset from flash.
+ *
+ * Everything this app writes lands in the edit buffer; /preset/store is the only
+ * thing that makes it permanent. Reselecting the same slot reloads it from
+ * flash, so the edit buffer is discarded — which is the whole of revert.
+ */
+export const revertPreset = (number) => selectPreset(number)
