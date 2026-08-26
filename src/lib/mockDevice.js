@@ -256,6 +256,36 @@ export function createMockDevice() {
           level: Math.random() * 0.7 + 0.15
         })),
 
+    placeBlock: (row, col, blockId) => {
+      const existing = state.blocks.findIndex((b) => b.row === row && b.col === col)
+      if (blockId === 0) {
+        if (existing >= 0) state.blocks.splice(existing, 1)
+        return { ok: true }
+      }
+      const known = LAYOUT.find((l) => l.effectId === blockId)
+      const block = {
+        slug: known?.slug || 'unknown',
+        name: known?.name || `Block ${blockId}`,
+        effectId: blockId,
+        row,
+        col,
+        fromRows: [row],
+        bypassed: false,
+        channel: 'A',
+        type: 0
+      }
+      if (existing >= 0) state.blocks[existing] = block
+      else state.blocks.push(block)
+      if (!state.params.has(blockId)) state.params.set(blockId, paramsFor(block.slug))
+      return { ok: true }
+    },
+
+    grid: () => ({
+      rows: GRID.rows,
+      cols: GRID.cols,
+      cells: state.blocks.map((b) => ({ row: b.row, col: b.col, effectId: b.effectId, name: b.name }))
+    }),
+
     versions: () => ({
       versions: [
         { id: 'v1', location: 500, name: 'DEMO', at: Date.now() - 3600_000, label: 'Before edit' },
