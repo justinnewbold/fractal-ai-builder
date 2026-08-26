@@ -74,16 +74,26 @@ Quit FM3-Edit before starting. Only one program can hold the USB port.
 - [x] Phase 4b — cab/IR picker, live meters *(block placement deliberately deferred, see below)*
 - [x] Phase 5 — .syx backup and restore, saved preset library
 
-### Block placement is deferred, not forgotten
+### Block placement, and the probe that makes it safe
 
-`PUT /preset/grid/cell` and `POST /preset/grid/cable` exist, but ForgeFX flags
-block placement as spec-derived and not hardware-confirmed, and the `?dryRun=true`
-frame preview its docs describe **is not implemented in the code** — zero matches
-across `server/src`. Writing preset structure with no way to preview the frame,
-on a project where three separate encoding assumptions have already turned out
-wrong, isn't a trade worth making yet.
+`PUT /preset/grid/cell` writes preset structure rather than values, and ForgeFX
+flags it as spec-derived rather than hardware-confirmed. The `?dryRun=true` frame
+preview its docs describe **is not implemented** — zero matches across
+`server/src`.
 
-Adding `dryRun` upstream is the unblocking move.
+Two things make it workable anyway. Placement writes go through the reject-watch
+path, so a refusal comes back as `ok: false` instead of passing silently (`0x0b`
+is an impossible grid position, `0x0c` is DSP overload). And
+`POST /preset/grid/select` writes nothing at all — it moves the unit's edit
+cursor, so you can point at a cell and watch the FM3's screen to confirm the app
+and the hardware agree about which cell is which.
+
+That probe matters because two indexing conventions are in play: `/preset/blocks`
+reports columns 0-indexed, the grid write routes take them 1-indexed to match
+FM-Edit. Conversion happens at the client boundary so the rest of the app deals
+in one convention, and the probe is what catches it if that's wrong.
+
+Grid editing stays behind an explicit unlock that asks for a device backup first.
 
 ### The UI follows the device, not the FM3
 

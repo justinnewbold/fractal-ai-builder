@@ -14,6 +14,7 @@ import Gig from './components/Gig'
 import { Modifiers, SceneMatrix, TempoTuner } from './components/Modifiers'
 import { Versions, DeviceBackup } from './components/Versions'
 import Footswitches from './components/Footswitches'
+import GridEditor from './components/GridEditor'
 import { savePreset } from './lib/history'
 import { costOf } from './lib/cost'
 import { VERSION, COMMIT, BUILT_AT } from './lib/version'
@@ -491,7 +492,11 @@ export default function App() {
                 blocks that are already placed &mdash; it can&rsquo;t build a chain from nothing
                 yet.
               </p>
-              <p>Load a preset that already has an amp and cab, then design from there.</p>
+              <p>
+                Load a preset that already has an amp and cab, or go to <strong>Bench</strong> and
+                build a chain first &mdash; there&rsquo;s a starter chain button that places
+                drive, amp, cab, delay and reverb in one go.
+              </p>
             </div>
           ) : (
             <ToneForm onGenerate={generate} busy={busy} disabled={status !== 'live'} />
@@ -602,6 +607,17 @@ export default function App() {
               read()
             }}
             onError={setError}
+          />
+
+          <GridEditor
+            blocks={blocks}
+            capabilities={device?.capabilities}
+            busy={busy}
+            onError={setError}
+            onChanged={(summary) => {
+              record('grid', summary)
+              read()
+            }}
           />
 
           <SceneMatrix onError={setError} />

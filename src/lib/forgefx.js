@@ -725,3 +725,61 @@ export const backupDevice = (label, from = 0, to = 511) =>
 
 /** Footswitch layout the unit reports. */
 export const fcModel = () => (mock ? tick().then(() => null) : request('/fc/model'))
+
+
+/* ------------------------------------------------------------------
+   Grid editing
+
+   Indexing is the trap. /preset/blocks reports col 0-indexed, while the
+   grid write routes take row and col 1-indexed to match FM-Edit. Mixing
+   them puts a block one column from where you meant.
+
+   Everything below takes display coordinates — the ones /preset/blocks
+   uses — and converts at the boundary, so the rest of the app only ever
+   deals in one convention.
+   ------------------------------------------------------------------ */
+
+const toWireCell = (row, col) => ({ row, col: col + 1 })
+
+/**
+ * Move the device's edit cursor to a cell. Writes nothing.
+ *
+ * The safe way to confirm the app and the hardware agree about which cell is
+ * which: point at one and watch the FM3's screen. Worth doing once before
+ * trusting placement, given the two indexing conventions in play.
+ */
+export const pointAtCell = (row, col) =>
+  mock
+    ? tick().then(() => ({ ok: true }))
+    : request('/preset/grid/select', { method: 'POST', body: JSON.stringify(toWireCell(row, col)) })
+
+/**
+ * Put a block in a cell, or clear it with blockId 0.
+ *
+ * ForgeFX sends a cell-select before the insert — the FM3 drops the block at a
+ * default cell otherwise — and watches for a 0x64 rejection on both frames, so
+ * a refusal comes back as ok:false rather than silence. Known refusals: 0x0b for
+ * an impossible grid position, 0x0c for DSP overload.
+ */
+export const placeBlock = (row, col, blockId) =>
+  mock
+    ? tick().then(() => mock.placeBlock(row, col, blockId))
+    : request('/preset/grid/cell', {
+        method: 'PUT',
+        body: JSON.stringify({ ...toWireCell(row, col), blockId })
+      })
+
+export const clearCell = (row, col) => placeBlock(row, col, 0)
+
+/** Connect or cut a cable from one cell to a row in the next column. */
+export const setCable = (srcRow, srcCol, destRow, connect = true) =>
+  mock
+    ? tick().then(() => ({ ok: true }))
+    : request('/preset/grid/cable', {
+        method: 'POST',
+        body: JSON.stringify({ ...toWireCell(srcRow, srcCol), srcRow, srcCol: srcCol + 1, destRow, connect })
+      })
+
+/** The routing grid as the device reports it, including cabling. */
+export const readGrid = () =>
+  mock ? tick().then(() => mock.grid()) : request('/preset/grid')
