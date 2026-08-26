@@ -100,12 +100,16 @@ export const setParam = (eid, paramId, value, param) => {
   // off a diagnostics panel beats asking someone to open browser devtools, and
   // it is the one piece of evidence that does not depend on which parameters a
   // given generation happened to pick.
+  const outOfRange =
+    param && typeof param.min === 'number' && (value < param.min || value > param.max)
+
   recordWire({
     eid,
     paramId,
     name: param?.name,
     wanted: value,
     sent: norm,
+    outOfRange,
     range: param ? { min: param.min, max: param.max, log: !!param.log } : null
   })
 
@@ -220,42 +224,76 @@ export async function readSchema(blocks, onProgress) {
  * Apply a validated set of changes, one write at a time.
  *
  * Sequential is a requirement, not a style choice: these all travel down one
- * serial port. Model swaps go first, since changing a model resets that block's
- * parameters and would otherwise undo the values we just wrote.
+ * serial port.
+ *
+ * Model swaps go first, because changing a block's model resets its parameters
+ * and would otherwise undo the values just written. But a swap can also change
+ * the parameter *ranges* — different amp models have different low-cut spans —
+ * and values were normalised against the ranges read before the swap. So after
+ * a model change that block's parameters are re-read and the conversion redone
+ * against what the new model actually reports. Without this, a frequency asked
+ * for in the middle of the old range can land pinned at the floor of the new
+ * one.
  */
 export async function applyChanges(changes, onProgress) {
-  const queue = []
+  const failures = []
+  const swapped = changes.filter((c) => c.type !== undefined)
+  let step = 0
+  const total =
+    changes.reduce(
+      (n, c) => n + c.params.length + (c.type !== undefined ? 1 : 0) + (c.bypassed !== undefined ? 1 : 0),
+      0
+    ) + swapped.length
 
-  for (const change of changes) {
-    if (change.type !== undefined) {
-      queue.push({ label: `${change.name} → ${change.typeName}`, run: () => setType(change.eid, change.type) })
+  const advance = (label) => onProgress?.(++step, total, label)
+
+  // 1. models
+  for (const change of swapped) {
+    advance(`${change.name} → ${change.typeName}`)
+    try {
+      await setType(change.eid, change.type)
+    } catch (err) {
+      failures.push(`${change.name} model — ${err.message}`)
     }
   }
+
+  // 2. re-read ranges for anything whose model moved
+  const freshRanges = new Map()
+  for (const change of swapped) {
+    advance(`Re-reading ${change.name} after model change`)
+    try {
+      const res = await blockParams(change.eid)
+      freshRanges.set(
+        change.eid,
+        new Map((res?.named || []).map((p) => [p.id, { min: p.min, max: p.max, log: !!p.log }]))
+      )
+    } catch {
+      // Fall back to the pre-swap ranges rather than skipping the writes.
+    }
+  }
+
+  // 3. parameters, then bypass
   for (const change of changes) {
+    const fresh = freshRanges.get(change.eid)
     for (const param of change.params) {
-      queue.push({
-        label: `${change.name} · ${param.name} → ${param.to}${param.unit}`,
-        run: () => setParam(change.eid, param.id, param.to, param.range)
-      })
+      const range = fresh?.get(param.id) ?? param.range
+      advance(`${change.name} · ${param.name} → ${param.to}${param.unit}`)
+      try {
+        await setParam(change.eid, param.id, param.to, { ...range, name: param.name })
+      } catch (err) {
+        failures.push(`${change.name} · ${param.name} — ${err.message}`)
+      }
     }
     if (change.bypassed !== undefined) {
-      queue.push({
-        label: `${change.name} ${change.bypassed ? 'bypassed' : 'engaged'}`,
-        run: () => setBypass(change.eid, change.bypassed)
-      })
+      advance(`${change.name} ${change.bypassed ? 'bypassed' : 'engaged'}`)
+      try {
+        await setBypass(change.eid, change.bypassed)
+      } catch (err) {
+        failures.push(`${change.name} bypass — ${err.message}`)
+      }
     }
   }
 
-  const failures = []
-  for (let i = 0; i < queue.length; i++) {
-    const step = queue[i]
-    onProgress?.(i + 1, queue.length, step.label)
-    try {
-      await step.run()
-    } catch (err) {
-      failures.push(`${step.label} — ${err.message}`)
-    }
-  }
   return failures
 }
 
