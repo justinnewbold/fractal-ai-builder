@@ -124,6 +124,19 @@ same reason: a threshold set too high mutes quiet playing, and the safe value
 depends on pickups and room rather than on a text description. See
 `src/lib/guardrails.js`.
 
+## Cost
+
+Each generation is priced from the token counts the API returns and shown next
+to the result, with a running session total. Rates live in `src/lib/cost.js`.
+
+The input side is dominated by the model roster and the parameter schema for
+every placed block, so cost scales with how much of the preset gets sent — a
+larger preset is a more expensive run. Cached input reads bill at a tenth of
+the base rate; the roster is stable between runs and is the obvious candidate
+for prompt caching later.
+
+A model with no published rate on file shows a blank rather than a guess.
+
 ## Browser support
 
 Chrome works. **Safari does not** — it blocks a secure page from calling
