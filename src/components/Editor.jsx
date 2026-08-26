@@ -86,7 +86,8 @@ export default function Editor({ blocks, onWritten, onError }) {
         detail.push(`${active.name} model → ${model?.name ?? modelEdit}`)
       }
       for (const change of pending) {
-        await setParam(openEid, change.id, change.to)
+        const meta = params.find((x) => x.id === change.id)
+        await setParam(openEid, change.id, change.to, meta)
         detail.push(`${active.name} · ${change.name} ${round(change.from)} → ${round(change.to)}${change.unit}`)
       }
       onWritten(`Edited ${active.name} by hand`, detail)
