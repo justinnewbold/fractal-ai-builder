@@ -11,6 +11,7 @@ import History from './components/History'
 import { CabPicker, Backup, Meters } from './components/Hardware'
 import { Refine, Compare } from './components/Refine'
 import Gig from './components/Gig'
+import { Modifiers, SceneMatrix, TempoTuner } from './components/Modifiers'
 import { savePreset } from './lib/history'
 import { costOf } from './lib/cost'
 import { VERSION, COMMIT, BUILT_AT } from './lib/version'
@@ -599,6 +600,21 @@ export default function App() {
               read()
             }}
             onError={setError}
+          />
+
+          <SceneMatrix onError={setError} />
+
+          <TempoTuner
+            busy={busy}
+            onError={setError}
+            onChanged={(summary) => record('tempo', summary)}
+          />
+
+          <Modifiers
+            blocks={blocks}
+            busy={busy}
+            onError={setError}
+            onChanged={(summary) => record('modifier', `Modifier bound: ${summary}`)}
           />
 
           <Editor
