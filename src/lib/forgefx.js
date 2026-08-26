@@ -291,6 +291,9 @@ export async function setParamConfirmed(eid, paramId, value, param) {
 
 async function landed(eid, paramId, wanted) {
   try {
+    // Without this the read can return the value we just sent from cache,
+    // confirming a write that never reached the hardware.
+    await clearDeviceCache().catch(() => {})
     const actual = await readParamValue(eid, paramId)
     if (typeof actual !== 'number') return false
     const tolerance = Math.max(0.05, Math.abs(wanted) * 0.02)
@@ -350,6 +353,14 @@ export { ForgeError }
  * transport is a single serial port and parallel reads collide.
  */
 export async function readSchema(blocks, onProgress) {
+  // The generation about to happen is computed against these ranges, so a stale
+  // read here produces values that are wrong from the start.
+  try {
+    await clearDeviceCache()
+  } catch {
+    // Older builds may not expose it; a stale read is better than no schema.
+  }
+
   const editable = blocks.filter((b) => !EXCLUDED_BLOCKS.includes(b.slug))
   const typeCache = new Map()
   const schema = []
@@ -585,3 +596,58 @@ export const getCab = (eid) => request(`/preset/blocks/${eid}/cab`)
 
 /** Impulse responses available on the unit. */
 export const listIrs = () => request('/cab/irs')
+
+
+/**
+ * Clear ForgeFX's parameter cache.
+ *
+ * There is an invalidation hook after all. ForgeFX caches block parameters, and
+ * after a busy session a read can report a value the hardware doesn't hold —
+ * which once had us chasing a preset that read Amp1 Level = -80 and was actually
+ * at -8, with a server restart the only known cure. This is the supported cure.
+ *
+ * Called before any read whose accuracy decides something: verifying a write,
+ * or building the schema a generation will be computed against.
+ */
+export const clearDeviceCache = () =>
+  mock ? tick().then(() => ({ ok: true })) : request('/device/cache', { method: 'DELETE' })
+
+/** Modifier slots and the sources that can drive them. */
+export const modifierModel = () => (mock ? tick().then(() => mock.modModel()) : request('/mod/model'))
+
+/**
+ * Attach a modifier source to a parameter.
+ *
+ * This is what makes a preset respond rather than sit still — an envelope
+ * follower on drive so it cleans up when you back off, an LFO on a filter, an
+ * expression pedal on delay mix. Static values are a preset; these are a
+ * performance.
+ */
+export const bindModifier = (slot, targetEffectId, targetParam, source) =>
+  mock
+    ? tick().then(() => mock.bindModifier(slot, targetEffectId, targetParam, source))
+    : request('/mod/bind', {
+        method: 'POST',
+        body: JSON.stringify({ slot, targetEffectId, targetParam, source })
+      })
+
+/** Which blocks are engaged in each scene, and on which channel. */
+export const sceneState = () =>
+  mock ? tick().then(() => mock.sceneState()) : request('/preset/scene-state')
+
+/** Preset tempo in BPM. Delays and modulation sync to it. */
+export const getTempo = () => (mock ? tick().then(() => mock.tempo()) : request('/tempo'))
+
+export const setTempo = (bpm) =>
+  mock
+    ? tick().then(() => mock.setTempo(bpm))
+    : request('/tempo', { method: 'POST', body: JSON.stringify({ bpm }) })
+
+export const tapTempo = () =>
+  mock ? tick().then(() => mock.tapTempo()) : request('/tempo/tap', { method: 'POST' })
+
+/** Turn the hardware tuner on or off. */
+export const setTuner = (on) =>
+  mock
+    ? tick().then(() => ({ ok: true }))
+    : request('/tuner', { method: 'POST', body: JSON.stringify({ on }) })

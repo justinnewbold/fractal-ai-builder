@@ -256,6 +256,42 @@ export function createMockDevice() {
           level: Math.random() * 0.7 + 0.15
         })),
 
+    modModel: () => ({
+      slots: 4,
+      sources: [
+        { value: 0, name: 'None' },
+        { value: 1, name: 'LFO 1' },
+        { value: 2, name: 'LFO 2' },
+        { value: 3, name: 'ADSR 1' },
+        { value: 4, name: 'Envelope' },
+        { value: 5, name: 'Expression 1' },
+        { value: 6, name: 'External 1' }
+      ],
+      bound: []
+    }),
+
+    bindModifier: () => ({ ok: true }),
+
+    sceneState: () => ({
+      scenes: state.sceneNames.map((name, i) => ({
+        index: i,
+        name,
+        blocks: state.blocks.map((b) => ({
+          eid: b.effectId,
+          name: b.name,
+          bypassed: i === 0 ? b.bypassed : (b.effectId + i) % 3 === 0,
+          channel: b.channel
+        }))
+      }))
+    }),
+
+    tempo: () => ({ bpm: state.bpm ?? 120 }),
+    setTempo: (bpm) => {
+      state.bpm = bpm
+      return { ok: true }
+    },
+    tapTempo: () => ({ bpm: state.bpm ?? 120 }),
+
     getScene: () => ({ index: state.scene, names: state.sceneNames.slice() }),
 
     setScene: (index) => {
