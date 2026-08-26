@@ -9,10 +9,35 @@
 //   - parameter writes take real units ({"value": 9} for a 0-10 gain), not 0-1
 //   - /preset/store commits to a slot even when capabilities report supportsSave:false
 
-import { EXCLUDED_BLOCKS, safeParams } from './guardrails'
-import { toNormalized } from './scale'
+import { EXCLUDED_BLOCKS, safeParams } from './guardrails.js'
+import { toNormalized } from './scale.js'
+import { createMockDevice } from './mockDevice.js'
 
 const DEFAULT_HOST = 'http://localhost:5056'
+
+/**
+ * Demo mode routes every device call to a simulated FM3 instead of the wire.
+ *
+ * Kept in the same module as the real client, and behind the same functions, so
+ * there is no second code path to drift — the app cannot tell the difference,
+ * which is the only way a simulator is worth having.
+ */
+let mock = null
+
+export const isDemo = () => mock !== null
+
+export function setDemo(on) {
+  mock = on ? createMockDevice() : null
+  if (on) localStorage.setItem('forgefx.demo', '1')
+  else localStorage.removeItem('forgefx.demo')
+}
+
+if (typeof localStorage !== 'undefined' && localStorage.getItem('forgefx.demo') === '1') {
+  mock = createMockDevice()
+}
+
+/** Simulated latency, so progress indicators behave as they do on real serial. */
+const tick = () => new Promise((r) => setTimeout(r, 12))
 
 export function getHost() {
   return localStorage.getItem('forgefx.host') || DEFAULT_HOST
@@ -64,22 +89,24 @@ async function request(path, options = {}) {
 }
 
 /** Liveness plus the model ForgeFX thinks is attached. */
-export const health = () => request('/healthz')
+export const health = async () => (mock ? (await tick(), mock.healthz()) : request('/healthz'))
 
 /** Full capability report: grid size, scene count, preset count, what writes are allowed. */
-export const detect = () => request('/device/detect')
+export const detect = async () => (mock ? (await tick(), mock.detect()) : request('/device/detect'))
 
 /** The preset currently loaded on the unit. */
-export const currentPreset = () => request('/preset')
+export const currentPreset = async () => (mock ? (await tick(), mock.preset()) : request('/preset'))
 
 /** Every block placed in the current preset, with grid position, bypass state and channel. */
-export const presetBlocks = () => request('/preset/blocks')
+export const presetBlocks = async () => (mock ? (await tick(), mock.presetBlocks()) : request('/preset/blocks'))
 
 /** Named parameters for one placed block. `eid` is the effect id from presetBlocks(). */
-export const blockParams = (eid) => request(`/preset/blocks/${eid}/params`)
+export const blockParams = async (eid) =>
+  mock ? (await tick(), mock.blockParams(eid)) : request(`/preset/blocks/${eid}/params`)
 
 /** Model roster for a block family, e.g. 'amp' -> 331 amp models. */
-export const blockTypes = (slug) => request(`/blocks/${slug}/types`)
+export const blockTypes = async (slug) =>
+  mock ? (await tick(), mock.blockTypes(slug)) : request(`/blocks/${slug}/types`)
 
 /**
  * Set one parameter.
@@ -144,6 +171,8 @@ export const setParam = (eid, paramId, value, param, continuous) => {
       new ForgeError(`No range known for parameter ${paramId}; refusing to write a guessed value.`)
     )
   }
+  if (mock) return tick().then(() => mock.setParam(eid, paramId, norm))
+
   return request(`/preset/blocks/${eid}/params/${paramId}`, {
     method: 'PUT',
     body: JSON.stringify({
@@ -211,21 +240,25 @@ export const clearWireLog = () => {
 
 /** Engage or bypass a block. */
 export const setBypass = (eid, bypassed) =>
-  request(`/preset/blocks/${eid}/bypass`, {
+  mock
+    ? tick().then(() => mock.setBypass(eid, bypassed))
+    : request(`/preset/blocks/${eid}/bypass`, {
     method: 'POST',
     body: JSON.stringify({ bypassed })
   })
 
 /** Swap the model loaded in a block. */
 export const setType = (eid, value) =>
-  request(`/preset/blocks/${eid}/type`, {
+  mock
+    ? tick().then(() => mock.setType(eid, value))
+    : request(`/preset/blocks/${eid}/type`, {
     method: 'POST',
     body: JSON.stringify({ value })
   })
 
 /** Commit the working preset to a numbered slot. Overwrites whatever is there. */
 export const storePreset = (number) =>
-  request('/preset/store', {
+  mock ? tick().then(() => mock.storePreset(number)) : request('/preset/store', {
     method: 'POST',
     body: JSON.stringify({ number })
   })
@@ -378,14 +411,15 @@ export async function applyChanges(changes, onProgress) {
 
 /** Load a preset by slot number on the hardware. */
 export const selectPreset = (number) =>
-  request('/preset/select', { method: 'POST', body: JSON.stringify({ number }) })
+  mock ? tick().then(() => mock.selectPreset(number)) : request('/preset/select', { method: 'POST', body: JSON.stringify({ number }) })
 
 /** Name of a stored preset, without loading it. */
-export const presetName = (number) => request(`/presets/${number}`)
+export const presetName = async (number) =>
+  mock ? (await tick(), mock.presetName(number)) : request(`/presets/${number}`)
 
 /** Rename the working buffer. Visible immediately; persist with storePreset. */
 export const setPresetName = (name) =>
-  request('/preset/name', { method: 'POST', body: JSON.stringify({ name }) })
+  mock ? tick().then(() => mock.setPresetName(name)) : request('/preset/name', { method: 'POST', body: JSON.stringify({ name }) })
 
 /**
  * Fetch names for a range of slots.
@@ -452,18 +486,20 @@ export async function verifyChanges(changes, onProgress) {
 }
 
 /** Current scene index and names. */
-export const getScene = () => request('/scene')
+export const getScene = async () => (mock ? (await tick(), mock.getScene()) : request('/scene'))
 
 /** Switch scenes. The FM3 has eight. */
 export const setScene = (index) =>
-  request('/scene', { method: 'POST', body: JSON.stringify({ index }) })
+  mock ? tick().then(() => mock.setScene(index)) : request('/scene', { method: 'POST', body: JSON.stringify({ index }) })
 
 export const setSceneName = (index, name) =>
-  request('/scene/name', { method: 'POST', body: JSON.stringify({ index, name }) })
+  mock ? tick().then(() => mock.setSceneName(index, name)) : request('/scene/name', { method: 'POST', body: JSON.stringify({ index, name }) })
 
 /** Switch a block's channel. Channels are A-D and hold independent settings. */
 export const setChannel = (eid, channel) =>
-  request(`/preset/blocks/${eid}/channel`, {
+  mock
+    ? tick().then(() => mock.setChannel(eid, channel))
+    : request(`/preset/blocks/${eid}/channel`, {
     method: 'POST',
     body: JSON.stringify({ channel })
   })

@@ -1187,3 +1187,18 @@ button.scene.current .scene-num {
   min-width: 34px;
   text-align: center;
 }
+
+.lamp[data-state='demo'] {
+  background: var(--silk-dim);
+  box-shadow: 0 0 0 3px rgba(135, 141, 151, 0.14);
+}
+
+.demo-banner {
+  margin: 10px 0 0;
+  padding: 9px 14px;
+  font-size: 12px;
+  color: var(--silk-dim);
+  background: var(--panel);
+  border: 1px dashed var(--rule);
+  border-radius: 3px;
+}
