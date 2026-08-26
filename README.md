@@ -61,9 +61,20 @@ Quit FM3-Edit before starting. Only one program can hold the USB port.
 
 ## Generation
 
-Set `ANTHROPIC_API_KEY` in the Vercel project settings. It is read only by the
-serverless function in `api/generate.js` and never reaches the browser.
-`GENERATOR_MODEL` optionally overrides the model.
+Built on the [Vercel AI SDK](https://sdk.vercel.ai). `generateObject` constrains
+the model to a Zod schema, so malformed replies are handled by the SDK rather
+than by parsing text.
+
+Two ways to supply a model, set in the Vercel project settings:
+
+| Variable | Notes |
+| --- | --- |
+| `ANTHROPIC_API_KEY` | Direct. Preferred — works on a fresh account. |
+| `AI_GATEWAY_API_KEY` | Vercel AI Gateway. Needs credit; the free tier returns 403 for every Anthropic model. |
+| `GENERATOR_MODEL` | Optional override. `claude-sonnet-5` direct, `anthropic/claude-sonnet-4.5` via gateway. |
+
+Whichever key is set, it is read only inside `api/generate.js` and never reaches
+the browser.
 
 Nothing generated is trusted. At generation time the app reads the live model
 roster and parameter ranges off the attached unit, hands those to the model as

@@ -3,61 +3,96 @@
  *
  * Turns a plain-language tone description into a concrete preset spec.
  *
- * The key never reaches the browser — that's the whole reason this runs
- * server-side. The model is given the *live* catalog and parameter schema read
- * off the player's own unit, so it can only choose models that exist on that
- * hardware and only set parameters that block actually has.
+ * Built on the Vercel AI SDK. `generateObject` constrains the model to a Zod
+ * schema, so a malformed reply is the SDK's problem rather than ours — no
+ * fence-stripping, no JSON.parse in a try/catch, no "the model added a
+ * preamble" failure mode.
+ *
+ * Routed through the Vercel AI Gateway, so the model is a plain string and
+ * swapping providers is an environment variable, not a code change. The key
+ * lives here and never reaches the browser.
  */
+import { generateObject } from 'ai'
+import { createAnthropic } from '@ai-sdk/anthropic'
+import { z } from 'zod'
 
-const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages'
-const MODEL = process.env.GENERATOR_MODEL || 'claude-sonnet-5'
+/**
+ * Two ways in, because they fail differently.
+ *
+ * A direct Anthropic key is the default: it needs no gateway credit and works
+ * on a fresh account. The Vercel AI Gateway is the alternative — one key for
+ * every provider, and swapping models becomes an env var — but its free tier
+ * returns 403 for every Anthropic model, so it can't be the default.
+ *
+ * Set ANTHROPIC_API_KEY for the direct path, or AI_GATEWAY_API_KEY (with
+ * credit on the account) for the gateway.
+ */
+function resolveModel() {
+  if (process.env.ANTHROPIC_API_KEY) {
+    const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    return anthropic(process.env.GENERATOR_MODEL || 'claude-sonnet-5')
+  }
+  if (process.env.AI_GATEWAY_API_KEY) {
+    return process.env.GENERATOR_MODEL || 'anthropic/claude-sonnet-4.5'
+  }
+  return null
+}
+
+const PresetSpec = z.object({
+  presetName: z.string().describe('Short name, 12 characters or fewer, uppercase.'),
+  summary: z.string().describe('One sentence on the approach taken.'),
+  blocks: z
+    .array(
+      z.object({
+        eid: z.number().int().describe('Effect id, copied from the supplied block list.'),
+        bypassed: z.boolean().describe('Whether this block should be bypassed.'),
+        type: z
+          .number()
+          .int()
+          .nullable()
+          .describe(
+            'Numeric "value" of a model from this block supplied model list, or null to leave the model alone.'
+          ),
+        typeName: z.string().nullable().describe('Name of that model, or null.'),
+        params: z
+          .array(
+            z.object({
+              id: z.number().int().describe('Parameter id from this block supplied list.'),
+              name: z.string().describe('That parameter name.'),
+              value: z
+                .number()
+                .describe('Value in the parameter own units, inside its own min and max.')
+            })
+          )
+          .describe('Parameters to set on this block. May be empty.')
+      })
+    )
+    .describe('Only blocks you are changing.'),
+  notes: z.string().describe('Anything the player should know. Empty string if nothing.')
+})
 
 const SYSTEM = `You are a Fractal Audio preset designer. You translate a guitarist's
-description of a tone into concrete settings for the blocks that exist in their
-currently loaded preset.
+description of a tone into concrete settings for the blocks in their currently
+loaded preset.
 
 HARD RULES
 
-1. Only use block effect ids that appear in the supplied block list. Never invent one.
-2. When choosing a model for a block, use only the numeric "value" of an entry in
-   that block's supplied model list. Never invent a model or guess a number.
+1. Only use effect ids that appear in the supplied block list.
+2. For a model change, use only the numeric "value" of an entry in that block's
+   supplied model list. Never invent a number.
 3. Only set parameter ids that appear in that block's supplied parameter list.
-4. Every parameter value must fall inside that parameter's own min and max, and be
-   expressed in that parameter's own units. A gain that runs 0-10 takes 7.5, not 0.75.
-5. Bypass blocks that don't belong in the described tone rather than leaving them
-   engaged and neutral.
-6. Do not attempt to move blocks, add blocks, or change routing. Work only with the
-   blocks already placed.
+4. Every value must sit inside that parameter's own min and max, in its own
+   units. A gain that runs 0-10 takes 7.5, not 0.75.
+5. Bypass blocks that don't belong in the tone rather than leaving them engaged
+   and neutral.
+6. Do not move blocks, add blocks, or change routing. Work with what is placed.
 
 TONE JUDGEMENT
 
-Set the amp's gain, EQ, presence and master to values a working engineer would
-actually dial for the description — not defaults, and not everything at noon.
-Consider the whole chain: a drive block in front changes how much amp gain the
-tone needs. If the player names a band, era, or record, pick the amp model whose
-real-world counterpart made that sound.
-
-OUTPUT
-
-Reply with JSON only. No prose, no markdown fences.
-
-{
-  "presetName": "short name, 12 chars or fewer, uppercase",
-  "summary": "one sentence on the approach taken",
-  "blocks": [
-    {
-      "eid": 58,
-      "bypassed": false,
-      "type": 82,
-      "typeName": "5153 100W Blue",
-      "params": [{ "id": 7, "name": "Gain 1", "value": 7.5 }]
-    }
-  ],
-  "notes": "anything the player should know, or empty string"
-}
-
-Omit "type" for blocks whose model you are not changing. Omit blocks you are not
-touching at all.`
+Dial values a working engineer would actually use for the description - not
+defaults, not everything at noon. Consider the whole chain: a drive in front
+changes how much amp gain the tone needs. If the player names a band, an era, or
+a record, choose the amp model whose real-world counterpart made that sound.`
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -65,10 +100,11 @@ export default async function handler(req, res) {
     return
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
+  const model = resolveModel()
+  if (!model) {
     res.status(500).json({
-      error: 'No API key configured. Set ANTHROPIC_API_KEY in the Vercel project settings.'
+      error:
+        'No model key configured. Set ANTHROPIC_API_KEY (or AI_GATEWAY_API_KEY) in the Vercel project settings.'
     })
     return
   }
@@ -98,55 +134,19 @@ export default async function handler(req, res) {
     }))
   }
 
-  let upstream
   try {
-    upstream = await fetch(ANTHROPIC_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 4096,
-        system: SYSTEM,
-        messages: [
-          {
-            role: 'user',
-            content: `Tone wanted: ${description}\n\nWhat's on the unit right now:\n${JSON.stringify(
-              context
-            )}`
-          }
-        ]
-      })
+    const { object } = await generateObject({
+      model,
+      schema: PresetSpec,
+      schemaName: 'preset_spec',
+      system: SYSTEM,
+      prompt: `Tone wanted: ${description}\n\nWhat's on the unit right now:\n${JSON.stringify(
+        context
+      )}`
     })
+
+    res.status(200).json(object)
   } catch (err) {
-    res.status(502).json({ error: `Could not reach the model: ${err.message}` })
-    return
+    res.status(502).json({ error: `Generation failed: ${err.message}` })
   }
-
-  if (!upstream.ok) {
-    const detail = await upstream.text()
-    res.status(upstream.status).json({ error: `Model request failed: ${detail.slice(0, 400)}` })
-    return
-  }
-
-  const data = await upstream.json()
-  const text = (data.content || [])
-    .filter((part) => part.type === 'text')
-    .map((part) => part.text)
-    .join('')
-
-  const cleaned = text.replace(/^```(?:json)?/gm, '').replace(/```$/gm, '').trim()
-
-  let spec
-  try {
-    spec = JSON.parse(cleaned)
-  } catch {
-    res.status(502).json({ error: 'The model did not return usable JSON.', raw: text.slice(0, 600) })
-    return
-  }
-
-  res.status(200).json(spec)
 }
