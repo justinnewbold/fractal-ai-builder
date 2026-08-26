@@ -7,6 +7,8 @@ import Editor from './components/Editor'
 import Diagnostics from './components/Diagnostics'
 import Cost from './components/Cost'
 import Scenes from './components/Scenes'
+import History from './components/History'
+import { savePreset } from './lib/history'
 import { costOf } from './lib/cost'
 import { VERSION, COMMIT, BUILT_AT } from './lib/version'
 import { isDemo, setDemo } from './lib/forgefx'
@@ -47,6 +49,8 @@ export default function App() {
   const [saveName, setSaveName] = useState('')
   const [log, setLog] = useState([])
   const [spend, setSpend] = useState({ total: 0, runs: 0 })
+  const [lastPrompt, setLastPrompt] = useState('')
+  const [historyKey, setHistoryKey] = useState(0)
 
   const record = useCallback((kind, summary, detail = []) => {
     setLog((prev) => append(prev, newEntry(kind, summary, detail)))
@@ -100,7 +104,10 @@ export default function App() {
       if (!res.ok) throw new Error(spec.error || 'Generation failed.')
 
       const validated = validateSpec(spec, schema)
+      validated.spec = spec
+      validated.description = description
       setResult(validated)
+      setLastPrompt(description)
 
       if (validated.presetName) setSaveName(validated.presetName)
 
@@ -137,6 +144,21 @@ export default function App() {
 
       const count = countWrites(result.changes)
       setApplied({ failures, count, mismatches })
+
+      // Saved after writing rather than on generation: a spec that was never
+      // sent isn't a preset, it's a draft.
+      if (result.spec) {
+        savePreset({
+          name: result.presetName || preset?.name || 'Untitled',
+          description: result.description || lastPrompt,
+          summary: result.summary,
+          spec: result.spec,
+          usage: result.usage,
+          device: device?.name,
+          blockNames: result.changes.map((c) => c.name)
+        })
+        setHistoryKey((k) => k + 1)
+      }
       record(
         'write',
         `Wrote ${count} changes to ${preset?.name || 'the working preset'}`,
@@ -210,6 +232,43 @@ export default function App() {
     } catch (err) {
       setError(err.message)
     } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * Replay a saved preset.
+   *
+   * Re-reads the schema and re-validates rather than writing the stored values
+   * directly — the preset loaded now may have a different block layout, and a
+   * model swap since then may have moved the ranges those values were computed
+   * against. Stops at the preview like any other generation.
+   */
+  const reload = async (entry) => {
+    setBusy(true)
+    setError(null)
+    setApplied(null)
+    try {
+      setProgress('Reading what the unit has loaded...')
+      const schema = await readSchema(blocks, (done, total, name) =>
+        setProgress(`Reading ${name} - ${done} of ${total}`)
+      )
+
+      const validated = validateSpec(entry.spec, schema)
+      validated.spec = entry.spec
+      validated.description = entry.description
+      if (!validated.presetName) validated.presetName = entry.name
+
+      setResult(validated)
+      setSaveName(validated.presetName || entry.name)
+      record('reload', `Loaded saved preset "${entry.name}"`, [
+        `${countWrites(validated.changes)} changes proposed`,
+        ...validated.problems
+      ])
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setProgress(null)
       setBusy(false)
     }
   }
@@ -388,6 +447,8 @@ export default function App() {
             }}
             onError={setError}
           />
+
+          <History key={historyKey} onReload={reload} busy={busy} />
 
           <ChangeLog log={log} onClear={() => setLog([])} />
 
