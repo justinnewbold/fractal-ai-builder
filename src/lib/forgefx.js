@@ -95,6 +95,20 @@ export const blockTypes = (slug) => request(`/blocks/${slug}/types`)
  */
 export const setParam = (eid, paramId, value, param) => {
   const norm = toNormalized(value, param)
+
+  // Recorded so the app can show what it actually put on the wire. Reading this
+  // off a diagnostics panel beats asking someone to open browser devtools, and
+  // it is the one piece of evidence that does not depend on which parameters a
+  // given generation happened to pick.
+  recordWire({
+    eid,
+    paramId,
+    name: param?.name,
+    wanted: value,
+    sent: norm,
+    range: param ? { min: param.min, max: param.max, log: !!param.log } : null
+  })
+
   if (norm === null) {
     return Promise.reject(
       new ForgeError(`No range known for parameter ${paramId}; refusing to write a guessed value.`)
@@ -105,6 +119,22 @@ export const setParam = (eid, paramId, value, param) => {
     body: JSON.stringify({ value: norm, continuous: false })
   })
 }
+
+const wireLog = []
+
+function recordWire(entry) {
+  wireLog.unshift({ ...entry, at: new Date() })
+  if (wireLog.length > 120) wireLog.length = 120
+}
+
+/** Everything this app has put on the wire, newest first. */
+export const getWireLog = () => wireLog.slice()
+export const clearWireLog = () => {
+  wireLog.length = 0
+}
+
+/** Build identifier, so a stale deployment is visible rather than inferred. */
+export const BUILD = __BUILD_STAMP__
 
 /** Engage or bypass a block. */
 export const setBypass = (eid, bypassed) =>

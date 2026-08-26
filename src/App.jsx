@@ -4,6 +4,7 @@ import Grid from './components/Grid'
 import { ToneForm, Preview } from './components/Generate'
 import { PresetBar, ChangeLog, Thinking } from './components/PresetBar'
 import Editor from './components/Editor'
+import Diagnostics from './components/Diagnostics'
 import {
   detect,
   currentPreset,
@@ -228,7 +229,19 @@ export default function App() {
         <>
           <PresetBar preset={preset} onSelect={jumpTo} onRename={rename} busy={busy} />
 
-          <ToneForm onGenerate={generate} busy={busy} disabled={status !== 'live'} />
+          {blocks.length === 0 ? (
+            <div className="notice">
+              <h2>This preset is empty</h2>
+              <p>
+                Slot {preset?.number} has no blocks on its grid, and this app can only adjust
+                blocks that are already placed &mdash; it can&rsquo;t build a chain from nothing
+                yet.
+              </p>
+              <p>Load a preset that already has an amp and cab, then design from there.</p>
+            </div>
+          ) : (
+            <ToneForm onGenerate={generate} busy={busy} disabled={status !== 'live'} />
+          )}
 
           <Thinking message={progress} />
 
@@ -307,6 +320,8 @@ export default function App() {
           />
 
           <ChangeLog log={log} onClear={() => setLog([])} />
+
+          <Diagnostics />
         </>
       ) : null}
 
