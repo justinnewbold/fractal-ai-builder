@@ -18,6 +18,8 @@ import { Versions, DeviceBackup } from './components/Versions'
 import Footswitches from './components/Footswitches'
 import GridEditor from './components/GridEditor'
 import Ports from './components/Ports'
+import Command from './components/Command'
+import { validatePlan, runPlan } from './lib/actions'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
 import {
   getTempo,
@@ -72,6 +74,8 @@ export default function App() {
   const [lastPrompt, setLastPrompt] = useState('')
   const [historyKey, setHistoryKey] = useState(0)
   const [compare, setCompare] = useState(null)
+  const [plan, setPlan] = useState(null)
+  const [runningPlan, setRunningPlan] = useState(false)
   const [catalog, setCatalog] = useState(null)
   const [partial, setPartial] = useState(null)
   const [liveOpen, setLiveOpen] = useState(false)
@@ -541,6 +545,84 @@ export default function App() {
     }
   }
 
+  /**
+   * Work out what an instruction means, without doing any of it.
+   *
+   * The schema read is the same one generation uses — the model can only act on
+   * ids and ranges the device actually reported.
+   */
+  const askFor = async (instruction) => {
+    setBusy(true)
+    setError(null)
+    setPlan(null)
+    try {
+      setProgress('Reading the preset...')
+      const schema = await readSchema(blocks, (done, total, name) =>
+        setProgress(`Reading ${name} - ${done} of ${total}`)
+      )
+
+      // Grid positions come from the placed-block list, not the schema, since
+      // the schema drops blocks the generator must not touch.
+      const withPositions = schema.map((entry) => {
+        const placed = blocks.find((b) => b.effectId === entry.eid)
+        return { ...entry, row: placed?.row, col: placed?.col }
+      })
+
+      setProgress('Working out what that means...')
+      const res = await fetch('/api/command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instruction,
+          device,
+          blocks: withPositions,
+          scene,
+          presetName: preset?.name
+        })
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error || 'That request failed.')
+
+      const checked = validatePlan(body, withPositions, device?.capabilities)
+      setPlan(checked)
+      record('ask', `Asked: ${instruction}`, [
+        checked.understood,
+        `${checked.actions.length} actions proposed`,
+        ...checked.problems
+      ])
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setProgress(null)
+      setBusy(false)
+    }
+  }
+
+  const doPlan = async () => {
+    if (!plan?.actions.length) return
+    setRunningPlan(true)
+    setError(null)
+    try {
+      const failures = await runPlan(plan.actions, (done, total, label) =>
+        setProgress(`${done} of ${total} - ${label}`)
+      )
+      record(
+        'edit',
+        `Did ${plan.actions.length} things`,
+        [...plan.actions.map((a) => a.label), ...failures]
+      )
+      if (failures.length) setError(failures.join(' · '))
+      setDirty(true)
+      setPlan(null)
+      await read()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setProgress(null)
+      setRunningPlan(false)
+    }
+  }
+
   const writeCount = result ? countWrites(result.changes) : 0
 
   return (
@@ -904,6 +986,16 @@ export default function App() {
             partial={partial}
             open={liveOpen}
             onToggle={() => setLiveOpen(!liveOpen)}
+          />
+
+          <Command
+            onPlan={askFor}
+            onRun={doPlan}
+            plan={plan}
+            running={runningPlan}
+            busy={busy}
+            progress={progress}
+            onDismiss={() => setPlan(null)}
           />
 
           <PresetBar preset={preset} onSelect={jumpTo} onRename={rename} busy={busy} />

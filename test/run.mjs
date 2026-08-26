@@ -167,4 +167,104 @@ test('avoids what has already been seen', () => {
 
 test('has a pool worth shuffling', () => assert.ok(totalSuggestions >= 30))
 
+
+
+console.log('command plan')
+
+const { validatePlan } = await import('../src/lib/actions.js')
+
+const cmdBlocks = [
+  {
+    eid: 58,
+    name: 'Amp 1',
+    slug: 'amp',
+    row: 1,
+    col: 4,
+    models: [{ value: 82, name: '5153 100W Blue' }],
+    params: [
+      { id: 7, name: 'Gain 1', value: 5, min: 0, max: 10 },
+      { id: 1, name: 'Amp1 Level', value: -8, min: -80, max: 20 }
+    ]
+  },
+  { eid: 118, name: 'Drive 1', slug: 'drive', row: 1, col: 6, models: [], params: [] }
+]
+const caps = { grid: { rows: 4, cols: 12 }, sceneCount: 8, channelNames: ['A', 'B', 'C', 'D'] }
+
+test('accepts a parameter change in range', () => {
+  const r = validatePlan(
+    { actions: [{ kind: 'setParam', eid: 58, paramId: 7, value: 7.5, why: '' }] },
+    cmdBlocks,
+    caps
+  )
+  assert.equal(r.actions.length, 1)
+  assert.match(r.actions[0].label, /Gain 1/)
+})
+
+test('refuses to touch output levels', () => {
+  const r = validatePlan(
+    { actions: [{ kind: 'setParam', eid: 58, paramId: 1, value: -40, why: '' }] },
+    cmdBlocks,
+    caps
+  )
+  assert.equal(r.actions.length, 0)
+  assert.match(r.problems[0], /gain staging|yours to set/i)
+})
+
+test('refuses an out-of-range value', () => {
+  const r = validatePlan(
+    { actions: [{ kind: 'setParam', eid: 58, paramId: 7, value: 99, why: '' }] },
+    cmdBlocks,
+    caps
+  )
+  assert.equal(r.actions.length, 0)
+})
+
+test('refuses an invented model', () => {
+  const r = validatePlan({ actions: [{ kind: 'setModel', eid: 58, value: 4242, why: '' }] }, cmdBlocks, caps)
+  assert.equal(r.actions.length, 0)
+  assert.match(r.problems[0], /isn't on this unit/)
+})
+
+test('refuses a move onto an occupied cell', () => {
+  const r = validatePlan(
+    { actions: [{ kind: 'moveBlock', eid: 118, row: 1, col: 4, why: '' }] },
+    cmdBlocks,
+    caps
+  )
+  assert.equal(r.actions.length, 0)
+  assert.match(r.problems[0], /already taken/)
+})
+
+test('refuses a cell off the grid', () => {
+  const r = validatePlan(
+    { actions: [{ kind: 'moveBlock', eid: 118, row: 9, col: 2, why: '' }] },
+    cmdBlocks,
+    caps
+  )
+  assert.equal(r.actions.length, 0)
+})
+
+test('orders structure before the values that depend on it', () => {
+  const r = validatePlan(
+    {
+      actions: [
+        { kind: 'setParam', eid: 58, paramId: 7, value: 8, why: '' },
+        { kind: 'setModel', eid: 58, value: 82, why: '' },
+        { kind: 'moveBlock', eid: 118, row: 1, col: 2, why: '' }
+      ]
+    },
+    cmdBlocks,
+    caps
+  )
+  assert.deepEqual(
+    r.actions.map((a) => a.kind),
+    ['moveBlock', 'setModel', 'setParam']
+  )
+})
+
+test('refuses a scene the device does not have', () => {
+  const r = validatePlan({ actions: [{ kind: 'setScene', value: 40, why: '' }] }, cmdBlocks, caps)
+  assert.equal(r.actions.length, 0)
+})
+
 console.log(`\n${passed} passed\n`)
