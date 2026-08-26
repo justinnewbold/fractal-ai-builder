@@ -210,3 +210,78 @@ export async function applyChanges(changes, onProgress) {
   }
   return failures
 }
+
+/** Load a preset by slot number on the hardware. */
+export const selectPreset = (number) =>
+  request('/preset/select', { method: 'POST', body: JSON.stringify({ number }) })
+
+/** Name of a stored preset, without loading it. */
+export const presetName = (number) => request(`/presets/${number}`)
+
+/** Rename the working buffer. Visible immediately; persist with storePreset. */
+export const setPresetName = (name) =>
+  request('/preset/name', { method: 'POST', body: JSON.stringify({ name }) })
+
+/**
+ * Fetch names for a range of slots.
+ *
+ * The bulk scan endpoint needs the canScanNames capability, which the FM3
+ * doesn't report, so this walks slots one at a time. Sequential and paged
+ * on purpose: 512 slots down one serial port is not something to do eagerly.
+ */
+export async function presetRange(start, count, onProgress) {
+  const out = []
+  for (let i = 0; i < count; i++) {
+    const number = start + i
+    onProgress?.(i + 1, count)
+    try {
+      const res = await presetName(number)
+      out.push({ number, name: (res?.name || '').trim() })
+    } catch {
+      out.push({ number, name: null })
+    }
+  }
+  return out
+}
+
+/**
+ * Read back what was just written and report anything that didn't stick.
+ *
+ * Worth the extra traffic. ForgeFX caches block parameters and has no
+ * invalidation hook, so a read can report a value the hardware doesn't hold —
+ * which once sent us chasing a silent preset that was never broken. A write
+ * that silently didn't land looks identical to one that did, unless something
+ * checks.
+ */
+export async function verifyChanges(changes, onProgress) {
+  const mismatches = []
+  for (let i = 0; i < changes.length; i++) {
+    const change = changes[i]
+    if (!change.params.length) continue
+    onProgress?.(i + 1, changes.length, change.name)
+
+    let live
+    try {
+      live = await blockParams(change.eid)
+    } catch {
+      continue
+    }
+    const byId = new Map((live?.named || []).map((p) => [p.id, p]))
+
+    for (const param of change.params) {
+      const actual = byId.get(param.id)
+      if (!actual) continue
+      const drift = Math.abs((actual.value ?? 0) - param.to)
+      const tolerance = Math.max(0.05, Math.abs(param.to) * 0.02)
+      if (drift > tolerance) {
+        mismatches.push({
+          block: change.name,
+          param: param.name,
+          wanted: param.to,
+          got: actual.value
+        })
+      }
+    }
+  }
+  return mismatches
+}
