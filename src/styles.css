@@ -2717,3 +2717,81 @@ button.port-row.current .port-model {
   font-size: 10.5px;
   color: var(--silk-faint);
 }
+
+/* ---------- the tone box, as the front door ---------- */
+
+/* This is what the app is for, so it gets the weight. Everything else on the
+   Design view is context for it or consequence of it. */
+.tone.hero {
+  margin-top: 22px;
+  padding: 26px 26px 22px;
+  background: linear-gradient(180deg, #191d24, var(--panel));
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--signal);
+  border-radius: 4px;
+}
+
+.tone-heading {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(20px, 3.4vw, 27px);
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+
+.tone-sub {
+  margin: 7px 0 0;
+  font-size: 13.5px;
+  color: var(--silk-dim);
+  max-width: 60ch;
+}
+
+.tone-field {
+  margin-top: 16px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--chassis);
+  transition: border-color 140ms ease;
+}
+
+.tone-field:focus-within {
+  border-color: var(--signal);
+}
+
+.tone-field textarea {
+  margin: 0;
+  border: none;
+  background: none;
+  font-size: 16px;
+  padding: 15px 17px 6px;
+}
+
+.tone-field textarea:focus-visible {
+  outline: none;
+}
+
+.tone-actions {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0 14px 13px;
+}
+
+button.big {
+  font-size: 14px;
+  padding: 11px 22px;
+}
+
+.tone-or {
+  margin: 18px 0 0;
+}
+
+.tone.hero .examples {
+  margin-top: 9px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tone-field {
+    transition: none;
+  }
+}

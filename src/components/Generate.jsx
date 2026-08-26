@@ -21,27 +21,36 @@ export function ToneForm({ onGenerate, busy, disabled }) {
   }
 
   return (
-    <section className="tone">
-      <p className="silk-label">Describe the tone</p>
+    <section className="tone hero">
+      <h2 className="tone-heading">What should it sound like?</h2>
+      <p className="tone-sub">
+        Describe a tone the way you&rsquo;d describe it to another player. It gets built from the
+        models your unit actually has.
+      </p>
 
-      <textarea
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit()
-        }}
-        placeholder="A guitar sound, in your own words."
-        rows={3}
-        disabled={disabled}
-        aria-label="Tone description"
-      />
+      <div className="tone-field">
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit()
+          }}
+          placeholder="Tight modern metal rhythm in drop A, scooped but not thin…"
+          rows={3}
+          disabled={disabled}
+          aria-label="Tone description"
+          autoFocus
+        />
 
-      <div className="tone-row">
-        <button onClick={submit} disabled={busy || disabled || !description.trim()}>
-          {busy ? 'Working…' : 'Design the preset'}
-        </button>
-        <span className="hint mono">⌘↵</span>
+        <div className="tone-actions">
+          <button className="primary big" onClick={submit} disabled={busy || disabled || !description.trim()}>
+            {busy ? 'Working…' : 'Design it'}
+          </button>
+          <span className="hint mono">⌘↵</span>
+        </div>
       </div>
+
+      <p className="silk-label tone-or">Or start from one of these</p>
 
       <div className="examples">
         {examples.map((example) => (
