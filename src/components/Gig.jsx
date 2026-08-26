@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getScene, setScene, selectPreset, liveMeters } from '../lib/forgefx'
+import { getScene, setScene, selectPreset, liveMeters, readSceneNames } from '../lib/forgefx'
 
 /**
  * The stand, not the bench.
@@ -26,11 +26,19 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
     ;(async () => {
       try {
         const res = await getScene()
-        if (stop) return
-        setSceneIndex(res?.index ?? 0)
-        setNames(Array.isArray(res?.names) ? res.names : [])
+        if (!stop && typeof res?.index === 'number' && res.index >= 0) setSceneIndex(res.index)
       } catch {
         /* a unit without scenes just shows none */
+      }
+
+      // Names aren't in the scene query on either device family — they live in
+      // the preset body. On stage the name is the whole point of the button:
+      // "Lead" is findable at a glance, "3" means remembering what 3 was.
+      try {
+        const found = await readSceneNames(preset?.number)
+        if (!stop) setNames(found)
+      } catch {
+        if (!stop) setNames([])
       }
     })()
     return () => {
@@ -107,11 +115,13 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
           {Array.from({ length: sceneCount }, (_, i) => (
             <button
               key={i}
-              className={`gig-scene ${i === scene ? 'current' : ''}`}
+              className={`gig-scene ${i === scene ? 'current' : ''} ${
+                names[i] ? 'named' : ''
+              }`}
               onClick={() => pickScene(i)}
             >
               <span className="gig-scene-num mono">{i + 1}</span>
-              {names[i] ? <span className="gig-scene-name">{names[i]}</span> : null}
+              <span className="gig-scene-name">{names[i] || `Scene ${i + 1}`}</span>
             </button>
           ))}
         </div>
