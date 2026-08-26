@@ -93,7 +93,32 @@ export const blockTypes = (slug) => request(`/blocks/${slug}/types`)
  * clamps and returns {"ok":true}. Sending 7.5 for a 0-10 gain pins it at 10 and
  * reports success.
  */
-export const setParam = (eid, paramId, value, param) => {
+/**
+ * Which write encoding actually works, learned at runtime.
+ *
+ * ForgeFX exposes two paths. `continuous: false` builds a discrete frame;
+ * `true` builds a continuous one. Both take a normalised 0-1 value, and the
+ * docs don't say which suits which control. On a real FM3, linear controls
+ * land correctly on the discrete path while frequency controls silently do
+ * not — they keep the value they were reset to.
+ *
+ * Rather than pick one and hope, writes start discrete, get verified, and
+ * retry on the other path when a value didn't stick. What worked is
+ * remembered per parameter so a preset full of frequency controls doesn't pay
+ * the retry cost every time.
+ */
+const encodingByParam = new Map()
+
+export const preferredEncoding = (eid, paramId) =>
+  encodingByParam.get(`${eid}:${paramId}`) ?? false
+
+export const rememberEncoding = (eid, paramId, continuous) =>
+  encodingByParam.set(`${eid}:${paramId}`, continuous)
+
+export const getEncodingMap = () =>
+  [...encodingByParam.entries()].map(([k, v]) => ({ key: k, continuous: v }))
+
+export const setParam = (eid, paramId, value, param, continuous) => {
   const norm = toNormalized(value, param)
 
   // Recorded so the app can show what it actually put on the wire. Reading this
@@ -110,6 +135,7 @@ export const setParam = (eid, paramId, value, param) => {
     wanted: value,
     sent: norm,
     outOfRange,
+    continuous: continuous ?? preferredEncoding(eid, paramId),
     range: param ? { min: param.min, max: param.max, log: !!param.log } : null
   })
 
@@ -120,8 +146,53 @@ export const setParam = (eid, paramId, value, param) => {
   }
   return request(`/preset/blocks/${eid}/params/${paramId}`, {
     method: 'PUT',
-    body: JSON.stringify({ value: norm, continuous: false })
+    body: JSON.stringify({
+      value: norm,
+      continuous: continuous ?? preferredEncoding(eid, paramId)
+    })
   })
+}
+
+/** Read one parameter's current value, for confirming a write landed. */
+async function readParamValue(eid, paramId) {
+  const res = await blockParams(eid)
+  return (res?.named || []).find((p) => p.id === paramId)?.value
+}
+
+/**
+ * Write a value and confirm it took, retrying on the other encoding if not.
+ *
+ * The device accepts a write it then ignores, and reports success either way,
+ * so confirming is the only way to know. Tolerance is proportional because
+ * the device rounds — asking for 40 Hz can read back 39.998.
+ */
+export async function setParamConfirmed(eid, paramId, value, param) {
+  const first = preferredEncoding(eid, paramId)
+
+  await setParam(eid, paramId, value, param, first)
+  if (await landed(eid, paramId, value)) {
+    rememberEncoding(eid, paramId, first)
+    return { ok: true, continuous: first, retried: false }
+  }
+
+  await setParam(eid, paramId, value, param, !first)
+  if (await landed(eid, paramId, value)) {
+    rememberEncoding(eid, paramId, !first)
+    return { ok: true, continuous: !first, retried: true }
+  }
+
+  return { ok: false, continuous: null, retried: true }
+}
+
+async function landed(eid, paramId, wanted) {
+  try {
+    const actual = await readParamValue(eid, paramId)
+    if (typeof actual !== 'number') return false
+    const tolerance = Math.max(0.05, Math.abs(wanted) * 0.02)
+    return Math.abs(actual - wanted) <= tolerance
+  } catch {
+    return false
+  }
 }
 
 const wireLog = []
@@ -279,7 +350,15 @@ export async function applyChanges(changes, onProgress) {
       const range = fresh?.get(param.id) ?? param.range
       advance(`${change.name} · ${param.name} → ${param.to}${param.unit}`)
       try {
-        await setParam(change.eid, param.id, param.to, { ...range, name: param.name })
+        const res = await setParamConfirmed(change.eid, param.id, param.to, {
+          ...range,
+          name: param.name
+        })
+        if (!res.ok) {
+          failures.push(
+            `${change.name} · ${param.name} — device ignored both write encodings`
+          )
+        }
       } catch (err) {
         failures.push(`${change.name} · ${param.name} — ${err.message}`)
       }
@@ -371,3 +450,26 @@ export async function verifyChanges(changes, onProgress) {
   }
   return mismatches
 }
+
+/** Current scene index and names. */
+export const getScene = () => request('/scene')
+
+/** Switch scenes. The FM3 has eight. */
+export const setScene = (index) =>
+  request('/scene', { method: 'POST', body: JSON.stringify({ index }) })
+
+export const setSceneName = (index, name) =>
+  request('/scene/name', { method: 'POST', body: JSON.stringify({ index, name }) })
+
+/** Switch a block's channel. Channels are A-D and hold independent settings. */
+export const setChannel = (eid, channel) =>
+  request(`/preset/blocks/${eid}/channel`, {
+    method: 'POST',
+    body: JSON.stringify({ channel })
+  })
+
+/** Cab block's current IR assignment. */
+export const getCab = (eid) => request(`/preset/blocks/${eid}/cab`)
+
+/** Impulse responses available on the unit. */
+export const listIrs = () => request('/cab/irs')

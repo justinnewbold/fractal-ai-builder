@@ -1012,7 +1012,7 @@ button.chip.active {
 
 .diag-row {
   display: grid;
-  grid-template-columns: minmax(150px, 1.6fr) 80px 80px 80px minmax(110px, 1fr);
+  grid-template-columns: minmax(140px, 1.5fr) 70px 70px 70px minmax(110px, 1fr) 50px;
   gap: 10px;
   padding: 7px 12px;
   font-size: 11.5px;
@@ -1109,4 +1109,81 @@ button.chip.active {
   font-family: var(--display);
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+/* ---------- scenes and channels ---------- */
+
+.scenes {
+  margin-top: 34px;
+}
+
+.scene-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+
+button.scene {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 9px 11px;
+  background: var(--panel);
+}
+
+button.scene.current {
+  border-color: var(--signal);
+  border-left-width: 2px;
+}
+
+.scene-num {
+  font-size: 10.5px;
+  color: var(--silk-faint);
+}
+
+button.scene.current .scene-num {
+  color: var(--signal);
+}
+
+.scene-name {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.channels-label {
+  margin-top: 24px;
+}
+
+.channel-list {
+  margin-top: 8px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+}
+
+.channel-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.channel-row:last-child {
+  border-bottom: none;
+}
+
+.channel-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.channel-buttons .chip {
+  min-width: 34px;
+  text-align: center;
 }

@@ -70,7 +70,8 @@ Quit FM3-Edit before starting. Only one program can hold the USB port.
 - [x] Phase 1 — device link, live routing grid, catalog grounding
 - [x] Phase 2 — tone description to validated parameter set, preview, write, save
 - [x] Phase 3 — preset browser, rename, hand editing, change log, write verification
-- [ ] Phase 4 — scenes, channels, cab/IR picker, block placement and cabling, live meters
+- [x] Phase 4a — scenes, channels, adaptive write encoding
+- [ ] Phase 4b — cab/IR picker, block placement and cabling, live meters
 - [ ] Phase 5 — .syx backup and restore, preset library with versions
 
 ## Reads can lie
@@ -110,6 +111,18 @@ the only legal vocabulary, then re-checks every value on the way back in
 
 Writes are sequential because they all travel down one serial port. Model swaps
 go first, since changing a block's model resets its parameters.
+
+### Which write encoding works is learned, not assumed
+
+ForgeFX exposes two write paths — `continuous: false` builds a discrete frame,
+`true` a continuous one. Both take a normalised 0–1 value, and nothing documents
+which suits which control. On a real FM3, linear controls land on the discrete
+path while frequency controls silently do not: they keep whatever value they
+were last reset to, and the write still returns `{"ok":true}`.
+
+So writes are confirmed. Each one is read back, and a value that didn't take is
+retried on the other encoding. What worked is remembered per parameter, so a
+preset full of frequency controls doesn't pay the retry cost twice.
 
 ### Gain staging is off limits
 
