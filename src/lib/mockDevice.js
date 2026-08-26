@@ -215,6 +215,47 @@ export function createMockDevice() {
       return { ok: true }
     },
 
+    setEnum: (eid, paramId, ordinal) => {
+      const list = state.params.get(eid)
+      const param = list?.find((p) => p.id === paramId)
+      if (param) param.value = ordinal
+      return { ok: true }
+    },
+
+    cabState: (eid) => ({
+      eid,
+      mode: 'STEREO',
+      slots: [
+        { slot: 1, bank: 'Factory 1', ir: 12, name: '4x12 5153' },
+        { slot: 2, bank: 'Factory 1', ir: 34, name: '4x12 CITRUS' }
+      ]
+    }),
+
+    irs: () => ({
+      banks: {
+        'Factory 1': cabTypes.map((c) => ({ value: c.value, name: c.name })),
+        Scratchpad: []
+      }
+    }),
+
+    backup: (location) => ({
+      location: location ?? state.presetNumber,
+      name: state.presetName,
+      // A plausible SysEx envelope: F0 00 01 74 11 ... F7
+      bytes: [0xf0, 0x00, 0x01, 0x74, 0x11, 0x01, ...Array(64).fill(0x00), 0xf7]
+    }),
+
+    loadBytes: () => ({ ok: true, loaded: true }),
+
+    meters: () =>
+      state.blocks
+        .filter((b) => !b.bypassed)
+        .map((b) => ({
+          eid: b.effectId,
+          name: b.name,
+          level: Math.random() * 0.7 + 0.15
+        })),
+
     getScene: () => ({ index: state.scene, names: state.sceneNames.slice() }),
 
     setScene: (index) => {

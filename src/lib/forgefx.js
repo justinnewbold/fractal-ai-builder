@@ -182,6 +182,82 @@ export const setParam = (eid, paramId, value, param, continuous) => {
   })
 }
 
+/**
+ * Set a discrete selector — bypass mode, input select, cab IR slot.
+ *
+ * These are not knobs. They carry an ordinal from a fixed option list, and
+ * normalising one would be meaningless: option 2 of 5 is not "40% of the way
+ * along". They go out on the discrete path with the ordinal intact, which is
+ * the same path a model change uses.
+ */
+export const setEnum = (eid, paramId, ordinal) => {
+  recordWire({
+    eid,
+    paramId,
+    wanted: ordinal,
+    sent: ordinal,
+    enum: true,
+    continuous: false,
+    range: null
+  })
+  if (mock) return tick().then(() => mock.setEnum(eid, paramId, ordinal))
+  return request(`/preset/blocks/${eid}/params/${paramId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ value: ordinal, continuous: false })
+  })
+}
+
+/** Cab block state for the IR picker: mode, per-slot bank and IR selection. */
+export const cabState = (eid) =>
+  mock ? tick().then(() => mock.cabState(eid)) : request(`/preset/blocks/${eid}/cab`)
+
+/** IR names by bank — Factory 1/2, Legacy, Scratchpad. */
+export const listIrBanks = () => (mock ? tick().then(() => mock.irs()) : request('/cab/irs'))
+
+/**
+ * Verbatim .syx dump of a preset. Omit the location for the working buffer.
+ *
+ * This is the only real backup — history stores generated specs, which describe
+ * an intent rather than a preset. A dump is the preset.
+ */
+export const backupPreset = (location) =>
+  mock
+    ? tick().then(() => mock.backup(location))
+    : request('/preset/backup', {
+        method: 'POST',
+        body: JSON.stringify(location === undefined ? {} : { location })
+      })
+
+/**
+ * Push raw .syx back to the unit.
+ *
+ * The FM3 reports restoreDump: false, so /preset/restore is refused. /preset/load
+ * takes the same bytes into the edit buffer instead, and storing is a separate
+ * step — which is arguably better, since it lands somewhere you can hear before
+ * it overwrites anything.
+ */
+export async function loadPresetBytes(bytes) {
+  if (mock) return tick().then(() => mock.loadBytes(bytes))
+  const res = await fetch(`${getHost()}/preset/load`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: new Uint8Array(bytes)
+  })
+  const body = await res.text()
+  let parsed = null
+  try {
+    parsed = body ? JSON.parse(body) : null
+  } catch {
+    parsed = body
+  }
+  if (!res.ok) throw new ForgeError(parsed?.error || parsed?.message || res.statusText)
+  return parsed
+}
+
+/** Live per-block output meters, for showing where signal actually is. */
+export const liveMeters = () =>
+  mock ? tick().then(() => mock.meters()) : request('/preset/monitors/live')
+
 /** Read one parameter's current value, for confirming a write landed. */
 async function readParamValue(eid, paramId) {
   const res = await blockParams(eid)

@@ -71,8 +71,26 @@ Quit FM3-Edit before starting. Only one program can hold the USB port.
 - [x] Phase 2 — tone description to validated parameter set, preview, write, save
 - [x] Phase 3 — preset browser, rename, hand editing, change log, write verification
 - [x] Phase 4a — scenes, channels, adaptive write encoding
-- [ ] Phase 4b — cab/IR picker, block placement and cabling, live meters
-- [ ] Phase 5 — .syx backup and restore, preset library with versions
+- [x] Phase 4b — cab/IR picker, live meters *(block placement deliberately deferred, see below)*
+- [x] Phase 5 — .syx backup and restore, saved preset library
+
+### Block placement is deferred, not forgotten
+
+`PUT /preset/grid/cell` and `POST /preset/grid/cable` exist, but ForgeFX flags
+block placement as spec-derived and not hardware-confirmed, and the `?dryRun=true`
+frame preview its docs describe **is not implemented in the code** — zero matches
+across `server/src`. Writing preset structure with no way to preview the frame,
+on a project where three separate encoding assumptions have already turned out
+wrong, isn't a trade worth making yet.
+
+Adding `dryRun` upstream is the unblocking move.
+
+### Discrete selectors are not knobs
+
+`GET /preset/blocks/{eid}/params` returns `enums` alongside `named`. Enums carry
+an ordinal from a fixed option list — bypass mode, input select, cab IR slot —
+and normalising one is meaningless: option 2 of 5 is not "40% along". They go out
+on the discrete path with the ordinal intact, the same way a model change does.
 
 ## Reads can lie
 
