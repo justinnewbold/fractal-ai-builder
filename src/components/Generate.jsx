@@ -1,14 +1,19 @@
-import { useState } from 'react'
-
-const EXAMPLES = [
-  'Tight modern metal rhythm in drop A, scooped but not thin',
-  'Warm blackface clean with a little spring reverb',
-  'Cranked plexi crunch, no pedals, just the amp working',
-  'Ambient lead with long delay trails and a soft edge'
-]
+import { useRef, useState } from 'react'
+import { suggest, totalSuggestions } from '../lib/suggestions'
 
 export function ToneForm({ onGenerate, busy, disabled }) {
   const [description, setDescription] = useState('')
+  const [examples, setExamples] = useState(() => suggest())
+  const seen = useRef(new Set(examples))
+
+  const more = () => {
+    const next = suggest(4, seen.current)
+    next.forEach((s) => seen.current.add(s))
+    // Once the pool has been worked through, start over rather than repeating
+    // the last four forever.
+    if (seen.current.size >= totalSuggestions) seen.current = new Set(next)
+    setExamples(next)
+  }
 
   const submit = () => {
     const text = description.trim()
@@ -39,11 +44,19 @@ export function ToneForm({ onGenerate, busy, disabled }) {
       </div>
 
       <div className="examples">
-        {EXAMPLES.map((example) => (
-          <button key={example} className="chip" onClick={() => setDescription(example)} disabled={disabled}>
+        {examples.map((example) => (
+          <button
+            key={example}
+            className="chip"
+            onClick={() => setDescription(example)}
+            disabled={disabled}
+          >
             {example}
           </button>
         ))}
+        <button className="chip more" onClick={more} disabled={disabled} title="Different ideas">
+          More ideas
+        </button>
       </div>
     </section>
   )

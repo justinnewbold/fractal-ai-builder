@@ -1301,3 +1301,8 @@ button.history-title:hover {
 .cost-saved {
   color: var(--live);
 }
+
+button.chip.more {
+  color: var(--signal);
+  border-style: dashed;
+}
