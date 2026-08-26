@@ -1840,3 +1840,61 @@ button.cell-btn.probed {
 .dirty-bar .history-actions {
   margin-top: 0;
 }
+
+/* ---------- live generation ---------- */
+
+.live-gen {
+  margin-top: 10px;
+}
+
+.live-body {
+  margin-top: 8px;
+  padding: 12px 14px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--signal);
+  border-radius: 3px;
+}
+
+.live-name {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.live-summary {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: var(--silk-dim);
+  max-width: 62ch;
+}
+
+.live-block {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+}
+
+.live-block-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 11px;
+  color: var(--silk-faint);
+}
+
+.live-model {
+  color: var(--signal);
+}
+
+.live-param {
+  font-size: 11px;
+  color: var(--silk-dim);
+  padding-left: 12px;
+  margin-top: 2px;
+}

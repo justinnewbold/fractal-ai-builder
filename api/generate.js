@@ -12,7 +12,7 @@
  * swapping providers is an environment variable, not a code change. The key
  * lives here and never reaches the browser.
  */
-import { generateObject } from 'ai'
+import { generateObject, streamObject } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 
@@ -182,6 +182,81 @@ export default async function handler(req, res) {
         `the differences — keep everything that isn't being changed. Make a real, audible move in ` +
         `the direction asked for rather than a token nudge, but change as little else as possible.`
       : `Tone wanted: ${description}`
+
+  const args = {
+    model,
+    schema: PresetSpec,
+    schemaName: 'preset_spec',
+    system: SYSTEM,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text:
+              `Models available on this unit, by block family. The numeric "value" is what ` +
+              `you must use when changing a model:\n${JSON.stringify(rosters)}\n\n` +
+              `What each block and control actually does, from the device's own reference:\n` +
+              `${JSON.stringify(reference)}`,
+            providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } }
+          },
+          {
+            type: 'text',
+            text: `Current state of the loaded preset:\n${JSON.stringify(state)}\n\n${task}`
+          }
+        ]
+      }
+    ]
+  }
+
+  // Streaming exists so the wait isn't a black box. The model decides blocks in
+  // order, so partials arrive as a chain being built — which is worth watching,
+  // and is also the only honest progress indicator available for a call whose
+  // duration nothing can predict.
+  if (req.query?.stream === '1' || req.headers?.['x-stream'] === '1') {
+    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8')
+    res.setHeader('Cache-Control', 'no-store')
+    res.setHeader('X-Accel-Buffering', 'no')
+
+    try {
+      const result = streamObject(args)
+      for await (const partial of result.partialObjectStream) {
+        res.write(JSON.stringify({ type: 'partial', object: partial }) + '\n')
+      }
+
+      const object = await result.object
+      const usage = await result.usage
+      const meta = (await result.providerMetadata)?.anthropic || {}
+
+      res.write(
+        JSON.stringify({
+          type: 'done',
+          object: {
+            ...object,
+            _usage: {
+              inputTokens: usage?.inputTokens ?? null,
+              outputTokens: usage?.outputTokens ?? null,
+              cachedInputTokens:
+                usage?.cachedInputTokens ??
+                usage?.inputTokenDetails?.cacheReadTokens ??
+                meta.cacheReadInputTokens ??
+                null,
+              cacheWriteTokens:
+                usage?.inputTokenDetails?.cacheWriteTokens ??
+                meta.cacheCreationInputTokens ??
+                null,
+              model: typeof model === 'string' ? model : model?.modelId || MODEL_NAME
+            }
+          }
+        }) + '\n'
+      )
+    } catch (err) {
+      res.write(JSON.stringify({ type: 'error', error: err.message }) + '\n')
+    }
+    res.end()
+    return
+  }
 
   try {
     const { object, usage, providerMetadata } = await generateObject({

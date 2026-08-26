@@ -11,6 +11,8 @@ import History from './components/History'
 import { CabPicker, Backup, Meters } from './components/Hardware'
 import { Refine, Compare } from './components/Refine'
 import Gig from './components/Gig'
+import { Stages, LiveGeneration } from './components/LiveGeneration'
+import { streamSpec } from './lib/stream'
 import { Modifiers, SceneMatrix, TempoTuner } from './components/Modifiers'
 import { Versions, DeviceBackup } from './components/Versions'
 import Footswitches from './components/Footswitches'
@@ -59,6 +61,9 @@ export default function App() {
   const [historyKey, setHistoryKey] = useState(0)
   const [compare, setCompare] = useState(null)
   const [catalog, setCatalog] = useState(null)
+  const [partial, setPartial] = useState(null)
+  const [liveOpen, setLiveOpen] = useState(false)
+  const [thinking, setThinking] = useState(false)
 
   // Anything written but not stored lives only in the edit buffer. Tracking it
   // is what lets the app say "this is not saved yet" instead of leaving someone
@@ -111,20 +116,22 @@ export default function App() {
 
   /** One path to the model, so generate, refine and compare can't drift apart. */
   const requestSpec = async (schema, description, previous) => {
-    const res = await fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        description,
-        device,
-        blocks: schema,
-        previous: previous || null,
-        mode: previous ? 'refine' : 'design'
-      })
-    })
-    const spec = await res.json()
-    if (!res.ok) throw new Error(spec.error || 'Generation failed.')
-    return spec
+    setPartial(null)
+    setThinking(true)
+    try {
+      return await streamSpec(
+        {
+          description,
+          device,
+          blocks: schema,
+          previous: previous || null,
+          mode: previous ? 'refine' : 'design'
+        },
+        { onPartial: setPartial }
+      )
+    } finally {
+      setThinking(false)
+    }
   }
 
   const generate = async (description) => {
@@ -138,7 +145,7 @@ export default function App() {
         setProgress(`Reading ${name} - ${done} of ${total}`)
       )
 
-      setProgress('Designing the preset...')
+      setProgress(null)
       const spec = await requestSpec(schema, description)
 
       const validated = validateSpec(spec, schema)
@@ -347,7 +354,7 @@ export default function App() {
         setProgress(`Reading ${name} - ${done} of ${total}`)
       )
 
-      setProgress(`Adjusting: ${instruction}`)
+      setProgress(null)
       const spec = await requestSpec(schema, instruction, previous)
 
       const validated = validateSpec(spec, schema)
@@ -590,6 +597,24 @@ export default function App() {
           )}
 
           <Thinking message={progress} />
+
+          {thinking ? (
+            <div className="thinking" role="status" aria-live="polite">
+              <span className="thinking-bars" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+                <i />
+              </span>
+              <Stages active={thinking} />
+            </div>
+          ) : null}
+
+          <LiveGeneration
+            partial={partial}
+            open={liveOpen}
+            onToggle={() => setLiveOpen(!liveOpen)}
+          />
 
           {error ? (
             <div className="notice" data-kind="fault">
