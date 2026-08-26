@@ -85,6 +85,19 @@ the only legal vocabulary, then re-checks every value on the way back in
 Writes are sequential because they all travel down one serial port. Model swaps
 go first, since changing a block's model resets its parameters.
 
+### Gain staging is off limits
+
+A block's output Level reads like a tone control by name — "Amp1 Level" sits in
+the same list as Bass, Mid and Treble — so a generator will set it to -60 dB
+while every other value is musically right. The preset then looks perfect and
+makes no sound, and range checking can't catch it because -60 dB is legal.
+
+So output levels, balance and pan are stripped from the schema before the model
+sees them, and dropped again on the way back. The Gate block is excluded for the
+same reason: a threshold set too high mutes quiet playing, and the safe value
+depends on pickups and room rather than on a text description. See
+`src/lib/guardrails.js`.
+
 ## Browser support
 
 Chrome works. **Safari does not** — it blocks a secure page from calling

@@ -6,6 +6,8 @@
  * parameter's own range. Anything that fails is dropped and reported, not sent.
  */
 
+import { isSilencingParam } from './guardrails'
+
 export function validateSpec(spec, schema) {
   const problems = []
   const changes = []
@@ -55,6 +57,12 @@ export function validateSpec(spec, schema) {
 
       if (!known_param) {
         problems.push(`${known.name}: no parameter ${param.id} — skipped.`)
+        continue
+      }
+      // Backstop. These are stripped before the generator ever sees them, but a
+      // silent preset is bad enough to be worth checking twice.
+      if (isSilencingParam(known_param.name)) {
+        problems.push(`${known.name} / ${known_param.name}: output level is yours to set — skipped.`)
         continue
       }
       if (typeof param.value !== 'number' || Number.isNaN(param.value)) {

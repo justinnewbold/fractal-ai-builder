@@ -9,6 +9,8 @@
 //   - parameter writes take real units ({"value": 9} for a 0-10 gain), not 0-1
 //   - /preset/store commits to a slot even when capabilities report supportsSave:false
 
+import { EXCLUDED_BLOCKS, safeParams } from './guardrails'
+
 const DEFAULT_HOST = 'http://localhost:5056'
 
 export function getHost() {
@@ -117,7 +119,7 @@ export { ForgeError }
  * transport is a single serial port and parallel reads collide.
  */
 export async function readSchema(blocks, onProgress) {
-  const editable = blocks.filter((b) => !['input', 'output', 'looper'].includes(b.slug))
+  const editable = blocks.filter((b) => !EXCLUDED_BLOCKS.includes(b.slug))
   const typeCache = new Map()
   const schema = []
 
@@ -128,14 +130,16 @@ export async function readSchema(blocks, onProgress) {
     let params = []
     try {
       const res = await blockParams(block.effectId)
-      params = (res?.named || []).map((p) => ({
-        id: p.id,
-        name: p.name,
-        value: p.value,
-        min: p.min,
-        max: p.max,
-        unit: p.unit || ''
-      }))
+      params = safeParams(
+        (res?.named || []).map((p) => ({
+          id: p.id,
+          name: p.name,
+          value: p.value,
+          min: p.min,
+          max: p.max,
+          unit: p.unit || ''
+        }))
+      )
     } catch {
       // A block with no readable parameters is not a failure — skip it.
     }
