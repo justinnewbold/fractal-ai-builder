@@ -18,8 +18,9 @@ const RATES = {
   'claude-opus-4-8': { in: 5, out: 25 }
 }
 
-/** Cached input reads bill at a tenth of the base input rate. */
+/** Cached reads bill at a tenth of base; writing the cache costs a premium. */
 const CACHE_READ_MULTIPLIER = 0.1
+const CACHE_WRITE_MULTIPLIER = 1.25
 
 /** Strip a gateway prefix and any date suffix so 'anthropic/claude-sonnet-5' matches. */
 function normalizeModel(model) {
@@ -45,14 +46,25 @@ export function costOf(usage, model) {
   const input = usage.inputTokens ?? 0
   const output = usage.outputTokens ?? 0
   const cached = usage.cachedInputTokens ?? 0
+  const written = usage.cacheWriteTokens ?? 0
 
   const fresh = Math.max(0, input - cached)
 
   return (
     (fresh / 1e6) * rate.in +
     (cached / 1e6) * rate.in * CACHE_READ_MULTIPLIER +
+    (written / 1e6) * rate.in * CACHE_WRITE_MULTIPLIER +
     (output / 1e6) * rate.out
   )
+}
+
+/** What this run would have cost with no cache, for showing the saving. */
+export function uncachedCostOf(usage, model) {
+  const rate = rateFor(model)
+  if (!rate || !usage) return null
+  const billable =
+    (usage.inputTokens ?? 0) + (usage.cachedInputTokens ?? 0) + (usage.cacheWriteTokens ?? 0)
+  return (billable / 1e6) * rate.in + ((usage.outputTokens ?? 0) / 1e6) * rate.out
 }
 
 /** Cents below a dollar, dollars above — reading $0.0431 takes a beat too long. */
