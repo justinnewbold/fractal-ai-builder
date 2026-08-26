@@ -89,7 +89,7 @@ export default function App() {
 
   // Fifteen stacked sections was a long scroll with the important things buried.
   // Grouped by what you're doing rather than by which endpoint it calls.
-  const [view, setView] = useState('design')
+  const [view, setView] = useState('console')
   const [selectedBlock, setSelectedBlock] = useState(null)
   const [slots, setSlots] = useState([])
   const [scanning, setScanning] = useState(false)
@@ -683,8 +683,8 @@ export default function App() {
       {status === 'live' ? (
         <nav className="views" aria-label="Sections">
           {[
-            ['design', 'Design'],
             ['console', 'Console'],
+            ['design', 'Design'],
             ['bench', 'Bench'],
             ['library', 'Library'],
             ['gig', 'Gig']
