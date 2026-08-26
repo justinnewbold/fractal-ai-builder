@@ -1666,3 +1666,31 @@ table.matrix th:first-child,
   min-width: 80px;
   max-width: 90px;
 }
+
+/* ---------- versions, device backup, slot peek ---------- */
+
+.versions,
+.device-backup {
+  margin-top: 30px;
+}
+
+.version-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+}
+
+.slot-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.slot-peek {
+  padding: 3px 10px 0;
+  font-size: 10px;
+  color: var(--silk-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

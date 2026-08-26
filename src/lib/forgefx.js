@@ -651,3 +651,56 @@ export const setTuner = (on) =>
   mock
     ? tick().then(() => ({ ok: true }))
     : request('/tuner', { method: 'POST', body: JSON.stringify({ on }) })
+
+
+/**
+ * ForgeFX's own preset version history.
+ *
+ * Distinct from the saved presets in this app. Those store a generated spec —
+ * an intent, replayable against any preset. A version is a raw .syx snapshot of
+ * one slot at one moment, which is what you want when the question is "put it
+ * back how it was" rather than "do that again".
+ */
+export const listVersions = (location) =>
+  mock
+    ? tick().then(() => mock.versions(location))
+    : request(`/versions${location === undefined ? '' : `?location=${location}`}`)
+
+/** Play a snapshot without occupying a slot — it lands in the edit buffer. */
+export const loadVersion = (id) =>
+  mock ? tick().then(() => ({ ok: true })) : request(`/version/${id}/load`, { method: 'POST' })
+
+/** Put a snapshot back in the slot it came from. Destructive. */
+export const restoreVersion = (id) =>
+  mock ? tick().then(() => ({ ok: true })) : request(`/version/${id}/restore`, { method: 'POST' })
+
+/** Read a stored preset without loading it onto the unit. */
+export const presetSummary = (n, full) =>
+  mock
+    ? tick().then(() => mock.presetSummary(n))
+    : request(`/presets/${n}/summary${full ? '?full=1' : ''}`)
+
+/** Every stored backup ForgeFX holds. */
+export const listBackups = () =>
+  mock ? tick().then(() => ({ backups: [] })) : request('/backups')
+
+/**
+ * Back up a range of slots in one pass.
+ *
+ * Per-preset .syx covers the preset you are working on. This covers the case
+ * where something went wrong and you don't yet know which slot it touched.
+ */
+export const backupDevice = (label, from = 0, to = 511) =>
+  mock
+    ? tick().then(() => ({ ok: true, label }))
+    : request('/backup/device', {
+        method: 'POST',
+        body: JSON.stringify({ label, from, to })
+      })
+
+/** ForgeFX's own reference material for a block family. */
+export const blockHelp = (slug) =>
+  mock ? tick().then(() => null) : request(`/help/blocks/${slug}`)
+
+/** Footswitch layout the unit reports. */
+export const fcModel = () => (mock ? tick().then(() => null) : request('/fc/model'))

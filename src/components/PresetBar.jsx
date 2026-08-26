@@ -18,6 +18,8 @@ export function PresetBar({ preset, onSelect, onRename, busy }) {
   const [renaming, setRenaming] = useState(false)
   const [draftName, setDraftName] = useState('')
   const [jump, setJump] = useState('')
+  const [peeking, setPeeking] = useState(null)
+  const [summary, setSummary] = useState(null)
 
   const loadPage = async (from) => {
     setStart(from)
@@ -30,6 +32,26 @@ export function PresetBar({ preset, onSelect, onRename, busy }) {
       setSlots(found)
     } finally {
       setLoading(null)
+    }
+  }
+
+  /**
+   * Peek inside a slot without loading it.
+   *
+   * A name tells you almost nothing — plenty of presets are called "Lead 3".
+   * The summary reads what's actually in the slot, and reading is cheaper than
+   * loading, which would kick you off whatever you're currently playing.
+   */
+  const peek = async (number) => {
+    setPeeking(number)
+    try {
+      const { presetSummary } = await import('../lib/forgefx')
+      const res = await presetSummary(number)
+      setSummary({ number, blocks: res?.blocks || [], name: res?.name })
+    } catch {
+      setSummary({ number, blocks: null })
+    } finally {
+      setPeeking(null)
     }
   }
 
@@ -122,15 +144,23 @@ export function PresetBar({ preset, onSelect, onRename, busy }) {
 
           <div className="slot-grid">
             {slots.map((slot) => (
-              <button
-                key={slot.number}
-                className={`slot ${slot.number === preset?.number ? 'current' : ''}`}
-                onClick={() => onSelect(slot.number)}
-                disabled={busy}
-              >
-                <span className="slot-num mono">{slot.number}</span>
-                <span className="slot-name">{slot.name || <em>empty</em>}</span>
-              </button>
+              <div className="slot-wrap" key={slot.number}>
+                <button
+                  className={`slot ${slot.number === preset?.number ? 'current' : ''}`}
+                  onClick={() => onSelect(slot.number)}
+                  onMouseEnter={() => slot.name && peek(slot.number)}
+                  onFocus={() => slot.name && peek(slot.number)}
+                  disabled={busy}
+                >
+                  <span className="slot-num mono">{slot.number}</span>
+                  <span className="slot-name">{slot.name || <em>empty</em>}</span>
+                </button>
+                {summary?.number === slot.number && summary.blocks?.length ? (
+                  <span className="slot-peek mono">{summary.blocks.slice(0, 4).join(' · ')}</span>
+                ) : peeking === slot.number ? (
+                  <span className="slot-peek mono">reading…</span>
+                ) : null}
+              </div>
             ))}
           </div>
         </div>

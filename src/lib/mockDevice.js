@@ -256,6 +256,19 @@ export function createMockDevice() {
           level: Math.random() * 0.7 + 0.15
         })),
 
+    versions: () => ({
+      versions: [
+        { id: 'v1', location: 500, name: 'DEMO', at: Date.now() - 3600_000, label: 'Before edit' },
+        { id: 'v2', location: 500, name: 'DEMO', at: Date.now() - 600_000, label: 'After metal pass' }
+      ]
+    }),
+
+    presetSummary: (n) => ({
+      number: n,
+      name: state.stored.get(n) || '',
+      blocks: state.blocks.filter((b) => !b.bypassed).map((b) => b.name)
+    }),
+
     modModel: () => ({
       slots: 4,
       sources: [
