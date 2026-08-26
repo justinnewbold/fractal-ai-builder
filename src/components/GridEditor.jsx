@@ -1,34 +1,14 @@
-import { useState } from 'react'
-import { pointAtCell, placeBlock, clearCell, readGrid } from '../lib/forgefx'
+import { useEffect, useState } from 'react'
+import { pointAtCell, placeBlock, clearCell, readGrid, blockCatalog } from '../lib/forgefx'
 
 /**
- * Blocks that make sense to place, with the effect ids ForgeFX addresses them
- * by. Instance limits are enforced server-side — an FM3 has one amp, and
- * placeCell refuses a second rather than wasting a doomed write.
+ * A workable starting chain, by block family rather than by number.
+ *
+ * Block type codes differ completely between an FM3 and an AM4, so the starter
+ * resolves against the device's own palette. Anything the attached unit doesn't
+ * offer is simply skipped.
  */
-const PLACEABLE = [
-  { eid: 46, name: 'Compressor', slug: 'comp' },
-  { eid: 94, name: 'Wah', slug: 'wah' },
-  { eid: 118, name: 'Drive 1', slug: 'drive' },
-  { eid: 119, name: 'Drive 2', slug: 'drive' },
-  { eid: 58, name: 'Amp', slug: 'amp' },
-  { eid: 62, name: 'Cab', slug: 'cab' },
-  { eid: 50, name: 'Graphic EQ', slug: 'geq' },
-  { eid: 54, name: 'Parametric EQ', slug: 'peq' },
-  { eid: 146, name: 'Gate', slug: 'gate' },
-  { eid: 78, name: 'Chorus', slug: 'chorus' },
-  { eid: 82, name: 'Flanger', slug: 'flanger' },
-  { eid: 90, name: 'Phaser', slug: 'phaser' },
-  { eid: 106, name: 'Tremolo', slug: 'tremolo' },
-  { eid: 110, name: 'Pitch', slug: 'pitch' },
-  { eid: 70, name: 'Delay 1', slug: 'delay' },
-  { eid: 71, name: 'Delay 2', slug: 'delay' },
-  { eid: 66, name: 'Reverb', slug: 'reverb' },
-  { eid: 102, name: 'Volume/Pan', slug: 'volume' }
-]
-
-/** A workable starting chain for an empty preset, left to right. */
-const STARTER = [118, 58, 62, 70, 66]
+const STARTER_ORDER = ['drive', 'amp', 'cab', 'delay', 'reverb']
 
 /**
  * Building a preset from an empty slot.
@@ -51,11 +31,26 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
   const [working, setWorking] = useState(null)
   const [probe, setProbe] = useState(null)
 
-  const rows = capabilities?.grid?.rows ?? 4
-  const cols = capabilities?.grid?.cols ?? 12
-  const linear = capabilities?.slotModel === 'linear'
+  const [palette, setPalette] = useState([])
 
-  if (linear) return null
+  const linear = capabilities?.slotModel === 'linear'
+  const rows = linear ? 1 : capabilities?.grid?.rows ?? 4
+  const cols = linear ? capabilities?.slotCount ?? 4 : capabilities?.grid?.cols ?? 12
+
+  useEffect(() => {
+    let stop = false
+    ;(async () => {
+      try {
+        const res = await blockCatalog()
+        if (!stop) setPalette(Array.isArray(res) ? res : [])
+      } catch {
+        if (!stop) setPalette([])
+      }
+    })()
+    return () => {
+      stop = true
+    }
+  }, [])
 
   const occupied = new Map(blocks.map((b) => [`${b.row}:${b.col}`, b]))
 
@@ -75,8 +70,12 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
     try {
       const res = await placeBlock(target.row, target.col, Number(choice))
       if (res?.ok === false) throw new Error('The unit refused that placement.')
-      const block = PLACEABLE.find((b) => b.eid === Number(choice))
-      onChanged(`Placed ${block?.name} at row ${target.row}, column ${target.col}`)
+      const block = palette.find((b) => b.page === Number(choice))
+      onChanged(
+        linear
+          ? `Placed ${block?.name} in slot ${target.col}`
+          : `Placed ${block?.name} at row ${target.row}, column ${target.col}`
+      )
       setTarget(null)
       setChoice('')
     } catch (err) {
@@ -102,11 +101,15 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
   const buildStarter = async () => {
     setWorking('starter')
     try {
-      for (const [i, eid] of STARTER.entries()) {
-        const res = await placeBlock(1, i + 1, eid)
-        if (res?.ok === false) throw new Error(`The unit refused a block at column ${i + 1}.`)
+      const chain = STARTER_ORDER.map((slug) => palette.find((b) => b.slug === slug)).filter(
+        Boolean
+      )
+      const fits = chain.slice(0, cols)
+      for (const [i, block] of fits.entries()) {
+        const res = await placeBlock(1, linear ? i + 1 : i + 1, block.page)
+        if (res?.ok === false) throw new Error(`The unit refused ${block.name}.`)
       }
-      onChanged('Built a starter chain — drive, amp, cab, delay, reverb')
+      onChanged(`Built a starter chain — ${fits.map((b) => b.name).join(', ')}`)
       await readGrid().catch(() => {})
     } catch (err) {
       onError(err.message)
@@ -165,7 +168,9 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
         >
           {Array.from({ length: rows * cols }, (_, i) => {
             const row = Math.floor(i / cols) + 1
-            const col = i % cols
+            // Linear devices address slots 1..n; matrix devices report columns
+            // 0-indexed and the client shifts them at the wire boundary.
+            const col = linear ? (i % cols) + 1 : i % cols
             const here = occupied.get(`${row}:${col}`)
             const selected = target?.row === row && target?.col === col
             const probed = probe === `${row}:${col}`
@@ -182,9 +187,7 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
                 {here ? (
                   <span className="cell-name">{here.name}</span>
                 ) : (
-                  <span className="cell-coord mono">
-                    {row}·{col}
-                  </span>
+                  <span className="cell-coord mono">{linear ? col : `${row}·${col}`}</span>
                 )}
               </button>
             )
@@ -195,7 +198,7 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
       {target ? (
         <div className="cell-actions">
           <span className="diff-label mono">
-            row {target.row}, column {target.col}
+            {linear ? `slot ${target.col}` : `row ${target.row}, column ${target.col}`}
           </span>
 
           <button className="chip" onClick={() => point(target.row, target.col)} disabled={busy}>
@@ -213,9 +216,11 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
           ) : (
             <>
               <select value={choice} onChange={(e) => setChoice(e.target.value)}>
-                <option value="">Choose a block…</option>
-                {PLACEABLE.map((b) => (
-                  <option key={b.eid} value={b.eid}>
+                <option value="">
+                  {palette.length ? 'Choose a block…' : 'No palette from this unit'}
+                </option>
+                {palette.map((b) => (
+                  <option key={`${b.slug}-${b.page}`} value={b.page}>
                     {b.name}
                   </option>
                 ))}

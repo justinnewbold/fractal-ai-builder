@@ -652,12 +652,14 @@ export default function App() {
             disabled={status !== 'live'}
           />
 
-          <CabPicker
-            blocks={blocks}
+          {device?.capabilities?.cabIrs !== false ? (
+            <CabPicker
+              blocks={blocks}
             busy={busy}
             onError={setError}
-            onChanged={(summary) => record('cab', summary)}
-          />
+              onChanged={(summary) => record('cab', summary)}
+            />
+          ) : null}
 
           <Backup
             preset={preset}
@@ -669,9 +671,14 @@ export default function App() {
             }}
           />
 
-          <Meters active={status === 'live'} />
+          {device?.capabilities?.meters?.outputLevels !== false &&
+          device?.capabilities?.telemetry?.outputMeters !== false ? (
+            <Meters active={status === 'live'} />
+          ) : null}
 
-          <Footswitches onError={setError} />
+          {device?.capabilities?.fc?.model !== false ? (
+            <Footswitches onError={setError} />
+          ) : null}
         </>
       ) : null}
 

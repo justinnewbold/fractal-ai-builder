@@ -783,3 +783,15 @@ export const setCable = (srcRow, srcCol, destRow, connect = true) =>
 /** The routing grid as the device reports it, including cabling. */
 export const readGrid = () =>
   mock ? tick().then(() => mock.grid()) : request('/preset/grid')
+
+
+/**
+ * Placeable blocks for whichever device is attached.
+ *
+ * GET /blocks is the palette: `page` is the block's own type code and goes
+ * straight back to placeCell. It has to come from the device — the FM3 and AM4
+ * use entirely different numbering, so a hardcoded list would place the wrong
+ * blocks on the wrong unit while looking like it worked.
+ */
+export const blockCatalog = () =>
+  mock ? tick().then(() => mock.blockCatalog()) : request('/blocks')

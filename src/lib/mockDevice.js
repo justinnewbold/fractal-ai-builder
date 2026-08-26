@@ -256,6 +256,17 @@ export function createMockDevice() {
           level: Math.random() * 0.7 + 0.15
         })),
 
+    blockCatalog: () =>
+      LAYOUT.filter((l) => !['input', 'output'].includes(l.slug)).map((l) => ({
+        slug: l.slug,
+        family: l.slug,
+        instance: 1,
+        name: l.name,
+        page: l.effectId,
+        paramCount: 0,
+        typeCount: 0
+      })),
+
     placeBlock: (row, col, blockId) => {
       const existing = state.blocks.findIndex((b) => b.row === row && b.col === col)
       if (blockId === 0) {

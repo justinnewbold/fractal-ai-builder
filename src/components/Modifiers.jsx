@@ -62,7 +62,10 @@ export function Modifiers({ blocks, onError, onChanged, busy }) {
     }
   }, [eid, onError])
 
-  if (!model) return null
+  // The AM4 exposes a modifier model but reports modBind false: the data is
+  // there, the wire binding isn't. Showing an Attach button that cannot attach
+  // would be worse than showing nothing.
+  if (!model || model.bindable === false) return null
 
   const bind = async () => {
     try {
