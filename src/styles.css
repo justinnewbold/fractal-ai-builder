@@ -1084,3 +1084,22 @@ button.chip.active {
   color: var(--silk-faint);
   max-width: 56ch;
 }
+
+/* ---------- build badge ---------- */
+
+.build-badge {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.version {
+  font-size: 12px;
+  color: var(--signal);
+}
+
+.build-meta {
+  font-size: 10.5px;
+  color: var(--silk-faint);
+}

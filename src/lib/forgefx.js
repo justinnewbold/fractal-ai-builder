@@ -133,8 +133,6 @@ export const clearWireLog = () => {
   wireLog.length = 0
 }
 
-/** Build identifier, so a stale deployment is visible rather than inferred. */
-export const BUILD = __BUILD_STAMP__
 
 /** Engage or bypass a block. */
 export const setBypass = (eid, bypassed) =>
