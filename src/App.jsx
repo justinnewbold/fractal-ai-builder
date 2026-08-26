@@ -31,6 +31,8 @@ import {
   setPresetName,
   setChannel,
   setScene,
+  revertPreset,
+  backupPreset,
   getHost
 } from './lib/forgefx'
 import { validateSpec, countWrites } from './lib/validate'
@@ -57,6 +59,12 @@ export default function App() {
   const [historyKey, setHistoryKey] = useState(0)
   const [compare, setCompare] = useState(null)
   const [catalog, setCatalog] = useState(null)
+
+  // Anything written but not stored lives only in the edit buffer. Tracking it
+  // is what lets the app say "this is not saved yet" instead of leaving someone
+  // to wonder whether they just overwrote a preset.
+  const [dirty, setDirty] = useState(false)
+  const [safety, setSafety] = useState(null)
 
   // Fifteen stacked sections was a long scroll with the important things buried.
   // Grouped by what you're doing rather than by which endpoint it calls.
@@ -161,6 +169,20 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
+      // A verbatim copy of the slot as it stands, taken before the first write.
+      // Revert covers unsaved edits; this covers changing your mind after
+      // saving, which revert cannot reach.
+      if (!safety && typeof preset?.number === 'number') {
+        try {
+          const dump = await backupPreset(preset.number)
+          if (dump?.bytes?.length) {
+            setSafety({ number: preset.number, name: preset.name, bytes: dump.bytes })
+          }
+        } catch {
+          // Not every device exposes the dump path. Revert still works.
+        }
+      }
+
       const failures = await applyChanges(result.changes, (done, total, label) =>
         setProgress(`${done} of ${total} - ${label}`)
       )
@@ -174,6 +196,7 @@ export default function App() {
 
       const count = countWrites(result.changes)
       setApplied({ failures, count, mismatches })
+      setDirty(true)
 
       // Saved after writing rather than on generation: a spec that was never
       // sent isn't a preset, it's a draft.
@@ -228,6 +251,7 @@ export default function App() {
       await storePreset(number)
       setApplied((prev) => ({ ...prev, savedTo: number }))
       record('save', `Saved "${name || preset?.name}" to slot ${number}`)
+      setDirty(false)
       await read()
     } catch (err) {
       setError(err.message)
@@ -242,6 +266,8 @@ export default function App() {
     try {
       await selectPreset(number)
       record('select', `Loaded slot ${number}`)
+      setDirty(false)
+      setSafety(null)
       setResult(null)
       setApplied(null)
       await read()
@@ -397,6 +423,43 @@ export default function App() {
     }
   }
 
+  /** Reload the current slot from flash, discarding anything unsaved. */
+  const revert = async () => {
+    if (typeof preset?.number !== 'number') return
+    setBusy(true)
+    setError(null)
+    try {
+      await revertPreset(preset.number)
+      record('revert', `Reverted slot ${preset.number} to its saved version`)
+      setDirty(false)
+      setResult(null)
+      setApplied(null)
+      await read()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** Push the pre-edit copy back, for when revert is no longer enough. */
+  const restoreSafety = async () => {
+    if (!safety) return
+    setBusy(true)
+    setError(null)
+    try {
+      const { loadPresetBytes } = await import('./lib/forgefx')
+      await loadPresetBytes(safety.bytes)
+      record('restore', `Loaded the pre-edit copy of "${safety.name}" into the edit buffer`)
+      setDirty(true)
+      await read()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const writeCount = result ? countWrites(result.changes) : 0
 
   return (
@@ -484,6 +547,26 @@ export default function App() {
         />
       ) : null}
 
+      {status === 'live' && dirty ? (
+        <div className="dirty-bar">
+          <span className="lamp" data-state="live" />
+          <span className="dirty-text">
+            Playing an unsaved version of <strong>{preset?.name}</strong>. Nothing is permanent
+            until you save it to a slot.
+          </span>
+          <div className="history-actions">
+            <button className="chip" onClick={revert} disabled={busy}>
+              Revert to saved
+            </button>
+            {safety ? (
+              <button className="chip" onClick={restoreSafety} disabled={busy}>
+                Load pre-edit copy
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       {status === 'live' && view === 'design' ? (
         <>
           <PresetBar preset={preset} onSelect={jumpTo} onRename={rename} busy={busy} />
@@ -522,7 +605,7 @@ export default function App() {
                 {applied.count} changes sent.
                 {applied.savedTo !== undefined
                   ? ` Stored to slot ${applied.savedTo}.`
-                  : ' Play it. If you want to keep it, save it to a slot below.'}
+                  : ' It\u2019s in the edit buffer \u2014 play it now. Nothing is permanent until you save it below, and Revert puts the saved version back.'}
               </p>
               {applied.failures?.length
                 ? applied.failures.map((f, i) => (
