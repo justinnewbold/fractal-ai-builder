@@ -320,7 +320,9 @@ export default function App() {
   }
 
   const save = async () => {
-    const number = Number(slot)
+    // An empty slot field means "the one that's loaded" — the save bar shows
+    // that number, so the button does what it says without anything typed.
+    const number = slot === '' ? preset?.number : Number(slot)
     if (!Number.isInteger(number) || number < 0) {
       setError('Enter a preset slot number.')
       return
@@ -687,7 +689,7 @@ export default function App() {
           {[
             ['console', 'Console'],
             ['design', 'Design'],
-            ['bench', 'Bench'],
+            ['edit', 'Edit'],
             ['library', 'Library'],
             ['gig', 'Gig']
           ].map(([id, label]) => (
@@ -937,6 +939,38 @@ export default function App() {
             Playing an unsaved version of <strong>{preset?.name}</strong>. Nothing is permanent
             until you save it to a slot.
           </span>
+
+          {/*
+            Save lives here rather than inside one view. This bar already appears
+            on every page the moment anything is unsaved, which is exactly when
+            the button is wanted — having to navigate to another tab to keep a
+            change you just made is how edits get lost.
+
+            The slot defaults to the preset currently loaded, so the common case
+            is one click. Typing a different number saves a copy elsewhere.
+          */}
+          <div className="save-row dirty-save">
+            <input
+              type="text"
+              className="name-field"
+              value={saveName || preset?.name?.trim() || ''}
+              maxLength={31}
+              onChange={(e) => setSaveName(e.target.value)}
+              placeholder="Preset name"
+              aria-label="Name to save the preset under"
+            />
+            <input
+              type="text"
+              value={slot === '' ? String(preset?.number ?? '') : slot}
+              onChange={(e) => setSlot(e.target.value.replace(/[^0-9]/g, ''))}
+              placeholder="Slot"
+              aria-label="Preset slot to save into"
+            />
+            <button className="save-now" onClick={save} disabled={busy}>
+              Save to slot {slot === '' ? (preset?.number ?? '--') : slot}
+            </button>
+          </div>
+
           <div className="history-actions">
             <button className="chip" onClick={revert} disabled={busy}>
               Revert to saved
@@ -961,7 +995,7 @@ export default function App() {
                 yet.
               </p>
               <p>
-                Load a preset that already has an amp and cab, or go to <strong>Bench</strong> and
+                Load a preset that already has an amp and cab, or go to <strong>Edit</strong> and
                 build a chain first &mdash; there&rsquo;s a starter chain button that places
                 drive, amp, cab, delay and reverb in one go.
               </p>
@@ -1088,7 +1122,7 @@ export default function App() {
         </>
       ) : null}
 
-      {status === 'live' && view === 'bench' ? (
+      {status === 'live' && view === 'edit' ? (
         <>
           {preset ? (
             <Grid preset={preset} blocks={blocks} capabilities={device?.capabilities} />
