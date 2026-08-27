@@ -10,6 +10,13 @@ import { toNormalized, fromNormalized } from '../src/lib/scale.js'
 import { isSilencingParam } from '../src/lib/guardrails.js'
 import { validateSpec, countWrites } from '../src/lib/validate.js'
 import { preferredEncoding, rememberEncoding, disambiguate } from '../src/lib/encoding.js'
+import {
+  patchSchemaValue,
+  invalidateSchema,
+  resetSchemaCache,
+  seedSchemaCache,
+  cachedSchema
+} from '../src/lib/schemaCache.js'
 
 let passed = 0
 const test = (name, fn) => {
@@ -346,6 +353,29 @@ test('backing up a preset needs no confirmation', () => {
   const r = validatePlan({ actions: [{ kind: 'backupPreset', value: 3, why: '' }] }, cmdBlocks, caps)
   assert.equal(r.actions.length, 1)
   assert.ok(!r.actions[0].destructive)
+})
+
+test('a confirmed write updates the cached value in place', () => {
+  resetSchemaCache()
+  const params = [{ id: 7, name: 'Gain', value: 5, min: 0, max: 10 }]
+  seedSchemaCache(58, params)
+  patchSchemaValue(58, 7, 8)
+  assert.equal(params[0].value, 8)
+})
+
+test('patching a block that was never cached is harmless', () => {
+  resetSchemaCache()
+  assert.doesNotThrow(() => patchSchemaValue(999, 1, 5))
+})
+
+test('invalidating one block leaves the others cached', () => {
+  resetSchemaCache()
+  seedSchemaCache(58, [{ id: 7, value: 5 }])
+  seedSchemaCache(118, [{ id: 2, value: 3 }])
+  invalidateSchema(58)
+  // The swapped block must be re-read; the untouched one must not.
+  assert.equal(cachedSchema(58), undefined)
+  assert.ok(cachedSchema(118))
 })
 
 console.log(`\n${passed} passed\n`)

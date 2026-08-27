@@ -94,13 +94,15 @@ export function validatePlan(plan, blocks, capabilities) {
           label: `${block.name} · ${param.name} ${round(param.value)} → ${round(raw.value)}${
             param.unit || ''
           }`,
-          run: async () =>
-            (await device()).setParamConfirmed(
-              block.eid ?? block.effectId,
-              param.id,
-              raw.value,
-              param
-            )
+          run: async () => {
+            const d = await device()
+            const eid = block.eid ?? block.effectId
+            const res = await d.setParamConfirmed(eid, param.id, raw.value, param)
+            // Confirmed by read-back inside setParamConfirmed, so recording it
+            // saves re-reading the whole block to learn a number we already had.
+            if (res?.ok) d.patchSchemaValue(eid, param.id, raw.value)
+            return res
+          }
         })
         break
       }
@@ -112,7 +114,15 @@ export function validatePlan(plan, blocks, capabilities) {
         actions.push({
           ...raw,
           label: `${block.name} → ${model.name}`,
-          run: async () => (await device()).setType(block.eid ?? block.effectId, model.value)
+          run: async () => {
+            const d = await device()
+            const eid = block.eid ?? block.effectId
+            const res = await d.setType(eid, model.value)
+            // A model swap resets this block's parameters and their ranges, so
+            // anything cached about it is now fiction.
+            d.invalidateSchema(eid)
+            return res
+          }
         })
         break
       }
@@ -135,7 +145,15 @@ export function validatePlan(plan, blocks, capabilities) {
         actions.push({
           ...raw,
           label: `${block.name} → channel ${raw.text}`,
-          run: async () => (await device()).setChannel(block.eid ?? block.effectId, raw.text)
+          run: async () => {
+            const d = await device()
+            const eid = block.eid ?? block.effectId
+            const res = await d.setChannel(eid, raw.text)
+            // Each channel carries its own values — the cached ones belong to
+            // the channel we just left.
+            d.invalidateSchema(eid)
+            return res
+          }
         })
         break
       }
@@ -179,7 +197,13 @@ export function validatePlan(plan, blocks, capabilities) {
         actions.push({
           ...raw,
           label: `Place a block at row ${raw.row}, column ${raw.col}`,
-          run: async () => (await device()).placeBlock(raw.row, raw.col, raw.value)
+          run: async () => {
+            const d = await device()
+            const res = await d.placeBlock(raw.row, raw.col, raw.value)
+            // The chain changed; which blocks exist is no longer what we cached.
+            d.invalidateSchema()
+            return res
+          }
         })
         break
       }
@@ -192,7 +216,13 @@ export function validatePlan(plan, blocks, capabilities) {
           ...raw,
           label: `Remove ${occupant?.name || 'the block'} from row ${raw.row}, column ${raw.col}`,
           destructive: true,
-          run: async () => (await device()).clearCell(raw.row, raw.col)
+          run: async () => {
+            const d = await device()
+            const res = await d.clearCell(raw.row, raw.col)
+            // The chain changed; which blocks exist is no longer what we cached.
+            d.invalidateSchema()
+            return res
+          }
         })
         break
       }
@@ -278,7 +308,13 @@ export function validatePlan(plan, blocks, capabilities) {
           label: `Load slot ${number}`,
           // Anything unsaved in the edit buffer goes with it.
           destructive: true,
-          run: async () => (await device()).selectPreset(number)
+          run: async () => {
+            const d = await device()
+            const res = await d.selectPreset(number)
+            // Different preset, different everything.
+            d.invalidateSchema()
+            return res
+          }
         })
         break
       }

@@ -40,6 +40,7 @@ import {
   currentPreset,
   presetBlocks,
   readSchema,
+  resetSchemaCache,
   applyChanges,
   verifyChanges,
   storePreset,
@@ -208,8 +209,12 @@ export default function App() {
     setApplied(null)
     try {
       setProgress('Reading what the unit has loaded...')
-      const schema = await readSchema(blocks, (done, total, name) =>
-        setProgress(`Reading ${name} - ${done} of ${total}`)
+      const schema = await readSchema(
+        blocks,
+        (done, total, name) => setProgress(`Reading ${name} - ${done} of ${total}`),
+        // Designing or rebuilding a whole preset starts from the unit, not from
+        // what we last wrote to it.
+        { force: true }
       )
 
       setProgress(null)
@@ -351,6 +356,8 @@ export default function App() {
   const jumpTo = async (number) => {
     setBusy(true)
     setError(null)
+    // A different preset means different blocks, values and ranges.
+    resetSchemaCache()
     try {
       await selectPreset(number)
       record('select', `Loaded slot ${number}`)
@@ -394,8 +401,12 @@ export default function App() {
     setApplied(null)
     try {
       setProgress('Reading what the unit has loaded...')
-      const schema = await readSchema(blocks, (done, total, name) =>
-        setProgress(`Reading ${name} - ${done} of ${total}`)
+      const schema = await readSchema(
+        blocks,
+        (done, total, name) => setProgress(`Reading ${name} - ${done} of ${total}`),
+        // Designing or rebuilding a whole preset starts from the unit, not from
+        // what we last wrote to it.
+        { force: true }
       )
 
       const validated = validateSpec(entry.spec, schema)
@@ -431,8 +442,12 @@ export default function App() {
     setError(null)
     try {
       setProgress('Reading what the unit has loaded...')
-      const schema = await readSchema(blocks, (done, total, name) =>
-        setProgress(`Reading ${name} - ${done} of ${total}`)
+      const schema = await readSchema(
+        blocks,
+        (done, total, name) => setProgress(`Reading ${name} - ${done} of ${total}`),
+        // Designing or rebuilding a whole preset starts from the unit, not from
+        // what we last wrote to it.
+        { force: true }
       )
 
       setProgress(null)
@@ -473,8 +488,12 @@ export default function App() {
     setCompare(null)
     try {
       setProgress('Reading what the unit has loaded...')
-      const schema = await readSchema(blocks, (done, total, name) =>
-        setProgress(`Reading ${name} - ${done} of ${total}`)
+      const schema = await readSchema(
+        blocks,
+        (done, total, name) => setProgress(`Reading ${name} - ${done} of ${total}`),
+        // Designing or rebuilding a whole preset starts from the unit, not from
+        // what we last wrote to it.
+        { force: true }
       )
 
       const withChannels = blocks.filter((b) => b.channel)
@@ -513,6 +532,7 @@ export default function App() {
 
   /** Reload the current slot from flash, discarding anything unsaved. */
   const revert = async () => {
+    resetSchemaCache()
     if (typeof preset?.number !== 'number') return
     setBusy(true)
     setError(null)
@@ -532,6 +552,7 @@ export default function App() {
 
   /** Push the pre-edit copy back, for when revert is no longer enough. */
   const restoreSafety = async () => {
+    resetSchemaCache()
     if (!safety) return
     setBusy(true)
     setError(null)
@@ -558,10 +579,18 @@ export default function App() {
     setBusy(true)
     setError(null)
     setTurns((prev) => [...prev, { role: 'user', text: instruction }])
+
+    // Parameters are cached between turns, which is what makes conversation
+    // quick. The cache cannot see a knob turned on the unit itself, so asking
+    // for a re-read is sayable rather than something only a hidden button does.
+    const wantsFresh = /\b(re-?read|refresh|reload|check again|what changed)\b/i.test(instruction)
+
     try {
       setProgress('Reading the preset...')
-      const schema = await readSchema(blocks, (done, total, name) =>
-        setProgress(`Reading ${name} - ${done} of ${total}`)
+      const schema = await readSchema(
+        blocks,
+        (done, total, name) => setProgress(`Reading ${name} - ${done} of ${total}`),
+        { force: wantsFresh }
       )
 
       // Grid positions come from the placed-block list, not the schema, since

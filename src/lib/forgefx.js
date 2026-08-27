@@ -11,6 +11,18 @@
 
 import { EXCLUDED_BLOCKS, safeParams } from './guardrails.js'
 import { toNormalized } from './scale.js'
+import {
+  rosterCache,
+  helpTextCache,
+  paramCache,
+  invalidateSchema,
+  patchSchemaValue,
+  resetSchemaCache,
+  seedSchemaCache,
+  cachedSchema
+} from './schemaCache.js'
+
+export { invalidateSchema, patchSchemaValue, resetSchemaCache }
 import { preferredEncoding, rememberEncoding, getEncodingMap, disambiguate } from './encoding.js'
 
 export { preferredEncoding, rememberEncoding, getEncodingMap, disambiguate }
@@ -391,30 +403,42 @@ export { ForgeError }
  * matches the firmware in front of the player. Sequential on purpose — the
  * transport is a single serial port and parallel reads collide.
  */
-export async function readSchema(blocks, onProgress) {
+export async function readSchema(blocks, onProgress, { force = false } = {}) {
+  if (force) paramCache.clear()
+
   // The generation about to happen is computed against these ranges, so a stale
-  // read here produces values that are wrong from the start.
-  try {
-    await clearDeviceCache()
-  } catch {
-    // Older builds may not expose it; a stale read is better than no schema.
+  // read here produces values that are wrong from the start. Only worth the
+  // round trip when something is actually going to be read.
+  const needsRead = blocks.some(
+    (b) => !EXCLUDED_BLOCKS.includes(b.slug) && !paramCache.has(b.effectId)
+  )
+  if (needsRead) {
+    try {
+      await clearDeviceCache()
+    } catch {
+      // Older builds may not expose it; a stale read is better than no schema.
+    }
   }
 
   const editable = blocks.filter((b) => !EXCLUDED_BLOCKS.includes(b.slug))
-  const typeCache = new Map()
-  const helpCache = new Map()
+  const typeCache = rosterCache
+  const helpCache = helpTextCache
   const schema = []
 
   for (let i = 0; i < editable.length; i++) {
     const block = editable[i]
     onProgress?.(i + 1, editable.length, block.name)
 
-    let params = []
-    try {
-      const res = await blockParams(block.effectId)
-      params = safeParams(disambiguate(res?.named || []))
-    } catch {
-      // A block with no readable parameters is not a failure — skip it.
+    let params = paramCache.get(block.effectId)
+    if (!params) {
+      params = []
+      try {
+        const res = await blockParams(block.effectId)
+        params = safeParams(disambiguate(res?.named || []))
+      } catch {
+        // A block with no readable parameters is not a failure — skip it.
+      }
+      paramCache.set(block.effectId, params)
     }
 
     let models = []
