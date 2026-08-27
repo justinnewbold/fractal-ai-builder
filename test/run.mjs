@@ -408,4 +408,15 @@ test('the library is written after the slot, not before', () => {
   )
 })
 
+test('a tone description is not treated as a list of changes', () => {
+  // designTone is routed to the design flow before validatePlan sees it, so the
+  // validator has no business inventing actions for it.
+  const r = validatePlan(
+    { actions: [{ kind: 'designTone', text: 'tight modern metal in drop A', why: '' }] },
+    cmdBlocks,
+    caps
+  )
+  assert.equal(r.actions.length, 0)
+})
+
 console.log(`\n${passed} passed\n`)

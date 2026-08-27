@@ -46,7 +46,8 @@ const Action = z.object({
       'savePreset',
       'loadPreset',
       'backupPreset',
-      'keepInLibrary'
+      'keepInLibrary',
+      'designTone'
     ])
     .describe('What to do.'),
   eid: z.number().int().nullable().describe('Effect id of the block, or null.'),
@@ -65,7 +66,8 @@ const Action = z.object({
     .nullable()
     .describe(
       'For renamePreset: the name. For setChannel: A/B/C/D. For savePreset and keepInLibrary: ' +
-        'an optional name to save it under. Null otherwise.'
+        'an optional name to save it under. For designTone: the tone description in the ' +
+        'player own words. Null otherwise.'
     ),
   fromRow: z.number().int().nullable().describe('Source row for moveBlock. Null otherwise.'),
   fromCol: z.number().int().nullable().describe('Source column for moveBlock. Null otherwise.'),
@@ -120,6 +122,20 @@ than the change you just made, and "put that back" refers to what you just did.
 If someone asks a question rather than requesting a change — what amp is this,
 what does that control do, is this saved — answer it in "understood" and return
 no actions. A question is not a failure, so leave "refused" empty for it.
+
+DESCRIBING A TONE IS NOT A LIST OF CHANGES
+
+If the request describes a sound to build rather than controls to change --
+"tight modern metal rhythm in drop A", "warm clean with a bit of shimmer",
+"something like a Vox on the edge of breakup" -- return exactly one action,
+designTone, with their words in "text" and nothing else. A whole tone gets
+designed and shown for approval before anything is written. That is a different
+and slower path than nudging a control, and it is the right one.
+
+The difference is whether they named what to change. "Turn the gain up" and "set
+high cut to 5k" are changes. "Make it heavier" is a change if the current tone is
+close and a design if they want a different sound entirely -- when it is
+genuinely unclear, prefer designTone, because it stops to show its work.
 
 There are two places a preset can be kept and they are not the same. A slot is
 on the unit, numbered, and saving to one overwrites what was there. The library

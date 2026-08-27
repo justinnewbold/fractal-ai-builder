@@ -3303,3 +3303,8 @@ ol.action-list li.destructive::marker {
   color: var(--silk-dim);
   font-style: italic;
 }
+
+/* Design view no longer takes input — it explains where the input went. */
+.design-hint {
+  margin-top: 18px;
+}
