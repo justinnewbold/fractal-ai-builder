@@ -2868,3 +2868,156 @@ ol.action-list li.destructive::marker {
   flex-wrap: wrap;
   margin-top: 14px;
 }
+
+/* ==================================================================
+   Phones
+
+   Not a scaled-down desktop. The console's source order is built for a
+   wide screen — presets down the left, chain to the right — and stacking
+   that vertically puts a 512-row list above everything else, which is
+   the worst possible first screen. On a narrow viewport the order is
+   what you actually need: what's in the chain, the block you're editing,
+   then the preset you're on, then the list.
+   ================================================================== */
+
+@media (max-width: 1000px) {
+  .console {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .console > .fx-panel {
+    order: 1;
+  }
+  .console > .block-panel {
+    order: 2;
+  }
+  .console > .center-panel {
+    order: 3;
+  }
+  .console > .preset-panel {
+    order: 4;
+  }
+
+  .preset-scroll {
+    max-height: 300px;
+  }
+}
+
+/* Anything driven by a finger rather than a pointer. */
+@media (pointer: coarse) {
+  /* iOS zooms the page when a focused input is under 16px. That zoom then
+     has to be undone by hand, so it is worth the extra size everywhere. */
+  input[type='text'],
+  input[type='number'],
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  /* A 24px chip is a miss more often than a hit. */
+  button,
+  .chip,
+  button.chip {
+    min-height: 40px;
+    padding-top: 9px;
+    padding-bottom: 9px;
+  }
+
+  button.icon-btn {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  button.preset-row,
+  button.port-row,
+  button.scene-line,
+  button.slot {
+    min-height: 46px;
+  }
+
+  /* The knob needs room for a thumb, and a bigger target than a cursor needs. */
+  .knob-cell {
+    width: 96px;
+  }
+
+  button.dot-btn {
+    padding: 11px;
+  }
+
+  button.cell-btn {
+    min-height: 54px;
+  }
+}
+
+@media (max-width: 700px) {
+  /* Tabs shouldn't wrap into three rows and push the content off screen. */
+  .views {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+
+  .views::-webkit-scrollbar {
+    display: none;
+  }
+
+  button.view-tab {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  .device-strip {
+    gap: 9px;
+  }
+
+  .strip-right {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .knob-deck {
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .chain-strip {
+    justify-content: flex-start;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding: 18px 14px 22px;
+    scrollbar-width: none;
+  }
+
+  .chain-strip::-webkit-scrollbar {
+    display: none;
+  }
+
+  button.fx-tile {
+    flex: none;
+  }
+
+  .tone.hero {
+    padding: 20px 16px 18px;
+  }
+
+  .preview-head,
+  .history-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .diff {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Notched phones: keep the last row of controls off the home indicator. */
+@supports (padding: max(0px)) {
+  .shell {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    padding-bottom: max(80px, calc(env(safe-area-inset-bottom) + 60px));
+  }
+}

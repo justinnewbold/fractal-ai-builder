@@ -24,10 +24,16 @@ export default function Knob({ param, value, onChange, onCommit, size = 58, labe
 
   const handleMove = useCallback(
     (event) => {
+      // Without this the page scrolls under the finger instead of the knob
+      // turning. The listener is registered passive:false precisely so this
+      // call is allowed.
+      if (event.cancelable) event.preventDefault()
+
       const y = event.touches ? event.touches[0].clientY : event.clientY
       const delta = origin.current.y - y
-      // 180px of travel covers the full range; fine mode with shift.
-      const scale = event.shiftKey ? 600 : 180
+      // 180px of travel covers the full range on a mouse. A thumb is less
+      // precise and a phone screen is shorter, so touch gets a longer throw.
+      const scale = event.shiftKey ? 600 : event.touches ? 260 : 180
       const next = clamp01(origin.current.norm + delta / scale)
       onChange(round3(fromNormalized(next, param)))
     },
@@ -45,15 +51,18 @@ export default function Knob({ param, value, onChange, onCommit, size = 58, labe
     window.addEventListener('mouseup', stop)
     window.addEventListener('touchmove', handleMove, { passive: false })
     window.addEventListener('touchend', stop)
+    window.addEventListener('touchcancel', stop)
     return () => {
       window.removeEventListener('mousemove', handleMove)
       window.removeEventListener('mouseup', stop)
       window.removeEventListener('touchmove', handleMove)
       window.removeEventListener('touchend', stop)
+      window.removeEventListener('touchcancel', stop)
     }
   }, [dragging, handleMove, onCommit])
 
   const begin = (event) => {
+    if (event.cancelable) event.preventDefault()
     const y = event.touches ? event.touches[0].clientY : event.clientY
     origin.current = { y, norm }
     setDragging(true)
