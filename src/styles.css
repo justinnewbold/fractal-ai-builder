@@ -1866,6 +1866,56 @@ button.cell-btn.probed {
   margin-top: 0;
 }
 
+/* The save controls sit in the unsaved bar, which shows on every view. They
+   read as the primary action there — revert and the pre-edit copy stay as
+   quiet chips beside them. */
+.save-row.dirty-save {
+  margin-top: 0;
+  gap: 8px;
+}
+
+.save-row.dirty-save input[type='text'] {
+  min-width: 84px;
+  padding: 6px 9px;
+  font-size: 12.5px;
+}
+
+.save-row.dirty-save input.name-field {
+  min-width: 150px;
+}
+
+button.save-now {
+  padding: 7px 15px;
+  font-family: var(--display);
+  font-size: 12.5px;
+  letter-spacing: 0.05em;
+  color: var(--ink-on-live, #0b0b0b);
+  background: var(--live);
+  border: 1px solid var(--live);
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+button.save-now:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+
+button.save-now:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (max-width: 620px) {
+  .save-row.dirty-save {
+    width: 100%;
+  }
+
+  button.save-now {
+    flex: 1 1 auto;
+  }
+}
+
 /* ---------- live generation ---------- */
 
 .live-gen {

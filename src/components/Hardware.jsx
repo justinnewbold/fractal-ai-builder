@@ -124,13 +124,13 @@ export function Backup({ preset, onError, onChanged, busy }) {
 
   return (
     <section className="backup">
-      <p className="silk-label">Preset file</p>
+      <p className="silk-label">Back up this preset</p>
       <div className="history-actions">
         <button className="chip" onClick={download} disabled={busy}>
-          Download .syx
+          Back up slot {preset?.number ?? '--'} to a file
         </button>
         <button className="chip" onClick={() => fileInput.current?.click()} disabled={busy}>
-          Load .syx
+          Restore a preset from a file
         </button>
         <input
           ref={fileInput}
@@ -141,8 +141,12 @@ export function Backup({ preset, onError, onChanged, busy }) {
         />
       </div>
       <p className="hint">
-        A loaded file lands in the edit buffer, not a slot — so you hear it before it overwrites
-        anything. Save it from above to keep it.
+        This backs up the one preset you have loaded, as a .syx file on your computer. For every
+        slot at once, use the whole-device backup in Library instead.
+      </p>
+      <p className="hint">
+        A restored file lands in the edit buffer, not a slot — so you hear it before it overwrites
+        anything. Save it from the bar at the top to keep it.
       </p>
       {note ? <p className="hint">{note}</p> : null}
     </section>
