@@ -3247,3 +3247,59 @@ ol.action-list li.destructive::marker {
     max-height: 260px;
   }
 }
+
+/* ---------- library on disk ---------- */
+
+.local-library {
+  margin-top: 34px;
+}
+
+.library-list {
+  margin-top: 12px;
+  border-top: 1px solid var(--rule);
+}
+
+.library-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.library-name {
+  flex: 0 0 auto;
+  font-family: var(--display);
+  font-size: 13px;
+  letter-spacing: 0.03em;
+}
+
+/* The path is what tells two same-named presets apart, so it stays visible but
+   yields its space first. */
+.library-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  color: var(--silk-dim);
+}
+
+@media (max-width: 620px) {
+  .library-row {
+    flex-wrap: wrap;
+  }
+
+  .library-path {
+    flex: 1 1 100%;
+    order: 3;
+  }
+}
+
+/* A change made by hand: context in the transcript, not a spoken turn. */
+.turn-system .turn-text {
+  font-size: 12px;
+  color: var(--silk-dim);
+  font-style: italic;
+}

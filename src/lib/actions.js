@@ -45,7 +45,8 @@ const ORDER = {
   setScene: 8,
   renamePreset: 9,
   setTempo: 10,
-  savePreset: 20
+  savePreset: 20,
+  keepInLibrary: 21
 }
 
 export function validatePlan(plan, blocks, capabilities) {
@@ -338,6 +339,33 @@ export function validatePlan(plan, blocks, capabilities) {
             a.download = `${String(raw.value ?? 0).padStart(3, '0')}-${safe}.syx`
             a.click()
             URL.revokeObjectURL(url)
+          }
+        })
+        break
+      }
+
+      /*
+       * Keeping a tone as a file on disk. Unlike savePreset this overwrites
+       * nothing on the unit, so it doesn't stop to ask — a file appearing in a
+       * folder is not a loss.
+       */
+      case 'keepInLibrary': {
+        const name = (raw.text || '').trim().slice(0, 60)
+        actions.push({
+          ...raw,
+          label: name ? `Keep "${name}" in the library` : 'Keep this preset in the library',
+          run: async () => {
+            const d = await device()
+            const dump = await d.backupPreset(raw.value ?? undefined)
+            const bytes = dump?.bytes
+            if (!Array.isArray(bytes) || !bytes.length) {
+              throw new Error('The unit returned no data.')
+            }
+            return d.writeLocalPreset({
+              name: name || dump.name || 'preset',
+              bytes,
+              overwrite: true
+            })
           }
         })
         break

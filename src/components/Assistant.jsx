@@ -49,7 +49,11 @@ export default function Assistant({ turns, onAsk, onConfirm, onCancel, busy, pro
 
         {turns.map((turn, i) => (
           <div key={i} className={`turn turn-${turn.role}`}>
-            <p className="turn-text">{turn.text}</p>
+            {/* Hand edits are shown as a quiet note: they are context for what
+                comes next, not something anyone said. */}
+            <p className="turn-text">
+              {turn.role === 'system' ? `You: ${turn.text}` : turn.text}
+            </p>
 
             {turn.actions?.length ? (
               <ul className="turn-actions">

@@ -378,4 +378,34 @@ test('invalidating one block leaves the others cached', () => {
   assert.ok(cachedSchema(118))
 })
 
+test('keeping a preset in the library asks no permission', () => {
+  const r = validatePlan(
+    { actions: [{ kind: 'keepInLibrary', value: null, text: 'Drop A Rhythm', why: '' }] },
+    cmdBlocks,
+    caps
+  )
+  assert.equal(r.actions.length, 1)
+  // A file appearing in a folder overwrites nothing on the unit.
+  assert.ok(!r.actions[0].destructive)
+  assert.ok(r.actions[0].label.includes('Drop A Rhythm'))
+})
+
+test('the library is written after the slot, not before', () => {
+  const r = validatePlan(
+    {
+      actions: [
+        { kind: 'keepInLibrary', value: null, text: 'Take one', why: '' },
+        { kind: 'setParam', eid: 58, paramId: 7, value: 8, why: '' },
+        { kind: 'savePreset', value: 4, text: null, why: '' }
+      ]
+    },
+    cmdBlocks,
+    caps
+  )
+  assert.deepEqual(
+    r.actions.map((a) => a.kind),
+    ['setParam', 'savePreset', 'keepInLibrary']
+  )
+})
+
 console.log(`\n${passed} passed\n`)

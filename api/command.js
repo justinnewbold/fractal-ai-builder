@@ -45,7 +45,8 @@ const Action = z.object({
       'setTempo',
       'savePreset',
       'loadPreset',
-      'backupPreset'
+      'backupPreset',
+      'keepInLibrary'
     ])
     .describe('What to do.'),
   eid: z.number().int().nullable().describe('Effect id of the block, or null.'),
@@ -63,8 +64,8 @@ const Action = z.object({
     .string()
     .nullable()
     .describe(
-      'For renamePreset: the name. For setChannel: A/B/C/D. For savePreset: an optional name ' +
-        'to save it under. Null otherwise.'
+      'For renamePreset: the name. For setChannel: A/B/C/D. For savePreset and keepInLibrary: ' +
+        'an optional name to save it under. Null otherwise.'
     ),
   fromRow: z.number().int().nullable().describe('Source row for moveBlock. Null otherwise.'),
   fromCol: z.number().int().nullable().describe('Source column for moveBlock. Null otherwise.'),
@@ -119,6 +120,12 @@ than the change you just made, and "put that back" refers to what you just did.
 If someone asks a question rather than requesting a change — what amp is this,
 what does that control do, is this saved — answer it in "understood" and return
 no actions. A question is not a failure, so leave "refused" empty for it.
+
+There are two places a preset can be kept and they are not the same. A slot is
+on the unit, numbered, and saving to one overwrites what was there. The library
+is a folder of files on the player's own computer, named rather than numbered,
+and nothing is lost by adding to it. "Save this to 67" is a slot. "Save this to
+my library" or "keep this as Drop A Rhythm" is keepInLibrary.
 
 Slots are addressed by the numbers the unit uses. "Save this to 67" is
 savePreset with value 67. "Save it" with no number means the slot that is
