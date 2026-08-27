@@ -1083,3 +1083,50 @@ export function servedLocally() {
 export function pageIsSecure() {
   return typeof window !== 'undefined' && window.location.protocol === 'https:'
 }
+
+/**
+ * A preset library on the player's own disk.
+ *
+ * The saved-preset history this app has shipped with lives in localStorage,
+ * which means it is tied to one browser profile on one machine and vanishes if
+ * that profile is cleared. ForgeFX already keeps a real folder of .syx files on
+ * the host, so a tone saved there is a file the player owns — copyable,
+ * backed up by whatever backs up their Mac, and readable by Fractal's own tools.
+ *
+ * It has to be pointed at a folder once. Until then every call returns a 409,
+ * which the UI reads as "not set up yet" rather than an error.
+ */
+export const localConfig = () =>
+  mock ? tick().then(() => ({ configured: false })) : request('/local/config')
+
+export const setLocalRoot = (root) =>
+  mock
+    ? tick().then(() => ({ configured: !!root, root }))
+    : request('/local/config', { method: 'PUT', body: JSON.stringify({ root }) })
+
+/** Everything in the library. `refresh` re-decodes rather than trusting mtimes. */
+export const localPresets = (refresh = false) =>
+  mock
+    ? tick().then(() => ({ entries: [] }))
+    : request(`/local/presets${refresh ? '?refresh=1' : ''}`)
+
+/** Raw bytes of one library file, fetched only when something is about to use it. */
+export const localPresetFile = (path) =>
+  mock
+    ? tick().then(() => [])
+    : request(`/local/presets/file?path=${encodeURIComponent(path)}`)
+
+export const writeLocalPreset = ({ name, dir, path, bytes, overwrite = false }) =>
+  mock
+    ? tick().then(() => ({ ok: true, path: `${name}.syx` }))
+    : request('/local/presets', {
+        method: 'POST',
+        body: JSON.stringify({ name, dir, path, bytes, overwrite })
+      })
+
+/** Write ForgeFX's whole version store out to the folder, and read it back. */
+export const localSync = () =>
+  mock ? tick().then(() => ({ ok: true })) : request('/local/sync', { method: 'POST' })
+
+export const localRestore = () =>
+  mock ? tick().then(() => ({ ok: true })) : request('/local/restore', { method: 'POST' })

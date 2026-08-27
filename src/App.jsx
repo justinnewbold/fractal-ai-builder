@@ -18,6 +18,7 @@ import { Versions, DeviceBackup } from './components/Versions'
 import Footswitches from './components/Footswitches'
 import GridEditor from './components/GridEditor'
 import Ports from './components/Ports'
+import LocalLibrary from './components/LocalLibrary'
 import Assistant from './components/Assistant'
 import Theme from './components/Theme'
 import { validatePlan, runPlan } from './lib/actions'
@@ -57,6 +58,26 @@ import { validateSpec, countWrites } from './lib/validate'
 import { newEntry, append } from './lib/log'
 
 import { blockCatalog } from './lib/forgefx'
+
+/**
+ * Which log entries are worth telling the assistant about.
+ *
+ * Changes to the sound and to what is loaded, so "put that back" and "what did
+ * I just do" work after a hand edit. Not asks — those are already turns — and
+ * not housekeeping like port choice or backups, which say nothing about the
+ * tone.
+ */
+const HAND_EDIT_KINDS = new Set([
+  'edit',
+  'scene',
+  'grid',
+  'cab',
+  'modifier',
+  'tempo',
+  'save',
+  'select',
+  'library'
+])
 
 export default function App() {
   const [status, setStatus] = useState('idle')
@@ -104,8 +125,21 @@ export default function App() {
   const stopScan = useRef(false)
   const [editTab, setEditTab] = useState('ai')
 
-  const record = useCallback((kind, summary, detail = []) => {
+  /**
+   * Everything that changed, in one place.
+   *
+   * Hand edits also land in the conversation. Without that the assistant is
+   * blind to half of what happens: turn a knob yourself, say "put that back",
+   * and it has no idea what "that" was. Since every manual control already
+   * reports here, this is the one place that has to know.
+   *
+   * `fromAssistant` marks the changes it made itself, which are already in the
+   * transcript and must not appear twice.
+   */
+  const record = useCallback((kind, summary, detail = [], fromAssistant = false) => {
     setLog((prev) => append(prev, newEntry(kind, summary, detail)))
+    if (fromAssistant || !HAND_EDIT_KINDS.has(kind)) return
+    setTurns((prev) => [...prev, { role: 'system', text: summary }])
   }, [])
 
   const read = useCallback(async () => {
@@ -611,18 +645,23 @@ export default function App() {
           scene,
           presetName: preset?.name,
           presetNumber: preset?.number,
-          history: turns.map((t) => ({ role: t.role, text: t.text }))
+          history: turns.map((t) =>
+            t.role === 'system'
+              ? { role: 'user', text: `(I did this by hand: ${t.text})` }
+              : { role: t.role, text: t.text }
+          )
         })
       })
       const body = await res.json()
       if (!res.ok) throw new Error(body.error || 'That request failed.')
 
       const checked = validatePlan(body, withPositions, device?.capabilities)
-      record('ask', `Asked: ${instruction}`, [
-        checked.understood,
-        `${checked.actions.length} actions proposed`,
-        ...checked.problems
-      ])
+      record(
+        'ask',
+        `Asked: ${instruction}`,
+        [checked.understood, `${checked.actions.length} actions proposed`, ...checked.problems],
+        true
+      )
 
       const reply = {
         role: 'assistant',
@@ -663,10 +702,12 @@ export default function App() {
       const failures = await runPlan(actions, (done, total, label) =>
         setProgress(`${done} of ${total} - ${label}`)
       )
-      record('edit', `Did ${actions.length} things`, [
-        ...actions.map((a) => a.label),
-        ...failures
-      ])
+      record(
+        'edit',
+        `Did ${actions.length} things`,
+        [...actions.map((a) => a.label), ...failures],
+        true
+      )
       if (failures.length) {
         setError(failures.join(' · '))
         setTurns((prev) => {
@@ -1309,6 +1350,13 @@ export default function App() {
           device?.capabilities?.telemetry?.outputMeters !== false ? (
             <Meters active={status === 'live'} />
           ) : null}
+
+          <LocalLibrary
+            preset={preset}
+            busy={busy}
+            onError={setError}
+            onChanged={(summary) => record('library', summary)}
+          />
 
           <Ports
             busy={busy}
