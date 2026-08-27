@@ -1,30 +1,92 @@
 import { useEffect, useRef, useState } from 'react'
 
-const EXAMPLES = [
+/**
+ * Things worth saying, typed out one at a time in the empty box.
+ *
+ * The placeholder is the only place a new player finds out what this understands.
+ * A single fixed example teaches one trick; rotating through them shows the
+ * range — a control by name, a whole tone, a question, saving, structure — which
+ * is the actual answer to "what can I say to it".
+ */
+const SUGGESTIONS = [
   'Change gain to 7 on the amp',
-  'Save this to slot 67',
+  'Tight modern metal rhythm in drop A',
   'Turn up the gain a little and cut the bass',
-  'Bypass the reverb',
+  'Save this to slot 67',
   'What amp is this?',
-  'Set the tempo to 96'
+  'Bypass the reverb',
+  'Move the drive before the amp',
+  'Warm clean with a bit of shimmer',
+  'Set the tempo to 96',
+  'Keep this as Drop A Rhythm',
+  'Rename this to something that describes it',
+  'Set high cut to 5k',
+  'Make the delay slower',
+  'Re-read the preset'
 ]
 
+const TYPE_MS = 55
+const DELETE_MS = 28
+const HOLD_MS = 1900
+
 /**
- * The main way to work the unit: say what you want.
+ * Type one suggestion, hold it, wipe it, move to the next.
  *
- * This is deliberately not a panel inside one view. It sits above everything and
- * stays there, because the split between "the AI does this" and "you do that by
- * hand" was the app's invention, not the player's. Anything reachable through a
- * knob here is reachable through a sentence.
- *
- * Safe changes run on arrival. Only the ones that can lose work — saving over a
- * slot, loading a different preset, clearing a cell — stop and ask. Requiring a
- * confirmation click for "set gain to 7" is the kind of ceremony that makes
- * people go back to the knobs.
+ * Stops the moment there's anything to stop for: text in the box, focus in the
+ * box, or a system that has asked for less motion. A placeholder animating under
+ * someone's cursor while they think is a distraction, not a hint.
  */
+function useTypedSuggestion(active) {
+  const [text, setText] = useState('')
+  const [index, setIndex] = useState(0)
+  const [phase, setPhase] = useState('typing')
+
+  const reduced =
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+
+  useEffect(() => {
+    if (!active || reduced) return undefined
+
+    const full = SUGGESTIONS[index % SUGGESTIONS.length]
+
+    // One timeout per step, phase in state. An interval would be fought by this
+    // effect re-running on every character it wrote.
+    if (phase === 'typing') {
+      if (text.length >= full.length) {
+        setPhase('holding')
+        return undefined
+      }
+      const t = setTimeout(() => setText(full.slice(0, text.length + 1)), TYPE_MS)
+      return () => clearTimeout(t)
+    }
+
+    if (phase === 'holding') {
+      const t = setTimeout(() => setPhase('deleting'), HOLD_MS)
+      return () => clearTimeout(t)
+    }
+
+    if (text.length === 0) {
+      setIndex((i) => (i + 1) % SUGGESTIONS.length)
+      setPhase('typing')
+      return undefined
+    }
+    const t = setTimeout(() => setText(full.slice(0, text.length - 1)), DELETE_MS)
+    return () => clearTimeout(t)
+  }, [text, index, phase, active, reduced])
+
+  if (reduced) return SUGGESTIONS[0]
+  if (!active) return SUGGESTIONS[index % SUGGESTIONS.length]
+  return text
+}
+
 export default function Assistant({ turns, onAsk, onConfirm, onCancel, busy, progress }) {
   const [text, setText] = useState('')
+  const [focused, setFocused] = useState(false)
   const tail = useRef(null)
+
+  // Only animate in an idle, empty box.
+  const typed = useTypedSuggestion(!text && !focused && !busy)
 
   useEffect(() => {
     tail.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -107,9 +169,13 @@ export default function Assistant({ turns, onAsk, onConfirm, onCancel, busy, pro
           className="refine-input"
           value={text}
           disabled={busy}
-          placeholder="Change gain to 7 on the amp…"
+          placeholder={typed ? `${typed}\u258f` : ''}
           onChange={(e) => setText(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
+          // The placeholder moves, so it can't be what a screen reader is told
+          // this box is for.
           aria-label="What you want done"
         />
         <button onClick={() => submit()} disabled={busy || !text.trim()}>
@@ -119,7 +185,7 @@ export default function Assistant({ turns, onAsk, onConfirm, onCancel, busy, pro
 
       {turns.length === 0 ? (
         <div className="examples">
-          {EXAMPLES.map((example) => (
+          {SUGGESTIONS.slice(0, 6).map((example) => (
             <button key={example} className="chip" onClick={() => submit(example)} disabled={busy}>
               {example}
             </button>

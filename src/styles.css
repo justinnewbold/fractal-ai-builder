@@ -3308,3 +3308,16 @@ ol.action-list li.destructive::marker {
 .design-hint {
   margin-top: 18px;
 }
+
+/* The rotating placeholder reads as something being typed, so it sits a shade
+   quieter than a static hint would and holds a caret at the end. */
+.assistant-row .refine-input::placeholder {
+  color: var(--silk-dim);
+  opacity: 0.72;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assistant-row .refine-input::placeholder {
+    opacity: 0.6;
+  }
+}
