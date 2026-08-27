@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getWireLog, clearWireLog } from '../lib/forgefx'
+import { getWireLog, clearWireLog, getCheckLog, clearCheckLog } from '../lib/forgefx'
 import { FULL, BUILT_AT } from '../lib/version'
 import { fromNormalized } from '../lib/scale'
 
@@ -15,8 +15,12 @@ import { fromNormalized } from '../lib/scale'
 export default function Diagnostics() {
   const [open, setOpen] = useState(false)
   const [rows, setRows] = useState([])
+  const [checks, setChecks] = useState([])
 
-  const refresh = () => setRows(getWireLog())
+  const refresh = () => {
+    setRows(getWireLog())
+    setChecks(getCheckLog())
+  }
 
   const show = () => {
     refresh()
@@ -27,9 +31,20 @@ export default function Diagnostics() {
 
   const copy = async () => {
     const current = getWireLog()
+    const verified = getCheckLog()
     const lines = [
       `${FULL} — built ${BUILT_AT} UTC`,
-      `${current.length} writes`,
+      `${current.length} writes, ${verified.length} verifications`,
+      '',
+      'VERIFIED — parameter | wanted | read back | landed | encoding | attempt | device said',
+      ...verified.map(
+        (c) =>
+          `${c.name || '#' + c.paramId} | ${c.wanted} | ${
+            c.readBack === null ? 'unreadable' : c.readBack
+          } | ${c.landed ? 'yes' : 'NO'} | ${c.encoding ? 'cont' : 'disc'} | ${c.attempt} | ${
+            c.deviceOk === undefined ? '—' : c.deviceOk ? 'ok' : 'ok:false'
+          }`
+      ),
       '',
       'parameter | wanted | sent | means | range | encoding',
       ...current.map((r) => {
@@ -77,7 +92,9 @@ export default function Diagnostics() {
               className="chip"
               onClick={() => {
                 clearWireLog()
+                clearCheckLog()
                 setRows([])
+                setChecks([])
               }}
             >
               Clear
@@ -88,6 +105,34 @@ export default function Diagnostics() {
               </span>
             ) : null}
           </div>
+
+          {checks.length ? (
+            <div className="diag-table">
+              <div className="diag-row diag-head-row silk-label">
+                <span>Verified</span>
+                <span>Wanted</span>
+                <span>Read back</span>
+                <span>Landed</span>
+                <span>Enc</span>
+                <span>Device said</span>
+              </div>
+              {checks.map((c, i) => (
+                <div className="diag-row mono" key={`c${i}`} data-extreme={!c.landed}>
+                  <span className="diag-name">{c.name || `#${c.paramId}`}</span>
+                  <span>{fmt(c.wanted)}</span>
+                  <span>{c.readBack === null ? 'unreadable' : fmt(c.readBack)}</span>
+                  <span>{c.landed ? 'yes' : 'NO'}</span>
+                  <span className="diag-range">
+                    {c.encoding ? 'cont' : 'disc'}
+                    {c.attempt > 1 ? ` · retry` : ''}
+                  </span>
+                  <span className="diag-range">
+                    {c.deviceOk === undefined ? '—' : c.deviceOk ? 'ok' : 'ok:false'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           {rows.length === 0 ? (
             <p className="hint">Nothing written yet this session.</p>
@@ -130,6 +175,15 @@ export default function Diagnostics() {
             Sent is the normalised 0–1 value that went to the device. Means is what that converts
             back to. If Wanted and Means disagree, the conversion is wrong. If Sent shows the raw
             number instead of a decimal, this build is stale.
+          </p>
+
+          <p className="hint diag-note">
+            Read back is what the device reported after the write, with its cache cleared first —
+            the only trustworthy signal that a value stuck. Device said is the unit&rsquo;s own
+            verdict, which an AM4 gets wrong: it reports <span className="mono">ok:false</span> on
+            continuous writes that landed correctly, because it waits for an acknowledgement the
+            unit doesn&rsquo;t send. A row marked <span className="mono">retry</span> means the
+            first encoding didn&rsquo;t take and the other one was tried.
           </p>
         </>
       ) : null}

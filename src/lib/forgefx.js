@@ -258,14 +258,38 @@ async function readParamValue(eid, paramId) {
 export async function setParamConfirmed(eid, paramId, value, param) {
   const first = preferredEncoding(eid, paramId)
 
-  await setParam(eid, paramId, value, param, first)
-  if (await landed(eid, paramId, value)) {
+  const a = await setParam(eid, paramId, value, param, first)
+  const checkA = await landed(eid, paramId, value)
+  recordCheck({
+    eid,
+    paramId,
+    name: param?.name,
+    wanted: value,
+    readBack: checkA.actual,
+    landed: checkA.ok,
+    encoding: first,
+    attempt: 1,
+    deviceOk: a?.ok
+  })
+  if (checkA.ok) {
     rememberEncoding(eid, paramId, first)
     return { ok: true, continuous: first, retried: false }
   }
 
-  await setParam(eid, paramId, value, param, !first)
-  if (await landed(eid, paramId, value)) {
+  const b = await setParam(eid, paramId, value, param, !first)
+  const checkB = await landed(eid, paramId, value)
+  recordCheck({
+    eid,
+    paramId,
+    name: param?.name,
+    wanted: value,
+    readBack: checkB.actual,
+    landed: checkB.ok,
+    encoding: !first,
+    attempt: 2,
+    deviceOk: b?.ok
+  })
+  if (checkB.ok) {
     rememberEncoding(eid, paramId, !first)
     return { ok: true, continuous: !first, retried: true }
   }
@@ -273,17 +297,27 @@ export async function setParamConfirmed(eid, paramId, value, param) {
   return { ok: false, continuous: null, retried: true }
 }
 
+/**
+ * Read the value back and say whether it matches, returning what was actually
+ * there either way.
+ *
+ * The read-back is the only trustworthy signal. An AM4 reports {"ok": false} on
+ * a continuous write that landed correctly — its driver waits 600ms for a
+ * command acknowledgement and calls the write failed when none arrives, while
+ * the frame goes out regardless. So the device's own answer is recorded for
+ * interest but never believed.
+ */
 async function landed(eid, paramId, wanted) {
   try {
     // Without this the read can return the value we just sent from cache,
     // confirming a write that never reached the hardware.
     await clearDeviceCache().catch(() => {})
     const actual = await readParamValue(eid, paramId)
-    if (typeof actual !== 'number') return false
+    if (typeof actual !== 'number') return { ok: false, actual: null }
     const tolerance = Math.max(0.05, Math.abs(wanted) * 0.02)
-    return Math.abs(actual - wanted) <= tolerance
+    return { ok: Math.abs(actual - wanted) <= tolerance, actual }
   } catch {
-    return false
+    return { ok: false, actual: null }
   }
 }
 
@@ -292,6 +326,27 @@ const wireLog = []
 function recordWire(entry) {
   wireLog.unshift({ ...entry, at: new Date() })
   if (wireLog.length > 120) wireLog.length = 120
+}
+
+const checkLog = []
+
+/**
+ * What came back when a write was verified.
+ *
+ * The wire log says what went out; on its own it can't distinguish a value that
+ * landed from one the device quietly ignored. Recording the read-back next to
+ * what was asked for makes the diagnostics panel answer that without anyone
+ * running curl against localhost.
+ */
+function recordCheck(entry) {
+  checkLog.unshift({ ...entry, at: new Date() })
+  if (checkLog.length > 120) checkLog.length = 120
+}
+
+/** Every verified write, newest first. */
+export const getCheckLog = () => checkLog.slice()
+export const clearCheckLog = () => {
+  checkLog.length = 0
 }
 
 /** Everything this app has put on the wire, newest first. */
