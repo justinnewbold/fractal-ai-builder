@@ -42,7 +42,10 @@ const Action = z.object({
       'setScene',
       'setSceneBlock',
       'renamePreset',
-      'setTempo'
+      'setTempo',
+      'savePreset',
+      'loadPreset',
+      'backupPreset'
     ])
     .describe('What to do.'),
   eid: z.number().int().nullable().describe('Effect id of the block, or null.'),
@@ -52,10 +55,17 @@ const Action = z.object({
     .nullable()
     .describe(
       'Numeric argument: the parameter value in its own units, a model ordinal, a scene index, ' +
-        'a block type code, or BPM. Null when not needed.'
+        'a block type code, BPM, or a preset slot number for savePreset and loadPreset. ' +
+        'Null when not needed.'
     ),
   flag: z.boolean().nullable().describe('For setBypass and setSceneBlock: true means bypassed.'),
-  text: z.string().nullable().describe('For renamePreset and setChannel: the name, or A/B/C/D.'),
+  text: z
+    .string()
+    .nullable()
+    .describe(
+      'For renamePreset: the name. For setChannel: A/B/C/D. For savePreset: an optional name ' +
+        'to save it under. Null otherwise.'
+    ),
   fromRow: z.number().int().nullable().describe('Source row for moveBlock. Null otherwise.'),
   fromCol: z.number().int().nullable().describe('Source column for moveBlock. Null otherwise.'),
   row: z.number().int().nullable().describe('Target row for moveBlock, placeBlock, clearCell.'),
@@ -65,15 +75,21 @@ const Action = z.object({
 })
 
 const Plan = z.object({
-  understood: z.string().describe('What you took the request to mean, in one sentence.'),
+  understood: z
+    .string()
+    .describe(
+      'Your reply to the player, in one or two plain sentences. This is read as conversation, ' +
+        'so answer questions here too, not just describe changes.'
+    ),
   actions: z.array(Action).describe('Ordered. Empty if the request cannot be done.'),
   refused: z
     .string()
     .describe('If nothing can be done, why — otherwise an empty string.')
 })
 
-const SYSTEM = `You turn a guitarist's spoken-style instruction into concrete changes
-to the preset on their Fractal unit.
+const SYSTEM = `You are the way a guitarist operates their Fractal unit. They talk to
+you; you do the thing. Anything they could reach in and change by hand, you can
+change, including saving and loading presets.
 
 WHAT YOU ARE GIVEN
 
@@ -92,6 +108,21 @@ HARD RULES
    player's gain staging, not yours.
 5. If the request is ambiguous or cannot be done with the blocks present, return
    no actions and say why in "refused". Guessing is worse than asking.
+6. Never save or load a preset unless you were asked to. Saving overwrites a
+   slot and loading discards unsaved work — neither is a tidy finishing touch to
+   add on your own initiative.
+
+CONVERSATION
+
+You may be given earlier turns. Use them: "make it darker still" means darker
+than the change you just made, and "put that back" refers to what you just did.
+If someone asks a question rather than requesting a change — what amp is this,
+what does that control do, is this saved — answer it in "understood" and return
+no actions. A question is not a failure, so leave "refused" empty for it.
+
+Slots are addressed by the numbers the unit uses. "Save this to 67" is
+savePreset with value 67. "Save it" with no number means the slot that is
+already loaded, which you are given.
 
 READING INTENT
 
@@ -117,7 +148,8 @@ export default async function handler(req, res) {
     return
   }
 
-  const { instruction, device, blocks, grid, scene, presetName } = req.body || {}
+  const { instruction, device, blocks, grid, scene, presetName, presetNumber, history } =
+    req.body || {}
 
   if (!instruction || typeof instruction !== 'string') {
     res.status(400).json({ error: 'Say what you want changed.' })
@@ -138,6 +170,7 @@ export default async function handler(req, res) {
     slotModel: device?.capabilities?.slotModel,
     grid: device?.capabilities?.grid || { slots: device?.capabilities?.slotCount },
     presetName,
+    presetNumber,
     activeScene: scene,
     blocks: blocks.map((b) => ({
       eid: b.eid,
@@ -166,12 +199,22 @@ export default async function handler(req, res) {
               type: 'text',
               text: `Models on this unit:\n${JSON.stringify(rosters)}`,
               providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } }
-            },
-            {
-              type: 'text',
-              text: `Preset right now:\n${JSON.stringify(state)}\n\nInstruction: ${instruction}`
             }
           ]
+        },
+        // Earlier turns, so "a bit more" and "put that back" mean something.
+        // Trimmed to the last few: the preset state below is always current, and
+        // stale block data from ten turns ago is worse than no memory at all.
+        ...(Array.isArray(history) ? history : [])
+          .slice(-8)
+          .filter((m) => m && typeof m.text === 'string' && m.text.trim())
+          .map((m) => ({
+            role: m.role === 'assistant' ? 'assistant' : 'user',
+            content: m.text.slice(0, 1200)
+          })),
+        {
+          role: 'user',
+          content: `Preset right now:\n${JSON.stringify(state)}\n\nInstruction: ${instruction}`
         }
       ]
     })

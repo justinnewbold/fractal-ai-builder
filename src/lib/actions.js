@@ -23,8 +23,17 @@ import { isSilencingParam } from './guardrails.js'
  */
 const device = () => import('./forgefx.js')
 
-/** Lower runs first. */
+/**
+ * Lower runs first.
+ *
+ * Loading replaces everything, so it goes before any edit; saving makes the
+ * result permanent, so it goes after. Asking to "load 12, drop the gain and save
+ * it back" in one breath then does those three things in the only order that
+ * means anything, whatever order they were said in.
+ */
 const ORDER = {
+  loadPreset: -3,
+  backupPreset: -2,
   clearCell: 0,
   moveBlock: 1,
   placeBlock: 2,
@@ -35,7 +44,8 @@ const ORDER = {
   setSceneBlock: 7,
   setScene: 8,
   renamePreset: 9,
-  setTempo: 10
+  setTempo: 10,
+  savePreset: 20
 }
 
 export function validatePlan(plan, blocks, capabilities) {
@@ -230,6 +240,69 @@ export function validatePlan(plan, blocks, capabilities) {
           ...raw,
           label: `Tempo → ${raw.value} BPM`,
           run: async () => (await device()).setTempo(raw.value)
+        })
+        break
+      }
+
+      /*
+       * Saving, loading and backing up are here for the same reason every other
+       * action is: anything reachable by hand should be sayable. "Save this to
+       * 67" was the obvious hole — the model could rebuild an entire preset and
+       * then had no way to keep it.
+       */
+      case 'savePreset': {
+        const number = raw.value
+        if (!need(Number.isInteger(number) && number >= 0, `${number} isn't a slot number.`)) break
+        const name = (raw.text || '').trim().slice(0, 31)
+        actions.push({
+          ...raw,
+          label: name
+            ? `Save "${name}" to slot ${number}`
+            : `Save to slot ${number}`,
+          // Overwrites whatever is in that slot, so it asks first.
+          destructive: true,
+          run: async () => {
+            const d = await device()
+            if (name) await d.setPresetName(name)
+            return d.storePreset(number)
+          }
+        })
+        break
+      }
+
+      case 'loadPreset': {
+        const number = raw.value
+        if (!need(Number.isInteger(number) && number >= 0, `${number} isn't a slot number.`)) break
+        actions.push({
+          ...raw,
+          label: `Load slot ${number}`,
+          // Anything unsaved in the edit buffer goes with it.
+          destructive: true,
+          run: async () => (await device()).selectPreset(number)
+        })
+        break
+      }
+
+      case 'backupPreset': {
+        actions.push({
+          ...raw,
+          label: 'Back up this preset to a file',
+          run: async () => {
+            const d = await device()
+            const dump = await d.backupPreset(raw.value ?? undefined)
+            const bytes = dump?.bytes
+            if (!Array.isArray(bytes) || !bytes.length) {
+              throw new Error('The unit returned no data.')
+            }
+            const blob = new Blob([new Uint8Array(bytes)], { type: 'application/octet-stream' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            const safe = (dump.name || 'preset').trim().replace(/[^\w-]+/g, '_')
+            a.href = url
+            a.download = `${String(raw.value ?? 0).padStart(3, '0')}-${safe}.syx`
+            a.click()
+            URL.revokeObjectURL(url)
+          }
         })
         break
       }
