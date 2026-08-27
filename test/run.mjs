@@ -301,4 +301,51 @@ test('separates a sub-block parameter that collides by name', () => {
   assert.ok(out[1].name.includes('sub-block 62'))
 })
 
+test('saves to a named slot', () => {
+  const r = validatePlan(
+    { actions: [{ kind: 'savePreset', value: 67, text: 'Drop A Rhythm', why: '' }] },
+    cmdBlocks,
+    caps
+  )
+  assert.equal(r.actions.length, 1)
+  assert.ok(r.actions[0].label.includes('67'))
+  // Overwrites a slot, so it must not run without being asked twice.
+  assert.equal(r.actions[0].destructive, true)
+})
+
+test('refuses a slot that is not a number', () => {
+  const r = validatePlan(
+    { actions: [{ kind: 'savePreset', value: null, text: '', why: '' }] },
+    cmdBlocks,
+    caps
+  )
+  assert.equal(r.actions.length, 0)
+  assert.equal(r.problems.length, 1)
+})
+
+test('loading is destructive and runs before edits, saving after', () => {
+  const r = validatePlan(
+    {
+      actions: [
+        { kind: 'savePreset', value: 12, text: null, why: '' },
+        { kind: 'setParam', eid: 58, paramId: 7, value: 8, why: '' },
+        { kind: 'loadPreset', value: 12, why: '' }
+      ]
+    },
+    cmdBlocks,
+    caps
+  )
+  assert.deepEqual(
+    r.actions.map((a) => a.kind),
+    ['loadPreset', 'setParam', 'savePreset']
+  )
+  assert.equal(r.actions[0].destructive, true)
+})
+
+test('backing up a preset needs no confirmation', () => {
+  const r = validatePlan({ actions: [{ kind: 'backupPreset', value: 3, why: '' }] }, cmdBlocks, caps)
+  assert.equal(r.actions.length, 1)
+  assert.ok(!r.actions[0].destructive)
+})
+
 console.log(`\n${passed} passed\n`)

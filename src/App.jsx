@@ -18,7 +18,7 @@ import { Versions, DeviceBackup } from './components/Versions'
 import Footswitches from './components/Footswitches'
 import GridEditor from './components/GridEditor'
 import Ports from './components/Ports'
-import Command from './components/Command'
+import Assistant from './components/Assistant'
 import Theme from './components/Theme'
 import { validatePlan, runPlan } from './lib/actions'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
@@ -75,7 +75,7 @@ export default function App() {
   const [lastPrompt, setLastPrompt] = useState('')
   const [historyKey, setHistoryKey] = useState(0)
   const [compare, setCompare] = useState(null)
-  const [plan, setPlan] = useState(null)
+  const [turns, setTurns] = useState([])
   const [runningPlan, setRunningPlan] = useState(false)
   const [catalog, setCatalog] = useState(null)
   const [partial, setPartial] = useState(null)
@@ -557,7 +557,7 @@ export default function App() {
   const askFor = async (instruction) => {
     setBusy(true)
     setError(null)
-    setPlan(null)
+    setTurns((prev) => [...prev, { role: 'user', text: instruction }])
     try {
       setProgress('Reading the preset...')
       const schema = await readSchema(blocks, (done, total, name) =>
@@ -580,43 +580,80 @@ export default function App() {
           device,
           blocks: withPositions,
           scene,
-          presetName: preset?.name
+          presetName: preset?.name,
+          presetNumber: preset?.number,
+          history: turns.map((t) => ({ role: t.role, text: t.text }))
         })
       })
       const body = await res.json()
       if (!res.ok) throw new Error(body.error || 'That request failed.')
 
       const checked = validatePlan(body, withPositions, device?.capabilities)
-      setPlan(checked)
       record('ask', `Asked: ${instruction}`, [
         checked.understood,
         `${checked.actions.length} actions proposed`,
         ...checked.problems
       ])
+
+      const reply = {
+        role: 'assistant',
+        text: checked.understood || checked.refused || 'Nothing to change.',
+        actions: checked.actions,
+        problems: checked.problems
+      }
+
+      // Anything that can lose work waits for a click. Everything else just
+      // happens — asking permission to set a gain value is the ceremony that
+      // sends people back to the knobs.
+      if (checked.actions.some((a) => a.destructive)) {
+        setTurns((prev) => [...prev, { ...reply, pending: true }])
+        return
+      }
+
+      setTurns((prev) => [...prev, reply])
+      if (checked.actions.length) await perform(checked.actions)
     } catch (err) {
       setError(err.message)
+      setTurns((prev) => [...prev, { role: 'assistant', text: `That didn't work: ${err.message}` }])
     } finally {
       setProgress(null)
       setBusy(false)
     }
   }
 
-  const doPlan = async () => {
-    if (!plan?.actions.length) return
+  /**
+   * Run a checked list and report back into the conversation.
+   *
+   * Failures are attached to the turn that proposed them rather than only
+   * raised as an error, so the transcript stays an honest record of what
+   * actually reached the unit.
+   */
+  const perform = async (actions) => {
     setRunningPlan(true)
-    setError(null)
     try {
-      const failures = await runPlan(plan.actions, (done, total, label) =>
+      const failures = await runPlan(actions, (done, total, label) =>
         setProgress(`${done} of ${total} - ${label}`)
       )
-      record(
-        'edit',
-        `Did ${plan.actions.length} things`,
-        [...plan.actions.map((a) => a.label), ...failures]
-      )
-      if (failures.length) setError(failures.join(' · '))
-      setDirty(true)
-      setPlan(null)
+      record('edit', `Did ${actions.length} things`, [
+        ...actions.map((a) => a.label),
+        ...failures
+      ])
+      if (failures.length) {
+        setError(failures.join(' · '))
+        setTurns((prev) => {
+          const next = [...prev]
+          for (let i = next.length - 1; i >= 0; i--) {
+            if (next[i].role === 'assistant' && next[i].actions?.length) {
+              next[i] = { ...next[i], failed: failures }
+              break
+            }
+          }
+          return next
+        })
+      }
+      // Saving is what makes things permanent, so a plan containing one leaves
+      // the preset clean rather than still flagged as unsaved.
+      setDirty(!actions.some((a) => a.kind === 'savePreset'))
       await read()
     } catch (err) {
       setError(err.message)
@@ -624,6 +661,26 @@ export default function App() {
       setProgress(null)
       setRunningPlan(false)
     }
+  }
+
+  const confirmTurn = async (index) => {
+    const turn = turns[index]
+    if (!turn?.actions?.length) return
+    setTurns((prev) => prev.map((t, i) => (i === index ? { ...t, pending: false } : t)))
+    setBusy(true)
+    try {
+      await perform(turn.actions)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const cancelTurn = (index) => {
+    setTurns((prev) =>
+      prev.map((t, i) =>
+        i === index ? { ...t, pending: false, actions: [], text: `${t.text} — left alone.` } : t
+      )
+    )
   }
 
   const writeCount = result ? countWrites(result.changes) : 0
@@ -682,6 +739,22 @@ export default function App() {
             runs against a simulated FM3 built from real captured device data.
           </p>
         </div>
+      ) : null}
+
+      {/*
+        The assistant sits above the tabs, not inside one. It is how the app is
+        meant to be worked: the views below are for when you'd rather reach for
+        the control yourself, not a separate mode with different powers.
+      */}
+      {status === 'live' ? (
+        <Assistant
+          turns={turns}
+          onAsk={askFor}
+          onConfirm={confirmTurn}
+          onCancel={cancelTurn}
+          busy={busy || runningPlan}
+          progress={progress}
+        />
       ) : null}
 
       {status === 'live' ? (
@@ -1022,16 +1095,6 @@ export default function App() {
             partial={partial}
             open={liveOpen}
             onToggle={() => setLiveOpen(!liveOpen)}
-          />
-
-          <Command
-            onPlan={askFor}
-            onRun={doPlan}
-            plan={plan}
-            running={runningPlan}
-            busy={busy}
-            progress={progress}
-            onDismiss={() => setPlan(null)}
           />
 
           <PresetBar preset={preset} onSelect={jumpTo} onRename={rename} busy={busy} />
