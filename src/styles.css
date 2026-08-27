@@ -126,12 +126,12 @@ body {
 
 .lamp[data-state='live'] {
   background: var(--live);
-  box-shadow: 0 0 0 3px rgba(95, 191, 209, 0.16);
+  box-shadow: 0 0 0 3px var(--live-halo);
 }
 
 .lamp[data-state='fault'] {
   background: var(--fault);
-  box-shadow: 0 0 0 3px rgba(224, 104, 79, 0.16);
+  box-shadow: 0 0 0 3px var(--fault-halo);
 }
 
 .device-name {
@@ -462,7 +462,7 @@ textarea:focus-visible {
 button.primary {
   background: var(--signal);
   border-color: var(--signal);
-  color: #14100a;
+  color: var(--on-signal);
   font-weight: 600;
 }
 
@@ -1189,7 +1189,7 @@ button.scene.current .scene-num {
 
 .lamp[data-state='demo'] {
   background: var(--silk-dim);
-  box-shadow: 0 0 0 3px rgba(135, 141, 151, 0.14);
+  box-shadow: 0 0 0 3px var(--dim-halo);
 }
 
 .demo-banner {
@@ -1555,7 +1555,7 @@ button.gig-scene {
 button.gig-scene.current {
   background: var(--signal);
   border-color: var(--signal);
-  color: #14100a;
+  color: var(--on-signal);
 }
 
 .gig-scene-num {
@@ -1570,7 +1570,7 @@ button.gig-scene.named .gig-scene-num {
 }
 
 button.gig-scene.named.current .gig-scene-num {
-  color: rgba(20, 16, 10, 0.6);
+  color: var(--on-signal-dim);
 }
 
 .gig-scene-name {
@@ -1940,7 +1940,7 @@ button.cell-btn.lifting {
 button.cell-btn.over {
   border-style: solid;
   border-color: var(--signal);
-  background: rgba(240, 167, 60, 0.12);
+  background: var(--signal-wash);
 }
 
 /* ==================================================================
@@ -1986,7 +1986,7 @@ button.cell-btn.over {
   gap: 14px;
   flex-wrap: wrap;
   padding: 9px 14px;
-  background: linear-gradient(180deg, #1b1f26, #14171c);
+  background: linear-gradient(180deg, var(--strip-a), var(--strip-b));
   border: 1px solid var(--rule);
   border-radius: 3px;
 }
@@ -2010,7 +2010,7 @@ button.cell-btn.over {
 .strip-btn.armed {
   background: var(--signal);
   border-color: var(--signal);
-  color: #14100a;
+  color: var(--on-signal);
 }
 
 .bpm-box {
@@ -2122,7 +2122,7 @@ button.preset-row:hover:not(:disabled) {
 }
 
 button.preset-row.current {
-  background: #1d2a3a;
+  background: var(--row-current);
   border-left-color: var(--live);
   color: var(--live);
 }
@@ -2475,8 +2475,8 @@ button.chan-btn.current {
 }
 
 .knob-body {
-  fill: #2a2f37;
-  stroke: #10131a;
+  fill: var(--knob-face);
+  stroke: var(--knob-edge);
 }
 
 .knob-dot {
@@ -2750,7 +2750,7 @@ button.port-row.current .port-model {
 .tone.hero {
   margin-top: 22px;
   padding: 26px 26px 22px;
-  background: linear-gradient(180deg, #191d24, var(--panel));
+  background: linear-gradient(180deg, var(--hero-a), var(--panel));
   border: 1px solid var(--rule);
   border-left: 2px solid var(--signal);
   border-radius: 4px;
@@ -3019,5 +3019,97 @@ ol.action-list li.destructive::marker {
     padding-left: max(16px, env(safe-area-inset-left));
     padding-right: max(16px, env(safe-area-inset-right));
     padding-bottom: max(80px, calc(env(safe-area-inset-bottom) + 60px));
+  }
+}
+
+
+/* ==================================================================
+   Light theme
+
+   Not an inversion. The dark theme is the unit — anodised chassis, warm
+   silkscreen. The light one is the other half of that world: the printed
+   panel, the manual page, the schematic. Warm paper rather than white,
+   because pure white against this much fine type is glare.
+
+   The two accents keep their jobs and change nothing else: amber still
+   means signal, cyan still means the device is answering. Both are
+   darkened, since a colour that reads well against black is usually too
+   pale against paper.
+   ================================================================== */
+
+[data-theme='light'] {
+  --chassis: #f2efe9;
+  --panel: #faf8f4;
+  --panel-hi: #ffffff;
+  --rule: #d8d3c8;
+  --silk: #23262b;
+  --silk-dim: #5f6670;
+  --silk-faint: #8b9099;
+
+  --signal: #b5711a;
+  --live: #1f7f92;
+  --fault: #b23b23;
+  --bypass: #c3bfb5;
+
+  --on-signal: #fffaf2;
+  --on-signal-dim: rgba(255, 250, 242, 0.7);
+  --strip-a: #ffffff;
+  --strip-b: #f4f1ea;
+  --hero-a: #ffffff;
+  --row-current: #dfeaef;
+  --knob-face: #eceae4;
+  --knob-edge: #c7c2b7;
+  --signal-wash: rgba(181, 113, 26, 0.12);
+  --live-halo: rgba(31, 127, 146, 0.18);
+  --fault-halo: rgba(178, 59, 35, 0.16);
+  --dim-halo: rgba(95, 102, 112, 0.14);
+}
+
+/* Block tiles carry their own colour, so on paper they need a darker face
+   and light lettering rather than the lifted gradient used on the chassis. */
+[data-theme='light'] button.fx-tile,
+[data-theme='light'] .block-icon {
+  background: linear-gradient(180deg, var(--tile), color-mix(in srgb, var(--tile) 82%, black));
+  color: #fff;
+}
+
+[data-theme='light'] .knob-body {
+  fill: var(--knob-face);
+  stroke: var(--knob-edge);
+}
+
+/* ---------- theme control ---------- */
+
+.theme-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--chassis);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+}
+
+.theme-toggle button {
+  padding: 5px 9px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-family: var(--display);
+  background: none;
+  border: none;
+  border-radius: 2px;
+  color: var(--silk-faint);
+  min-height: 0;
+}
+
+.theme-toggle button.current {
+  background: var(--panel-hi);
+  color: var(--silk);
+}
+
+@media (pointer: coarse) {
+  .theme-toggle button {
+    min-height: 34px;
+    padding: 7px 11px;
   }
 }

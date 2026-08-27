@@ -19,6 +19,7 @@ import Footswitches from './components/Footswitches'
 import GridEditor from './components/GridEditor'
 import Ports from './components/Ports'
 import Command from './components/Command'
+import Theme from './components/Theme'
 import { validatePlan, runPlan } from './lib/actions'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
 import {
@@ -635,6 +636,7 @@ export default function App() {
           <p className="tagline">Describe a tone. Get a preset on the unit.</p>
         </div>
         <div className="build-badge">
+          <Theme />
           <span className="version mono">v{VERSION}</span>
           <span className="silk-label">Phase 4 &middot; depth</span>
           <span className="build-meta mono" title={`built ${BUILT_AT} UTC`}>
