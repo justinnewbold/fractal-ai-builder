@@ -11,6 +11,9 @@
 
 import { EXCLUDED_BLOCKS, safeParams } from './guardrails.js'
 import { toNormalized } from './scale.js'
+import { preferredEncoding, rememberEncoding, getEncodingMap, disambiguate } from './encoding.js'
+
+export { preferredEncoding, rememberEncoding, getEncodingMap, disambiguate }
 import { createMockDevice } from './mockDevice.js'
 
 const DEFAULT_HOST = 'http://localhost:5056'
@@ -124,30 +127,6 @@ export const blockTypes = async (slug) =>
  * clamps and returns {"ok":true}. Sending 7.5 for a 0-10 gain pins it at 10 and
  * reports success.
  */
-/**
- * Which write encoding actually works, learned at runtime.
- *
- * ForgeFX exposes two paths. `continuous: false` builds a discrete frame;
- * `true` builds a continuous one. Both take a normalised 0-1 value, and the
- * docs don't say which suits which control. On a real FM3, linear controls
- * land correctly on the discrete path while frequency controls silently do
- * not — they keep the value they were reset to.
- *
- * Rather than pick one and hope, writes start discrete, get verified, and
- * retry on the other path when a value didn't stick. What worked is
- * remembered per parameter so a preset full of frequency controls doesn't pay
- * the retry cost every time.
- */
-const encodingByParam = new Map()
-
-export const preferredEncoding = (eid, paramId) =>
-  encodingByParam.get(`${eid}:${paramId}`) ?? false
-
-export const rememberEncoding = (eid, paramId, continuous) =>
-  encodingByParam.set(`${eid}:${paramId}`, continuous)
-
-export const getEncodingMap = () =>
-  [...encodingByParam.entries()].map(([k, v]) => ({ key: k, continuous: v }))
 
 export const setParam = (eid, paramId, value, param, continuous) => {
   const norm = toNormalized(value, param)
@@ -261,6 +240,7 @@ export async function loadPresetBytes(bytes) {
 /** Live per-block output meters, for showing where signal actually is. */
 export const liveMeters = () =>
   mock ? tick().then(() => mock.meters()) : request('/preset/monitors/live')
+
 
 /** Read one parameter's current value, for confirming a write landed. */
 async function readParamValue(eid, paramId) {
@@ -377,17 +357,7 @@ export async function readSchema(blocks, onProgress) {
     let params = []
     try {
       const res = await blockParams(block.effectId)
-      params = safeParams(
-        (res?.named || []).map((p) => ({
-          id: p.id,
-          name: p.name,
-          value: p.value,
-          min: p.min,
-          max: p.max,
-          log: !!p.log,
-          unit: p.unit || ''
-        }))
-      )
+      params = safeParams(disambiguate(res?.named || []))
     } catch {
       // A block with no readable parameters is not a failure — skip it.
     }

@@ -9,6 +9,7 @@ import assert from 'node:assert/strict'
 import { toNormalized, fromNormalized } from '../src/lib/scale.js'
 import { isSilencingParam } from '../src/lib/guardrails.js'
 import { validateSpec, countWrites } from '../src/lib/validate.js'
+import { preferredEncoding, rememberEncoding, disambiguate } from '../src/lib/encoding.js'
 
 let passed = 0
 const test = (name, fn) => {
@@ -265,6 +266,39 @@ test('orders structure before the values that depend on it', () => {
 test('refuses a scene the device does not have', () => {
   const r = validatePlan({ actions: [{ kind: 'setScene', value: 40, why: '' }] }, cmdBlocks, caps)
   assert.equal(r.actions.length, 0)
+})
+
+test('writes start on the continuous path', () => {
+  // Every parameter the app can reach comes from a block's `named` list, which
+  // is ForgeFX's continuous-knob half. Defaulting to discrete floored AM4
+  // controls to their minimum on the first attempt.
+  assert.equal(preferredEncoding(58, 17), true)
+})
+
+test('a remembered encoding still wins over the default', () => {
+  rememberEncoding(58, 99, false)
+  assert.equal(preferredEncoding(58, 99), false)
+})
+
+test('leaves distinct parameter names alone', () => {
+  const out = disambiguate([
+    { id: 11, name: 'Gain', value: 6.5, min: 0, max: 10, unit: '' },
+    { id: 15, name: 'Master', value: 6, min: 0, max: 10, unit: '' }
+  ])
+  assert.deepEqual(out.map((p) => p.name), ['Gain', 'Master'])
+  assert.equal(out[0].subBlockId, null)
+})
+
+test('separates a sub-block parameter that collides by name', () => {
+  // The AM4 amp page carries its integrated cab, so both report a "High Cut".
+  const out = disambiguate([
+    { id: 17, name: 'High Cut', value: 8000, min: 400, max: 40000, unit: 'Hz' },
+    { id: 4063264, name: 'High Cut', value: 4016, min: 200, max: 20000, unit: 'Hz' }
+  ])
+  assert.notEqual(out[0].name, out[1].name)
+  assert.equal(out[0].subBlockId, null)
+  assert.equal(out[1].subBlockId, 62)
+  assert.ok(out[1].name.includes('sub-block 62'))
 })
 
 console.log(`\n${passed} passed\n`)
