@@ -68,11 +68,13 @@ export default function Assistant({ turns, onAsk, onConfirm, onCancel, busy, pro
             {turn.pending ? (
               <div className="turn-confirm">
                 <span className="hint">
-                  {turn.actions.some((a) => a.kind === 'savePreset')
-                    ? 'This overwrites whatever is in that slot.'
-                    : turn.actions.some((a) => a.kind === 'loadPreset')
-                      ? 'Anything unsaved goes with it.'
-                      : 'This removes something.'}
+                  {turn.reason === 'broad'
+                    ? `That's ${turn.actions.length} changes — worth a look first.`
+                    : turn.actions.some((a) => a.kind === 'savePreset')
+                      ? 'This overwrites whatever is in that slot.'
+                      : turn.actions.some((a) => a.kind === 'loadPreset')
+                        ? 'Anything unsaved goes with it.'
+                        : 'This removes something.'}
                 </span>
                 <button className="save-now" onClick={() => onConfirm(i)} disabled={busy}>
                   Do it

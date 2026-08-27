@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import DeviceBar from './components/DeviceBar'
 import Grid from './components/Grid'
-import { ToneForm, Preview } from './components/Generate'
+import { Preview } from './components/Generate'
 import { PresetBar, ChangeLog, Thinking } from './components/PresetBar'
 import Editor from './components/Editor'
 import Diagnostics from './components/Diagnostics'
@@ -9,7 +9,7 @@ import Cost from './components/Cost'
 import Scenes from './components/Scenes'
 import History from './components/History'
 import { CabPicker, Backup, Meters } from './components/Hardware'
-import { Refine, Compare } from './components/Refine'
+import { Compare } from './components/Refine'
 import Gig from './components/Gig'
 import { Stages, LiveGeneration } from './components/LiveGeneration'
 import { streamSpec } from './lib/stream'
@@ -67,6 +67,15 @@ import { blockCatalog } from './lib/forgefx'
  * not housekeeping like port choice or backups, which say nothing about the
  * tone.
  */
+/**
+ * Past this many changes in one request, show them before doing them.
+ *
+ * Four is roughly the line between "turn the gain up and cut the bass" and
+ * reshaping the sound. Below it you know what you asked for; above it you want
+ * to read the list first.
+ */
+const PREVIEW_ABOVE = 4
+
 const HAND_EDIT_KINDS = new Set([
   'edit',
   'scene',
@@ -655,6 +664,32 @@ export default function App() {
       const body = await res.json()
       if (!res.ok) throw new Error(body.error || 'That request failed.')
 
+      /*
+       * A tone description is not a list of changes. It gets designed and shown
+       * before anything is written — describing a sound and having the unit
+       * silently become something else is the opposite of useful.
+       */
+      const design = (body?.actions || []).find((a) => a.kind === 'designTone')
+      if (design) {
+        setTurns((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            text:
+              body.understood ||
+              'Designing that — I\u2019ll show you the whole thing before anything is written.'
+          }
+        ])
+        setView('design')
+        // With a design already on screen and not yet written, adjust that spec
+        // rather than starting over: "warmer" means warmer than the thing you
+        // are looking at, and redesigning from scratch would throw away
+        // everything else about it.
+        if (result?.spec) await refine(design.text || instruction)
+        else await generate(design.text || instruction)
+        return
+      }
+
       const checked = validatePlan(body, withPositions, device?.capabilities)
       record(
         'ask',
@@ -670,11 +705,25 @@ export default function App() {
         problems: checked.problems
       }
 
-      // Anything that can lose work waits for a click. Everything else just
-      // happens — asking permission to set a gain value is the ceremony that
-      // sends people back to the knobs.
-      if (checked.actions.some((a) => a.destructive)) {
-        setTurns((prev) => [...prev, { ...reply, pending: true }])
+      /*
+       * What runs on arrival and what waits.
+       *
+       * Setting a named control is a thing you asked for by name, so it just
+       * happens — a confirmation click there is the ceremony that sends people
+       * back to the knobs. Anything that can lose work waits. So does anything
+       * broad: past a handful of changes you are no longer nudging a control,
+       * you are reshaping the sound, and you should see that first.
+       */
+      const broad = checked.actions.length > PREVIEW_ABOVE
+      if (checked.actions.some((a) => a.destructive) || broad) {
+        setTurns((prev) => [
+          ...prev,
+          {
+            ...reply,
+            pending: true,
+            reason: broad && !checked.actions.some((a) => a.destructive) ? 'broad' : null
+          }
+        ])
         return
       }
 
@@ -724,6 +773,7 @@ export default function App() {
       // Saving is what makes things permanent, so a plan containing one leaves
       // the preset clean rather than still flagged as unsaved.
       setDirty(!actions.some((a) => a.kind === 'savePreset'))
+      showWhatChanged(actions)
       await read()
     } catch (err) {
       setError(err.message)
@@ -731,6 +781,36 @@ export default function App() {
       setProgress(null)
       setRunningPlan(false)
     }
+  }
+
+  /**
+   * Put the thing that just changed on screen.
+   *
+   * A change you asked for in words and can't see is worse than no change: you
+   * are left checking the unit to find out whether it worked. So the view
+   * follows the work, and the relevant section is scrolled to rather than left
+   * somewhere below the fold.
+   */
+  const showWhatChanged = (actions) => {
+    const kinds = new Set(actions.map((a) => a.kind))
+    const target = kinds.has('keepInLibrary')
+      ? { view: 'library', anchor: '.local-library' }
+      : kinds.has('placeBlock') || kinds.has('clearCell') || kinds.has('moveBlock')
+        ? { view: 'edit', anchor: '.grid-editor' }
+        : kinds.has('setSceneBlock') || kinds.has('setScene')
+          ? { view: 'edit', anchor: '.scenes' }
+          : kinds.has('setParam') || kinds.has('setModel') || kinds.has('setChannel')
+            ? { view: 'edit', anchor: '.editor' }
+            : null
+    if (!target) return
+    setView(target.view)
+    // After the view swaps, not before — the element doesn't exist until then.
+    requestAnimationFrame(() => {
+      document.querySelector(target.anchor)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      })
+    })
   }
 
   const confirmTurn = async (index) => {
@@ -1003,7 +1083,10 @@ export default function App() {
 
               {editTab === 'ai' ? (
                 <>
-                  <ToneForm onGenerate={generate} busy={busy} disabled={status !== 'live'} />
+                  <p className="hint">
+                    Describe the tone in the chat above &mdash; the design lands here for you to
+                    read before anything is written.
+                  </p>
                   <Thinking message={progress} />
                   {thinking ? (
                     <div className="thinking" role="status" aria-live="polite">
@@ -1022,7 +1105,9 @@ export default function App() {
                     onToggle={() => setLiveOpen(!liveOpen)}
                   />
                   {result ? (
-                    <Refine onRefine={refine} busy={busy} disabled={status !== 'live'} />
+                    <p className="hint">
+              Not quite it? Say what to change in the chat above.
+            </p>
                   ) : null}
                   <Preview
                     result={result}
@@ -1144,7 +1229,11 @@ export default function App() {
               </p>
             </div>
           ) : (
-            <ToneForm onGenerate={generate} busy={busy} disabled={status !== 'live'} />
+            <p className="hint design-hint">
+              Describe the tone you want in the chat above &mdash; &ldquo;tight modern metal
+              rhythm in drop A&rdquo;. What comes back is shown here, control by control, before
+              anything reaches the unit.
+            </p>
           )}
 
           <Thinking message={progress} />
@@ -1238,7 +1327,9 @@ export default function App() {
           ) : null}
 
           {result ? (
-            <Refine onRefine={refine} busy={busy} disabled={status !== 'live'} />
+            <p className="hint">
+              Not quite it? Say what to change in the chat above.
+            </p>
           ) : null}
 
           <Preview
