@@ -363,19 +363,25 @@ export function validatePlan(plan, blocks, capabilities) {
         const name = (raw.text || '').trim().slice(0, 60)
         actions.push({
           ...raw,
-          label: name ? `Keep "${name}" in the library` : 'Keep this preset in the library',
+          label: name ? `Keep "${name}" as a file` : 'Keep this preset as a file',
           run: async () => {
+            // Writes into the folder chosen with the picker, the same one the
+            // Library panel uses. There is no path to pass anywhere: a folder
+            // handle grants access without revealing where the folder lives.
+            const { savedFolder, writePresetFile } = await import('./localFolder.js')
+            const folder = await savedFolder()
+            if (!folder || folder.needsPermission) {
+              throw new Error(
+                'No preset folder chosen yet — pick one in Library first, under "Presets on this Mac".'
+              )
+            }
             const d = await device()
             const dump = await d.backupPreset(raw.value ?? undefined)
             const bytes = dump?.bytes
             if (!Array.isArray(bytes) || !bytes.length) {
               throw new Error('The unit returned no data.')
             }
-            return d.writeLocalPreset({
-              name: name || dump.name || 'preset',
-              bytes,
-              overwrite: true
-            })
+            return writePresetFile(folder, name || dump.name || 'preset', bytes)
           }
         })
         break
