@@ -485,4 +485,47 @@ test('a preset backup is refused remotely, matching the host', () => {
   assert.equal(forbiddenRemotely('GET', '/presets/12/summary'), null)
 })
 
+test('a preset name is made safe to use as a filename', async () => {
+  // This writes to a real folder on someone's Mac, so a name with a slash in it
+  // must not become a path.
+  let written = null
+  const folder = {
+    getFileHandle: async (file) => {
+      written = file
+      return { createWritable: async () => ({ write: async () => {}, close: async () => {} }) }
+    }
+  }
+  const { writePresetFile } = await import('../src/lib/localFolder.js')
+  await writePresetFile(folder, 'Drop A / "Lead" *rhythm*', [1, 2, 3])
+  assert.ok(!written.includes('/'))
+  assert.ok(!written.includes('"'))
+  assert.ok(written.endsWith('.syx'))
+})
+
+test('an empty name still produces a usable file', async () => {
+  let written = null
+  const folder = {
+    getFileHandle: async (file) => {
+      written = file
+      return { createWritable: async () => ({ write: async () => {}, close: async () => {} }) }
+    }
+  }
+  const { writePresetFile } = await import('../src/lib/localFolder.js')
+  await writePresetFile(folder, '   ', [1])
+  assert.equal(written, 'preset.syx')
+})
+
+test('a name of dots cannot produce a hidden file', async () => {
+  let written = null
+  const folder = {
+    getFileHandle: async (file) => {
+      written = file
+      return { createWritable: async () => ({ write: async () => {}, close: async () => {} }) }
+    }
+  }
+  const { writePresetFile } = await import('../src/lib/localFolder.js')
+  await writePresetFile(folder, '...', [1])
+  assert.ok(!written.startsWith('.'))
+})
+
 console.log(`\n${passed} passed\n`)

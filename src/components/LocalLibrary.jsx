@@ -1,56 +1,73 @@
 import { useEffect, useState } from 'react'
+import { backupPreset, loadPresetBytes } from '../lib/forgefx'
 import {
-  localConfig,
-  setLocalRoot,
-  localPresets,
-  localPresetFile,
-  writeLocalPreset,
-  localSync,
-  localRestore,
-  backupPreset,
-  loadPresetBytes
-} from '../lib/forgefx'
+  canPickFolder,
+  pickFolder,
+  savedFolder,
+  forgetFolder,
+  listPresetFiles,
+  writePresetFile,
+  readPresetFile,
+  deletePresetFile
+} from '../lib/localFolder'
 
 /**
- * Presets kept as files on the player's own machine.
+ * Presets kept as files in a folder on this Mac.
  *
- * The history this app shipped with lives in localStorage: one browser profile,
- * one machine, gone if the profile is cleared. A .syx in a folder is a file the
- * player owns — it copies, it gets backed up by whatever backs up their Mac, and
- * Fractal's own tools can read it.
+ * The folder is chosen through the operating system's own picker rather than by
+ * typing a path. A typed path is a thing you can get wrong in silence, and
+ * nobody knows how their home directory is spelled.
  *
- * The folder has to be named once. Until then ForgeFX answers every call with a
- * 409, which is a setup state rather than a failure, so it is presented that way.
+ * Files are read and written by the browser directly, not through the helper
+ * app. That is not a workaround: the picker deliberately never reveals where a
+ * folder lives, so there is no path to hand anyone, and going direct means
+ * there is nothing for two sides to disagree about.
  */
 export default function LocalLibrary({ preset, busy, onError, onChanged }) {
-  const [config, setConfig] = useState(null)
-  const [root, setRoot] = useState('')
+  const [folder, setFolder] = useState(null)
+  const [needsPermission, setNeedsPermission] = useState(false)
   const [entries, setEntries] = useState([])
   const [working, setWorking] = useState(null)
   const [note, setNote] = useState(null)
 
-  const loadConfig = async () => {
-    try {
-      const c = await localConfig()
-      setConfig(c)
-      if (c?.root) setRoot(c.root)
-      return c
-    } catch {
-      // A server too old to have the routes is a missing feature, not a fault.
-      setConfig({ configured: false, unsupported: true })
-      return null
-    }
-  }
-
   useEffect(() => {
-    loadConfig()
+    let stop = false
+    savedFolder()
+      .then((res) => {
+        if (stop || !res) return
+        if (res.needsPermission) {
+          setNeedsPermission(true)
+          setFolder(res.handle)
+        } else {
+          setFolder(res)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      stop = true
+    }
   }, [])
 
-  const listAll = async (refresh = false) => {
-    setWorking('listing')
+  useEffect(() => {
+    if (!folder || needsPermission) return
+    let stop = false
+    listPresetFiles(folder)
+      .then((list) => !stop && setEntries(list))
+      .catch(() => !stop && setEntries([]))
+    return () => {
+      stop = true
+    }
+  }, [folder, needsPermission])
+
+  const choose = async () => {
+    setWorking('choose')
     try {
-      const res = await localPresets(refresh)
-      setEntries(Array.isArray(res?.entries) ? res.entries : [])
+      const handle = await pickFolder()
+      if (!handle) return
+      setFolder(handle)
+      setNeedsPermission(false)
+      setNote(`Using "${handle.name}".`)
+      onChanged(`Preset folder set to "${handle.name}"`)
     } catch (err) {
       onError(err.message)
     } finally {
@@ -58,18 +75,20 @@ export default function LocalLibrary({ preset, busy, onError, onChanged }) {
     }
   }
 
-  const point = async () => {
-    const path = root.trim()
-    if (!path.startsWith('/')) {
-      onError('Give the full path to a folder, starting with a slash.')
-      return
+  const regrant = async () => {
+    const res = await savedFolder({ prompt: true })
+    if (res && !res.needsPermission) {
+      setFolder(res)
+      setNeedsPermission(false)
+    } else {
+      onError('That folder is no longer available — choose it again.')
     }
-    setWorking('config')
+  }
+
+  const refresh = async () => {
+    setWorking('list')
     try {
-      const c = await setLocalRoot(path)
-      setConfig(c)
-      onChanged(`Library folder set to ${path}`)
-      await listAll()
+      setEntries(await listPresetFiles(folder))
     } catch (err) {
       onError(err.message)
     } finally {
@@ -77,18 +96,18 @@ export default function LocalLibrary({ preset, busy, onError, onChanged }) {
     }
   }
 
-  /** Put whatever is loaded on the unit into the library, under its own name. */
+  /** Put whatever is loaded on the unit into the folder, under its own name. */
   const keep = async () => {
-    setWorking('keeping')
+    setWorking('keep')
     try {
       const dump = await backupPreset(preset?.number)
       const bytes = dump?.bytes
       if (!Array.isArray(bytes) || !bytes.length) throw new Error('The unit returned no data.')
       const name = (dump.name || preset?.name || 'preset').trim()
-      await writeLocalPreset({ name, bytes, overwrite: true })
-      setNote(`Saved "${name}" to the library.`)
-      onChanged(`Kept "${name}" in the library`)
-      await listAll(true)
+      const file = await writePresetFile(folder, name, bytes)
+      setNote(`Saved as ${file}.`)
+      onChanged(`Kept "${name}" in the preset folder`)
+      await refresh()
     } catch (err) {
       onError(err.message)
     } finally {
@@ -97,20 +116,19 @@ export default function LocalLibrary({ preset, busy, onError, onChanged }) {
   }
 
   /**
-   * Send a library file to the unit's edit buffer.
+   * Send a file to the unit's edit buffer.
    *
-   * Deliberately not to a slot: it lands where you can hear it, and keeping it
-   * is a separate decision made with the save bar at the top.
+   * Not to a slot: it lands where you can hear it, and keeping it is a separate
+   * decision made with the save bar at the top.
    */
-  const audition = async (entry) => {
-    setWorking(entry.path)
+  const load = async (entry) => {
+    setWorking(entry.file)
     try {
-      const bytes = await localPresetFile(entry.path)
-      const list = Array.isArray(bytes) ? bytes : [...new Uint8Array(bytes)]
-      if (!list.length) throw new Error('That file is empty.')
-      await loadPresetBytes(list)
+      const bytes = await readPresetFile(folder, entry.file)
+      if (!bytes.length) throw new Error('That file is empty.')
+      await loadPresetBytes(bytes)
       setNote(`Loaded "${entry.name}". Play it, then save it to a slot to keep it.`)
-      onChanged(`Loaded "${entry.name}" from the library`)
+      onChanged(`Loaded "${entry.name}" from the preset folder`)
     } catch (err) {
       onError(err.message)
     } finally {
@@ -118,18 +136,12 @@ export default function LocalLibrary({ preset, busy, onError, onChanged }) {
     }
   }
 
-  const runSync = async (which) => {
-    setWorking(which)
+  const remove = async (entry) => {
+    setWorking(entry.file)
     try {
-      if (which === 'sync') {
-        await localSync()
-        setNote('Version history written out to the folder.')
-        onChanged('Synced version history to the library folder')
-      } else {
-        await localRestore()
-        setNote('Version history read back in from the folder.')
-        onChanged('Restored version history from the library folder')
-      }
+      await deletePresetFile(folder, entry.file)
+      setNote(`Deleted ${entry.file}.`)
+      await refresh()
     } catch (err) {
       onError(err.message)
     } finally {
@@ -137,82 +149,89 @@ export default function LocalLibrary({ preset, busy, onError, onChanged }) {
     }
   }
 
-  if (config?.unsupported) return null
+  if (!canPickFolder()) {
+    return (
+      <p className="hint">
+        Choosing a folder needs Chrome. In other browsers you can still back up one preset at a
+        time from Edit.
+      </p>
+    )
+  }
+
+  if (!folder) {
+    return (
+      <>
+        <p className="hint">
+          Pick a folder and your presets get kept there as ordinary files &mdash; yours, on your own
+          Mac, where your backups will pick them up.
+        </p>
+        <button className="save-now" onClick={choose} disabled={busy || working === 'choose'}>
+          {working === 'choose' ? 'Choosing…' : 'Choose a folder'}
+        </button>
+      </>
+    )
+  }
+
+  if (needsPermission) {
+    return (
+      <>
+        <p className="hint">
+          Chrome needs you to allow access to &ldquo;{folder.name}&rdquo; again for this session.
+        </p>
+        <button className="save-now" onClick={regrant}>
+          Allow access
+        </button>
+      </>
+    )
+  }
 
   return (
-    <section className="local-library">
-      <p className="silk-label">Library on this Mac</p>
+    <>
+      <p className="hint">
+        Using <strong>{folder.name}</strong>
+      </p>
 
-      {!config?.configured ? (
-        <>
-          <p className="hint">
-            Name a folder and presets get kept there as .syx files &mdash; yours, on your own disk,
-            rather than in this browser&rsquo;s storage. It will make a{' '}
-            <span className="mono">Presets</span> folder inside whatever you point it at.
-          </p>
-          <div className="save-row">
-            <input
-              type="text"
-              className="name-field"
-              value={root}
-              onChange={(e) => setRoot(e.target.value)}
-              placeholder="/Users/justinnewbold/Documents/Fractal"
-              aria-label="Full path to the library folder"
-            />
-            <button className="save-now" onClick={point} disabled={busy || working === 'config'}>
-              {working === 'config' ? 'Setting up…' : 'Use this folder'}
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <p className="hint mono">
-            {config.root}
-            {config.writable === false ? ' · not writable' : ''}
-          </p>
+      <div className="history-actions">
+        <button className="chip" onClick={keep} disabled={busy || !!working}>
+          {working === 'keep' ? 'Saving…' : `Keep slot ${preset?.number ?? '--'} here`}
+        </button>
+        <button className="chip" onClick={refresh} disabled={busy || !!working}>
+          {working === 'list' ? 'Reading…' : 'Refresh'}
+        </button>
+        <button
+          className="chip"
+          onClick={async () => {
+            await forgetFolder()
+            setFolder(null)
+            setEntries([])
+          }}
+        >
+          Use a different folder
+        </button>
+      </div>
 
-          <div className="history-actions">
-            <button className="chip" onClick={keep} disabled={busy || !!working}>
-              {working === 'keeping' ? 'Saving…' : `Keep slot ${preset?.number ?? '--'} here`}
-            </button>
-            <button className="chip" onClick={() => listAll(true)} disabled={busy || !!working}>
-              {working === 'listing' ? 'Reading…' : 'Refresh list'}
-            </button>
-            <button className="chip" onClick={() => runSync('sync')} disabled={busy || !!working}>
-              {working === 'sync' ? 'Writing…' : 'Sync version history out'}
-            </button>
-            <button className="chip" onClick={() => runSync('restore')} disabled={busy || !!working}>
-              {working === 'restore' ? 'Reading…' : 'Restore version history'}
-            </button>
-          </div>
-
-          {entries.length ? (
-            <div className="library-list">
-              {entries.map((entry) => (
-                <div className="library-row" key={entry.path}>
-                  <span className="library-name">{entry.name}</span>
-                  <span className="library-path mono">{entry.path}</span>
-                  <button
-                    className="chip"
-                    onClick={() => audition(entry)}
-                    disabled={busy || !!working}
-                  >
-                    {working === entry.path ? 'Loading…' : 'Load'}
-                  </button>
-                </div>
-              ))}
+      {entries.length ? (
+        <div className="library-list">
+          {entries.map((entry) => (
+            <div className="library-row" key={entry.file}>
+              <span className="library-name">{entry.name}</span>
+              <span className="library-path mono">
+                {new Date(entry.at).toLocaleDateString()}
+              </span>
+              <button className="chip" onClick={() => load(entry)} disabled={busy || !!working}>
+                {working === entry.file ? 'Working…' : 'Load'}
+              </button>
+              <button className="chip" onClick={() => remove(entry)} disabled={busy || !!working}>
+                Delete
+              </button>
             </div>
-          ) : (
-            <p className="hint">
-              {working === 'listing'
-                ? 'Reading the folder…'
-                : 'Nothing in the library yet — refresh the list, or keep the loaded preset here.'}
-            </p>
-          )}
-        </>
+          ))}
+        </div>
+      ) : (
+        <p className="hint">Nothing saved here yet.</p>
       )}
 
       {note ? <p className="hint">{note}</p> : null}
-    </section>
+    </>
   )
 }
