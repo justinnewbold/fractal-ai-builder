@@ -31,8 +31,18 @@ const device = () => import('./forgefx.js')
  * it back" in one breath then does those three things in the only order that
  * means anything, whatever order they were said in.
  */
+/**
+ * What goes into an empty preset when nobody says which blocks.
+ *
+ * Drive into amp into cab is the spine of almost every electric guitar sound;
+ * delay and reverb are the two everyone reaches for next. A unit that lacks any
+ * of them just gets fewer.
+ */
+const DEFAULT_CHAIN = ['drive', 'amp', 'cab', 'delay', 'reverb']
+
 const ORDER = {
   loadPreset: -3,
+  buildChain: -2.5,
   backupPreset: -2,
   clearCell: 0,
   moveBlock: 1,
@@ -366,6 +376,49 @@ export function validatePlan(plan, blocks, capabilities) {
               bytes,
               overwrite: true
             })
+          }
+        })
+        break
+      }
+
+      /*
+       * Build a chain into an empty preset.
+       *
+       * The grid editor could already do this and the assistant could not, so
+       * an empty slot was a dead end you had to leave the conversation to get
+       * out of. Named blocks in order, or a sensible default chain.
+       *
+       * The catalog is fetched at run time rather than validated against here:
+       * which blocks a unit offers is a device question, and an AM4's four
+       * slots hold a different chain than an FM3's grid.
+       */
+      case 'buildChain': {
+        const wanted = (raw.text || '')
+          .split(/[,>\s]+/)
+          .map((w) => w.trim().toLowerCase())
+          .filter(Boolean)
+        const order = wanted.length ? wanted : DEFAULT_CHAIN
+        actions.push({
+          ...raw,
+          label: `Build a chain: ${order.join(' → ')}`,
+          run: async () => {
+            const d = await device()
+            const palette = await d.blockCatalog()
+            const list = Array.isArray(palette) ? palette : palette?.blocks || []
+            const chain = order
+              .map((slug) => list.find((b) => b.slug === slug))
+              .filter(Boolean)
+            if (!chain.length) throw new Error('This unit offers none of those blocks.')
+
+            const width = cols || chain.length
+            const fits = chain.slice(0, width)
+            for (const [i, block] of fits.entries()) {
+              const res = await d.placeBlock(1, i + 1, block.page ?? block.effectId)
+              if (res?.ok === false) throw new Error(`The unit refused ${block.name}.`)
+            }
+            // Which blocks exist is the thing that just changed.
+            d.invalidateSchema()
+            return { ok: true, placed: fits.length }
           }
         })
         break

@@ -154,6 +154,7 @@ export default function App() {
   const read = useCallback(async () => {
     setBusy(true)
     setError(null)
+    let fresh = null
     try {
       const info = await detect()
       setDevice(info)
@@ -167,6 +168,10 @@ export default function App() {
       const list = Array.isArray(b) ? b : []
       setBlocks(list)
       setStatus('live')
+      // Returned as well as stored: a caller that reads and then acts in the
+      // same tick still has the old array in its closure, and state won't have
+      // caught up yet.
+      fresh = list
 
       // Keep a sensible selection: the amp if nothing is chosen, and drop a
       // selection that no longer exists rather than showing a stale panel.
@@ -205,6 +210,7 @@ export default function App() {
     } finally {
       setBusy(false)
     }
+    return fresh
   }, [])
 
   useEffect(() => {
@@ -245,7 +251,7 @@ export default function App() {
     }
   }
 
-  const generate = async (description) => {
+  const generate = async (description, against = null) => {
     setBusy(true)
     setError(null)
     setResult(null)
@@ -253,7 +259,7 @@ export default function App() {
     try {
       setProgress('Reading what the unit has loaded...')
       const schema = await readSchema(
-        blocks,
+        against || blocks,
         (done, total, name) => setProgress(`Reading ${name} - ${done} of ${total}`),
         // Designing or rebuilding a whole preset starts from the unit, not from
         // what we last wrote to it.
@@ -681,12 +687,53 @@ export default function App() {
           }
         ])
         setView('design')
+        let builtBlocks = null
+
+        /*
+         * An empty slot used to be a dead end: design refused and told you to go
+         * place blocks yourself, which meant leaving the conversation to get out
+         * of it. Ask for a tone on an empty preset and the chain gets built
+         * first, because that is plainly what you meant.
+         */
+        if (blocks.length === 0) {
+          setTurns((prev) => [
+            ...prev,
+            { role: 'system', text: 'Empty slot — putting a chain in first.' }
+          ])
+          const built = validatePlan(
+            { actions: [{ kind: 'buildChain', text: null, why: 'empty preset' }] },
+            [],
+            device?.capabilities
+          )
+          const failures = await runPlan(built.actions, (done, total, label) =>
+            setProgress(`${done} of ${total} - ${label}`)
+          )
+          if (failures.length) {
+            setError(failures.join(' · '))
+            setTurns((prev) => [
+              ...prev,
+              { role: 'assistant', text: `Couldn't build a chain: ${failures.join(' · ')}` }
+            ])
+            return
+          }
+          // Design computes against what is on the grid, so it has to see it.
+          // Taken from read's return rather than state, which hasn't caught up.
+          builtBlocks = await read()
+          if (!builtBlocks?.length) {
+            setTurns((prev) => [
+              ...prev,
+              { role: 'assistant', text: 'The chain went in but the unit reports nothing on the grid.' }
+            ])
+            return
+          }
+        }
+
         // With a design already on screen and not yet written, adjust that spec
         // rather than starting over: "warmer" means warmer than the thing you
         // are looking at, and redesigning from scratch would throw away
         // everything else about it.
         if (result?.spec) await refine(design.text || instruction)
-        else await generate(design.text || instruction)
+        else await generate(design.text || instruction, builtBlocks)
         return
       }
 
@@ -1218,21 +1265,21 @@ export default function App() {
             <div className="notice">
               <h2>This preset is empty</h2>
               <p>
-                Slot {preset?.number} has no blocks on its grid, and this app can only adjust
-                blocks that are already placed &mdash; it can&rsquo;t build a chain from nothing
-                yet.
+                Slot {preset?.number} has no blocks on its grid &mdash; but that&rsquo;s no longer
+                a dead end. Describe the tone you want in the chat above and a chain gets placed
+                before anything is designed.
               </p>
               <p>
-                Load a preset that already has an amp and cab, or go to <strong>Edit</strong> and
-                build a chain first &mdash; there&rsquo;s a starter chain button that places
-                drive, amp, cab, delay and reverb in one go.
+                To choose the blocks yourself, say which ones &mdash; &ldquo;build a drive, amp,
+                cab and delay chain&rdquo; &mdash; or use the starter chain button in{' '}
+                <strong>Edit</strong>.
               </p>
             </div>
           ) : (
             <p className="hint design-hint">
-              Describe the tone you want in the chat above &mdash; &ldquo;tight modern metal
-              rhythm in drop A&rdquo;. What comes back is shown here, control by control, before
-              anything reaches the unit.
+              Slot {preset?.number} is empty. Describe the tone you want in the chat above and a
+              chain gets placed first &mdash; or say which blocks, like &ldquo;build a drive, amp,
+              cab and delay chain&rdquo;.
             </p>
           )}
 

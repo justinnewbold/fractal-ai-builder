@@ -22,7 +22,8 @@ const SUGGESTIONS = [
   'Rename this to something that describes it',
   'Set high cut to 5k',
   'Make the delay slower',
-  'Re-read the preset'
+  'Re-read the preset',
+  'Build a drive, amp, cab and delay chain'
 ]
 
 const TYPE_MS = 55
