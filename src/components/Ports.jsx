@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { listPorts, selectPort, servedLocally, pageIsSecure, getHost } from '../lib/forgefx'
+import { listPorts, selectPort, servedLocally } from '../lib/forgefx'
 
 /**
  * Which unit to talk to, and how to reach the server from elsewhere.
@@ -66,7 +66,7 @@ export default function Ports({ onError, onChanged, busy }) {
       {open ? (
         <>
           <p className="silk-label" style={{ marginTop: 10 }}>
-            Devices ForgeFX can see
+            Units plugged into your Mac
           </p>
 
           {!ports ? (
@@ -119,46 +119,27 @@ export default function Ports({ onError, onChanged, busy }) {
 }
 
 /**
- * Why the hosted app can't be used from a phone, and what to do about it.
+ * How to use this from a phone.
  *
- * Browsers make an exception that lets an HTTPS page call http://localhost —
- * which is the only reason the hosted app works at all. That exemption does not
- * extend to a LAN address, so a phone loading the hosted app cannot reach the
- * server on the machine with the cable. No amount of app-side work changes
- * that; it's the browser's rule.
- *
- * ForgeFX can serve the app itself over plain HTTP, which makes everything
- * same-origin and sidesteps it entirely.
+ * This used to explain same-origin rules and tell people to rebuild the app and
+ * relaunch the helper with an environment variable pointing at a dist folder.
+ * That was a workaround for a problem the remote session now solves properly,
+ * so it was not merely jargon — it was worse advice than the thing that works.
  */
 function RemoteHelp() {
-  const local = servedLocally()
-  const secure = pageIsSecure()
-
-  if (local) {
+  if (servedLocally()) {
     return (
       <p className="hint">
-        This page is being served by ForgeFX, so any device on the same network can load it at{' '}
-        <code>{window.location.origin}</code> — including a phone. Gig mode works from there.
+        This page is being served from your Mac, so any device on the same network can open{' '}
+        <code>{window.location.origin}</code> — including a phone.
       </p>
     )
   }
 
   return (
-    <div className="notice">
-      <p>
-        {secure
-          ? 'This page is served over HTTPS, and a secure page may only call localhost — not a LAN address. So a phone loading this URL cannot reach ForgeFX on your Mac.'
-          : `This page talks to ${getHost()}, which only resolves on the machine running ForgeFX.`}
-      </p>
-      <p>To use it from a phone, have ForgeFX serve the app instead:</p>
-      <p>
-        <code>npm run build</code> in this project, then start ForgeFX with{' '}
-        <code>FORGEFX_STATIC=/path/to/dist npm run dev</code>
-      </p>
-      <p>
-        Then browse to <code>http://&lt;your-mac-ip&gt;:5056</code> from the phone. Same origin,
-        plain HTTP, no browser restriction.
-      </p>
-    </div>
+    <p className="hint">
+      To play from a phone, use <strong>Play from your phone</strong> above. Your Mac stays plugged
+      into the unit and the phone drives it from anywhere.
+    </p>
   )
 }
