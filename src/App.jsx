@@ -131,6 +131,9 @@ export default function App() {
   const [compare, setCompare] = useState(null)
   const [turns, setTurns] = useState([])
   const [remote, setRemote] = useState(false)
+  // Where "Leave gig" returns to. Gig takes the screen over, so coming back out
+  // should land where you were rather than at a fixed default.
+  const [lastView, setLastView] = useState('console')
   const [runningPlan, setRunningPlan] = useState(false)
   const [catalog, setCatalog] = useState(null)
   const [partial, setPartial] = useState(null)
@@ -1048,17 +1051,34 @@ export default function App() {
 
       {status === 'live' ? (
         <nav className="views" aria-label="Sections">
+          {/*
+            Gig is not a section like the others — it takes the screen over, and
+            it's the one you reach for on a stage, one-handed, in the dark. As
+            the last tab in a strip that scrolls sideways on a phone it was
+            simply off the edge. Sticky keeps it in view however far the rest
+            scrolls, and it leads rather than trails.
+          */}
+          <button
+            className={`view-tab gig-tab ${view === 'gig' ? 'current' : ''}`}
+            onClick={() => setView(view === 'gig' ? lastView : 'gig')}
+            aria-current={view === 'gig'}
+          >
+            {view === 'gig' ? 'Leave gig' : 'Gig'}
+          </button>
+
           {[
             ['console', 'Console'],
             ['design', 'Design'],
             ['edit', 'Edit'],
-            ['library', 'Library'],
-            ['gig', 'Gig']
+            ['library', 'Library']
           ].map(([id, label]) => (
             <button
               key={id}
               className={`view-tab ${view === id ? 'current' : ''}`}
-              onClick={() => setView(id)}
+              onClick={() => {
+                setLastView(id)
+                setView(id)
+              }}
               aria-current={view === id}
             >
               {label}
