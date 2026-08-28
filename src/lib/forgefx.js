@@ -961,6 +961,46 @@ export async function scanAllPresets(total, onProgress, shouldStop) {
  * Both are heavier reads than a scene query, so this is called on preset change
  * rather than on every poll.
  */
+const SCENE_NAME_CACHE = 'fractal.sceneNames'
+
+/** Names last read for a preset, so a session that can't read them still shows them. */
+function rememberSceneNames(number, names) {
+  if (typeof number !== 'number' || !names?.some((n) => n)) return
+  try {
+    const all = JSON.parse(localStorage.getItem(SCENE_NAME_CACHE) || '{}')
+    all[number] = names
+    localStorage.setItem(SCENE_NAME_CACHE, JSON.stringify(all))
+  } catch {
+    // A full or disabled localStorage costs us a nicety, nothing more.
+  }
+}
+
+function recallSceneNames(number) {
+  if (typeof number !== 'number') return []
+  try {
+    const all = JSON.parse(localStorage.getItem(SCENE_NAME_CACHE) || '{}')
+    return Array.isArray(all[number]) ? all[number] : []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * What each scene is called.
+ *
+ * Two routes, because the devices differ. An FM3 puts scene names in its preset
+ * summary. An AM4 does not — its summary returns an empty scenes array, and the
+ * names only exist inside a full preset dump, decoded from the raw bytes.
+ *
+ * That dump is a POST, and POSTs of preset backups are deliberately absent from
+ * ForgeFX's remote allowlist. So on an AM4 driven from a phone the names are
+ * genuinely unreachable — which is exactly the situation where they matter most,
+ * standing on a stage looking for "Lead" rather than "3".
+ *
+ * So whenever they are readable they're kept, keyed by preset. A remote session
+ * then shows what the last local one learned. Renaming a scene overwrites the
+ * entry, so a stale name can't outlive the thing it named.
+ */
 export async function readSceneNames(number) {
   if (mock) {
     await tick()
@@ -972,7 +1012,9 @@ export async function readSceneNames(number) {
       const summary = await presetSummary(number)
       const names = summary?.scenes
       if (Array.isArray(names) && names.some((n) => (n || '').trim())) {
-        return names.map((n) => (n || '').trim())
+        const clean = names.map((n) => (n || '').trim())
+        rememberSceneNames(number, clean)
+        return clean
       }
     } catch {
       // Not every device serves a summary; fall through to the dump.
@@ -982,12 +1024,28 @@ export async function readSceneNames(number) {
   try {
     const dump = await backupPreset(number)
     const names = dump?.sceneNames
-    if (Array.isArray(names)) return names.map((n) => (n || '').trim())
+    if (Array.isArray(names) && names.some((n) => (n || '').trim())) {
+      const clean = names.map((n) => (n || '').trim())
+      rememberSceneNames(number, clean)
+      return clean
+    }
   } catch {
-    // Neither path worked — the caller shows scene numbers alone.
+    // Blocked remotely, or the device has no dump to give.
   }
 
-  return []
+  return recallSceneNames(number)
+}
+
+/** Drop cached names for a preset — call after renaming a scene. */
+export function forgetSceneNames(number) {
+  if (typeof number !== 'number') return
+  try {
+    const all = JSON.parse(localStorage.getItem(SCENE_NAME_CACHE) || '{}')
+    delete all[number]
+    localStorage.setItem(SCENE_NAME_CACHE, JSON.stringify(all))
+  } catch {
+    // Nothing to clean up if it was never written.
+  }
 }
 
 
