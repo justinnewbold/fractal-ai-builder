@@ -11,6 +11,7 @@ import History from './components/History'
 import { CabPicker, Backup, Meters } from './components/Hardware'
 import { Compare } from './components/Refine'
 import Gig from './components/Gig'
+import SaveBar from './components/SaveBar'
 import { Stages, LiveGeneration } from './components/LiveGeneration'
 import { streamSpec } from './lib/stream'
 import { Modifiers, SceneMatrix, TempoTuner } from './components/Modifiers'
@@ -133,6 +134,9 @@ export default function App() {
   const [applied, setApplied] = useState(null)
   const [slot, setSlot] = useState('')
   const [saveName, setSaveName] = useState('')
+  // A failed save is shown on the save bar as well as in the banner — the bar is
+  // where the tap happened, and on a phone the banner is off-screen above it.
+  const [saveError, setSaveError] = useState(null)
   const [log, setLog] = useState([])
   const [spend, setSpend] = useState({ total: 0, runs: 0 })
   const [lastPrompt, setLastPrompt] = useState('')
@@ -445,11 +449,12 @@ export default function App() {
     // that number, so the button does what it says without anything typed.
     const number = slot === '' ? preset?.number : Number(slot)
     if (!Number.isInteger(number) || number < 0) {
-      setError('Enter a preset slot number.')
+      setSaveError('Enter a preset slot number.')
       return
     }
     setBusy(true)
     setError(null)
+    setSaveError(null)
     try {
       // Name first: /preset/name writes the working buffer, and storePreset is
       // what makes it permanent. Doing it the other way round saves the old name.
@@ -463,6 +468,10 @@ export default function App() {
       setDirty(false)
       await read()
     } catch (err) {
+      // Shown on the save bar itself as well as the banner. A refusal that
+      // appears only at the top of a page you aren't looking at reads as a
+      // button that did nothing.
+      setSaveError(err.message)
       setError(err.message)
     } finally {
       setBusy(false)
@@ -1297,58 +1306,6 @@ export default function App() {
         />
       ) : null}
 
-      {status === 'live' && dirty ? (
-        <div className="dirty-bar">
-          <span className="lamp" data-state="live" />
-          <span className="dirty-text">
-            Playing an unsaved version of <strong>{preset?.name}</strong>. Nothing is permanent
-            until you save it to a slot.
-          </span>
-
-          {/*
-            Save lives here rather than inside one view. This bar already appears
-            on every page the moment anything is unsaved, which is exactly when
-            the button is wanted — having to navigate to another tab to keep a
-            change you just made is how edits get lost.
-
-            The slot defaults to the preset currently loaded, so the common case
-            is one click. Typing a different number saves a copy elsewhere.
-          */}
-          <div className="save-row dirty-save">
-            <input
-              type="text"
-              className="name-field"
-              value={saveName}
-              maxLength={31}
-              onChange={(e) => setSaveName(e.target.value)}
-              placeholder="Preset name"
-              aria-label="Name to save the preset under"
-            />
-            <input
-              type="text"
-              value={slot === '' ? String(preset?.number ?? '') : slot}
-              onChange={(e) => setSlot(e.target.value.replace(/[^0-9]/g, ''))}
-              placeholder="Slot"
-              aria-label="Preset slot to save into"
-            />
-            <button className="save-now" onClick={save} disabled={busy}>
-              Save to slot {slot === '' ? (preset?.number ?? '--') : slot}
-            </button>
-          </div>
-
-          <div className="history-actions">
-            <button className="chip" onClick={revert} disabled={busy}>
-              Revert to saved
-            </button>
-            {safety ? (
-              <button className="chip" onClick={restoreSafety} disabled={busy}>
-                Load pre-edit copy
-              </button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-
       {status === 'live' && view === 'design' ? (
         <>
           {blocks.length === 0 ? (
@@ -1740,6 +1697,31 @@ export default function App() {
         </a>
         , an independent project not affiliated with Fractal Audio Systems.
       </p>
+
+      {/*
+        Last in the document, pinned to the bottom of the viewport, and outside
+        every view — because saving belongs to the preset, not to whichever tab
+        happens to be open. Absent in gig: that screen exists to switch sounds
+        with a thumb in the dark, and a slot overwrite is not something to put
+        within reach of a mis-tap mid-song.
+      */}
+      {status === 'live' && view !== 'gig' ? (
+        <SaveBar
+          preset={preset}
+          dirty={dirty}
+          busy={busy}
+          saveName={saveName}
+          onName={setSaveName}
+          slot={slot}
+          onSlot={setSlot}
+          onSave={save}
+          onRevert={revert}
+          safety={safety}
+          onRestoreSafety={restoreSafety}
+          error={saveError}
+          onDismissError={() => setSaveError(null)}
+        />
+      ) : null}
     </div>
   )
 }
