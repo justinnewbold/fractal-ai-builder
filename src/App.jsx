@@ -1522,6 +1522,14 @@ export default function App() {
             <Meters active={status === 'live'} />
           ) : null}
 
+          {device?.capabilities?.fc?.model !== false ? (
+            <Footswitches onError={setError} />
+          ) : null}
+        </>
+      ) : null}
+
+      {status === 'live' && view === 'library' ? (
+        <>
           {/* Host controls are local-only — from a phone these calls are refused,
               and a button that cannot work is worse than no button. */}
           {!remote ? <Host onError={setError} /> : null}
@@ -1553,14 +1561,6 @@ export default function App() {
             }}
           />
 
-          {device?.capabilities?.fc?.model !== false ? (
-            <Footswitches onError={setError} />
-          ) : null}
-        </>
-      ) : null}
-
-      {status === 'live' && view === 'library' ? (
-        <>
           <Versions
             preset={preset}
             busy={busy}
