@@ -3352,3 +3352,11 @@ ol.action-list li.destructive::marker {
   word-break: break-all;
   color: var(--silk-dim);
 }
+
+.host {
+  margin-top: 34px;
+}
+
+.host .save-row {
+  margin-top: 8px;
+}
