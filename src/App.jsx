@@ -19,6 +19,7 @@ import Footswitches from './components/Footswitches'
 import GridEditor from './components/GridEditor'
 import Ports from './components/Ports'
 import LocalLibrary from './components/LocalLibrary'
+import Remote from './components/Remote'
 import Assistant from './components/Assistant'
 import Theme from './components/Theme'
 import { validatePlan, runPlan } from './lib/actions'
@@ -76,6 +77,15 @@ import { blockCatalog } from './lib/forgefx'
  */
 const PREVIEW_ABOVE = 4
 
+/**
+ * What a remote session cannot do.
+ *
+ * ForgeFX's allowlist stops at live performance edits — anything that
+ * permanently overwrites is local-only. Mirroring the list here is what lets the
+ * app explain itself instead of relaying a 403.
+ */
+const REMOTE_BLOCKED_KINDS = new Set(['savePreset', 'backupPreset', 'keepInLibrary'])
+
 const HAND_EDIT_KINDS = new Set([
   'edit',
   'scene',
@@ -107,6 +117,7 @@ export default function App() {
   const [historyKey, setHistoryKey] = useState(0)
   const [compare, setCompare] = useState(null)
   const [turns, setTurns] = useState([])
+  const [remote, setRemote] = useState(false)
   const [runningPlan, setRunningPlan] = useState(false)
   const [catalog, setCatalog] = useState(null)
   const [partial, setPartial] = useState(null)
@@ -761,6 +772,27 @@ export default function App() {
        * broad: past a handful of changes you are no longer nudging a control,
        * you are reshaping the sound, and you should see that first.
        */
+      /*
+       * Some things the host refuses from a distance, deliberately: saving to a
+       * slot, backups, the library. Say so before running anything rather than
+       * letting the player watch a plan half-succeed and then throw a 403.
+       */
+      if (remote) {
+        const blocked = checked.actions.filter((a) => REMOTE_BLOCKED_KINDS.has(a.kind))
+        if (blocked.length) {
+          setTurns((prev) => [
+            ...prev,
+            {
+              role: 'assistant',
+              text: `${blocked
+                .map((a) => a.label)
+                .join(', ')} — that has to happen at the Mac. ForgeFX won't let a remote session overwrite a preset, which is the right call mid-set.`
+            }
+          ])
+          return
+        }
+      }
+
       const broad = checked.actions.length > PREVIEW_ABOVE
       if (checked.actions.some((a) => a.destructive) || broad) {
         setTurns((prev) => [
@@ -1488,6 +1520,17 @@ export default function App() {
           device?.capabilities?.telemetry?.outputMeters !== false ? (
             <Meters active={status === 'live'} />
           ) : null}
+
+          <Remote
+            onConnected={(on) => {
+              setRemote(on)
+              record('remote', on ? 'Connected to the host remotely' : 'Back to the local connection')
+              // Everything about the device has to be re-read down the new path.
+              resetSchemaCache()
+              read()
+            }}
+            onError={setError}
+          />
 
           <LocalLibrary
             preset={preset}

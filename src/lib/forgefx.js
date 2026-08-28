@@ -11,6 +11,7 @@
 
 import { EXCLUDED_BLOCKS, safeParams } from './guardrails.js'
 import { toNormalized } from './scale.js'
+import { remoteActive, remoteRequest, subscribeRemoteEvents } from './remote.js'
 import {
   rosterCache,
   helpTextCache,
@@ -72,6 +73,17 @@ class ForgeError extends Error {
 }
 
 async function request(path, options = {}) {
+  // With a remote session up, everything travels the relay instead. This is the
+  // one place that has to know, which is why it was worth keeping a single
+  // chokepoint for every call the app makes.
+  if (remoteActive()) {
+    try {
+      return await remoteRequest(path, options)
+    } catch (err) {
+      throw new ForgeError(err.message, { status: err.status, cause: err })
+    }
+  }
+
   const url = `${getHost()}${path}`
   let res
   try {
@@ -874,6 +886,10 @@ export function subscribeEvents(onEvent) {
     }, 400)
     return () => clearInterval(id)
   }
+
+  // Over the relay the host bridges the same events onto the channel, so there
+  // is no EventSource to open — localhost isn't reachable from the phone.
+  if (remoteActive()) return subscribeRemoteEvents(onEvent)
 
   let source
   try {
