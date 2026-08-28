@@ -143,6 +143,24 @@ export async function remoteConnect() {
   if (channel) return userId
 
   /*
+   * Clear out anything left from a previous attempt first.
+   *
+   * client.channel(topic) returns the EXISTING channel when one is already
+   * registered for that topic rather than making a new one. So a connect that
+   * failed after subscribing leaves a joined channel behind, and every retry is
+   * handed that same joined channel — where registering presence throws. The
+   * symptom is an error that repeats forever until the page is reloaded, which
+   * is a miserable thing to hand someone mid-setup.
+   */
+  for (const existing of client.getChannels()) {
+    try {
+      await client.removeChannel(existing)
+    } catch {
+      // Already gone is the outcome we wanted anyway.
+    }
+  }
+
+  /*
    * Presence has to be declared before subscribe, not after.
    *
    * realtime-js decides whether to enable presence at join time, from the
@@ -194,6 +212,10 @@ export async function remoteConnect() {
         reject(new Error(`Realtime ${status}. Is the host signed in and enabled?`))
       }
     })
+  }).catch(async (err) => {
+    // Leave nothing registered on the way out, or the next attempt inherits it.
+    await client.removeChannel(chan).catch(() => {})
+    throw err
   })
 
   await chan.track({ at: Date.now() }).catch(() => {})
