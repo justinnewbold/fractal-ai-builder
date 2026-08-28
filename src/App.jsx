@@ -972,6 +972,24 @@ export default function App() {
       ) : null}
 
       {/*
+        Errors are raised from every view, so the one place they're shown has to
+        be outside all of them. This banner lived inside Design, which meant a
+        failure anywhere else — a rejected sign-in, a refused write — set the
+        message and rendered nothing. Silence read as "the button does nothing".
+      */}
+      {status === 'live' && error ? (
+        <div className="notice" data-kind="fault" role="alert">
+          <h2>Didn&rsquo;t work</h2>
+          <p>{error}</p>
+          <div className="history-actions">
+            <button className="chip" onClick={() => setError(null)}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/*
         The assistant sits above the tabs, not inside one. It is how the app is
         meant to be worked: the views below are for when you'd rather reach for
         the control yourself, not a separate mode with different powers.
@@ -1337,13 +1355,6 @@ export default function App() {
           />
 
           <PresetBar preset={preset} onSelect={jumpTo} onRename={rename} busy={busy} />
-
-          {error ? (
-            <div className="notice" data-kind="fault">
-              <h2>Didn&rsquo;t work</h2>
-              <p>{error}</p>
-            </div>
-          ) : null}
 
           {applied ? (
             <div className="notice">

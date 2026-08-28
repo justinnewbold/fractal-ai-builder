@@ -86,12 +86,29 @@ const listeners = new Set()
 export const remoteActive = () => !!channel
 
 /** Sign in to the player's own Supabase project. */
+/**
+ * Supabase's auth errors are terse and one of them is actively misleading.
+ *
+ * An unconfirmed account fails with wording that sounds like a wrong password,
+ * which sends you off changing credentials that were right all along.
+ */
+export function explainAuth(message) {
+  const m = (message || '').toLowerCase()
+  if (m.includes('not confirmed') || m.includes('email not confirmed')) {
+    return 'That account exists but its email was never confirmed. Check for a confirmation mail from Supabase, or tell me and I can confirm it directly.'
+  }
+  if (m.includes('invalid login')) {
+    return 'Email or password not accepted. If the account is new, its email may still need confirming.'
+  }
+  return message
+}
+
 /** Create the account, when there isn't one yet. Same project, same policies. */
 export async function remoteSignUp({ url, anonKey, email, password }) {
   const { createClient } = await import('@supabase/supabase-js')
   const c = createClient(url || DEFAULT_PROJECT.url, anonKey || DEFAULT_PROJECT.anonKey)
   const { data, error } = await c.auth.signUp({ email, password })
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(explainAuth(error.message))
   // Confirmation may be required, in which case there is no session yet.
   return { needsConfirmation: !data?.session, userId: data?.user?.id || null }
 }
@@ -104,7 +121,7 @@ export async function remoteSignIn({ url, anonKey, email, password }) {
     auth: { persistSession: true }
   })
   const { data, error } = await client.auth.signInWithPassword({ email, password })
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(explainAuth(error.message))
   userId = data?.user?.id
   if (!userId) throw new Error('Signed in but Supabase returned no user id.')
   return userId

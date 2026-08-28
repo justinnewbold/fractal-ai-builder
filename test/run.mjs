@@ -10,7 +10,7 @@ import { toNormalized, fromNormalized } from '../src/lib/scale.js'
 import { isSilencingParam } from '../src/lib/guardrails.js'
 import { validateSpec, countWrites } from '../src/lib/validate.js'
 import { preferredEncoding, rememberEncoding, disambiguate } from '../src/lib/encoding.js'
-import { forbiddenRemotely } from '../src/lib/remote.js'
+import { forbiddenRemotely, explainAuth } from '../src/lib/remote.js'
 import {
   patchSchemaValue,
   invalidateSchema,
@@ -463,6 +463,18 @@ test('live performance edits travel fine', () => {
   // Trailing slashes and query strings must not sneak past the check.
   assert.ok(forbiddenRemotely('POST', '/preset/store/'))
   assert.ok(forbiddenRemotely('GET', '/local/presets?refresh=1'))
+})
+
+test('an unconfirmed account is not reported as a bad password', () => {
+  // Supabase's own wording sends people off changing credentials that were
+  // right all along.
+  const msg = explainAuth('Email not confirmed')
+  assert.ok(/confirm/i.test(msg))
+  assert.ok(!/password/i.test(msg))
+})
+
+test('unrecognised auth errors pass through unchanged', () => {
+  assert.equal(explainAuth('Rate limit exceeded'), 'Rate limit exceeded')
 })
 
 console.log(`\n${passed} passed\n`)
