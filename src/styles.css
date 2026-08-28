@@ -3360,3 +3360,41 @@ ol.action-list li.destructive::marker {
 .host .save-row {
   margin-top: 8px;
 }
+
+/* ---------- gig as a mode, not a section ---------- */
+
+/* Sticky so it survives the sideways scroll on a phone: the tab strip is wider
+   than a handset and Gig is the one thing that must never be off the edge. */
+button.view-tab.gig-tab {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  color: var(--live);
+  background: var(--chassis);
+  padding-right: 18px;
+}
+
+button.view-tab.gig-tab.current {
+  color: var(--live);
+  border-color: var(--live);
+}
+
+/* A fade on the trailing edge, so the sticky button reads as sitting above the
+   strip rather than clipping it mid-letter. */
+button.view-tab.gig-tab::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -12px;
+  width: 12px;
+  height: 100%;
+  background: linear-gradient(to right, var(--chassis), transparent);
+  pointer-events: none;
+}
+
+@media (max-width: 620px) {
+  button.view-tab.gig-tab {
+    font-size: 12px;
+    padding: 11px 16px 11px 2px;
+  }
+}
