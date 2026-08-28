@@ -80,10 +80,14 @@ export const saveRemoteConfig = (config) => {
 let client = null
 let channel = null
 let userId = null
+let hostSeen = false
 const waiting = new Map()
 const listeners = new Set()
 
 export const remoteActive = () => !!channel
+
+/** Whether anything besides this browser is on the channel. */
+export const remoteHostSeen = () => hostSeen
 
 /** Sign in to the player's own Supabase project. */
 /**
@@ -138,8 +142,17 @@ export async function remoteConnect() {
   if (!client || !userId) throw new Error('Sign in first.')
   if (channel) return userId
 
+  /*
+   * Presence has to be declared before subscribe, not after.
+   *
+   * realtime-js decides whether to enable presence at join time, from the
+   * bindings registered so far plus `presence.enabled`. Calling track() on an
+   * already-joined channel throws, and — worse than the crash — presence would
+   * have been off on the server side, so the host would never have seen anyone
+   * watching and would never have bridged a single device event.
+   */
   const chan = client.channel(`remote:${userId}`, {
-    config: { private: true, broadcast: { ack: false }, presence: { key: 'browser' } }
+    config: { private: true, broadcast: { ack: false }, presence: { key: 'browser', enabled: true } }
   })
 
   chan.on('broadcast', { event: 'res' }, ({ payload }) => {
@@ -147,6 +160,16 @@ export async function remoteConnect() {
     if (pending) {
       waiting.delete(payload.id)
       pending.resolve(payload)
+    }
+  })
+
+  // Registered before subscribe, which is both required and useful: it tells us
+  // whether the host agent is actually on the channel.
+  chan.on('presence', { event: 'sync' }, () => {
+    try {
+      hostSeen = Object.keys(chan.presenceState()).length > 1
+    } catch {
+      hostSeen = false
     }
   })
 
@@ -187,6 +210,7 @@ export async function remoteDisconnect() {
     }
   }
   channel = null
+  hostSeen = false
   for (const [, pending] of waiting) pending.reject(new Error('Remote disconnected.'))
   waiting.clear()
 }
