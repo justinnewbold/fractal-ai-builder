@@ -77,6 +77,20 @@ export const saveRemoteConfig = (config) => {
   else localStorage.removeItem(STORE_KEY)
 }
 
+/**
+ * Whether to rejoin the host automatically on load.
+ *
+ * Having signed in once isn't the same as wanting to be remote. Someone sitting
+ * at the Mac with the cable in it should stay local, so this records the last
+ * thing chosen rather than inferring it from a session that happens to exist.
+ */
+export const setAutoConnect = (on) => {
+  const config = loadRemoteConfig() || {}
+  saveRemoteConfig({ ...config, autoConnect: !!on })
+}
+
+export const wantsAutoConnect = () => !!loadRemoteConfig()?.autoConnect
+
 let client = null
 let channel = null
 let userId = null
@@ -117,12 +131,41 @@ export async function remoteSignUp({ url, anonKey, email, password }) {
   return { needsConfirmation: !data?.session, userId: data?.user?.id || null }
 }
 
+/**
+ * Pick up a session left over from last time.
+ *
+ * Supabase already persists the session — signing in writes it to localStorage
+ * and it stays there. What was missing is this: nothing ever asked for it, so a
+ * refresh looked like a sign-out and the password got typed again.
+ *
+ * Returns the user id when a session is still good, null otherwise. Never
+ * throws and never prompts: a stale or expired session is a normal thing to
+ * find, and the answer is to show the sign-in form, not an error.
+ */
+export async function restoreSession({ url, anonKey } = {}) {
+  try {
+    const { createClient } = await import('@supabase/supabase-js')
+    const c = createClient(url || DEFAULT_PROJECT.url, anonKey || DEFAULT_PROJECT.anonKey, {
+      auth: { persistSession: true, autoRefreshToken: true }
+    })
+    const { data } = await c.auth.getSession()
+    if (!data?.session?.user?.id) return null
+    client = c
+    userId = data.session.user.id
+    return userId
+  } catch {
+    return null
+  }
+}
+
 export async function remoteSignIn({ url, anonKey, email, password }) {
   // Loaded on demand: a realtime client is a couple of hundred KB and most
   // sessions are local, sitting at the machine with the cable in it.
   const { createClient } = await import('@supabase/supabase-js')
   client = createClient(url || DEFAULT_PROJECT.url, anonKey || DEFAULT_PROJECT.anonKey, {
-    auth: { persistSession: true }
+    // autoRefreshToken keeps a long session alive rather than expiring it
+    // mid-set, which is the worst possible moment to be handed a login form.
+    auth: { persistSession: true, autoRefreshToken: true }
   })
   const { data, error } = await client.auth.signInWithPassword({ email, password })
   if (error) throw new Error(explainAuth(error.message))

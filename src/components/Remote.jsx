@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   loadRemoteConfig,
   saveRemoteConfig,
@@ -8,6 +8,9 @@ import {
   remoteDisconnect,
   remoteActive,
   remoteHostSeen,
+  restoreSession,
+  setAutoConnect,
+  wantsAutoConnect,
   DEFAULT_PROJECT
 } from '../lib/remote'
 
@@ -33,6 +36,38 @@ export default function Remote({ onConnected, onError }) {
   const [state, setState] = useState(remoteActive() ? 'connected' : 'idle')
   const [note, setNote] = useState(null)
 
+  /*
+   * Rejoin without being asked, when that's plainly what's wanted.
+   *
+   * Supabase keeps the session across a refresh; nothing was picking it up, so
+   * every reload looked like a sign-out. This restores it and rejoins the
+   * channel silently — but only for someone who was connected when they left,
+   * since having signed in once is not the same as wanting to be remote.
+   */
+  useEffect(() => {
+    if (remoteActive() || !wantsAutoConnect()) return
+    let stop = false
+    ;(async () => {
+      const uid = await restoreSession({ url: saved?.url, anonKey: saved?.anonKey })
+      if (!uid || stop) return
+      try {
+        await remoteConnect()
+        if (stop) return
+        setState('connected')
+        setNote('Reconnected to the host.')
+        onConnected(true)
+      } catch {
+        // The host may simply be off. Leaving the form is the right answer, and
+        // an error on page load for something nobody asked for is not.
+        setAutoConnect(false)
+      }
+    })()
+    return () => {
+      stop = true
+    }
+    // Runs once on mount by design: this is about the state the app opened in.
+  }, [])
+
   const connect = async () => {
     if (!email.trim() || !password) {
       onError('Enter your email and password to connect.')
@@ -49,7 +84,12 @@ export default function Remote({ onConnected, onError }) {
       })
       const uid = await remoteConnect()
       // The password is deliberately not among them.
-      saveRemoteConfig({ url: url.trim(), anonKey: anonKey.trim(), email: email.trim() })
+      saveRemoteConfig({
+        url: url.trim(),
+        anonKey: anonKey.trim(),
+        email: email.trim(),
+        autoConnect: true
+      })
       setState('connected')
       /*
        * Joining a channel nobody else is on succeeds perfectly well and does
@@ -99,6 +139,8 @@ export default function Remote({ onConnected, onError }) {
   }
 
   const disconnect = async () => {
+    // Disconnecting is a decision; don't undo it on the next load.
+    setAutoConnect(false)
     await remoteDisconnect()
     setState('idle')
     setNote('Back to the local connection.')
