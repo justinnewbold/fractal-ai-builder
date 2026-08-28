@@ -3321,3 +3321,19 @@ ol.action-list li.destructive::marker {
     opacity: 0.6;
   }
 }
+
+/* ---------- remote session ---------- */
+
+.remote {
+  margin-top: 34px;
+}
+
+.remote .save-row {
+  margin-top: 8px;
+}
+
+/* Long keys and URLs shouldn't force a horizontal scroll on a phone. */
+.remote input.name-field {
+  min-width: 0;
+  flex: 1 1 260px;
+}
