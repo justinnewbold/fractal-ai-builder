@@ -1506,6 +1506,7 @@ export default function App() {
 
           <Scenes
             blocks={blocks}
+            preset={preset}
             count={device?.capabilities?.sceneCount || 8}
             channelNames={device?.capabilities?.channelNames}
             hasScenes={device?.capabilities?.hasScenes !== false}

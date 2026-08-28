@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getScene, setScene, setSceneName, setChannel } from '../lib/forgefx'
+import { getScene, setScene, setSceneName, setChannel, forgetSceneNames } from '../lib/forgefx'
 
 /**
  * Scenes and per-block channels.
@@ -14,6 +14,7 @@ import { getScene, setScene, setSceneName, setChannel } from '../lib/forgefx'
  */
 export default function Scenes({
   blocks,
+  preset,
   count = 8,
   channelNames,
   hasScenes = true,
@@ -61,6 +62,9 @@ export default function Scenes({
     if (!name) return
     try {
       await setSceneName(index, name)
+      // Gig keeps a copy so a remote session can still show names. Drop it, or
+      // the old name outlives the thing it named.
+      forgetSceneNames(preset?.number)
       onChanged(`Named scene ${index + 1} "${name}"`)
       await load()
     } catch (err) {

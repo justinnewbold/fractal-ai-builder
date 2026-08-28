@@ -477,4 +477,12 @@ test('unrecognised auth errors pass through unchanged', () => {
   assert.equal(explainAuth('Rate limit exceeded'), 'Rate limit exceeded')
 })
 
+test('a preset backup is refused remotely, matching the host', () => {
+  // Which is why scene names have to be cached: on an AM4 they only exist
+  // inside the dump, and the dump cannot cross the relay.
+  assert.ok(forbiddenRemotely('POST', '/preset/backup'))
+  // The summary is a GET and does travel — that's the FM3's path to names.
+  assert.equal(forbiddenRemotely('GET', '/presets/12/summary'), null)
+})
+
 console.log(`\n${passed} passed\n`)

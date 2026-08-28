@@ -121,7 +121,10 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
               onClick={() => pickScene(i)}
             >
               <span className="gig-scene-num mono">{i + 1}</span>
-              <span className="gig-scene-name">{names[i] || `Scene ${i + 1}`}</span>
+              {/* No name means no name — repeating the number as "Scene 3"
+                  fills the row with a word that carries nothing, and makes an
+                  unnamed scene look identical to a named one. */}
+              {names[i] ? <span className="gig-scene-name">{names[i]}</span> : null}
             </button>
           ))}
         </div>
