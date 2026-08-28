@@ -7,6 +7,7 @@ import {
   remoteConnect,
   remoteDisconnect,
   remoteActive,
+  remoteHostSeen,
   DEFAULT_PROJECT
 } from '../lib/remote'
 
@@ -50,6 +51,19 @@ export default function Remote({ onConnected, onError }) {
       // The password is deliberately not among them.
       saveRemoteConfig({ url: url.trim(), anonKey: anonKey.trim(), email: email.trim() })
       setState('connected')
+      /*
+       * Joining a channel nobody else is on succeeds perfectly well and does
+       * nothing, which would look like a working connection until the first
+       * request timed out. Presence settles a moment after subscribe, so the
+       * check waits for it rather than reading an empty state.
+       */
+      setTimeout(() => {
+        setNote(
+          remoteHostSeen()
+            ? `Connected as ${uid.slice(0, 8)}… — the host is on the channel.`
+            : `Connected as ${uid.slice(0, 8)}…, but nothing else is on this channel. Turn the host on at the Mac.`
+        )
+      }, 1200)
       setNote(`Connected as ${uid.slice(0, 8)}…`)
       setPassword('')
       onConnected(true)
