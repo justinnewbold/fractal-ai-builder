@@ -79,6 +79,18 @@ import { blockCatalog } from './lib/forgefx'
 const PREVIEW_ABOVE = 4
 
 /**
+ * Whether this is plainly not the machine with the cable in it.
+ *
+ * Only used to choose which advice to give on the no-connection screen, so a
+ * rough answer is the right kind: coarse enough not to matter when it's wrong,
+ * and it spares someone on a phone a paragraph about npm.
+ */
+const onAnotherDevice =
+  typeof navigator !== 'undefined' &&
+  (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent)))
+
+/**
  * What a remote session cannot do.
  *
  * ForgeFX's allowlist stops at live performance edits — anything that
@@ -951,10 +963,19 @@ export default function App() {
             This app runs in the cloud, but your Fractal unit is on your desk &mdash; so it talks
             to ForgeFX running locally at <code>{getHost()}</code>.
           </p>
-          <p>
-            Safari blocks a secure page from calling <code>localhost</code>. Use Chrome, or run
-            this app locally with <code>npm run dev</code>.
-          </p>
+          {/* On a phone the local advice is not just unhelpful, it's wrong:
+              localhost is the phone itself, and no browser choice changes that. */}
+          {onAnotherDevice ? (
+            <p>
+              On a phone or tablet there is nothing to fix here &mdash; <code>localhost</code> means
+              this device, and your unit is plugged into the Mac. Connect to it below instead.
+            </p>
+          ) : (
+            <p>
+              Safari blocks a secure page from calling <code>localhost</code>. Use Chrome, or run
+              this app locally with <code>npm run dev</code>.
+            </p>
+          )}
           <p>
             No unit to hand?{' '}
             <button
@@ -969,6 +990,26 @@ export default function App() {
             runs against a simulated FM3 built from real captured device data.
           </p>
         </div>
+      ) : null}
+
+      {/*
+        On a phone this is the only screen that ever renders.
+        `localhost` is the machine you're holding, so a phone can never reach
+        ForgeFX directly and the status never becomes live — which meant the one
+        panel that could rescue it was behind a check for being live already.
+        A remote session is precisely the answer to having no local connection,
+        so it belongs on the screen that says there isn't one.
+      */}
+      {status === 'fault' ? (
+        <Remote
+          onConnected={(on) => {
+            setRemote(on)
+            record('remote', on ? 'Connected to the host remotely' : 'Back to the local connection')
+            resetSchemaCache()
+            read()
+          }}
+          onError={setError}
+        />
       ) : null}
 
       {/*
