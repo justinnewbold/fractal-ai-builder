@@ -70,7 +70,9 @@ body {
 .shell {
   max-width: 1180px;
   margin: 0 auto;
-  padding: 28px 24px 80px;
+  /* Bottom padding clears the pinned save bar, plus the home indicator on a
+     phone. Content that ends underneath a fixed bar is content you can't read. */
+  padding: 28px 24px calc(120px + env(safe-area-inset-bottom, 0px));
 }
 
 .masthead {
@@ -1838,51 +1840,9 @@ button.cell-btn.probed {
 
 /* ---------- unsaved state ---------- */
 
-.dirty-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 14px;
-  padding: 11px 15px;
-  background: var(--panel);
-  border: 1px solid var(--rule);
-  border-left: 2px solid var(--live);
-  border-radius: 3px;
-}
-
-.dirty-text {
-  flex: 1 1 260px;
-  font-size: 12.5px;
-  color: var(--silk-dim);
-}
-
-.dirty-text strong {
-  color: var(--silk);
-  font-weight: 600;
-}
-
-.dirty-bar .history-actions {
-  margin-top: 0;
-}
-
-/* The save controls sit in the unsaved bar, which shows on every view. They
-   read as the primary action there — revert and the pre-edit copy stay as
-   quiet chips beside them. */
-.save-row.dirty-save {
-  margin-top: 0;
-  gap: 8px;
-}
-
-.save-row.dirty-save input[type='text'] {
-  min-width: 84px;
-  padding: 6px 9px;
-  font-size: 12.5px;
-}
-
-.save-row.dirty-save input.name-field {
-  min-width: 150px;
-}
+/* The unsaved panel that used to live at the foot of the page is gone — saving
+   is a pinned bar now (see "saving" below). What's kept here is the base look of
+   the save button itself, which the Library view still uses. */
 
 button.save-now {
   padding: 7px 15px;
@@ -1904,16 +1864,6 @@ button.save-now:hover:not(:disabled) {
 button.save-now:disabled {
   opacity: 0.5;
   cursor: default;
-}
-
-@media (max-width: 620px) {
-  .save-row.dirty-save {
-    width: 100%;
-  }
-
-  button.save-now {
-    flex: 1 1 auto;
-  }
 }
 
 /* ---------- live generation ---------- */
@@ -3642,4 +3592,159 @@ button.gig-block:disabled {
 .gig-note-action button {
   min-height: 40px;
   padding: 8px 16px;
+}
+
+/* ---------- saving ---------- */
+
+/*
+ * Pinned, not placed. The old save panel sat at the foot of a long page and
+ * only existed while the app believed something had changed — so on a phone it
+ * was both out of sight and intermittent, which is a hard thing to learn the
+ * location of. This is always in the same place: the bottom of the screen.
+ */
+.save-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: color-mix(in srgb, var(--chassis) 92%, black);
+  border-top: 1px solid var(--rule);
+  backdrop-filter: blur(8px);
+}
+
+/* Unsaved work gets a lit edge — the one state worth interrupting for. */
+.save-bar.unsaved {
+  border-top-color: var(--live);
+  box-shadow: 0 -1px 0 var(--live);
+}
+
+.save-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.save-bar-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.save-bar-text {
+  font-size: 12.5px;
+  color: var(--silk-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.save-bar-text strong {
+  color: var(--silk);
+  font-weight: 600;
+}
+
+/* Both targets are thumb-sized. This bar gets pressed in a hurry. */
+.save-bar button.save-now {
+  flex: 0 0 auto;
+  min-height: 46px;
+  padding: 10px 18px;
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--on-signal);
+}
+
+.save-bar button.save-now:disabled {
+  background: var(--panel);
+  border-color: var(--rule);
+  color: var(--silk-faint);
+  /* Not a failure state: on a remote session this is simply the truth about
+     where a slot write can happen, said before the tap rather than after. */
+  opacity: 1;
+}
+
+.save-bar button.save-options {
+  flex: 0 0 auto;
+  min-height: 46px;
+  padding: 10px 14px;
+  font-size: 12.5px;
+}
+
+/* Name, slot and the undo actions — folded away, because the common save is to
+   the slot already loaded and that needs no fields at all. */
+.save-sheet {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  max-width: 1180px;
+  margin: 0 auto 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.save-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 160px;
+}
+
+.save-field input {
+  min-height: 44px;
+  font-size: 16px; /* iOS zooms the page on focus at anything smaller */
+}
+
+.save-field-slot {
+  flex: 0 1 110px;
+}
+
+.save-sheet-actions {
+  display: flex;
+  gap: 8px;
+  flex: 1 1 100%;
+}
+
+.save-bar-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 1180px;
+  margin: 0 auto 8px;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: var(--silk);
+  background: color-mix(in srgb, var(--fault, #b4453a) 18%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--fault, #b4453a) 45%, var(--rule));
+  border-radius: 3px;
+}
+
+.save-bar-error span {
+  flex: 1 1 auto;
+}
+
+@media (max-width: 620px) {
+  .save-bar-row {
+    flex-wrap: wrap;
+  }
+
+  .save-bar-state {
+    flex: 1 1 100%;
+    order: -1;
+    margin-bottom: 8px;
+  }
+
+  /* Save is the wide one. Options is a sidecar, not an equal. */
+  .save-bar button.save-now {
+    flex: 1 1 auto;
+  }
 }

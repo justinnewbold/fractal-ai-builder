@@ -3,6 +3,27 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 5.5.2
+
+**Saving.** The button was in the wrong place, and on a phone it was also
+telling the truth too late.
+
+- Save is now a bar pinned to the bottom of the screen, on every view except
+  gig. It used to be a panel at the foot of a long page, shown only while the
+  app believed something had changed — off-screen and intermittent, which is a
+  hard thing to learn the location of. It's always in the same place now, and
+  saving an unchanged preset just writes the same bytes back.
+- The tap that did nothing: ForgeFX refuses a slot write over the remote relay,
+  and it's right to. But the refusal arrived after the tap, in a banner at the
+  top of a page you weren't looking at. The button now says "Saving happens at
+  the Mac" before you press it, and any other save failure shows on the bar
+  itself.
+- One button for the common case — the slot already loaded, nothing typed. Name
+  and slot fields fold away behind Options, along with revert and the pre-edit
+  copy.
+- Thumb-sized targets, and the fields use 16px text so iOS stops zooming the
+  page when you tap into them.
+
 ## 5.5.1
 
 **The gig screen on a phone.** Scene names and block buttons were both missing

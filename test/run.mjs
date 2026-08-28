@@ -629,4 +629,58 @@ test('a refresh that fails after blocks were showing still explains itself', () 
   assert.equal(chainState('failed', 4), 'explain')
 })
 
+// Saving. Both complaints were about the button, not the write: it couldn't be
+// found, and when it was found it appeared to do nothing.
+console.log('\nsaving')
+
+// What the bar offers, given where the app is running.
+const saveButton = (remote, busy) =>
+  remote ? 'blocked' : busy ? 'working' : 'save'
+
+test('a slot write is offered when the cable is on this machine', () => {
+  assert.equal(saveButton(false, false), 'save')
+})
+
+test('a remote session says so before the tap, not after', () => {
+  // ForgeFX refuses POST /preset/store over the relay — correctly. The old bar
+  // offered the button anyway and surfaced the 403 in a banner off-screen.
+  assert.equal(saveButton(true, false), 'blocked')
+  assert.ok(forbiddenRemotely('POST', '/preset/store'))
+})
+
+// The bar is present whether or not the app believes anything changed.
+const barShown = (status, view) => status === 'live' && view !== 'gig'
+
+test('the save bar is there before anything is edited', () => {
+  // dirty is the app's belief; a knob turned on the front panel doesn't set it,
+  // and a button that comes and goes by an invisible rule can't be learned.
+  assert.ok(barShown('live', 'design'))
+  assert.ok(barShown('live', 'edit'))
+})
+
+test('gig keeps no slot write within reach of a mis-tap', () => {
+  assert.ok(!barShown('live', 'gig'))
+})
+
+test('nothing to save to when no unit is attached', () => {
+  assert.ok(!barShown('fault', 'design'))
+})
+
+// An empty slot field means the slot already loaded, so the common save needs
+// nothing typed at all.
+const target = (slot, loaded) => (slot === '' ? loaded : Number(slot))
+
+test('an untouched slot field saves over the preset you are playing', () => {
+  assert.equal(target('', 97), 97)
+})
+
+test('a typed slot saves a copy elsewhere', () => {
+  assert.equal(target('12', 97), 12)
+})
+
+test('slot zero is a real slot, not an empty field', () => {
+  // `slot || preset.number` would have sent this to 97.
+  assert.equal(target('0', 97), 0)
+})
+
 console.log(`\n${passed} passed\n`)
