@@ -3,10 +3,15 @@ import { useEffect, useRef, useState } from 'react'
 /**
  * Things worth saying, typed out one at a time in the empty box.
  *
- * The placeholder is the only place a new player finds out what this understands.
- * A single fixed example teaches one trick; rotating through them shows the
- * range — a control by name, a whole tone, a question, saving, structure — which
- * is the actual answer to "what can I say to it".
+ * These used to be a row of buttons under the input as well. Two copies of the
+ * same list, one of them a wall of grey pills sitting between the chat box and
+ * the rest of the screen — the suggestions were doing more to clutter the page
+ * than to teach anything.
+ *
+ * Rotating them through the placeholder does the teaching without taking any
+ * room, so all of them are here rather than the first six. The point is to show
+ * the range — a control by name, a whole tone, a question, saving, structure —
+ * because that is the real answer to "what can I say to it".
  */
 const SUGGESTIONS = [
   'Change gain to 7 on the amp',
@@ -39,7 +44,10 @@ const HOLD_MS = 1900
  */
 function useTypedSuggestion(active) {
   const [text, setText] = useState('')
-  const [index, setIndex] = useState(0)
+  // Start somewhere random. With the buttons gone this is the only place the
+  // suggestions appear, and always opening on the same one would make fourteen
+  // of them invisible to anyone who doesn't sit and watch.
+  const [index, setIndex] = useState(() => Math.floor(Math.random() * SUGGESTIONS.length))
   const [phase, setPhase] = useState('typing')
 
   const reduced =
@@ -76,7 +84,7 @@ function useTypedSuggestion(active) {
     return () => clearTimeout(t)
   }, [text, index, phase, active, reduced])
 
-  if (reduced) return SUGGESTIONS[0]
+  if (reduced) return SUGGESTIONS[index % SUGGESTIONS.length]
   if (!active) return SUGGESTIONS[index % SUGGESTIONS.length]
   return text
 }
@@ -184,15 +192,6 @@ export default function Assistant({ turns, onAsk, onConfirm, onCancel, busy, pro
         </button>
       </div>
 
-      {turns.length === 0 ? (
-        <div className="examples">
-          {SUGGESTIONS.slice(0, 6).map((example) => (
-            <button key={example} className="chip" onClick={() => submit(example)} disabled={busy}>
-              {example}
-            </button>
-          ))}
-        </div>
-      ) : null}
     </section>
   )
 }
