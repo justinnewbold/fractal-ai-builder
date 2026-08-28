@@ -1,0 +1,228 @@
+/**
+ * Driving the unit from somewhere that isn't the machine holding the cable.
+ *
+ * ForgeFX can act as a host agent: signed in to Supabase, it subscribes to the
+ * private channel `remote:<uid>` and executes allowlisted requests against its
+ * own local server, replying on the same channel. This is the other end of that
+ * — the phone in your hand at the far side of a stage.
+ *
+ * The channel is private and RLS-scoped to one user, so both ends must be signed
+ * in as the same person. That is the whole of the security model, and it is a
+ * good one: nobody else can join, by construction rather than by convention.
+ *
+ * Credentials live in this browser rather than in the deployed build. The app is
+ * hosted, the Supabase project is the player's own, and baking one person's
+ * project into a public bundle would be wrong even when that person is the only
+ * user.
+ */
+
+const STORE_KEY = 'fractal.remote.config'
+
+/**
+ * What the host will and won't do from a distance.
+ *
+ * ForgeFX refuses these with a 403 and it is right to: a phone on a dark stage
+ * should not be able to overwrite slot 67 or move firmware around. Naming them
+ * here lets the app say so plainly instead of surfacing a bare status code
+ * halfway through a song.
+ */
+export const REMOTE_FORBIDDEN = [
+  { match: (m, p) => m === 'POST' && p === '/preset/store', why: 'save to a slot' },
+  { match: (m, p) => p.startsWith('/preset/backup'), why: 'back up a preset' },
+  { match: (m, p) => p.startsWith('/preset/restore'), why: 'restore a preset' },
+  { match: (m, p) => p.startsWith('/backup'), why: 'back up the device' },
+  { match: (m, p) => p.startsWith('/local'), why: 'reach the library on your Mac' },
+  { match: (m, p) => p.startsWith('/ports'), why: 'change which port is used' },
+  { match: (m, p) => p.startsWith('/firmware'), why: 'touch firmware' },
+  { match: (m, p) => p.startsWith('/debug/raw'), why: 'send raw SysEx' }
+]
+
+/** Why this request can't travel, or null if it can. */
+export function forbiddenRemotely(method, path) {
+  const clean = (path.split('?')[0] || '').replace(/\/+$/, '') || '/'
+  return REMOTE_FORBIDDEN.find((r) => r.match(method.toUpperCase(), clean))?.why || null
+}
+
+export const loadRemoteConfig = () => {
+  try {
+    return JSON.parse(localStorage.getItem(STORE_KEY) || 'null')
+  } catch {
+    return null
+  }
+}
+
+export const saveRemoteConfig = (config) => {
+  if (config) localStorage.setItem(STORE_KEY, JSON.stringify(config))
+  else localStorage.removeItem(STORE_KEY)
+}
+
+let client = null
+let channel = null
+let userId = null
+const waiting = new Map()
+const listeners = new Set()
+
+export const remoteActive = () => !!channel
+
+/** Sign in to the player's own Supabase project. */
+export async function remoteSignIn({ url, anonKey, email, password }) {
+  // Loaded on demand: a realtime client is a couple of hundred KB and most
+  // sessions are local, sitting at the machine with the cable in it.
+  const { createClient } = await import('@supabase/supabase-js')
+  client = createClient(url, anonKey, { auth: { persistSession: true } })
+  const { data, error } = await client.auth.signInWithPassword({ email, password })
+  if (error) throw new Error(error.message)
+  userId = data?.user?.id
+  if (!userId) throw new Error('Signed in but Supabase returned no user id.')
+  return userId
+}
+
+/**
+ * Join the host's channel and start relaying.
+ *
+ * Presence matters: the host only bridges device events while at least one
+ * remote is watching, so joining with a presence track is what makes live
+ * updates arrive rather than an optional nicety.
+ */
+export async function remoteConnect() {
+  if (!client || !userId) throw new Error('Sign in first.')
+  if (channel) return userId
+
+  const chan = client.channel(`remote:${userId}`, {
+    config: { private: true, broadcast: { ack: false }, presence: { key: 'browser' } }
+  })
+
+  chan.on('broadcast', { event: 'res' }, ({ payload }) => {
+    const pending = payload?.id && waiting.get(payload.id)
+    if (pending) {
+      waiting.delete(payload.id)
+      pending.resolve(payload)
+    }
+  })
+
+  chan.on('broadcast', { event: 'evt' }, ({ payload }) => {
+    for (const fn of listeners) {
+      try {
+        fn(payload)
+      } catch {
+        // One bad listener shouldn't stop the others.
+      }
+    }
+  })
+
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Joining the channel timed out.')), 12000)
+    chan.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        clearTimeout(timer)
+        resolve()
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        clearTimeout(timer)
+        reject(new Error(`Realtime ${status}. Is the host signed in and enabled?`))
+      }
+    })
+  })
+
+  await chan.track({ at: Date.now() }).catch(() => {})
+  channel = chan
+  return userId
+}
+
+export async function remoteDisconnect() {
+  if (channel) {
+    try {
+      await channel.unsubscribe()
+    } catch {
+      // Leaving a channel that's already gone is not a failure.
+    }
+  }
+  channel = null
+  for (const [, pending] of waiting) pending.reject(new Error('Remote disconnected.'))
+  waiting.clear()
+}
+
+/** Device events bridged from the host, same shape as the local SSE stream. */
+export function subscribeRemoteEvents(fn) {
+  listeners.add(fn)
+  return () => listeners.delete(fn)
+}
+
+/** Decode whatever framing the host used. */
+async function decode(payload) {
+  const { body, encoding } = payload
+  if (encoding === 'utf8') return body
+
+  const bytes = Uint8Array.from(atob(body), (c) => c.charCodeAt(0))
+  if (encoding === 'base64') return bytes
+
+  // gzip: the host compresses anything over a couple of KB, which is most of
+  // the interesting payloads — catalogs, grids, block lists.
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))
+  return new Response(stream).text()
+}
+
+/**
+ * Send one request over the relay and wait for its reply.
+ *
+ * Every message carries an id because replies arrive on a shared broadcast
+ * channel with no ordering guarantee — matching on id is the only way to know
+ * which answer belongs to which question.
+ */
+export async function remoteRequest(path, options = {}) {
+  if (!channel) throw new Error('Not connected to the host.')
+  const method = (options.method || 'GET').toUpperCase()
+
+  const why = forbiddenRemotely(method, path)
+  if (why) {
+    const err = new Error(`You can't ${why} from a remote session — do that at the Mac.`)
+    err.status = 403
+    err.remoteBlocked = true
+    throw err
+  }
+
+  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+  const reply = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      waiting.delete(id)
+      reject(new Error('The host did not answer. Is ForgeFX still running?'))
+    }, 15000)
+    waiting.set(id, {
+      resolve: (v) => {
+        clearTimeout(timer)
+        resolve(v)
+      },
+      reject: (e) => {
+        clearTimeout(timer)
+        reject(e)
+      }
+    })
+  })
+
+  await channel.send({
+    type: 'broadcast',
+    event: 'req',
+    payload: { id, method, path, body: options.body ?? null }
+  })
+
+  const payload = await reply
+  const text = await decode(payload)
+
+  let parsed = null
+  if (typeof text === 'string' && text) {
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      parsed = text
+    }
+  } else if (text) {
+    parsed = text
+  }
+
+  if (payload.status >= 400) {
+    const err = new Error(parsed?.message || parsed?.error || `Host returned ${payload.status}`)
+    err.status = payload.status
+    if (payload.status === 403) err.remoteBlocked = true
+    throw err
+  }
+  return parsed
+}

@@ -10,6 +10,7 @@ import { toNormalized, fromNormalized } from '../src/lib/scale.js'
 import { isSilencingParam } from '../src/lib/guardrails.js'
 import { validateSpec, countWrites } from '../src/lib/validate.js'
 import { preferredEncoding, rememberEncoding, disambiguate } from '../src/lib/encoding.js'
+import { forbiddenRemotely } from '../src/lib/remote.js'
 import {
   patchSchemaValue,
   invalidateSchema,
@@ -443,6 +444,25 @@ test('a chain with no blocks named falls back to a default', () => {
   const r = validatePlan({ actions: [{ kind: 'buildChain', text: null, why: '' }] }, cmdBlocks, caps)
   assert.equal(r.actions.length, 1)
   assert.ok(r.actions[0].label.includes('amp'))
+})
+
+test('the relay refuses what the host refuses', () => {
+  // Mirrors ForgeFX's own allowlist so the app can explain itself rather than
+  // relaying a bare 403 mid-song.
+  assert.ok(forbiddenRemotely('POST', '/preset/store'))
+  assert.ok(forbiddenRemotely('POST', '/preset/backup'))
+  assert.ok(forbiddenRemotely('GET', '/local/presets'))
+  assert.ok(forbiddenRemotely('POST', '/ports/select'))
+})
+
+test('live performance edits travel fine', () => {
+  assert.equal(forbiddenRemotely('PUT', '/preset/blocks/58/params/17'), null)
+  assert.equal(forbiddenRemotely('POST', '/scene'), null)
+  assert.equal(forbiddenRemotely('POST', '/tempo'), null)
+  assert.equal(forbiddenRemotely('POST', '/preset/select'), null)
+  // Trailing slashes and query strings must not sneak past the check.
+  assert.ok(forbiddenRemotely('POST', '/preset/store/'))
+  assert.ok(forbiddenRemotely('GET', '/local/presets?refresh=1'))
 })
 
 console.log(`\n${passed} passed\n`)
