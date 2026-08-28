@@ -47,7 +47,8 @@ const Action = z.object({
       'loadPreset',
       'backupPreset',
       'keepInLibrary',
-      'designTone'
+      'designTone',
+      'buildChain'
     ])
     .describe('What to do.'),
   eid: z.number().int().nullable().describe('Effect id of the block, or null.'),
@@ -67,7 +68,8 @@ const Action = z.object({
     .describe(
       'For renamePreset: the name. For setChannel: A/B/C/D. For savePreset and keepInLibrary: ' +
         'an optional name to save it under. For designTone: the tone description in the ' +
-        'player own words. Null otherwise.'
+        'player own words. For buildChain: the block slugs in signal order, comma separated, ' +
+        'or null for a sensible default. Null otherwise.'
     ),
   fromRow: z.number().int().nullable().describe('Source row for moveBlock. Null otherwise.'),
   fromCol: z.number().int().nullable().describe('Source column for moveBlock. Null otherwise.'),
@@ -122,6 +124,15 @@ than the change you just made, and "put that back" refers to what you just did.
 If someone asks a question rather than requesting a change — what amp is this,
 what does that control do, is this saved — answer it in "understood" and return
 no actions. A question is not a failure, so leave "refused" empty for it.
+
+AN EMPTY PRESET
+
+A preset with no blocks has nothing to adjust. buildChain places blocks into it
+in signal order -- "build a drive, amp, cab and delay chain" is buildChain with
+those slugs, and asking for a chain without saying which blocks gets the default.
+
+You do not need to build before designing. A tone description on an empty preset
+is still just designTone; the chain gets put there first automatically.
 
 DESCRIBING A TONE IS NOT A LIST OF CHANGES
 

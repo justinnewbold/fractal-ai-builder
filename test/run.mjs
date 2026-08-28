@@ -419,4 +419,30 @@ test('a tone description is not treated as a list of changes', () => {
   assert.equal(r.actions.length, 0)
 })
 
+test('building a chain needs no confirmation and runs before edits', () => {
+  const r = validatePlan(
+    {
+      actions: [
+        { kind: 'setParam', eid: 58, paramId: 7, value: 8, why: '' },
+        { kind: 'buildChain', text: 'drive, amp, cab', why: '' }
+      ]
+    },
+    cmdBlocks,
+    caps
+  )
+  assert.deepEqual(
+    r.actions.map((a) => a.kind),
+    ['buildChain', 'setParam']
+  )
+  // Placing blocks into an empty slot destroys nothing.
+  assert.ok(!r.actions[0].destructive)
+  assert.ok(r.actions[0].label.includes('drive'))
+})
+
+test('a chain with no blocks named falls back to a default', () => {
+  const r = validatePlan({ actions: [{ kind: 'buildChain', text: null, why: '' }] }, cmdBlocks, caps)
+  assert.equal(r.actions.length, 1)
+  assert.ok(r.actions[0].label.includes('amp'))
+})
+
 console.log(`\n${passed} passed\n`)
