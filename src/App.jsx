@@ -99,6 +99,14 @@ const onAnotherDevice =
  */
 const REMOTE_BLOCKED_KINDS = new Set(['savePreset', 'backupPreset', 'keepInLibrary'])
 
+/**
+ * Kinds that leave the preset holding unsaved changes.
+ *
+ * Narrower than HAND_EDIT_KINDS: loading a preset or writing to the library
+ * tells the assistant something useful but doesn't make the edit buffer dirty.
+ */
+const UNSAVES_PRESET = new Set(['edit', 'grid', 'scene', 'cab', 'modifier', 'tempo'])
+
 const HAND_EDIT_KINDS = new Set([
   'edit',
   'scene',
@@ -174,6 +182,22 @@ export default function App() {
    */
   const record = useCallback((kind, summary, detail = [], fromAssistant = false) => {
     setLog((prev) => append(prev, newEntry(kind, summary, detail)))
+
+    /*
+     * Anything that alters the sound leaves the preset unsaved.
+     *
+     * This was set by two components out of nine. The grid editor and the hand
+     * editor — the two that change the most — never set it, so placing blocks or
+     * turning a knob left the save bar hidden and there was no way to keep the
+     * work. On an empty slot that reads as "it won't let me save", because
+     * building a chain is the only change there is.
+     *
+     * Every one of those components already reports here, so here is the place
+     * that has to know. The assistant's own writes are excluded: perform()
+     * decides that case, since a plan containing a save leaves things clean.
+     */
+    if (!fromAssistant && UNSAVES_PRESET.has(kind)) setDirty(true)
+
     if (fromAssistant || !HAND_EDIT_KINDS.has(kind)) return
     setTurns((prev) => [...prev, { role: 'system', text: summary }])
   }, [])
@@ -243,6 +267,22 @@ export default function App() {
   useEffect(() => {
     read()
   }, [read])
+
+  /*
+   * Seed the name field from whatever is loaded.
+   *
+   * It used to fall back to the preset name while displaying, which meant
+   * clearing the box put the old name straight back and there was no way to
+   * type a different one from empty. Seeding on load instead leaves the field
+   * genuinely editable — including blank, which is what an empty slot starts as
+   * and what naming a new preset needs.
+   */
+  useEffect(() => {
+    setSaveName(preset?.name?.trim() || '')
+    // Keyed on the slot alone, not the name. A generation suggests a name and
+    // the writes that follow re-read the preset; including the name here would
+    // let that read overwrite the suggestion before it could be saved.
+  }, [preset?.number])
 
   // The tuner pushes readings over SSE rather than answering requests, so the
   // subscription is what makes the button do anything visible.
@@ -745,6 +785,7 @@ export default function App() {
           }
           // Design computes against what is on the grid, so it has to see it.
           // Taken from read's return rather than state, which hasn't caught up.
+          record('grid', 'Built a chain into the empty slot')
           builtBlocks = await read()
           if (!builtBlocks?.length) {
             setTurns((prev) => [
@@ -1340,7 +1381,7 @@ export default function App() {
             <input
               type="text"
               className="name-field"
-              value={saveName || preset?.name?.trim() || ''}
+              value={saveName}
               maxLength={31}
               onChange={(e) => setSaveName(e.target.value)}
               placeholder="Preset name"
@@ -1389,9 +1430,8 @@ export default function App() {
             </div>
           ) : (
             <p className="hint design-hint">
-              Slot {preset?.number} is empty. Describe the tone you want in the chat above and a
-              chain gets placed first &mdash; or say which blocks, like &ldquo;build a drive, amp,
-              cab and delay chain&rdquo;.
+              Describe the tone you want in the chat above. What comes back is shown here, control
+              by control, before anything reaches the unit.
             </p>
           )}
 
