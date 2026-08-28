@@ -528,4 +528,40 @@ test('a name of dots cannot produce a hidden file', async () => {
   assert.ok(!written.startsWith('.'))
 })
 
+// Panel order is stored per screen and read back into whatever panels exist
+// today, so it has to survive ids appearing, vanishing and repeating.
+const sortIds = (order, ids) => [
+  ...new Set([...order.filter((x) => ids.includes(x)), ...ids.filter((x) => !order.includes(x))])
+]
+
+test('with no saved order panels keep their natural order', () => {
+  assert.deepEqual(sortIds([], ['a', 'b', 'c']), ['a', 'b', 'c'])
+})
+
+test('a saved order is applied and unknown panels follow', () => {
+  assert.deepEqual(sortIds(['c', 'a'], ['a', 'b', 'c']), ['c', 'a', 'b'])
+})
+
+test('a panel that no longer exists is ignored', () => {
+  // A unit without scenes shows fewer panels than the one that saved the order.
+  assert.deepEqual(sortIds(['gone', 'b'], ['a', 'b']), ['b', 'a'])
+})
+
+test('a repeated id cannot render a panel twice', () => {
+  // React throws on duplicate keys, and the panel would appear twice.
+  const out = sortIds(['b', 'b', 'a'], ['a', 'b'])
+  assert.equal(out.length, new Set(out).size)
+  assert.deepEqual(out, ['b', 'a'])
+})
+
+test('dropping a panel moves it without losing any', () => {
+  const drop = (sorted, dragging, target) => {
+    const next = sorted.filter((x) => x !== dragging)
+    next.splice(next.indexOf(target), 0, dragging)
+    return next
+  }
+  assert.deepEqual(drop(['a', 'b', 'c', 'd'], 'd', 'b'), ['a', 'd', 'b', 'c'])
+  assert.equal(drop(['a', 'b', 'c'], 'a', 'c').length, 3)
+})
+
 console.log(`\n${passed} passed\n`)

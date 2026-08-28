@@ -21,6 +21,7 @@ import Ports from './components/Ports'
 import LocalLibrary from './components/LocalLibrary'
 import Remote from './components/Remote'
 import Section from './components/Section'
+import SectionStack from './components/SectionStack'
 import Host from './components/Host'
 import Assistant from './components/Assistant'
 import Theme from './components/Theme'
@@ -1486,7 +1487,8 @@ export default function App() {
             <Grid preset={preset} blocks={blocks} capabilities={device?.capabilities} />
           ) : null}
 
-          <Section title="Controls" note="Every knob on every block" defaultOpen>
+          <SectionStack id="edit">
+          <Section key="controls" title="Controls" note="Every knob on every block" defaultOpen>
             <Editor
               blocks={blocks}
               onWritten={(summary, detail) => {
@@ -1497,7 +1499,7 @@ export default function App() {
             />
           </Section>
 
-          <Section title="Chain" note="Add, remove and move blocks">
+          <Section key="chain" title="Chain" note="Add, remove and move blocks">
             <GridEditor
               blocks={blocks}
               capabilities={device?.capabilities}
@@ -1511,7 +1513,7 @@ export default function App() {
           </Section>
 
           {device?.capabilities?.hasScenes !== false ? (
-            <Section title="Scenes" note="Name them and set what each one does">
+            <Section key="scenes" title="Scenes" note="Name them and set what each one does">
               <Scenes
                 blocks={blocks}
                 preset={preset}
@@ -1541,7 +1543,7 @@ export default function App() {
           ) : null}
 
           {device?.capabilities?.cabIrs !== false ? (
-            <Section title="Speaker cabinets" note="Choose the cab this amp plays through">
+            <Section key="speaker-cabinets" title="Speaker cabinets" note="Choose the cab this amp plays through">
               <CabPicker
                 blocks={blocks}
                 busy={busy}
@@ -1551,7 +1553,7 @@ export default function App() {
             </Section>
           ) : null}
 
-          <Section title="Tempo and tuner">
+          <Section key="tempo-and-tuner" title="Tempo and tuner">
             <TempoTuner
               busy={busy}
               onError={setError}
@@ -1559,7 +1561,7 @@ export default function App() {
             />
           </Section>
 
-          <Section title="Modifiers" note="Let a pedal or the volume knob move a control">
+          <Section key="modifiers" title="Modifiers" note="Let a pedal or the volume knob move a control">
             <Modifiers
               blocks={blocks}
               busy={busy}
@@ -1569,19 +1571,19 @@ export default function App() {
           </Section>
 
           {device?.capabilities?.fc?.model !== false ? (
-            <Section title="Footswitches">
+            <Section key="footswitches" title="Footswitches">
               <Footswitches onError={setError} />
             </Section>
           ) : null}
 
           {device?.capabilities?.meters?.outputLevels !== false &&
           device?.capabilities?.telemetry?.outputMeters !== false ? (
-            <Section title="Output levels">
+            <Section key="output-levels" title="Output levels">
               <Meters active={status === 'live'} />
             </Section>
           ) : null}
 
-          <Section title="Try two versions" note="Build a pair and switch between them">
+          <Section key="try-two-versions" title="Try two versions" note="Build a pair and switch between them">
             <Compare
               onCompare={buildComparison}
               state={compare}
@@ -1591,7 +1593,7 @@ export default function App() {
             />
           </Section>
 
-          <Section title="Back up this preset">
+          <Section key="back-up-this-preset" title="Back up this preset">
             <Backup
               preset={preset}
               busy={busy}
@@ -1602,6 +1604,7 @@ export default function App() {
               }}
             />
           </Section>
+          </SectionStack>
         </>
       ) : null}
 
@@ -1612,7 +1615,8 @@ export default function App() {
             setup you touch once. Saved work comes first and open; anything you
             configure and forget is folded away below it.
           */}
-          <Section title="Presets on this Mac" note="Kept as files in a folder you choose" defaultOpen>
+          <SectionStack id="library">
+          <Section key="presets-on-this-mac" title="Presets on this Mac" note="Kept as files in a folder you choose" defaultOpen>
             <LocalLibrary
               preset={preset}
               busy={busy}
@@ -1621,11 +1625,11 @@ export default function App() {
             />
           </Section>
 
-          <Section title="Tones you've made here" note="Everything designed in this app">
+          <Section key="tones-you-ve-made-here" title="Tones you've made here" note="Everything designed in this app">
             <History key={historyKey} onReload={reload} busy={busy} />
           </Section>
 
-          <Section title="Whole-unit backups" note="Every slot at once, before something goes wrong">
+          <Section key="whole-unit-backups" title="Whole-unit backups" note="Every slot at once, before something goes wrong">
             <Versions
               preset={preset}
               busy={busy}
@@ -1643,7 +1647,7 @@ export default function App() {
             />
           </Section>
 
-          <Section title="Play from your phone" note={remote ? 'Connected' : 'Leave the Mac by the amp'}>
+          <Section key="play-from-your-phone" title="Play from your phone" note={remote ? 'Connected' : 'Leave the Mac by the amp'}>
             {/* Host controls only work on the machine holding the cable — from a
                 phone these calls are refused, and a button that cannot work is
                 worse than no button. */}
@@ -1664,7 +1668,7 @@ export default function App() {
             />
           </Section>
 
-          <Section title="Connection" note="Which unit this app is talking to">
+          <Section key="connection" title="Connection" note="Which unit this app is talking to">
             <Ports
               busy={busy}
               onError={setError}
@@ -1675,13 +1679,14 @@ export default function App() {
             />
           </Section>
 
-          <Section title="What's changed this session">
+          <Section key="what-s-changed-this-session" title="What's changed this session">
             <ChangeLog log={log} onClear={() => setLog([])} />
           </Section>
 
-          <Section title="Technical details" note="For working out why something went wrong">
+          <Section key="technical-details" title="Technical details" note="For working out why something went wrong">
             <Diagnostics />
           </Section>
+          </SectionStack>
         </>
       ) : null}
 

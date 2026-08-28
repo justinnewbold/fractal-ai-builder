@@ -3474,3 +3474,77 @@ button.view-tab.gig-tab::after {
     transition: none;
   }
 }
+
+/* ---------- reorderable, resizable panels ---------- */
+
+.stack-item {
+  position: relative;
+}
+
+/* The grip is its own target rather than the whole header: a draggable summary
+   fights the click that opens it. */
+.stack-grip {
+  position: absolute;
+  top: 15px;
+  left: 3px;
+  width: 12px;
+  height: 14px;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  background-image: radial-gradient(var(--silk-faint) 1px, transparent 1px);
+  background-size: 4px 4px;
+  z-index: 3;
+}
+
+.stack-item:hover .stack-grip,
+.stack-grip:focus-visible {
+  opacity: 1;
+}
+
+.stack-grip:focus-visible {
+  outline: 1px solid var(--live);
+  outline-offset: 2px;
+}
+
+.stack-grip:active {
+  cursor: grabbing;
+}
+
+.stack-item.dragging {
+  opacity: 0.45;
+}
+
+/* Where it will land, drawn on the panel being hovered rather than as a
+   separate placeholder that would shift everything below it mid-drag. */
+.stack-item.over > .section {
+  border-top: 2px solid var(--live);
+}
+
+.section-body {
+  resize: vertical;
+  overflow: auto;
+  max-height: none;
+}
+
+.stack-reset {
+  margin-top: 10px;
+}
+
+/* No dragging on a handset. There is no room to arrange anything, the gesture
+   fights the scroll, and a panel dragged off the edge is unreachable. */
+@media (max-width: 620px) {
+  .stack-grip {
+    display: none;
+  }
+
+  .section-body {
+    resize: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stack-grip {
+    transition: none;
+  }
+}
