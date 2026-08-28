@@ -19,6 +19,27 @@
 const STORE_KEY = 'fractal.remote.config'
 
 /**
+ * The project this app relays through.
+ *
+ * Baked in rather than typed each time. The anon key is designed to be public —
+ * it identifies the project, it authorises nothing on its own, and every table
+ * and channel behind it is governed by RLS.
+ *
+ * Specifically: the realtime policy on this project allows a signed-in user to
+ * read and write only the channel `remote:<their own uid>`. So a stranger who
+ * takes this key and signs up gets a channel of their own with no host on it.
+ * They cannot see this one, and no amount of knowing the key changes that.
+ * Safety comes from the policy, not from the key being secret.
+ *
+ * Both can still be overridden, for a second project or a rotated key.
+ */
+export const DEFAULT_PROJECT = {
+  url: 'https://biznwrqeckviawjuhvyg.supabase.co',
+  anonKey:
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpem53cnFlY2t2aWF3anVodnlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MjIyNDksImV4cCI6MjEwMzQ5ODI0OX0.WT2K6kxqy5cMc1tL-Lr3JgTwwhFYY2t-NJsOXNJXgVU'
+}
+
+/**
  * What the host will and won't do from a distance.
  *
  * ForgeFX refuses these with a 403 and it is right to: a phone on a dark stage
@@ -65,11 +86,23 @@ const listeners = new Set()
 export const remoteActive = () => !!channel
 
 /** Sign in to the player's own Supabase project. */
+/** Create the account, when there isn't one yet. Same project, same policies. */
+export async function remoteSignUp({ url, anonKey, email, password }) {
+  const { createClient } = await import('@supabase/supabase-js')
+  const c = createClient(url || DEFAULT_PROJECT.url, anonKey || DEFAULT_PROJECT.anonKey)
+  const { data, error } = await c.auth.signUp({ email, password })
+  if (error) throw new Error(error.message)
+  // Confirmation may be required, in which case there is no session yet.
+  return { needsConfirmation: !data?.session, userId: data?.user?.id || null }
+}
+
 export async function remoteSignIn({ url, anonKey, email, password }) {
   // Loaded on demand: a realtime client is a couple of hundred KB and most
   // sessions are local, sitting at the machine with the cable in it.
   const { createClient } = await import('@supabase/supabase-js')
-  client = createClient(url, anonKey, { auth: { persistSession: true } })
+  client = createClient(url || DEFAULT_PROJECT.url, anonKey || DEFAULT_PROJECT.anonKey, {
+    auth: { persistSession: true }
+  })
   const { data, error } = await client.auth.signInWithPassword({ email, password })
   if (error) throw new Error(error.message)
   userId = data?.user?.id

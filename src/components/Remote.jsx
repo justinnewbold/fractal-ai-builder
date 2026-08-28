@@ -3,9 +3,11 @@ import {
   loadRemoteConfig,
   saveRemoteConfig,
   remoteSignIn,
+  remoteSignUp,
   remoteConnect,
   remoteDisconnect,
-  remoteActive
+  remoteActive,
+  DEFAULT_PROJECT
 } from '../lib/remote'
 
 /**
@@ -22,16 +24,17 @@ import {
  */
 export default function Remote({ onConnected, onError }) {
   const saved = loadRemoteConfig()
-  const [url, setUrl] = useState(saved?.url || '')
-  const [anonKey, setAnonKey] = useState(saved?.anonKey || '')
+  const [url, setUrl] = useState(saved?.url || DEFAULT_PROJECT.url)
+  const [anonKey, setAnonKey] = useState(saved?.anonKey || DEFAULT_PROJECT.anonKey)
+  const [advanced, setAdvanced] = useState(false)
   const [email, setEmail] = useState(saved?.email || '')
   const [password, setPassword] = useState('')
   const [state, setState] = useState(remoteActive() ? 'connected' : 'idle')
   const [note, setNote] = useState(null)
 
   const connect = async () => {
-    if (!url.trim() || !anonKey.trim() || !email.trim() || !password) {
-      onError('Fill in all four fields to connect.')
+    if (!email.trim() || !password) {
+      onError('Enter your email and password to connect.')
       return
     }
     setState('connecting')
@@ -50,6 +53,31 @@ export default function Remote({ onConnected, onError }) {
       setNote(`Connected as ${uid.slice(0, 8)}…`)
       setPassword('')
       onConnected(true)
+    } catch (err) {
+      setState('idle')
+      onError(err.message)
+    }
+  }
+
+  const register = async () => {
+    if (!email.trim() || !password) {
+      onError('Enter an email and password to create the account.')
+      return
+    }
+    setState('connecting')
+    try {
+      const res = await remoteSignUp({
+        url: url.trim(),
+        anonKey: anonKey.trim(),
+        email: email.trim(),
+        password
+      })
+      setState('idle')
+      setNote(
+        res.needsConfirmation
+          ? 'Account made — confirm the email Supabase just sent, then Connect.'
+          : 'Account made. Hit Connect.'
+      )
     } catch (err) {
       setState('idle')
       onError(err.message)
@@ -86,33 +114,15 @@ export default function Remote({ onConnected, onError }) {
       ) : (
         <>
           <p className="hint">
-            On the Mac: put <span className="mono">AXIS_CLOUD=1</span>,{' '}
-            <span className="mono">SUPABASE_URL</span> and{' '}
-            <span className="mono">SUPABASE_ANON_KEY</span> in{' '}
-            <span className="mono">ForgeFX/server/.env</span>, restart it, sign in and enable the
-            remote host. Then sign in here as the same user.
+            On the Mac, add these to <span className="mono">ForgeFX/server/.env</span> and restart
+            it, then sign in and enable the remote host:
           </p>
+          <pre className="mono env-block">
+{`AXIS_CLOUD=1
+SUPABASE_URL=${DEFAULT_PROJECT.url}
+SUPABASE_ANON_KEY=${DEFAULT_PROJECT.anonKey}`}
+          </pre>
 
-          <div className="save-row">
-            <input
-              type="text"
-              className="name-field"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://yourproject.supabase.co"
-              aria-label="Supabase project URL"
-            />
-          </div>
-          <div className="save-row">
-            <input
-              type="text"
-              className="name-field"
-              value={anonKey}
-              onChange={(e) => setAnonKey(e.target.value)}
-              placeholder="Supabase anon key (publishable)"
-              aria-label="Supabase anon key"
-            />
-          </div>
           <div className="save-row">
             <input
               type="email"
@@ -135,9 +145,44 @@ export default function Remote({ onConnected, onError }) {
             </button>
           </div>
 
+          <div className="history-actions">
+            <button className="chip" onClick={register} disabled={state === 'connecting'}>
+              Create the account
+            </button>
+            <button className="chip" onClick={() => setAdvanced((v) => !v)}>
+              {advanced ? 'Hide project settings' : 'Use a different project'}
+            </button>
+          </div>
+
+          {advanced ? (
+            <>
+              <div className="save-row">
+                <input
+                  type="text"
+                  className="name-field"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="https://yourproject.supabase.co"
+                  aria-label="Supabase project URL"
+                />
+              </div>
+              <div className="save-row">
+                <input
+                  type="text"
+                  className="name-field"
+                  value={anonKey}
+                  onChange={(e) => setAnonKey(e.target.value)}
+                  placeholder="Supabase anon key"
+                  aria-label="Supabase anon key"
+                />
+              </div>
+            </>
+          ) : null}
+
           <p className="hint">
-            The anon key is the publishable one and is safe here. Never put a service role key in a
-            browser.
+            The key above is the publishable one, which is why it can sit in plain sight. A
+            signed-in user can only reach their own channel, so it grants a stranger nothing.
+            Never put a service role key here.
           </p>
         </>
       )}
