@@ -90,9 +90,8 @@ export default function Host({ onError }) {
       <section className="host">
         <p className="silk-label">This Mac as the host</p>
         <p className="hint">
-          ForgeFX isn&rsquo;t running with <span className="mono">AXIS_CLOUD=1</span> yet. Add it to{' '}
-          <span className="mono">ForgeFX/server/.env</span> along with the two Supabase lines above,
-          restart ForgeFX, and this will wake up.
+          The helper app on your Mac isn&rsquo;t set up for this yet. Add the three settings shown
+          below to its <span className="mono">.env</span> file, restart it, and this will wake up.
         </p>
       </section>
     )

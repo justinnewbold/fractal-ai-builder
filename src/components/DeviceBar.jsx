@@ -47,7 +47,7 @@ export default function DeviceBar({ status, device, onRetry, busy }) {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && save()}
-            aria-label="ForgeFX address"
+            aria-label="Address of the helper app on your Mac"
           />
           <button onClick={save}>Use this address</button>
         </>

@@ -116,8 +116,8 @@ export default function Remote({ onConnected, onError }) {
             work from here.
           </p>
           <p className="hint">
-            Saving to a slot, backups and the library stay at the Mac &mdash; ForgeFX refuses those
-            from a distance on purpose, so a phone can&rsquo;t overwrite a preset mid-set.
+            Saving to a slot, backups and the library stay at the Mac &mdash; on purpose, so a
+            phone can&rsquo;t overwrite a preset in the middle of a set.
           </p>
           <div className="history-actions">
             <button className="chip" onClick={disconnect}>
@@ -128,8 +128,8 @@ export default function Remote({ onConnected, onError }) {
       ) : (
         <>
           <p className="hint">
-            On the Mac, add these to <span className="mono">ForgeFX/server/.env</span> and restart
-            it, then sign in and enable the remote host:
+            On the Mac, add these to the helper app&rsquo;s <span className="mono">.env</span> file
+            and restart it, then sign in and turn the host on:
           </p>
           <pre className="mono env-block">
 {`AXIS_CLOUD=1

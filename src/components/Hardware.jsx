@@ -98,7 +98,7 @@ export function Backup({ preset, onError, onChanged, busy }) {
       a.download = `${String(preset?.number ?? 0).padStart(3, '0')}-${safe}.syx`
       a.click()
       URL.revokeObjectURL(url)
-      onChanged(`Backed up slot ${preset?.number} as .syx`)
+      onChanged(`Backed up slot ${preset?.number} to a file`)
     } catch (err) {
       onError(err.message)
     }
@@ -110,7 +110,7 @@ export function Backup({ preset, onError, onChanged, busy }) {
     try {
       const bytes = [...new Uint8Array(await file.arrayBuffer())]
       if (bytes[0] !== 0xf0 || bytes[bytes.length - 1] !== 0xf7) {
-        throw new Error("That doesn't look like a SysEx file — it should start F0 and end F7.")
+        throw new Error("That doesn't look like a Fractal preset file.")
       }
       await loadPresetBytes(bytes)
       setNote('Loaded into the edit buffer. Play it, then save it to a slot to keep it.')
@@ -141,8 +141,8 @@ export function Backup({ preset, onError, onChanged, busy }) {
         />
       </div>
       <p className="hint">
-        This backs up the one preset you have loaded, as a .syx file on your computer. For every
-        slot at once, use the whole-device backup in Library instead.
+        Saves the preset you have loaded as a file on your computer. To back up every slot at
+        once, use the whole-unit backup in Library.
       </p>
       <p className="hint">
         A restored file lands in the edit buffer, not a slot — so you hear it before it overwrites

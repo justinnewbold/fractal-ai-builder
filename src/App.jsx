@@ -20,6 +20,7 @@ import GridEditor from './components/GridEditor'
 import Ports from './components/Ports'
 import LocalLibrary from './components/LocalLibrary'
 import Remote from './components/Remote'
+import Section from './components/Section'
 import Host from './components/Host'
 import Assistant from './components/Assistant'
 import Theme from './components/Theme'
@@ -53,8 +54,7 @@ import {
   setPresetName,
   setChannel,
   revertPreset,
-  backupPreset,
-  getHost
+  backupPreset
 } from './lib/forgefx'
 import { validateSpec, countWrites } from './lib/validate'
 import { newEntry, append } from './lib/log'
@@ -167,7 +167,6 @@ export default function App() {
   const [tuning, setTuning] = useState(null)
   const [scanProgress, setScanProgress] = useState(null)
   const stopScan = useRef(false)
-  const [editTab, setEditTab] = useState('ai')
 
   /**
    * Everything that changed, in one place.
@@ -1001,27 +1000,27 @@ export default function App() {
 
       {status === 'fault' ? (
         <div className="notice" data-kind="fault">
-          <h2>No connection</h2>
-          <p>{error}</p>
+          <h2>Can&rsquo;t reach your unit</h2>
           <p>
-            This app runs in the cloud, but your Fractal unit is on your desk &mdash; so it talks
-            to ForgeFX running locally at <code>{getHost()}</code>.
+            This app runs on the web, but your Fractal unit is on your desk &mdash; so it needs the
+            helper app running on your Mac to reach it.
           </p>
           {/* On a phone the local advice is not just unhelpful, it's wrong:
               localhost is the phone itself, and no browser choice changes that. */}
           {onAnotherDevice ? (
             <p>
-              On a phone or tablet there is nothing to fix here &mdash; <code>localhost</code> means
-              this device, and your unit is plugged into the Mac. Connect to it below instead.
+              Nothing is broken &mdash; a phone can&rsquo;t reach your unit directly, because the
+              unit is plugged into your Mac. Connect to the Mac below and you can play through it
+              from here.
             </p>
           ) : (
             <p>
-              Safari blocks a secure page from calling <code>localhost</code>. Use Chrome, or run
-              this app locally with <code>npm run dev</code>.
+              Check the helper app is running on your Mac. If you&rsquo;re using Safari, try Chrome
+              instead &mdash; Safari won&rsquo;t let a website talk to your own computer.
             </p>
           )}
           <p>
-            No unit to hand?{' '}
+            No unit plugged in?{' '}
             <button
               className="chip"
               onClick={() => {
@@ -1031,7 +1030,7 @@ export default function App() {
             >
               Try demo mode
             </button>{' '}
-            runs against a simulated FM3 built from real captured device data.
+            lets you try everything against a simulated FM3.
           </p>
         </div>
       ) : null}
@@ -1108,7 +1107,7 @@ export default function App() {
           </button>
 
           {[
-            ['console', 'Console'],
+            ['console', 'Home'],
             ['design', 'Design'],
             ['edit', 'Edit'],
             ['library', 'Library']
@@ -1265,72 +1264,9 @@ export default function App() {
                 </>
               ) : null}
 
-              <div className="edit-tabs">
-                {[
-                  ['ai', 'Design with AI'],
-                  ['fx', 'FX Edit'],
-                  ['build', 'Quick Build']
-                ].map(([id, label]) => (
-                  <button
-                    key={id}
-                    className={`edit-tab ${editTab === id ? 'current' : ''}`}
-                    onClick={() => setEditTab(id)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              {editTab === 'ai' ? (
-                <>
-                  <p className="hint">
-                    Describe the tone in the chat above &mdash; the design lands here for you to
-                    read before anything is written.
-                  </p>
-                  <Thinking message={progress} />
-                  {thinking ? (
-                    <div className="thinking" role="status" aria-live="polite">
-                      <span className="thinking-bars" aria-hidden="true">
-                        <i />
-                        <i />
-                        <i />
-                        <i />
-                      </span>
-                      <Stages active={thinking} />
-                    </div>
-                  ) : null}
-                  <LiveGeneration
-                    partial={partial}
-                    open={liveOpen}
-                    onToggle={() => setLiveOpen(!liveOpen)}
-                  />
-                  {result ? (
-                    <p className="hint">
-              Not quite it? Say what to change in the chat above.
-            </p>
-                  ) : null}
-                  <Preview
-                    result={result}
-                    writeCount={writeCount}
-                    busy={busy}
-                    onApply={apply}
-                    onDiscard={() => setResult(null)}
-                  />
-                </>
-              ) : null}
-
-              {editTab === 'build' ? (
-                <GridEditor
-                  blocks={blocks}
-                  capabilities={device?.capabilities}
-                  busy={busy}
-                  onError={setError}
-                  onChanged={(summary) => {
-                    record('grid', summary)
-                    read()
-                  }}
-                />
-              ) : null}
+              {/* The design preview and the grid builder live in Design and
+                  Edit. Duplicating them here made Home a third copy of two
+                  other screens, which is most of why this felt cluttered. */}
             </div>
 
             <Chain blocks={blocks} selected={selectedBlock} onSelect={setSelectedBlock} />
@@ -1540,161 +1476,212 @@ export default function App() {
 
       {status === 'live' && view === 'edit' ? (
         <>
+          {/*
+            Twelve panels used to stand open in one column. Everything visible
+            at once means nothing stands out, and most of these are touched once
+            a month. The chain and the controls stay open because they're what
+            you came for; the rest fold away until wanted.
+          */}
           {preset ? (
             <Grid preset={preset} blocks={blocks} capabilities={device?.capabilities} />
           ) : null}
 
-          <Scenes
-            blocks={blocks}
-            preset={preset}
-            count={device?.capabilities?.sceneCount || 8}
-            channelNames={device?.capabilities?.channelNames}
-            hasScenes={device?.capabilities?.hasScenes !== false}
-            busy={busy}
-            onChanged={(summary) => {
-              record('scene', summary)
-              read()
-            }}
-            onError={setError}
-          />
-
-          <GridEditor
-            blocks={blocks}
-            capabilities={device?.capabilities}
-            busy={busy}
-            onError={setError}
-            onChanged={(summary) => {
-              record('grid', summary)
-              read()
-            }}
-          />
-
-          <SceneMatrix
-            blocks={blocks}
-            count={device?.capabilities?.sceneCount || 8}
-            names={sceneNames}
-            busy={busy}
-            onError={setError}
-            onChanged={(summary) => {
-              record('scene', summary)
-              setDirty(true)
-            }}
-          />
-
-          <TempoTuner
-            busy={busy}
-            onError={setError}
-            onChanged={(summary) => record('tempo', summary)}
-          />
-
-          <Modifiers
-            blocks={blocks}
-            busy={busy}
-            onError={setError}
-            onChanged={(summary) => record('modifier', `Modifier bound: ${summary}`)}
-          />
-
-          <Editor
-            blocks={blocks}
-            onWritten={(summary, detail) => {
-              record('edit', summary, detail)
-              read()
-            }}
-            onError={setError}
-          />
-
-          <Compare
-            onCompare={buildComparison}
-            state={compare}
-            onClear={() => setCompare(null)}
-            busy={busy}
-            disabled={status !== 'live'}
-          />
-
-          {device?.capabilities?.cabIrs !== false ? (
-            <CabPicker
+          <Section title="Controls" note="Every knob on every block" defaultOpen>
+            <Editor
               blocks={blocks}
-            busy={busy}
-            onError={setError}
-              onChanged={(summary) => record('cab', summary)}
+              onWritten={(summary, detail) => {
+                record('edit', summary, detail)
+                read()
+              }}
+              onError={setError}
             />
+          </Section>
+
+          <Section title="Chain" note="Add, remove and move blocks">
+            <GridEditor
+              blocks={blocks}
+              capabilities={device?.capabilities}
+              busy={busy}
+              onError={setError}
+              onChanged={(summary) => {
+                record('grid', summary)
+                read()
+              }}
+            />
+          </Section>
+
+          {device?.capabilities?.hasScenes !== false ? (
+            <Section title="Scenes" note="Name them and set what each one does">
+              <Scenes
+                blocks={blocks}
+                preset={preset}
+                count={device?.capabilities?.sceneCount || 8}
+                channelNames={device?.capabilities?.channelNames}
+                hasScenes={device?.capabilities?.hasScenes !== false}
+                busy={busy}
+                onChanged={(summary) => {
+                  record('scene', summary)
+                  read()
+                }}
+                onError={setError}
+              />
+
+              <SceneMatrix
+                blocks={blocks}
+                count={device?.capabilities?.sceneCount || 8}
+                names={sceneNames}
+                busy={busy}
+                onError={setError}
+                onChanged={(summary) => {
+                  record('scene', summary)
+                  setDirty(true)
+                }}
+              />
+            </Section>
           ) : null}
 
-          <Backup
-            preset={preset}
-            busy={busy}
-            onError={setError}
-            onChanged={(summary) => {
-              record('backup', summary)
-              read()
-            }}
-          />
+          {device?.capabilities?.cabIrs !== false ? (
+            <Section title="Speaker cabinets" note="Choose the cab this amp plays through">
+              <CabPicker
+                blocks={blocks}
+                busy={busy}
+                onError={setError}
+                onChanged={(summary) => record('cab', summary)}
+              />
+            </Section>
+          ) : null}
+
+          <Section title="Tempo and tuner">
+            <TempoTuner
+              busy={busy}
+              onError={setError}
+              onChanged={(summary) => record('tempo', summary)}
+            />
+          </Section>
+
+          <Section title="Modifiers" note="Let a pedal or the volume knob move a control">
+            <Modifiers
+              blocks={blocks}
+              busy={busy}
+              onError={setError}
+              onChanged={(summary) => record('modifier', `Modifier bound: ${summary}`)}
+            />
+          </Section>
+
+          {device?.capabilities?.fc?.model !== false ? (
+            <Section title="Footswitches">
+              <Footswitches onError={setError} />
+            </Section>
+          ) : null}
 
           {device?.capabilities?.meters?.outputLevels !== false &&
           device?.capabilities?.telemetry?.outputMeters !== false ? (
-            <Meters active={status === 'live'} />
+            <Section title="Output levels">
+              <Meters active={status === 'live'} />
+            </Section>
           ) : null}
 
-          {device?.capabilities?.fc?.model !== false ? (
-            <Footswitches onError={setError} />
-          ) : null}
+          <Section title="Try two versions" note="Build a pair and switch between them">
+            <Compare
+              onCompare={buildComparison}
+              state={compare}
+              onClear={() => setCompare(null)}
+              busy={busy}
+              disabled={status !== 'live'}
+            />
+          </Section>
+
+          <Section title="Back up this preset">
+            <Backup
+              preset={preset}
+              busy={busy}
+              onError={setError}
+              onChanged={(summary) => {
+                record('backup', summary)
+                read()
+              }}
+            />
+          </Section>
         </>
       ) : null}
 
       {status === 'live' && view === 'library' ? (
         <>
-          {/* Host controls are local-only — from a phone these calls are refused,
-              and a button that cannot work is worse than no button. */}
-          {!remote ? <Host onError={setError} /> : null}
+          {/*
+            Two different things shared one screen: presets you reach for, and
+            setup you touch once. Saved work comes first and open; anything you
+            configure and forget is folded away below it.
+          */}
+          <Section title="Presets on this Mac" note="Kept as files in a folder you choose" defaultOpen>
+            <LocalLibrary
+              preset={preset}
+              busy={busy}
+              onError={setError}
+              onChanged={(summary) => record('library', summary)}
+            />
+          </Section>
 
-          <Remote
-            onConnected={(on) => {
-              setRemote(on)
-              record('remote', on ? 'Connected to the host remotely' : 'Back to the local connection')
-              // Everything about the device has to be re-read down the new path.
-              resetSchemaCache()
-              read()
-            }}
-            onError={setError}
-          />
+          <Section title="Tones you've made here" note="Everything designed in this app">
+            <History key={historyKey} onReload={reload} busy={busy} />
+          </Section>
 
-          <LocalLibrary
-            preset={preset}
-            busy={busy}
-            onError={setError}
-            onChanged={(summary) => record('library', summary)}
-          />
+          <Section title="Whole-unit backups" note="Every slot at once, before something goes wrong">
+            <Versions
+              preset={preset}
+              busy={busy}
+              onError={setError}
+              onChanged={(summary) => {
+                record('version', summary)
+                read()
+              }}
+            />
 
-          <Ports
-            busy={busy}
-            onError={setError}
-            onChanged={(summary) => {
-              record('port', summary)
-              read()
-            }}
-          />
+            <DeviceBackup
+              busy={busy}
+              onError={setError}
+              onChanged={(summary) => record('backup', summary)}
+            />
+          </Section>
 
-          <Versions
-            preset={preset}
-            busy={busy}
-            onError={setError}
-            onChanged={(summary) => {
-              record('version', summary)
-              read()
-            }}
-          />
+          <Section title="Play from your phone" note={remote ? 'Connected' : 'Leave the Mac by the amp'}>
+            {/* Host controls only work on the machine holding the cable — from a
+                phone these calls are refused, and a button that cannot work is
+                worse than no button. */}
+            {!remote ? <Host onError={setError} /> : null}
 
-          <DeviceBackup
-            busy={busy}
-            onError={setError}
-            onChanged={(summary) => record('backup', summary)}
-          />
+            <Remote
+              onConnected={(on) => {
+                setRemote(on)
+                record(
+                  'remote',
+                  on ? 'Connected to the host remotely' : 'Back to the local connection'
+                )
+                // Everything about the device has to be re-read down the new path.
+                resetSchemaCache()
+                read()
+              }}
+              onError={setError}
+            />
+          </Section>
 
-          <History key={historyKey} onReload={reload} busy={busy} />
+          <Section title="Connection" note="Which unit this app is talking to">
+            <Ports
+              busy={busy}
+              onError={setError}
+              onChanged={(summary) => {
+                record('port', summary)
+                read()
+              }}
+            />
+          </Section>
 
-          <ChangeLog log={log} onClear={() => setLog([])} />
+          <Section title="What's changed this session">
+            <ChangeLog log={log} onClear={() => setLog([])} />
+          </Section>
 
-          <Diagnostics />
+          <Section title="Technical details" note="For working out why something went wrong">
+            <Diagnostics />
+          </Section>
         </>
       ) : null}
 
