@@ -185,23 +185,8 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
         </button>
       </div>
 
-      {blocks.length ? (
-        <div className="gig-blocks">
-          {blocks.map((block) => (
-            <button
-              key={block.effectId}
-              className={`gig-block ${block.bypassed ? 'off' : 'on'}`}
-              onClick={() => toggle(block)}
-              disabled={toggling === block.effectId}
-              aria-pressed={!block.bypassed}
-            >
-              <span className="gig-block-name">{block.name || block.slug}</span>
-              <span className="gig-block-state">{block.bypassed ? 'Off' : 'On'}</span>
-            </button>
-          ))}
-        </div>
-      ) : null}
-
+      {/* Scenes lead. A scene is the bigger move and it sets every block state
+          below it, so cause sits above effect rather than under it. */}
       {hasScenes ? (
         <div className="gig-scenes">
           {Array.from({ length: sceneCount }, (_, i) => (
@@ -217,6 +202,23 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
                   fills the row with a word that carries nothing, and makes an
                   unnamed scene look identical to a named one. */}
               {names[i] ? <span className="gig-scene-name">{names[i]}</span> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {blocks.length ? (
+        <div className="gig-blocks">
+          {blocks.map((block) => (
+            <button
+              key={block.effectId}
+              className={`gig-block ${block.bypassed ? 'off' : 'on'}`}
+              onClick={() => toggle(block)}
+              disabled={toggling === block.effectId}
+              aria-pressed={!block.bypassed}
+            >
+              <span className="gig-block-name">{block.name || block.slug}</span>
+              <span className="gig-block-state">{block.bypassed ? 'Off' : 'On'}</span>
             </button>
           ))}
         </div>
