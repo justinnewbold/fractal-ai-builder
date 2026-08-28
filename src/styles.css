@@ -3337,3 +3337,18 @@ ol.action-list li.destructive::marker {
   min-width: 0;
   flex: 1 1 260px;
 }
+
+/* The .env block is meant to be copied, so it wraps rather than scrolls and
+   keeps its line breaks. */
+.env-block {
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  background: var(--panel-deep, rgba(0, 0, 0, 0.18));
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  font-size: 11.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--silk-dim);
+}
