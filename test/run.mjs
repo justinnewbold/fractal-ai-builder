@@ -10,7 +10,7 @@ import { toNormalized, fromNormalized } from '../src/lib/scale.js'
 import { isSilencingParam } from '../src/lib/guardrails.js'
 import { validateSpec, countWrites } from '../src/lib/validate.js'
 import { preferredEncoding, rememberEncoding, disambiguate } from '../src/lib/encoding.js'
-import { forbiddenRemotely, explainAuth } from '../src/lib/remote.js'
+import { forbiddenRemotely, explainAuth, timeoutFor } from '../src/lib/remote.js'
 import {
   patchSchemaValue,
   invalidateSchema,
@@ -562,6 +562,71 @@ test('dropping a panel moves it without losing any', () => {
   }
   assert.deepEqual(drop(['a', 'b', 'c', 'd'], 'd', 'b'), ['a', 'd', 'b', 'c'])
   assert.equal(drop(['a', 'b', 'c'], 'a', 'c').length, 3)
+})
+
+// The gig screen on a phone. Both failures here were silent: a read that timed
+// out looked like a preset with no blocks, and names that couldn't travel the
+// relay looked like scenes nobody had named.
+console.log('\ngig over the relay')
+
+test('a preset dump read gets longer than a scene change', () => {
+  assert.ok(timeoutFor('GET', '/preset/blocks') > timeoutFor('POST', '/scene'))
+})
+
+test('the block list read is treated as slow — it dumps the preset on an AM4', () => {
+  assert.equal(timeoutFor('GET', '/preset/blocks'), 45000)
+  assert.equal(timeoutFor('GET', '/preset/blocks?fresh=1'), 45000)
+  assert.equal(timeoutFor('GET', '/presets/97/summary'), 45000)
+})
+
+test('an ordinary write keeps the short timeout', () => {
+  assert.equal(timeoutFor('POST', '/scene'), 20000)
+  assert.equal(timeoutFor('PUT', '/preset/grid/cell'), 20000)
+})
+
+test('a block that looks slow but is a plain write is not given the long wait', () => {
+  // The bypass toggle is the one thing that has to feel instant on stage.
+  assert.equal(timeoutFor('POST', '/preset/blocks/58/bypass'), 20000)
+})
+
+test('scene names still travel to the host, which is why the phone can read them', () => {
+  // GET of a stored doc is allowed; the config PUT is on the host allowlist.
+  assert.equal(forbiddenRemotely('GET', '/store/config/scene-names-am4:97'), null)
+  assert.equal(forbiddenRemotely('PUT', '/store/config/scene-names-am4:97'), null)
+})
+
+test('the dump those names come from still does not', () => {
+  // Which is the whole reason for the host copy.
+  assert.ok(forbiddenRemotely('POST', '/preset/backup'))
+})
+
+// Cached names are keyed per unit. An AM4 and an FM3 both have a slot 97 and
+// they are not the same preset.
+const key = (model, n) => `${model}:${n}`
+
+test('two units cannot share one preset cache entry', () => {
+  assert.notEqual(key('am4', 97), key('fm3', 97))
+})
+
+// What the gig screen shows for the block row, given how the read went.
+const chainState = (state, count) =>
+  state === 'failed' ? 'explain' : state === 'reading' && !count ? 'reading' : count ? 'buttons' : 'empty'
+
+test('a failed read explains itself rather than showing nothing', () => {
+  assert.equal(chainState('failed', 0), 'explain')
+})
+
+test('a preset that genuinely has no blocks says so', () => {
+  assert.equal(chainState('ok', 0), 'empty')
+})
+
+test('blocks that arrived are just buttons', () => {
+  assert.equal(chainState('ok', 4), 'buttons')
+})
+
+test('a refresh that fails after blocks were showing still explains itself', () => {
+  // The old code cleared the row and left it looking like an empty preset.
+  assert.equal(chainState('failed', 4), 'explain')
 })
 
 console.log(`\n${passed} passed\n`)

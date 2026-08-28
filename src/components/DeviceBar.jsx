@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { getHost, setHost, isDemo, setDemo } from '../lib/forgefx'
+import { remoteActive } from '../lib/remote'
 
 export default function DeviceBar({ status, device, onRetry, busy }) {
   const [editing, setEditing] = useState(false)
@@ -12,6 +13,14 @@ export default function DeviceBar({ status, device, onRetry, busy }) {
   }
 
   const demo = isDemo()
+  /*
+   * A remote session doesn't go to the saved address, so printing it is a lie —
+   * and an expensive one. It's what makes a phone relaying through the Mac look
+   * like a phone that has somehow reached its own localhost, which sends you
+   * looking for a networking problem that isn't there.
+   */
+  const remote = remoteActive()
+  const grid = device?.capabilities?.grid
 
   const toggleDemo = () => {
     setDemo(!demo)
@@ -32,9 +41,11 @@ export default function DeviceBar({ status, device, onRetry, busy }) {
 
       {status === 'live' && device ? (
         <div className="device-meta mono">
-          gen {device.gen} · grid {device.capabilities?.grid?.rows}×
-          {device.capabilities?.grid?.cols} · {device.capabilities?.sceneCount} scenes ·{' '}
-          {device.capabilities?.presets?.count} slots
+          gen {device.gen}
+          {/* The AM4 has a four-slot chain and reports no grid. "grid ×" with
+              nothing either side of it isn't a fact about the unit. */}
+          {grid?.rows && grid?.cols ? ` · grid ${grid.rows}×${grid.cols}` : ''} ·{' '}
+          {device.capabilities?.sceneCount} scenes · {device.capabilities?.presets?.count} slots
         </div>
       ) : null}
 
@@ -53,9 +64,13 @@ export default function DeviceBar({ status, device, onRetry, busy }) {
         </>
       ) : (
         <>
-          <span className="device-meta mono">{demo ? 'simulated' : getHost()}</span>
+          <span className="device-meta mono">
+            {demo ? 'simulated' : remote ? 'remote session' : getHost()}
+          </span>
           <button onClick={toggleDemo}>{demo ? 'Use real device' : 'Demo mode'}</button>
-          {!demo ? <button onClick={() => setEditing(true)}>Change address</button> : null}
+          {!demo && !remote ? (
+            <button onClick={() => setEditing(true)}>Change address</button>
+          ) : null}
           <button onClick={onRetry} disabled={busy}>
             {busy ? 'Reading…' : 'Reconnect'}
           </button>

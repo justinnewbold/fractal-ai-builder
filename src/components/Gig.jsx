@@ -9,6 +9,7 @@ import {
   setBypass,
   subscribeEvents
 } from '../lib/forgefx'
+import { remoteActive } from '../lib/remote'
 import { EXCLUDED_BLOCKS } from '../lib/guardrails'
 
 /**
@@ -29,6 +30,15 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
   const [working, setWorking] = useState(false)
   const [blocks, setBlocks] = useState([])
   const [toggling, setToggling] = useState(null)
+  /*
+   * 'reading' | 'ok' | 'failed'.
+   *
+   * A read that fell over and a preset with nothing in it used to look the same
+   * on this screen: no buttons, no explanation. They are not the same, and the
+   * difference matters most on the one where you can't see the unit — a phone at
+   * the far side of a stage, where the read travels a relay and can time out.
+   */
+  const [chain, setChain] = useState('reading')
 
   /**
    * What's on and what's off, as the unit currently has it.
@@ -37,16 +47,21 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
    * the answer changes the moment a scene does — and it can change without this
    * app doing anything, from a footswitch or the unit's own front panel.
    */
-  const refreshBlocks = async () => {
+  const refreshBlocks = async ({ quiet = false } = {}) => {
+    if (!quiet) setChain('reading')
     try {
       const list = await presetBlocks()
       const usable = (Array.isArray(list) ? list : []).filter(
         (b) => b.slug && !EXCLUDED_BLOCKS.includes(b.slug)
       )
       setBlocks(usable)
+      setChain('ok')
     } catch {
-      // A unit that won't report its chain still gets scenes and preset steps.
+      // A unit that won't report its chain still gets scenes and preset steps —
+      // but it says so rather than showing an empty row and letting you assume
+      // the preset is empty.
       setBlocks([])
+      setChain('failed')
     }
   }
 
@@ -61,7 +76,7 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
   useEffect(() => {
     const unsubscribe = subscribeEvents((event) => {
       if (event?.type === 'scene' && typeof event.index === 'number') setSceneIndex(event.index)
-      if (event?.type === 'scene' || event?.type === 'changed') refreshBlocks()
+      if (event?.type === 'scene' || event?.type === 'changed') refreshBlocks({ quiet: true })
     })
     return unsubscribe
   }, [])
@@ -96,16 +111,28 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
     }
   }, [preset])
 
+  /*
+   * The signal bar, at a cadence the connection can afford.
+   *
+   * Twice a second is nothing over localhost. Over the relay it is a broadcast
+   * round trip every 500ms competing for the same serial port as the reads that
+   * actually matter — the block list on an AM4 is a full preset dump, and a
+   * meter poll in front of it is why that read was timing out. Meters are a
+   * nicety; the chain is the screen.
+   */
   useEffect(() => {
     let stop = false
     const tick = async () => {
-      try {
-        const data = await liveMeters()
-        if (!stop) setMeters(Array.isArray(data) ? data : data?.blocks || [])
-      } catch {
-        /* meters are a nicety here, not worth surfacing an error over */
+      const remote = remoteActive()
+      if (!(typeof document !== 'undefined' && document.hidden)) {
+        try {
+          const data = await liveMeters()
+          if (!stop) setMeters(Array.isArray(data) ? data : data?.blocks || [])
+        } catch {
+          /* meters are a nicety here, not worth surfacing an error over */
+        }
       }
-      if (!stop) setTimeout(tick, 500)
+      if (!stop) setTimeout(tick, remote ? 2000 : 500)
     }
     tick()
     return () => {
@@ -205,6 +232,30 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
             </button>
           ))}
         </div>
+      ) : null}
+
+      {/* An AM4 keeps its scene names inside a preset dump, and dumps don't
+          travel the relay. Silence there reads as "this preset has unnamed
+          scenes", which is a different and wrong thing to believe. */}
+      {hasScenes && !names.some((n) => (n || '').trim()) && remoteActive() ? (
+        <p className="gig-note">
+          Scene names aren&rsquo;t readable over a remote session. Open this preset once at the
+          Mac and they&rsquo;ll show here from then on.
+        </p>
+      ) : null}
+
+      {chain === 'failed' ? (
+        <div className="gig-note gig-note-action">
+          <span>
+            Couldn&rsquo;t read the chain{remoteActive() ? ' over the remote session' : ''}, so
+            there&rsquo;s nothing to switch here yet.
+          </span>
+          <button onClick={() => refreshBlocks()}>Try again</button>
+        </div>
+      ) : chain === 'reading' && !blocks.length ? (
+        <p className="gig-note">Reading the chain&hellip;</p>
+      ) : !blocks.length ? (
+        <p className="gig-note">Nothing switchable in this preset.</p>
       ) : null}
 
       {blocks.length ? (

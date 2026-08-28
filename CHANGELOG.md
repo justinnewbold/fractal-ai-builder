@@ -3,6 +3,26 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 5.5.1
+
+**The gig screen on a phone.** Scene names and block buttons were both missing
+over a remote session, for two unrelated reasons that looked like one.
+
+- Scene names on an AM4 live inside a preset dump, and dumps are refused over the
+  relay by design. They're now published to ForgeFX's own document store while
+  the Mac has the cable, and read back from there on the phone. The cache is
+  keyed per unit — an AM4 slot 97 and an FM3 slot 97 are different presets and
+  were sharing one entry.
+- The block list read makes an AM4 dump its whole preset over serial, which
+  outran the relay's fifteen-second timeout. Slow reads now get forty-five
+  seconds, and the meter poll drops to every two seconds when remote instead of
+  competing with them for the port twice a second.
+- A failed chain read used to render as an empty row, indistinguishable from a
+  preset with nothing in it. It now says what happened and offers to try again.
+- The device bar said `localhost:5056` during a remote session, which is where
+  the request wasn't going. It says "remote session", and no longer prints a
+  grid size for a unit that has no grid.
+
 ## 2.3.0
 
 Version and commit shown in the header, so which build is running is readable

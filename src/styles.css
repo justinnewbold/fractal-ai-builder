@@ -3620,3 +3620,26 @@ button.gig-block:disabled {
     min-height: 66px;
   }
 }
+
+/* ---------- gig: saying why something isn't there ---------- */
+
+/* An empty row with no explanation is the one thing this screen must not do.
+   Quiet enough not to compete with the buttons, present enough to read. */
+.gig-note {
+  margin-top: 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--silk-faint);
+}
+
+.gig-note-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.gig-note-action button {
+  min-height: 40px;
+  padding: 8px 16px;
+}
