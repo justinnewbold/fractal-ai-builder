@@ -20,6 +20,7 @@ import GridEditor from './components/GridEditor'
 import Ports from './components/Ports'
 import LocalLibrary from './components/LocalLibrary'
 import Remote from './components/Remote'
+import Host from './components/Host'
 import Assistant from './components/Assistant'
 import Theme from './components/Theme'
 import { validatePlan, runPlan } from './lib/actions'
@@ -1520,6 +1521,10 @@ export default function App() {
           device?.capabilities?.telemetry?.outputMeters !== false ? (
             <Meters active={status === 'live'} />
           ) : null}
+
+          {/* Host controls are local-only — from a phone these calls are refused,
+              and a button that cannot work is worse than no button. */}
+          {!remote ? <Host onError={setError} /> : null}
 
           <Remote
             onConnected={(on) => {

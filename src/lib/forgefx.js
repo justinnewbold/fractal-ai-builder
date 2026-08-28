@@ -1146,3 +1146,30 @@ export const localSync = () =>
 
 export const localRestore = () =>
   mock ? tick().then(() => ({ ok: true })) : request('/local/restore', { method: 'POST' })
+
+/**
+ * Signing the host agent in, and turning it on.
+ *
+ * These are local-only by design — they aren't on ForgeFX's remote allowlist,
+ * so they can only be driven from the machine holding the cable. They're POSTs,
+ * which means a browser address bar can't reach them, and that was the last
+ * thing in this setup that needed a terminal.
+ */
+export const cloudStatus = () =>
+  mock ? tick().then(() => ({ enabled: false, user: null })) : request('/cloud/status')
+
+export const cloudLogin = (email, password) =>
+  mock
+    ? tick().then(() => ({ user: { email } }))
+    : request('/cloud/login', { method: 'POST', body: JSON.stringify({ email, password }) })
+
+export const cloudLogout = () =>
+  mock ? tick().then(() => ({ user: null })) : request('/cloud/logout', { method: 'POST' })
+
+export const remoteStatus = () =>
+  mock ? tick().then(() => ({ enabled: false, connected: false })) : request('/remote/status')
+
+export const remoteEnable = (on) =>
+  mock
+    ? tick().then(() => ({ enabled: on, connected: on }))
+    : request('/remote/enable', { method: 'POST', body: JSON.stringify({ on }) })
