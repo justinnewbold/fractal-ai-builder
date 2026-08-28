@@ -3548,3 +3548,75 @@ button.view-tab.gig-tab::after {
     transition: none;
   }
 }
+
+/* ---------- gig: blocks you can tap ---------- */
+
+.gig-blocks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  margin-top: 18px;
+}
+
+/* Sized for a thumb on a dark stage, not a mouse. */
+button.gig-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 62px;
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--panel);
+  text-align: left;
+}
+
+.gig-block-name {
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--silk-dim);
+}
+
+.gig-block-state {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--silk-faint);
+}
+
+/* On carries the signal colour and a lit edge, so which blocks are live reads
+   at a glance without having to compare labels. */
+button.gig-block.on {
+  border-color: var(--signal);
+  background: color-mix(in srgb, var(--signal) 12%, var(--panel));
+}
+
+button.gig-block.on .gig-block-name {
+  color: var(--silk);
+}
+
+button.gig-block.on .gig-block-state {
+  color: var(--signal);
+}
+
+button.gig-block.off {
+  opacity: 0.62;
+}
+
+button.gig-block:disabled {
+  opacity: 0.4;
+}
+
+@media (max-width: 620px) {
+  .gig-blocks {
+    grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+  }
+
+  button.gig-block {
+    min-height: 66px;
+  }
+}

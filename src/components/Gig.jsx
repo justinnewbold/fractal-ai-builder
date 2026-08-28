@@ -1,5 +1,15 @@
 import { useEffect, useState } from 'react'
-import { getScene, setScene, selectPreset, liveMeters, readSceneNames } from '../lib/forgefx'
+import {
+  getScene,
+  setScene,
+  selectPreset,
+  liveMeters,
+  readSceneNames,
+  presetBlocks,
+  setBypass,
+  subscribeEvents
+} from '../lib/forgefx'
+import { EXCLUDED_BLOCKS } from '../lib/guardrails'
 
 /**
  * The stand, not the bench.
@@ -17,6 +27,44 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
   const [names, setNames] = useState([])
   const [meters, setMeters] = useState([])
   const [working, setWorking] = useState(false)
+  const [blocks, setBlocks] = useState([])
+  const [toggling, setToggling] = useState(null)
+
+  /**
+   * What's on and what's off, as the unit currently has it.
+   *
+   * Read rather than remembered. Each scene carries its own bypass states, so
+   * the answer changes the moment a scene does — and it can change without this
+   * app doing anything, from a footswitch or the unit's own front panel.
+   */
+  const refreshBlocks = async () => {
+    try {
+      const list = await presetBlocks()
+      const usable = (Array.isArray(list) ? list : []).filter(
+        (b) => b.slug && !EXCLUDED_BLOCKS.includes(b.slug)
+      )
+      setBlocks(usable)
+    } catch {
+      // A unit that won't report its chain still gets scenes and preset steps.
+      setBlocks([])
+    }
+  }
+
+  /*
+   * A scene changed by footswitch is still a scene change.
+   *
+   * On stage most switching happens on the floor, not in this app. Without
+   * this the buttons would show the states of whatever scene was last picked
+   * here, which is worse than showing nothing — it would look authoritative and
+   * be wrong.
+   */
+  useEffect(() => {
+    const unsubscribe = subscribeEvents((event) => {
+      if (event?.type === 'scene' && typeof event.index === 'number') setSceneIndex(event.index)
+      if (event?.type === 'scene' || event?.type === 'changed') refreshBlocks()
+    })
+    return unsubscribe
+  }, [])
 
   const sceneCount = capabilities?.sceneCount || 8
   const hasScenes = capabilities?.hasScenes !== false
@@ -40,6 +88,8 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
       } catch {
         if (!stop) setNames([])
       }
+
+      if (!stop) await refreshBlocks()
     })()
     return () => {
       stop = true
@@ -67,8 +117,33 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
     setSceneIndex(index) // optimistic: the footswitch feel matters more than the round trip
     try {
       await setScene(index)
+      // The new scene brings its own on/off states with it.
+      await refreshBlocks()
     } catch (err) {
       onError(err.message)
+    }
+  }
+
+  /**
+   * Turn one block on or off.
+   *
+   * Optimistic, then confirmed. On a stage the tap has to look like it worked
+   * immediately; the read that follows is what makes sure it actually did, and
+   * puts the button back if it didn't.
+   */
+  const toggle = async (block) => {
+    const eid = block.effectId
+    const wanted = !block.bypassed
+    setToggling(eid)
+    setBlocks((prev) => prev.map((b) => (b.effectId === eid ? { ...b, bypassed: wanted } : b)))
+    try {
+      await setBypass(eid, wanted)
+      await refreshBlocks()
+    } catch (err) {
+      onError(err.message)
+      await refreshBlocks()
+    } finally {
+      setToggling(null)
     }
   }
 
@@ -109,6 +184,23 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
           Next ›
         </button>
       </div>
+
+      {blocks.length ? (
+        <div className="gig-blocks">
+          {blocks.map((block) => (
+            <button
+              key={block.effectId}
+              className={`gig-block ${block.bypassed ? 'off' : 'on'}`}
+              onClick={() => toggle(block)}
+              disabled={toggling === block.effectId}
+              aria-pressed={!block.bypassed}
+            >
+              <span className="gig-block-name">{block.name || block.slug}</span>
+              <span className="gig-block-state">{block.bypassed ? 'Off' : 'On'}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {hasScenes ? (
         <div className="gig-scenes">
