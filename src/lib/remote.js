@@ -58,6 +58,32 @@ export const REMOTE_FORBIDDEN = [
   { match: (m, p) => p.startsWith('/debug/raw'), why: 'send raw SysEx' }
 ]
 
+/**
+ * How long to wait for the host, by what was asked of it.
+ *
+ * Fifteen seconds was fine for the requests that motivated it — a scene change,
+ * a parameter write, a preset select. It is not fine for a read that makes the
+ * unit dump its whole preset over serial before answering. On an AM4 the block
+ * list is exactly that read, and the relay was giving up on it mid-answer, which
+ * the gig screen then showed as a preset with no blocks in it.
+ *
+ * The cost of waiting longer is only ever waiting longer. The cost of giving up
+ * early is being told something false about the unit.
+ */
+const SLOW_READS = [
+  /^\/preset\/blocks$/,
+  /^\/preset\/blocks\/\d+\/(params|raw|cab)$/,
+  /^\/preset\/grid$/,
+  /^\/presets\/\d+(\/|$)/,
+  /^\/preset\/locations$/,
+  /^\/device\/cache/
+]
+
+export function timeoutFor(method, path) {
+  const clean = (path.split('?')[0] || '').replace(/\/+$/, '') || '/'
+  return SLOW_READS.some((re) => re.test(clean)) ? 45000 : 20000
+}
+
 /** Why this request can't travel, or null if it can. */
 export function forbiddenRemotely(method, path) {
   const clean = (path.split('?')[0] || '').replace(/\/+$/, '') || '/'
@@ -324,7 +350,7 @@ export async function remoteRequest(path, options = {}) {
     const timer = setTimeout(() => {
       waiting.delete(id)
       reject(new Error('The host did not answer. Is ForgeFX still running?'))
-    }, 15000)
+    }, timeoutFor(method, path))
     waiting.set(id, {
       resolve: (v) => {
         clearTimeout(timer)

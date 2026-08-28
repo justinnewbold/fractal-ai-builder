@@ -118,8 +118,72 @@ async function request(path, options = {}) {
 /** Liveness plus the model ForgeFX thinks is attached. */
 export const health = async () => (mock ? (await tick(), mock.healthz()) : request('/healthz'))
 
+/**
+ * Which unit is on the other end, as a key.
+ *
+ * Two units share one slot numbering. An AM4 and an FM3 both have a slot 97 and
+ * they are not the same preset, so anything cached per preset has to be told
+ * them apart or the FM3's scene names turn up on the AM4.
+ */
+let deviceSlug = 'device'
+
+export const currentDeviceSlug = () => deviceSlug
+
 /** Full capability report: grid size, scene count, preset count, what writes are allowed. */
-export const detect = async () => (mock ? (await tick(), mock.detect()) : request('/device/detect'))
+export const detect = async () => {
+  const res = mock ? (await tick(), mock.detect()) : await request('/device/detect')
+  const label = res?.short || res?.name
+  if (label) deviceSlug = String(label).toLowerCase().replace(/[^a-z0-9]/g, '') || 'device'
+  return res
+}
+
+/**
+ * Small documents the host holds on behalf of every browser that talks to it.
+ *
+ * localStorage is per-browser by definition, which is exactly the wrong shape
+ * for something the Mac learns and the phone needs. ForgeFX already keeps a
+ * document store for app config, it survives restarts, and writes to its config
+ * collection are one of the few things allowed over the remote relay — so both
+ * ends of a gig can read and write it.
+ *
+ * Never load-bearing. Every caller treats a miss as "not known yet", because a
+ * host that has never been written to returns 404 and that is normal.
+ */
+export async function readHostDoc(id) {
+  if (mock) return null
+  try {
+    const doc = await request(`/store/config/${encodeURIComponent(id)}`)
+    return doc?.data ?? null
+  } catch {
+    return null
+  }
+}
+
+export async function deleteHostDoc(id) {
+  if (mock) return false
+  try {
+    await request(`/store/config/${encodeURIComponent(id)}`, { method: 'DELETE' })
+    return true
+  } catch {
+    // Deletes don't travel the relay, and a doc that was never written is
+    // already in the state we wanted.
+    return false
+  }
+}
+
+export async function writeHostDoc(id, data) {
+  if (mock) return false
+  try {
+    await request(`/store/config/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ data, origin: 'fractal' })
+    })
+    return true
+  } catch {
+    // Read-only or unreachable host: the local cache still works, for this browser.
+    return false
+  }
+}
 
 /** The preset currently loaded on the unit. */
 export const currentPreset = async () => (mock ? (await tick(), mock.preset()) : request('/preset'))
@@ -963,23 +1027,30 @@ export async function scanAllPresets(total, onProgress, shouldStop) {
  */
 const SCENE_NAME_CACHE = 'fractal.sceneNames'
 
+/** Cache key for one preset on one unit. Slot 97 on an AM4 is not slot 97 on an FM3. */
+export const sceneNameKey = (number) => `${currentDeviceSlug()}:${number}`
+
 /** Names last read for a preset, so a session that can't read them still shows them. */
 function rememberSceneNames(number, names) {
   if (typeof number !== 'number' || !names?.some((n) => n)) return
   try {
     const all = JSON.parse(localStorage.getItem(SCENE_NAME_CACHE) || '{}')
-    all[number] = names
+    all[sceneNameKey(number)] = names
     localStorage.setItem(SCENE_NAME_CACHE, JSON.stringify(all))
   } catch {
     // A full or disabled localStorage costs us a nicety, nothing more.
   }
+  // And on the host, where the phone can reach them. Deliberately not awaited:
+  // nothing on screen should wait on a write that only helps a later session.
+  writeHostDoc(`scene-names-${sceneNameKey(number)}`, names)
 }
 
 function recallSceneNames(number) {
   if (typeof number !== 'number') return []
   try {
     const all = JSON.parse(localStorage.getItem(SCENE_NAME_CACHE) || '{}')
-    return Array.isArray(all[number]) ? all[number] : []
+    const hit = all[sceneNameKey(number)]
+    return Array.isArray(hit) ? hit : []
   } catch {
     return []
   }
@@ -997,9 +1068,12 @@ function recallSceneNames(number) {
  * genuinely unreachable — which is exactly the situation where they matter most,
  * standing on a stage looking for "Lead" rather than "3".
  *
- * So whenever they are readable they're kept, keyed by preset. A remote session
- * then shows what the last local one learned. Renaming a scene overwrites the
- * entry, so a stale name can't outlive the thing it named.
+ * So whenever they are readable they're kept — in this browser, and on the host
+ * itself. The host copy is the one that matters on stage: the Mac learns the
+ * names while the cable is in, and the phone reads them back over the relay,
+ * which is the only reason an AM4 shows "Lead" rather than "3" from the floor.
+ *
+ * Renaming a scene clears both, so a stale name can't outlive the thing it named.
  */
 export async function readSceneNames(number) {
   if (mock) {
@@ -1033,19 +1107,47 @@ export async function readSceneNames(number) {
     // Blocked remotely, or the device has no dump to give.
   }
 
-  return recallSceneNames(number)
+  // Nothing readable from the unit. What did a session that could read them keep?
+  const local = recallSceneNames(number)
+  if (local.some((n) => (n || '').trim())) return local
+
+  if (typeof number === 'number') {
+    const held = await readHostDoc(`scene-names-${sceneNameKey(number)}`)
+    if (Array.isArray(held) && held.some((n) => (n || '').trim())) {
+      const clean = held.map((n) => (n || '').trim())
+      // Keep it locally too, so the next preset change doesn't need the round trip.
+      try {
+        const all = JSON.parse(localStorage.getItem(SCENE_NAME_CACHE) || '{}')
+        all[sceneNameKey(number)] = clean
+        localStorage.setItem(SCENE_NAME_CACHE, JSON.stringify(all))
+      } catch {
+        // Nicety only.
+      }
+      return clean
+    }
+  }
+
+  return local
 }
 
-/** Drop cached names for a preset — call after renaming a scene. */
+/**
+ * Drop cached names for a preset — call after renaming a scene.
+ *
+ * Both copies. Leaving the host copy behind would be worse than having no cache
+ * at all: the phone would keep showing the old name for a scene that no longer
+ * has it, and look authoritative doing it.
+ */
 export function forgetSceneNames(number) {
   if (typeof number !== 'number') return
   try {
     const all = JSON.parse(localStorage.getItem(SCENE_NAME_CACHE) || '{}')
-    delete all[number]
+    delete all[sceneNameKey(number)]
+    delete all[number] // entries from before the cache was keyed by device
     localStorage.setItem(SCENE_NAME_CACHE, JSON.stringify(all))
   } catch {
     // Nothing to clean up if it was never written.
   }
+  deleteHostDoc(`scene-names-${sceneNameKey(number)}`)
 }
 
 
