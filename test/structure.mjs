@@ -178,6 +178,22 @@ export function run(test) {
     assert.ok(src.includes('const landed = (builtBlocks || []).filter'), 'the read-back guard lost its filter')
   })
 
+  test('a fresh chain is designed against, never refined against', () => {
+    // The lingering-spec path: a failed attempt stores its spec, the next ask
+    // builds a chain, then refine runs against state that predates the build
+    // and reports "No blocks were read from the device" while the chain sits
+    // there, built and invisible.
+    const at = src.indexOf('if (builtBlocks) {')
+    assert.notEqual(at, -1, 'the build handoff no longer branches on builtBlocks')
+    const window = src.slice(at, at + 400)
+    assert.ok(window.includes('setResult(null)'), 'a stale spec survives the chain build')
+    assert.ok(window.includes('await generate('), 'a built chain must go to generate')
+    assert.ok(
+      src.indexOf('await refine(') > at,
+      'refine must only be reachable when nothing was built'
+    )
+  })
+
   test('the error banner is outside every view', () => {
     // It lived inside Design, so a failure in Library or Edit set the message
     // and rendered nothing. Silence reads as a dead button.

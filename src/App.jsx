@@ -341,6 +341,12 @@ export default function App() {
         { force: true }
       )
 
+      if (!schema.length) {
+        throw new Error(
+          'Nothing to design against — this preset has no editable blocks. Ask again and a chain will be built first.'
+        )
+      }
+
       setProgress(null)
       const spec = await requestSpec(schema, description)
 
@@ -581,7 +587,7 @@ export default function App() {
    * Sends the previous spec as the subject rather than a fresh brief, so the
    * model moves one thing instead of redesigning around a new sentence.
    */
-  const refine = async (instruction) => {
+  const refine = async (instruction, against = null) => {
     const previous = result?.spec
     if (!previous) return
 
@@ -590,12 +596,21 @@ export default function App() {
     try {
       setProgress('Reading what the unit has loaded...')
       const schema = await readSchema(
-        blocks,
+        against || blocks,
         (done, total, name) => setProgress(`Reading ${name} - ${done} of ${total}`),
         // Designing or rebuilding a whole preset starts from the unit, not from
         // what we last wrote to it.
         { force: true }
       )
+
+      if (!schema.length) {
+        // The generic server refusal for an empty schema reads like a device
+        // fault. This is not one: the preset simply has nothing editable to
+        // adjust, and saying so keeps the person off a debugging goose chase.
+        throw new Error(
+          'Nothing here to refine — this preset has no editable blocks. Ask for a tone and a chain will be built first.'
+        )
+      }
 
       setProgress(null)
       const spec = await requestSpec(schema, instruction, previous)
@@ -849,7 +864,7 @@ export default function App() {
           // Design computes against what is on the grid, so it has to see it.
           // Taken from read's return rather than state, which hasn't caught up.
           record('grid', 'Built a chain into the empty slot')
-          builtBlocks = await read()
+          builtBlocks = (await read()) || []
           // The same raw-count trap as above: input and output rows would pass
           // this guard even if placement wrote nothing. Count what's editable.
           const landed = (builtBlocks || []).filter((b) => !EXCLUDED_BLOCKS.includes(b.slug))
@@ -878,8 +893,26 @@ export default function App() {
         // rather than starting over: "warmer" means warmer than the thing you
         // are looking at, and redesigning from scratch would throw away
         // everything else about it.
-        if (result?.spec) await refine(design.text || instruction)
-        else await generate(design.text || instruction, builtBlocks)
+        /*
+         * A chain that was just built has no history to refine. The lingering
+         * spec that sent us to refine here belonged to whatever was loaded
+         * before — including a failed attempt, which stores its spec too — and
+         * refine reads its schema from state that hasn't caught up with the
+         * build. That exact combination turned a successful chain build into
+         * "No blocks were read from the device": the chain landed, then a
+         * stale spec was refined against a stale empty schema, and the error
+         * buried the success.
+         */
+        if (builtBlocks) {
+          setResult(null)
+          await generate(design.text || instruction, builtBlocks)
+        } else if (result?.changes?.length) {
+          // Refining means adjusting a design that produced something. A spec
+          // whose every change was rejected is not a thing to build on.
+          await refine(design.text || instruction)
+        } else {
+          await generate(design.text || instruction, builtBlocks)
+        }
         return
       }
 
