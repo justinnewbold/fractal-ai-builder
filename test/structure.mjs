@@ -166,6 +166,18 @@ export function run(test) {
     }
   })
 
+  test('emptiness is judged on editable blocks, not raw count', () => {
+    // An empty AM4 slot still reports input and output rows. Both hardware
+    // failures of the chain builder were this gap wearing different errors:
+    // "two blocks" skipped the build, then the schema filtered both out and
+    // sent the generator nothing.
+    const at = src.indexOf('const editableBlocks = blocks.filter')
+    assert.notEqual(at, -1, 'the editable filter is gone')
+    const guard = src.indexOf('if (editableBlocks.length === 0)')
+    assert.notEqual(guard, -1, 'the build trigger no longer counts editable blocks')
+    assert.ok(src.includes('const landed = (builtBlocks || []).filter'), 'the read-back guard lost its filter')
+  })
+
   test('the error banner is outside every view', () => {
     // It lived inside Design, so a failure in Library or Edit set the message
     // and rendered nothing. Silence reads as a dead button.

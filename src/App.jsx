@@ -61,6 +61,7 @@ import {
 import { validateSpec, countWrites } from './lib/validate'
 import { newEntry, append } from './lib/log'
 import { VERSION } from './lib/version'
+import { EXCLUDED_BLOCKS } from './lib/guardrails'
 
 import { blockCatalog } from './lib/forgefx'
 
@@ -790,7 +791,17 @@ export default function App() {
          * of it. Ask for a tone on an empty preset and the chain gets built
          * first, because that is plainly what you meant.
          */
-        if (blocks.length === 0) {
+        /*
+         * Empty means nothing you can edit — not nothing at all.
+         *
+         * An empty AM4 slot still reports its input and output rows, so the
+         * raw count said "two blocks", the chain build was skipped as
+         * unnecessary, and the schema then filtered those two rows out and
+         * sent the generator nothing. Both hardware failures so far were this
+         * one gap wearing different errors.
+         */
+        const editableBlocks = blocks.filter((b) => !EXCLUDED_BLOCKS.includes(b.slug))
+        if (editableBlocks.length === 0) {
           /*
            * A verbatim copy of the slot before the first structural write.
            *
@@ -837,19 +848,22 @@ export default function App() {
           // Taken from read's return rather than state, which hasn't caught up.
           record('grid', 'Built a chain into the empty slot')
           builtBlocks = await read()
+          // The same raw-count trap as above: input and output rows would pass
+          // this guard even if placement wrote nothing. Count what's editable.
+          const landed = (builtBlocks || []).filter((b) => !EXCLUDED_BLOCKS.includes(b.slug))
           // Say what landed, ids included. When the generation then references
           // ids the preset doesn't hold, this line is the other half of the
           // diagnosis, already on screen.
-          if (builtBlocks?.length) {
+          if (landed.length) {
             setTurns((prev) => [
               ...prev,
               {
                 role: 'system',
-                text: `Chain in: ${builtBlocks.map((b) => `${b.name || b.slug} (${b.effectId})`).join(', ')}`
+                text: `Chain in: ${landed.map((b) => `${b.name || b.slug} (${b.effectId})`).join(', ')}`
               }
             ])
           }
-          if (!builtBlocks?.length) {
+          if (!landed.length) {
             setTurns((prev) => [
               ...prev,
               { role: 'assistant', text: 'The chain went in but the unit reports nothing on the grid.' }
