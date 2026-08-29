@@ -3822,3 +3822,16 @@ button.gig-block:disabled {
     margin-left: 0;
   }
 }
+
+/* The assistant's working area: previews, progress and results render as part
+   of the conversation, and this seam is what makes them read as a reply rather
+   than a floating panel that happens to be nearby. */
+.turn.turn-result {
+  border-left: 2px solid var(--rule);
+  padding-left: 12px;
+  margin-top: 10px;
+}
+
+.turn.turn-result:empty {
+  display: none;
+}

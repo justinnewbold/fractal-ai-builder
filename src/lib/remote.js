@@ -47,13 +47,57 @@ export const DEFAULT_PROJECT = {
  * here lets the app say so plainly instead of surfacing a bare status code
  * halfway through a song.
  */
+/**
+ * A verbatim port of the host's own rule — ForgeFX server/src/remote.ts,
+ * remoteAllowed(). Keep the two in lockstep, character for character where the
+ * shapes allow.
+ *
+ * This used to be a hand-written list of notable blocks, and it drifted in both
+ * directions. It blocked GETs the host happily serves (the backup list, the
+ * port list — needlessly dead panels on the phone), and it allowed writes the
+ * host refuses (renames, version restores, cache deletes — which then failed as
+ * raw relay errors instead of the friendly refusal this list exists to give).
+ * Eight routes disagreed with the server by the time anyone compared them. A
+ * port of the real function cannot disagree about anything.
+ */
+function hostAllows(method, p) {
+  if (method === 'GET') return !p.startsWith('/cloud') && !p.startsWith('/remote') && p !== '/debug/raw'
+  if (method === 'PUT')
+    return (
+      /^\/preset\/blocks\/\d+\/params(\/\d+)?$/.test(p) ||
+      /^\/preset\/grid\/cell$/.test(p) ||
+      /^\/am4\/param$/.test(p) ||
+      /^\/device\/param$/.test(p) ||
+      p === '/telemetry/config' ||
+      /^\/store\/config\/[^/]+$/.test(p)
+    )
+  if (method === 'POST')
+    return (
+      /^\/preset\/blocks\/\d+\/(bypass|channel|type|read|readrange)$/.test(p) ||
+      p === '/preset/meters' ||
+      p === '/preset/select' ||
+      p === '/preset/grid/cable' ||
+      p === '/preset/grid/select' ||
+      p === '/scene' ||
+      p === '/tempo' ||
+      p === '/tempo/tap' ||
+      p === '/tuner' ||
+      p === '/mod/bind' ||
+      /^\/am4\/(bypass|scene|preset)$/.test(p)
+    )
+  return false
+}
+
+/** Friendly phrasings for the refusals people will actually hit. */
 export const REMOTE_FORBIDDEN = [
   { match: (m, p) => m === 'POST' && p === '/preset/store', why: 'save to a slot' },
   { match: (m, p) => p.startsWith('/preset/backup'), why: 'back up a preset' },
   { match: (m, p) => p.startsWith('/preset/restore'), why: 'restore a preset' },
   { match: (m, p) => p.startsWith('/backup'), why: 'back up the device' },
+  { match: (m, p) => p.startsWith('/version'), why: 'load or restore a version' },
+  { match: (m, p) => p === '/preset/name' || p === '/scene/name', why: 'rename anything' },
   { match: (m, p) => p.startsWith('/local'), why: 'reach the library on your Mac' },
-  { match: (m, p) => p.startsWith('/ports'), why: 'change which port is used' },
+  { match: (m, p) => m !== 'GET' && p.startsWith('/ports'), why: 'change which port is used' },
   { match: (m, p) => p.startsWith('/firmware'), why: 'touch firmware' },
   { match: (m, p) => p.startsWith('/debug/raw'), why: 'send raw SysEx' }
 ]
@@ -87,7 +131,13 @@ export function timeoutFor(method, path) {
 /** Why this request can't travel, or null if it can. */
 export function forbiddenRemotely(method, path) {
   const clean = (path.split('?')[0] || '').replace(/\/+$/, '') || '/'
-  return REMOTE_FORBIDDEN.find((r) => r.match(method.toUpperCase(), clean))?.why || null
+  const m = method.toUpperCase()
+  if (hostAllows(m, clean)) return null
+  // The host will refuse it; say why in words if we have them.
+  return (
+    REMOTE_FORBIDDEN.find((r) => r.match(m, clean))?.why ||
+    'do that from a distance — it only works at the Mac'
+  )
 }
 
 export const loadRemoteConfig = () => {

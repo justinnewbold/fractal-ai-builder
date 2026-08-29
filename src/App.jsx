@@ -1155,13 +1155,12 @@ export default function App() {
                 <i />
                 <i />
               </span>
-              <Stages partial={partial} />
+              <Stages active={thinking} />
             </div>
           ) : null}
 
           <LiveGeneration
             partial={partial}
-            active={thinking}
             open={liveOpen}
             onToggle={() => setLiveOpen(!liveOpen)}
           />

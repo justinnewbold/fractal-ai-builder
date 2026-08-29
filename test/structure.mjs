@@ -84,17 +84,72 @@ function declaredProps(component) {
 
 export function run(test) {
   test('call sites only pass props the component has', () => {
-    for (const name of ['Cost', 'Preview', 'StatusLine', 'Section', 'Gig', 'LocalLibrary']) {
-      const declared = declaredProps(name)
-      if (!declared) continue
-      const props = tag(src, name)
-      if (!props) continue
-      const passed = [...props.matchAll(/(\w+)=\{/g)].map((m) => m[1])
-      for (const prop of passed) {
-        assert.ok(
-          declared.includes(prop) || prop === 'key',
-          `<${name}> is passed "${prop}", which it does not accept`
-        )
+    // Every component, every caller — including components calling components.
+    // The six-name version of this check missed <Stages partial={...} /> when
+    // Stages takes active: rendered fine, sat frozen forever.
+    const dir = new URL('../src/components/', import.meta.url)
+    const files = readdirSync(dir).filter((f) => f.endsWith('.jsx'))
+    const bodies = Object.fromEntries(files.map((f) => [f, readFileSync(new URL(f, dir), 'utf8')]))
+
+    /*
+     * Signatures per file, resolved local-first.
+     *
+     * Two files can declare components with the same name — Grid.jsx has a
+     * private Chain that takes different props from Console.jsx's exported
+     * Chain — and a flat name-to-signature map picks whichever file happened to
+     * parse last. That false positive nearly caused a real bug: acting on it
+     * removed a prop the local component genuinely declares.
+     */
+    const perFile = {}
+    const everywhere = {}
+    for (const [file, body] of Object.entries(bodies)) {
+      perFile[file] = {}
+      for (const m of body.matchAll(
+        /(?:export default |export )?function ([A-Z]\w+)\s*\(\s*\{([^}]*)\}/gs
+      )) {
+        const props = m[2]
+          .split(',')
+          .map((x) => x.split(/[=:]/)[0].trim())
+          .filter((x) => /^\w+$/.test(x))
+        perFile[file][m[1]] = props
+        everywhere[m[1]] = [...new Set([...(everywhere[m[1]] || []), ...props])]
+      }
+    }
+
+    const callers = { 'App.jsx': src, ...bodies }
+    for (const [caller, body] of Object.entries(callers)) {
+      for (const name of Object.keys(everywhere)) {
+        // The component defined in the caller's own file wins; otherwise the
+        // union of every declaration, which cannot produce a false failure.
+        const props = perFile[caller]?.[name] || everywhere[name]
+        // Skip a component's own definition file matching its wrapper usage.
+        let from = 0
+        for (;;) {
+          const at = body.indexOf('<' + name, from)
+          if (at === -1) break
+          const boundary = body[at + name.length + 1]
+          if (boundary && /[\w-]/.test(boundary)) {
+            from = at + 1
+            continue
+          }
+          let i = at + name.length + 1
+          let depth = 0
+          while (i < body.length) {
+            const ch = body[i]
+            if (ch === '{') depth++
+            else if (ch === '}') depth--
+            else if (ch === '>' && depth === 0) break
+            i++
+          }
+          const passed = [...body.slice(at, i).matchAll(/(\w+)=/g)].map((m) => m[1])
+          for (const prop of passed) {
+            assert.ok(
+              props.includes(prop) || prop === 'key' || prop === 'children',
+              `${caller}: <${name}> is passed "${prop}", which it does not accept`
+            )
+          }
+          from = i
+        }
       }
     }
   })
