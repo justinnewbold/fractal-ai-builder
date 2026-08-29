@@ -60,6 +60,7 @@ import {
 } from './lib/forgefx'
 import { validateSpec, countWrites } from './lib/validate'
 import { newEntry, append } from './lib/log'
+import { VERSION } from './lib/version'
 
 import { blockCatalog } from './lib/forgefx'
 
@@ -1056,6 +1057,11 @@ export default function App() {
         */}
         <div className="build-badge">
           <Theme />
+          {/* The one piece of "chrome" that earned its place back: the version
+              is how a deploy is confirmed after every change, and burying it
+              three taps deep in Technical details broke that habit. Just the
+              number — the phase, hash and build stamp stay buried. */}
+          <span className="version mono">v{VERSION}</span>
         </div>
       </header>
 
@@ -1276,9 +1282,11 @@ export default function App() {
             <span className="lamp" data-state={isDemo() ? 'demo' : 'live'} />
             <span className="device-name">{device?.short || device?.name}</span>
             <span className="device-meta mono">
+              {/* "Slots" already means presets one panel up — the same word for
+                  chain positions read as a contradiction (104 slots vs 4). */}
               gen {device?.gen} · {device?.capabilities?.slotModel === 'linear'
-                ? `${device?.capabilities?.slotCount} slots`
-                : `${device?.capabilities?.grid?.rows}×${device?.capabilities?.grid?.cols}`}
+                ? `${device?.capabilities?.slotCount}-block chain`
+                : `${device?.capabilities?.grid?.rows}×${device?.capabilities?.grid?.cols} grid`}
             </span>
 
             <div className="strip-right">
