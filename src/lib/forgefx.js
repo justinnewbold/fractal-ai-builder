@@ -778,6 +778,20 @@ export async function versionBytes(id) {
   return new Uint8Array(await res.arrayBuffer())
 }
 
+/**
+ * What a preset file actually holds, without loading any of it.
+ *
+ * The host decodes offline — no transport touched — and dispatches on the
+ * model byte, so an AM4 dump decodes even while an FM3 is the attached unit.
+ * A file can hold a whole bank; the answer is per-preset: name, slot, scene
+ * names where the format carries them, and whether the checksum still agrees
+ * with the bytes.
+ */
+export const decodePresetFile = (bytes) =>
+  mock
+    ? tick().then(() => ({ model: 'demo', count: 1, presets: [{ name: 'Demo preset', location: 0 }] }))
+    : request('/preset/decode', { method: 'POST', body: JSON.stringify({ bytes: Array.from(bytes) }) })
+
 /** Modifier slots and the sources that can drive them. */
 export const modifierModel = () => (mock ? tick().then(() => mock.modModel()) : request('/mod/model'))
 
