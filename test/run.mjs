@@ -852,6 +852,16 @@ test('every block colour is real CSS', async () => {
   }
 })
 
+test('display-name shapes resolve to their family', async () => {
+  // Axis's category map showed which shapes actually arrive: spaces, hyphens,
+  // slashes, instance numbers.
+  const { blockColor } = await import('../src/lib/blockColors.js')
+  assert.deepEqual(blockColor('Plex Delay'), blockColor('plex'))
+  assert.deepEqual(blockColor('Ten-Tap'), blockColor('tentap'))
+  assert.deepEqual(blockColor('Vol/Pan'), blockColor('volpan'))
+  assert.deepEqual(blockColor('RingMod'), blockColor('ringmod'))
+})
+
 test('instance suffixes and unknowns resolve sensibly', async () => {
   const { blockColor } = await import('../src/lib/blockColors.js')
   assert.deepEqual(blockColor('delay2'), blockColor('delay'))

@@ -40,6 +40,7 @@ const APPROXIMATE = {
   multitap: { fill: '#2a7f9c', ink: '#ffffff' },
   megatap: { fill: '#2a7f9c', ink: '#ffffff' },
   plex: { fill: '#2a7f9c', ink: '#ffffff' },
+  plexdelay: { fill: '#2a7f9c', ink: '#ffffff' },
   gate: { fill: '#6f7480', ink: '#ffffff' },
   ingate: { fill: '#6f7480', ink: '#ffffff' },
   volume: { fill: '#6f7480', ink: '#ffffff' },
@@ -48,7 +49,25 @@ const APPROXIMATE = {
   looper: { fill: '#6f7480', ink: '#ffffff' },
   enhancer: { fill: '#4a8f7a', ink: '#ffffff' },
   input: { fill: '#555b66', ink: '#ffffff' },
-  output: { fill: '#555b66', ink: '#ffffff' }
+  output: { fill: '#555b66', ink: '#ffffff' },
+
+  /*
+   * Families learned from Axis's category map — its coverage, not its colours.
+   * Axis paints by its own design language (an orange amp, one hue for all of
+   * time), which is a choice for their app and the wrong one for this one: the
+   * brief here is to agree with the unit's screen. So these take the hue of the
+   * family Axis groups them with, in our palette.
+   */
+  ringmod: { fill: '#4a5fb8', ink: '#ffffff' },
+  formant: { fill: '#4a5fb8', ink: '#ffffff' },
+  multicomp: { fill: '#2f8f8f', ink: '#ffffff' },
+  crossover: { fill: '#2f8f8f', ink: '#ffffff' },
+  tentap: { fill: '#2a7f9c', ink: '#ffffff' },
+  resonator: { fill: '#2a7f9c', ink: '#ffffff' },
+  send: { fill: '#555b66', ink: '#ffffff' },
+  return: { fill: '#555b66', ink: '#ffffff' },
+  multiplexer: { fill: '#555b66', ink: '#ffffff' },
+  shunt: { fill: '#555b66', ink: '#ffffff' }
 }
 
 const FAMILIES = { ...APPROXIMATE, ...VERIFIED }
@@ -62,5 +81,9 @@ export function blockColor(slug) {
   if (FAMILIES[key]) return FAMILIES[key]
   // Slugs sometimes carry an instance suffix — delay2, drive1.
   const bare = key.replace(/\d+$/, '')
-  return FAMILIES[bare] || NEUTRAL
+  if (FAMILIES[bare]) return FAMILIES[bare]
+  // Display names arrive with spaces, hyphens and slashes — "Plex Delay",
+  // "Ten-Tap", "Vol/Pan" — a normalisation Axis's map taught us to expect.
+  const squeezed = bare.replace(/[^a-z]/g, '')
+  return FAMILIES[squeezed] || NEUTRAL
 }
