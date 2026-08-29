@@ -38,7 +38,7 @@ import {
   cachedPresetNames,
   readSceneNames
 } from './lib/forgefx'
-import { savePreset } from './lib/history'
+import { savePreset, buildEntry } from './lib/history'
 import { costOf } from './lib/cost'
 import { isDemo, setDemo } from './lib/forgefx'
 import {
@@ -412,7 +412,7 @@ export default function App() {
       // Saved after writing rather than on generation: a spec that was never
       // sent isn't a preset, it's a draft.
       if (result.spec) {
-        savePreset({
+        const fields = {
           name: result.presetName || preset?.name || 'Untitled',
           description: result.description || lastPrompt,
           summary: result.summary,
@@ -420,7 +420,25 @@ export default function App() {
           usage: result.usage,
           device: device?.name,
           blockNames: result.changes.map((c) => c.name)
-        })
+        }
+        /*
+         * The folder is the home when one is chosen; this browser's storage is
+         * the fallback, not a second copy. Writing both would show every design
+         * twice on the Mac and leave the question "which one is real" — files
+         * on disk are the answer, because backups reach them and browsers get
+         * reinstalled.
+         */
+        const { savedFolder, writeDesignFile } = await import('./lib/localFolder')
+        const folder = await savedFolder().catch(() => null)
+        if (folder && !folder.needsPermission) {
+          try {
+            await writeDesignFile(folder, buildEntry(fields))
+          } catch {
+            savePreset(fields)
+          }
+        } else {
+          savePreset(fields)
+        }
         setHistoryKey((k) => k + 1)
       }
       record(
@@ -1562,17 +1580,25 @@ export default function App() {
             configure and forget is folded away below it.
           */}
           <SectionStack id="library">
-          <Section key="presets-on-this-mac" title="Presets on this Mac" note="Kept as files in a folder you choose" defaultOpen>
+          <Section key="presets-on-this-mac" title="Saved presets" note="Captures and designs, as files in a folder you choose" defaultOpen>
             <LocalLibrary
               preset={preset}
               busy={busy}
+              remote={remote}
               onError={setError}
+              onReload={reload}
               onChanged={(summary) => record('library', summary)}
             />
           </Section>
 
-          <Section key="tones-you-ve-made-here" title="Tones you've made here" note="Everything designed in this app">
-            <History key={historyKey} onReload={reload} busy={busy} />
+          <Section key="tones-you-ve-made-here" title="Older saves in this browser" note="Move these into the folder — files survive, browser storage doesn't">
+            <History
+              key={historyKey}
+              onReload={reload}
+              busy={busy}
+              onError={setError}
+              onMoved={() => setHistoryKey((k) => k + 1)}
+            />
           </Section>
 
           <Section key="whole-unit-backups" title="Whole-unit backups" note="Every slot at once, before something goes wrong">

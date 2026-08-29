@@ -761,6 +761,23 @@ export const listIrs = () => request('/cab/irs')
 export const clearDeviceCache = () =>
   mock ? tick().then(() => ({ ok: true })) : request('/device/cache', { method: 'DELETE' })
 
+/**
+ * One stored version's exact bytes, as a plain array.
+ *
+ * The route answers with an octet-stream rather than JSON, so this goes through
+ * fetch directly. Local-only by nature: it exists to write files into a folder
+ * this Mac chose, so it never needs to travel the relay.
+ */
+export async function versionBytes(id) {
+  if (mock) {
+    await tick()
+    return []
+  }
+  const res = await fetch(`${getHost()}/version/${encodeURIComponent(id)}/syx`)
+  if (!res.ok) throw new Error(`Version ${id} not readable (${res.status}).`)
+  return new Uint8Array(await res.arrayBuffer())
+}
+
 /** Modifier slots and the sources that can drive them. */
 export const modifierModel = () => (mock ? tick().then(() => mock.modModel()) : request('/mod/model'))
 
