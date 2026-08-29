@@ -127,6 +127,11 @@ no actions. A question is not a failure, so leave "refused" empty for it.
 
 AN EMPTY PRESET
 
+To add one block: kind placeBlock with text = its name from the placeable list,
+value null, row and col null — the app resolves the type code and finds a free
+slot on the device itself. Only give row and col when the player named a slot.
+To remove one: clearCell with the block's row and col from the blocks list.
+
 A preset with no blocks has nothing to adjust. buildChain places blocks into it
 in signal order -- "build a drive, amp, cab and delay chain" is buildChain with
 those slugs, and asking for a chain without saying which blocks gets the default.

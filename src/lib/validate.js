@@ -17,6 +17,7 @@ export function validateSpec(spec, schema) {
   }
 
   const blocksByEid = new Map(schema.map((b) => [b.eid, b]))
+  let hinted = false
   // When a lookup misses, the id the spec used is only half the story — what
   // ids the preset actually holds is the half that names the mismatch. A run
   // where every change was skipped and this line was absent cost a full
@@ -31,6 +32,12 @@ export function validateSpec(spec, schema) {
 
     if (!known) {
       problems.push(`Skipped effect ${block.eid} — no such block in this preset. ${inventory()}`)
+      if (!hinted) {
+        hinted = true
+        problems.push(
+          'If the tone needs a block the chain doesn\u2019t have, say "add a reverb" (or whichever block) and it will be placed in a free slot first.'
+        )
+      }
       continue
     }
 

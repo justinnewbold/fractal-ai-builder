@@ -879,6 +879,38 @@ test('the chain builder places into columns the unit has', async () => {
   assert.ok(src.includes('d.placeBlock(1, i, block.page'), 'the builder is 1-basing columns again')
 })
 
+console.log('\nadd a block')
+
+test('the free cell is on the chain row, judged against every block', async () => {
+  const { firstFreeCell } = await import('../src/lib/actions.js')
+  // Input and output count as occupants — the raw-versus-editable lesson,
+  // pointed the other way.
+  const blocks = [
+    { slug: 'input', row: 0, col: 0 },
+    { slug: 'drive', row: 0, col: 1 },
+    { slug: 'amp', row: 0, col: 2 }
+  ]
+  assert.deepEqual(firstFreeCell(blocks, 1, 4), { row: 0, col: 3 })
+  // A full row says so rather than inventing a cell.
+  assert.equal(firstFreeCell([...blocks, { slug: 'delay', row: 0, col: 3 }], 1, 4), null)
+  // An empty grid starts at the top left.
+  assert.deepEqual(firstFreeCell([], 1, 4), { row: 0, col: 0 })
+})
+
+test('placeable names resolve however the player said them', async () => {
+  const { resolvePlaceable } = await import('../src/lib/actions.js')
+  const palette = [
+    { slug: 'reverb', name: 'Reverb', page: 66 },
+    { slug: 'delay', name: 'Delay', page: 70 },
+    { slug: 'volpan', name: 'Vol/Pan', page: 102 }
+  ]
+  assert.equal(resolvePlaceable(palette, 'reverb').page, 66)
+  assert.equal(resolvePlaceable(palette, 'Reverb ').page, 66)
+  assert.equal(resolvePlaceable(palette, 'vol/pan').page, 102)
+  assert.equal(resolvePlaceable(palette, 'rev').page, 66)
+  assert.equal(resolvePlaceable(palette, 'chorus'), null)
+})
+
 console.log('\nxy pad')
 
 test('the write gate holds against a fast finger', async () => {

@@ -40,6 +40,44 @@ const device = () => import('./forgefx.js')
  */
 const DEFAULT_CHAIN = ['drive', 'amp', 'cab', 'delay', 'reverb']
 
+/**
+ * Where a new block should land when nobody said.
+ *
+ * The first free column on the row the chain lives on. "Free" is judged
+ * against every placed block including input and output rows — the same
+ * raw-versus-editable distinction that bit the empty-slot detection, applied
+ * in the opposite direction: for occupancy, everything counts.
+ */
+export function firstFreeCell(blocks, rows, cols) {
+  const chainRow =
+    [...(blocks || [])]
+      .filter((b) => typeof b.row === 'number')
+      .sort(
+        (a, b) =>
+          (blocks || []).filter((x) => x.row === b.row).length -
+          (blocks || []).filter((x) => x.row === a.row).length
+      )[0]?.row ?? 0
+  const taken = new Set(
+    (blocks || []).filter((b) => b.row === chainRow && typeof b.col === 'number').map((b) => b.col)
+  )
+  for (let col = 0; col < (cols || 4); col++) {
+    if (!taken.has(col)) return { row: chainRow, col }
+  }
+  return null
+}
+
+/** A placeable entry by name or slug, however the model said it. */
+export function resolvePlaceable(palette, text) {
+  if (!text) return null
+  const want = String(text).toLowerCase().replace(/[^a-z]/g, '')
+  return (
+    (palette || []).find((b) => b.slug === want) ||
+    (palette || []).find((b) => (b.name || '').toLowerCase().replace(/[^a-z]/g, '') === want) ||
+    (palette || []).find((b) => b.slug.startsWith(want)) ||
+    null
+  )
+}
+
 const ORDER = {
   loadPreset: -3,
   buildChain: -2.5,
@@ -202,15 +240,38 @@ export function validatePlan(plan, blocks, capabilities) {
       }
 
       case 'placeBlock': {
-        if (!need(typeof raw.value === 'number', 'No block type given to place.')) break
-        if (!need(inGrid(raw.row, raw.col, rows, cols), `Row ${raw.row}, column ${raw.col} is off the grid.`))
-          break
+        /*
+         * "Add a reverb" arrives as a name, because names are what the model
+         * can know — type codes differ per unit and the catalog lives here.
+         * Resolution and cell-picking happen at run time against the actual
+         * device; the model's job is intent, not id arithmetic.
+         */
         actions.push({
           ...raw,
-          label: `Place a block at row ${raw.row}, column ${raw.col}`,
+          label: raw.text
+            ? `Add a ${raw.text}${typeof raw.col === 'number' ? ` in slot ${raw.col + 1}` : ''}`
+            : `Place a block at row ${raw.row}, column ${raw.col}`,
           run: async () => {
             const d = await device()
-            const res = await d.placeBlock(raw.row, raw.col, raw.value)
+            let typeCode = typeof raw.value === 'number' ? raw.value : null
+            if (typeCode === null) {
+              const palette = await d.blockCatalog()
+              const list = Array.isArray(palette) ? palette : palette?.blocks || []
+              const hit = resolvePlaceable(list, raw.text)
+              if (!hit) throw new Error(`This unit has no block called "${raw.text}".`)
+              typeCode = hit.page ?? hit.effectId
+            }
+            let { row, col } = raw
+            if (typeof col !== 'number') {
+              const cell = firstFreeCell(blocks, rows, cols)
+              if (!cell) throw new Error('Every slot is in use — remove something first.')
+              row = cell.row
+              col = cell.col
+            }
+            if (!inGrid(row, col, rows, cols)) {
+              throw new Error(`Row ${row}, column ${col} is off the grid.`)
+            }
+            const res = await d.placeBlock(row, col, typeCode)
             // The chain changed; which blocks exist is no longer what we cached.
             d.invalidateSchema()
             return res
