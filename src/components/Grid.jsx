@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { blockColor } from '../lib/blockColors'
 
 /**
  * The signal path, read live off the device.
@@ -31,7 +32,11 @@ function Chain({ preset, blocks }) {
         <div className="chain">
           {blocks.map((block, i) => (
             <div key={block.effectId ?? i} className="chain-link">
-              <div className="block" data-bypassed={String(block.bypassed)}>
+              <div
+                className="block"
+                data-bypassed={String(block.bypassed)}
+                style={{ '--block-fill': blockColor(block.slug).fill }}
+              >
                 <div className="block-name">{block.name}</div>
                 <div className="block-meta">
                   <span>{block.effectId}</span>

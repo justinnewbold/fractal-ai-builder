@@ -11,6 +11,7 @@ import {
 } from '../lib/forgefx'
 import { remoteActive } from '../lib/remote'
 import { EXCLUDED_BLOCKS } from '../lib/guardrails'
+import { blockColor } from '../lib/blockColors'
 
 /**
  * The stand, not the bench.
@@ -264,6 +265,10 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
             <button
               key={block.effectId}
               className={`gig-block ${block.bypassed ? 'off' : 'on'}`}
+              style={{
+                '--block-fill': blockColor(block.slug).fill,
+                '--block-ink': blockColor(block.slug).ink
+              }}
               onClick={() => toggle(block)}
               disabled={toggling === block.effectId}
               aria-pressed={!block.bypassed}

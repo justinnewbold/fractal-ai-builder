@@ -836,4 +836,28 @@ test('a design file survives the round trip', async () => {
   assert.deepEqual(back.spec, entry.spec)
 })
 
+test('every block colour is real CSS', async () => {
+  // A Cyrillic а slipped into the reverb hex on first writing: identical on
+  // screen, invalid to CSS, and the colour just never appears — no error, no
+  // clue. Colour strings must be plain ASCII hex or a var() reference.
+  const { blockColor } = await import('../src/lib/blockColors.js')
+  for (const slug of ['drive', 'amp', 'delay', 'reverb', 'cab', 'chorus', 'pitch', 'mystery']) {
+    const { fill, ink } = blockColor(slug)
+    for (const value of [fill, ink]) {
+      assert.ok(
+        /^#[0-9a-f]{6}$/.test(value) || /^var\(--[\w-]+\)$/.test(value),
+        `${slug}: "${value}" is not valid CSS`
+      )
+    }
+  }
+})
+
+test('instance suffixes and unknowns resolve sensibly', async () => {
+  const { blockColor } = await import('../src/lib/blockColors.js')
+  assert.deepEqual(blockColor('delay2'), blockColor('delay'))
+  assert.deepEqual(blockColor('drive1'), blockColor('drive'))
+  assert.equal(blockColor('definitely-new-block').fill, 'var(--panel-hi)')
+  assert.equal(blockColor(null).fill, 'var(--panel-hi)')
+})
+
 console.log(`\n${passed} passed\n`)

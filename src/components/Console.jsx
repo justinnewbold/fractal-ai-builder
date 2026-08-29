@@ -1,45 +1,6 @@
 import { useEffect, useState } from 'react'
-import Knob from './Knob'
-import { blockParams, blockTypes, setParamConfirmed, setType, setBypass, setChannel } from '../lib/forgefx'
-import { isSilencingParam } from '../lib/guardrails'
+import { blockColor } from '../lib/blockColors'
 
-/**
- * Block colours, matched to how Fractal's own editors code them.
- *
- * The colour is doing real work: on a chain of four abbreviated tiles it's the
- * fastest way to read what kind of block sits where, faster than the three
- * letters printed on it.
- */
-const FAMILY_COLOR = {
-  wah: '#3f63c8',
-  filter: '#3f63c8',
-  drive: '#b32d2d',
-  amp: '#8b8f96',
-  cab: '#3f8f5c',
-  comp: '#2f8f8f',
-  compressor: '#2f8f8f',
-  geq: '#c07a2a',
-  peq: '#c07a2a',
-  delay: '#2a7f9c',
-  reverb: '#6b3fbf',
-  chorus: '#4a5fb8',
-  flanger: '#4a5fb8',
-  phaser: '#5a4fb8',
-  tremolo: '#8a5fb0',
-  pitch: '#a04f8a',
-  gate: '#6f7480',
-  ingate: '#6f7480',
-  volume: '#6f7480',
-  volpan: '#6f7480',
-  looper: '#6f7480',
-  enhancer: '#4a8f7a',
-  rotary: '#8a5fb0',
-  synth: '#a04f8a',
-  input: '#555b66',
-  output: '#555b66'
-}
-
-/** Three-letter tile labels, the way the hardware abbreviates them. */
 const SHORT = {
   wah: 'WAH',
   drive: 'DRV',
@@ -69,7 +30,24 @@ const SHORT = {
 }
 
 const shortName = (slug) => SHORT[slug] || (slug || '??').slice(0, 3).toUpperCase()
-const colorFor = (slug) => FAMILY_COLOR[slug] || '#6f7480'
+
+/*
+ * One palette for the whole app. This file used to carry its own, which meant
+ * the chain tiles and the gig buttons could disagree about what colour a delay
+ * is — and with the photo-corrected hues, they briefly did.
+ */
+const colorFor = (slug) => blockColor(slug).fill
+import Knob from './Knob'
+import { blockParams, blockTypes, setParamConfirmed, setType, setBypass, setChannel } from '../lib/forgefx'
+import { isSilencingParam } from '../lib/guardrails'
+
+/**
+ * Block colours, matched to how Fractal's own editors code them.
+ *
+ * The colour is doing real work: on a chain of four abbreviated tiles it's the
+ * fastest way to read what kind of block sits where, faster than the three
+ * letters printed on it.
+ */
 
 /** The signal chain, as coloured tiles with the active channel on each. */
 export function Chain({ blocks, selected, onSelect }) {
