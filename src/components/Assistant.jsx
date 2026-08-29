@@ -89,7 +89,15 @@ function useTypedSuggestion(active) {
   return text
 }
 
-export default function Assistant({ turns, onAsk, onConfirm, onCancel, busy, progress }) {
+export default function Assistant({
+  turns,
+  onAsk,
+  onConfirm,
+  onCancel,
+  busy,
+  progress,
+  children
+}) {
   const [text, setText] = useState('')
   const [focused, setFocused] = useState(false)
   const tail = useRef(null)
@@ -169,6 +177,16 @@ export default function Assistant({ turns, onAsk, onConfirm, onCancel, busy, pro
         ))}
 
         {progress ? <p className="hint assistant-progress mono">{progress}</p> : null}
+
+        {/*
+          A design lands here, where it was asked for.
+          It used to render in a separate tab, so describing a tone put the
+          answer on a screen you weren't looking at — one input, several
+          unrelated places for output, which is most of why this felt like a
+          control panel with a chat bolted on.
+        */}
+        {children ? <div className="turn turn-result">{children}</div> : null}
+
         <div ref={tail} />
       </div>
 
