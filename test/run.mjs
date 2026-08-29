@@ -683,4 +683,8 @@ test('slot zero is a real slot, not an empty field', () => {
   assert.equal(target('0', 97), 0)
 })
 
+console.log('\nstructure')
+const { run: structure } = await import('./structure.mjs')
+structure(test)
+
 console.log(`\n${passed} passed\n`)

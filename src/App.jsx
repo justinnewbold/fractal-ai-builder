@@ -23,6 +23,7 @@ import LocalLibrary from './components/LocalLibrary'
 import Remote from './components/Remote'
 import Section from './components/Section'
 import SectionStack from './components/SectionStack'
+import StatusLine from './components/StatusLine'
 import Host from './components/Host'
 import Assistant from './components/Assistant'
 import Theme from './components/Theme'
@@ -39,7 +40,6 @@ import {
 } from './lib/forgefx'
 import { savePreset } from './lib/history'
 import { costOf } from './lib/cost'
-import { VERSION, COMMIT, BUILT_AT } from './lib/version'
 import { isDemo, setDemo } from './lib/forgefx'
 import {
   detect,
@@ -762,7 +762,7 @@ export default function App() {
               'Designing that — I\u2019ll show you the whole thing before anything is written.'
           }
         ])
-        setView('design')
+        // No view to switch to — the design appears in this conversation.
         let builtBlocks = null
 
         /*
@@ -915,6 +915,24 @@ export default function App() {
           return next
         })
       }
+      /*
+       * Say what happened, in the conversation.
+       *
+       * Otherwise a request ends in silence and you have to go and look at a
+       * panel to find out whether it worked — which is the same "the answer is
+       * somewhere else" problem the design preview had.
+       */
+      if (!failures.length) {
+        const done = actions.map((a) => a.label)
+        setTurns((prev) => [
+          ...prev,
+          {
+            role: 'system',
+            text: done.length === 1 ? `Done — ${done[0]}.` : `Done — ${done.length} changes.`
+          }
+        ])
+      }
+
       // Saving is what makes things permanent, so a plan containing one leaves
       // the preset clean rather than still flagged as unsaved.
       setDirty(!actions.some((a) => a.kind === 'savePreset'))
@@ -989,13 +1007,15 @@ export default function App() {
           </h1>
           <p className="tagline">Describe a tone. Get a preset on the unit.</p>
         </div>
+        {/*
+          Version, build stamp and commit used to sit here, above everything.
+          They are the first thing a guitarist saw and told them nothing; they
+          matter only when something has gone wrong, which is where they now
+          live — Library, Technical details. The theme toggle stays, because
+          that is a thing you actually want to change.
+        */}
         <div className="build-badge">
           <Theme />
-          <span className="version mono">v{VERSION}</span>
-          <span className="silk-label">Phase 4 &middot; depth</span>
-          <span className="build-meta mono" title={`built ${BUILT_AT} UTC`}>
-            {COMMIT}
-          </span>
         </div>
       </header>
 
@@ -1088,6 +1108,11 @@ export default function App() {
         meant to be worked: the views below are for when you'd rather reach for
         the control yourself, not a separate mode with different powers.
       */}
+      {/* Always on screen, above everything, on every view. */}
+      {status === 'live' ? (
+        <StatusLine device={device} preset={preset} dirty={dirty} remote={remote} />
+      ) : null}
+
       {status === 'live' ? (
         <Assistant
           turns={turns}
@@ -1096,7 +1121,77 @@ export default function App() {
           onCancel={cancelTurn}
           busy={busy || runningPlan}
           progress={progress}
-        />
+        >
+          {/* A design shows up in the conversation that asked for it. */}
+          <Thinking message={progress} />
+
+          {thinking ? (
+            <div className="thinking" role="status" aria-live="polite">
+              <span className="thinking-bars" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+                <i />
+              </span>
+              <Stages partial={partial} />
+            </div>
+          ) : null}
+
+          <LiveGeneration
+            partial={partial}
+            active={thinking}
+            open={liveOpen}
+            onToggle={() => setLiveOpen(!liveOpen)}
+          />
+
+          <Cost usage={result?.usage} sessionTotal={spend.total} runs={spend.runs} />
+
+          <Preview
+            result={result}
+            writeCount={writeCount}
+            busy={busy}
+            onApply={apply}
+            onDiscard={() => setResult(null)}
+          />
+
+          {/*
+            What applying actually did, including anything that read back
+            different from what was sent. This lived in the Design view; without
+            it here, applying a design would finish in silence.
+          */}
+          {applied ? (
+            <div className="notice">
+              <h2>{applied.savedTo !== undefined ? 'Saved' : 'Written to the unit'}</h2>
+              <p>
+                {applied.count} changes sent.
+                {applied.savedTo !== undefined
+                  ? ` Stored to slot ${applied.savedTo}.`
+                  : ' It\u2019s in the edit buffer \u2014 play it now. Nothing is permanent until you save it, and Revert puts the saved version back.'}
+              </p>
+              {applied.failures?.length
+                ? applied.failures.map((f, i) => (
+                    <p key={i} className="mono problem">
+                      {f}
+                    </p>
+                  ))
+                : null}
+              {applied.mismatches?.length ? (
+                <>
+                  <p className="mono problem">
+                    {applied.mismatches.length} value
+                    {applied.mismatches.length > 1 ? 's' : ''} read back different from what was
+                    sent:
+                  </p>
+                  {applied.mismatches.map((m, i) => (
+                    <p key={i} className="mono problem">
+                      {m}
+                    </p>
+                  ))}
+                </>
+              ) : null}
+            </div>
+          ) : null}
+        </Assistant>
       ) : null}
 
       {status === 'live' ? (
@@ -1118,9 +1213,8 @@ export default function App() {
 
           {[
             ['console', 'Home'],
-            ['design', 'Design'],
-            ['edit', 'Edit'],
-            ['library', 'Library']
+            ['edit', 'Controls'],
+            ['library', 'Presets']
           ].map(([id, label]) => (
             <button
               key={id}
@@ -1304,132 +1398,6 @@ export default function App() {
           onError={setError}
           onChanged={read}
         />
-      ) : null}
-
-      {status === 'live' && view === 'design' ? (
-        <>
-          {blocks.length === 0 ? (
-            <div className="notice">
-              <h2>This preset is empty</h2>
-              <p>
-                Slot {preset?.number} has no blocks on its grid &mdash; but that&rsquo;s no longer
-                a dead end. Describe the tone you want in the chat above and a chain gets placed
-                before anything is designed.
-              </p>
-              <p>
-                To choose the blocks yourself, say which ones &mdash; &ldquo;build a drive, amp,
-                cab and delay chain&rdquo; &mdash; or use the starter chain button in{' '}
-                <strong>Edit</strong>.
-              </p>
-            </div>
-          ) : (
-            <p className="hint design-hint">
-              Describe the tone you want in the chat above. What comes back is shown here, control
-              by control, before anything reaches the unit.
-            </p>
-          )}
-
-          <Thinking message={progress} />
-
-          {thinking ? (
-            <div className="thinking" role="status" aria-live="polite">
-              <span className="thinking-bars" aria-hidden="true">
-                <i />
-                <i />
-                <i />
-                <i />
-              </span>
-              <Stages active={thinking} />
-            </div>
-          ) : null}
-
-          <LiveGeneration
-            partial={partial}
-            open={liveOpen}
-            onToggle={() => setLiveOpen(!liveOpen)}
-          />
-
-          <PresetBar preset={preset} onSelect={jumpTo} onRename={rename} busy={busy} />
-
-          {applied ? (
-            <div className="notice">
-              <h2>{applied.savedTo !== undefined ? 'Saved' : 'Written to the unit'}</h2>
-              <p>
-                {applied.count} changes sent.
-                {applied.savedTo !== undefined
-                  ? ` Stored to slot ${applied.savedTo}.`
-                  : ' It\u2019s in the edit buffer \u2014 play it now. Nothing is permanent until you save it below, and Revert puts the saved version back.'}
-              </p>
-              {applied.failures?.length
-                ? applied.failures.map((f, i) => (
-                    <p key={i} className="mono problem">
-                      {f}
-                    </p>
-                  ))
-                : null}
-              {applied.mismatches?.length ? (
-                <>
-                  <p className="mono problem">
-                    {applied.mismatches.length} value
-                    {applied.mismatches.length > 1 ? 's' : ''} read back different from what was
-                    sent:
-                  </p>
-                  {applied.mismatches.map((m, i) => (
-                    <p key={i} className="mono problem">
-                      {m.block} · {m.param} — wanted {m.wanted}, reads {m.got}
-                    </p>
-                  ))}
-                </>
-              ) : null}
-              {applied.savedTo === undefined ? (
-                <div className="save-row">
-                  <input
-                    type="text"
-                    className="name-field"
-                    value={saveName}
-                    maxLength={31}
-                    onChange={(e) => setSaveName(e.target.value)}
-                    placeholder="Preset name"
-                    aria-label="Name to save the preset under"
-                  />
-                  <input
-                    type="text"
-                    value={slot}
-                    onChange={(e) => setSlot(e.target.value.replace(/[^0-9]/g, ''))}
-                    placeholder="Slot"
-                    aria-label="Preset slot to save into"
-                  />
-                  <button onClick={save} disabled={busy || !slot}>
-                    Save to slot {slot || '--'}
-                  </button>
-                  <span className="hint">Overwrites whatever is in that slot.</span>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
-          {result?.usage ? (
-            <Cost usage={result.usage} sessionTotal={spend.total} runs={spend.runs} />
-          ) : null}
-
-          {result ? (
-            <p className="hint">
-              Not quite it? Say what to change in the chat above.
-            </p>
-          ) : null}
-
-          <Preview
-            result={result}
-            writeCount={writeCount}
-            busy={busy}
-            onApply={apply}
-            onDiscard={() => setResult(null)}
-          />
-
-          {preset ? (
-            <Grid preset={preset} blocks={blocks} capabilities={device?.capabilities} />
-          ) : null}
-        </>
       ) : null}
 
       {status === 'live' && view === 'edit' ? (

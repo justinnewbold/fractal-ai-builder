@@ -3748,3 +3748,77 @@ button.gig-block:disabled {
     flex: 1 1 auto;
   }
 }
+
+/* ---------- persistent status ---------- */
+
+.status-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding: 9px 13px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+}
+
+.status-line .lamp {
+  align-self: center;
+}
+
+.status-line .lamp.remote {
+  background: var(--signal);
+  box-shadow: 0 0 6px var(--signal);
+}
+
+.status-unit {
+  flex: 0 0 auto;
+}
+
+.status-preset {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.status-slot {
+  font-size: 12px;
+  color: var(--silk-faint);
+}
+
+/* The name is the thing you actually read, so it gets the weight and the room,
+   and truncates rather than wrapping the line onto two. */
+.status-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--silk);
+}
+
+.status-dirty {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid var(--live);
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--live);
+}
+
+@media (max-width: 620px) {
+  .status-name {
+    font-size: 13px;
+  }
+
+  .status-dirty {
+    margin-left: 0;
+  }
+}
