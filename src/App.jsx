@@ -772,6 +772,28 @@ export default function App() {
          * first, because that is plainly what you meant.
          */
         if (blocks.length === 0) {
+          /*
+           * A verbatim copy of the slot before the first structural write.
+           *
+           * "Empty" is this app's own read, and this is the one path that
+           * changes what blocks exist. If that read were ever wrong — and AM4
+           * placement is the least hardware-proven part of the stack — these
+           * writes would land on someone's real preset. The apply path has
+           * taken this exact precaution all along; the build path just never
+           * did, and it's the riskier of the two.
+           */
+          if (!safety && typeof preset?.number === 'number') {
+            try {
+              const dump = await backupPreset(preset.number)
+              if (dump?.bytes?.length) {
+                setSafety({ number: preset.number, name: preset.name, bytes: dump.bytes })
+              }
+            } catch {
+              // Not every device exposes the dump path; the unsaved buffer can
+              // still be discarded by reloading the preset.
+            }
+          }
+
           setTurns((prev) => [
             ...prev,
             { role: 'system', text: 'Empty slot — putting a chain in first.' }
