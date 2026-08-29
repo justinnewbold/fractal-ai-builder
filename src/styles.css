@@ -3870,3 +3870,56 @@ button.gig-block.off {
 .chain .block[data-bypassed='true'] {
   opacity: 0.55;
 }
+
+/* ---------- the tuner, at stage size ---------- */
+
+button.gig-tuner-btn {
+  display: block;
+  width: 100%;
+  margin-top: 16px;
+  padding: 13px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--panel);
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--silk-dim);
+}
+
+button.gig-tuner-btn.on {
+  border-color: var(--live);
+  color: var(--live);
+}
+
+/* Everything scaled for a glance from standing height: the note fills the
+   panel, the needle bar is thick enough to read at arm's length in the dark. */
+.gig-tuner .tuner-panel {
+  margin-top: 10px;
+  padding: 22px 18px 18px;
+}
+
+.gig-tuner .tuner-note .note {
+  font-size: 64px;
+  line-height: 1;
+}
+
+.gig-tuner .tuner-note .octave {
+  font-size: 20px;
+}
+
+.gig-tuner .tuner-bar {
+  height: 16px;
+  margin-top: 16px;
+}
+
+.gig-tuner .tuner-needle {
+  width: 5px;
+}
+
+.gig-tuner .tuner-cents {
+  margin-top: 10px;
+  font-size: 14px;
+}
