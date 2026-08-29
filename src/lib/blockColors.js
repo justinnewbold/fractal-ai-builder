@@ -21,18 +21,28 @@ const VERIFIED = {
   reverb: { fill: '#5a3fc0', ink: '#ffffff' }
 }
 
+/*
+ * Read off an FM3-Edit screenshot of a full chain. Note the one conflict found:
+ * FM3-Edit draws the amp tile dark graphite where the AM4's screen draws it
+ * silver — the generations genuinely differ. Silver wins here because the AM4
+ * is the unit on the board and its photo is device truth; if a per-device
+ * palette is ever wanted, this is the entry that motivates it.
+ */
+const VERIFIED_FM3EDIT = {
+  comp: { fill: '#8f8a2f', ink: '#ffffff' },
+  compressor: { fill: '#8f8a2f', ink: '#ffffff' },
+  chorus: { fill: '#2f8f9c', ink: '#ffffff' },
+  flanger: { fill: '#a2439a', ink: '#ffffff' },
+  phaser: { fill: '#3f8a4f', ink: '#ffffff' }
+}
+
 const APPROXIMATE = {
   wah: { fill: '#3f63c8', ink: '#ffffff' },
   filter: { fill: '#3f63c8', ink: '#ffffff' },
   cab: { fill: '#3f8f5c', ink: '#ffffff' },
-  comp: { fill: '#2f8f8f', ink: '#ffffff' },
-  compressor: { fill: '#2f8f8f', ink: '#ffffff' },
   geq: { fill: '#c07a2a', ink: '#ffffff' },
   peq: { fill: '#c07a2a', ink: '#ffffff' },
   eq: { fill: '#c07a2a', ink: '#ffffff' },
-  chorus: { fill: '#4a5fb8', ink: '#ffffff' },
-  flanger: { fill: '#4a5fb8', ink: '#ffffff' },
-  phaser: { fill: '#5a4fb8', ink: '#ffffff' },
   tremolo: { fill: '#8a5fb0', ink: '#ffffff' },
   rotary: { fill: '#8a5fb0', ink: '#ffffff' },
   pitch: { fill: '#a04f8a', ink: '#ffffff' },
@@ -70,7 +80,7 @@ const APPROXIMATE = {
   shunt: { fill: '#555b66', ink: '#ffffff' }
 }
 
-const FAMILIES = { ...APPROXIMATE, ...VERIFIED }
+const FAMILIES = { ...APPROXIMATE, ...VERIFIED_FM3EDIT, ...VERIFIED }
 
 const NEUTRAL = { fill: 'var(--panel-hi)', ink: 'var(--silk)' }
 
