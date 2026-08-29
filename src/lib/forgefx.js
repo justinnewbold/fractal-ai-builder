@@ -1075,11 +1075,24 @@ function recallSceneNames(number) {
  *
  * Renaming a scene clears both, so a stale name can't outlive the thing it named.
  */
+/**
+ * Where the last scene-name lookup got its answer, step by step.
+ *
+ * Names have four possible sources and three of them fail silently by design.
+ * That is right for the gig screen — a missing nicety must not error — and
+ * wrong for debugging it, which turned into guesswork twice. So the path
+ * narrates itself here, and Technical details shows it.
+ */
+export let sceneNameTrace = []
+const traceStep = (step) => sceneNameTrace.push(step)
+
 export async function readSceneNames(number) {
   if (mock) {
     await tick()
     return mock.getScene().names
   }
+  sceneNameTrace = []
+  traceStep(`lookup for ${sceneNameKey(number)}`)
 
   if (typeof number === 'number') {
     try {
@@ -1088,10 +1101,12 @@ export async function readSceneNames(number) {
       if (Array.isArray(names) && names.some((n) => (n || '').trim())) {
         const clean = names.map((n) => (n || '').trim())
         rememberSceneNames(number, clean)
+        traceStep('summary: found names')
         return clean
       }
-    } catch {
-      // Not every device serves a summary; fall through to the dump.
+      traceStep('summary: no names (normal on an AM4)')
+    } catch (err) {
+      traceStep(`summary: failed — ${err.message}`)
     }
   }
 
@@ -1101,18 +1116,29 @@ export async function readSceneNames(number) {
     if (Array.isArray(names) && names.some((n) => (n || '').trim())) {
       const clean = names.map((n) => (n || '').trim())
       rememberSceneNames(number, clean)
+      traceStep('dump: found names')
       return clean
     }
-  } catch {
-    // Blocked remotely, or the device has no dump to give.
+    traceStep(
+      dump?.sceneNames === undefined
+        ? `dump: no sceneNames field at all — the decode on the Mac gave nothing (crcValid: ${dump?.crcValid ?? 'absent'})`
+        : 'dump: sceneNames present but every name is blank — the scenes are unnamed on the unit'
+    )
+  } catch (err) {
+    traceStep(`dump: refused or failed — ${err.message}`)
   }
 
   // Nothing readable from the unit. What did a session that could read them keep?
   const local = recallSceneNames(number)
-  if (local.some((n) => (n || '').trim())) return local
+  if (local.some((n) => (n || '').trim())) {
+    traceStep('this browser remembered them')
+    return local
+  }
+  traceStep('nothing remembered in this browser')
 
   if (typeof number === 'number') {
     const held = await readHostDoc(`scene-names-${sceneNameKey(number)}`)
+    traceStep(held === null ? 'host store: nothing under this key' : 'host store: found an entry')
     if (Array.isArray(held) && held.some((n) => (n || '').trim())) {
       const clean = held.map((n) => (n || '').trim())
       // Keep it locally too, so the next preset change doesn't need the round trip.
