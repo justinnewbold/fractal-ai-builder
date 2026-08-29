@@ -4082,3 +4082,61 @@ button.gig-tuner-btn.on {
   font-size: 12px;
   color: var(--silk-dim);
 }
+
+/* ---------- the preset file inspector ---------- */
+
+.inspect {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--panel);
+}
+
+.inspect-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.inspect-head .chip {
+  margin-left: auto;
+}
+
+.inspect-preset {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+  padding: 9px 0;
+  border-top: 1px solid var(--rule);
+  margin-top: 9px;
+}
+
+.inspect-slot {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--silk-faint);
+}
+
+.inspect-name {
+  font-family: var(--display);
+  font-weight: 600;
+  color: var(--silk);
+}
+
+.inspect-scenes {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--silk-dim);
+}
+
+.inspect-ok {
+  font-size: 11px;
+  color: var(--silk-faint);
+}
+
+.inspect-bad {
+  font-size: 12px;
+  color: var(--live);
+}

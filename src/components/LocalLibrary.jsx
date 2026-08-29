@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react'
-import { backupPreset, loadPresetBytes, listVersions, versionBytes } from '../lib/forgefx'
+import {
+  backupPreset,
+  loadPresetBytes,
+  listVersions,
+  versionBytes,
+  decodePresetFile
+} from '../lib/forgefx'
 import {
   canPickFolder,
   pickFolder,
@@ -33,6 +39,7 @@ export default function LocalLibrary({ preset, busy, onError, onChanged, onReloa
   const [entries, setEntries] = useState([])
   const [working, setWorking] = useState(null)
   const [note, setNote] = useState(null)
+  const [inspecting, setInspecting] = useState(null)
 
   useEffect(() => {
     let stop = false
@@ -125,6 +132,29 @@ export default function LocalLibrary({ preset, busy, onError, onChanged, onReloa
    * Not to a slot: it lands where you can hear it, and keeping it is a separate
    * decision made with the save bar at the top.
    */
+  /**
+   * What's in this file, before any of it touches the unit.
+   *
+   * A .syx is opaque until loaded, and loading is exactly the moment you'd
+   * want to already know what it was — a file can hold a whole bank. The host
+   * decodes offline off the model byte, so an AM4 dump inspects fine while an
+   * FM3 is attached, and nothing here touches the hardware at all.
+   */
+  const inspect = async (entry) => {
+    setWorking(entry.file)
+    try {
+      const bytes = await readPresetFile(folder, entry.file)
+      if (!bytes.length) throw new Error('That file is empty.')
+      const result = await decodePresetFile(bytes)
+      if (result?.error) throw new Error(result.error)
+      setInspecting({ entry, result, size: bytes.length })
+    } catch (err) {
+      onError(`Couldn't read "${entry.name}" as a preset file — ${err.message}`)
+    } finally {
+      setWorking(null)
+    }
+  }
+
   const load = async (entry) => {
     setWorking(entry.file)
     try {
@@ -280,6 +310,11 @@ export default function LocalLibrary({ preset, busy, onError, onChanged, onReloa
                 {entry.kind === 'design' ? 'design · ' : ''}
                 {new Date(entry.at).toLocaleDateString()}
               </span>
+              {entry.kind === 'capture' && !remote ? (
+                <button className="chip" onClick={() => inspect(entry)} disabled={busy || !!working}>
+                  Inspect
+                </button>
+              ) : null}
               <button className="chip" onClick={() => load(entry)} disabled={busy || !!working}>
                 {working === entry.file ? 'Working…' : 'Load'}
               </button>
@@ -292,6 +327,46 @@ export default function LocalLibrary({ preset, busy, onError, onChanged, onReloa
       ) : (
         <p className="hint">Nothing saved here yet.</p>
       )}
+
+      {inspecting ? (
+        <div className="inspect">
+          <div className="inspect-head">
+            <span className="library-name">{inspecting.entry.name}</span>
+            <span className="library-path mono">
+              {inspecting.result.model ? `${String(inspecting.result.model).toUpperCase()} · ` : ''}
+              {inspecting.size.toLocaleString()} bytes
+            </span>
+            <button className="chip" onClick={() => setInspecting(null)}>
+              Close
+            </button>
+          </div>
+
+          {(inspecting.result.presets || []).map((p, i) => (
+            <div className="inspect-preset" key={i}>
+              <span className="inspect-slot mono">{p.location ?? p.index ?? '—'}</span>
+              <span className="inspect-name">{p.name?.trim() || 'Untitled'}</span>
+
+              {p.crcValid === false ? (
+                <span className="inspect-bad">checksum mismatch — bytes may be damaged</span>
+              ) : null}
+              {p.crcValid === true ? <span className="inspect-ok mono">intact</span> : null}
+
+              {Array.isArray(p.sceneNames) && p.sceneNames.some((n) => (n || '').trim()) ? (
+                <span className="inspect-scenes">
+                  {p.sceneNames
+                    .map((n, idx) => (n || '').trim() && `S${idx + 1} ${n.trim()}`)
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              ) : null}
+            </div>
+          ))}
+
+          {!(inspecting.result.presets || []).length ? (
+            <p className="hint">The file decoded, but no presets were found inside it.</p>
+          ) : null}
+        </div>
+      ) : null}
 
       {note ? <p className="hint">{note}</p> : null}
     </>
