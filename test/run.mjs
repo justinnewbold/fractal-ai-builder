@@ -783,4 +783,57 @@ console.log('\nstructure')
 const { run: structure } = await import('./structure.mjs')
 structure(test)
 
+test('both file kinds are listed and told apart', async () => {
+  // A .syx goes back to the unit verbatim; a design re-validates first. Load
+  // treating one as the other would either corrupt or silently no-op.
+  const files = [
+    { kind: 'file', name: 'Drop A.syx', getFile: async () => ({ size: 3, lastModified: 2 }) },
+    { kind: 'file', name: 'Lead.design.json', getFile: async () => ({ size: 9, lastModified: 5 }) },
+    { kind: 'file', name: 'notes.txt', getFile: async () => ({ size: 1, lastModified: 9 }) },
+    { kind: 'directory', name: 'versions' }
+  ]
+  const handle = { values: async function* () { for (const f of files) yield f } }
+  const { listPresetFiles } = await import('../src/lib/localFolder.js')
+  const out = await listPresetFiles(handle)
+  assert.deepEqual(out.map((e) => [e.name, e.kind]), [['Lead', 'design'], ['Drop A', 'capture']])
+})
+
+test('a re-run of the version sync writes nothing twice', async () => {
+  // Idempotence lives in the filename: the version id rides at the end, and the
+  // synced-id scan reads it back.
+  const { writeVersionFile, syncedVersionIds } = await import('../src/lib/localFolder.js')
+  const written = []
+  const dir = {
+    getFileHandle: async (name) => {
+      written.push(name)
+      return { createWritable: async () => ({ write: async () => {}, close: async () => {} }) }
+    },
+    values: async function* () {
+      for (const name of written) yield { kind: 'file', name }
+    }
+  }
+  await writeVersionFile(dir, { id: 'bk-abc123', capturedAt: 0, location: 5, name: 'Rig' }, new Uint8Array([1]))
+  const have = await syncedVersionIds(dir)
+  assert.ok(have.has('bk-abc123'))
+})
+
+test('a design file survives the round trip', async () => {
+  const store = {}
+  const dir = {
+    getFileHandle: async (name, opts) => {
+      if (!opts?.create && !(name in store)) throw new Error('not found')
+      return {
+        createWritable: async () => ({ write: async (t) => { store[name] = t }, close: async () => {} }),
+        getFile: async () => ({ text: async () => store[name] })
+      }
+    }
+  }
+  const { writeDesignFile, readDesignFile } = await import('../src/lib/localFolder.js')
+  const entry = { id: 'x', name: 'Lead / "Solo"', spec: { amp: { gain: 7 } } }
+  const file = await writeDesignFile(dir, entry)
+  assert.ok(file.endsWith('.design.json') && !file.includes('/'))
+  const back = await readDesignFile(dir, file)
+  assert.deepEqual(back.spec, entry.spec)
+})
+
 console.log(`\n${passed} passed\n`)

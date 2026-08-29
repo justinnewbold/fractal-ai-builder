@@ -92,14 +92,31 @@ export async function forgetFolder() {
   await put(null).catch(() => {})
 }
 
-/** Every preset file in the folder, newest first. */
+/**
+ * Everything saved in the folder, newest first.
+ *
+ * Two kinds live side by side and the distinction matters when loading. A .syx
+ * is an exact capture of a preset — bytes that go back to the unit verbatim. A
+ * .design.json is a tone as designed — it re-validates against whatever is on
+ * the unit now and lands as a preview, exactly like a fresh generation. One is
+ * a photograph, the other is the recipe.
+ */
 export async function listPresetFiles(handle) {
   const out = []
   for await (const entry of handle.values()) {
-    if (entry.kind !== 'file' || !entry.name.toLowerCase().endsWith('.syx')) continue
+    if (entry.kind !== 'file') continue
+    const lower = entry.name.toLowerCase()
+    const kind = lower.endsWith('.design.json') ? 'design' : lower.endsWith('.syx') ? 'capture' : null
+    if (!kind) continue
     try {
       const file = await entry.getFile()
-      out.push({ name: entry.name.replace(/\.syx$/i, ''), file: entry.name, size: file.size, at: file.lastModified })
+      out.push({
+        name: entry.name.replace(/\.design\.json$/i, '').replace(/\.syx$/i, ''),
+        file: entry.name,
+        kind,
+        size: file.size,
+        at: file.lastModified
+      })
     } catch {
       // A file that vanished between listing and reading isn't worth an error.
     }
@@ -109,10 +126,7 @@ export async function listPresetFiles(handle) {
 
 /** Write a preset into the folder. Returns the filename used. */
 export async function writePresetFile(handle, name, bytes) {
-  // Trim first, then fall back. A name of spaces is truthy, so `name || 'preset'`
-  // would have kept it and written a hidden file called ".syx".
-  const cleaned = (name || '').trim().replace(/[/\\:*?"<>|]+/g, '-').replace(/^\.+/, '').slice(0, 60)
-  const file = `${cleaned.trim() || 'preset'}.syx`
+  const file = `${safeFileName(name)}.syx`
   const fh = await handle.getFileHandle(file, { create: true })
   const w = await fh.createWritable()
   await w.write(new Uint8Array(bytes))
@@ -129,4 +143,63 @@ export async function readPresetFile(handle, file) {
 
 export async function deletePresetFile(handle, file) {
   await handle.removeEntry(file)
+}
+
+/** The filename a name becomes — shared by both kinds so the rules can't split. */
+export function safeFileName(name) {
+  return (
+    (name || '')
+      .trim()
+      .replace(/[/\\:*?"<>|]+/g, '-')
+      .replace(/^\.+/, '')
+      .slice(0, 60)
+      .trim() || 'preset'
+  )
+}
+
+/** Write a design (a saved tone spec) into the folder. */
+export async function writeDesignFile(handle, entry) {
+  const file = `${safeFileName(entry.name)}.design.json`
+  const fh = await handle.getFileHandle(file, { create: true })
+  const w = await fh.createWritable()
+  await w.write(JSON.stringify(entry, null, 2))
+  await w.close()
+  return file
+}
+
+export async function readDesignFile(handle, file) {
+  const fh = await handle.getFileHandle(file)
+  const text = await (await fh.getFile()).text()
+  return JSON.parse(text)
+}
+
+/**
+ * A subfolder for whole-unit version history.
+ *
+ * Kept apart from the presets so a sync of forty versions doesn't bury the
+ * dozen tones someone actually reaches for.
+ */
+export async function versionsFolder(handle) {
+  return handle.getDirectoryHandle('versions', { create: true })
+}
+
+/** Which version ids are already on disk, read from the filenames. */
+export async function syncedVersionIds(dir) {
+  const ids = new Set()
+  for await (const entry of dir.values()) {
+    const m = entry.name.match(/\.(bk-[a-z0-9]+|v-[a-z0-9]+|[a-z0-9]{6,})\.syx$/i)
+    if (entry.kind === 'file' && m) ids.add(m[1])
+  }
+  return ids
+}
+
+export async function writeVersionFile(dir, version, bytes) {
+  const stamp = new Date(version.capturedAt || Date.now()).toISOString().slice(0, 10)
+  const label = safeFileName(`${stamp} slot ${version.location ?? '--'} ${version.name || ''}`)
+  const file = `${label}.${version.id}.syx`
+  const fh = await dir.getFileHandle(file, { create: true })
+  const w = await fh.createWritable()
+  await w.write(bytes)
+  await w.close()
+  return file
 }

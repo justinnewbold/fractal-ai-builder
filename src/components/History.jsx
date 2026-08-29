@@ -9,6 +9,7 @@ import {
   formatWhen
 } from '../lib/history'
 import { costOf, formatCost } from '../lib/cost'
+import { savedFolder, writeDesignFile } from '../lib/localFolder'
 
 /**
  * Saved presets.
@@ -19,7 +20,7 @@ import { costOf, formatCost } from '../lib/cost'
  * meet a different block layout or different parameter ranges, and the checks
  * that catch that are the ones already in the pipeline.
  */
-export default function History({ onReload, busy }) {
+export default function History({ onReload, busy, onError, onMoved }) {
   const [entries, setEntries] = useState(() => listPresets())
   const [expanded, setExpanded] = useState(null)
   const [renaming, setRenaming] = useState(null)
@@ -38,6 +39,37 @@ export default function History({ onReload, busy }) {
     renamePreset(id, draft)
     setRenaming(null)
     refresh()
+  }
+
+  /**
+   * Move everything here into the chosen folder, as design files.
+   *
+   * This storage is the older home, and it has the weaknesses files don't: it
+   * belongs to one browser, backups never see it, and clearing site data takes
+   * every tone with it. Moving is per-entry deliberate — each one is written to
+   * disk first and removed from here only after that write succeeded, so a
+   * failure part-way loses nothing, it just leaves some not yet moved.
+   */
+  const moveAll = async () => {
+    const folder = await savedFolder().catch(() => null)
+    if (!folder || folder.needsPermission) {
+      onError?.('Choose a preset folder first, in the panel above.')
+      return
+    }
+    let moved = 0
+    try {
+      for (const entry of listPresets()) {
+        await writeDesignFile(folder, entry)
+        deletePreset(entry.id)
+        moved++
+      }
+      setNote(`Moved ${moved} design${moved === 1 ? '' : 's'} into the folder.`)
+      refresh()
+      onMoved?.(moved)
+    } catch (err) {
+      refresh()
+      onError?.(`Moved ${moved}, then: ${err.message}`)
+    }
   }
 
   const download = () => {
@@ -74,6 +106,9 @@ export default function History({ onReload, busy }) {
           later.
         </p>
         <div className="history-actions">
+          <button className="chip" onClick={moveAll} disabled={busy || !entries.length}>
+            Move all into the folder
+          </button>
           <button className="chip" onClick={() => fileInput.current?.click()}>
             Import
           </button>

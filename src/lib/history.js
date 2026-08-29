@@ -39,9 +39,8 @@ export function listPresets() {
   return read().sort((a, b) => (b.at || 0) - (a.at || 0))
 }
 
-export function savePreset({ name, description, summary, spec, usage, device, blockNames }) {
-  const entries = read()
-  const entry = {
+export function buildEntry({ name, description, summary, spec, usage, device, blockNames }) {
+  return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     at: Date.now(),
     name: (name || 'Untitled').trim(),
@@ -52,7 +51,11 @@ export function savePreset({ name, description, summary, spec, usage, device, bl
     device: device || null,
     blockNames: blockNames || []
   }
-  write([entry, ...entries])
+}
+
+export function savePreset(fields) {
+  const entry = buildEntry(fields)
+  write([entry, ...read()])
   return entry
 }
 
