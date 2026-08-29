@@ -763,12 +763,27 @@ export default function App() {
       })
 
       setProgress('Working out what that means...')
+      // The placeable palette rides along so "add a reverb" is sayable: the
+      // model can only speak in names it has been shown, and type codes differ
+      // per unit. Cached per device inside blockCatalog's own layer.
+      let palette = []
+      try {
+        const cat = await blockCatalog()
+        palette = (Array.isArray(cat) ? cat : cat?.blocks || []).map((b) => ({
+          slug: b.slug,
+          name: b.name
+        }))
+      } catch {
+        // A unit that won't list its palette just can't be added to by name.
+      }
+
       const res = await fetch('/api/command', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           instruction,
           device,
+          grid: { ...(device?.capabilities?.grid || {}), palette },
           blocks: withPositions,
           scene,
           presetName: preset?.name,
