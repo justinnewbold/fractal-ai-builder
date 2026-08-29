@@ -419,7 +419,15 @@ export function validatePlan(plan, blocks, capabilities) {
             const width = cols || chain.length
             const fits = chain.slice(0, width)
             for (const [i, block] of fits.entries()) {
-              const res = await d.placeBlock(1, i + 1, block.page ?? block.effectId)
+              /*
+               * Columns are 0-based here — the client converts to the wire's
+               * 1-based convention at the boundary, once. This loop used to
+               * 1-base them too, so every placement landed one slot right and
+               * the last one asked an AM4 for column 5, which it refuses.
+               * GridEditor, which passes readGrid's coordinates straight
+               * through, was the convention's proof all along.
+               */
+              const res = await d.placeBlock(1, i, block.page ?? block.effectId)
               if (res?.ok === false) throw new Error(`The unit refused ${block.name}.`)
             }
             // Which blocks exist is the thing that just changed.

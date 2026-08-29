@@ -870,6 +870,15 @@ test('instance suffixes and unknowns resolve sensibly', async () => {
   assert.equal(blockColor(null).fill, 'var(--panel-hi)')
 })
 
+test('the chain builder places into columns the unit has', async () => {
+  // The builder 1-based a 0-based API: the client adds the wire's +1 itself,
+  // so placements landed one slot right and the fourth asked an AM4 for
+  // column 5, which it refuses — failing the whole plan on the last block.
+  const { readFileSync } = await import('node:fs')
+  const src = readFileSync(new URL('../src/lib/actions.js', import.meta.url), 'utf8')
+  assert.ok(src.includes('d.placeBlock(1, i, block.page'), 'the builder is 1-basing columns again')
+})
+
 console.log('\nxy pad')
 
 test('the write gate holds against a fast finger', async () => {
