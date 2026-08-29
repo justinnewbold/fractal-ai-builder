@@ -161,7 +161,7 @@ export function run(test) {
       assert.ok(!components(view('edit')).includes(name), `${name} should not be in Edit`)
     }
 
-    for (const name of ['Editor', 'GridEditor', 'Scenes', 'Modifiers', 'CabPicker']) {
+    for (const name of ['Editor', 'GridEditor', 'Scenes', 'Modifiers', 'CabPicker', 'ParamSearch']) {
       assert.ok(components(view('edit')).includes(name), `${name} should be in Edit`)
     }
   })

@@ -3923,3 +3923,78 @@ button.gig-tuner-btn.on {
   margin-top: 10px;
   font-size: 14px;
 }
+
+/* ---------- find a control ---------- */
+
+.param-search input[type='search'] {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--panel);
+  color: var(--silk);
+  font-size: 16px; /* iOS zooms anything smaller on focus */
+}
+
+.param-search-hits {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.param-search-hit {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--panel);
+  text-align: left;
+}
+
+.param-search-hit .hit-block {
+  flex: 0 0 auto;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--silk-faint);
+}
+
+.param-search-hit .hit-param {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--silk);
+}
+
+.param-search-hit .hit-value {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--silk-dim);
+}
+
+/* The landing: the searched-for row announces itself, then settles. */
+.param-row.found {
+  animation: found-pulse 2s ease-out;
+}
+
+@keyframes found-pulse {
+  0%,
+  35% {
+    background: color-mix(in srgb, var(--signal) 18%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .param-row.found {
+    animation: none;
+    outline: 2px solid var(--signal);
+  }
+}

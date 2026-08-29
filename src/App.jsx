@@ -24,6 +24,7 @@ import Remote from './components/Remote'
 import Section from './components/Section'
 import SectionStack from './components/SectionStack'
 import StatusLine from './components/StatusLine'
+import ParamSearch from './components/ParamSearch'
 import Host from './components/Host'
 import Assistant from './components/Assistant'
 import Theme from './components/Theme'
@@ -172,6 +173,7 @@ export default function App() {
   const [bpm, setBpm] = useState(null)
   const [tunerOn, setTunerOn] = useState(false)
   const [tuning, setTuning] = useState(null)
+  const [editorFocus, setEditorFocus] = useState(null)
   const [scanProgress, setScanProgress] = useState(null)
   const stopScan = useRef(false)
 
@@ -1487,7 +1489,13 @@ export default function App() {
 
           <SectionStack id="edit">
           <Section key="controls" title="Controls" note="Every knob on every block" defaultOpen>
+            <ParamSearch
+              blocks={blocks}
+              onError={setError}
+              onPick={(eid, paramId) => setEditorFocus({ eid, paramId, nonce: Date.now() })}
+            />
             <Editor
+              focus={editorFocus}
               blocks={blocks}
               onWritten={(summary, detail) => {
                 record('edit', summary, detail)
