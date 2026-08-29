@@ -17,12 +17,20 @@ export function validateSpec(spec, schema) {
   }
 
   const blocksByEid = new Map(schema.map((b) => [b.eid, b]))
+  // When a lookup misses, the id the spec used is only half the story — what
+  // ids the preset actually holds is the half that names the mismatch. A run
+  // where every change was skipped and this line was absent cost a full
+  // hardware round trip to learn four numbers.
+  const inventory = () =>
+    schema.length
+      ? `This preset has: ${schema.map((b) => `${b.name || b.slug} (${b.eid})`).join(', ')}.`
+      : 'This preset reports no blocks at all.'
 
   for (const block of spec.blocks || []) {
     const known = blocksByEid.get(block.eid)
 
     if (!known) {
-      problems.push(`Skipped effect ${block.eid} — no such block in this preset.`)
+      problems.push(`Skipped effect ${block.eid} — no such block in this preset. ${inventory()}`)
       continue
     }
 

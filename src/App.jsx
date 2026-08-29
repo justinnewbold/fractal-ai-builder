@@ -837,6 +837,18 @@ export default function App() {
           // Taken from read's return rather than state, which hasn't caught up.
           record('grid', 'Built a chain into the empty slot')
           builtBlocks = await read()
+          // Say what landed, ids included. When the generation then references
+          // ids the preset doesn't hold, this line is the other half of the
+          // diagnosis, already on screen.
+          if (builtBlocks?.length) {
+            setTurns((prev) => [
+              ...prev,
+              {
+                role: 'system',
+                text: `Chain in: ${builtBlocks.map((b) => `${b.name || b.slug} (${b.effectId})`).join(', ')}`
+              }
+            ])
+          }
           if (!builtBlocks?.length) {
             setTurns((prev) => [
               ...prev,
