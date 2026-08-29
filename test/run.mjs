@@ -447,12 +447,15 @@ test('a chain with no blocks named falls back to a default', () => {
 })
 
 test('the relay refuses what the host refuses', () => {
-  // Mirrors ForgeFX's own allowlist so the app can explain itself rather than
-  // relaying a bare 403 mid-song.
   assert.ok(forbiddenRemotely('POST', '/preset/store'))
   assert.ok(forbiddenRemotely('POST', '/preset/backup'))
-  assert.ok(forbiddenRemotely('GET', '/local/presets'))
   assert.ok(forbiddenRemotely('POST', '/ports/select'))
+  // Renames and version moves are host-refused too; the mirror used to allow
+  // them, so a phone rename died as a raw relay error instead of an explanation.
+  assert.ok(forbiddenRemotely('POST', '/preset/name'))
+  assert.ok(forbiddenRemotely('POST', '/scene/name'))
+  assert.ok(forbiddenRemotely('POST', '/version/3/restore'))
+  assert.ok(forbiddenRemotely('DELETE', '/device/cache'))
 })
 
 test('live performance edits travel fine', () => {
@@ -460,9 +463,102 @@ test('live performance edits travel fine', () => {
   assert.equal(forbiddenRemotely('POST', '/scene'), null)
   assert.equal(forbiddenRemotely('POST', '/tempo'), null)
   assert.equal(forbiddenRemotely('POST', '/preset/select'), null)
+  // GETs are broadly allowed by the host — the old mirror needlessly killed the
+  // backup and port lists on the phone, and these assertions encoded that bug.
+  assert.equal(forbiddenRemotely('GET', '/backups'), null)
+  assert.equal(forbiddenRemotely('GET', '/ports'), null)
+  assert.equal(forbiddenRemotely('GET', '/local/presets'), null)
   // Trailing slashes and query strings must not sneak past the check.
   assert.ok(forbiddenRemotely('POST', '/preset/store/'))
-  assert.ok(forbiddenRemotely('GET', '/local/presets?refresh=1'))
+  assert.ok(forbiddenRemotely('POST', '/preset/backup?x=1'))
+})
+
+test('the mirror agrees with the host about every route this app calls', () => {
+  /*
+   * The host's rule, transcribed from ForgeFX server/src/remote.ts
+   * remoteAllowed() and verified against that file this session. If ForgeFX
+   * changes its allowlist, update BOTH this transcription and hostAllows() in
+   * src/lib/remote.js — this test exists because the two drifted on eight
+   * routes before anyone compared them.
+   */
+  const hostAllows = (method, p) => {
+    if (method === 'GET')
+      return !p.startsWith('/cloud') && !p.startsWith('/remote') && p !== '/debug/raw'
+    if (method === 'PUT')
+      return (
+        /^\/preset\/blocks\/\d+\/params(\/\d+)?$/.test(p) ||
+        /^\/preset\/grid\/cell$/.test(p) ||
+        /^\/am4\/param$/.test(p) ||
+        /^\/device\/param$/.test(p) ||
+        p === '/telemetry/config' ||
+        /^\/store\/config\/[^/]+$/.test(p)
+      )
+    if (method === 'POST')
+      return (
+        /^\/preset\/blocks\/\d+\/(bypass|channel|type|read|readrange)$/.test(p) ||
+        [
+          '/preset/meters',
+          '/preset/select',
+          '/preset/grid/cable',
+          '/preset/grid/select',
+          '/scene',
+          '/tempo',
+          '/tempo/tap',
+          '/tuner',
+          '/mod/bind'
+        ].includes(p) ||
+        /^\/am4\/(bypass|scene|preset)$/.test(p)
+      )
+    return false
+  }
+
+  const calls = [
+    ['DELETE', '/device/cache'],
+    ['DELETE', '/store/config/x'],
+    ['GET', '/backups'],
+    ['GET', '/blocks'],
+    ['GET', '/device/detect'],
+    ['GET', '/ports'],
+    ['GET', '/preset'],
+    ['GET', '/preset/blocks'],
+    ['GET', '/preset/blocks/1/params'],
+    ['GET', '/preset/grid'],
+    ['GET', '/presets/1'],
+    ['GET', '/scene'],
+    ['GET', '/store/config/x'],
+    ['GET', '/tempo'],
+    ['POST', '/backup/device'],
+    ['POST', '/mod/bind'],
+    ['POST', '/ports/select'],
+    ['POST', '/preset/backup'],
+    ['POST', '/preset/blocks/1/bypass'],
+    ['POST', '/preset/blocks/1/channel'],
+    ['POST', '/preset/blocks/1/type'],
+    ['POST', '/preset/grid/cable'],
+    ['POST', '/preset/grid/select'],
+    ['POST', '/preset/name'],
+    ['POST', '/preset/select'],
+    ['POST', '/preset/store'],
+    ['POST', '/scene'],
+    ['POST', '/scene/name'],
+    ['POST', '/tempo'],
+    ['POST', '/tempo/tap'],
+    ['POST', '/tuner'],
+    ['POST', '/version/1/load'],
+    ['POST', '/version/1/restore'],
+    ['PUT', '/preset/blocks/1/params/1'],
+    ['PUT', '/preset/grid/cell'],
+    ['PUT', '/store/config/x']
+  ]
+
+  for (const [m, p] of calls) {
+    const mirror = forbiddenRemotely(m, p) === null
+    assert.equal(
+      mirror,
+      hostAllows(m, p),
+      `${m} ${p}: mirror says ${mirror ? 'allowed' : 'blocked'}, host says the opposite`
+    )
+  }
 })
 
 test('an unconfirmed account is not reported as a bad password', () => {
