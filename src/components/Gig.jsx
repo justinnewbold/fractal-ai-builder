@@ -7,11 +7,13 @@ import {
   readSceneNames,
   presetBlocks,
   setBypass,
+  setTuner,
   subscribeEvents
 } from '../lib/forgefx'
 import { remoteActive } from '../lib/remote'
 import { EXCLUDED_BLOCKS } from '../lib/guardrails'
 import { blockColor } from '../lib/blockColors'
+import { Tuner } from './Console'
 
 /**
  * The stand, not the bench.
@@ -31,6 +33,8 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
   const [working, setWorking] = useState(false)
   const [blocks, setBlocks] = useState([])
   const [toggling, setToggling] = useState(null)
+  const [tunerOn, setTunerOn] = useState(false)
+  const [tuning, setTuning] = useState(null)
   /*
    * 'reading' | 'ok' | 'failed'.
    *
@@ -78,6 +82,7 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
     const unsubscribe = subscribeEvents((event) => {
       if (event?.type === 'scene' && typeof event.index === 'number') setSceneIndex(event.index)
       if (event?.type === 'scene' || event?.type === 'changed') refreshBlocks({ quiet: true })
+      if (event?.type === 'tuner') setTuning(event)
     })
     return unsubscribe
   }, [])
@@ -140,6 +145,36 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
       stop = true
     }
   }, [])
+
+  /**
+   * The tuner, on this screen, where tuning actually happens.
+   *
+   * There is nothing to open on the unit — the AM4's tuner block is always
+   * live, and what "the tuner works in Axis" turned out to mean is a display in
+   * the app, fed by the same poll. So that is what this is. POST /tuner and the
+   * bridged events both travel the relay, so it works the same from a phone.
+   */
+  const toggleTuner = async () => {
+    const next = !tunerOn
+    setTunerOn(next)
+    if (!next) setTuning(null)
+    try {
+      await setTuner(next)
+    } catch (err) {
+      setTunerOn(!next)
+      onError(err.message)
+    }
+  }
+
+  /*
+   * Leaving gig mode with the tuner running would leave the poll running for a
+   * display nobody can see. Cleanup turns it off with the same best-effort
+   * shrug as the toggle itself.
+   */
+  useEffect(() => {
+    if (!tunerOn) return
+    return () => setTuner(false).catch(() => {})
+  }, [tunerOn])
 
   const pickScene = async (index) => {
     setSceneIndex(index) // optimistic: the footswitch feel matters more than the round trip
@@ -212,6 +247,20 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
           Next ›
         </button>
       </div>
+
+      <button
+        className={`gig-tuner-btn ${tunerOn ? 'on' : ''}`}
+        onClick={toggleTuner}
+        aria-pressed={tunerOn}
+      >
+        {tunerOn ? 'Tuner off' : 'Tuner'}
+      </button>
+
+      {tunerOn ? (
+        <div className="gig-tuner">
+          <Tuner reading={tuning} on={tunerOn} />
+        </div>
+      ) : null}
 
       {/* Scenes lead. A scene is the bigger move and it sets every block state
           below it, so cause sits above effect rather than under it. */}
