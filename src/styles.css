@@ -3835,3 +3835,38 @@ button.gig-block:disabled {
 .turn.turn-result:empty {
   display: none;
 }
+
+/* ---------- gig blocks in the unit's own colours ---------- */
+
+/* On matches the AM4's screen: the family colour as the whole tile, the way
+   the hardware draws it, so which pedal is which reads from across a stage. */
+button.gig-block.on {
+  border-color: var(--block-fill, var(--signal));
+  background: var(--block-fill, var(--panel));
+}
+
+button.gig-block.on .gig-block-name {
+  color: var(--block-ink, var(--silk));
+}
+
+button.gig-block.on .gig-block-state {
+  color: var(--block-ink, var(--signal));
+  opacity: 0.75;
+}
+
+/* Off keeps a sliver of the family colour on the leading edge — enough to find
+   the delay you're about to stomp, without it reading as engaged. */
+button.gig-block.off {
+  border-left: 3px solid var(--block-fill, var(--rule));
+  opacity: 0.62;
+}
+
+/* The read-only chain diagram carries the family colour as an edge rather than
+   a fill — it's a map, not a control, and a row of solid tiles would shout. */
+.chain .block {
+  border-left: 3px solid var(--block-fill, var(--rule));
+}
+
+.chain .block[data-bypassed='true'] {
+  opacity: 0.55;
+}
