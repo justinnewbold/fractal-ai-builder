@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
-import { blockParams, disambiguate } from '../lib/forgefx'
-import { EXCLUDED_BLOCKS, safeParams } from '../lib/guardrails'
+import { EXCLUDED_BLOCKS } from '../lib/guardrails'
+import { buildParamIndex } from '../lib/paramIndex'
 
 /**
  * Find a control by name, across every block at once.
@@ -28,18 +28,7 @@ export default function ParamSearch({ blocks, onPick, onError }) {
     if (loadedFor.current === key) return
     setReading(true)
     try {
-      const built = []
-      for (const block of editable) {
-        try {
-          const res = await blockParams(block.effectId)
-          for (const p of safeParams(disambiguate(res?.named || []))) {
-            built.push({ block, param: p })
-          }
-        } catch {
-          // A block that won't list its params just isn't searchable.
-        }
-      }
-      setIndex(built)
+      setIndex(await buildParamIndex(blocks))
       loadedFor.current = key
     } finally {
       setReading(false)

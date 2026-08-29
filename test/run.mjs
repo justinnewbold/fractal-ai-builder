@@ -870,4 +870,29 @@ test('instance suffixes and unknowns resolve sensibly', async () => {
   assert.equal(blockColor(null).fill, 'var(--panel-hi)')
 })
 
+console.log('\nxy pad')
+
+test('the write gate holds against a fast finger', async () => {
+  const { gateWrite } = await import('../src/lib/xy.js')
+  // First touch always writes.
+  assert.ok(gateWrite({ now: 0, lastAt: 0, lastFrac: null, frac: 0.5, interval: 60 }))
+  // A twitch below the epsilon never writes, no matter how much time passed.
+  assert.ok(!gateWrite({ now: 9999, lastAt: 0, lastFrac: 0.5, frac: 0.502, interval: 60 }))
+  // Real movement too soon after the last write waits.
+  assert.ok(!gateWrite({ now: 30, lastAt: 0, lastFrac: 0.5, frac: 0.7, interval: 60 }))
+  // Real movement after the interval goes through.
+  assert.ok(gateWrite({ now: 61, lastAt: 0, lastFrac: 0.5, frac: 0.7, interval: 60 }))
+})
+
+test('pointer positions clamp to the pad and up means more', async () => {
+  const { padFraction } = await import('../src/lib/xy.js')
+  const rect = { left: 100, top: 100, width: 200, height: 200 }
+  assert.deepEqual(padFraction(200, 200, rect), { x: 0.5, y: 0.5 })
+  // Top edge of the pad is full value, not zero.
+  assert.deepEqual(padFraction(100, 100, rect), { x: 0, y: 1 })
+  // A drag that leaves the pad pins to the edge instead of overshooting.
+  assert.deepEqual(padFraction(999, -50, rect), { x: 1, y: 1 })
+  assert.deepEqual(padFraction(-50, 999, rect), { x: 0, y: 0 })
+})
+
 console.log(`\n${passed} passed\n`)
