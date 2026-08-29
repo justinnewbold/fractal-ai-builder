@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { blockParams, blockTypes, setParamConfirmed, setType, setBypass } from '../lib/forgefx'
 import { isSilencingParam } from '../lib/guardrails'
 
@@ -13,7 +13,7 @@ import { isSilencingParam } from '../lib/guardrails'
  * Output levels stay visible here but read-only. The generator shouldn't set
  * them; a player editing by hand still needs to see where they sit.
  */
-export default function Editor({ blocks, onWritten, onError }) {
+export default function Editor({ blocks, onWritten, onError, focus }) {
   const [openEid, setOpenEid] = useState(null)
   const [params, setParams] = useState([])
   const [models, setModels] = useState([])
@@ -23,6 +23,33 @@ export default function Editor({ blocks, onWritten, onError }) {
   const [writing, setWriting] = useState(false)
 
   const active = blocks.find((b) => b.effectId === openEid)
+
+  /*
+   * Search hands over here: open the right block, then put the person's eyes
+   * (and cursor) on the control they named. The highlight rides the param list
+   * finishing its read — jumping before the row exists would scroll to nothing.
+   */
+  const pendingFocus = useRef(null)
+  useEffect(() => {
+    if (!focus?.nonce) return
+    pendingFocus.current = focus
+    setOpenEid(focus.eid)
+  }, [focus])
+
+  useEffect(() => {
+    const want = pendingFocus.current
+    if (!want || loading || openEid !== want.eid) return
+    pendingFocus.current = null
+    const el = document.getElementById(`p-${want.paramId}`)
+    if (!el) return
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    el.focus({ preventScroll: true })
+    const row = el.closest('.param-row')
+    if (row) {
+      row.classList.add('found')
+      setTimeout(() => row.classList.remove('found'), 2000)
+    }
+  }, [loading, openEid])
 
   useEffect(() => {
     if (openEid === null) return
