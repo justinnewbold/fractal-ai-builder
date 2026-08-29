@@ -14,6 +14,7 @@ import { remoteActive } from '../lib/remote'
 import { EXCLUDED_BLOCKS } from '../lib/guardrails'
 import { blockColor } from '../lib/blockColors'
 import { Tuner } from './Console'
+import XYPad from './XYPad'
 
 /**
  * The stand, not the bench.
@@ -34,6 +35,7 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
   const [blocks, setBlocks] = useState([])
   const [toggling, setToggling] = useState(null)
   const [tunerOn, setTunerOn] = useState(false)
+  const [xyOn, setXyOn] = useState(false)
   const [tuning, setTuning] = useState(null)
   /*
    * 'reading' | 'ok' | 'failed'.
@@ -261,6 +263,18 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
           <Tuner reading={tuning} on={tunerOn} />
         </div>
       ) : null}
+
+      <button
+        className={`gig-tuner-btn ${xyOn ? 'on' : ''}`}
+        onClick={() => setXyOn(!xyOn)}
+        aria-pressed={xyOn}
+      >
+        {xyOn ? 'Close XY pad' : 'XY pad'}
+      </button>
+
+      {/* Live even while hidden would be wrong the other way: the pad holds no
+          poll and writes only under a finger, so mount/unmount is free. */}
+      {xyOn ? <XYPad blocks={blocks} onError={onError} /> : null}
 
       {/* Scenes lead. A scene is the bigger move and it sets every block state
           below it, so cause sits above effect rather than under it. */}

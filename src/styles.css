@@ -3998,3 +3998,87 @@ button.gig-tuner-btn.on {
     outline: 2px solid var(--signal);
   }
 }
+
+/* ---------- the XY pad ---------- */
+
+.xy {
+  margin-top: 10px;
+}
+
+.xy-pickers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.xy-pickers label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.xy-pickers select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--panel);
+  color: var(--silk);
+  font-size: 16px;
+}
+
+/* Square, edge to edge, and it owns every touch that starts on it — without
+   touch-action the browser treats a vertical drag as a scroll. */
+.xy-pad {
+  position: relative;
+  margin-top: 10px;
+  aspect-ratio: 1;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background:
+    linear-gradient(var(--rule) 1px, transparent 1px) 0 0 / 100% 25%,
+    linear-gradient(90deg, var(--rule) 1px, transparent 1px) 0 0 / 25% 100%,
+    var(--chassis);
+  touch-action: none;
+  overflow: hidden;
+}
+
+.xy-line-h,
+.xy-line-v {
+  position: absolute;
+  background: color-mix(in srgb, var(--signal) 45%, transparent);
+  pointer-events: none;
+}
+
+.xy-line-h {
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+
+.xy-line-v {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+.xy-dot {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--signal);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--signal) 60%, transparent);
+  pointer-events: none;
+}
+
+.xy-readout {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--silk-dim);
+}
