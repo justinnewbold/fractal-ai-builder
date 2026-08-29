@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getWireLog, clearWireLog, getCheckLog, clearCheckLog } from '../lib/forgefx'
+import { getWireLog, clearWireLog, getCheckLog, clearCheckLog, sceneNameTrace } from '../lib/forgefx'
 import { FULL, BUILT_AT } from '../lib/version'
 import { fromNormalized } from '../lib/scale'
 
@@ -78,6 +78,17 @@ export default function Diagnostics() {
           {FULL} &middot; built {BUILT_AT} UTC
         </span>
       </div>
+
+      {sceneNameTrace.length ? (
+        <div className="diag-block">
+          <p className="silk-label">Last scene-name lookup</p>
+          {sceneNameTrace.map((step, i) => (
+            <p key={i} className="mono hint">
+              {step}
+            </p>
+          ))}
+        </div>
+      ) : null}
 
       {open ? (
         <>
