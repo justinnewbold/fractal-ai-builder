@@ -1153,20 +1153,48 @@ export default function App() {
           </h1>
           <p className="tagline">Describe a tone. Get a preset on the unit.</p>
         </div>
-        {/*
-          Version, build stamp and commit used to sit here, above everything.
-          They are the first thing a guitarist saw and told them nothing; they
-          matter only when something has gone wrong, which is where they now
-          live — Library, Technical details. The theme toggle stays, because
-          that is a thing you actually want to change.
-        */}
-        <div className="build-badge">
-          <Theme />
-          {/* The one piece of "chrome" that earned its place back: the version
-              is how a deploy is confirmed after every change, and burying it
-              three taps deep in Technical details broke that habit. Just the
-              number — the phase, hash and build stamp stay buried. */}
-          <span className="version mono">v{VERSION}</span>
+        <div className="mast-right">
+          {/*
+            Saving, top right — moved up from a bar pinned over the bottom of
+            every screen. Absent in gig: that screen exists to switch sounds
+            with a thumb in the dark, and a slot overwrite is not something to
+            put within reach of a mis-tap mid-song. The StatusLine still says
+            "Unsaved" on every screen, so the state survives the scroll even
+            though the button doesn't follow it.
+          */}
+          {status === 'live' && view !== 'gig' ? (
+            <SaveBar
+              preset={preset}
+              dirty={dirty}
+              busy={busy}
+              saveName={saveName}
+              onName={setSaveName}
+              slot={slot}
+              onSlot={setSlot}
+              onSave={save}
+              onRevert={revert}
+              safety={safety}
+              onRestoreSafety={restoreSafety}
+              error={saveError}
+              onDismissError={() => setSaveError(null)}
+            />
+          ) : null}
+
+          {/*
+            Version, build stamp and commit used to sit here, above everything.
+            They are the first thing a guitarist saw and told them nothing; they
+            matter only when something has gone wrong, which is where they now
+            live — Library, Technical details. The theme toggle stays, because
+            that is a thing you actually want to change.
+          */}
+          <div className="build-badge">
+            <Theme />
+            {/* The one piece of "chrome" that earned its place back: the version
+                is how a deploy is confirmed after every change, and burying it
+                three taps deep in Technical details broke that habit. Just the
+                number — the phase, hash and build stamp stay buried. */}
+            <span className="version mono">v{VERSION}</span>
+          </div>
         </div>
       </header>
 
@@ -1869,30 +1897,6 @@ export default function App() {
         , an independent project not affiliated with Fractal Audio Systems.
       </p>
 
-      {/*
-        Last in the document, pinned to the bottom of the viewport, and outside
-        every view — because saving belongs to the preset, not to whichever tab
-        happens to be open. Absent in gig: that screen exists to switch sounds
-        with a thumb in the dark, and a slot overwrite is not something to put
-        within reach of a mis-tap mid-song.
-      */}
-      {status === 'live' && view !== 'gig' ? (
-        <SaveBar
-          preset={preset}
-          dirty={dirty}
-          busy={busy}
-          saveName={saveName}
-          onName={setSaveName}
-          slot={slot}
-          onSlot={setSlot}
-          onSave={save}
-          onRevert={revert}
-          safety={safety}
-          onRestoreSafety={restoreSafety}
-          error={saveError}
-          onDismissError={() => setSaveError(null)}
-        />
-      ) : null}
     </div>
   )
 }
