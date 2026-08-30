@@ -106,7 +106,16 @@ export default function Assistant({
   const typed = useTypedSuggestion(!text && !focused && !busy)
 
   useEffect(() => {
-    tail.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    /*
+     * Keep the conversation pinned to its latest turn — but only inside the
+     * log's own scrollbox. This used to be scrollIntoView, which scrolls every
+     * scrollable ancestor including the page: each new turn or progress tick
+     * yanked the whole screen down to this element, and during a generation it
+     * kept doing it against the player's own scrolling. The page is not this
+     * component's to move.
+     */
+    const log = tail.current?.parentElement
+    if (log) log.scrollTop = log.scrollHeight
   }, [turns, progress])
 
   const submit = (value) => {
