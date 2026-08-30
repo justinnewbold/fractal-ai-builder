@@ -779,6 +779,141 @@ test('slot zero is a real slot, not an empty field', () => {
   assert.equal(target('0', 97), 0)
 })
 
+console.log('\nthe relay coming and going')
+
+test('a channel whose socket closed is never handed back', async () => {
+  const { canReuseChannel } = await import('../src/lib/remote.js')
+  const client = { id: 'a' }
+  const joined = { state: 'joined' }
+  const closed = { state: 'closed' }
+  assert.equal(canReuseChannel(joined, { client, chan: joined }, client), true)
+  // The bug: connect returned this one, so every request went into a dead
+  // socket and only reloading the page ever fixed it.
+  assert.equal(canReuseChannel(closed, { client, chan: closed }, client), false)
+})
+
+test('a channel belonging to a previous sign-in is never handed back', async () => {
+  const { canReuseChannel } = await import('../src/lib/remote.js')
+  const old = { id: 'old' }
+  const fresh = { id: 'fresh' }
+  const chan = { state: 'joined' }
+  assert.equal(canReuseChannel(chan, { client: old, chan }, fresh), false)
+})
+
+test('nothing to reuse is not something to reuse', async () => {
+  const { canReuseChannel } = await import('../src/lib/remote.js')
+  const client = { id: 'a' }
+  assert.equal(canReuseChannel(null, null, client), false)
+  assert.equal(canReuseChannel({ state: 'joined' }, null, client), false)
+})
+
+console.log('\nparameter matching')
+
+const ampSchema = [
+  {
+    eid: 58,
+    name: 'Amp 1',
+    slug: 'amp',
+    params: [
+      { id: 3, name: 'Bass', value: 5, min: 0, max: 10 },
+      { id: 12, name: 'Low Cut Frequency', value: 20, min: 10, max: 1000, log: true },
+      { id: 4, name: 'Amp 1 Level', value: 0, min: -80, max: 20 }
+    ],
+    models: []
+  }
+]
+
+test('a control named right and addressed wrong is still written', () => {
+  // The FM3 run that prompted this: "Amp 1 / Low Cut Frequency: 5.5 is outside
+  // 10-1000" was a Bass of 5.5 sent to the id the model believed Bass was.
+  const res = validateSpec(
+    { blocks: [{ eid: 58, params: [{ id: 12, name: 'Bass', value: 5.5 }] }] },
+    ampSchema
+  )
+  assert.equal(res.changes[0].params[0].id, 3)
+  assert.equal(res.changes[0].params[0].to, 5.5)
+  assert.equal(res.problems.length, 0)
+  assert.match(res.repairs[0], /Low Cut Frequency/)
+})
+
+test('a name that matches nothing is still a rejection', () => {
+  const res = validateSpec(
+    { blocks: [{ eid: 58, params: [{ id: 99, name: 'Sparkle', value: 4 }] }] },
+    ampSchema
+  )
+  assert.equal(res.changes.length, 0)
+  assert.match(res.problems[0], /no parameter 99/)
+})
+
+test('matching by name never resurrects an output level', () => {
+  const res = validateSpec(
+    { blocks: [{ eid: 58, params: [{ id: 3, name: 'Amp 1 Level', value: -60 }] }] },
+    ampSchema
+  )
+  assert.equal(res.changes.length, 0)
+  assert.match(res.problems[0], /yours to set/)
+})
+
+test('a name matched to the right id is not reported as a correction', () => {
+  const res = validateSpec(
+    { blocks: [{ eid: 58, params: [{ id: 3, name: 'Bass', value: 7 }] }] },
+    ampSchema
+  )
+  assert.equal(res.repairs.length, 0)
+  assert.equal(res.changes[0].params[0].id, 3)
+})
+
+test('a matched name is still checked against that control own range', () => {
+  const res = validateSpec(
+    { blocks: [{ eid: 58, params: [{ id: 12, name: 'Bass', value: 50 }] }] },
+    ampSchema
+  )
+  assert.equal(res.changes.length, 0)
+  assert.match(res.problems[0], /Bass: 50 is outside 0–10/)
+})
+
+console.log('\nslot addressing')
+
+test('a gen-3 slot is a number, not a bank letter', async () => {
+  const { slotLabel } = await import('../src/lib/slots.js')
+  assert.equal(slotLabel(0, 'numeric'), '000')
+  assert.equal(slotLabel(2, 'numeric'), '002')
+  assert.equal(slotLabel(511, 'numeric'), '511')
+})
+
+test('the AM4 keeps its lettered banks of four', async () => {
+  const { slotLabel } = await import('../src/lib/slots.js')
+  assert.equal(slotLabel(0, 'bankLetter'), 'A01')
+  assert.equal(slotLabel(7, 'bankLetter'), 'B04')
+  assert.equal(slotLabel(103, 'bankLetter'), 'Z04')
+})
+
+test('past Z there is no letter, so it falls back to the number', async () => {
+  // 512 slots lettered in fours ran off the end of the alphabet: slot 200 was
+  // labelled "s1" and slot 460 "À1", addresses that name nothing.
+  const { slotLabel } = await import('../src/lib/slots.js')
+  assert.equal(slotLabel(200, 'bankLetter'), '200')
+  assert.equal(slotLabel(460, 'bankLetter'), '460')
+})
+
+test('bank rules are drawn only where there are banks', async () => {
+  const { startsBank } = await import('../src/lib/slots.js')
+  assert.equal(startsBank(4, 3, 'bankLetter'), true)
+  assert.equal(startsBank(5, 4, 'bankLetter'), false)
+  assert.equal(startsBank(0, null, 'bankLetter'), true)
+  assert.equal(startsBank(4, 3, 'numeric'), false)
+})
+
+test('a scan says how long it has left, in words', async () => {
+  const { timeLeft } = await import('../src/lib/slots.js')
+  assert.equal(timeLeft(400, 300), 'about 2 minutes left')
+  assert.equal(timeLeft(100, 600), 'about 1 minute left')
+  assert.equal(timeLeft(10, 300), 'under a minute left')
+  // Nothing to say before anything has been timed.
+  assert.equal(timeLeft(400, null), null)
+  assert.equal(timeLeft(0, 300), null)
+})
+
 console.log('\nstructure')
 const { run: structure } = await import('./structure.mjs')
 structure(test)

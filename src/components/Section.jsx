@@ -1,3 +1,5 @@
+import Boundary from './Boundary'
+
 /**
  * A panel you can fold away.
  *
@@ -24,7 +26,9 @@ export default function Section({ title, note, defaultOpen = false, children }) 
         hold. Height only — width is the column's job, and a half-width panel in
         a stack is just a panel with a gap next to it.
       */}
-      <div className="section-body">{children}</div>
+      <div className="section-body">
+        <Boundary label={title}>{children}</Boundary>
+      </div>
     </details>
   )
 }

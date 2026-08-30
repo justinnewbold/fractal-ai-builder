@@ -168,16 +168,81 @@ export const setAutoConnect = (on) => {
 export const wantsAutoConnect = () => !!loadRemoteConfig()?.autoConnect
 
 let client = null
-let channel = null
+let channel = null // the joined channel, and null the moment it stops being joined
+let session = null // what we built: the channel object and the client it belongs to
 let userId = null
 let hostSeen = false
 const waiting = new Map()
 const listeners = new Set()
+const watchers = new Set()
 
 export const remoteActive = () => !!channel
 
+/** A session that exists, joined or not — the difference between "dropped" and "never set up". */
+export const remoteLinked = () => !!session
+
 /** Whether anything besides this browser is on the channel. */
 export const remoteHostSeen = () => hostSeen
+
+/**
+ * Whether the relay is up, as it changes.
+ *
+ * A socket can close under a phone that's locked, carried out of range, or
+ * handed from wifi to cellular, and nothing here noticed: `channel` stayed set,
+ * so the app went on believing it was connected and every request went into a
+ * dead socket and waited for its timeout. Worse, a manual reconnect saw that
+ * same channel and returned it unchanged, which is why only a page reload ever
+ * fixed it — a reload is the one thing that clears this module's state.
+ *
+ * So the join status is watched rather than sampled once, and anyone who cares
+ * is told. realtime-js rejoins on its own when the network comes back; this is
+ * what turns that rejoin into the app catching up rather than a stale screen.
+ */
+export function subscribeRemoteState(fn) {
+  watchers.add(fn)
+  return () => watchers.delete(fn)
+}
+
+let lastState = false
+function announce() {
+  const up = !!channel
+  if (up === lastState) return
+  lastState = up
+  for (const fn of watchers) {
+    try {
+      fn(up)
+    } catch {
+      // One bad watcher shouldn't stop the others.
+    }
+  }
+}
+
+/** Nothing can be answered on a channel that has gone. Fail them now, loudly. */
+function failWaiting(message) {
+  for (const [, pending] of waiting) pending.reject(new Error(message))
+  waiting.clear()
+}
+
+/** realtime-js keeps its own channel state; 'joined' is the only one that can carry a request. */
+const isJoined = (chan) => {
+  try {
+    return chan?.state === 'joined'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Whether an existing channel is worth keeping instead of rebuilding.
+ *
+ * Two ways it isn't, and connect used to fall for both. A channel whose socket
+ * has closed is still an object and still truthy. And signing in again builds a
+ * new client, which leaves the channel wired to the old one — a client the app
+ * no longer holds and whose socket nothing is keeping alive.
+ */
+export function canReuseChannel(channel, session, client) {
+  return !!channel && !!client && session?.client === client && isJoined(channel)
+}
 
 /** Sign in to the player's own Supabase project. */
 /**
@@ -259,7 +324,17 @@ export async function remoteSignIn({ url, anonKey, email, password }) {
  */
 export async function remoteConnect() {
   if (!client || !userId) throw new Error('Sign in first.')
-  if (channel) return userId
+
+  /*
+   * Only a channel that is joined AND belongs to the client we're holding can
+   * be reused. This used to be `if (channel) return userId`, which handed back
+   * whatever was left over: a socket that had dropped, or — after signing in
+   * again, which builds a new client — a channel wired to the old one. Connect
+   * returned instantly, the app said it was connected, and every request sat
+   * there until it timed out. Anything else gets torn down and rebuilt.
+   */
+  if (canReuseChannel(channel, session, client)) return userId
+  await remoteDisconnect()
 
   /*
    * Clear out anything left from a previous attempt first.
@@ -320,40 +395,79 @@ export async function remoteConnect() {
     }
   })
 
+  /*
+   * The callback stays live for the life of the channel, not just the join.
+   * realtime-js calls it again every time the channel's state changes — which
+   * is the only notice we get that a socket died, and the only notice that it
+   * came back. Settling the join promise is a one-off; keeping `channel`
+   * truthful is the ongoing job.
+   */
+  session = { chan, client }
+  let settled = false
   await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Joining the channel timed out.')), 12000)
+    const timer = setTimeout(() => {
+      if (settled) return
+      settled = true
+      reject(new Error('Joining the channel timed out.'))
+    }, 12000)
+
     chan.subscribe((status) => {
+      if (session?.chan !== chan) return // a channel we've already replaced
+
       if (status === 'SUBSCRIBED') {
-        clearTimeout(timer)
-        resolve()
-      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        clearTimeout(timer)
-        reject(new Error(`Realtime ${status}. Is the host signed in and enabled?`))
+        channel = chan
+        chan.track({ at: Date.now() }).catch(() => {})
+        if (!settled) {
+          settled = true
+          clearTimeout(timer)
+          resolve()
+        }
+        announce()
+        return
+      }
+
+      if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        if (channel === chan) {
+          channel = null
+          hostSeen = false
+          failWaiting('The remote session dropped before the host answered.')
+        }
+        if (!settled) {
+          settled = true
+          clearTimeout(timer)
+          reject(new Error(`Realtime ${status}. Is the host signed in and enabled?`))
+        }
+        announce()
       }
     })
   }).catch(async (err) => {
     // Leave nothing registered on the way out, or the next attempt inherits it.
+    if (session?.chan === chan) session = null
     await client.removeChannel(chan).catch(() => {})
     throw err
   })
 
-  await chan.track({ at: Date.now() }).catch(() => {})
-  channel = chan
   return userId
 }
 
 export async function remoteDisconnect() {
-  if (channel) {
-    try {
-      await channel.unsubscribe()
-    } catch {
-      // Leaving a channel that's already gone is not a failure.
-    }
-  }
+  const going = session
+  session = null
   channel = null
   hostSeen = false
-  for (const [, pending] of waiting) pending.reject(new Error('Remote disconnected.'))
-  waiting.clear()
+  failWaiting('Remote disconnected.')
+  announce()
+
+  if (going?.chan) {
+    try {
+      // Removed, not merely unsubscribed: a channel left registered on the
+      // client is handed back by the next `client.channel(topic)`, already
+      // joined, and registering presence on it throws.
+      await going.client.removeChannel(going.chan)
+    } catch {
+      // Already gone is the outcome we wanted anyway.
+    }
+  }
 }
 
 /** Device events bridged from the host, same shape as the local SSE stream. */
@@ -385,6 +499,15 @@ async function decode(payload) {
  */
 export async function remoteRequest(path, options = {}) {
   if (!channel) throw new Error('Not connected to the host.')
+  // A channel can stop being joined between one request and the next, and
+  // sending into it waits out the whole timeout for an answer nobody heard the
+  // question. Catching it here costs nothing and says what actually happened.
+  if (!isJoined(channel)) {
+    channel = null
+    hostSeen = false
+    announce()
+    throw new Error('The remote session dropped. Reconnect to the Mac to carry on.')
+  }
   const method = (options.method || 'GET').toUpperCase()
 
   const why = forbiddenRemotely(method, path)

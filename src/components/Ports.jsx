@@ -51,8 +51,22 @@ export default function Ports({ onError, onChanged, busy }) {
     }
   }
 
-  const fractal = (ports?.serial || []).filter((p) => p.fractal)
-  const others = (ports?.serial || []).filter((p) => !p.fractal)
+  /*
+   * ForgeFX answers /ports with one `ports` list carrying both transports, each
+   * entry flagged `fractal`. This read `ports.serial` — a field the server has
+   * never sent — so the list was always empty and the panel always said no unit
+   * was found, on a Mac with the unit plugged in and answering every other call
+   * the app made.
+   *
+   * MIDI endpoints are shown but not offered as a choice: a MIDI connection is
+   * an input and an output together, and ForgeFX pairs them itself when there's
+   * no Fractal unit on a serial port. Picking one half here would record a
+   * connection that doesn't work.
+   */
+  const all = Array.isArray(ports?.ports) ? ports.ports : []
+  const fractal = all.filter((p) => p.fractal && p.transport !== 'midi')
+  const overMidi = all.filter((p) => p.fractal && p.transport === 'midi')
+  const others = all.filter((p) => !p.fractal)
   const chosenId = ports?.chosen?.id
 
   return (
@@ -90,9 +104,16 @@ export default function Ports({ onError, onChanged, busy }) {
                 ))
               )}
 
+              {overMidi.length ? (
+                <p className="hint pad">
+                  Also reachable over MIDI: {overMidi.map((p) => p.label || p.id).join(', ')} — used
+                  automatically when nothing is on a serial port.
+                </p>
+              ) : null}
+
               {others.length ? (
                 <p className="hint pad">
-                  {others.length} other serial port{others.length === 1 ? '' : 's'} ignored — no
+                  {others.length} other connection{others.length === 1 ? '' : 's'} ignored — no
                   Fractal unit on them.
                 </p>
               ) : null}

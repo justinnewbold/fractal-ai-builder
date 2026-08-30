@@ -45,3 +45,35 @@ export const EXCLUDED_BLOCKS = ['input', 'output', 'looper', 'gate']
 export function safeParams(params) {
   return (params || []).filter((p) => !isSilencingParam(p.name))
 }
+
+/**
+ * Which parameter a generated change is actually for.
+ *
+ * The id is an address and the name is the intent, and when the two disagree it
+ * is the name that came out right. A run against a real FM3 rejected "Amp 1 /
+ * Low Cut Frequency: 5.5 is outside 10–1000" — a Bass of 5.5, sent to whatever
+ * id the model believed Bass was, landing on the parameter that id really is.
+ * Half a page of rejections were legible requests thrown away on a technicality
+ * with the device's own list right there to settle them.
+ *
+ * This loosens nothing. What comes back is always a parameter the device
+ * reported, and the caller still checks the value against that parameter's own
+ * range and its own silencing rule. It says why it moved, so a correction can
+ * be shown rather than being a quiet change of meaning.
+ */
+const plain = (name) => String(name ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
+
+export function matchParam(params, { id, name }) {
+  const list = params || []
+  const byId = list.find((p) => p.id === id) || null
+  const wanted = plain(name)
+  if (!wanted || (byId && plain(byId.name) === wanted)) return { param: byId, note: null }
+
+  const byName = list.find((p) => plain(p.name) === wanted)
+  if (!byName || byName === byId) return { param: byId, note: null }
+
+  return {
+    param: byName,
+    note: byId ? `id ${id} is ${byId.name} on this unit` : `there is no parameter ${id} here`
+  }
+}

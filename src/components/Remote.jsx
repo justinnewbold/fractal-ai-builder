@@ -8,6 +8,7 @@ import {
   remoteDisconnect,
   remoteActive,
   remoteHostSeen,
+  subscribeRemoteState,
   restoreSession,
   setAutoConnect,
   wantsAutoConnect,
@@ -67,6 +68,48 @@ export default function Remote({ onConnected, onError }) {
     }
     // Runs once on mount by design: this is about the state the app opened in.
   }, [])
+
+  /*
+   * The panel follows the link rather than remembering what it last did.
+   *
+   * It set `connected` once, on the way in, and nothing ever unset it — so a
+   * dropped socket left a panel offering a Disconnect button for a session that
+   * was already gone, with no way back except reloading the page.
+   */
+  useEffect(
+    () =>
+      subscribeRemoteState((up) => {
+        setState(up ? 'connected' : 'idle')
+        setNote(up ? 'Reconnected to the host.' : 'The connection to the Mac dropped.')
+      }),
+    []
+  )
+
+  /**
+   * Back on the channel without typing the password again.
+   *
+   * The reason a reload was the only cure for a dropped session: on load the
+   * app picks up the Supabase session that's already in this browser and
+   * rejoins silently, while the panel itself offered nothing but a sign-in form
+   * — and the password isn't kept, on purpose. This is the load path, on a
+   * button, which is what should have been under the finger all along.
+   */
+  const rejoin = async () => {
+    setState('connecting')
+    setNote(null)
+    try {
+      const uid = await restoreSession({ url: saved?.url, anonKey: saved?.anonKey })
+      if (!uid) throw new Error('That sign-in has expired — enter your password to connect again.')
+      await remoteConnect()
+      setState('connected')
+      setNote('Reconnected to the host.')
+      setAutoConnect(true)
+      onConnected(true)
+    } catch (err) {
+      setState('idle')
+      onError(err.message)
+    }
+  }
 
   const connect = async () => {
     if (!email.trim() || !password) {
@@ -169,6 +212,15 @@ export default function Remote({ onConnected, onError }) {
         </>
       ) : (
         <>
+          {/* Whoever has connected before wants this button, not the form. */}
+          {saved?.email ? (
+            <div className="history-actions">
+              <button className="save-now" onClick={rejoin} disabled={state === 'connecting'}>
+                {state === 'connecting' ? 'Reconnecting…' : `Reconnect as ${saved.email}`}
+              </button>
+            </div>
+          ) : null}
+
           <p className="hint">
             On the Mac, add these to the helper app&rsquo;s <span className="mono">.env</span> file
             and restart it, then sign in and turn the host on:

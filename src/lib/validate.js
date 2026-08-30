@@ -6,14 +6,24 @@
  * parameter's own range. Anything that fails is dropped and reported, not sent.
  */
 
-import { isSilencingParam } from './guardrails.js'
+import { isSilencingParam, matchParam } from './guardrails.js'
 
 export function validateSpec(spec, schema) {
   const problems = []
+  // Not rejections: changes that were kept after being matched to the control
+  // the model named rather than the id it gave. Shown separately, because a
+  // correction listed under "rejected" reads as a loss.
+  const repairs = []
   const changes = []
 
   if (!spec || typeof spec !== 'object') {
-    return { changes, problems: ['The generator returned nothing usable.'], presetName: '', summary: '' }
+    return {
+      changes,
+      problems: ['The generator returned nothing usable.'],
+      repairs,
+      presetName: '',
+      summary: ''
+    }
   }
 
   const blocksByEid = new Map(schema.map((b) => [b.eid, b]))
@@ -68,10 +78,14 @@ export function validateSpec(spec, schema) {
 
     // parameters
     for (const param of block.params || []) {
-      const known_param = (known.params || []).find((p) => p.id === param.id)
+      const { param: known_param, note } = matchParam(known.params, param)
 
       if (!known_param) {
-        problems.push(`${known.name}: no parameter ${param.id} — skipped.`)
+        problems.push(
+          `${known.name}: no parameter ${param.id}${
+            param.name ? ` and nothing called "${param.name}"` : ''
+          } — skipped.`
+        )
         continue
       }
       // Backstop. These are stripped before the generator ever sees them, but a
@@ -92,6 +106,8 @@ export function validateSpec(spec, schema) {
         )
         continue
       }
+
+      if (note) repairs.push(`${known.name} / ${known_param.name}: ${note} — matched by name.`)
 
       change.params.push({
         id: known_param.id,
@@ -116,7 +132,8 @@ export function validateSpec(spec, schema) {
     summary: typeof spec.summary === 'string' ? spec.summary : '',
     notes: typeof spec.notes === 'string' ? spec.notes : '',
     changes,
-    problems
+    problems,
+    repairs
   }
 }
 

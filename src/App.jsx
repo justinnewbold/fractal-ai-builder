@@ -30,6 +30,7 @@ import Assistant from './components/Assistant'
 import Theme from './components/Theme'
 import UpdateNotice from './components/UpdateNotice'
 import { validatePlan, runPlan } from './lib/actions'
+import { timeLeft } from './lib/slots'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
 import {
   getTempo,
@@ -40,6 +41,7 @@ import {
   subscribeEvents,
   scanAllPresets,
   cachedPresetNames,
+  forgetPresetName,
   readSceneNames
 } from './lib/forgefx'
 import { savePreset, buildEntry } from './lib/history'
@@ -67,7 +69,7 @@ import {
 } from './lib/forgefx'
 import { validateSpec, countWrites } from './lib/validate'
 import { beatFlash } from './lib/feedback'
-import { remoteActive } from './lib/remote'
+import { remoteActive, remoteLinked, remoteHostSeen, subscribeRemoteState } from './lib/remote'
 import { newEntry, append } from './lib/log'
 import { VERSION } from './lib/version'
 import { EXCLUDED_BLOCKS } from './lib/guardrails'
@@ -340,6 +342,30 @@ export default function App() {
   useEffect(() => {
     read()
   }, [read])
+
+  /*
+   * A relay that comes and goes, followed rather than assumed.
+   *
+   * A phone put in a pocket drops its socket, and realtime-js rejoins on its
+   * own when the network returns — but nothing here noticed either event. The
+   * screen went on saying "remote session" over a dead channel, and the way
+   * back was to reload the page, which is not a thing to be doing between
+   * songs. Coming back re-reads the unit, because whatever happened while the
+   * link was down happened without us.
+   */
+  useEffect(
+    () =>
+      subscribeRemoteState((up) => {
+        setRemote(up)
+        if (up) {
+          setError(null)
+          read()
+        } else {
+          setError('The remote session dropped. Rejoining — or press Reconnect to try now.')
+        }
+      }),
+    [read]
+  )
 
   /*
    * Seed the name field from whatever is loaded.
@@ -616,6 +642,9 @@ export default function App() {
         await setPresetName(name)
       }
       await storePreset(number)
+      // The list is holding that slot's old name, and it just stopped being true.
+      forgetPresetName(number)
+      setSlots((prev) => prev.filter((s) => s.number !== number))
       setApplied((prev) => ({ ...prev, savedTo: number }))
       record('save', `Saved "${name || preset?.name}" to slot ${number}`)
       setDirty(false)
@@ -1355,8 +1384,27 @@ export default function App() {
             helper app running on your Mac to reach it.
           </p>
           {/* On a phone the local advice is not just unhelpful, it's wrong:
-              localhost is the phone itself, and no browser choice changes that. */}
-          {onAnotherDevice ? (
+              localhost is the phone itself, and no browser choice changes that.
+              And with a relay already up, both versions are wrong — the Mac is
+              answering, so nothing about helper apps or browsers is the story. */}
+          {remoteActive() && remoteHostSeen() ? (
+            <p>
+              The Mac is on the channel but reports no unit attached to it. Check the cable, and
+              that nothing else &mdash; FM3-Edit, a second copy of the helper &mdash; is holding the
+              port, then press Reconnect.
+            </p>
+          ) : remoteActive() ? (
+            <p>
+              You&rsquo;re on the channel, but nothing else is: the helper app at the Mac either
+              isn&rsquo;t running or hasn&rsquo;t been switched on for remote. Start it there and
+              press Reconnect.
+            </p>
+          ) : remoteLinked() ? (
+            <p>
+              The remote session dropped. It rejoins on its own when the network comes back, or you
+              can connect again below.
+            </p>
+          ) : onAnotherDevice ? (
             <p>
               Nothing is broken &mdash; a phone can&rsquo;t reach your unit directly, because the
               unit is plugged into your Mac. Connect to the Mac below and you can play through it
@@ -1663,6 +1711,7 @@ export default function App() {
               slots={slots.length ? slots : cachedPresetNames()}
               current={preset?.number}
               deviceSlots={device?.capabilities?.presets?.count}
+              addressing={device?.capabilities?.presets?.addressing}
               scanning={scanning}
               progress={scanProgress}
               onStop={() => {
@@ -1672,11 +1721,30 @@ export default function App() {
                 setScanning(true)
                 stopScan.current = false
                 const total = device?.capabilities?.presets?.count ?? 512
+                /*
+                 * The pace is measured over the last stretch and smoothed,
+                 * never taken from the start of the run: a resumed scan skips
+                 * hundreds of known slots in a blink, and an average carrying
+                 * that would promise four hundred dumps in ten seconds.
+                 */
+                const pace = { at: Date.now(), done: 0, each: null }
                 try {
                   const found = await scanAllPresets(
                     total,
                     (done, all, partial) => {
-                      setScanProgress({ done, total: all, pct: Math.round((done / all) * 100) })
+                      const since = done - pace.done
+                      if (since >= 8) {
+                        const each = (Date.now() - pace.at) / since
+                        pace.each = pace.each ? (pace.each + each) / 2 : each
+                        pace.at = Date.now()
+                        pace.done = done
+                      }
+                      setScanProgress({
+                        done,
+                        total: all,
+                        pct: Math.round((done / all) * 100),
+                        left: timeLeft(all - done, pace.each)
+                      })
                       setSlots(partial)
                     },
                     () => stopScan.current
