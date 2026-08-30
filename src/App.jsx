@@ -32,7 +32,9 @@ import { validatePlan, runPlan } from './lib/actions'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
 import {
   getTempo,
+  setTempo,
   tapTempo,
+  setBypass,
   setTuner,
   subscribeEvents,
   scanAllPresets,
@@ -171,6 +173,8 @@ export default function App() {
   const [scene, setSceneIdx] = useState(0)
   const [sceneNames, setSceneNames] = useState([])
   const [bpm, setBpm] = useState(null)
+  // One tempo read per burst of taps, not one per tap.
+  const tapReadback = useRef(null)
   const [tunerOn, setTunerOn] = useState(false)
   const [tuning, setTuning] = useState(null)
   const [editorFocus, setEditorFocus] = useState(null)
@@ -209,6 +213,30 @@ export default function App() {
     if (fromAssistant || !HAND_EDIT_KINDS.has(kind)) return
     setTurns((prev) => [...prev, { role: 'system', text: summary }])
   }, [])
+
+  /**
+   * Flip one block on or off, straight from its chain tile.
+   *
+   * Optimistic, like the gig screen's toggles: the tile flips now, the write
+   * follows, and a refusal flips it back with the reason. Deliberately NOT a
+   * full read() — reloading the whole device state to change one bypass bit is
+   * what makes the screen lurch.
+   */
+  const toggleBlock = async (block) => {
+    const wanted = !block.bypassed
+    const flip = (to) =>
+      setBlocks((prev) =>
+        prev.map((b) => (b.effectId === block.effectId ? { ...b, bypassed: to } : b))
+      )
+    flip(wanted)
+    try {
+      await setBypass(block.effectId, wanted)
+      record('edit', `${block.name || block.slug} ${wanted ? 'bypassed' : 'engaged'}`)
+    } catch (err) {
+      flip(!wanted)
+      setError(err.message)
+    }
+  }
 
   const read = useCallback(async () => {
     setBusy(true)
@@ -1383,8 +1411,23 @@ export default function App() {
                 className="strip-btn"
                 onClick={async () => {
                   try {
-                    const r = await tapTempo()
-                    if (typeof r?.bpm === 'number') setBpm(r.bpm)
+                    await tapTempo()
+                    /*
+                     * The device computes the tempo from the spacing of the
+                     * taps, and /tempo/tap answers only {ok} — the new value
+                     * has to be read back. Debounced past the last tap so a
+                     * burst of taps costs one read, and the box doesn't
+                     * flicker through half-computed tempos mid-burst.
+                     */
+                    clearTimeout(tapReadback.current)
+                    tapReadback.current = setTimeout(async () => {
+                      try {
+                        const t = await getTempo()
+                        if (typeof t?.bpm === 'number') setBpm(t.bpm)
+                      } catch {
+                        /* the box keeps its last known value */
+                      }
+                    }, 700)
                   } catch (err) {
                     setError(err.message)
                   }
@@ -1392,7 +1435,21 @@ export default function App() {
               >
                 Tap
               </button>
-              {bpm !== null ? <span className="bpm-box">{bpm} BPM</span> : null}
+              {bpm !== null ? (
+                <BpmBox
+                  bpm={bpm}
+                  onSet={async (n) => {
+                    try {
+                      await setTempo(n)
+                      setBpm(n)
+                      record('tempo', `Tempo → ${n} BPM`)
+                    } catch (err) {
+                      setError(err.message)
+                    }
+                  }}
+                  onError={setError}
+                />
+              ) : null}
               {dirty ? (
                 <button className="strip-btn armed" onClick={revert} disabled={busy}>
                   Revert
@@ -1496,7 +1553,12 @@ export default function App() {
                   other screens, which is most of why this felt cluttered. */}
             </div>
 
-            <Chain blocks={blocks} selected={selectedBlock} onSelect={setSelectedBlock} />
+            <Chain
+              blocks={blocks}
+              selected={selectedBlock}
+              onSelect={setSelectedBlock}
+              onToggle={toggleBlock}
+            />
 
             <BlockPanel
               block={blocks.find((b) => b.effectId === selectedBlock)}
@@ -1828,5 +1890,60 @@ export default function App() {
         />
       ) : null}
     </div>
+  )
+}
+
+/**
+ * The tempo readout you can type into.
+ *
+ * Tap gets you close; typing gets you exact. Shows "120 BPM" at rest; a tap
+ * into it drops the unit and selects the number so typing replaces it. Enter
+ * or tapping away commits, Escape abandons, and the device's own 20–400 range
+ * is enforced here so an impossible tempo is refused with words rather than
+ * silently clamped somewhere downstream.
+ */
+function BpmBox({ bpm, onSet, onError }) {
+  const [text, setText] = useState(null)
+  const abandon = useRef(false)
+
+  const finish = () => {
+    if (abandon.current) {
+      abandon.current = false
+      setText(null)
+      return
+    }
+    if (text === null) return
+    const n = Math.round(Number(text))
+    setText(null)
+    if (!Number.isFinite(n) || n === bpm || text.trim() === '') return
+    if (n < 20 || n > 400) {
+      onError(`${n} BPM is out of range — the unit takes 20 to 400.`)
+      return
+    }
+    onSet(n)
+  }
+
+  return (
+    <input
+      className="bpm-box mono"
+      type="text"
+      inputMode="numeric"
+      value={text !== null ? text : `${bpm} BPM`}
+      onFocus={(e) => {
+        setText(String(bpm))
+        const el = e.target
+        requestAnimationFrame(() => el.select())
+      }}
+      onChange={(e) => setText(e.target.value.replace(/[^0-9]/g, ''))}
+      onBlur={finish}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur()
+        else if (e.key === 'Escape') {
+          abandon.current = true
+          e.currentTarget.blur()
+        }
+      }}
+      aria-label="Tempo in BPM"
+    />
   )
 }

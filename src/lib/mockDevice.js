@@ -367,7 +367,22 @@ export function createMockDevice() {
       state.bpm = bpm
       return { ok: true }
     },
-    tapTempo: () => ({ bpm: state.bpm ?? 120 }),
+    /*
+     * Like the hardware: a tap registers, the tempo is computed from the
+     * spacing between taps, and the answer is only {ok} — reading the result
+     * is the client's job (the real /tempo/tap returns no bpm either, which is
+     * exactly the contract that made the Tap button look broken).
+     */
+    tapTempo: () => {
+      const now = Date.now()
+      const gap = state.lastTapAt ? now - state.lastTapAt : null
+      state.lastTapAt = now
+      // 150ms..3s covers 20-400 BPM; outside that it's a first tap, not a beat.
+      if (gap && gap >= 150 && gap <= 3000) {
+        state.bpm = Math.max(20, Math.min(400, Math.round(60000 / gap)))
+      }
+      return { ok: true }
+    },
 
     getScene: () => ({ index: state.scene, names: state.sceneNames.slice() }),
 

@@ -49,9 +49,28 @@ import { isSilencingParam } from '../lib/guardrails'
  * letters printed on it.
  */
 
-/** The signal chain, as coloured tiles with the active channel on each. */
-export function Chain({ blocks, selected, onSelect }) {
+/**
+ * The signal chain, as coloured tiles with the active channel on each.
+ *
+ * A tile opens its block for editing; the On/Off pill under it flips the block
+ * without opening anything, so kicking the drive in doesn't require a trip
+ * through the editor. A quick second tap on the tile itself does the same —
+ * the first tap already opened the editor, so the double costs nothing extra.
+ */
+export function Chain({ blocks, selected, onSelect, onToggle }) {
   const chain = blocks.filter((b) => !['input', 'output'].includes(b.slug))
+  const lastTap = useRef({ id: null, at: 0 })
+
+  const tap = (block) => {
+    const now = Date.now()
+    if (onToggle && lastTap.current.id === block.effectId && now - lastTap.current.at < 350) {
+      lastTap.current = { id: null, at: 0 }
+      onToggle(block)
+      return
+    }
+    lastTap.current = { id: block.effectId, at: now }
+    onSelect(block.effectId)
+  }
 
   return (
     <div className="fx-panel">
@@ -61,18 +80,29 @@ export function Chain({ blocks, selected, onSelect }) {
           ▶
         </span>
         {chain.map((block) => (
-          <button
-            key={block.effectId}
-            className={`fx-tile ${selected === block.effectId ? 'selected' : ''} ${
-              block.bypassed ? 'bypassed' : ''
-            }`}
-            style={{ '--tile': colorFor(block.slug) }}
-            onClick={() => onSelect(block.effectId)}
-            title={block.name}
-          >
-            <span className="fx-abbr">{shortName(block.slug)}</span>
-            <span className="fx-chan">{block.channel || 'A'}</span>
-          </button>
+          <div className="fx-cell" key={block.effectId}>
+            <button
+              className={`fx-tile ${selected === block.effectId ? 'selected' : ''} ${
+                block.bypassed ? 'bypassed' : ''
+              }`}
+              style={{ '--tile': colorFor(block.slug) }}
+              onClick={() => tap(block)}
+              title={block.name}
+            >
+              <span className="fx-abbr">{shortName(block.slug)}</span>
+              <span className="fx-chan">{block.channel || 'A'}</span>
+            </button>
+            {onToggle ? (
+              <button
+                className={`fx-power ${block.bypassed ? 'off' : 'on'}`}
+                onClick={() => onToggle(block)}
+                aria-pressed={!block.bypassed}
+                aria-label={`${block.name || block.slug} ${block.bypassed ? 'off — turn on' : 'on — turn off'}`}
+              >
+                {block.bypassed ? 'Off' : 'On'}
+              </button>
+            ) : null}
+          </div>
         ))}
         <span className="io-arrow" aria-hidden="true">
           ▶
