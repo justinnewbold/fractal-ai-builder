@@ -1424,7 +1424,21 @@ export default function App() {
       */}
       {/* Always on screen, above everything, on every view. */}
       {status === 'live' ? (
-        <StatusLine device={device} preset={preset} dirty={dirty} remote={remote} />
+        <StatusLine
+          device={device}
+          preset={preset}
+          dirty={dirty}
+          remote={remote}
+          onError={setError}
+          /* Same consequences as the panel's own buttons: which unit answers
+             changes, so the cached schema and the whole read go with it. */
+          onRemoteChanged={(on) => {
+            setRemote(on)
+            record('remote', on ? 'Connected to the host remotely' : 'Back to the local connection')
+            resetSchemaCache()
+            read()
+          }}
+        />
       ) : null}
 
       {status === 'live' ? (
