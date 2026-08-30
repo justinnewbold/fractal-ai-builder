@@ -7,6 +7,7 @@ import {
   remoteConnect,
   remoteDisconnect,
   remoteActive,
+  remoteUserId,
   hostResponds,
   subscribeRemoteState,
   restoreSession,
@@ -46,6 +47,8 @@ export default function Remote({ onConnected, onError }) {
   const [password, setPassword] = useState('')
   const [state, setState] = useState(remoteActive() ? 'connected' : 'idle')
   const [note, setNote] = useState(null)
+  const [report, setReport] = useState(null)
+  const [checking, setChecking] = useState(false)
 
   /*
    * Rejoin without being asked, when that's plainly what's wanted.
@@ -191,6 +194,62 @@ export default function Remote({ onConnected, onError }) {
     }
   }
 
+  /**
+   * Where the link breaks, said in order.
+   *
+   * "It isn't working" has had four different causes in this app's short life —
+   * the host switched off, the two ends on different accounts, a socket that
+   * had closed, a unit unplugged at the far end — and from the phone all four
+   * look identical: a screen that says it can't reach the unit. Every one of
+   * them is a question this browser can answer for itself in about a second,
+   * so it asks all of them and prints what it found.
+   *
+   * No side effects. It joins nothing, signs nothing in and changes nothing:
+   * a thing you run when something is already wrong should not be able to make
+   * it worse.
+   */
+  const test = async () => {
+    setChecking(true)
+    setReport(null)
+    const lines = []
+    try {
+      const uid = remoteUserId()
+      lines.push(
+        uid
+          ? `Signed in here as ${uid.slice(0, 8)}… — the Mac must show these same eight characters, or the two ends are on different channels.`
+          : 'Not signed in on this device yet.'
+      )
+
+      if (!remoteActive()) {
+        lines.push('Not on the channel. Connect, or reload the page to rejoin.')
+        return
+      }
+      lines.push('On the channel.')
+
+      const began = Date.now()
+      const answered = await hostResponds()
+      lines.push(
+        answered
+          ? `The Mac answered in ${Date.now() - began} ms.`
+          : `No answer from the Mac in ${Math.round((Date.now() - began) / 1000)}s. ${NO_ANSWER}`
+      )
+      if (!answered) return
+
+      const { detect } = await import('../lib/forgefx')
+      const info = await detect()
+      lines.push(
+        info?.connected
+          ? `The Mac has a ${info.short || info.name} attached. The link is working.`
+          : 'The Mac is answering but has no unit attached to it — check the cable there, and that nothing else is holding the port.'
+      )
+    } catch (err) {
+      lines.push(`Stopped at: ${err.message}`)
+    } finally {
+      setReport(lines)
+      setChecking(false)
+    }
+  }
+
   const disconnect = async () => {
     // Disconnecting is a decision; don't undo it on the next load.
     setAutoConnect(false)
@@ -207,14 +266,17 @@ export default function Remote({ onConnected, onError }) {
       {state === 'connected' ? (
         <>
           <p className="hint">
-            Relaying through your Supabase project. Changes, scenes, tempo and preset selection all
-            work from here.
+            Relaying through your Supabase project{remoteUserId() ? ` as ${remoteUserId().slice(0, 8)}…` : ''}.
+            Changes, scenes, tempo and preset selection all work from here.
           </p>
           <p className="hint">
             Saving to a slot, backups and the library stay at the Mac &mdash; on purpose, so a
             phone can&rsquo;t overwrite a preset in the middle of a set.
           </p>
           <div className="history-actions">
+            <button className="chip" onClick={test} disabled={checking}>
+              {checking ? 'Testing…' : 'Test this link'}
+            </button>
             <button className="chip" onClick={disconnect}>
               Disconnect
             </button>
@@ -227,6 +289,9 @@ export default function Remote({ onConnected, onError }) {
             <div className="history-actions">
               <button className="save-now" onClick={rejoin} disabled={state === 'connecting'}>
                 {state === 'connecting' ? 'Reconnecting…' : `Reconnect as ${saved.email}`}
+              </button>
+              <button className="chip" onClick={test} disabled={checking}>
+                {checking ? 'Testing…' : 'Test this link'}
               </button>
             </div>
           ) : null}
@@ -304,6 +369,17 @@ SUPABASE_ANON_KEY=${DEFAULT_PROJECT.anonKey}`}
           </p>
         </>
       )}
+
+      {report ? (
+        <div className="problems">
+          <p className="silk-label">What this link is doing</p>
+          {report.map((line, i) => (
+            <p key={i} className="mono problem repair">
+              {line}
+            </p>
+          ))}
+        </div>
+      ) : null}
 
       {note ? <p className="hint">{note}</p> : null}
     </section>
