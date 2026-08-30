@@ -102,7 +102,18 @@ export function Preview({ result, onApply, onDiscard, busy, writeCount }) {
           <button onClick={onDiscard} disabled={busy}>
             Discard
           </button>
-          <button className="primary" onClick={onApply} disabled={busy}>
+          {/* Blurred before the write for the same reason the assistant box is:
+              a focused control is something iOS scrolls back into view on every
+              layout change, and writing a preset changes the layout for several
+              seconds. The button has done its job the moment it's pressed. */}
+          <button
+            className="primary"
+            onClick={(e) => {
+              e.currentTarget.blur()
+              onApply()
+            }}
+            disabled={busy}
+          >
             {busy ? 'Writing…' : `Send ${writeCount} changes to the unit`}
           </button>
         </div>

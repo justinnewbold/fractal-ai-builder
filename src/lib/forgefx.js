@@ -185,6 +185,32 @@ export async function writeHostDoc(id, data) {
   }
 }
 
+/**
+ * A name that wants to be on the unit but couldn't be written yet.
+ *
+ * Renames are one of the things ForgeFX refuses over the remote relay, and it
+ * is right to: a phone shouldn't rewrite what's in a slot. But a preset
+ * generated from the phone comes with a name, and dropping it on the floor
+ * meant every remote generation kept whatever the slot was called before.
+ *
+ * The host's own document store is the way across — writes to it are allowed
+ * remotely, it survives restarts, and it is already how scene names reach the
+ * phone. So the phone parks the name here, and the app at the Mac — where a
+ * rename is allowed — picks it up and writes it. Keyed per unit and slot,
+ * because an AM4 slot 97 and an FM3 slot 97 are different presets.
+ */
+const pendingNameKey = (slot) => `fractal.pendingName.${deviceSlug}.${slot}`
+
+export const parkPresetName = (slot, name) =>
+  writeHostDoc(pendingNameKey(slot), { name, at: Date.now() })
+
+export const takeParkedPresetName = async (slot) => {
+  const doc = await readHostDoc(pendingNameKey(slot))
+  return typeof doc?.name === 'string' && doc.name.trim() ? doc.name.trim() : null
+}
+
+export const clearParkedPresetName = (slot) => deleteHostDoc(pendingNameKey(slot))
+
 /** The preset currently loaded on the unit. */
 export const currentPreset = async () => (mock ? (await tick(), mock.preset()) : request('/preset'))
 
