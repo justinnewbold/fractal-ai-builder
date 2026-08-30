@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { beatFlash } from '../lib/feedback'
 import {
   modifierModel,
   bindModifier,
@@ -318,7 +319,8 @@ export function TempoTuner({ onError, onChanged, busy }) {
   // /tempo/tap answers only {ok} — the device computes the tempo from the tap
   // spacing, so the new value is read back, debounced past the last tap.
   const tapReadback = useRef(null)
-  const tap = async () => {
+  const tap = async (e) => {
+    beatFlash(e.currentTarget)
     try {
       await tapTempo()
       clearTimeout(tapReadback.current)

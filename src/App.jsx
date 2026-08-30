@@ -62,6 +62,7 @@ import {
   backupPreset
 } from './lib/forgefx'
 import { validateSpec, countWrites } from './lib/validate'
+import { beatFlash } from './lib/feedback'
 import { newEntry, append } from './lib/log'
 import { VERSION } from './lib/version'
 import { EXCLUDED_BLOCKS } from './lib/guardrails'
@@ -1409,7 +1410,10 @@ export default function App() {
               </button>
               <button
                 className="strip-btn"
-                onClick={async () => {
+                onClick={async (e) => {
+                  // Feedback before the round trip: the flash confirms the tap
+                  // registered, at tap time, not at network time.
+                  beatFlash(e.currentTarget)
                   try {
                     await tapTempo()
                     /*
