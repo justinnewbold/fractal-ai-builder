@@ -2,7 +2,17 @@ import { useState } from 'react'
 import { getHost, setHost, isDemo, setDemo } from '../lib/forgefx'
 import { remoteActive } from '../lib/remote'
 
+/**
+ * One line about the unit, everything else behind it.
+ *
+ * Collapsed — the default — this says the two things worth a permanent slot:
+ * which unit ("FM3", "AM4") and how it's reached (connected, demo, remote,
+ * offline). The grid shape, scene count, host address, demo toggle and
+ * reconnect are setup, not status: touched once a month, and until now they
+ * cost a full panel on every visit. They open on tap.
+ */
 export default function DeviceBar({ status, device, onRetry, busy }) {
+  const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(getHost())
 
@@ -27,55 +37,73 @@ export default function DeviceBar({ status, device, onRetry, busy }) {
     onRetry()
   }
 
-  const label =
+  // The short name is the point of the collapsed row: "FM3", not a sentence.
+  const name =
     status === 'live'
-      ? device?.name || 'Connected'
+      ? device?.short || device?.name || 'Connected'
       : status === 'fault'
         ? 'No device'
         : 'Looking…'
 
+  const how =
+    demo ? 'demo' : status === 'live' ? (remote ? 'remote' : 'connected') : status === 'fault' ? 'offline' : ''
+
   return (
     <div className="device-bar">
-      <div className="lamp" data-state={demo ? 'demo' : status} />
-      <div className="device-name">{label}</div>
+      <button
+        className="device-summary"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-label={`${name}${how ? `, ${how}` : ''} — connection details`}
+      >
+        <span className="lamp" data-state={demo ? 'demo' : status} />
+        <span className="device-name">{name}</span>
+        {how ? <span className="device-state mono">{how}</span> : null}
+        <span className={`device-chevron ${open ? 'open' : ''}`} aria-hidden="true" />
+      </button>
 
-      {status === 'live' && device ? (
-        <div className="device-meta mono">
-          gen {device.gen}
-          {/* The AM4 has a four-slot chain and reports no grid. "grid ×" with
-              nothing either side of it isn't a fact about the unit. */}
-          {grid?.rows && grid?.cols ? ` · grid ${grid.rows}×${grid.cols}` : ''} ·{' '}
-          {device.capabilities?.sceneCount} scenes · {device.capabilities?.presets?.count} slots
+      {open ? (
+        <div className="device-detail">
+          {status === 'live' && device ? (
+            <div className="device-meta mono">
+              gen {device.gen}
+              {/* The AM4 has a four-slot chain and reports no grid. "grid ×"
+                  with nothing either side of it isn't a fact about the unit. */}
+              {grid?.rows && grid?.cols ? ` · grid ${grid.rows}×${grid.cols}` : ''} ·{' '}
+              {device.capabilities?.sceneCount} scenes · {device.capabilities?.presets?.count}{' '}
+              slots
+            </div>
+          ) : null}
+
+          <div className="device-detail-row">
+            {editing ? (
+              <>
+                <input
+                  type="text"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && save()}
+                  aria-label="Address of the helper app on your Mac"
+                />
+                <button onClick={save}>Use this address</button>
+              </>
+            ) : (
+              <>
+                <span className="device-meta mono">
+                  {demo ? 'simulated' : remote ? 'remote session' : getHost()}
+                </span>
+                <button onClick={toggleDemo}>{demo ? 'Use real device' : 'Demo mode'}</button>
+                {!demo && !remote ? (
+                  <button onClick={() => setEditing(true)}>Change address</button>
+                ) : null}
+                <button onClick={onRetry} disabled={busy}>
+                  {busy ? 'Reading…' : 'Reconnect'}
+                </button>
+              </>
+            )}
+          </div>
         </div>
       ) : null}
-
-      <div className="spacer" />
-
-      {editing ? (
-        <>
-          <input
-            type="text"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && save()}
-            aria-label="Address of the helper app on your Mac"
-          />
-          <button onClick={save}>Use this address</button>
-        </>
-      ) : (
-        <>
-          <span className="device-meta mono">
-            {demo ? 'simulated' : remote ? 'remote session' : getHost()}
-          </span>
-          <button onClick={toggleDemo}>{demo ? 'Use real device' : 'Demo mode'}</button>
-          {!demo && !remote ? (
-            <button onClick={() => setEditing(true)}>Change address</button>
-          ) : null}
-          <button onClick={onRetry} disabled={busy}>
-            {busy ? 'Reading…' : 'Reconnect'}
-          </button>
-        </>
-      )}
     </div>
   )
 }
