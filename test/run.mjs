@@ -779,6 +779,34 @@ test('slot zero is a real slot, not an empty field', () => {
   assert.equal(target('0', 97), 0)
 })
 
+console.log('\nthe relay coming and going')
+
+test('a channel whose socket closed is never handed back', async () => {
+  const { canReuseChannel } = await import('../src/lib/remote.js')
+  const client = { id: 'a' }
+  const joined = { state: 'joined' }
+  const closed = { state: 'closed' }
+  assert.equal(canReuseChannel(joined, { client, chan: joined }, client), true)
+  // The bug: connect returned this one, so every request went into a dead
+  // socket and only reloading the page ever fixed it.
+  assert.equal(canReuseChannel(closed, { client, chan: closed }, client), false)
+})
+
+test('a channel belonging to a previous sign-in is never handed back', async () => {
+  const { canReuseChannel } = await import('../src/lib/remote.js')
+  const old = { id: 'old' }
+  const fresh = { id: 'fresh' }
+  const chan = { state: 'joined' }
+  assert.equal(canReuseChannel(chan, { client: old, chan }, fresh), false)
+})
+
+test('nothing to reuse is not something to reuse', async () => {
+  const { canReuseChannel } = await import('../src/lib/remote.js')
+  const client = { id: 'a' }
+  assert.equal(canReuseChannel(null, null, client), false)
+  assert.equal(canReuseChannel({ state: 'joined' }, null, client), false)
+})
+
 console.log('\nparameter matching')
 
 const ampSchema = [
