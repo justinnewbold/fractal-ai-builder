@@ -28,6 +28,7 @@ import ParamSearch from './components/ParamSearch'
 import Host from './components/Host'
 import Assistant from './components/Assistant'
 import Theme from './components/Theme'
+import UpdateNotice from './components/UpdateNotice'
 import { validatePlan, runPlan } from './lib/actions'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
 import {
@@ -1281,6 +1282,10 @@ export default function App() {
 
   return (
     <div className="shell">
+      {/* Above everything, because a stale tab makes every other thing on this
+          screen a possible lie about what the code does. */}
+      <UpdateNotice />
+
       <header className="masthead">
         <div>
           <h1 className="wordmark">

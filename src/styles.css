@@ -3986,6 +3986,27 @@ button.gig-block:disabled {
   color: var(--live);
 }
 
+/* ---------- a tab running yesterday's build ---------- */
+
+.update-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--silk);
+  background: color-mix(in srgb, var(--live) 14%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--live) 45%, var(--rule));
+  border-radius: 3px;
+}
+
+.update-notice span {
+  flex: 1 1 220px;
+}
+
 /* ---------- the phone link, on every screen ---------- */
 
 /* Sits at the end of the status line, and owns the space after it so the chip
