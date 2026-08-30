@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   getScene,
   setScene,
@@ -37,6 +37,19 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
   const [tunerOn, setTunerOn] = useState(false)
   const [xyOn, setXyOn] = useState(false)
   const [tuning, setTuning] = useState(null)
+  /*
+   * Whether readings are actually arriving while the tuner is on.
+   *
+   * The tuner can be genuinely running on the unit with nothing reaching this
+   * screen: ForgeFX starts the poll for any client, but its remote relay
+   * deliberately doesn't bridge the tuner stream (it filters high-frequency
+   * telemetry), so on a phone the overlay would sit at "Play a string" forever
+   * while the Mac quietly polls the port. That silence needs words. Tracked by
+   * time rather than a boolean so a patched or newer ForgeFX that does bridge
+   * the stream lights this screen up with no app change.
+   */
+  const [tunerStalled, setTunerStalled] = useState(false)
+  const lastTunerAt = useRef(0)
   /*
    * 'reading' | 'ok' | 'failed'.
    *
@@ -84,10 +97,27 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
     const unsubscribe = subscribeEvents((event) => {
       if (event?.type === 'scene' && typeof event.index === 'number') setSceneIndex(event.index)
       if (event?.type === 'scene' || event?.type === 'changed') refreshBlocks({ quiet: true })
-      if (event?.type === 'tuner') setTuning(event)
+      if (event?.type === 'tuner') {
+        lastTunerAt.current = Date.now()
+        setTunerStalled(false)
+        setTuning(event)
+      }
     })
     return unsubscribe
   }, [])
+
+  // Five seconds of a running tuner with no reading is not "play louder".
+  useEffect(() => {
+    if (!tunerOn) {
+      setTunerStalled(false)
+      return
+    }
+    const since = Date.now()
+    const timer = setTimeout(() => {
+      if (lastTunerAt.current < since) setTunerStalled(true)
+    }, 5000)
+    return () => clearTimeout(timer)
+  }, [tunerOn])
 
   const sceneCount = capabilities?.sceneCount || 8
   const hasScenes = capabilities?.hasScenes !== false
@@ -161,7 +191,14 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
     setTunerOn(next)
     if (!next) setTuning(null)
     try {
-      await setTuner(next)
+      const res = await setTuner(next)
+      // ForgeFX answers {ok:false} — not an error — when the attached unit has
+      // no tuner path in this build. Silence here looked exactly like a tuner
+      // that was warming up, forever.
+      if (next && res && res.ok === false) {
+        setTunerOn(false)
+        onError('ForgeFX refused the tuner for this unit — its build may predate tuner support for it.')
+      }
     } catch (err) {
       setTunerOn(!next)
       onError(err.message)
@@ -250,18 +287,36 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
         </button>
       </div>
 
-      <button
-        className={`gig-tuner-btn ${tunerOn ? 'on' : ''}`}
-        onClick={toggleTuner}
-        aria-pressed={tunerOn}
-      >
-        {tunerOn ? 'Tuner off' : 'Tuner'}
-      </button>
+      {/* Same rule as scenes: a unit whose driver reports no tuner doesn't get
+          a tuner button that can only disappoint. Absent means unknown (an
+          older ForgeFX that predates the flag), and unknown still gets to try. */}
+      {capabilities?.tuner !== false ? (
+        <button
+          className={`gig-tuner-btn ${tunerOn ? 'on' : ''}`}
+          onClick={toggleTuner}
+          aria-pressed={tunerOn}
+        >
+          {tunerOn ? 'Tuner off' : 'Tuner'}
+        </button>
+      ) : null}
 
       {tunerOn ? (
         <div className="gig-tuner">
           <Tuner reading={tuning} on={tunerOn} />
         </div>
+      ) : null}
+
+      {/* The tuner is running — POST /tuner said ok — but nothing has arrived.
+          Over a remote session that is ForgeFX's relay by design: it bridges
+          discrete changes and filters the high-frequency tuner stream, so the
+          unit is being polled at the Mac and every reading stays there. Saying
+          so beats a needle that never moves. */}
+      {tunerOn && tunerStalled ? (
+        <p className="gig-note">
+          {remoteActive()
+            ? 'The tuner is running on the unit, but ForgeFX doesn’t send tuner readings over a remote session yet — they only reach the app at the Mac. Tune there, or from a browser on the Mac’s own address.'
+            : 'No readings are arriving from ForgeFX. If the unit is making sound, this ForgeFX build may not support the tuner on it — try updating ForgeFX.'}
+        </p>
       ) : null}
 
       <button

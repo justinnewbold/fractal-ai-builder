@@ -332,6 +332,24 @@ Then browse to `http://<your-machine-ip>:5056` from the phone. Gig mode works
 from there. `/remote/enable` looks like it should help and doesn't — it belongs
 to Axis's cloud relay and returns 503 in the plain server runtime.
 
+### The tuner over a remote session
+
+The tuner works here the way it works in Axis: `POST /tuner` starts ForgeFX
+polling the unit (on an AM4, the always-live tuner block), and readings arrive
+as `{type:'tuner'}` events on the event stream. At the Mac that stream is SSE
+and the tuner just works.
+
+Over a remote session it can't, and the reason is the host, not this app:
+ForgeFX's relay bridges only discrete change events — param, scene, tempo —
+and deliberately filters the ~8×/s telemetry streams, tuner included, to keep
+the channel quiet (`server/src/remote.ts`, the `RELAYED` set). `POST /tuner`
+*is* allowed remotely, so a phone can start the poll and then never see a
+reading: the unit is being polled at the Mac and every answer stays there.
+The gig screen says exactly that after five silent seconds instead of showing
+a needle that never moves. Adding `'tuner'` to that host-side set turns the
+stream on for remote sessions; this app already listens and needs no change
+to benefit.
+
 ## Credits
 
 Device protocol by [ForgeFX](https://github.com/sKuhLight/ForgeFX) and
