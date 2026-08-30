@@ -162,6 +162,10 @@ export default function App() {
   const [partial, setPartial] = useState(null)
   const [liveOpen, setLiveOpen] = useState(false)
   const [thinking, setThinking] = useState(false)
+  // The live request, and when it started — what Stop acts on and what the
+  // elapsed clock counts from.
+  const generationAbort = useRef(null)
+  const [genStarted, setGenStarted] = useState(null)
 
   // Anything written but not stored lives only in the edit buffer. Tracking it
   // is what lets the app say "this is not saved yet" instead of leaving someone
@@ -370,6 +374,14 @@ export default function App() {
   const requestSpec = async (schema, description, previous) => {
     setPartial(null)
     setThinking(true)
+    /*
+     * A handle on the request while it runs, so Stop can actually stop it.
+     * Without one the only way out of a stuck generation was reloading the
+     * page, which also throws away the conversation.
+     */
+    const control = new AbortController()
+    generationAbort.current = control
+    setGenStarted(Date.now())
     try {
       return await streamSpec(
         {
@@ -379,10 +391,33 @@ export default function App() {
           previous: previous || null,
           mode: previous ? 'refine' : 'design'
         },
-        { onPartial: setPartial }
+        {
+          onPartial: setPartial,
+          signal: control.signal,
+          /*
+           * Say what is actually happening rather than what a timer guesses.
+           * "Nearly there" was a scripted line that arrived 26 seconds in and
+           * then stayed forever, saying the same thing whether the model was
+           * one token from done or had died two minutes ago.
+           */
+          onEvent: (e) => {
+            if (e.kind === 'request') setProgress('Sent to the model — waiting for the first line…')
+            else if (e.kind === 'first-output') setProgress('The model is answering…')
+            else if (e.kind === 'partial') {
+              setProgress(
+                e.blocks
+                  ? `Building the preset — ${e.blocks} block${e.blocks === 1 ? '' : 's'} so far`
+                  : 'Building the preset…'
+              )
+            } else if (e.kind === 'fallback') setProgress('Streaming refused — asking again in one piece…')
+          }
+        }
       )
     } finally {
+      generationAbort.current = null
+      setGenStarted(null)
       setThinking(false)
+      setProgress(null)
     }
   }
 
@@ -1359,6 +1394,18 @@ export default function App() {
           onCancel={cancelTurn}
           busy={busy || runningPlan}
           progress={progress}
+          startedAt={genStarted}
+          onStop={
+            genStarted
+              ? () => {
+                  generationAbort.current?.abort()
+                  setTurns((prev) => [
+                    ...prev,
+                    { role: 'system', text: 'Stopped. Nothing was written to the unit.' }
+                  ])
+                }
+              : null
+          }
         >
           {/* A design shows up in the conversation that asked for it. */}
           <Thinking message={progress} />
@@ -1371,7 +1418,7 @@ export default function App() {
                 <i />
                 <i />
               </span>
-              <Stages active={thinking} />
+              <Stages active={thinking} startedAt={genStarted} />
             </div>
           ) : null}
 
