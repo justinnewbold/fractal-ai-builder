@@ -16,26 +16,48 @@ const STAGES = [
   'Shaping the EQ',
   'Balancing the drive against the amp',
   'Choosing a cabinet',
-  'Setting time and space',
-  'Checking it against the ranges your unit reports',
-  'Nearly there'
+  'Setting time and space'
 ]
 
-export function Stages({ active }) {
-  const [index, setIndex] = useState(0)
+/**
+ * How long this has been going, and after a while, the truth.
+ *
+ * These lines are a guess at what a model is doing, and they were presented as
+ * if they were status: the script ran out after half a minute, parked on
+ * "Nearly there…", and then said that identical thing whether the model was a
+ * token from finishing or the request had died two minutes earlier. Someone
+ * watching it for four minutes was watching an animation.
+ *
+ * So the script now describes only the window it can honestly describe, and
+ * after that this counts out loud. A generation that is genuinely working shows
+ * its work in the live output beside this; one that isn't shows a clock going
+ * up, which is the fact.
+ */
+export function Stages({ active, startedAt }) {
+  const [now, setNow] = useState(Date.now())
 
   useEffect(() => {
-    if (!active) return setIndex(0)
-    const id = setInterval(() => {
-      // Hold on the last message rather than looping — looping would suggest
-      // it's started over, which is worse than admitting it's still going.
-      setIndex((i) => Math.min(i + 1, STAGES.length - 1))
-    }, 2600)
+    if (!active) return
+    const id = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(id)
   }, [active])
 
   if (!active) return null
-  return <span>{STAGES[index]}…</span>
+
+  const seconds = startedAt ? Math.max(0, Math.round((now - startedAt) / 1000)) : 0
+  const scripted = STAGES[Math.min(Math.floor(seconds / 3), STAGES.length - 1)]
+  const clock = seconds >= 60 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${seconds}s`
+
+  // Under half a minute a generation is simply running; past it, the honest
+  // thing is the clock and, further out, that this is no longer normal.
+  if (!startedAt) return <span>{scripted}…</span>
+  if (seconds < 24) return <span>{scripted}…</span>
+  if (seconds < 60) return <span>Waiting on the model — {clock}</span>
+  return (
+    <span>
+      Still waiting — {clock}. Longer than usual; Stop is safe, nothing has been written.
+    </span>
+  )
 }
 
 /**

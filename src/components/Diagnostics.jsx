@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { getWireLog, clearWireLog, getCheckLog, clearCheckLog, sceneNameTrace } from '../lib/forgefx'
+import { getGenerationLog } from '../lib/stream'
 import { FULL, BUILT_AT } from '../lib/version'
 import { fromNormalized } from '../lib/scale'
 
@@ -16,6 +17,10 @@ export default function Diagnostics() {
   const [open, setOpen] = useState(false)
   const [rows, setRows] = useState([])
   const [checks, setChecks] = useState([])
+  // Read straight from the log rather than snapshotting it into state: this
+  // panel is most wanted right after something went wrong, and a stale copy of
+  // the very events being asked about would be the one useless version.
+  const gen = getGenerationLog()
 
   const refresh = () => {
     setRows(getWireLog())
@@ -78,6 +83,28 @@ export default function Diagnostics() {
           {FULL} &middot; built {BUILT_AT} UTC
         </span>
       </div>
+
+      {/*
+          What the model side did, which used to be visible only in devtools.
+          The device has had a wire log for a long time; a generation that sat
+          there for four minutes had no record at all, so "what was it doing"
+          could only be guessed at. Each line is a real event with the time it
+          happened, so a slow model and a dead connection stop looking alike.
+      */}
+      {gen.length ? (
+        <div className="diag-block">
+          <p className="silk-label">Last generations</p>
+          {gen.map((e, i) => (
+            <p key={i} className="mono hint">
+              {new Date(e.at).toLocaleTimeString()} · {e.event}
+              {typeof e.ms === 'number' ? ` at ${(e.ms / 1000).toFixed(1)}s` : ''}
+              {e.blocks !== undefined ? ` · ${e.blocks} blocks` : ''}
+              {e.kind ? ` · ${e.kind}` : ''}
+              {e.message ? ` — ${e.message}` : ''}
+            </p>
+          ))}
+        </div>
+      ) : null}
 
       {sceneNameTrace.length ? (
         <div className="diag-block">

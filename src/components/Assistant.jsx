@@ -96,6 +96,8 @@ export default function Assistant({
   onCancel,
   busy,
   progress,
+  startedAt,
+  onStop,
   children
 }) {
   const [text, setText] = useState('')
@@ -231,9 +233,16 @@ export default function Assistant({
           // this box is for.
           aria-label="What you want done"
         />
-        <button onClick={() => submit()} disabled={busy || !text.trim()}>
-          {busy ? 'Working…' : 'Send'}
-        </button>
+        {/* While the model has the request, the useful button is the one that
+            takes it back. "Working…" disabled is a dead end when the thing has
+            hung, which is exactly when someone reaches for a button. */}
+        {onStop ? (
+          <button onClick={onStop}>Stop</button>
+        ) : (
+          <button onClick={() => submit()} disabled={busy || !text.trim()}>
+            {busy ? 'Working…' : 'Send'}
+          </button>
+        )}
       </div>
 
     </section>
