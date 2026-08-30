@@ -514,6 +514,75 @@ input[type='text']:focus-visible {
   .preset-name {
     font-size: 19px;
   }
+
+  /*
+   * A phone screen is mostly chrome before it is anything.
+   *
+   * Above the first control there were: a wordmark, a sentence explaining what
+   * the app is to someone already using it, a save cluster, a row for the theme
+   * and the version, the unit and how it's reached, and then the unit again
+   * with the preset. Two of those said the same thing twice and one was an
+   * advertisement. What's left is what changes.
+   */
+  .tagline {
+    display: none;
+  }
+
+  /* The unit's name is in the device bar directly above; the status line's job
+     here is the preset and whether it's saved. */
+  .status-unit {
+    display: none;
+  }
+
+  /* Theme and version are read once a session and set once a month. They keep
+     their place and stop taking a full row's worth of height for it. */
+  .build-badge {
+    gap: 8px;
+  }
+  .build-badge .theme-toggle button {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+  .version {
+    font-size: 11px;
+  }
+
+  /*
+   * The masthead reads as one line, because it is one line's worth of fact.
+   * Wrapping put the wordmark, then saving, then the theme on three rows of
+   * their own — a third of the screen spent before the first thing you came to
+   * do, on the screen with the least room to spare.
+   */
+  .masthead {
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 12px;
+  }
+  .wordmark {
+    font-size: 15px;
+    letter-spacing: 0.03em;
+    /* One line or nothing: broken across three, a wordmark stops being one. */
+    white-space: nowrap;
+  }
+  /* Saving, and the number that says which build you're looking at, on one
+     line. Stacked, the version had a row of the screen to itself. */
+  .mast-right {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* Both of these are one short line of text in a box built for a desk. */
+  button.device-summary {
+    padding: 9px 13px;
+  }
+  .status-line {
+    margin-top: 10px;
+    padding: 7px 12px;
+  }
+
 }
 
 /* ---------- tone input ---------- */
@@ -3945,6 +4014,10 @@ button.gig-block:disabled {
 /* ---------- persistent status ---------- */
 
 .status-line {
+  /* The popover below hangs off this, not off the chip: the line wraps on a
+     phone and the chip lands at the left of the second row, where anchoring a
+     300px panel to the chip's right edge puts most of it off the screen. */
+  position: relative;
   display: flex;
   align-items: baseline;
   gap: 10px;
@@ -4074,6 +4147,7 @@ button.phone-chip.off {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
+  max-width: calc(100vw - 20px);
   z-index: 30;
   width: min(300px, calc(100vw - 40px));
   padding: 12px 14px;
@@ -4086,6 +4160,23 @@ button.phone-chip.off {
 .phone-pop .hint {
   margin: 0;
   line-height: 1.5;
+}
+
+/* The popover belongs to the status line, not to a chip that has wrapped to the
+   left of it: anchored to the chip's right edge on a phone, most of a 300px
+   panel is off the screen. Placed after the rules it overrides, because these
+   carry the same weight and the last one wins. */
+@media (max-width: 620px) {
+  .phone-link {
+    position: static;
+  }
+
+  .phone-pop {
+    left: 0;
+    right: 0;
+    width: auto;
+    max-width: none;
+  }
 }
 
 .phone-pop-actions {

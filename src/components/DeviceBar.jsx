@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { getHost, setHost, isDemo, setDemo } from '../lib/forgefx'
 import { remoteActive } from '../lib/remote'
+import Theme from './Theme'
 
 /**
  * One line about the unit, everything else behind it.
@@ -105,6 +106,9 @@ export default function DeviceBar({ status, device, onRetry, busy }) {
                 <button onClick={onRetry} disabled={busy}>
                   {busy ? 'Reading…' : 'Reconnect'}
                 </button>
+                {/* Light or dark is set about as often as the host address, and
+                    kept a row of every screen to itself for it. */}
+                <Theme />
               </>
             )}
           </div>
