@@ -96,13 +96,63 @@ export default function XYPad({ blocks, onError }) {
     )
   }
 
-  const move = (e, opts) => {
+  const apply = (clientX, clientY, opts) => {
     if (!xCtl || !yCtl || !padRef.current) return
-    const { x, y } = padFraction(e.clientX, e.clientY, padRef.current.getBoundingClientRect())
+    const { x, y } = padFraction(clientX, clientY, padRef.current.getBoundingClientRect())
     setDot({ x, y })
     writeAxis('x', xCtl, x, opts)
     writeAxis('y', yCtl, y, opts)
   }
+
+  /*
+   * Mouse and touch on the window, not pointer capture — same lesson as the
+   * knob: WebKit stops delivering a captured touch's moves once it leaves the
+   * element, and holding the edge of the pad to pin a control at its extreme
+   * is exactly a finger past the boundary. The drag remembers which touch
+   * started it and follows only that one.
+   */
+  const [drag, setDrag] = useState(null)
+
+  useEffect(() => {
+    if (!drag) return
+
+    if (drag.touchId === null) {
+      const move = (e) => apply(e.clientX, e.clientY)
+      const end = (e) => {
+        apply(e.clientX, e.clientY, { final: true })
+        setDrag(null)
+      }
+      window.addEventListener('mousemove', move)
+      window.addEventListener('mouseup', end)
+      return () => {
+        window.removeEventListener('mousemove', move)
+        window.removeEventListener('mouseup', end)
+      }
+    }
+
+    const find = (list) => Array.from(list).find((t) => t.identifier === drag.touchId)
+    const move = (e) => {
+      const t = find(e.touches)
+      if (!t) return
+      if (e.cancelable) e.preventDefault()
+      apply(t.clientX, t.clientY)
+    }
+    const end = (e) => {
+      const t = find(e.changedTouches)
+      if (!t) return
+      apply(t.clientX, t.clientY, { final: true })
+      setDrag(null)
+    }
+    window.addEventListener('touchmove', move, { passive: false })
+    window.addEventListener('touchend', end)
+    window.addEventListener('touchcancel', end)
+    return () => {
+      window.removeEventListener('touchmove', move)
+      window.removeEventListener('touchend', end)
+      window.removeEventListener('touchcancel', end)
+    }
+    // eslint-disable-next-line
+  }, [drag, xCtl, yCtl])
 
   const options = (index || []).map((e) => (
     <option key={controlKey(e.block.effectId, e.param.id)} value={controlKey(e.block.effectId, e.param.id)}>
@@ -134,13 +184,19 @@ export default function XYPad({ blocks, onError }) {
           <div
             ref={padRef}
             className="xy-pad"
-            onPointerDown={(e) => {
+            onMouseDown={(e) => {
+              if (e.button !== 0 || drag) return
               errored.current = false
-              e.currentTarget.setPointerCapture(e.pointerId)
-              move(e)
+              apply(e.clientX, e.clientY)
+              setDrag({ touchId: null })
             }}
-            onPointerMove={(e) => e.buttons > 0 && move(e)}
-            onPointerUp={(e) => move(e, { final: true })}
+            onTouchStart={(e) => {
+              if (drag) return
+              errored.current = false
+              const t = e.changedTouches[0]
+              apply(t.clientX, t.clientY)
+              setDrag({ touchId: t.identifier })
+            }}
             role="application"
             aria-label={`Pad controlling ${xCtl.param.name} across and ${yCtl.param.name} up`}
           >

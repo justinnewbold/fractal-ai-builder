@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { blockColor } from '../lib/blockColors'
 
 const SHORT = {
@@ -229,8 +229,8 @@ export function BlockPanel({ block, channels, onError, onChanged, busy }) {
 
   const valueOf = (p) => (local[p.id] !== undefined ? local[p.id] : p.value)
 
-  const commit = async (p) => {
-    const next = local[p.id]
+  const commit = async (p, override) => {
+    const next = override !== undefined ? override : local[p.id]
     if (next === undefined || next === p.value) return
     try {
       const res = await setParamConfirmed(block.effectId, p.id, next, p)
@@ -356,10 +356,14 @@ export function BlockPanel({ block, channels, onError, onChanged, busy }) {
                 onChange={(v) => setLocal((prev) => ({ ...prev, [p.id]: v }))}
                 onCommit={() => commit(p)}
               />
-              <div className="knob-readout mono">
-                {fmt(valueOf(p))}
-                {p.unit ? ` ${p.unit}` : ''}
-              </div>
+              <ValueBox
+                param={p}
+                value={valueOf(p)}
+                onCommit={(v) => {
+                  setLocal((prev) => ({ ...prev, [p.id]: v }))
+                  commit(p, v)
+                }}
+              />
             </div>
           ))
         )}
@@ -382,6 +386,61 @@ function fmt(n) {
   if (typeof n !== 'number') return '—'
   if (Math.abs(n) >= 1000) return Math.round(n).toLocaleString()
   return n.toFixed(2)
+}
+
+/**
+ * The number under a knob, and a way to just type it.
+ *
+ * A knob is right for sweeping; a thumb on a phone is wrong for landing on
+ * exactly 4.00. Tap the number and it becomes an input — type, and Enter or
+ * tapping away commits through the same verified write as the knob. What's
+ * typed clamps to the parameter's own range, the same rule the device itself
+ * applies to every write.
+ */
+function ValueBox({ param, value, onCommit }) {
+  const [text, setText] = useState(null) // null = showing, string = editing
+  const abandon = useRef(false)
+
+  const finish = () => {
+    if (abandon.current) {
+      abandon.current = false
+      setText(null)
+      return
+    }
+    if (text === null) return
+    const n = Number(text.replace(',', '.').trim())
+    setText(null)
+    if (!Number.isFinite(n) || n === value) return
+    const lo = typeof param.min === 'number' ? param.min : -Infinity
+    const hi = typeof param.max === 'number' ? param.max : Infinity
+    onCommit(Math.min(hi, Math.max(lo, n)))
+  }
+
+  return (
+    <input
+      className="knob-readout mono"
+      type="text"
+      inputMode="decimal"
+      value={text !== null ? text : `${fmt(value)}${param?.unit ? ` ${param.unit}` : ''}`}
+      onFocus={(e) => {
+        // The unit drops out and the whole number is selected, so typing
+        // replaces rather than appends to "6.70 dB".
+        setText(typeof value === 'number' ? String(Math.round(value * 100) / 100) : '')
+        const el = e.target
+        requestAnimationFrame(() => el.select())
+      }}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={finish}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur()
+        else if (e.key === 'Escape') {
+          abandon.current = true
+          e.currentTarget.blur()
+        }
+      }}
+      aria-label={`${param?.name} value`}
+    />
+  )
 }
 
 
