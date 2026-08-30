@@ -729,19 +729,29 @@ test('a refresh that fails after blocks were showing still explains itself', () 
 // found, and when it was found it appeared to do nothing.
 console.log('\nsaving')
 
-// What the bar offers, given where the app is running.
-const saveButton = (remote, busy) =>
-  remote ? 'blocked' : busy ? 'working' : 'save'
+// What the bar offers, given where the app is running and what it's waiting on.
+const saveButton = (remote, busy, queued) =>
+  queued ? 'waiting' : busy ? 'working' : remote ? 'ask the Mac' : 'save'
 
 test('a slot write is offered when the cable is on this machine', () => {
-  assert.equal(saveButton(false, false), 'save')
+  assert.equal(saveButton(false, false, null), 'save')
 })
 
-test('a remote session says so before the tap, not after', () => {
-  // ForgeFX refuses POST /preset/store over the relay — correctly. The old bar
-  // offered the button anyway and surfaced the 403 in a banner off-screen.
-  assert.equal(saveButton(true, false), 'blocked')
+test('a remote session saves through the Mac rather than refusing', () => {
+  // ForgeFX refuses POST /preset/store over the relay — correctly, and still.
+  // The request goes by the road that IS open, and the page at the Mac writes
+  // it; the button says who does the writing instead of being dead.
+  assert.equal(saveButton(true, false, null), 'ask the Mac')
   assert.ok(forbiddenRemotely('POST', '/preset/store'))
+  // The road: config docs are the one write the host takes from a distance.
+  assert.equal(forbiddenRemotely('PUT', '/store/config/fractal.pendingSave.fm3'), null)
+  assert.equal(forbiddenRemotely('GET', '/store/config/fractal.saveResult.fm3'), null)
+  // And the clean-up stays at the Mac, which is why the phone never deletes.
+  assert.ok(forbiddenRemotely('DELETE', '/store/config/fractal.pendingSave.fm3'))
+})
+
+test('a queued save says it is waiting rather than offering to ask twice', () => {
+  assert.equal(saveButton(true, false, { id: 'x', slot: 12 }), 'waiting')
 })
 
 // The bar is present whether or not the app believes anything changed.

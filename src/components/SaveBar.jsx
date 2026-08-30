@@ -26,6 +26,7 @@ export default function SaveBar({
   slot,
   onSlot,
   onSave,
+  queued,
   onRevert,
   safety,
   onRestoreSafety,
@@ -36,10 +37,15 @@ export default function SaveBar({
 
   /*
    * A slot write is on ForgeFX's never-remote list, and it should be — a phone
-   * at the far side of a room shouldn't be able to overwrite a slot. But the
-   * refusal used to arrive AFTER the tap, as a message in a banner at the top
-   * of a page you weren't looking at. So it's said before the tap instead, on
-   * the button itself.
+   * at the far side of a room shouldn't be able to overwrite a slot on a mis-tap.
+   * That refusal stands. What changed is the answer given to the player: it used
+   * to be a disabled button reading "saving happens at the Mac", which is true
+   * and useless after ten minutes of work on a tone with the amp across the room.
+   *
+   * The request now travels the host's document store — the one road the relay
+   * leaves open — and the page at the Mac carries it out. So the button saves;
+   * it just says who does the writing, and waits for word back rather than
+   * claiming a slot was written the moment it was asked for.
    */
   const remote = remoteActive()
   const target = slot === '' ? preset?.number : Number(slot)
@@ -61,13 +67,13 @@ export default function SaveBar({
         </button>
 
         {remote ? (
-          /* Disabled, and saying why on its face — not in a banner elsewhere. */
           <button
             className="save-now"
-            disabled
-            title="ForgeFX won't take a slot write over a remote session"
+            onClick={onSave}
+            disabled={busy || !!queued}
+            title="The page at your Mac does the writing"
           >
-            Saving happens at the Mac
+            {queued ? 'Waiting for the Mac…' : `Save at the Mac · ${targetLabel}`}
           </button>
         ) : (
           <button className="save-now" onClick={onSave} disabled={busy}>
@@ -76,8 +82,14 @@ export default function SaveBar({
         )}
       </div>
 
-      {open || error ? (
+      {open || error || queued ? (
         <div className="save-pop">
+          {queued ? (
+            <p className="hint">
+              Slot {queued.slot} is queued. The page at your Mac writes it &mdash; open there if it
+              isn&rsquo;t, and this says so the moment it lands.
+            </p>
+          ) : null}
           {error ? (
             <div className="save-error" role="alert">
               <span>{error}</span>

@@ -250,6 +250,32 @@ export const takeParkedPresetName = async (slot) => {
 
 export const clearParkedPresetName = (slot) => deleteHostDoc(pendingNameKey(slot))
 
+/**
+ * A slot write asked for from the phone, and carried out at the Mac.
+ *
+ * ForgeFX will not take a store over the relay, and that is not a bug to work
+ * around: its allowlist names it, and a phone at the far side of a room that
+ * can overwrite slot 67 with a mis-tap is a worse app than one that can't. But
+ * "you cannot save from here" is the wrong answer to someone who has just spent
+ * ten minutes on a tone with the amp across the room.
+ *
+ * So the request travels the one road that is open — the host's document store,
+ * which the relay does allow — and the Mac does the writing, which is where the
+ * writing was always allowed to happen. It carries the slot it came from, so
+ * the Mac can tell "save what is loaded" from "save something the unit has
+ * since moved on from", and an id, so the phone can be told what became of it
+ * rather than being left to wonder.
+ */
+const pendingSaveKey = () => `fractal.pendingSave.${deviceSlug}`
+const saveResultKey = () => `fractal.saveResult.${deviceSlug}`
+
+export const parkSave = (request) => writeHostDoc(pendingSaveKey(), { ...request, at: Date.now() })
+export const takeParkedSave = () => readHostDoc(pendingSaveKey())
+export const clearParkedSave = () => deleteHostDoc(pendingSaveKey())
+
+export const reportSave = (result) => writeHostDoc(saveResultKey(), { ...result, at: Date.now() })
+export const readSaveResult = () => readHostDoc(saveResultKey())
+
 /** The preset currently loaded on the unit. */
 export const currentPreset = async () => (mock ? (await tick(), mock.preset()) : request('/preset'))
 

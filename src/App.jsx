@@ -27,7 +27,6 @@ import StatusLine from './components/StatusLine'
 import ParamSearch from './components/ParamSearch'
 import Host from './components/Host'
 import Assistant from './components/Assistant'
-import Theme from './components/Theme'
 import UpdateNotice from './components/UpdateNotice'
 import { validatePlan, runPlan } from './lib/actions'
 import { timeLeft } from './lib/slots'
@@ -42,6 +41,11 @@ import {
   scanAllPresets,
   cachedPresetNames,
   localHelperAlive,
+  parkSave,
+  takeParkedSave,
+  clearParkedSave,
+  reportSave,
+  readSaveResult,
   forgetPresetName,
   readSceneNames
 } from './lib/forgefx'
@@ -169,6 +173,10 @@ export default function App() {
   const [compare, setCompare] = useState(null)
   const [turns, setTurns] = useState([])
   const [remote, setRemote] = useState(false)
+  // A slot write asked for from the phone: what it's waiting on there, and
+  // what has arrived here.
+  const [queuedSave, setQueuedSave] = useState(null)
+  const [askedSave, setAskedSave] = useState(null)
   /*
    * Whether this is the machine with the cable in it.
    *
@@ -396,6 +404,85 @@ export default function App() {
     }
     await read()
   }, [read])
+
+  /** Do at the Mac what the phone asked for, and say so at both ends. */
+  const carryOutSave = useCallback(
+    async (req) => {
+      setBusy(true)
+      setAskedSave(null)
+      try {
+        const name = (req.name || '').trim()
+        if (name && name !== preset?.name?.trim()) await setPresetName(name)
+        await storePreset(req.slot)
+        forgetPresetName(req.slot)
+        setSlots((prev) => prev.filter((s) => s.number !== req.slot))
+        await clearParkedSave()
+        // The phone is watching for this; without it, "asked" never becomes
+        // "done" over there and the only honest thing it could say is nothing.
+        await reportSave({ id: req.id, ok: true, slot: req.slot })
+        setDirty(false)
+        record('save', `Saved "${name || preset?.name}" to slot ${req.slot}, asked for from the phone`)
+        await read()
+      } catch (err) {
+        await clearParkedSave().catch(() => {})
+        await reportSave({ id: req.id, ok: false, slot: req.slot, error: err.message }).catch(() => {})
+        setError(err.message)
+      } finally {
+        setBusy(false)
+      }
+    },
+    [preset?.name, read, record]
+  )
+
+  /*
+   * At the Mac: anything the phone has asked for.
+   *
+   * Applied without ceremony when it is plainly the thing that is loaded — that
+   * is someone saving the tone they have been editing, and a confirmation step
+   * at a machine they are not standing at helps nobody. When the unit has moved
+   * on since the request, it asks: storing the wrong buffer under someone's
+   * name is not a mistake to make on their behalf.
+   */
+  useEffect(() => {
+    if (status !== 'live' || remote || isDemo()) return
+    let stop = false
+    const look = async () => {
+      const req = await takeParkedSave()
+      if (stop || !req?.id || !Number.isInteger(req.slot) || askedSave?.id === req.id) return
+      const fresh = Date.now() - (req.at || 0) < 15 * 60 * 1000
+      const sameBuffer = req.fromSlot == null || req.fromSlot === preset?.number
+      if (fresh && sameBuffer) await carryOutSave(req)
+      else setAskedSave(req)
+    }
+    look()
+    const timer = setInterval(look, 6000)
+    return () => {
+      stop = true
+      clearInterval(timer)
+    }
+  }, [status, remote, preset?.number, carryOutSave, askedSave?.id])
+
+  /* On the phone: what became of it. */
+  useEffect(() => {
+    if (!queuedSave) return
+    let stop = false
+    const timer = setInterval(async () => {
+      const res = await readSaveResult()
+      if (stop || res?.id !== queuedSave.id) return
+      setQueuedSave(null)
+      if (res.ok) {
+        setDirty(false)
+        record('save', `The Mac saved it to slot ${res.slot}`)
+        read()
+      } else {
+        setSaveError(res.error || 'The Mac could not save it.')
+      }
+    }, 3000)
+    return () => {
+      stop = true
+      clearInterval(timer)
+    }
+  }, [queuedSave, read, record])
 
   useEffect(() => {
     read()
@@ -701,6 +788,30 @@ export default function App() {
     setError(null)
     setSaveError(null)
     try {
+      /*
+       * From the phone, the Mac does the writing.
+       *
+       * ForgeFX refuses a slot write over the relay by design, and that refusal
+       * is worth keeping — but it was being handed to the player as "you can't
+       * save from here", which is the wrong answer to ten minutes of work on a
+       * tone with the amp across the room. The request goes into the host's
+       * document store, which the relay does allow, and the page at the Mac
+       * carries it out where writing was always permitted.
+       */
+      if (remoteActive()) {
+        const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+        await parkSave({
+          id,
+          slot: number,
+          name: saveName.trim(),
+          fromSlot: preset?.number ?? null,
+          fromName: preset?.name ?? null
+        })
+        setQueuedSave({ id, slot: number })
+        record('save', `Asked the Mac to save "${saveName.trim() || preset?.name}" to slot ${number}`)
+        return
+      }
+
       // Name first: /preset/name writes the working buffer, and storePreset is
       // what makes it permanent. Doing it the other way round saves the old name.
       const name = saveName.trim()
@@ -1407,6 +1518,7 @@ export default function App() {
               slot={slot}
               onSlot={setSlot}
               onSave={save}
+              queued={queuedSave}
               onRevert={revert}
               safety={safety}
               onRestoreSafety={restoreSafety}
@@ -1422,12 +1534,15 @@ export default function App() {
             live — Library, Technical details. The theme toggle stays, because
             that is a thing you actually want to change.
           */}
+          {/* The one piece of "chrome" that earned its place back: the version
+              is how a deploy is confirmed after every change, and burying it
+              three taps deep in Technical details broke that habit. Just the
+              number — the phase, hash and build stamp stay buried.
+
+              The theme toggle used to sit beside it and cost a row of its own
+              on every screen for something set once a month. It moved in with
+              the other things you set once: the device bar's fold. */}
           <div className="build-badge">
-            <Theme />
-            {/* The one piece of "chrome" that earned its place back: the version
-                is how a deploy is confirmed after every change, and burying it
-                three taps deep in Technical details broke that habit. Just the
-                number — the phase, hash and build stamp stay buried. */}
             <span className="version mono">v{VERSION}</span>
           </div>
         </div>
@@ -1547,6 +1662,38 @@ export default function App() {
         failure anywhere else — a rejected sign-in, a refused write — set the
         message and rendered nothing. Silence read as "the button does nothing".
       */}
+      {askedSave ? (
+        <div className="notice" data-kind="fault">
+          <h2>The phone asked to save</h2>
+          <p>
+            &ldquo;{askedSave.name || askedSave.fromName || 'Untitled'}&rdquo; to slot{' '}
+            {askedSave.slot}. The unit has moved since it asked &mdash; it was on{' '}
+            {askedSave.fromSlot ?? '--'} and is on {preset?.number ?? '--'} now &mdash; so saving
+            would store what is loaded here, under that name.
+          </p>
+          <div className="history-actions">
+            <button className="chip" onClick={() => carryOutSave(askedSave)} disabled={busy}>
+              Save it anyway
+            </button>
+            <button
+              className="chip"
+              onClick={async () => {
+                await clearParkedSave().catch(() => {})
+                await reportSave({
+                  id: askedSave.id,
+                  ok: false,
+                  slot: askedSave.slot,
+                  error: 'Left alone at the Mac — the unit had moved on.'
+                }).catch(() => {})
+                setAskedSave(null)
+              }}
+            >
+              Leave it
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {status === 'live' && error ? (
         <div className="notice" data-kind="fault" role="alert">
           <h2>Didn&rsquo;t work</h2>
