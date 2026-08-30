@@ -73,11 +73,16 @@ export default function XYPad({ blocks, onError }) {
     }
   }
 
-  const writeAxis = (axis, ctl, frac) => {
+  const writeAxis = (axis, ctl, frac, { final = false } = {}) => {
     const g = gate.current[axis]
     const now = performance.now()
     const interval = remoteActive() ? 150 : 60
-    if (!gateWrite({ now, lastAt: g.at, lastFrac: g.frac, frac, interval })) return
+    // The lift is the value the player chose, so it goes out even when the
+    // gate would swallow it — otherwise the control rests a few pixels shy of
+    // where the finger left it. Only an exact repeat of the last write is
+    // skipped.
+    if (final ? frac === g.frac : !gateWrite({ now, lastAt: g.at, lastFrac: g.frac, frac, interval }))
+      return
     g.at = now
     g.frac = frac
     setParam(ctl.block.effectId, ctl.param.id, fromNormalized(frac, ctl.param), ctl.param).catch(
@@ -91,12 +96,12 @@ export default function XYPad({ blocks, onError }) {
     )
   }
 
-  const move = (e) => {
+  const move = (e, opts) => {
     if (!xCtl || !yCtl || !padRef.current) return
     const { x, y } = padFraction(e.clientX, e.clientY, padRef.current.getBoundingClientRect())
     setDot({ x, y })
-    writeAxis('x', xCtl, x)
-    writeAxis('y', yCtl, y)
+    writeAxis('x', xCtl, x, opts)
+    writeAxis('y', yCtl, y, opts)
   }
 
   const options = (index || []).map((e) => (
@@ -135,6 +140,7 @@ export default function XYPad({ blocks, onError }) {
               move(e)
             }}
             onPointerMove={(e) => e.buttons > 0 && move(e)}
+            onPointerUp={(e) => move(e, { final: true })}
             role="application"
             aria-label={`Pad controlling ${xCtl.param.name} across and ${yCtl.param.name} up`}
           >

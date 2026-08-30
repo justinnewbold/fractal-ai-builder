@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { toNormalized, fromNormalized } from '../lib/scale'
 
 /**
@@ -12,60 +12,45 @@ import { toNormalized, fromNormalized } from '../lib/scale'
  * Dragging is vertical only. Circular tracking sounds right and isn't — the
  * pointer leaves the knob, and small movements near the centre produce huge
  * jumps. Every hardware editor uses vertical drag for the same reason.
+ *
+ * Input is pointer events with capture. The old window-level touch listeners
+ * read touches[0], so with a finger on each of two knobs both knobs tracked
+ * whichever finger landed first. Capture ties each drag to the pointer that
+ * started it, and scrolling is refused by touch-action in CSS rather than by
+ * preventDefault gymnastics.
  */
 const START = 135 // degrees, 7 o'clock
 const SWEEP = 270 // to 5 o'clock
 
 export default function Knob({ param, value, onChange, onCommit, size = 58, label }) {
-  const [dragging, setDragging] = useState(false)
+  // The pointer that owns this knob, or null. Coarse means a finger or pen —
+  // anything where the pointer is also the thing hiding the knob.
+  const [drag, setDrag] = useState(null)
   const origin = useRef({ y: 0, norm: 0 })
 
   const norm = clamp01(toNormalized(value, param) ?? 0)
 
-  const handleMove = useCallback(
-    (event) => {
-      // Without this the page scrolls under the finger instead of the knob
-      // turning. The listener is registered passive:false precisely so this
-      // call is allowed.
-      if (event.cancelable) event.preventDefault()
-
-      const y = event.touches ? event.touches[0].clientY : event.clientY
-      const delta = origin.current.y - y
-      // 180px of travel covers the full range on a mouse. A thumb is less
-      // precise and a phone screen is shorter, so touch gets a longer throw.
-      const scale = event.shiftKey ? 600 : event.touches ? 260 : 180
-      const next = clamp01(origin.current.norm + delta / scale)
-      onChange(round3(fromNormalized(next, param)))
-    },
-    [onChange, param]
-  )
-
-  useEffect(() => {
-    if (!dragging) return
-
-    const stop = () => {
-      setDragging(false)
-      onCommit?.()
-    }
-    window.addEventListener('mousemove', handleMove)
-    window.addEventListener('mouseup', stop)
-    window.addEventListener('touchmove', handleMove, { passive: false })
-    window.addEventListener('touchend', stop)
-    window.addEventListener('touchcancel', stop)
-    return () => {
-      window.removeEventListener('mousemove', handleMove)
-      window.removeEventListener('mouseup', stop)
-      window.removeEventListener('touchmove', handleMove)
-      window.removeEventListener('touchend', stop)
-      window.removeEventListener('touchcancel', stop)
-    }
-  }, [dragging, handleMove, onCommit])
-
   const begin = (event) => {
-    if (event.cancelable) event.preventDefault()
-    const y = event.touches ? event.touches[0].clientY : event.clientY
-    origin.current = { y, norm }
-    setDragging(true)
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    event.currentTarget.setPointerCapture(event.pointerId)
+    origin.current = { y: event.clientY, norm }
+    setDrag({ pointerId: event.pointerId, coarse: event.pointerType !== 'mouse' })
+  }
+
+  const handleMove = (event) => {
+    if (!drag || event.pointerId !== drag.pointerId) return
+    const delta = origin.current.y - event.clientY
+    // 180px of travel covers the full range on a mouse. A thumb is less
+    // precise and a phone screen is shorter, so touch gets a longer throw.
+    const scale = event.shiftKey ? 600 : drag.coarse ? 260 : 180
+    const next = clamp01(origin.current.norm + delta / scale)
+    onChange(round3(fromNormalized(next, param)))
+  }
+
+  const end = (event) => {
+    if (!drag || event.pointerId !== drag.pointerId) return
+    setDrag(null)
+    onCommit?.()
   }
 
   const nudge = (event) => {
@@ -91,10 +76,12 @@ export default function Knob({ param, value, onChange, onCommit, size = 58, labe
       {label ? <span className="knob-label">{label}</span> : null}
 
       <div
-        className={`knob ${dragging ? 'dragging' : ''}`}
+        className={`knob ${drag ? 'dragging' : ''}`}
         style={{ width: size, height: size }}
-        onMouseDown={begin}
-        onTouchStart={begin}
+        onPointerDown={begin}
+        onPointerMove={handleMove}
+        onPointerUp={end}
+        onPointerCancel={end}
         onKeyDown={nudge}
         role="slider"
         tabIndex={0}
@@ -114,6 +101,15 @@ export default function Knob({ param, value, onChange, onCommit, size = 58, labe
             className="knob-dot"
           />
         </svg>
+
+        {/* A finger covers the knob and the readout below it at once, so while
+            it drags, the value floats above where it can be seen. */}
+        {drag?.coarse ? (
+          <span className="knob-flag mono" aria-hidden="true">
+            {fmt(value)}
+            {param?.unit ? ` ${param.unit}` : ''}
+          </span>
+        ) : null}
       </div>
     </div>
   )
@@ -133,6 +129,12 @@ function arc(cx, cy, r, from, to) {
 function polar(cx, cy, r, deg) {
   const rad = toRad(deg)
   return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) }
+}
+
+function fmt(n) {
+  if (typeof n !== 'number') return '—'
+  if (Math.abs(n) >= 1000) return Math.round(n).toLocaleString()
+  return n.toFixed(2)
 }
 
 function clamp01(v) {

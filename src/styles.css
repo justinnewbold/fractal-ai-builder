@@ -47,6 +47,9 @@ body {
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  /* A scroll past the top must not become pull-to-refresh: mid-gig that
+     reloads the app and drops the device connection. */
+  overscroll-behavior-y: contain;
 }
 
 /* Silkscreen labels: wide, small, letterspaced — the way equipment
@@ -166,9 +169,25 @@ button {
   padding: 8px 14px;
   cursor: pointer;
   transition: border-color 120ms ease, color 120ms ease;
+  /* Tap mechanics. manipulation drops the double-tap-zoom wait, so two fast
+     taps on Next are two presets, not a zoomed page. The OS highlight and
+     long-press text selection are replaced by our own :active state. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
-button:hover:not(:disabled) {
+/* Hover only where a hover can end. On a touch screen the style would stick
+   to the last thing tapped and read as state it isn't. */
+@media (hover: hover) {
+  button:hover:not(:disabled) {
+    border-color: var(--silk-faint);
+  }
+}
+
+/* The press is the tap's feedback — same cue hover gives a mouse. */
+button:active:not(:disabled) {
   border-color: var(--silk-faint);
 }
 
@@ -468,7 +487,13 @@ button.primary {
   font-weight: 600;
 }
 
-button.primary:hover:not(:disabled) {
+@media (hover: hover) {
+  button.primary:hover:not(:disabled) {
+    border-color: var(--silk);
+  }
+}
+
+button.primary:active:not(:disabled) {
   border-color: var(--silk);
 }
 
@@ -1476,7 +1501,14 @@ button.view-tab {
   padding: 10px 16px;
 }
 
-button.view-tab:hover:not(:disabled) {
+@media (hover: hover) {
+  button.view-tab:hover:not(:disabled) {
+    color: var(--silk-dim);
+    border-color: var(--rule);
+  }
+}
+
+button.view-tab:active:not(:disabled) {
   color: var(--silk-dim);
   border-color: var(--rule);
 }
@@ -1857,7 +1889,13 @@ button.save-now {
   white-space: nowrap;
 }
 
-button.save-now:hover:not(:disabled) {
+@media (hover: hover) {
+  button.save-now:hover:not(:disabled) {
+    filter: brightness(1.12);
+  }
+}
+
+button.save-now:active:not(:disabled) {
   filter: brightness(1.12);
 }
 
@@ -2116,7 +2154,14 @@ button.preset-row.bank-start {
   border-top: 1px solid var(--rule);
 }
 
-button.preset-row:hover:not(:disabled) {
+@media (hover: hover) {
+  button.preset-row:hover:not(:disabled) {
+    background: var(--panel-hi);
+    border-left-color: var(--rule);
+  }
+}
+
+button.preset-row:active:not(:disabled) {
   background: var(--panel-hi);
   border-left-color: var(--rule);
 }
@@ -2433,6 +2478,9 @@ button.chan-btn.current {
   flex-direction: column;
   align-items: center;
   gap: 5px;
+  /* A drag that wanders off the knob must not start selecting labels. */
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .knob-label {
@@ -2446,8 +2494,31 @@ button.chan-btn.current {
 }
 
 .knob {
+  position: relative;
   cursor: ns-resize;
   touch-action: none;
+  /* A slow first touch is a drag starting, not a long-press: no iOS callout,
+     no magnifier. */
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Floats above the knob while a finger drags it — the finger is on top of
+   both the knob and the readout below. */
+.knob-flag {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 9px;
+  font-size: 14px;
+  white-space: nowrap;
+  color: var(--silk);
+  background: var(--panel-hi);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 4;
 }
 
 .knob:focus-visible {
@@ -2657,7 +2728,14 @@ button.dot-btn {
   line-height: 0;
 }
 
-button.dot-btn:hover:not(:disabled) {
+@media (hover: hover) {
+  button.dot-btn:hover:not(:disabled) {
+    background: var(--panel-hi);
+    border: none;
+  }
+}
+
+button.dot-btn:active:not(:disabled) {
   background: var(--panel-hi);
   border: none;
 }
@@ -2939,6 +3017,17 @@ ol.action-list li.destructive::marker {
   /* The knob needs room for a thumb, and a bigger target than a cursor needs. */
   .knob-cell {
     width: 96px;
+  }
+
+  /* Hit slop: the drawn knob stays its size, the touchable area grows. The
+     negative margin gives the padding back so layout doesn't shift.
+     content-box because the element's inline width is the artwork's size —
+     border-box padding would shrink the drawing instead of growing the
+     target. */
+  .knob {
+    box-sizing: content-box;
+    padding: 10px;
+    margin: -10px;
   }
 
   button.dot-btn {
@@ -3404,8 +3493,10 @@ button.view-tab.gig-tab::after {
   transform: rotate(-135deg) translate(-2px, -2px);
 }
 
-.section-head:hover .section-title {
-  color: var(--silk);
+@media (hover: hover) {
+  .section-head:hover .section-title {
+    color: var(--silk);
+  }
 }
 
 .section-body {
@@ -4042,6 +4133,11 @@ button.gig-tuner-btn.on {
     var(--chassis);
   touch-action: none;
   overflow: hidden;
+  /* Holding a finger still on the pad is playing, not long-pressing. */
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .xy-line-h,
