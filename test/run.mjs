@@ -781,6 +781,13 @@ test('slot zero is a real slot, not an empty field', () => {
 
 console.log('\nthe relay coming and going')
 
+test('the host can be asked whether it is there', () => {
+  // The probe that replaced presence: the host joins the channel but never
+  // tracks presence, so "is anyone else here?" was always answered no. A
+  // relayed GET is the test instead, and it has to be one the host allows.
+  assert.equal(forbiddenRemotely('GET', '/healthz'), null)
+})
+
 test('a channel whose socket closed is never handed back', async () => {
   const { canReuseChannel } = await import('../src/lib/remote.js')
   const client = { id: 'a' }

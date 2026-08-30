@@ -7,7 +7,7 @@ import {
   remoteConnect,
   remoteDisconnect,
   remoteActive,
-  remoteHostSeen,
+  hostResponds,
   subscribeRemoteState,
   restoreSession,
   setAutoConnect,
@@ -27,6 +27,16 @@ import {
  * hosted publicly and the Supabase project is the player's own; baking one
  * person's project into the bundle would be wrong even with one user.
  */
+/**
+ * The one thing to do about a channel with nobody on the other end.
+ *
+ * Signing in on the phone joins the channel; it does not put the Mac on it.
+ * That is a separate switch in a separate place, and the sign-in going through
+ * makes it look like it can't be the problem.
+ */
+const NO_ANSWER =
+  'Open this app at the Mac, find "Play from your phone", and turn the host on — signed in as this same account.'
+
 export default function Remote({ onConnected, onError }) {
   const saved = loadRemoteConfig()
   const [url, setUrl] = useState(saved?.url || DEFAULT_PROJECT.url)
@@ -57,6 +67,8 @@ export default function Remote({ onConnected, onError }) {
         setState('connected')
         setNote('Reconnected to the host.')
         onConnected(true)
+        const answered = await hostResponds()
+        if (!stop && !answered) setNote(NO_ANSWER)
       } catch {
         // The host may simply be off. Leaving the form is the right answer, and
         // an error on page load for something nobody asked for is not.
@@ -102,9 +114,9 @@ export default function Remote({ onConnected, onError }) {
       if (!uid) throw new Error('That sign-in has expired — enter your password to connect again.')
       await remoteConnect()
       setState('connected')
-      setNote('Reconnected to the host.')
       setAutoConnect(true)
       onConnected(true)
+      setNote((await hostResponds()) ? 'Reconnected to the host.' : NO_ANSWER)
     } catch (err) {
       setState('idle')
       onError(err.message)
@@ -134,22 +146,20 @@ export default function Remote({ onConnected, onError }) {
         autoConnect: true
       })
       setState('connected')
-      /*
-       * Joining a channel nobody else is on succeeds perfectly well and does
-       * nothing, which would look like a working connection until the first
-       * request timed out. Presence settles a moment after subscribe, so the
-       * check waits for it rather than reading an empty state.
-       */
-      setTimeout(() => {
-        setNote(
-          remoteHostSeen()
-            ? `Connected as ${uid.slice(0, 8)}… — the host is on the channel.`
-            : `Connected as ${uid.slice(0, 8)}…, but nothing else is on this channel. Turn the host on at the Mac.`
-        )
-      }, 1200)
       setNote(`Connected as ${uid.slice(0, 8)}…`)
       setPassword('')
       onConnected(true)
+      /*
+       * Joining a channel nobody else is on succeeds perfectly well and does
+       * nothing, which looks like a working connection until the first request
+       * times out. So the channel is tested by using it, which is the only
+       * thing that can tell the two apart.
+       */
+      setNote(
+        (await hostResponds())
+          ? `Connected as ${uid.slice(0, 8)}… — the Mac is answering.`
+          : `Connected as ${uid.slice(0, 8)}…, but the Mac isn't answering. ${NO_ANSWER}`
+      )
     } catch (err) {
       setState('idle')
       onError(err.message)

@@ -84,11 +84,31 @@ async function request(path, options = {}) {
     }
   }
 
+  return directRequest(path, options)
+}
+
+/**
+ * Straight to this machine, whatever the relay is doing.
+ *
+ * A few routes are local by definition — the helper's own sign-in, and the
+ * switch that puts it on the channel. ForgeFX refuses both from a distance and
+ * is right to. But every call went through the relay whenever a remote session
+ * was up, and at the Mac a remote session is an ordinary thing to have: the
+ * page there had been relaying to a host that wasn't on, so the panel holding
+ * the switch to turn it on couldn't be read, and wasn't even drawn. The one
+ * control that fixes the problem hid itself exactly when it was the answer.
+ */
+async function directRequest(path, options = {}) {
   const url = `${getHost()}${path}`
   let res
   try {
+    // A machine that isn't running the helper refuses instantly, but a machine
+    // that is busy or asleep can leave a fetch hanging, and the callers here
+    // are asking a yes/no question someone is waiting on.
+    const stop = options.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined
     res = await fetch(url, {
       ...options,
+      signal: stop,
       headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
     })
   } catch (cause) {
@@ -113,6 +133,25 @@ async function request(path, options = {}) {
     throw new ForgeError(detail, { status: res.status })
   }
   return parsed
+}
+
+/**
+ * Whether the helper is running on this very machine.
+ *
+ * The question the app never asked: a browser at the Mac and a browser on a
+ * phone are told apart today by guessing from the user agent, when the honest
+ * test is whether localhost answers. It decides whether the host switch is
+ * yours to throw, and whether a remote session on this machine is a relay to
+ * somewhere else or a relay to the desk you're sitting at.
+ */
+export async function localHelperAlive() {
+  if (mock) return false
+  try {
+    await directRequest('/healthz', { timeoutMs: 2500 })
+    return true
+  } catch {
+    return false
+  }
 }
 
 /** Liveness plus the model ForgeFX thinks is attached. */
@@ -1481,20 +1520,20 @@ export function pageIsSecure() {
  * thing in this setup that needed a terminal.
  */
 export const cloudStatus = () =>
-  mock ? tick().then(() => ({ enabled: false, user: null })) : request('/cloud/status')
+  mock ? tick().then(() => ({ enabled: false, user: null })) : directRequest('/cloud/status')
 
 export const cloudLogin = (email, password) =>
   mock
     ? tick().then(() => ({ user: { email } }))
-    : request('/cloud/login', { method: 'POST', body: JSON.stringify({ email, password }) })
+    : directRequest('/cloud/login', { method: 'POST', body: JSON.stringify({ email, password }) })
 
 export const cloudLogout = () =>
-  mock ? tick().then(() => ({ user: null })) : request('/cloud/logout', { method: 'POST' })
+  mock ? tick().then(() => ({ user: null })) : directRequest('/cloud/logout', { method: 'POST' })
 
 export const remoteStatus = () =>
-  mock ? tick().then(() => ({ enabled: false, connected: false })) : request('/remote/status')
+  mock ? tick().then(() => ({ enabled: false, connected: false })) : directRequest('/remote/status')
 
 export const remoteEnable = (on) =>
   mock
     ? tick().then(() => ({ enabled: on, connected: on }))
-    : request('/remote/enable', { method: 'POST', body: JSON.stringify({ on }) })
+    : directRequest('/remote/enable', { method: 'POST', body: JSON.stringify({ on }) })
