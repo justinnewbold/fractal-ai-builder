@@ -1,3 +1,5 @@
+import PhoneLink from './PhoneLink'
+
 /**
  * Where you are, on every screen.
  *
@@ -9,15 +11,12 @@
  * One line, always present, always the same shape. Nothing here is a control;
  * it exists to answer "what am I about to change" before you change it.
  */
-export default function StatusLine({ device, preset, dirty, remote }) {
+export default function StatusLine({ device, preset, dirty, remote, onRemoteChanged, onError }) {
   return (
     <div className="status-line" role="status">
       <span className={`lamp ${remote ? 'remote' : ''}`} data-state="live" />
 
-      <span className="status-unit silk-label">
-        {device?.short || device?.name || 'Unit'}
-        {remote ? ' · remote' : ''}
-      </span>
+      <span className="status-unit silk-label">{device?.short || device?.name || 'Unit'}</span>
 
       <span className="status-preset">
         <span className="status-slot mono">{preset?.number ?? '--'}</span>
@@ -27,6 +26,11 @@ export default function StatusLine({ device, preset, dirty, remote }) {
       {/* Said plainly rather than as a coloured dot on its own: unsaved is the
           one state here with a consequence, and a dot needs a legend. */}
       {dirty ? <span className="status-dirty">Unsaved</span> : null}
+
+      {/* The phone link used to be a "· remote" suffix on the unit name above,
+          which is a fact about how this browser reaches the amp wearing the
+          clothes of a fact about the amp. It gets its own control. */}
+      <PhoneLink onChanged={onRemoteChanged} onError={onError} />
     </div>
   )
 }

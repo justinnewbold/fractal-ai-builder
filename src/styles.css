@@ -3986,12 +3986,85 @@ button.gig-block:disabled {
   color: var(--live);
 }
 
+/* ---------- the phone link, on every screen ---------- */
+
+/* Sits at the end of the status line, and owns the space after it so the chip
+   and its menu line up on the right whether or not "Unsaved" is showing. */
+.phone-link {
+  position: relative;
+  margin-left: auto;
+  align-self: center;
+}
+
+button.phone-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  background: none;
+}
+
+/* Live and answering gets the connection colour; joined-but-alone gets the
+   fault colour, because a link with no host on it is not a working link and
+   should not be dressed as one. */
+button.phone-chip.on {
+  color: var(--live);
+  border-color: color-mix(in srgb, var(--live) 55%, var(--rule));
+}
+
+button.phone-chip.lonely {
+  color: var(--fault);
+  border-color: color-mix(in srgb, var(--fault) 55%, var(--rule));
+}
+
+button.phone-chip.lonely .lamp {
+  background: var(--fault);
+  box-shadow: none;
+}
+
+button.phone-chip.off {
+  color: var(--silk-faint);
+}
+
+.phone-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  width: min(300px, calc(100vw - 40px));
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+.phone-pop .hint {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.phone-pop-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 @media (max-width: 620px) {
   .status-name {
     font-size: 13px;
   }
 
   .status-dirty {
+    margin-left: 0;
+  }
+
+  /* On a narrow line the chip wraps to its own row rather than squeezing the
+     preset name, which is the thing you came to read. */
+  .phone-link {
     margin-left: 0;
   }
 }
