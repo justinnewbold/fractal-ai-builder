@@ -204,7 +204,16 @@ export function createMockDevice() {
       return { ok: true }
     },
 
-    presetName: (number) => ({ number, name: state.stored.get(number) || '' }),
+    /*
+     * The gen-3 stub, reproduced deliberately.
+     *
+     * ForgeFX answers GET /presets/{n} on every gen-3 unit with an empty name,
+     * because the firmware has no query for a stored name — 200 OK and nothing
+     * in it. This mock used to answer with the real name, so the preset list
+     * looked right in demo and showed 512 empties on an actual FM3. The name
+     * lives in the dump, and presetSummary is where it comes from.
+     */
+    presetName: (number) => ({ number, name: '' }),
 
     setPresetName: (name) => {
       state.presetName = name
@@ -257,16 +266,24 @@ export function createMockDevice() {
           level: Math.random() * 0.7 + 0.15
         })),
 
+    /*
+     * The shape ForgeFX actually serves: one `ports` list carrying both
+     * transports, each entry flagged. The invented `serial` / `midiIn` /
+     * `midiOut` split that used to be here is why the picker read an
+     * always-undefined field and told everyone their unit wasn't plugged in.
+     */
     ports: () => ({
-      serial: [
-        { id: '/dev/cu.usbmodem1104', fractal: true, model: 'FM3' },
-        { id: '/dev/cu.usbmodem2201', fractal: true, model: 'AM4' },
-        { id: '/dev/cu.Bluetooth-Incoming-Port', fractal: false }
-      ],
-      midiIn: [],
-      midiOut: [],
       chosen: { transport: 'serial', id: '/dev/cu.usbmodem1104' },
-      override: null
+      override: null,
+      profileOverride: null,
+      profile: { key: 'fm3', name: 'FM3', model: '0x11' },
+      ports: [
+        { transport: 'serial', id: '/dev/cu.usbmodem1104', label: '/dev/cu.usbmodem1104 · FM3', fractal: true, model: 'FM3' },
+        { transport: 'serial', id: '/dev/cu.usbmodem2201', label: '/dev/cu.usbmodem2201 · AM4', fractal: true, model: 'AM4' },
+        { transport: 'serial', id: '/dev/cu.Bluetooth-Incoming-Port', label: '/dev/cu.Bluetooth-Incoming-Port', fractal: false },
+        { transport: 'midi', id: 'FM3 MIDI In', label: 'FM3 MIDI In', fractal: true, dir: 'input' },
+        { transport: 'midi', id: 'FM3 MIDI Out', label: 'FM3 MIDI Out', fractal: true, dir: 'output' }
+      ]
     }),
 
     blockCatalog: () =>

@@ -40,6 +40,7 @@ const colorFor = (slug) => blockColor(slug).fill
 import Knob from './Knob'
 import { blockParams, blockTypes, setParamConfirmed, setType, setBypass, setChannel } from '../lib/forgefx'
 import { isSilencingParam } from '../lib/guardrails'
+import { slotLabel, startsBank } from '../lib/slots'
 
 /**
  * Block colours, matched to how Fractal's own editors code them.
@@ -113,14 +114,28 @@ export function Chain({ blocks, selected, onSelect, onToggle }) {
 }
 
 /**
- * Bank-grouped preset list.
+ * The preset list.
  *
- * Names are read one slot at a time down a serial port, so the whole list can't
- * arrive at once — it fills in as it scans, and the scan can be stopped. A
- * filter box matters more here than in most lists: 512 presets is a lot to
+ * Names are read one slot at a time down a serial port — and on a gen-3 unit
+ * each one is a whole preset dump, because the firmware has no query for a
+ * stored name. That makes a full read minutes of work rather than seconds, so
+ * the scan says how long it has left, can be stopped at any point, and keeps
+ * what it has already learned.
+ *
+ * A filter box matters more here than in most lists: 512 presets is a lot to
  * scroll, and half of them are called some variation of "Lead".
  */
-export function PresetList({ slots, current, onSelect, onScan, onStop, scanning, progress, deviceSlots }) {
+export function PresetList({
+  slots,
+  current,
+  onSelect,
+  onScan,
+  onStop,
+  scanning,
+  progress,
+  deviceSlots,
+  addressing
+}) {
   const [filter, setFilter] = useState('')
 
   const needle = filter.trim().toLowerCase()
@@ -129,6 +144,7 @@ export function PresetList({ slots, current, onSelect, onScan, onStop, scanning,
         (s) => (s.name || '').toLowerCase().includes(needle) || String(s.number) === needle
       )
     : slots
+  const named = slots.filter((s) => (s.name || '').trim()).length
 
   return (
     <div className="preset-panel">
@@ -157,6 +173,7 @@ export function PresetList({ slots, current, onSelect, onScan, onStop, scanning,
           <div className="scan-fill" style={{ width: `${progress.pct}%` }} />
           <span className="scan-text mono">
             {progress.done} / {progress.total}
+            {progress.left ? ` · ${progress.left}` : ''}
           </span>
         </div>
       ) : null}
@@ -167,33 +184,26 @@ export function PresetList({ slots, current, onSelect, onScan, onStop, scanning,
         ) : shown.length === 0 ? (
           <p className="hint pad">Nothing matches “{filter}”.</p>
         ) : (
-          shown.map((slot, i) => {
-            const bank = String.fromCharCode(65 + Math.floor(slot.number / 4))
-            const within = (slot.number % 4) + 1
-            const newBank =
-              !needle &&
-              (i === 0 || Math.floor(slot.number / 4) !== Math.floor(shown[i - 1].number / 4))
-            return (
-              <button
-                key={slot.number}
-                className={`preset-row ${slot.number === current ? 'current' : ''} ${
-                  newBank ? 'bank-start' : ''
-                }`}
-                onClick={() => onSelect(slot.number)}
-              >
-                <span className="preset-id mono">
-                  {bank}
-                  {within}:
-                </span>
-                <span className="preset-title">{slot.name || <em>empty</em>}</span>
-              </button>
-            )
-          })
+          shown.map((slot, i) => (
+            <button
+              key={slot.number}
+              className={`preset-row ${slot.number === current ? 'current' : ''} ${
+                !needle && startsBank(slot.number, i === 0 ? null : shown[i - 1].number, addressing)
+                  ? 'bank-start'
+                  : ''
+              }`}
+              onClick={() => onSelect(slot.number)}
+            >
+              <span className="preset-id mono">{slotLabel(slot.number, addressing)}:</span>
+              <span className="preset-title">{slot.name?.trim() || <em>empty</em>}</span>
+            </button>
+          ))
         )}
       </div>
-      {deviceSlots ? (
+      {deviceSlots && slots.length ? (
         <p className="hint pad">
           {slots.length} of {deviceSlots} read
+          {slots.length && !named ? ' — this unit gave no names back' : ''}
         </p>
       ) : null}
     </div>

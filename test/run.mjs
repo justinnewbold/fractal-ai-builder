@@ -779,6 +779,48 @@ test('slot zero is a real slot, not an empty field', () => {
   assert.equal(target('0', 97), 0)
 })
 
+console.log('\nslot addressing')
+
+test('a gen-3 slot is a number, not a bank letter', async () => {
+  const { slotLabel } = await import('../src/lib/slots.js')
+  assert.equal(slotLabel(0, 'numeric'), '000')
+  assert.equal(slotLabel(2, 'numeric'), '002')
+  assert.equal(slotLabel(511, 'numeric'), '511')
+})
+
+test('the AM4 keeps its lettered banks of four', async () => {
+  const { slotLabel } = await import('../src/lib/slots.js')
+  assert.equal(slotLabel(0, 'bankLetter'), 'A01')
+  assert.equal(slotLabel(7, 'bankLetter'), 'B04')
+  assert.equal(slotLabel(103, 'bankLetter'), 'Z04')
+})
+
+test('past Z there is no letter, so it falls back to the number', async () => {
+  // 512 slots lettered in fours ran off the end of the alphabet: slot 200 was
+  // labelled "s1" and slot 460 "À1", addresses that name nothing.
+  const { slotLabel } = await import('../src/lib/slots.js')
+  assert.equal(slotLabel(200, 'bankLetter'), '200')
+  assert.equal(slotLabel(460, 'bankLetter'), '460')
+})
+
+test('bank rules are drawn only where there are banks', async () => {
+  const { startsBank } = await import('../src/lib/slots.js')
+  assert.equal(startsBank(4, 3, 'bankLetter'), true)
+  assert.equal(startsBank(5, 4, 'bankLetter'), false)
+  assert.equal(startsBank(0, null, 'bankLetter'), true)
+  assert.equal(startsBank(4, 3, 'numeric'), false)
+})
+
+test('a scan says how long it has left, in words', async () => {
+  const { timeLeft } = await import('../src/lib/slots.js')
+  assert.equal(timeLeft(400, 300), 'about 2 minutes left')
+  assert.equal(timeLeft(100, 600), 'about 1 minute left')
+  assert.equal(timeLeft(10, 300), 'under a minute left')
+  // Nothing to say before anything has been timed.
+  assert.equal(timeLeft(400, null), null)
+  assert.equal(timeLeft(0, 300), null)
+})
+
 console.log('\nstructure')
 const { run: structure } = await import('./structure.mjs')
 structure(test)

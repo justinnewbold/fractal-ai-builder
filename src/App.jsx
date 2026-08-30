@@ -30,6 +30,7 @@ import Assistant from './components/Assistant'
 import Theme from './components/Theme'
 import UpdateNotice from './components/UpdateNotice'
 import { validatePlan, runPlan } from './lib/actions'
+import { timeLeft } from './lib/slots'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
 import {
   getTempo,
@@ -40,6 +41,7 @@ import {
   subscribeEvents,
   scanAllPresets,
   cachedPresetNames,
+  forgetPresetName,
   readSceneNames
 } from './lib/forgefx'
 import { savePreset, buildEntry } from './lib/history'
@@ -616,6 +618,9 @@ export default function App() {
         await setPresetName(name)
       }
       await storePreset(number)
+      // The list is holding that slot's old name, and it just stopped being true.
+      forgetPresetName(number)
+      setSlots((prev) => prev.filter((s) => s.number !== number))
       setApplied((prev) => ({ ...prev, savedTo: number }))
       record('save', `Saved "${name || preset?.name}" to slot ${number}`)
       setDirty(false)
@@ -1663,6 +1668,7 @@ export default function App() {
               slots={slots.length ? slots : cachedPresetNames()}
               current={preset?.number}
               deviceSlots={device?.capabilities?.presets?.count}
+              addressing={device?.capabilities?.presets?.addressing}
               scanning={scanning}
               progress={scanProgress}
               onStop={() => {
@@ -1672,11 +1678,30 @@ export default function App() {
                 setScanning(true)
                 stopScan.current = false
                 const total = device?.capabilities?.presets?.count ?? 512
+                /*
+                 * The pace is measured over the last stretch and smoothed,
+                 * never taken from the start of the run: a resumed scan skips
+                 * hundreds of known slots in a blink, and an average carrying
+                 * that would promise four hundred dumps in ten seconds.
+                 */
+                const pace = { at: Date.now(), done: 0, each: null }
                 try {
                   const found = await scanAllPresets(
                     total,
                     (done, all, partial) => {
-                      setScanProgress({ done, total: all, pct: Math.round((done / all) * 100) })
+                      const since = done - pace.done
+                      if (since >= 8) {
+                        const each = (Date.now() - pace.at) / since
+                        pace.each = pace.each ? (pace.each + each) / 2 : each
+                        pace.at = Date.now()
+                        pace.done = done
+                      }
+                      setScanProgress({
+                        done,
+                        total: all,
+                        pct: Math.round((done / all) * 100),
+                        left: timeLeft(all - done, pace.each)
+                      })
                       setSlots(partial)
                     },
                     () => stopScan.current

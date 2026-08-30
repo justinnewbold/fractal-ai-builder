@@ -689,18 +689,16 @@ export const setPresetName = (name) =>
  * The bulk scan endpoint needs the canScanNames capability, which the FM3
  * doesn't report, so this walks slots one at a time. Sequential and paged
  * on purpose: 512 slots down one serial port is not something to do eagerly.
+ *
+ * Each slot goes through the same two-route read as the full scan, and shares
+ * its cache — a page of a browser you've already scanned costs nothing.
  */
 export async function presetRange(start, count, onProgress) {
   const out = []
   for (let i = 0; i < count; i++) {
     const number = start + i
     onProgress?.(i + 1, count)
-    try {
-      const res = await presetName(number)
-      out.push({ number, name: (res?.name || '').trim() })
-    } catch {
-      out.push({ number, name: null })
-    }
+    out.push({ number, name: await rememberedName(number) })
   }
   return out
 }
@@ -1035,37 +1033,167 @@ export function subscribeEvents(onEvent) {
 }
 
 /**
- * Read every preset name on the unit, in pages.
+ * The name in a stored slot, whatever it takes to learn it.
  *
- * 512 sequential reads down one serial port is slow, so this reports progress
- * and can be stopped. Names are cached for the session — they only change when
- * something is stored, and re-reading 512 slots to redraw a list would be
- * absurd.
+ * `/presets/{n}` is the short, obvious read, and on an AM4 it answers with the
+ * name the unit has stored. Gen-3 units have no such query in their firmware,
+ * so ForgeFX answers that same route with a `{number, name: ''}` stub: 200 OK,
+ * and nothing in it. That is what an FM3's preset list was showing — 512 slots
+ * read in a blink and every one of them "empty", including the one that was
+ * loaded and named on screen at the time.
+ *
+ * On those units a name exists only inside the preset's own body, so the
+ * fallback is to make the unit dump the preset and decode it. That costs a
+ * SysEx transfer per slot instead of a short reply, which is why it isn't tried
+ * first — and why, once the short route has been caught stubbing, it isn't
+ * tried again for the rest of the session.
  */
-const nameCache = new Map()
+let nameRouteStubbed = false
+let deepNamesOff = false
+
+/** Forget what was learned about the routes — a different unit answers differently. */
+export function resetNameRoutes() {
+  nameRouteStubbed = false
+  deepNamesOff = false
+}
+
+/** Whether names on this unit cost a preset dump each. Known only after the first read. */
+export const namesCostADump = () => nameRouteStubbed
+
+/**
+ * `known` says the unit has answered about this slot and won't say more —
+ * including an answer of "nothing stored here". An unknown is a slot the unit
+ * declined to talk about, and is worth asking again rather than remembering.
+ */
+export async function storedName(number) {
+  let quick = null // null = the route didn't answer at all
+  if (!nameRouteStubbed) {
+    try {
+      const res = await presetName(number)
+      quick = (res?.name || '').trim()
+    } catch {
+      quick = null
+    }
+    if (quick) return { name: quick, known: true }
+  }
+
+  if (deepNamesOff) return { name: '', known: quick === '' }
+
+  let decoded = null
+  try {
+    const res = await presetSummary(number)
+    decoded = (res?.name || '').trim()
+  } catch (err) {
+    // 501 is ForgeFX saying this unit has no dump to decode, which is final.
+    // Anything else is one slot going wrong, and the next slot deserves a try.
+    if (err?.status === 501) deepNamesOff = true
+    return { name: '', known: quick === '' && deepNamesOff }
+  }
+
+  // The short route said nothing about a slot that plainly has a name in it.
+  // That route is the stub, and there is no point asking it about the other 511.
+  if (decoded && quick === '') nameRouteStubbed = true
+  return { name: decoded, known: true }
+}
+
+/**
+ * The names, once learned, kept.
+ *
+ * They used to live for a session, which was fine when a name cost a short
+ * reply. A gen-3 name costs a preset dump, so a full list is minutes of the
+ * unit's attention — worth paying for once, not once per session. Kept per
+ * unit, because slot 97 on an AM4 is not slot 97 on an FM3, and only ever
+ * stale when something is stored, which is when the slot is forgotten.
+ */
+const NAME_STORE = 'fractal.presetNames'
+
+let nameCache = new Map()
+let namesFor = null
+
+/** The unit these names belong to. A demo scan is never confused for a real one. */
+const nameOwner = () => (mock ? `${currentDeviceSlug()}:demo` : currentDeviceSlug())
+
+function restoreNames() {
+  const owner = nameOwner()
+  if (namesFor === owner) return
+  namesFor = owner
+  nameCache = new Map()
+  resetNameRoutes()
+  try {
+    const all = JSON.parse(localStorage.getItem(NAME_STORE) || '{}')
+    for (const [n, name] of Object.entries(all[owner] || {})) nameCache.set(Number(n), name)
+  } catch {
+    // A full or disabled localStorage costs a re-scan, nothing more.
+  }
+}
+
+let saveTimer = null
+
+/** Coalesced, because a scan learns names one at a time and this rewrites the lot. */
+function persistNames() {
+  clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    try {
+      const all = JSON.parse(localStorage.getItem(NAME_STORE) || '{}')
+      all[namesFor] = Object.fromEntries(nameCache)
+      localStorage.setItem(NAME_STORE, JSON.stringify(all))
+    } catch {
+      // As above: the list still holds them for this session.
+    }
+  }, 500)
+}
 
 export function cachedPresetNames() {
+  restoreNames()
   return [...nameCache.entries()]
     .map(([number, name]) => ({ number, name }))
     .sort((a, b) => a.number - b.number)
 }
 
 export function forgetPresetName(number) {
-  nameCache.delete(number)
+  restoreNames()
+  if (nameCache.delete(number)) persistNames()
 }
 
+/** One slot's name: from what's already known, and from the unit when it isn't. */
+export async function rememberedName(number) {
+  restoreNames()
+  if (nameCache.has(number)) return nameCache.get(number)
+  const { name, known } = await storedName(number)
+  if (known) {
+    nameCache.set(number, name)
+    persistNames()
+  }
+  return name
+}
+
+/**
+ * Read every preset name on the unit.
+ *
+ * Slow by nature: sequential reads down one serial port, and a whole preset
+ * dump for each one on a unit that has no name query. So it reports progress
+ * every slot and it can be stopped — and it never re-reads a slot it already
+ * knows, which is what makes stopping it half way harmless.
+ */
 export async function scanAllPresets(total, onProgress, shouldStop) {
+  restoreNames()
+  let read = 0
   for (let number = 0; number < total; number++) {
     if (shouldStop?.()) break
-    if (nameCache.has(number)) continue
-    try {
-      const res = await presetName(number)
-      nameCache.set(number, (res?.name || '').trim())
-    } catch {
-      nameCache.set(number, null)
+    if (nameCache.has(number)) {
+      // Already known: worth showing the scan moving through them, not worth a
+      // redraw per slot when a resumed scan skips four hundred in a row.
+      if (number % 32 === 0) onProgress?.(number + 1, total, cachedPresetNames())
+      continue
     }
-    if (number % 4 === 0 || number === total - 1) onProgress?.(number + 1, total, cachedPresetNames())
+    const { name, known } = await storedName(number)
+    if (known) nameCache.set(number, name)
+    read++
+    // A dump per slot is seconds, not milliseconds, on a slow link. Progress
+    // moves every slot because every slot is now something you can watch.
+    onProgress?.(number + 1, total, cachedPresetNames())
   }
+  if (read) persistNames()
   return cachedPresetNames()
 }
 

@@ -58,7 +58,13 @@ export default function DeviceBar({ status, device, onRetry, busy }) {
       >
         <span className="lamp" data-state={demo ? 'demo' : status} />
         <span className="device-name">{name}</span>
-        {how ? <span className="device-state mono">{how}</span> : null}
+        {/* The word carries the state as well as saying it: green when the unit
+            is answering, red when it isn't, so the bar reads at a glance. */}
+        {how ? (
+          <span className="device-state mono" data-state={demo ? 'demo' : status}>
+            {how}
+          </span>
+        ) : null}
         <span className={`device-chevron ${open ? 'open' : ''}`} aria-hidden="true" />
       </button>
 
