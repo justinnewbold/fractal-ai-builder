@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   modifierModel,
   bindModifier,
@@ -315,13 +315,24 @@ export function TempoTuner({ onError, onChanged, busy }) {
     }
   }
 
+  // /tempo/tap answers only {ok} — the device computes the tempo from the tap
+  // spacing, so the new value is read back, debounced past the last tap.
+  const tapReadback = useRef(null)
   const tap = async () => {
     try {
-      const res = await tapTempo()
-      if (typeof res?.bpm === 'number') {
-        setBpm(res.bpm)
-        setDraft(String(res.bpm))
-      }
+      await tapTempo()
+      clearTimeout(tapReadback.current)
+      tapReadback.current = setTimeout(async () => {
+        try {
+          const res = await getTempo()
+          if (typeof res?.bpm === 'number') {
+            setBpm(res.bpm)
+            setDraft(String(res.bpm))
+          }
+        } catch {
+          /* keep the last known value */
+        }
+      }, 700)
     } catch (err) {
       onError(err.message)
     }
