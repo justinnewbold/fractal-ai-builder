@@ -132,6 +132,7 @@ export function createMockDevice() {
         channelNames: ['A', 'B', 'C', 'D'],
         presets: { count: 512, canScanNames: false },
         cabIrs: true,
+        tuner: true,
         supportsSave: false
       },
       port: 'simulated'
