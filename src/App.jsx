@@ -41,6 +41,7 @@ import {
   subscribeEvents,
   scanAllPresets,
   cachedPresetNames,
+  localHelperAlive,
   forgetPresetName,
   readSceneNames
 } from './lib/forgefx'
@@ -69,7 +70,13 @@ import {
 } from './lib/forgefx'
 import { validateSpec, countWrites } from './lib/validate'
 import { beatFlash } from './lib/feedback'
-import { remoteActive, remoteLinked, subscribeRemoteState } from './lib/remote'
+import {
+  remoteActive,
+  remoteLinked,
+  remoteDisconnect,
+  setAutoConnect,
+  subscribeRemoteState
+} from './lib/remote'
 import { newEntry, append } from './lib/log'
 import { VERSION } from './lib/version'
 import { EXCLUDED_BLOCKS } from './lib/guardrails'
@@ -157,6 +164,15 @@ export default function App() {
   const [compare, setCompare] = useState(null)
   const [turns, setTurns] = useState([])
   const [remote, setRemote] = useState(false)
+  /*
+   * Whether this is the machine with the cable in it.
+   *
+   * Asked of localhost rather than guessed from the user agent, and asked
+   * independently of the relay: a browser AT the Mac can perfectly well be in a
+   * remote session — the page had been relaying to a host that wasn't on — and
+   * it is still the machine where the host switch lives.
+   */
+  const [atTheMac, setAtTheMac] = useState(false)
   // Where "Leave gig" returns to. Gig takes the screen over, so coming back out
   // should land where you were rather than at a fixed default.
   const [lastView, setLastView] = useState('console')
@@ -342,6 +358,14 @@ export default function App() {
   useEffect(() => {
     read()
   }, [read])
+
+  useEffect(() => {
+    let stop = false
+    localHelperAlive().then((alive) => !stop && setAtTheMac(alive))
+    return () => {
+      stop = true
+    }
+  }, [remote, status])
 
   /*
    * A relay that comes and goes, followed rather than assumed.
@@ -1398,6 +1422,23 @@ export default function App() {
               nothing else &mdash; FM3-Edit, a second copy of the helper &mdash; is holding the
               port, then press Reconnect.
             </p>
+          ) : remoteActive() && atTheMac ? (
+            <p>
+              This machine is running the helper, so the relay is a long way round to a unit on
+              this desk &mdash; and the host it relays to isn&rsquo;t answering.{' '}
+              <button
+                className="chip"
+                onClick={async () => {
+                  setAutoConnect(false)
+                  await remoteDisconnect()
+                  setRemote(false)
+                  read()
+                }}
+              >
+                Use the cable instead
+              </button>{' '}
+              and the host switch appears under <strong>Play from your phone</strong>.
+            </p>
           ) : remoteActive() ? (
             <p>
               You&rsquo;re on the channel and the Mac isn&rsquo;t answering on it. Signing in here
@@ -2046,8 +2087,11 @@ export default function App() {
           <Section key="play-from-your-phone" title="Play from your phone" note={remote ? 'Connected' : 'Leave the Mac by the amp'}>
             {/* Host controls only work on the machine holding the cable — from a
                 phone these calls are refused, and a button that cannot work is
-                worse than no button. */}
-            {!remote ? <Host onError={setError} /> : null}
+                worse than no button. But "not in a remote session" was the wrong
+                test for that: at the Mac, relaying to a host that isn't on is
+                exactly the situation this panel exists to fix, and it was
+                hiding itself for the duration. Ask localhost instead. */}
+            {atTheMac ? <Host onError={setError} /> : null}
 
             <Remote
               onConnected={(on) => {

@@ -197,6 +197,9 @@ export const remoteLinked = () => !!session
  *
  * Our own presence still matters and is still tracked — the host bridges live
  * device events only while it can see a browser watching.
+ *
+ * Kept current by ordinary traffic rather than by asking: every answered
+ * request is proof, and every request that times out is proof of the opposite.
  */
 export const remoteHostSeen = () => hostSeen
 
@@ -559,6 +562,9 @@ export async function remoteRequest(path, options = {}) {
   const reply = new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       waiting.delete(id)
+      // Nothing came back: whatever we last believed about the Mac being there,
+      // this is better evidence.
+      hostSeen = false
       reject(new Error('The host did not answer. Is ForgeFX still running?'))
     }, options.timeoutMs || timeoutFor(method, path))
     waiting.set(id, {
@@ -580,6 +586,9 @@ export async function remoteRequest(path, options = {}) {
   })
 
   const payload = await reply
+  // An answer is proof the Mac is on the channel — better proof than any probe,
+  // and free. Every request the app makes keeps this current.
+  hostSeen = true
   const text = await decode(payload)
 
   let parsed = null

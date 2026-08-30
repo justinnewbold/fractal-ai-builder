@@ -5,6 +5,7 @@ import {
   remoteConnect,
   remoteDisconnect,
   remoteHostSeen,
+  hostResponds,
   restoreSession,
   setAutoConnect,
   wantsAutoConnect
@@ -36,15 +37,37 @@ export default function PhoneLink({ onChanged, onError }) {
   const known = !!loadRemoteConfig()?.email
 
   /*
-   * Presence settles a moment after joining, so "connected" and "connected to
-   * something that is actually there" are different questions with different
-   * answers for the first second or so. This asks the later one, quietly.
+   * "Connected" and "connected to something that is actually there" are
+   * different questions, and this chip asks the second one.
+   *
+   * It used to read presence, which the host does not take part in — so the
+   * answer was always no and this chip sat there in red saying "no host" over
+   * a session that was working perfectly, next to a preset it had just loaded.
+   * The answer now comes from traffic: every answered request is proof, every
+   * one that times out is proof of the opposite.
    */
   useEffect(() => {
     if (!active) return
     const id = setInterval(() => setHostSeen(remoteHostSeen()), 2000)
     return () => clearInterval(id)
   }, [active])
+
+  /*
+   * An idle screen makes no traffic, so a chip that has gone red has nothing to
+   * turn it green again. This asks directly, but only while it looks broken —
+   * a working link is kept current by the requests the app is already making.
+   */
+  useEffect(() => {
+    if (!active || hostSeen) return
+    let stop = false
+    const ask = () => hostResponds().then((up) => !stop && setHostSeen(up))
+    ask()
+    const id = setInterval(ask, 15000)
+    return () => {
+      stop = true
+      clearInterval(id)
+    }
+  }, [active, hostSeen])
 
   // A tap outside is the ordinary way to dismiss a small menu on a phone.
   useEffect(() => {
@@ -99,7 +122,7 @@ export default function PhoneLink({ onChanged, onError }) {
   const label = active
     ? hostSeen
       ? 'Connected to phone'
-      : 'Phone link · no host'
+      : 'Phone link · no answer'
     : 'Phone link off'
 
   return (
@@ -125,8 +148,9 @@ export default function PhoneLink({ onChanged, onError }) {
                 </>
               ) : (
                 <>
-                  Joined the channel, but nothing else is on it. Turn the host on at the Mac —
-                  until it answers, nothing here reaches the unit.
+                  On the channel, but the Mac isn&rsquo;t answering on it. Turn the host on there
+                  &mdash; the helper forgets that switch every time it restarts, and until it
+                  answers nothing here reaches the unit.
                 </>
               )
             ) : (
