@@ -181,8 +181,45 @@ export const remoteActive = () => !!channel
 /** A session that exists, joined or not — the difference between "dropped" and "never set up". */
 export const remoteLinked = () => !!session
 
-/** Whether anything besides this browser is on the channel. */
+/**
+ * Whether the Mac answered the last time we asked it something.
+ *
+ * This used to count presence — "is anything else on the channel?" — and the
+ * answer was always no, on a working session as much as a broken one. The host
+ * joins the channel but never tracks presence, so it is not in the state we
+ * were reading, and there is nothing it could do about it from here. What that
+ * check produced was a line saying "nothing else is on this channel, turn the
+ * host on at the Mac" every single time someone connected, including with the
+ * host on and answering.
+ *
+ * A relayed request is the only honest test of a relay, so that is the test:
+ * ask the host for its health and see whether an answer comes back.
+ *
+ * Our own presence still matters and is still tracked — the host bridges live
+ * device events only while it can see a browser watching.
+ */
 export const remoteHostSeen = () => hostSeen
+
+/**
+ * Ask the Mac whether it's there, and remember the answer.
+ *
+ * Short-fused on purpose: this is asked at moments someone is waiting through
+ * — just after connecting, and on a screen that is already saying something is
+ * wrong. A host that is there answers /healthz in well under a second.
+ */
+export async function hostResponds() {
+  if (!channel) {
+    hostSeen = false
+    return false
+  }
+  try {
+    await remoteRequest('/healthz', { timeoutMs: 6000 })
+    hostSeen = true
+  } catch {
+    hostSeen = false
+  }
+  return hostSeen
+}
 
 /**
  * Whether the relay is up, as it changes.
@@ -523,7 +560,7 @@ export async function remoteRequest(path, options = {}) {
     const timer = setTimeout(() => {
       waiting.delete(id)
       reject(new Error('The host did not answer. Is ForgeFX still running?'))
-    }, timeoutFor(method, path))
+    }, options.timeoutMs || timeoutFor(method, path))
     waiting.set(id, {
       resolve: (v) => {
         clearTimeout(timer)

@@ -136,10 +136,17 @@ export default function Host({ onError }) {
           <p className="hint mono">
             Signed in as {user.email || user.id}
             {host?.connected ? ' · host online' : host?.enabled ? ' · connecting…' : ' · host off'}
+            {/* The channel is the account, so two ends signed in as different
+                accounts each work perfectly and never meet. The phone prints
+                the same eight characters when it connects; if they differ,
+                that is the whole problem and nothing else will show it. */}
+            {host?.userId ? ` · channel ${host.userId.slice(0, 8)}…` : ''}
           </p>
           <p className="hint">
             With the host on, open this app on your phone, go to{' '}
-            <strong>Run this from another device</strong> and sign in as the same account.
+            <strong>Run this from another device</strong> and sign in as the same account. The phone
+            shows the same eight characters when it connects &mdash; if they don&rsquo;t match, the
+            two ends are on different channels and neither will ever hear the other.
           </p>
           <div className="history-actions">
             <button

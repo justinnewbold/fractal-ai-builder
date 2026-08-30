@@ -69,7 +69,7 @@ import {
 } from './lib/forgefx'
 import { validateSpec, countWrites } from './lib/validate'
 import { beatFlash } from './lib/feedback'
-import { remoteActive, remoteLinked, remoteHostSeen, subscribeRemoteState } from './lib/remote'
+import { remoteActive, remoteLinked, subscribeRemoteState } from './lib/remote'
 import { newEntry, append } from './lib/log'
 import { VERSION } from './lib/version'
 import { EXCLUDED_BLOCKS } from './lib/guardrails'
@@ -1387,17 +1387,23 @@ export default function App() {
               localhost is the phone itself, and no browser choice changes that.
               And with a relay already up, both versions are wrong — the Mac is
               answering, so nothing about helper apps or browsers is the story. */}
-          {remoteActive() && remoteHostSeen() ? (
+          {/* Which of the two remote failures this is, told apart by what the
+              read actually did: an answer saying "no unit" is a different
+              problem from no answer at all. Not by presence — the host joins
+              the channel without tracking any, so "is anyone else there?" is a
+              question the channel cannot answer. */}
+          {remoteActive() && device && !device.connected ? (
             <p>
-              The Mac is on the channel but reports no unit attached to it. Check the cable, and
-              that nothing else &mdash; FM3-Edit, a second copy of the helper &mdash; is holding the
+              The Mac is answering but reports no unit attached to it. Check the cable, and that
+              nothing else &mdash; FM3-Edit, a second copy of the helper &mdash; is holding the
               port, then press Reconnect.
             </p>
           ) : remoteActive() ? (
             <p>
-              You&rsquo;re on the channel, but nothing else is: the helper app at the Mac either
-              isn&rsquo;t running or hasn&rsquo;t been switched on for remote. Start it there and
-              press Reconnect.
+              You&rsquo;re on the channel and the Mac isn&rsquo;t answering on it. Signing in here
+              joins the channel; it doesn&rsquo;t put the Mac on it. Open this app at the Mac, find{' '}
+              <strong>Play from your phone</strong>, and turn the host on &mdash; signed in as this
+              same account, since that is what puts the two ends on the same channel.
             </p>
           ) : remoteLinked() ? (
             <p>
