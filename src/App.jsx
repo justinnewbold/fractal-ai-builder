@@ -450,6 +450,7 @@ export default function App() {
       validated.description = description
       setResult(validated)
       setLastPrompt(description)
+      revealResult()
 
       setSaveName(validated.presetName || preset?.name?.trim() || '')
 
@@ -671,6 +672,44 @@ export default function App() {
    * model swap since then may have moved the ranges those values were computed
    * against. Stops at the preview like any other generation.
    */
+  /**
+   * Put a freshly proposed design where it can be seen.
+   *
+   * The preview renders inside the assistant, which sits at the top of the
+   * page on every view. Ask for something from the bottom of Presets — Reload
+   * on a saved preset is the clearest case — and the result lands a screen and
+   * a half above you, with nothing near the button you pressed. It looked
+   * exactly like a button that does nothing.
+   *
+   * One scroll, on an explicit request, after the commit that renders it. This
+   * is deliberately not the assistant's old auto-scroll, which ran on every
+   * turn and every progress tick and fought the player for the scroll position
+   * all through a generation. Wanting to be shown the thing you just asked for
+   * is not the same as being dragged there ten times a minute.
+   */
+  const revealResult = () => {
+    /*
+     * Two scrolls, because the preview sits inside the assistant's own
+     * scrollbox: moving the page to the panel doesn't help if the panel is
+     * scrolled to an older turn, and scrolling the box doesn't help if the
+     * panel is off screen. So the box goes to the top of the result — where
+     * its name and the Send button are — and the page goes to the panel.
+     *
+     * Two frames, not one: recording the change adds a turn, and the log pins
+     * itself to its newest turn on that commit. One frame lands before that
+     * and gets overwritten, leaving the box showing the END of a long preview.
+     */
+    const run = () => {
+      const preview = document.querySelector('.preview')
+      const log = document.querySelector('.assistant-log')
+      if (log && preview) {
+        log.scrollTop = Math.max(0, preview.offsetTop - log.offsetTop - 8)
+      }
+      document.querySelector('.assistant')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    requestAnimationFrame(() => requestAnimationFrame(run))
+  }
+
   const reload = async (entry) => {
     setBusy(true)
     setError(null)
@@ -692,6 +731,7 @@ export default function App() {
 
       setResult(validated)
       setSaveName(validated.presetName || entry.name)
+      revealResult()
       record('reload', `Loaded saved preset "${entry.name}"`, [
         `${countWrites(validated.changes)} changes proposed`,
         ...validated.problems
@@ -744,6 +784,7 @@ export default function App() {
       setResult(validated)
       setApplied(null)
       setSaveName(validated.presetName || preset?.name?.trim() || '')
+      revealResult()
 
       const runCost = costOf(validated.usage, validated.usage?.model)
       if (runCost !== null) setSpend((p) => ({ total: p.total + runCost, runs: p.runs + 1 }))
