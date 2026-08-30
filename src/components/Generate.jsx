@@ -74,7 +74,7 @@ export function ToneForm({ onGenerate, busy, disabled }) {
 export function Preview({ result, onApply, onDiscard, busy, writeCount }) {
   if (!result) return null
 
-  const { changes, problems, summary, notes, presetName } = result
+  const { changes, problems, repairs = [], summary, notes, presetName } = result
 
   if (changes.length === 0) {
     return (
@@ -163,6 +163,19 @@ export function Preview({ result, onApply, onDiscard, busy, writeCount }) {
           <p className="silk-label">Rejected during checking</p>
           {problems.map((p, i) => (
             <p key={i} className="mono problem">
+              {p}
+            </p>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Kept, not lost — but you should know the control isn't the one the
+          generator addressed, because that is worth doubting. */}
+      {repairs.length > 0 ? (
+        <div className="problems">
+          <p className="silk-label">Matched by name</p>
+          {repairs.map((p, i) => (
+            <p key={i} className="mono problem repair">
               {p}
             </p>
           ))}

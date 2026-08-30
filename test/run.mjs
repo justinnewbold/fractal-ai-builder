@@ -779,6 +779,71 @@ test('slot zero is a real slot, not an empty field', () => {
   assert.equal(target('0', 97), 0)
 })
 
+console.log('\nparameter matching')
+
+const ampSchema = [
+  {
+    eid: 58,
+    name: 'Amp 1',
+    slug: 'amp',
+    params: [
+      { id: 3, name: 'Bass', value: 5, min: 0, max: 10 },
+      { id: 12, name: 'Low Cut Frequency', value: 20, min: 10, max: 1000, log: true },
+      { id: 4, name: 'Amp 1 Level', value: 0, min: -80, max: 20 }
+    ],
+    models: []
+  }
+]
+
+test('a control named right and addressed wrong is still written', () => {
+  // The FM3 run that prompted this: "Amp 1 / Low Cut Frequency: 5.5 is outside
+  // 10-1000" was a Bass of 5.5 sent to the id the model believed Bass was.
+  const res = validateSpec(
+    { blocks: [{ eid: 58, params: [{ id: 12, name: 'Bass', value: 5.5 }] }] },
+    ampSchema
+  )
+  assert.equal(res.changes[0].params[0].id, 3)
+  assert.equal(res.changes[0].params[0].to, 5.5)
+  assert.equal(res.problems.length, 0)
+  assert.match(res.repairs[0], /Low Cut Frequency/)
+})
+
+test('a name that matches nothing is still a rejection', () => {
+  const res = validateSpec(
+    { blocks: [{ eid: 58, params: [{ id: 99, name: 'Sparkle', value: 4 }] }] },
+    ampSchema
+  )
+  assert.equal(res.changes.length, 0)
+  assert.match(res.problems[0], /no parameter 99/)
+})
+
+test('matching by name never resurrects an output level', () => {
+  const res = validateSpec(
+    { blocks: [{ eid: 58, params: [{ id: 3, name: 'Amp 1 Level', value: -60 }] }] },
+    ampSchema
+  )
+  assert.equal(res.changes.length, 0)
+  assert.match(res.problems[0], /yours to set/)
+})
+
+test('a name matched to the right id is not reported as a correction', () => {
+  const res = validateSpec(
+    { blocks: [{ eid: 58, params: [{ id: 3, name: 'Bass', value: 7 }] }] },
+    ampSchema
+  )
+  assert.equal(res.repairs.length, 0)
+  assert.equal(res.changes[0].params[0].id, 3)
+})
+
+test('a matched name is still checked against that control own range', () => {
+  const res = validateSpec(
+    { blocks: [{ eid: 58, params: [{ id: 12, name: 'Bass', value: 50 }] }] },
+    ampSchema
+  )
+  assert.equal(res.changes.length, 0)
+  assert.match(res.problems[0], /Bass: 50 is outside 0–10/)
+})
+
 console.log('\nslot addressing')
 
 test('a gen-3 slot is a number, not a bank letter', async () => {

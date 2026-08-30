@@ -145,6 +145,16 @@ button.device-summary {
   font-size: 12px;
 }
 
+.problem.repair {
+  color: var(--silk-dim);
+}
+
+.panel-failed {
+  padding: 10px 0;
+  border-left: 2px solid var(--fault);
+  padding-left: 12px;
+}
+
 .device-state[data-state='live'] {
   color: var(--ok);
 }
