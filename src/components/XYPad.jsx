@@ -110,49 +110,84 @@ export default function XYPad({ blocks, onError }) {
    * element, and holding the edge of the pad to pin a control at its extreme
    * is exactly a finger past the boundary. The drag remembers which touch
    * started it and follows only that one.
+   *
+   * And the same second lesson: the touch is armed by a native listener rather
+   * than by React. React's touch listeners are passive, so preventDefault in
+   * one is ignored, and an effect that registers the move listener after a
+   * state change runs a render too late — by which time iOS has decided the
+   * gesture is a scroll and cancelled it. A pad you drag with a finger cannot
+   * afford either.
    */
-  const [drag, setDrag] = useState(null)
+  const drag = useRef(null)
+  const [dragging, setDragging] = useState(false)
+  const live = useRef({ apply })
+  useEffect(() => {
+    live.current = { apply }
+  })
 
   useEffect(() => {
-    if (!drag) return
+    const el = padRef.current
+    if (!el) return
 
-    if (drag.touchId === null) {
-      const move = (e) => apply(e.clientX, e.clientY)
-      const end = (e) => {
-        apply(e.clientX, e.clientY, { final: true })
-        setDrag(null)
-      }
-      window.addEventListener('mousemove', move)
-      window.addEventListener('mouseup', end)
-      return () => {
-        window.removeEventListener('mousemove', move)
-        window.removeEventListener('mouseup', end)
-      }
-    }
+    const find = (list) => Array.from(list).find((t) => t.identifier === drag.current?.touchId)
 
-    const find = (list) => Array.from(list).find((t) => t.identifier === drag.touchId)
     const move = (e) => {
       const t = find(e.touches)
       if (!t) return
       if (e.cancelable) e.preventDefault()
-      apply(t.clientX, t.clientY)
+      live.current.apply(t.clientX, t.clientY)
     }
+
     const end = (e) => {
       const t = find(e.changedTouches)
       if (!t) return
-      apply(t.clientX, t.clientY, { final: true })
-      setDrag(null)
-    }
-    window.addEventListener('touchmove', move, { passive: false })
-    window.addEventListener('touchend', end)
-    window.addEventListener('touchcancel', end)
-    return () => {
+      live.current.apply(t.clientX, t.clientY, { final: true })
+      drag.current = null
+      setDragging(false)
       window.removeEventListener('touchmove', move)
       window.removeEventListener('touchend', end)
       window.removeEventListener('touchcancel', end)
     }
-    // eslint-disable-next-line
-  }, [drag, xCtl, yCtl])
+
+    const begin = (e) => {
+      if (drag.current) return
+      const t = e.changedTouches[0]
+      if (!t) return
+      if (e.cancelable) e.preventDefault()
+      errored.current = false
+      drag.current = { touchId: t.identifier }
+      setDragging(true)
+      live.current.apply(t.clientX, t.clientY)
+      window.addEventListener('touchmove', move, { passive: false })
+      window.addEventListener('touchend', end)
+      window.addEventListener('touchcancel', end)
+    }
+
+    el.addEventListener('touchstart', begin, { passive: false })
+    return () => {
+      el.removeEventListener('touchstart', begin)
+      window.removeEventListener('touchmove', move)
+      window.removeEventListener('touchend', end)
+      window.removeEventListener('touchcancel', end)
+    }
+  }, [])
+
+  // The mouse was never contested; it keeps the simple path.
+  useEffect(() => {
+    if (dragging !== 'mouse') return
+    const move = (e) => live.current.apply(e.clientX, e.clientY)
+    const end = (e) => {
+      live.current.apply(e.clientX, e.clientY, { final: true })
+      drag.current = null
+      setDragging(false)
+    }
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', end)
+    return () => {
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', end)
+    }
+  }, [dragging])
 
   const options = (index || []).map((e) => (
     <option key={controlKey(e.block.effectId, e.param.id)} value={controlKey(e.block.effectId, e.param.id)}>
@@ -185,17 +220,11 @@ export default function XYPad({ blocks, onError }) {
             ref={padRef}
             className="xy-pad"
             onMouseDown={(e) => {
-              if (e.button !== 0 || drag) return
+              if (e.button !== 0 || drag.current) return
               errored.current = false
+              drag.current = { touchId: null }
+              setDragging('mouse')
               apply(e.clientX, e.clientY)
-              setDrag({ touchId: null })
-            }}
-            onTouchStart={(e) => {
-              if (drag) return
-              errored.current = false
-              const t = e.changedTouches[0]
-              apply(t.clientX, t.clientY)
-              setDrag({ touchId: t.identifier })
             }}
             role="application"
             aria-label={`Pad controlling ${xCtl.param.name} across and ${yCtl.param.name} up`}
