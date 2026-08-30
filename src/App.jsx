@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import DeviceBar from './components/DeviceBar'
 import Grid from './components/Grid'
 import { Preview } from './components/Generate'
-import { PresetBar, ChangeLog, Thinking } from './components/PresetBar'
+import { ChangeLog } from './components/ChangeLog'
 import Editor from './components/Editor'
 import Diagnostics from './components/Diagnostics'
 import Cost from './components/Cost'
@@ -12,7 +12,7 @@ import { CabPicker, Backup, Meters } from './components/Hardware'
 import { Compare } from './components/Refine'
 import Gig from './components/Gig'
 import SaveBar from './components/SaveBar'
-import { Stages, LiveGeneration } from './components/LiveGeneration'
+import { Stages, LiveGeneration, Thinking } from './components/LiveGeneration'
 import { streamSpec } from './lib/stream'
 import { Modifiers, SceneMatrix, TempoTuner } from './components/Modifiers'
 import { Versions, DeviceBackup } from './components/Versions'
@@ -73,7 +73,7 @@ import {
   clearParkedPresetName
 } from './lib/forgefx'
 import { validateSpec, countWrites } from './lib/validate'
-import { beatFlash } from './lib/feedback'
+import { beatFlash, bringIntoView } from './lib/feedback'
 import {
   remoteActive,
   remoteLinked,
@@ -912,7 +912,7 @@ export default function App() {
       if (log && preview) {
         log.scrollTop = Math.max(0, preview.offsetTop - log.offsetTop - 8)
       }
-      document.querySelector('.assistant')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      bringIntoView(document.querySelector('.assistant'), { block: 'start' })
     }
     requestAnimationFrame(() => requestAnimationFrame(run))
   }
@@ -1457,10 +1457,7 @@ export default function App() {
     setView(target.view)
     // After the view swaps, not before — the element doesn't exist until then.
     requestAnimationFrame(() => {
-      document.querySelector(target.anchor)?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start'
-      })
+      bringIntoView(document.querySelector(target.anchor), { block: 'start' })
     })
   }
 

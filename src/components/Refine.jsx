@@ -19,57 +19,6 @@ const QUICK = [
  * heard, which is the opposite of how anyone actually works. The previous spec
  * goes back as the subject and the instruction is an adjustment to it.
  */
-export function Refine({ onRefine, busy, disabled }) {
-  const [text, setText] = useState('')
-
-  const submit = (value) => {
-    const instruction = (value ?? text).trim()
-    if (instruction) {
-      onRefine(instruction)
-      setText('')
-    }
-  }
-
-  return (
-    <section className="refine">
-      <p className="silk-label">Not quite right?</p>
-
-      <div className="refine-row">
-        <input
-          type="text"
-          className="refine-input"
-          value={text}
-          disabled={disabled}
-          placeholder="Tell it what to change"
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && submit()}
-          aria-label="What to change about this tone"
-        />
-        <button onClick={() => submit()} disabled={busy || disabled || !text.trim()}>
-          {busy ? 'Working…' : 'Adjust'}
-        </button>
-      </div>
-
-      <div className="examples">
-        {QUICK.map((q) => (
-          <button key={q} className="chip" onClick={() => submit(q)} disabled={busy || disabled}>
-            {q}
-          </button>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-/**
- * A/B two versions of a tone on the hardware.
- *
- * Scenes don't hold parameter values — they hold which blocks are engaged and
- * which channel each block is using. Values live on channels. So a real A/B is
- * two channels: variant A written to channel A, variant B to channel B, and two
- * scenes pointing at them. Then it's a footswitch away and you compare by ear,
- * which is the only comparison that settles anything.
- */
 export function Compare({ onCompare, state, onClear, busy, disabled }) {
   const [description, setDescription] = useState('')
 

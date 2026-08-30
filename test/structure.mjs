@@ -194,6 +194,41 @@ export function run(test) {
     )
   })
 
+  test('every class this app scrolls to exists somewhere that renders it', () => {
+    /*
+     * `.local-library` didn't. The stylesheet had a rule for it, the assistant
+     * scrolled to it after keeping something in the library, and no component
+     * ever rendered the class — so "show me what you changed" quietly did
+     * nothing, and a silent scroll is indistinguishable from a dead button.
+     *
+     * Anchors are strings matched at runtime against a DOM built somewhere
+     * else, which is exactly the seam a text test can hold shut.
+     */
+    const dir = new URL('../src/', import.meta.url)
+    const files = []
+    const walk = (at) => {
+      for (const entry of readdirSync(at, { withFileTypes: true })) {
+        const next = new URL(entry.name + (entry.isDirectory() ? '/' : ''), at)
+        if (entry.isDirectory()) walk(next)
+        else if (/\.(jsx?|css)$/.test(entry.name)) files.push(readFileSync(next, 'utf8'))
+      }
+    }
+    walk(dir)
+    const rendered = files
+      .flatMap((body) => [...body.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)])
+      .flatMap((m) => (m[1] || m[2] || '').split(/[\s${}?:'"]+/))
+      .filter(Boolean)
+
+    const anchors = [
+      ...[...src.matchAll(/querySelector\('\.([\w-]+)'\)/g)].map((m) => m[1]),
+      ...[...src.matchAll(/anchor: '\.([\w-]+)'/g)].map((m) => m[1])
+    ]
+    assert.ok(anchors.length >= 5, 'the anchor scan found nothing to check')
+    for (const name of new Set(anchors)) {
+      assert.ok(rendered.includes(name), `nothing renders .${name}, so scrolling to it does nothing`)
+    }
+  })
+
   test('the error banner is outside every view', () => {
     // It lived inside Design, so a failure in Library or Edit set the message
     // and rendered nothing. Silence reads as a dead button.

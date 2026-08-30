@@ -22,8 +22,82 @@
   --fault: #e0684f;
   --ok: #63c68c; /* the green of a connection that is up, in words */
 
+  /*
+   * Surfaces and washes derived from the four above.
+   *
+   * These lived only inside [data-theme='light'] and were used unconditionally,
+   * which meant the DEFAULT theme quietly lost twelve rules: the current preset
+   * row had no highlight, all three lamps lost their halo, the knob face fell
+   * back to black, two panels lost their gradient, and amber buttons drew
+   * near-white text on a bright amber ground. Nobody had seen the dark theme
+   * render as it was drawn.
+   *
+   * Both selectors weigh the same, so the light block wins on source order
+   * alone — it sits 3300 lines below this one. Nothing here needs `html:root`,
+   * and adding it would break light instead.
+   */
+  --on-signal: #14161a; /* ink on an amber ground — dark here, near-white on paper */
+  --on-signal-dim: rgba(20, 22, 26, 0.72);
+  --strip-a: #1b1f26;
+  --strip-b: #15181d;
+  --hero-a: #1b1f26;
+  --row-current: #1b2530; /* the loaded slot, lifted and cooled toward --live */
+  --knob-face: #1c2027;
+  --knob-edge: #2c323b;
+  --signal-wash: rgba(240, 167, 60, 0.12);
+  --live-halo: rgba(95, 191, 209, 0.2);
+  --fault-halo: rgba(224, 104, 79, 0.2);
+  --dim-halo: rgba(135, 141, 151, 0.16);
+
+  /*
+   * Scales, so the next thing built has somewhere to get its numbers.
+   *
+   * The stylesheet currently holds 21 font sizes, 82 padding values and 22 gap
+   * values, and the one dimensional token it had was used once in 118 gap
+   * declarations. These are additive: nothing is retrofitted here, because a
+   * sweep and a restructure in the same commit is a regression nobody can
+   * bisect. New work uses them; old work is converted a region at a time.
+   */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+
+  /* Radius says what a thing IS. The hardware idiom is 3px and load-bearing —
+     panels, tiles, the chassis. The app's own furniture (sheets, scrims, pills)
+     is rounder, so the two never read as the same surface. */
+  --r-1: 3px;
+  --r-2: 10px;
+  --r-3: 20px;
+
+  --e-1: 0 1px 2px rgba(0, 0, 0, 0.28);
+  --e-2: 0 6px 20px rgba(0, 0, 0, 0.34);
+  --e-3: 0 18px 48px rgba(0, 0, 0, 0.44);
+
+  --t-1: 120ms; /* a state change you shouldn't notice */
+  --t-2: 200ms; /* something moving on purpose */
+  --t-3: 320ms; /* a surface arriving */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --z-bar: 40;
+  --z-scrim: 50;
+  --z-sheet: 60;
+  --z-toast: 70;
+
+  --f-1: 10px;
+  --f-2: 11px;
+  --f-3: 13px;
+  --f-4: 15px;
+  --f-5: 18px;
+  --f-6: 24px;
+  --f-7: 34px;
+
   --row-h: 60px;
-  --gutter: 8px;
+  --gutter: 8px; /* superseded by --s-2; kept until .grid is converted */
 
   --display: 'Archivo Expanded', 'Archivo', system-ui, sans-serif;
   --body: 'Archivo', system-ui, -apple-system, sans-serif;
@@ -3344,7 +3418,6 @@ ol.action-list li.destructive::marker {
   --live: #1f7f92;
   --fault: #b23b23;
   --ok: #1f7a45; /* darker on paper — the dark-theme green greys out on white */
-  --bypass: #c3bfb5;
 
   --on-signal: #fffaf2;
   --on-signal-dim: rgba(255, 250, 242, 0.7);

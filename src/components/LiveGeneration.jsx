@@ -116,3 +116,18 @@ export function LiveGeneration({ partial, open, onToggle }) {
     </div>
   )
 }
+
+export function Thinking({ message }) {
+  if (!message) return null
+  return (
+    <div className="thinking" role="status" aria-live="polite">
+      <span className="thinking-bars" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+        <i />
+      </span>
+      <span className="mono">{message}</span>
+    </div>
+  )
+}
