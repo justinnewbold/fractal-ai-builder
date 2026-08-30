@@ -138,7 +138,25 @@ export default function Assistant({
      * Sending is also the moment a player is done typing, so dropping focus
      * dismisses the keyboard — which is what you want on a phone anyway.
      */
+    /*
+     * Hold the page still across the keyboard closing.
+     *
+     * Dismissing the keyboard hands back the space it occupied, and iOS
+     * resolves that by moving the document — which is why this only ever
+     * happened after typing, never after tapping a button. Blurring is what
+     * makes the send predictable; keeping the scroll is what makes it not
+     * lurch. Restored over the next few frames because the resize lands after
+     * the blur, then left alone: past that, any scrolling is the player's.
+     */
+    const keep = window.scrollY
     box.current?.blur()
+    let frames = 0
+    const hold = () => {
+      if (Math.abs(window.scrollY - keep) > 8) window.scrollTo(0, keep)
+      if (++frames < 12) requestAnimationFrame(hold)
+    }
+    requestAnimationFrame(hold)
+
     onAsk(instruction)
     setText('')
   }
