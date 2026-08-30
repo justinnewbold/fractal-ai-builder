@@ -2564,6 +2564,23 @@ button.chan-btn.current {
   border-radius: 2px;
 }
 
+/* The editable readout. Same clothes as the plain one; an input just needs a
+   width, because left alone it asks for 20 characters. Positioned so it wins
+   the overlap with the knob's touch slop above it — a tap on the number is a
+   tap on the number, not the bottom edge of the knob. */
+input.knob-readout {
+  width: 100%;
+  min-width: 0; /* the 230px floor on text inputs is for search boxes, not this */
+  max-width: 84px;
+  color: var(--silk);
+  position: relative;
+}
+
+input.knob-readout:focus {
+  outline: none;
+  border-color: var(--live);
+}
+
 .level-column {
   display: flex;
   flex-direction: column;
@@ -3017,6 +3034,10 @@ ol.action-list li.destructive::marker {
   /* The knob needs room for a thumb, and a bigger target than a cursor needs. */
   .knob-cell {
     width: 96px;
+  }
+
+  input.knob-readout {
+    max-width: 96px;
   }
 
   /* Hit slop: the drawn knob stays its size, the touchable area grows. The
