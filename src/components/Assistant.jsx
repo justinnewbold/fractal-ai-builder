@@ -101,6 +101,7 @@ export default function Assistant({
   const [text, setText] = useState('')
   const [focused, setFocused] = useState(false)
   const tail = useRef(null)
+  const box = useRef(null)
 
   // Only animate in an idle, empty box.
   const typed = useTypedSuggestion(!text && !focused && !busy)
@@ -121,6 +122,21 @@ export default function Assistant({
   const submit = (value) => {
     const instruction = (value ?? text).trim()
     if (!instruction || busy) return
+    /*
+     * Let go of the box before the work starts.
+     *
+     * On iOS a focused field is a magnet: Safari scrolls it back into view on
+     * every layout change, and a generation changes the layout continuously —
+     * progress lines, the design, the diff. The page kept snapping back to the
+     * input, and scrolling away only bought a moment before the next render
+     * dragged it down again. React makes it worse by restoring focus to the
+     * last focused element after each commit (the box is disabled while busy
+     * and re-enabled after), so the magnet survives the whole run.
+     *
+     * Sending is also the moment a player is done typing, so dropping focus
+     * dismisses the keyboard — which is what you want on a phone anyway.
+     */
+    box.current?.blur()
     onAsk(instruction)
     setText('')
   }
@@ -201,6 +217,7 @@ export default function Assistant({
 
       <div className="refine-row assistant-row">
         <input
+          ref={box}
           type="text"
           className="refine-input"
           value={text}

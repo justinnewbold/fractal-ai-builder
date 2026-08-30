@@ -59,10 +59,14 @@ import {
   setPresetName,
   setChannel,
   revertPreset,
-  backupPreset
+  backupPreset,
+  parkPresetName,
+  takeParkedPresetName,
+  clearParkedPresetName
 } from './lib/forgefx'
 import { validateSpec, countWrites } from './lib/validate'
 import { beatFlash } from './lib/feedback'
+import { remoteActive } from './lib/remote'
 import { newEntry, append } from './lib/log'
 import { VERSION } from './lib/version'
 import { EXCLUDED_BLOCKS } from './lib/guardrails'
@@ -279,6 +283,33 @@ export default function App() {
         readSceneNames(p.number)
           .then((names) => setSceneNames(names))
           .catch(() => setSceneNames([]))
+
+        /*
+         * A name a phone couldn't write, written now.
+         *
+         * Generating from a remote session leaves the name parked on the host,
+         * because ForgeFX refuses renames over the relay. This is the other end
+         * of that: at the Mac, where a rename IS allowed, the parked name is
+         * applied to the preset it was designed for and then cleared. Guarded
+         * on the slot matching and on the name actually differing, so a stale
+         * doc can't rename a preset someone has since moved on from.
+         */
+        if (!remoteActive()) {
+          takeParkedPresetName(p.number)
+            .then(async (parked) => {
+              if (!parked || parked === p.name?.trim()) return
+              await setPresetName(parked)
+              await clearParkedPresetName(p.number)
+              setPreset((prev) => (prev ? { ...prev, name: parked } : prev))
+              setDirty(true)
+              record('rename', `Applied the name “${parked}” designed on the phone`, [
+                'Not permanent until saved to a slot.'
+              ])
+            })
+            .catch(() => {
+              // Nothing parked, or the unit refused: the preset keeps its name.
+            })
+        }
       }
 
       getTempo()
@@ -452,9 +483,21 @@ export default function App() {
            * happened next to the button that will finish the job.
            */
           setSaveName(generatedName)
+          /*
+           * Park it on the host so it isn't lost. Renames are refused over the
+           * relay by design, but writes to ForgeFX's document store are not —
+           * the same crossing scene names already use. The app at the Mac picks
+           * this up on its next read and writes it, so a preset designed from
+           * the phone ends up named without anyone retyping it.
+           */
+          const parked =
+            typeof preset?.number === 'number' &&
+            (await parkPresetName(preset.number, generatedName).catch(() => false))
           setSaveError(
             err.remoteBlocked
-              ? `The unit still has its old name: ForgeFX only takes renames at the Mac, not over a remote session. The generated name “${generatedName}” is kept in the save options here — rename at the Mac or in Axis to put it on the unit.`
+              ? parked
+                ? `ForgeFX won't rename over a remote session, so the unit still shows the old name. “${generatedName}” is waiting on the host — open this app at the Mac and it gets written automatically.`
+                : `ForgeFX won't rename over a remote session, so the unit still shows the old name. “${generatedName}” is kept in the save options here — rename at the Mac to put it on the unit.`
               : `Couldn't write the name “${generatedName}” to the unit — it's kept in the save options and will be applied on save.`
           )
         }
