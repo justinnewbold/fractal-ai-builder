@@ -438,9 +438,25 @@ export default function App() {
       const generatedName = (saveName || result.presetName || '').trim()
       if (generatedName && generatedName !== preset?.name?.trim()) {
         try {
-          await setPresetName(generatedName)
-        } catch {
-          // A device that refuses renames still gets the parameter changes.
+          const res = await setPresetName(generatedName)
+          // The AM4 answers {ok:false} rather than erroring when it can't
+          // resolve the stored location — a refusal wearing a success shape.
+          if (res && res.ok === false) throw new Error('The unit refused the rename.')
+        } catch (err) {
+          /*
+           * This used to be swallowed whole, and over a remote session it fails
+           * EVERY time — ForgeFX's relay refuses renames by design — so every
+           * generated preset silently kept its old name and the feature looked
+           * broken. The name is part of what was generated: keep the intent in
+           * the save options, where the save flow will write it, and say what
+           * happened next to the button that will finish the job.
+           */
+          setSaveName(generatedName)
+          setSaveError(
+            err.remoteBlocked
+              ? `The unit still has its old name: ForgeFX only takes renames at the Mac, not over a remote session. The generated name “${generatedName}” is kept in the save options here — rename at the Mac or in Axis to put it on the unit.`
+              : `Couldn't write the name “${generatedName}” to the unit — it's kept in the save options and will be applied on save.`
+          )
         }
       }
 
