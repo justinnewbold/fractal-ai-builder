@@ -178,6 +178,17 @@ const watchers = new Set()
 
 export const remoteActive = () => !!channel
 
+/**
+ * Which account this browser joined as.
+ *
+ * The channel is named after the user id, so the two ends meeting at all
+ * depends on this matching what the Mac signed in as — and a browser holds a
+ * Supabase session of its own, which survives everything and is not necessarily
+ * the address anyone remembers typing. Printed at both ends, a mismatch is a
+ * thing you can see; unprinted, it is a connection that simply never happens.
+ */
+export const remoteUserId = () => userId
+
 /** A session that exists, joined or not — the difference between "dropped" and "never set up". */
 export const remoteLinked = () => !!session
 
