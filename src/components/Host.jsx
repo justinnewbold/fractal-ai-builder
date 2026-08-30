@@ -120,6 +120,31 @@ export default function Host({ onError }) {
     }
   }
 
+  /**
+   * Off, then on.
+   *
+   * The helper reports `connected` from a channel handle it sets once and never
+   * clears, so a socket that died an hour ago still reads as "host online" —
+   * and the phone, which can only tell that nothing answers, gets blamed for a
+   * link that is deaf at this end. Rejoining is the cure and there is no way to
+   * ask for it: turning it off and on again is what the terminal did.
+   */
+  const restart = async () => {
+    setWorking('restart')
+    setNote(null)
+    try {
+      await remoteEnable(false)
+      const res = await remoteEnable(true)
+      if (res?.error) onError(res.error)
+      else setNote('Rejoined the channel. Test the link from the phone.')
+      await refresh()
+    } catch (err) {
+      onError(err.message)
+    } finally {
+      setWorking(null)
+    }
+  }
+
   const signOut = async () => {
     setWorking('logout')
     try {
@@ -197,6 +222,13 @@ export default function Host({ onError }) {
             two ends are on different channels and neither will ever hear the other.
           </p>
           {note ? <p className="hint">{note}</p> : null}
+          {host?.enabled ? (
+            <p className="hint">
+              &ldquo;Host online&rdquo; is the helper reporting a channel it opened, not one it has
+              heard from &mdash; a socket that died an hour ago still reads that way. If the phone
+              says nothing answers, rejoin the channel here.
+            </p>
+          ) : null}
           {!host?.enabled ? (
             <p className="hint">
               The helper forgets this switch when it restarts, and a phone can&rsquo;t tell that
@@ -216,6 +248,11 @@ export default function Host({ onError }) {
                   ? 'Turn the host off'
                   : 'Turn the host on'}
             </button>
+            {host?.enabled ? (
+              <button className="chip" onClick={restart} disabled={working === 'restart'}>
+                {working === 'restart' ? 'Rejoining…' : 'Rejoin the channel'}
+              </button>
+            ) : null}
             <button className="chip" onClick={signOut} disabled={working === 'logout'}>
               Sign out
             </button>
