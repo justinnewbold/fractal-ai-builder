@@ -73,7 +73,12 @@ import { beatFlash } from './lib/feedback'
 import {
   remoteActive,
   remoteLinked,
+  remoteConnect,
   remoteDisconnect,
+  hostResponds,
+  restoreSession,
+  loadRemoteConfig,
+  wantsAutoConnect,
   setAutoConnect,
   subscribeRemoteState
 } from './lib/remote'
@@ -354,6 +359,43 @@ export default function App() {
     }
     return fresh
   }, [])
+
+  /**
+   * What a reload does, without the reload.
+   *
+   * Reconnect only re-read the unit, and a reload does two things: it re-reads,
+   * and it rejoins the relay from the session this browser already holds. So
+   * when the link had dropped, pressing the button read over nothing and
+   * refreshing the page "fixed" it — which is the wrong lesson to teach anyone
+   * about a button called Reconnect.
+   *
+   * A relay that has stopped answering is worse than no relay at all: every
+   * request goes into it and waits out its own timeout. So a dead one is
+   * dropped before anything else is tried.
+   */
+  const reconnect = useCallback(async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      if (remoteActive() && !(await hostResponds())) await remoteDisconnect()
+
+      if (!remoteActive() && wantsAutoConnect() && !(await localHelperAlive())) {
+        const config = loadRemoteConfig()
+        try {
+          if (await restoreSession({ url: config?.url, anonKey: config?.anonKey })) {
+            await remoteConnect()
+            setRemote(true)
+          }
+        } catch {
+          // Nothing to rejoin, or the far end is down. The read below says so
+          // in the one place this app reports what it can't reach.
+        }
+      }
+    } catch {
+      // Every step above is best-effort; the read is what decides the verdict.
+    }
+    await read()
+  }, [read])
 
   useEffect(() => {
     read()
@@ -1391,7 +1433,7 @@ export default function App() {
         </div>
       </header>
 
-      <DeviceBar status={status} device={device} onRetry={read} busy={busy} />
+      <DeviceBar status={status} device={device} onRetry={reconnect} busy={busy} />
 
       {isDemo() && status === 'live' ? (
         <p className="demo-banner">
