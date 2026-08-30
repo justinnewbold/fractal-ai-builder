@@ -62,6 +62,18 @@ export default function Remote({ onConnected, onError }) {
     if (remoteActive() || !wantsAutoConnect()) return
     let stop = false
     ;(async () => {
+      /*
+       * Not at the Mac itself.
+       *
+       * The relay exists for browsers that cannot reach the helper. At the
+       * machine holding the cable it is a round trip through a datacentre to
+       * an amp on the desk — and a socket that drops every time the Mac sleeps
+       * or changes network, which is what "it keeps disconnecting" was. If
+       * localhost answers, that is the connection to use.
+       */
+      const { localHelperAlive } = await import('../lib/forgefx')
+      if (await localHelperAlive()) return
+
       const uid = await restoreSession({ url: saved?.url, anonKey: saved?.anonKey })
       if (!uid || stop) return
       try {
