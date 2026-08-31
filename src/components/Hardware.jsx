@@ -2,6 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { cabState, listIrBanks, backupPreset, loadPresetBytes, liveMeters } from '../lib/forgefx'
 
 /**
+ * A device enum, as one readable word.
+ *
+ * ForgeFX serves its discrete selections as {value, label} — cab mode, cab
+ * bank, DynaCab type. Handing one of those straight to React throws "objects
+ * are not valid as a React child" and takes the whole view down with it, which
+ * is what this panel did on hardware while rendering perfectly in demo.
+ */
+const label = (v) => (v && typeof v === 'object' ? (v.label ?? v.name ?? null) : (v ?? null))
+
+/**
  * Cab and impulse response picker.
  *
  * The cab is doing more to the sound than most of the amp controls, and it's the
@@ -23,7 +33,10 @@ export function CabPicker({ blocks, onError, onChanged, busy }) {
         const [s, b] = await Promise.all([cabState(cab.effectId), listIrBanks()])
         if (cancelled) return
         setState(s?.error ? null : s)
-        setBanks(b?.banks || null)
+        // GET /cab/irs is the bank→names map itself. Reaching for a `banks`
+        // key that only the old mock ever had left this permanently null, so
+        // the line below never rendered on a real unit.
+        setBanks(b && typeof b === 'object' && !b.error ? (b.banks ?? b) : null)
       } catch (err) {
         if (!cancelled) onError(err.message)
       } finally {
@@ -48,11 +61,11 @@ export function CabPicker({ blocks, onError, onChanged, busy }) {
           {state.slots.map((slot) => (
             <div className="cab-slot" key={slot.slot}>
               <span className="silk-label">Slot {slot.slot}</span>
-              <span className="cab-ir">{slot.name || `IR ${slot.ir}`}</span>
-              <span className="cab-bank mono">{slot.bank}</span>
+              <span className="cab-ir">{slot.irName || `IR ${slot.irIndex ?? '—'}`}</span>
+              <span className="cab-bank mono">{label(slot.bank)}</span>
             </div>
           ))}
-          {state.mode ? <span className="cab-mode mono">{state.mode}</span> : null}
+          {label(state.mode) ? <span className="cab-mode mono">{label(state.mode)}</span> : null}
         </div>
       ) : !loading ? (
         <p className="hint">
@@ -64,7 +77,7 @@ export function CabPicker({ blocks, onError, onChanged, busy }) {
       {banks ? (
         <p className="hint">
           {Object.entries(banks)
-            .map(([name, list]) => `${name}: ${list.length}`)
+            .map(([name, list]) => `${name}: ${Array.isArray(list) ? list.length : 0}`)
             .join(' · ')}{' '}
           impulse responses available.
         </p>
@@ -195,15 +208,25 @@ export function Meters({ active }) {
       {on ? (
         rows.length ? (
           <div className="meter-list">
+            {/*
+              One row per monitored parameter — a block can expose several, so
+              the key is the pair, not the block. The level is `norm`: `level`
+              was invented by the old mock and is undefined on a real unit,
+              which drew every bar at zero width under a blank label, with each
+              row claiming the same undefined React key.
+            */}
             {rows.map((row) => (
-              <div className="meter-row" key={row.eid}>
-                <span className="diff-label">{row.name || row.eid}</span>
+              <div className="meter-row" key={`${row.effectId}:${row.paramName}`}>
+                <span className="diff-label">{row.paramName || `Block ${row.effectId}`}</span>
                 <div className="meter-track">
                   <div
                     className="meter-fill"
-                    style={{ width: `${Math.round((row.level ?? 0) * 100)}%` }}
+                    style={{ width: `${Math.round(Math.min(1, Math.max(0, row.norm ?? 0)) * 100)}%` }}
                   />
                 </div>
+                {typeof row.db === 'number' ? (
+                  <span className="mono meter-db">{row.db.toFixed(1)} dB</span>
+                ) : null}
               </div>
             ))}
           </div>

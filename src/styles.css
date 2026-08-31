@@ -2836,8 +2836,12 @@ button.edit-tab.current {
 }
 
 /* Channel on the left, engaged/bypassed on the right: the two things you flip
-   without thinking, on one row. */
-.block-meta {
+   without thinking, on one row.
+
+   Not `.block-meta` — Grid.jsx has owned that name since long before this
+   panel did, and an identical-specificity rule 2000 lines further down the
+   file silently won on source order, flattening the grid's block captions. */
+.block-switches {
   display: flex;
   align-items: center;
   gap: var(--s-2);
@@ -3471,6 +3475,14 @@ ol.action-list li.destructive::marker {
   button.scene-line,
   button.slot {
     min-height: 46px;
+  }
+
+  /* The On/Off pill under each chain tile — the thing you kick a drive in
+     with, mid-song, standing up. It sat at 26px because `button.fx-power` is
+     (0,1,1) and the blanket `button` rule above is (0,0,1), so the blanket
+     never reached it. This one matches specificity and wins on source order. */
+  button.fx-power {
+    min-height: 40px;
   }
 
   /* The knob needs room for a thumb, and a bigger target than a cursor needs. */

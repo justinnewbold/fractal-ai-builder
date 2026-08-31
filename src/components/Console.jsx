@@ -221,6 +221,11 @@ export function PresetList({
 export function BlockPanel({ block, channels, onError, onChanged, busy }) {
   const [params, setParams] = useState([])
   const [models, setModels] = useState([])
+  // Which model this block is actually on. It comes back on the params read
+  // and nowhere else: /preset/blocks has never carried a typeName, so the
+  // `block.typeName` this used to match against was permanently undefined and
+  // the picker permanently read "N models…" instead of naming the model.
+  const [type, setTypeState] = useState(null)
   const [tab, setTab] = useState('main')
   const [loading, setLoading] = useState(false)
   const [local, setLocal] = useState({})
@@ -239,6 +244,7 @@ export function BlockPanel({ block, channels, onError, onChanged, busy }) {
         if (stop) return
         setParams(p?.named || [])
         setModels(t || [])
+        setTypeState(p?.type ?? null)
       } catch (err) {
         if (!stop) onError(err.message)
       } finally {
@@ -293,6 +299,7 @@ export function BlockPanel({ block, channels, onError, onChanged, busy }) {
       await setType(block.effectId, Number(value))
       const fresh = await blockParams(block.effectId)
       setParams(fresh?.named || [])
+      setTypeState(fresh?.type ?? null)
       onChanged(`${block.name} → ${models.find((m) => m.value === Number(value))?.name}`)
     } catch (err) {
       onError(err.message)
@@ -310,7 +317,7 @@ export function BlockPanel({ block, channels, onError, onChanged, busy }) {
         you could see. The name and the block's own colour are on the sheet
         header above, so neither is repeated here.
       */}
-      <div className="block-meta">
+      <div className="block-switches">
         {channels?.length ? (
           <div className="chan-row" role="group" aria-label="Channel">
             {channels.map((ch) => (
@@ -355,10 +362,16 @@ export function BlockPanel({ block, channels, onError, onChanged, busy }) {
         <select
           className="type-select"
           aria-label="Model"
-          value={models.find((m) => m.name === block.typeName)?.value ?? ''}
+          value={
+            type && models.some((m) => m.value === type.value)
+              ? type.value
+              : (models.find((m) => m.name === type?.name)?.value ?? '')
+          }
           onChange={(e) => e.target.value !== '' && swapModel(e.target.value)}
         >
-          <option value="">{models.length} models…</option>
+          {/* Only reachable while the model is genuinely unknown — an older
+              firmware that doesn't report one, or the read still in flight. */}
+          <option value="">{type?.name || `${models.length} models…`}</option>
           {models.map((m) => (
             <option key={m.value} value={m.value}>
               {m.name}

@@ -40,6 +40,16 @@ const LAYOUT = [
 
 const ROSTERS = { amp: ampTypes, drive: driveTypes, cab: cabTypes }
 
+/*
+ * GET /cab/irs, as the device serves it: bank name → a plain list of IR names.
+ * Not objects, and not wrapped in anything.
+ */
+const IR_BANKS = {
+  'Factory 1': cabTypes.map((c) => c.name),
+  'Factory 2': cabTypes.slice(0, 40).map((c) => c.name),
+  Scratchpad: []
+}
+
 /** Generic controls for blocks whose real parameter list wasn't captured. */
 const GENERIC = [
   { id: 1, name: 'Level', value: 0, min: -80, max: 20, unit: 'dB' },
@@ -154,13 +164,19 @@ export function createMockDevice() {
 
     blockParams: (eid) => {
       const block = state.blocks.find((b) => b.effectId === eid)
-      if (!block) return { block: '', slug: '', page: -1, named: [], enums: [] }
+      if (!block) return { block: '', slug: '', page: -1, named: [], enums: [], type: null }
+      // `type` is how the device says which model this block is on. It is the
+      // only place that answers it — /preset/blocks does not carry a typeName,
+      // which is why the model picker showed "331 models…" and never a model.
+      const roster = ROSTERS[block.slug] || []
+      const chosen = roster.find((m) => m.value === block.type) || roster[0] || null
       return {
         block: block.name,
         slug: block.slug,
         page: eid,
         named: clone(state.params.get(eid) || []),
-        enums: []
+        enums: [],
+        type: chosen ? { value: chosen.value, name: chosen.name } : null
       }
     },
 
@@ -232,21 +248,57 @@ export function createMockDevice() {
       return { ok: true }
     },
 
-    cabState: (eid) => ({
-      eid,
-      mode: 'STEREO',
-      slots: [
-        { slot: 1, bank: 'Factory 1', ir: 12, name: '4x12 5153' },
-        { slot: 2, bank: 'Factory 1', ir: 34, name: '4x12 CITRUS' }
-      ]
-    }),
-
-    irs: () => ({
-      banks: {
-        'Factory 1': cabTypes.map((c) => ({ value: c.value, name: c.name })),
-        Scratchpad: []
+    /*
+     * The shape ForgeFX actually serves.
+     *
+     * This used to invent `mode: 'STEREO'` and `slots[].bank/ir/name` — flat
+     * strings and numbers that read beautifully in demo and exist nowhere on a
+     * real unit, which serves `mode` and `bank` as {value,label} objects and
+     * the IR as irIndex/irName. The panel therefore handed React an object as a
+     * child and threw, on hardware only. A mock that invents its own shapes is
+     * worse than no mock: it makes the broken path the only one anyone tests.
+     */
+    cabState: (eid) => {
+      const banks = Object.keys(IR_BANKS)
+      const names = IR_BANKS[banks[0]] || []
+      return {
+        modeParam: 31,
+        mode: { value: 1, label: 'Stereo' },
+        modeOptions: [
+          { value: 0, label: 'Mono' },
+          { value: 1, label: 'Stereo' }
+        ],
+        bankOptions: banks,
+        dynaOptions: [{ value: 0, label: 'None' }],
+        slots: [
+          {
+            slot: 1,
+            bankParam: 1,
+            irParam: 4,
+            dynaParam: 85,
+            bank: { value: 0, label: banks[0] },
+            irIndex: 12,
+            irName: names[12] || '#12',
+            dyna: { value: 0, label: 'None' }
+          },
+          {
+            slot: 2,
+            bankParam: 2,
+            irParam: 5,
+            dynaParam: 86,
+            bank: { value: 0, label: banks[0] },
+            irIndex: 34,
+            irName: names[34] || '#34',
+            dyna: { value: 0, label: 'None' }
+          }
+        ],
+        eid
       }
-    }),
+    },
+
+    /* GET /cab/irs is a bare bank→names map. There is no `banks` wrapper; the
+       one this mock used to add is why the IR count line never appeared. */
+    irs: () => clone(IR_BANKS),
 
     backup: (location) => ({
       location: location ?? state.presetNumber,
@@ -257,14 +309,29 @@ export function createMockDevice() {
 
     loadBytes: () => ({ ok: true, loaded: true }),
 
+    /*
+     * GET /preset/monitors/live, in the shape the device answers with:
+     * one row per monitored parameter, not one per block, and the level is
+     * `norm` — not `level`, which never existed. Reading the invented names
+     * gave every meter a blank label, a zero-width bar and an undefined React
+     * key, on hardware, forever.
+     */
     meters: () =>
       state.blocks
-        .filter((b) => !b.bypassed)
-        .map((b) => ({
-          eid: b.effectId,
-          name: b.name,
-          level: Math.random() * 0.7 + 0.15
-        })),
+        .filter((b) => !b.bypassed && !['input'].includes(b.slug))
+        .map((b) => {
+          const norm = Math.random() * 0.7 + 0.15
+          return {
+            effectId: b.effectId,
+            family: b.slug.toUpperCase(),
+            paramName: b.slug === 'output' ? 'Output VU' : `${b.name} Level`,
+            role: 'level',
+            norm,
+            db: Math.round((norm * 80 - 80) * 10) / 10,
+            minDb: -80,
+            maxDb: 0
+          }
+        }),
 
     /*
      * The shape ForgeFX actually serves: one `ports` list carrying both
@@ -340,18 +407,27 @@ export function createMockDevice() {
       blocks: state.blocks.filter((b) => !b.bypassed).map((b) => b.name)
     }),
 
+    /*
+     * GET /mod/model, in the device's shape: `slotCount` not `slots`,
+     * `bindingSupported` not `bindable`, and sources keyed by `ordinal` —
+     * the enum value the wire actually carries. The invented `value` meant
+     * every source option rendered without one, so picking a source sent the
+     * device NaN.
+     */
     modModel: () => ({
-      slots: 4,
+      bindingSupported: true,
+      effectId: 190,
+      slotCount: 4,
+      fields: { source: { pid: 0 }, targetEffectId: { pid: 8 }, targetParam: { pid: 9 } },
       sources: [
-        { value: 0, name: 'None' },
-        { value: 1, name: 'LFO 1' },
-        { value: 2, name: 'LFO 2' },
-        { value: 3, name: 'ADSR 1' },
-        { value: 4, name: 'Envelope' },
-        { value: 5, name: 'Expression 1' },
-        { value: 6, name: 'External 1' }
-      ],
-      bound: []
+        { ordinal: 0, name: 'None' },
+        { ordinal: 1, name: 'LFO 1' },
+        { ordinal: 2, name: 'LFO 2' },
+        { ordinal: 3, name: 'ADSR 1' },
+        { ordinal: 4, name: 'Envelope' },
+        { ordinal: 5, name: 'Expression 1' },
+        { ordinal: 6, name: 'External 1' }
+      ]
     }),
 
     bindModifier: () => ({ ok: true }),
@@ -365,19 +441,6 @@ export function createMockDevice() {
             state.scene === 0 ? b.bypassed : (b.effectId + state.scene) % 3 === 0,
           channel: b.channel
         })),
-
-    sceneState: () => ({
-      scenes: state.sceneNames.map((name, i) => ({
-        index: i,
-        name,
-        blocks: state.blocks.map((b) => ({
-          eid: b.effectId,
-          name: b.name,
-          bypassed: i === 0 ? b.bypassed : (b.effectId + i) % 3 === 0,
-          channel: b.channel
-        }))
-      }))
-    }),
 
     tempo: () => ({ bpm: state.bpm ?? 120 }),
     setTempo: (bpm) => {
