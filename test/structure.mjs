@@ -397,6 +397,107 @@ export function run(test) {
     assert.equal((src.match(/<Section /g) || []).length, (src.match(/<\/Section>/g) || []).length)
   })
 
+  test('the app reads the fields the device actually sends', () => {
+    /*
+     * The most expensive class of bug this codebase has, because it is
+     * invisible in demo and total on hardware: the mock invents a shape, the
+     * UI is written against the invention, and the panel is broken for every
+     * real user while looking perfect to everyone who tests it.
+     *
+     * It has now happened four times. The ports picker read a serial/midiIn
+     * split that ForgeFX has never served, and told everyone their unit wasn't
+     * plugged in. The cab panel read `slot.bank` — an object on a real unit —
+     * and handed React an object as a child, taking the Controls view down
+     * with it. The meters read `level`, which does not exist, so every bar sat
+     * at zero under a blank label. And the model picker matched
+     * `block.typeName`, a field /preset/blocks has never returned, so it never
+     * once named the model it was on.
+     *
+     * So: the names below are the device's, verified against the ForgeFX
+     * driver source, and nothing may read the invented ones.
+     */
+    // Code only. Half the value of a rule like this is the comment beside the
+    // fix explaining what the wrong field was, and a scan that reads prose
+    // fails on its own documentation.
+    const code = (body) => body.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ')
+
+    const dir = new URL('../src/', import.meta.url)
+    const files = {}
+    const walk = (at, prefix = '') => {
+      for (const entry of readdirSync(at, { withFileTypes: true })) {
+        const next = new URL(entry.name + (entry.isDirectory() ? '/' : ''), at)
+        if (entry.isDirectory()) walk(next, prefix + entry.name + '/')
+        else if (/\.jsx?$/.test(entry.name)) files[prefix + entry.name] = code(readFileSync(next, 'utf8'))
+      }
+    }
+    walk(dir)
+
+    const mock = files['lib/mockDevice.js']
+    assert.ok(mock, 'the mock device is gone')
+
+    // What the routes really answer with. Drift here is the bug.
+    for (const [field, route] of [
+      ['irName', 'GET /preset/blocks/:eid/cab — slots carry irName/irIndex'],
+      ['irIndex', 'GET /preset/blocks/:eid/cab'],
+      ['effectId', 'GET /preset/monitors/live — rows are keyed by effectId'],
+      ['paramName', 'GET /preset/monitors/live — one row per monitored param'],
+      ['norm', 'GET /preset/monitors/live — the level is norm'],
+      ['type', 'GET /preset/blocks/:eid/params — carries the current model'],
+      ['slotCount', 'GET /mod/model — slotCount, not slots'],
+      ['ordinal', 'GET /mod/model — sources are keyed by ordinal'],
+      ['bindingSupported', 'GET /mod/model — how a unit says it cannot bind']
+    ]) {
+      assert.ok(mock.includes(field), `the mock no longer serves ${field} (${route})`)
+    }
+
+    // And the shapes nothing serves. Each cost a release.
+    /*
+     * Pinned positively, one assertion per bug, rather than by banning the
+     * wrong field names: "slot", "block" and "type" each name two unrelated
+     * things in this codebase — a preset slot and a cab slot, a device block
+     * and a streamed spec block — so a name-ban flags honest code and gets
+     * deleted the first time it cries wolf.
+     */
+    const hw = files['components/Hardware.jsx']
+    const gig = files['components/Gig.jsx']
+    assert.ok(hw && gig, 'Hardware.jsx or Gig.jsx is gone')
+
+    // The cab panel: names and the enum labels, never the enum objects.
+    assert.ok(/slot\.irName/.test(hw), 'the cab panel no longer reads irName')
+    assert.ok(/slot\.irIndex/.test(hw), 'the cab panel no longer reads irIndex')
+    assert.ok(
+      /label\(slot\.bank\)/.test(hw) && /label\(state\.mode\)/.test(hw),
+      'the cab panel renders a {value,label} enum straight into JSX again — that throws'
+    )
+
+    // The meters: one row per monitored parameter, level is norm.
+    assert.ok(/row\.norm/.test(hw), 'the meters no longer read norm')
+    assert.ok(/m\.norm/.test(gig), "the gig screen's signal bar no longer reads norm")
+    assert.ok(
+      /key=\{`\$\{row\.effectId\}/.test(hw),
+      'meter rows are keyed on something other than the effectId they arrive with'
+    )
+
+    // Modifiers: the source ordinal is what gets written to the device, so a
+    // wrong field name here is not a blank label, it is a bad write.
+    const mods = files['components/Modifiers.jsx']
+    assert.ok(mods, 'Modifiers.jsx is gone')
+    assert.ok(/s\.ordinal/.test(mods), 'the source picker no longer reads the ordinal it must send')
+    assert.ok(!/s\.value/.test(mods), 'a modifier source is being read as .value again — it has none')
+    assert.ok(
+      /model\.bindingSupported === false/.test(mods),
+      'the guard that hides Attach on a unit that cannot bind is reading the wrong field'
+    )
+    assert.ok(/model\.slotCount/.test(mods), 'the slot count is being read as .slots again')
+
+    const console_ = files['components/Console.jsx']
+    assert.ok(console_, 'Console.jsx is gone')
+    assert.ok(
+      /setTypeState\(\w+\?\.type/.test(console_),
+      'the model picker no longer reads the type off the params response'
+    )
+  })
+
   test('nothing user-facing talks about the plumbing', () => {
     // Terms that mean something to whoever built this and nothing to a
     // guitarist. Comments are allowed to say ForgeFX; the screen is not.

@@ -266,7 +266,11 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
     }
   }
 
-  const peak = meters.length ? Math.max(...meters.map((m) => m.level ?? 0)) : 0
+  // `norm`, not `level` — the monitor route reports a normalised 0..1 per
+  // monitored parameter. Reading the field the old mock invented pinned this
+  // bar at zero on hardware, so the one thing on this screen that says "signal
+  // is getting through" always said it wasn't.
+  const peak = meters.length ? Math.max(...meters.map((m) => m.norm ?? 0)) : 0
 
   return (
     <div className="gig">

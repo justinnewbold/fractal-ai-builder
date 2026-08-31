@@ -63,17 +63,21 @@ export function Modifiers({ blocks, onError, onChanged, busy }) {
     }
   }, [eid, onError])
 
-  // The AM4 exposes a modifier model but reports modBind false: the data is
-  // there, the wire binding isn't. Showing an Attach button that cannot attach
-  // would be worse than showing nothing.
-  if (!model || model.bindable === false) return null
+  // The AM4 exposes a modifier model but reports the wire binding unsupported:
+  // the data is there, the binding isn't. Showing an Attach button that cannot
+  // attach would be worse than showing nothing.
+  //
+  // The field is `bindingSupported`. It was `bindable`, which ForgeFX has never
+  // served anywhere — so this guard could not fire, and the AM4 got exactly the
+  // dead Attach button the comment above says it must not.
+  if (!model || model.bindingSupported === false) return null
 
   const bind = async () => {
     try {
       await bindModifier(Number(slot), Number(eid), Number(paramId), Number(source))
       const block = blocks.find((b) => b.effectId === Number(eid))
       const param = params.find((p) => p.id === Number(paramId))
-      const src = model.sources?.find((s) => s.value === Number(source))
+      const src = model.sources?.find((s) => s.ordinal === Number(source))
       onChanged(`${src?.name} → ${block?.name} · ${param?.name} (slot ${slot})`)
     } catch (err) {
       onError(err.message)
@@ -94,7 +98,7 @@ export function Modifiers({ blocks, onError, onChanged, busy }) {
         <label className="mod-field">
           <span className="diff-label">Slot</span>
           <select value={slot} onChange={(e) => setSlot(e.target.value)}>
-            {Array.from({ length: model.slots || 4 }, (_, i) => (
+            {Array.from({ length: model.slotCount || 4 }, (_, i) => (
               <option key={i + 1} value={i + 1}>
                 {i + 1}
               </option>
@@ -130,12 +134,24 @@ export function Modifiers({ blocks, onError, onChanged, busy }) {
           <span className="diff-label">Source</span>
           <select value={source} onChange={(e) => setSource(e.target.value)}>
             <option value="">Choose…</option>
+            {/*
+              `ordinal`, not `value`. A source has never carried a `value`, so
+              every option rendered without one — which makes a DOM option fall
+              back to its own text, so picking "LFO 1" put the string "LFO 1"
+              into state and Number() turned it into NaN on the way to the
+              device. Every option also shared an undefined React key.
+            */}
             {(model.sources || []).map((s) => (
-              <option key={s.value} value={s.value}>
+              <option key={s.ordinal} value={s.ordinal}>
                 {s.name}
               </option>
             ))}
           </select>
+          {/* Some units build their source enum at runtime and ForgeFX hasn't
+              captured it; it says so rather than leaving an empty list. */}
+          {!model.sources?.length && model.sourcesNote ? (
+            <span className="hint">{model.sourcesNote}</span>
+          ) : null}
         </label>
       </div>
 
