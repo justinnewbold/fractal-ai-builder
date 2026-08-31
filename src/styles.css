@@ -88,16 +88,33 @@
   --z-sheet: 60;
   --z-toast: 70;
 
-  --f-1: 10px;
+  /*
+   * Seven sizes, chosen from the nineteen that were here rather than invented
+   * ahead of them. The 12px band was the largest by a distance — 45 of 137
+   * declarations — and the scale this replaced had no step there at all, so
+   * every one of them would have had to grow or shrink to join it.
+   *
+   * The half-pixel sizes are gone: nine of the nineteen sat in the 9.5-13.5
+   * band in half-pixel steps, which is a distinction nothing renders
+   * differently and nobody chose deliberately twice.
+   */
+  --f-1: 10px; /* silkscreen labels */
   --f-2: 11px;
-  --f-3: 13px;
-  --f-4: 15px;
-  --f-5: 18px;
-  --f-6: 24px;
-  --f-7: 34px;
+  --f-3: 12px; /* the commonest text in the app */
+  --f-4: 13px;
+  --f-5: 15px;
+  --f-6: 20px;
+  --f-7: 28px;
+
+  /* Not a step on the scale: a platform floor. iOS zooms the page when a
+     focused input is under 16px, and that zoom then has to be undone by hand. */
+  --f-input: 16px;
+
+  /* The preset name on the stage screen, read from across a room. Deliberately
+     off the scale — it is not text, it is a sign. */
+  --f-sign: 40px;
 
   --row-h: 60px;
-  --gutter: 8px; /* superseded by --s-2; kept until .grid is converted */
 
   --bar-h: 45px; /* the top bar plus its rule; what a docked rail starts under */
   --rail-w: 380px;
@@ -122,7 +139,7 @@ body {
   background: var(--chassis);
   color: var(--silk);
   font-family: var(--body);
-  font-size: 15px;
+  font-size: var(--f-5);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   /* A scroll past the top must not become pull-to-refresh: mid-gig that
@@ -135,7 +152,7 @@ body {
 .silk-label {
   font-family: var(--display);
   font-weight: 700;
-  font-size: 10px;
+  font-size: var(--f-1);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--silk-faint);
@@ -153,23 +170,23 @@ body {
   margin: 0 auto;
   /* Nothing is pinned over the page any more, so the bottom padding only has
      to clear the home indicator on a phone. */
-  padding: 28px 24px calc(40px + env(safe-area-inset-bottom, 0px));
+  padding: var(--s-5) var(--s-5) calc(40px + env(safe-area-inset-bottom, 0px));
 }
 
 .masthead {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 20px;
+  gap: var(--s-4);
   flex-wrap: wrap;
-  padding-bottom: 18px;
+  padding-bottom: var(--s-4);
   border-bottom: 1px solid var(--rule);
 }
 
 .wordmark {
   font-family: var(--display);
   font-weight: 700;
-  font-size: 19px;
+  font-size: var(--f-6);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   margin: 0;
@@ -181,7 +198,7 @@ body {
 
 .tagline {
   color: var(--silk-dim);
-  font-size: 13px;
+  font-size: var(--f-4);
   margin: 4px 0 0;
 }
 
@@ -190,7 +207,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 10px;
+  gap: var(--s-2);
   margin-left: auto;
 }
 
@@ -277,7 +294,7 @@ button.scene-line:active:not(:disabled) {
 
 .topbar-unit {
   flex: 0 0 auto;
-  font-size: var(--f-3);
+  font-size: var(--f-4);
 }
 
 .topbar-how {
@@ -302,10 +319,10 @@ button.topbar-preset {
   gap: var(--s-2);
   flex: 1 1 auto;
   min-width: 0;
-  padding: 5px var(--s-2);
+  padding: var(--s-1) var(--s-2);
   background: none;
   border-color: transparent;
-  border-radius: var(--r-2);
+  border-radius: var(--r-2);;
 }
 
 button.topbar-preset:active:not(:disabled) {
@@ -323,7 +340,7 @@ button.topbar-preset:active:not(:disabled) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--f-4);
+  font-size: var(--f-5);
   font-weight: 600;
 }
 
@@ -352,11 +369,11 @@ button.topbar-preset:active:not(:disabled) {
 
 button.topbar-gear {
   flex: 0 0 auto;
-  padding: 6px var(--s-2);
+  padding: var(--s-1) var(--s-2);
   background: none;
   border-color: transparent;
   color: var(--silk-dim);
-  font-size: var(--f-4);
+  font-size: var(--f-5);
   line-height: 1;
 }
 
@@ -377,24 +394,24 @@ button.topbar-gear.open {
   margin-top: 22px;
   background: var(--panel);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 button.device-summary {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--s-3);
   width: 100%;
-  padding: 13px 16px;
+  padding: var(--s-3) var(--s-4);
   background: none;
   border: none;
-  border-radius: 3px;
+  border-radius: var(--r-1);
   text-align: left;
 }
 
 .device-state {
   color: var(--silk-dim);
-  font-size: 12px;
+  font-size: var(--f-3);
 }
 
 .problem.repair {
@@ -402,9 +419,9 @@ button.device-summary {
 }
 
 .panel-failed {
-  padding: 10px 0;
+  padding: var(--s-2) 0;
   border-left: 2px solid var(--fault);
-  padding-left: 12px;
+  padding-left: var(--s-3);
 }
 
 .device-state[data-state='live'] {
@@ -433,21 +450,21 @@ button.device-summary {
 .device-detail {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 2px 16px 14px;
+  gap: var(--s-2);
+  padding: var(--s-1) var(--s-4) var(--s-3);
 }
 
 .device-detail-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--s-3);
   flex-wrap: wrap;
 }
 
 .lamp {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: 50%;;
   background: var(--silk-faint);
   flex: none;
 }
@@ -465,14 +482,14 @@ button.device-summary {
 .device-name {
   font-family: var(--display);
   font-weight: 700;
-  font-size: 15px;
+  font-size: var(--f-5);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .device-meta {
   color: var(--silk-dim);
-  font-size: 12.5px;
+  font-size: var(--f-3);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -485,13 +502,13 @@ button.device-summary {
 
 button {
   font-family: var(--body);
-  font-size: 13px;
+  font-size: var(--f-4);
   font-weight: 500;
   color: var(--silk);
   background: var(--panel-hi);
   border: 1px solid var(--rule);
-  border-radius: 3px;
-  padding: 8px 14px;
+  border-radius: var(--r-1);
+  padding: var(--s-2) var(--s-3);
   cursor: pointer;
   transition: border-color 120ms ease, color 120ms ease;
   /* Tap mechanics. manipulation drops the double-tap-zoom wait, so two fast
@@ -528,12 +545,12 @@ button:disabled {
 
 input[type='text'] {
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--f-4);
   color: var(--silk);
   background: var(--chassis);
   border: 1px solid var(--rule);
-  border-radius: 3px;
-  padding: 8px 10px;
+  border-radius: var(--r-1);
+  padding: var(--s-2) var(--s-2);
   min-width: 230px;
 }
 
@@ -546,10 +563,10 @@ input[type='text']:focus-visible {
 
 .notice {
   margin-top: 22px;
-  padding: 16px 18px;
+  padding: var(--s-4) var(--s-4);
   border: 1px solid var(--rule);
   border-left: 2px solid var(--silk-faint);
-  border-radius: 3px;
+  border-radius: var(--r-1);
   background: var(--panel);
 }
 
@@ -559,7 +576,7 @@ input[type='text']:focus-visible {
 
 .notice h2 {
   font-family: var(--display);
-  font-size: 13px;
+  font-size: var(--f-4);
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -569,7 +586,7 @@ input[type='text']:focus-visible {
 .notice p {
   margin: 0 0 10px;
   color: var(--silk-dim);
-  font-size: 13.5px;
+  font-size: var(--f-4);
 }
 
 .notice p:last-child {
@@ -578,11 +595,11 @@ input[type='text']:focus-visible {
 
 .notice code {
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: var(--f-3);
   color: var(--silk);
   background: var(--chassis);
-  padding: 1px 5px;
-  border-radius: 2px;
+  padding: 1px var(--s-1);
+  border-radius: var(--r-1);
 }
 
 /* ---------- the grid: signature element ---------- */
@@ -595,14 +612,14 @@ input[type='text']:focus-visible {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--s-4);
   margin-bottom: 12px;
 }
 
 .preset-name {
   font-family: var(--display);
   font-weight: 700;
-  font-size: 22px;
+  font-size: var(--f-6);
   letter-spacing: 0.03em;
   margin: 0;
 }
@@ -610,29 +627,29 @@ input[type='text']:focus-visible {
 .preset-slot {
   color: var(--signal);
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--f-4);
 }
 
 .grid-scroll {
   overflow-x: auto;
-  padding-bottom: 6px;
+  padding-bottom: var(--s-1);
 }
 
 .grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(94px, 1fr));
   grid-auto-rows: var(--row-h);
-  gap: var(--gutter);
+  gap: var(--s-2);
   min-width: 940px;
-  padding: 14px;
+  padding: var(--s-3);
   background: var(--panel);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 .cell {
   border: 1px dashed var(--rule);
-  border-radius: 2px;
+  border-radius: var(--r-1);
 }
 
 /* A block is a plate screwed to the chassis. Engaged plates carry the
@@ -642,12 +659,12 @@ input[type='text']:focus-visible {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 3px;
-  padding: 8px 10px;
+  gap: var(--s-1);
+  padding: var(--s-2) var(--s-2);
   background: var(--panel-hi);
   border: 1px solid var(--rule);
   border-left: 2px solid var(--signal);
-  border-radius: 2px;
+  border-radius: var(--r-1);
   overflow: hidden;
 }
 
@@ -663,7 +680,7 @@ input[type='text']:focus-visible {
 .block-name {
   font-family: var(--display);
   font-weight: 600;
-  font-size: 11.5px;
+  font-size: var(--f-2);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -673,10 +690,10 @@ input[type='text']:focus-visible {
 
 .block-meta {
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: var(--f-1);
   color: var(--silk-faint);
   display: flex;
-  gap: 8px;
+  gap: var(--s-2);
 }
 
 .block-meta .chan {
@@ -685,7 +702,7 @@ input[type='text']:focus-visible {
 
 .grid-legend {
   display: flex;
-  gap: 22px;
+  gap: var(--s-5);
   flex-wrap: wrap;
   margin-top: 12px;
 }
@@ -693,7 +710,7 @@ input[type='text']:focus-visible {
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--s-2);
 }
 
 .swatch {
@@ -707,7 +724,7 @@ input[type='text']:focus-visible {
 }
 
 .legend-item span {
-  font-size: 11.5px;
+  font-size: var(--f-2);
   color: var(--silk-dim);
 }
 
@@ -720,18 +737,18 @@ input[type='text']:focus-visible {
   margin-top: 34px;
   background: var(--rule);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
   overflow: hidden;
 }
 
 .stat {
   background: var(--panel);
-  padding: 15px 16px;
+  padding: var(--s-4) var(--s-4);
 }
 
 .stat .value {
   font-family: var(--mono);
-  font-size: 25px;
+  font-size: var(--f-7);
   color: var(--silk);
   line-height: 1.15;
 }
@@ -742,10 +759,10 @@ input[type='text']:focus-visible {
 
 .footnote {
   margin-top: 30px;
-  padding-top: 18px;
+  padding-top: var(--s-4);
   border-top: 1px solid var(--rule);
   color: var(--silk-faint);
-  font-size: 12px;
+  font-size: var(--f-3);
   max-width: 62ch;
 }
 
@@ -764,10 +781,10 @@ input[type='text']:focus-visible {
 
 @media (max-width: 620px) {
   .shell {
-    padding: 22px 16px 60px;
+    padding: var(--s-5) var(--s-4) var(--s-7);
   }
   .preset-name {
-    font-size: 19px;
+    font-size: var(--f-6);
   }
 
   /*
@@ -786,7 +803,7 @@ input[type='text']:focus-visible {
   }
 
   .topbar-row {
-    gap: 6px;
+    gap: var(--s-1);
   }
 
   /* With a unit answering, its name and the word "connected" are the least of
@@ -827,14 +844,14 @@ input[type='text']:focus-visible {
   /* Theme and version are read once a session and set once a month. They keep
      their place and stop taking a full row's worth of height for it. */
   .build-badge {
-    gap: 8px;
+    gap: var(--s-2);
   }
   .build-badge .theme-toggle button {
-    padding: 4px 8px;
-    font-size: 10px;
+    padding: var(--s-1) var(--s-2);
+    font-size: var(--f-1);
   }
   .version {
-    font-size: 11px;
+    font-size: var(--f-2);
   }
 
   /*
@@ -845,11 +862,11 @@ input[type='text']:focus-visible {
    */
   .masthead {
     align-items: center;
-    gap: 10px;
-    padding-bottom: 12px;
+    gap: var(--s-2);
+    padding-bottom: var(--s-3);
   }
   .wordmark {
-    font-size: 15px;
+    font-size: var(--f-5);
     letter-spacing: 0.03em;
     /* One line or nothing: broken across three, a wordmark stops being one. */
     white-space: nowrap;
@@ -861,16 +878,16 @@ input[type='text']:focus-visible {
     align-items: center;
     flex-wrap: wrap;
     justify-content: flex-end;
-    gap: 8px;
+    gap: var(--s-2);
   }
 
   /* Both of these are one short line of text in a box built for a desk. */
   button.device-summary {
-    padding: 9px 13px;
+    padding: var(--s-2) var(--s-3);
   }
   .status-line {
     margin-top: 10px;
-    padding: 7px 12px;
+    padding: var(--s-2) var(--s-3);
   }
 
 }
@@ -885,14 +902,14 @@ textarea {
   display: block;
   width: 100%;
   margin-top: 8px;
-  padding: 13px 15px;
+  padding: var(--s-3) var(--s-4);
   font-family: var(--body);
-  font-size: 15px;
+  font-size: var(--f-5);
   line-height: 1.5;
   color: var(--silk);
   background: var(--panel);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
   resize: vertical;
 }
 
@@ -908,7 +925,7 @@ textarea:focus-visible {
 .tone-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--s-3);
   margin-top: 10px;
 }
 
@@ -930,27 +947,27 @@ button.primary:active:not(:disabled) {
 }
 
 .hint {
-  font-size: 11.5px;
+  font-size: var(--f-2);
   color: var(--silk-faint);
 }
 
 .examples {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: var(--s-2);
   margin-top: 12px;
 }
 
 button.chip {
-  font-size: 11.5px;
-  padding: 5px 10px;
+  font-size: var(--f-2);
+  padding: var(--s-1) var(--s-2);
   color: var(--silk-dim);
   background: transparent;
 }
 
 .progress {
   margin-top: 14px;
-  font-size: 12.5px;
+  font-size: var(--f-3);
   color: var(--signal);
 }
 
@@ -958,62 +975,62 @@ button.chip {
 
 .preview {
   margin-top: 28px;
-  padding: 18px;
+  padding: var(--s-4);
   background: var(--panel);
   border: 1px solid var(--rule);
   border-left: 2px solid var(--signal);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 .preview-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 18px;
+  gap: var(--s-4);
   flex-wrap: wrap;
 }
 
 .preview-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--s-2);
   flex-wrap: wrap;
 }
 
 .summary {
   margin: 6px 0 0;
   color: var(--silk-dim);
-  font-size: 13.5px;
+  font-size: var(--f-4);
   max-width: 58ch;
 }
 
 .diff {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
-  gap: 12px;
+  gap: var(--s-3);
   margin-top: 18px;
 }
 
 .diff-block {
-  padding: 12px 14px;
+  padding: var(--s-3) var(--s-3);
   background: var(--chassis);
   border: 1px solid var(--rule);
-  border-radius: 2px;
+  border-radius: var(--r-1);
 }
 
 .diff-block-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding-bottom: 8px;
+  gap: var(--s-2);
+  padding-bottom: var(--s-2);
   margin-bottom: 8px;
   border-bottom: 1px solid var(--rule);
 }
 
 .tag {
   font-family: var(--mono);
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 2px;
+  font-size: var(--f-1);
+  padding: 1px var(--s-1);
+  border-radius: var(--r-1);
   text-transform: uppercase;
 }
 
@@ -1031,9 +1048,9 @@ button.chip {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 10px;
-  padding: 3px 0;
-  font-size: 12.5px;
+  gap: var(--s-2);
+  padding: var(--s-1) 0;
+  font-size: var(--f-3);
 }
 
 .diff-label {
@@ -1041,7 +1058,7 @@ button.chip {
 }
 
 .diff-value {
-  font-size: 12px;
+  font-size: var(--f-3);
   white-space: nowrap;
 }
 
@@ -1060,7 +1077,7 @@ button.chip {
 
 .based-on {
   flex-basis: 100%;
-  font-size: 11px;
+  font-size: var(--f-2);
   color: var(--silk-faint);
   text-align: right;
 }
@@ -1068,19 +1085,19 @@ button.chip {
 .notes {
   margin-top: 16px;
   color: var(--silk-dim);
-  font-size: 13px;
+  font-size: var(--f-4);
   max-width: 62ch;
 }
 
 .problems {
   margin-top: 16px;
-  padding-top: 12px;
+  padding-top: var(--s-3);
   border-top: 1px solid var(--rule);
 }
 
 .problem {
   margin: 4px 0 0;
-  font-size: 11.5px;
+  font-size: var(--f-2);
   color: var(--fault);
 }
 
@@ -1089,7 +1106,7 @@ button.chip {
 .save-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--s-2);
   flex-wrap: wrap;
   margin-top: 12px;
 }
@@ -1102,27 +1119,27 @@ button.chip {
 
 .preset-bar {
   margin-top: 26px;
-  padding: 16px 18px;
+  padding: var(--s-4) var(--s-4);
   background: var(--panel);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 .preset-bar-row {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--s-4);
   flex-wrap: wrap;
 }
 
 .preset-bar .preset-name {
-  font-size: 20px;
+  font-size: var(--f-6);
   margin: 4px 0 0;
 }
 
 .preset-bar .preset-slot {
-  font-size: 12px;
+  font-size: var(--f-3);
   color: var(--silk-faint);
   letter-spacing: 0;
 }
@@ -1131,7 +1148,7 @@ button.chip {
 .rename-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   flex-wrap: wrap;
 }
 
@@ -1145,35 +1162,35 @@ input.jump {
 
 .browser {
   margin-top: 16px;
-  padding-top: 14px;
+  padding-top: var(--s-3);
   border-top: 1px solid var(--rule);
 }
 
 .browser-nav {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--s-2);
   flex-wrap: wrap;
   margin-bottom: 12px;
 }
 
 .browser-range {
-  font-size: 12px;
+  font-size: var(--f-3);
   color: var(--silk-faint);
 }
 
 .slot-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
-  gap: 6px;
+  gap: var(--s-1);
 }
 
 button.slot {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--s-2);
   text-align: left;
-  padding: 7px 10px;
+  padding: var(--s-2) var(--s-2);
   background: var(--chassis);
 }
 
@@ -1182,13 +1199,13 @@ button.slot.current {
 }
 
 .slot-num {
-  font-size: 10.5px;
+  font-size: var(--f-1);
   color: var(--silk-faint);
   min-width: 26px;
 }
 
 .slot-name {
-  font-size: 12.5px;
+  font-size: var(--f-3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1204,16 +1221,16 @@ button.slot.current {
 .thinking {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: var(--s-3);
   margin-top: 14px;
-  font-size: 12.5px;
+  font-size: var(--f-3);
   color: var(--signal);
 }
 
 .thinking-bars {
   display: inline-flex;
   align-items: flex-end;
-  gap: 2px;
+  gap: var(--s-1);
   height: 13px;
 }
 
@@ -1262,7 +1279,7 @@ button.slot.current {
 .editor-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--s-1);
   margin-top: 8px;
 }
 
@@ -1273,18 +1290,18 @@ button.chip.active {
 
 .editor-panel {
   margin-top: 14px;
-  padding: 16px 18px;
+  padding: var(--s-4) var(--s-4);
   background: var(--panel);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 .editor-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding-bottom: 10px;
+  gap: var(--s-3);
+  padding-bottom: var(--s-2);
   margin-bottom: 12px;
   border-bottom: 1px solid var(--rule);
 }
@@ -1292,7 +1309,7 @@ button.chip.active {
 .param-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
-  gap: 4px 20px;
+  gap: var(--s-1) var(--s-4);
   max-height: 380px;
   overflow-y: auto;
 }
@@ -1301,26 +1318,26 @@ button.chip.active {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 5px 0;
-  font-size: 12.5px;
+  gap: var(--s-3);
+  padding: var(--s-1) 0;
+  font-size: var(--f-3);
 }
 
 .param-input {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--s-2);
 }
 
 .param-row input[type='number'] {
   width: 82px;
-  padding: 5px 8px;
+  padding: var(--s-1) var(--s-2);
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--f-3);
   color: var(--silk);
   background: var(--chassis);
   border: 1px solid var(--rule);
-  border-radius: 2px;
+  border-radius: var(--r-1);
 }
 
 .param-row input:focus-visible,
@@ -1331,24 +1348,24 @@ button.chip.active {
 
 .param-row select {
   font-family: var(--body);
-  font-size: 12.5px;
+  font-size: var(--f-3);
   color: var(--silk);
   background: var(--chassis);
   border: 1px solid var(--rule);
-  border-radius: 2px;
-  padding: 6px 8px;
+  border-radius: var(--r-1);
+  padding: var(--s-1) var(--s-2);
   max-width: 330px;
 }
 
 .range {
-  font-size: 10.5px;
+  font-size: var(--f-1);
   color: var(--silk-faint);
   white-space: nowrap;
 }
 
 .locked {
   margin-left: 7px;
-  font-size: 10px;
+  font-size: var(--f-1);
   color: var(--silk-faint);
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -1357,10 +1374,10 @@ button.chip.active {
 .editor-confirm {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--s-2);
   flex-wrap: wrap;
   margin-top: 16px;
-  padding-top: 14px;
+  padding-top: var(--s-3);
   border-top: 1px solid var(--rule);
 }
 
@@ -1370,7 +1387,7 @@ button.chip.active {
 
 .pending p {
   margin: 2px 0;
-  font-size: 11.5px;
+  font-size: var(--f-2);
   color: var(--signal);
 }
 
@@ -1382,19 +1399,19 @@ button.chip.active {
 
 .log-head {
   display: flex;
-  gap: 8px;
+  gap: var(--s-2);
 }
 
 .log-body {
   margin-top: 10px;
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
   max-height: 340px;
   overflow-y: auto;
 }
 
 .log-entry {
-  padding: 10px 14px;
+  padding: var(--s-2) var(--s-3);
   border-bottom: 1px solid var(--rule);
   border-left: 2px solid var(--rule);
 }
@@ -1414,18 +1431,18 @@ button.chip.active {
 
 .log-line {
   display: flex;
-  gap: 12px;
+  gap: var(--s-3);
   align-items: baseline;
 }
 
 .log-time {
-  font-size: 10.5px;
+  font-size: var(--f-1);
   color: var(--silk-faint);
   flex: none;
 }
 
 .log-summary {
-  font-size: 13px;
+  font-size: var(--f-4);
 }
 
 .log-detail {
@@ -1435,7 +1452,7 @@ button.chip.active {
 
 .log-detail p {
   margin: 2px 0;
-  font-size: 11px;
+  font-size: var(--f-2);
   color: var(--silk-dim);
 }
 
@@ -1457,7 +1474,7 @@ button.chip.active {
 .diag-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--s-2);
   flex-wrap: wrap;
   margin-top: 10px;
 }
@@ -1465,16 +1482,16 @@ button.chip.active {
 .diag-table {
   margin-top: 10px;
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
   overflow-x: auto;
 }
 
 .diag-row {
   display: grid;
   grid-template-columns: minmax(140px, 1.5fr) 70px 70px 70px minmax(110px, 1fr) 50px;
-  gap: 10px;
-  padding: 7px 12px;
-  font-size: 11.5px;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--f-2);
   border-bottom: 1px solid var(--rule);
   min-width: 560px;
 }
@@ -1485,7 +1502,7 @@ button.chip.active {
 
 .diag-head-row {
   background: var(--panel);
-  font-size: 10px;
+  font-size: var(--f-1);
 }
 
 .diag-row[data-extreme='true'] {
@@ -1512,34 +1529,34 @@ button.chip.active {
 
 .cost {
   margin-top: 20px;
-  padding: 13px 16px;
+  padding: var(--s-3) var(--s-4);
   background: var(--panel);
   border: 1px solid var(--rule);
   border-left: 2px solid var(--live);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 .cost-row {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 14px;
+  gap: var(--s-3);
 }
 
 .cost-figure {
-  font-size: 19px;
+  font-size: var(--f-6);
   color: var(--live);
 }
 
 .cost-detail {
   margin-top: 4px;
-  font-size: 11px;
+  font-size: var(--f-2);
   color: var(--silk-faint);
 }
 
 .cost-note {
   margin: 8px 0 0;
-  font-size: 11px;
+  font-size: var(--f-2);
   color: var(--silk-faint);
   max-width: 56ch;
 }
@@ -1549,17 +1566,17 @@ button.chip.active {
 .build-badge {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: var(--s-2);
   flex-wrap: wrap;
 }
 
 .version {
-  font-size: 12px;
+  font-size: var(--f-3);
   color: var(--signal);
 }
 
 .build-meta {
-  font-size: 10.5px;
+  font-size: var(--f-1);
   color: var(--silk-faint);
 }
 
@@ -1578,7 +1595,7 @@ button.chip.active {
 .scene-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-  gap: 6px;
+  gap: var(--s-1);
   margin-top: 8px;
 }
 
@@ -1586,8 +1603,8 @@ button.scene {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
-  padding: 9px 11px;
+  gap: var(--s-1);
+  padding: var(--s-2) var(--s-3);
   background: var(--panel);
 }
 
@@ -1597,7 +1614,7 @@ button.scene.current {
 }
 
 .scene-num {
-  font-size: 10.5px;
+  font-size: var(--f-1);
   color: var(--silk-faint);
 }
 
@@ -1606,7 +1623,7 @@ button.scene.current .scene-num {
 }
 
 .scene-name {
-  font-size: 12px;
+  font-size: var(--f-3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1620,15 +1637,15 @@ button.scene.current .scene-num {
 .channel-list {
   margin-top: 8px;
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 .channel-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  padding: 8px 14px;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-3);
   border-bottom: 1px solid var(--rule);
 }
 
@@ -1638,7 +1655,7 @@ button.scene.current .scene-num {
 
 .channel-buttons {
   display: flex;
-  gap: 4px;
+  gap: var(--s-1);
 }
 
 .channel-buttons .chip {
@@ -1653,12 +1670,12 @@ button.scene.current .scene-num {
 
 .demo-banner {
   margin: 10px 0 0;
-  padding: 9px 14px;
-  font-size: 12px;
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--f-3);
   color: var(--silk-dim);
   background: var(--panel);
   border: 1px dashed var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 /* ---------- saved presets ---------- */
@@ -1671,13 +1688,13 @@ button.scene.current .scene-num {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: var(--s-3);
   flex-wrap: wrap;
 }
 
 .history-actions {
   display: flex;
-  gap: 6px;
+  gap: var(--s-1);
   flex-wrap: wrap;
   margin-top: 8px;
 }
@@ -1685,11 +1702,11 @@ button.scene.current .scene-num {
 .history-list {
   margin-top: 10px;
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 .history-entry {
-  padding: 11px 14px;
+  padding: var(--s-3) var(--s-3);
   border-bottom: 1px solid var(--rule);
 }
 
@@ -1701,13 +1718,13 @@ button.scene.current .scene-num {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--s-3);
 }
 
 button.history-title {
   display: flex;
   align-items: baseline;
-  gap: 12px;
+  gap: var(--s-3);
   flex: 1;
   text-align: left;
   padding: 0;
@@ -1722,31 +1739,31 @@ button.history-title:hover {
 .history-name {
   font-family: var(--display);
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--f-4);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .history-when {
-  font-size: 10.5px;
+  font-size: var(--f-1);
   color: var(--silk-faint);
 }
 
 .history-desc {
   margin: 5px 0 0;
-  font-size: 12.5px;
+  font-size: var(--f-3);
   color: var(--silk-dim);
   max-width: 62ch;
 }
 
 .history-detail {
   margin-top: 10px;
-  padding-top: 10px;
+  padding-top: var(--s-2);
   border-top: 1px solid var(--rule);
 }
 
 .history-meta {
-  font-size: 10.5px;
+  font-size: var(--f-1);
   color: var(--silk-faint);
   margin-top: 6px;
 }
@@ -1775,7 +1792,7 @@ button.chip.more {
 
 .cab-slots {
   display: flex;
-  gap: 8px;
+  gap: var(--s-2);
   flex-wrap: wrap;
   align-items: center;
   margin-top: 8px;
@@ -1784,44 +1801,44 @@ button.chip.more {
 .cab-slot {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 10px 13px;
+  gap: var(--s-1);
+  padding: var(--s-2) var(--s-3);
   background: var(--panel);
   border: 1px solid var(--rule);
   border-left: 2px solid var(--signal);
-  border-radius: 3px;
+  border-radius: var(--r-1);
   min-width: 150px;
 }
 
 .cab-ir {
   font-family: var(--display);
   font-weight: 600;
-  font-size: 12.5px;
+  font-size: var(--f-3);
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
 .cab-bank {
-  font-size: 10.5px;
+  font-size: var(--f-1);
   color: var(--silk-faint);
 }
 
 .cab-mode {
-  font-size: 10.5px;
+  font-size: var(--f-1);
   color: var(--live);
 }
 
 .meter-list {
   margin-top: 10px;
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 .meter-row {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 7px 14px;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-3);
   border-bottom: 1px solid var(--rule);
 }
 
@@ -1831,14 +1848,14 @@ button.chip.more {
 
 .meter-row .diff-label {
   min-width: 110px;
-  font-size: 12px;
+  font-size: var(--f-3);
 }
 
 .meter-track {
   flex: 1;
   height: 6px;
   background: var(--chassis);
-  border-radius: 1px;
+  border-radius: var(--r-1);
   overflow: hidden;
 }
 
@@ -1863,7 +1880,7 @@ button.chip.more {
 
 .refine-row {
   display: flex;
-  gap: 8px;
+  gap: var(--s-2);
   flex-wrap: wrap;
   margin-top: 8px;
 }
@@ -1871,7 +1888,7 @@ button.chip.more {
 input.refine-input {
   flex: 1 1 280px;
   font-family: var(--body);
-  font-size: 14px;
+  font-size: var(--f-4);
 }
 
 .compare .notice strong {
@@ -1885,17 +1902,17 @@ input.refine-input {
   display: flex;
   align-items: stretch;
   gap: 0;
-  padding: 14px;
+  padding: var(--s-3);
   background: var(--panel);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
   min-width: min(100%, 520px);
 }
 
 .chain-link {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--s-2);
   flex: 1;
 }
 
@@ -1907,14 +1924,14 @@ input.refine-input {
 
 .chain-arrow {
   color: var(--silk-faint);
-  font-size: 13px;
+  font-size: var(--f-4);
 }
 
 /* ---------- view tabs ---------- */
 
 .views {
   display: flex;
-  gap: 2px;
+  gap: var(--s-1);
   margin-top: var(--s-3);
   border-bottom: 1px solid var(--rule);
 }
@@ -1922,15 +1939,15 @@ input.refine-input {
 button.view-tab {
   font-family: var(--display);
   font-weight: 600;
-  font-size: 11px;
+  font-size: var(--f-2);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--silk-faint);
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
-  border-radius: 0;
-  padding: 10px 16px;
+  border-radius: 0;;
+  padding: var(--s-2) var(--s-4);
 }
 
 @media (hover: hover) {
@@ -1958,11 +1975,11 @@ button.view-tab.current {
 }
 
 .gig-preset {
-  padding: 22px 20px;
+  padding: var(--s-5) var(--s-4);
   background: var(--panel);
   border: 1px solid var(--rule);
   border-left: 2px solid var(--signal);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 .gig-name {
@@ -1978,7 +1995,7 @@ button.view-tab.current {
   height: 5px;
   margin-top: 10px;
   background: var(--panel);
-  border-radius: 1px;
+  border-radius: var(--r-1);
   overflow: hidden;
 }
 
@@ -1991,19 +2008,19 @@ button.view-tab.current {
 .gig-nav {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: var(--s-2);
   margin-top: 12px;
 }
 
 .gig-nav button {
-  padding: 18px;
-  font-size: 15px;
+  padding: var(--s-4);
+  font-size: var(--f-5);
 }
 
 .gig-scenes {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: 8px;
+  gap: var(--s-2);
   margin-top: 12px;
 }
 
@@ -2012,9 +2029,9 @@ button.gig-scene {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: var(--s-1);
   min-height: 88px;
-  padding: 12px 10px;
+  padding: var(--s-3) var(--s-2);
   background: var(--panel);
 }
 
@@ -2025,13 +2042,13 @@ button.gig-scene.current {
 }
 
 .gig-scene-num {
-  font-size: 21px;
+  font-size: var(--f-6);
 }
 
 /* When a scene has a name, the name is what you're looking for — the number
    drops to an index. Unnamed, the number is all there is, so it stays large. */
 button.gig-scene.named .gig-scene-num {
-  font-size: 12px;
+  font-size: var(--f-3);
   color: var(--silk-faint);
 }
 
@@ -2040,7 +2057,7 @@ button.gig-scene.named.current .gig-scene-num {
 }
 
 .gig-scene-name {
-  font-size: 11px;
+  font-size: var(--f-2);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   overflow: hidden;
@@ -2053,7 +2070,7 @@ button.gig-scene.named.current .gig-scene-num {
 button.gig-scene.named .gig-scene-name {
   font-family: var(--display);
   font-weight: 700;
-  font-size: 14px;
+  font-size: var(--f-4);
   color: var(--silk);
   white-space: normal;
   line-height: 1.15;
@@ -2081,24 +2098,24 @@ button.gig-scene.named.current .gig-scene-name {
 .mod-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
+  gap: var(--s-2);
   margin-top: 10px;
 }
 
 .mod-field {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: var(--s-1);
 }
 
 .mod-field select {
   font-family: var(--body);
-  font-size: 12.5px;
+  font-size: var(--f-3);
   color: var(--silk);
   background: var(--chassis);
   border: 1px solid var(--rule);
-  border-radius: 2px;
-  padding: 8px;
+  border-radius: var(--r-1);
+  padding: var(--s-2);
   width: 100%;
 }
 
@@ -2119,7 +2136,7 @@ table.matrix {
 
 table.matrix th,
 table.matrix td {
-  padding: 6px 10px;
+  padding: var(--s-1) var(--s-2);
   text-align: center;
   border-bottom: 1px solid var(--rule);
 }
@@ -2127,7 +2144,7 @@ table.matrix td {
 table.matrix th:first-child,
 .matrix-name {
   text-align: left;
-  font-size: 12px;
+  font-size: var(--f-3);
   color: var(--silk-dim);
   white-space: nowrap;
 }
@@ -2136,7 +2153,7 @@ table.matrix th:first-child,
   display: inline-block;
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: 50%;;
   border: 1px solid var(--silk-faint);
 }
 
@@ -2148,7 +2165,7 @@ table.matrix th:first-child,
 .tempo-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   flex-wrap: wrap;
   margin-top: 8px;
 }
@@ -2168,7 +2185,7 @@ table.matrix th:first-child,
 .version-info {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--s-1);
   flex: 1;
 }
 
@@ -2178,8 +2195,8 @@ table.matrix th:first-child,
 }
 
 .slot-peek {
-  padding: 3px 10px 0;
-  font-size: 10px;
+  padding: var(--s-1) var(--s-2) 0;
+  font-size: var(--f-1);
   color: var(--silk-faint);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2195,35 +2212,35 @@ table.matrix th:first-child,
 .fc-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 8px;
+  gap: var(--s-2);
   margin-top: 10px;
 }
 
 .fc-switch {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 12px 14px;
+  gap: var(--s-1);
+  padding: var(--s-3) var(--s-3);
   background: var(--panel);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 .fc-num {
-  font-size: 10.5px;
+  font-size: var(--f-1);
   color: var(--silk-faint);
 }
 
 .fc-label {
   font-family: var(--display);
   font-weight: 600;
-  font-size: 12.5px;
+  font-size: var(--f-3);
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
 .fc-fn {
-  font-size: 10.5px;
+  font-size: var(--f-1);
   color: var(--live);
 }
 
@@ -2235,17 +2252,17 @@ table.matrix th:first-child,
 
 .grid.editable {
   grid-auto-rows: 48px;
-  gap: 4px;
+  gap: var(--s-1);
 }
 
 button.cell-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 6px;
+  padding: var(--s-1) var(--s-1);
   background: transparent;
   border: 1px dashed var(--rule);
-  border-radius: 2px;
+  border-radius: var(--r-1);
   overflow: hidden;
 }
 
@@ -2267,7 +2284,7 @@ button.cell-btn.probed {
 .cell-name {
   font-family: var(--display);
   font-weight: 600;
-  font-size: 10px;
+  font-size: var(--f-1);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -2276,30 +2293,30 @@ button.cell-btn.probed {
 }
 
 .cell-coord {
-  font-size: 10px;
+  font-size: var(--f-1);
   color: var(--silk-faint);
 }
 
 .cell-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   flex-wrap: wrap;
   margin-top: 12px;
-  padding: 12px 14px;
+  padding: var(--s-3) var(--s-3);
   background: var(--panel);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 .cell-actions select {
   font-family: var(--body);
-  font-size: 12.5px;
+  font-size: var(--f-3);
   color: var(--silk);
   background: var(--chassis);
   border: 1px solid var(--rule);
-  border-radius: 2px;
-  padding: 7px 9px;
+  border-radius: var(--r-1);
+  padding: var(--s-2) var(--s-2);
 }
 
 /* ---------- unsaved state ---------- */
@@ -2309,14 +2326,14 @@ button.cell-btn.probed {
    the save button itself, which the Library view still uses. */
 
 button.save-now {
-  padding: 7px 15px;
+  padding: var(--s-2) var(--s-4);
   font-family: var(--display);
-  font-size: 12.5px;
+  font-size: var(--f-3);
   letter-spacing: 0.05em;
   color: var(--ink-on-live, #0b0b0b);
   background: var(--live);
   border: 1px solid var(--live);
-  border-radius: 3px;
+  border-radius: var(--r-1);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -2344,19 +2361,19 @@ button.save-now:disabled {
 
 .live-body {
   margin-top: 8px;
-  padding: 12px 14px;
+  padding: var(--s-3) var(--s-3);
   max-height: 260px;
   overflow-y: auto;
   background: var(--panel);
   border: 1px solid var(--rule);
   border-left: 2px solid var(--signal);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 .live-name {
   font-family: var(--display);
   font-weight: 700;
-  font-size: 14px;
+  font-size: var(--f-4);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   margin: 0;
@@ -2364,22 +2381,22 @@ button.save-now:disabled {
 
 .live-summary {
   margin: 6px 0 0;
-  font-size: 12.5px;
+  font-size: var(--f-3);
   color: var(--silk-dim);
   max-width: 62ch;
 }
 
 .live-block {
   margin-top: 10px;
-  padding-top: 8px;
+  padding-top: var(--s-2);
   border-top: 1px solid var(--rule);
 }
 
 .live-block-head {
   display: flex;
   align-items: center;
-  gap: 9px;
-  font-size: 11px;
+  gap: var(--s-2);
+  font-size: var(--f-2);
   color: var(--silk-faint);
 }
 
@@ -2388,9 +2405,9 @@ button.save-now:disabled {
 }
 
 .live-param {
-  font-size: 11px;
+  font-size: var(--f-2);
   color: var(--silk-dim);
-  padding-left: 12px;
+  padding-left: var(--s-3);
   margin-top: 2px;
 }
 
@@ -2430,7 +2447,7 @@ button.cell-btn.over {
 .console {
   display: grid;
   grid-template-columns: 250px minmax(0, 1fr) minmax(300px, 0.9fr);
-  gap: 10px;
+  gap: var(--s-2);
   margin-top: 12px;
   /* No align-items here. Below 1000px this same selector becomes a flex
      column, and `start` there stops stretching the panels to the width — the
@@ -2449,28 +2466,28 @@ button.cell-btn.over {
 .device-strip {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: var(--s-3);
   flex-wrap: wrap;
-  padding: 9px 14px;
+  padding: var(--s-2) var(--s-3);
   background: linear-gradient(180deg, var(--strip-a), var(--strip-b));
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 .strip-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   margin-left: auto;
   flex-wrap: wrap;
 }
 
 .strip-btn {
   font-family: var(--display);
-  font-size: 10px;
+  font-size: var(--f-1);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  padding: 6px 12px;
+  padding: var(--s-1) var(--s-3);
 }
 
 .strip-btn.armed {
@@ -2481,11 +2498,11 @@ button.cell-btn.over {
 
 .bpm-box {
   font-family: var(--mono);
-  font-size: 12px;
-  padding: 5px 10px;
+  font-size: var(--f-3);
+  padding: var(--s-1) var(--s-2);
   background: var(--chassis);
   border: 1px solid var(--rule);
-  border-radius: 2px;
+  border-radius: var(--r-1);
   min-width: 76px;
   text-align: center;
 }
@@ -2505,7 +2522,7 @@ input.bpm-box:focus {
 .cpu-meter {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--s-2);
 }
 
 .cpu-track {
@@ -2513,7 +2530,7 @@ input.bpm-box:focus {
   height: 8px;
   background: var(--chassis);
   border: 1px solid var(--rule);
-  border-radius: 1px;
+  border-radius: var(--r-1);
   overflow: hidden;
 }
 
@@ -2534,26 +2551,26 @@ input.bpm-box:focus {
 .block-panel {
   background: var(--panel);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 .panel-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 9px 12px;
+  padding: var(--s-2) var(--s-3);
   border-bottom: 1px solid var(--rule);
 }
 
 .panel-title {
   font-family: var(--display);
   font-weight: 700;
-  font-size: 11px;
+  font-size: var(--f-2);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--silk-dim);
   margin: 0;
-  padding: 9px 12px 0;
+  padding: var(--s-2) var(--s-3) 0;
 }
 
 .panel-head .panel-title {
@@ -2561,13 +2578,13 @@ input.bpm-box:focus {
 }
 
 .icon-btn {
-  padding: 3px 8px;
-  font-size: 13px;
+  padding: var(--s-1) var(--s-2);
+  font-size: var(--f-4);
   line-height: 1;
 }
 
 .pad {
-  padding: 10px 12px;
+  padding: var(--s-2) var(--s-3);
 }
 
 /* ---------- preset list ---------- */
@@ -2580,13 +2597,13 @@ input.bpm-box:focus {
 button.preset-row {
   display: flex;
   align-items: baseline;
-  gap: 9px;
+  gap: var(--s-2);
   width: 100%;
   text-align: left;
-  padding: 6px 12px;
+  padding: var(--s-1) var(--s-3);
   background: none;
   border: none;
-  border-radius: 0;
+  border-radius: 0;;
   border-left: 2px solid transparent;
 }
 
@@ -2613,7 +2630,7 @@ button.preset-row.current {
 }
 
 .preset-id {
-  font-size: 11px;
+  font-size: var(--f-2);
   color: var(--silk-faint);
   min-width: 26px;
 }
@@ -2623,7 +2640,7 @@ button.preset-row.current .preset-id {
 }
 
 .preset-title {
-  font-size: 12.5px;
+  font-size: var(--f-3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2635,14 +2652,14 @@ button.preset-row.current .preset-id {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
+  gap: var(--s-2);
   flex-wrap: wrap;
-  padding: 26px 14px 30px;
+  padding: var(--s-5) var(--s-3) var(--s-6);
 }
 
 .io-arrow {
   color: var(--silk-faint);
-  font-size: 13px;
+  font-size: var(--f-4);
 }
 
 button.fx-tile {
@@ -2651,11 +2668,11 @@ button.fx-tile {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: var(--s-1);
   width: 62px;
   height: 62px;
   padding: 0;
-  border-radius: 6px;
+  border-radius: var(--r-1);
   background: linear-gradient(180deg, color-mix(in srgb, var(--tile) 88%, white), var(--tile));
   border: 2px solid transparent;
   color: #fff;
@@ -2674,13 +2691,13 @@ button.fx-tile.bypassed {
 .fx-abbr {
   font-family: var(--display);
   font-weight: 700;
-  font-size: 14px;
+  font-size: var(--f-4);
   letter-spacing: 0.06em;
 }
 
 .fx-chan {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--f-1);
   opacity: 0.85;
 }
 
@@ -2689,7 +2706,7 @@ button.fx-tile.bypassed {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: var(--s-1);
 }
 
 /* On/off without opening the editor. As wide as the tile so the target is a
@@ -2697,9 +2714,9 @@ button.fx-tile.bypassed {
 button.fx-power {
   min-height: 26px;
   width: 62px;
-  padding: 3px 0;
+  padding: var(--s-1) 0;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--f-1);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -2716,30 +2733,30 @@ button.fx-power.off {
 /* ---------- centre panel ---------- */
 
 .center-panel {
-  padding: 12px;
+  padding: var(--s-3);
 }
 
 .preset-name-field {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-3);
   margin-top: 8px;
   background: var(--chassis);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 .preset-name-field .num {
   font-family: var(--mono);
-  font-size: 15px;
+  font-size: var(--f-5);
   color: var(--signal);
 }
 
 .preset-name-field .name {
   font-family: var(--display);
   font-weight: 700;
-  font-size: 19px;
+  font-size: var(--f-6);
   letter-spacing: 0.03em;
   color: var(--signal);
   flex: 1;
@@ -2750,27 +2767,27 @@ button.fx-power.off {
 
 .step-btns {
   display: flex;
-  gap: 4px;
+  gap: var(--s-1);
 }
 
 .scene-list {
   margin-top: 12px;
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
   overflow: hidden;
 }
 
 button.scene-line {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--s-2);
   width: 100%;
   text-align: left;
-  padding: 8px 10px;
+  padding: var(--s-2) var(--s-2);
   background: var(--chassis);
   border: none;
   border-bottom: 1px solid var(--rule);
-  border-radius: 0;
+  border-radius: 0;;
 }
 
 button.scene-line:last-child {
@@ -2779,10 +2796,10 @@ button.scene-line:last-child {
 
 .scene-tag {
   font-family: var(--mono);
-  font-size: 10.5px;
-  padding: 3px 7px;
+  font-size: var(--f-1);
+  padding: var(--s-1) var(--s-2);
   border: 1px solid var(--rule);
-  border-radius: 2px;
+  border-radius: var(--r-1);
   color: var(--silk-faint);
 }
 
@@ -2796,21 +2813,21 @@ button.scene-line.current {
 }
 
 .scene-title {
-  font-size: 12.5px;
+  font-size: var(--f-3);
 }
 
 /* ---------- edit tabs ---------- */
 
 .edit-tabs {
   display: flex;
-  gap: 4px;
+  gap: var(--s-1);
   flex-wrap: wrap;
   margin-top: 12px;
 }
 
 button.edit-tab {
-  font-size: 11px;
-  padding: 6px 11px;
+  font-size: var(--f-2);
+  padding: var(--s-1) var(--s-3);
   color: var(--silk-dim);
 }
 
@@ -2851,15 +2868,15 @@ button.edit-tab.current {
   display: flex;
   flex: 1 1 auto;
   min-width: 0;
-  gap: 4px;
+  gap: var(--s-1);
 }
 
 button.chan-btn {
   flex: 1 1 0;
   min-width: 0;
-  padding: 6px 0;
+  padding: var(--s-1) 0;
   font-family: var(--mono);
-  font-size: var(--f-3);
+  font-size: var(--f-4);
   background: var(--chassis);
 }
 
@@ -2871,13 +2888,13 @@ button.chan-btn.current {
 .type-select {
   width: 100%;
   margin: var(--s-2) 0 0;
-  padding: 8px 10px;
+  padding: var(--s-2) var(--s-2);
   font-family: var(--body);
-  font-size: var(--f-3);
+  font-size: var(--f-4);
   color: var(--silk);
   background: var(--chassis);
   border: 1px solid var(--rule);
-  border-radius: var(--r-1);
+  border-radius: var(--r-1);;
 }
 
 .bypass-btn {
@@ -2901,11 +2918,11 @@ button.chan-btn.current {
 .block-tabs button {
   background: none;
   border: none;
-  border-radius: 0;
+  border-radius: 0;;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
-  padding: 8px 12px;
-  font-size: var(--f-3);
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--f-4);
   color: var(--silk-faint);
 }
 
@@ -2917,16 +2934,16 @@ button.chan-btn.current {
 .knob-deck {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px 22px;
+  gap: var(--s-3) var(--s-5);
   align-content: flex-start;
-  padding: 18px 20px;
+  padding: var(--s-4) var(--s-4);
 }
 
 .knob-cell {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
+  gap: var(--s-1);
   width: 84px;
 }
 
@@ -2934,14 +2951,14 @@ button.chan-btn.current {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
+  gap: var(--s-1);
   /* A drag that wanders off the knob must not start selecting labels. */
   -webkit-user-select: none;
   user-select: none;
 }
 
 .knob-label {
-  font-size: 10.5px;
+  font-size: var(--f-1);
   color: var(--silk-dim);
   text-align: center;
   max-width: 84px;
@@ -2967,13 +2984,13 @@ button.chan-btn.current {
   bottom: calc(100% + 2px);
   left: 50%;
   transform: translateX(-50%);
-  padding: 4px 9px;
-  font-size: 14px;
+  padding: var(--s-1) var(--s-2);
+  font-size: var(--f-4);
   white-space: nowrap;
   color: var(--silk);
   background: var(--panel-hi);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
   pointer-events: none;
   z-index: 4;
 }
@@ -2981,7 +2998,7 @@ button.chan-btn.current {
 .knob:focus-visible {
   outline: 2px solid var(--live);
   outline-offset: 2px;
-  border-radius: 50%;
+  border-radius: 50%;;
 }
 
 .knob.dragging {
@@ -3012,13 +3029,13 @@ button.chan-btn.current {
 }
 
 .knob-readout {
-  font-size: 11px;
-  padding: 3px 7px;
+  font-size: var(--f-2);
+  padding: var(--s-1) var(--s-2);
   min-width: 62px;
   text-align: center;
   background: var(--chassis);
   border: 1px solid var(--rule);
-  border-radius: 2px;
+  border-radius: var(--r-1);
 }
 
 /* The editable readout. Same clothes as the plain one; an input just needs a
@@ -3051,7 +3068,7 @@ input.knob-readout:focus {
 
 .block-level .mono {
   flex: 1 1 auto;
-  font-size: var(--f-3);
+  font-size: var(--f-4);
   color: var(--silk);
 }
 
@@ -3061,9 +3078,9 @@ input.preset-filter {
   width: calc(100% - 20px);
   margin: 8px 10px;
   min-width: 0;
-  padding: 6px 8px;
+  padding: var(--s-1) var(--s-2);
   font-family: var(--body);
-  font-size: 12px;
+  font-size: var(--f-3);
 }
 
 .scan-bar {
@@ -3072,7 +3089,7 @@ input.preset-filter {
   margin: 0 10px 6px;
   background: var(--chassis);
   border: 1px solid var(--rule);
-  border-radius: 2px;
+  border-radius: var(--r-1);
   overflow: hidden;
 }
 
@@ -3089,7 +3106,7 @@ input.preset-filter {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 9.5px;
+  font-size: var(--f-1);
   color: var(--silk-dim);
 }
 
@@ -3098,18 +3115,18 @@ input.preset-filter {
 /* Centre-out, because that is the only thing anyone looks at while tuning. */
 .tuner-panel {
   margin-top: 10px;
-  padding: 14px 18px;
+  padding: var(--s-3) var(--s-4);
   background: var(--panel);
   border: 1px solid var(--rule);
   border-left: 2px solid var(--live);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 .tuner-note {
   display: flex;
   align-items: baseline;
   justify-content: center;
-  gap: 4px;
+  gap: var(--s-1);
 }
 
 .tuner-note .note {
@@ -3129,7 +3146,7 @@ input.preset-filter {
 }
 
 .tuner-note .octave {
-  font-size: 13px;
+  font-size: var(--f-4);
   color: var(--silk-faint);
 }
 
@@ -3140,7 +3157,7 @@ input.preset-filter {
   max-width: 420px;
   background: var(--chassis);
   border: 1px solid var(--rule);
-  border-radius: 2px;
+  border-radius: var(--r-1);
 }
 
 .tuner-centre {
@@ -3159,7 +3176,7 @@ input.preset-filter {
   width: 3px;
   margin-left: -1.5px;
   background: var(--signal);
-  border-radius: 1px;
+  border-radius: var(--r-1);
   transition: left 90ms linear;
 }
 
@@ -3169,7 +3186,7 @@ input.preset-filter {
 
 .tuner-cents {
   text-align: center;
-  font-size: 11px;
+  font-size: var(--f-2);
   color: var(--silk-faint);
 }
 
@@ -3187,10 +3204,10 @@ input.preset-filter {
 /* ---------- scene matrix cells ---------- */
 
 button.dot-btn {
-  padding: 5px;
+  padding: var(--s-1);
   background: none;
   border: none;
-  border-radius: 3px;
+  border-radius: var(--r-1);
   line-height: 0;
 }
 
@@ -3244,22 +3261,22 @@ button.dot-btn.on .dot {
 .port-list {
   margin-top: 8px;
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
   overflow: hidden;
 }
 
 button.port-row {
   display: flex;
   align-items: baseline;
-  gap: 12px;
+  gap: var(--s-3);
   width: 100%;
   text-align: left;
-  padding: 10px 14px;
+  padding: var(--s-2) var(--s-3);
   background: var(--panel);
   border: none;
   border-bottom: 1px solid var(--rule);
   border-left: 2px solid transparent;
-  border-radius: 0;
+  border-radius: 0;;
 }
 
 button.port-row:last-child {
@@ -3273,7 +3290,7 @@ button.port-row.current {
 .port-model {
   font-family: var(--display);
   font-weight: 600;
-  font-size: 12.5px;
+  font-size: var(--f-3);
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -3283,7 +3300,7 @@ button.port-row.current .port-model {
 }
 
 .port-id {
-  font-size: 10.5px;
+  font-size: var(--f-1);
   color: var(--silk-faint);
 }
 
@@ -3293,11 +3310,11 @@ button.port-row.current .port-model {
    Design view is context for it or consequence of it. */
 .tone.hero {
   margin-top: 22px;
-  padding: 26px 26px 22px;
+  padding: var(--s-5) var(--s-5) var(--s-5);
   background: linear-gradient(180deg, var(--hero-a), var(--panel));
   border: 1px solid var(--rule);
   border-left: 2px solid var(--signal);
-  border-radius: 4px;
+  border-radius: var(--r-1);
 }
 
 .tone-heading {
@@ -3310,7 +3327,7 @@ button.port-row.current .port-model {
 
 .tone-sub {
   margin: 7px 0 0;
-  font-size: 13.5px;
+  font-size: var(--f-4);
   color: var(--silk-dim);
   max-width: 60ch;
 }
@@ -3318,7 +3335,7 @@ button.port-row.current .port-model {
 .tone-field {
   margin-top: 16px;
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
   background: var(--chassis);
   transition: border-color 140ms ease;
 }
@@ -3331,8 +3348,8 @@ button.port-row.current .port-model {
   margin: 0;
   border: none;
   background: none;
-  font-size: 16px;
-  padding: 15px 17px 6px;
+  font-size: var(--f-input);
+  padding: var(--s-4) var(--s-4) var(--s-1);
 }
 
 .tone-field textarea:focus-visible {
@@ -3342,13 +3359,13 @@ button.port-row.current .port-model {
 .tone-actions {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 0 14px 13px;
+  gap: var(--s-3);
+  padding: 0 var(--s-3) var(--s-3);
 }
 
 button.big {
-  font-size: 14px;
-  padding: 11px 22px;
+  font-size: var(--f-4);
+  padding: var(--s-3) var(--s-5);
 }
 
 .tone-or {
@@ -3373,21 +3390,21 @@ button.big {
 
 .plan {
   margin-top: 14px;
-  padding: 15px 17px;
+  padding: var(--s-4) var(--s-4);
   background: var(--panel);
   border: 1px solid var(--rule);
   border-left: 2px solid var(--signal);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 ol.action-list {
   margin: 12px 0 0;
-  padding-left: 20px;
+  padding-left: var(--s-4);
 }
 
 ol.action-list li {
   margin-bottom: 8px;
-  font-size: 13px;
+  font-size: var(--f-4);
 }
 
 ol.action-list li.destructive::marker {
@@ -3402,13 +3419,13 @@ ol.action-list li.destructive::marker {
 .action-why {
   display: block;
   margin-top: 2px;
-  font-size: 11.5px;
+  font-size: var(--f-2);
   color: var(--silk-faint);
 }
 
 .plan-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--s-2);
   flex-wrap: wrap;
   margin-top: 14px;
 }
@@ -3453,7 +3470,7 @@ ol.action-list li.destructive::marker {
   input[type='number'],
   textarea,
   select {
-    font-size: 16px;
+    font-size: var(--f-input);
   }
 
   /* A 24px chip is a miss more often than a hit. */
@@ -3461,8 +3478,8 @@ ol.action-list li.destructive::marker {
   .chip,
   button.chip {
     min-height: 40px;
-    padding-top: 9px;
-    padding-bottom: 9px;
+    padding-top: var(--s-2);
+    padding-bottom: var(--s-2);
   }
 
   button.icon-btn {
@@ -3501,12 +3518,12 @@ ol.action-list li.destructive::marker {
      target. */
   .knob {
     box-sizing: content-box;
-    padding: 10px;
+    padding: var(--s-2);
     margin: -10px;
   }
 
   button.dot-btn {
-    padding: 11px;
+    padding: var(--s-3);
   }
 
   button.cell-btn {
@@ -3532,7 +3549,7 @@ ol.action-list li.destructive::marker {
   }
 
   .device-strip {
-    gap: 9px;
+    gap: var(--s-2);
   }
 
   .strip-right {
@@ -3542,15 +3559,15 @@ ol.action-list li.destructive::marker {
 
   .knob-deck {
     justify-content: space-between;
-    gap: 12px;
-    padding: 14px;
+    gap: var(--s-3);
+    padding: var(--s-3);
   }
 
   .chain-strip {
     justify-content: flex-start;
     overflow-x: auto;
     flex-wrap: nowrap;
-    padding: 18px 14px 22px;
+    padding: var(--s-4) var(--s-3) var(--s-5);
     scrollbar-width: none;
   }
 
@@ -3564,7 +3581,7 @@ ol.action-list li.destructive::marker {
   }
 
   .tone.hero {
-    padding: 20px 16px 18px;
+    padding: var(--s-4) var(--s-4) var(--s-4);
   }
 
   .preview-head,
@@ -3654,22 +3671,22 @@ ol.action-list li.destructive::marker {
 
 .theme-toggle {
   display: inline-flex;
-  gap: 2px;
-  padding: 2px;
+  gap: var(--s-1);
+  padding: var(--s-1);
   background: var(--chassis);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 .theme-toggle button {
-  padding: 5px 9px;
-  font-size: 10px;
+  padding: var(--s-1) var(--s-2);
+  font-size: var(--f-1);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   font-family: var(--display);
   background: none;
   border: none;
-  border-radius: 2px;
+  border-radius: var(--r-1);
   color: var(--silk-faint);
   min-height: 0;
 }
@@ -3682,7 +3699,7 @@ ol.action-list li.destructive::marker {
 @media (pointer: coarse) {
   .theme-toggle button {
     min-height: 34px;
-    padding: 7px 11px;
+    padding: var(--s-2) var(--s-3);
   }
 }
 
@@ -3692,11 +3709,11 @@ ol.action-list li.destructive::marker {
    gets the position and the weight, and the manual controls sit below it. */
 .assistant {
   margin-top: 18px;
-  padding: 14px 16px 12px;
+  padding: var(--s-3) var(--s-4) var(--s-3);
   background: var(--panel);
   border: 1px solid var(--rule);
   border-left: 2px solid var(--live);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 .assistant-log {
@@ -3715,13 +3732,13 @@ ol.action-list li.destructive::marker {
 
 .turn-text {
   margin: 0;
-  font-size: 13.5px;
+  font-size: var(--f-4);
   line-height: 1.5;
 }
 
 /* The player's own words are set apart so a long exchange stays readable. */
 .turn-user .turn-text {
-  padding-left: 10px;
+  padding-left: var(--s-2);
   border-left: 2px solid var(--rule);
   color: var(--silk-dim);
 }
@@ -3733,25 +3750,25 @@ ol.action-list li.destructive::marker {
 .turn-actions,
 .turn-problems {
   margin: 6px 0 0;
-  padding-left: 14px;
+  padding-left: var(--s-3);
   list-style: none;
 }
 
 .turn-actions li {
-  font-size: 12px;
+  font-size: var(--f-3);
   color: var(--silk-dim);
   line-height: 1.7;
 }
 
 .turn-problems li {
-  font-size: 12px;
+  font-size: var(--f-3);
   line-height: 1.7;
 }
 
 .turn-confirm {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: var(--s-2);
   flex-wrap: wrap;
   margin-top: 9px;
 }
@@ -3784,15 +3801,15 @@ ol.action-list li.destructive::marker {
 .library-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 0;
+  gap: var(--s-2);
+  padding: var(--s-2) 0;
   border-bottom: 1px solid var(--rule);
 }
 
 .library-name {
   flex: 0 0 auto;
   font-family: var(--display);
-  font-size: 13px;
+  font-size: var(--f-4);
   letter-spacing: 0.03em;
 }
 
@@ -3804,7 +3821,7 @@ ol.action-list li.destructive::marker {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11.5px;
+  font-size: var(--f-2);
   color: var(--silk-dim);
 }
 
@@ -3821,7 +3838,7 @@ ol.action-list li.destructive::marker {
 
 /* A change made by hand: context in the transcript, not a spoken turn. */
 .turn-system .turn-text {
-  font-size: 12px;
+  font-size: var(--f-3);
   color: var(--silk-dim);
   font-style: italic;
 }
@@ -3864,11 +3881,11 @@ ol.action-list li.destructive::marker {
    keeps its line breaks. */
 .env-block {
   margin: 8px 0 12px;
-  padding: 10px 12px;
+  padding: var(--s-2) var(--s-3);
   background: var(--panel-deep, rgba(0, 0, 0, 0.18));
   border: 1px solid var(--rule);
-  border-radius: 3px;
-  font-size: 11.5px;
+  border-radius: var(--r-1);
+  font-size: var(--f-2);
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-all;
@@ -3893,7 +3910,7 @@ button.view-tab.gig-tab {
   z-index: 2;
   color: var(--live);
   background: var(--chassis);
-  padding-right: 18px;
+  padding-right: var(--s-4);
 }
 
 button.view-tab.gig-tab.current {
@@ -3916,8 +3933,8 @@ button.view-tab.gig-tab::after {
 
 @media (max-width: 620px) {
   button.view-tab.gig-tab {
-    font-size: 12px;
-    padding: 11px 16px 11px 2px;
+    font-size: var(--f-3);
+    padding: var(--s-3) var(--s-4) var(--s-3) var(--s-1);
   }
 }
 
@@ -3926,15 +3943,15 @@ button.view-tab.gig-tab::after {
 .section {
   margin-top: 14px;
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
   background: var(--panel);
 }
 
 .section-head {
   display: flex;
   align-items: baseline;
-  gap: 10px;
-  padding: 13px 15px;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
   cursor: pointer;
   list-style: none;
   user-select: none;
@@ -3955,7 +3972,7 @@ button.view-tab.gig-tab::after {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--f-3);
   color: var(--silk-faint);
 }
 
@@ -3983,7 +4000,7 @@ button.view-tab.gig-tab::after {
 }
 
 .section-body {
-  padding: 0 15px 16px;
+  padding: 0 var(--s-4) var(--s-4);
 }
 
 /* Panels inside a section already sit under its heading, so their own top
@@ -4078,7 +4095,7 @@ button.view-tab.gig-tab::after {
 .gig-blocks {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 8px;
+  gap: var(--s-2);
   margin-top: 18px;
 }
 
@@ -4087,18 +4104,18 @@ button.gig-block {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: var(--s-1);
   min-height: 62px;
-  padding: 12px 14px;
+  padding: var(--s-3) var(--s-3);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
   background: var(--panel);
   text-align: left;
 }
 
 .gig-block-name {
   font-family: var(--display);
-  font-size: 14px;
+  font-size: var(--f-4);
   font-weight: 600;
   letter-spacing: 0.03em;
   text-transform: uppercase;
@@ -4107,7 +4124,7 @@ button.gig-block {
 
 .gig-block-state {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: var(--f-2);
   letter-spacing: 0.08em;
   color: var(--silk-faint);
 }
@@ -4151,7 +4168,7 @@ button.gig-block:disabled {
    Quiet enough not to compete with the buttons, present enough to read. */
 .gig-note {
   margin-top: 14px;
-  font-size: 13px;
+  font-size: var(--f-4);
   line-height: 1.45;
   color: var(--silk-faint);
 }
@@ -4160,12 +4177,12 @@ button.gig-block:disabled {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: var(--s-2);
 }
 
 .gig-note-action button {
   min-height: 40px;
-  padding: 8px 16px;
+  padding: var(--s-2) var(--s-4);
 }
 
 /* ---------- saving ---------- */
@@ -4186,15 +4203,15 @@ button.gig-block:disabled {
 .save-cluster-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
 }
 
 /* Both targets are thumb-sized. These get pressed in a hurry. */
 .save-cluster button.save-now {
   min-height: 46px;
-  padding: 10px 18px;
+  padding: var(--s-2) var(--s-4);
   font-family: var(--display);
-  font-size: 13px;
+  font-size: var(--f-4);
   font-weight: 700;
   letter-spacing: 0.04em;
   background: var(--signal);
@@ -4213,8 +4230,8 @@ button.gig-block:disabled {
 
 .save-cluster button.save-options {
   min-height: 46px;
-  padding: 10px 14px;
-  font-size: 12.5px;
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--f-3);
 }
 
 /* Name, slot and the undo actions — an anchored menu under the buttons,
@@ -4229,19 +4246,19 @@ button.gig-block:disabled {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 10px;
+  gap: var(--s-2);
   width: min(380px, calc(100vw - 40px));
-  padding: 14px;
+  padding: var(--s-3);
   background: var(--panel);
   border: 1px solid var(--rule);
-  border-radius: 3px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  border-radius: var(--r-1);
+  box-shadow: var(--e-2);
 }
 
 .save-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--s-1);
   flex: 1 1 160px;
 }
 
@@ -4249,7 +4266,7 @@ button.gig-block:disabled {
   min-height: 44px;
   min-width: 0;
   width: 100%;
-  font-size: 16px; /* iOS zooms the page on focus at anything smaller */
+  font-size: var(--f-input); /* iOS zooms the page on focus at anything smaller */
 }
 
 .save-field-slot {
@@ -4258,7 +4275,7 @@ button.gig-block:disabled {
 
 .save-sheet-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--s-2);
   flex-wrap: wrap;
   flex: 1 1 100%;
 }
@@ -4266,14 +4283,14 @@ button.gig-block:disabled {
 .save-error {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--s-2);
   flex: 1 1 100%;
-  padding: 8px 12px;
-  font-size: 12.5px;
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--f-3);
   color: var(--silk);
   background: color-mix(in srgb, var(--fault, #b4453a) 18%, var(--panel));
   border: 1px solid color-mix(in srgb, var(--fault, #b4453a) 45%, var(--rule));
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 .save-error span {
@@ -4289,13 +4306,13 @@ button.gig-block:disabled {
   position: relative;
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: var(--s-2);
   flex-wrap: wrap;
   margin-top: 16px;
-  padding: 9px 13px;
+  padding: var(--s-2) var(--s-3);
   background: var(--panel);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 .status-line .lamp {
@@ -4314,12 +4331,12 @@ button.gig-block:disabled {
 .status-preset {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--s-2);
   min-width: 0;
 }
 
 .status-slot {
-  font-size: 12px;
+  font-size: var(--f-3);
   color: var(--silk-faint);
 }
 
@@ -4330,7 +4347,7 @@ button.gig-block:disabled {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--display);
-  font-size: 14px;
+  font-size: var(--f-4);
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--silk);
@@ -4338,11 +4355,11 @@ button.gig-block:disabled {
 
 .status-dirty {
   margin-left: auto;
-  padding: 2px 8px;
+  padding: var(--s-1) var(--s-2);
   border: 1px solid var(--live);
-  border-radius: 2px;
+  border-radius: var(--r-1);
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: var(--f-1);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--live);
@@ -4353,16 +4370,16 @@ button.gig-block:disabled {
 .update-notice {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--s-3);
   flex-wrap: wrap;
   margin-bottom: 14px;
-  padding: 10px 14px;
-  font-size: 13px;
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--f-4);
   line-height: 1.45;
   color: var(--silk);
   background: color-mix(in srgb, var(--live) 14%, var(--panel));
   border: 1px solid color-mix(in srgb, var(--live) 45%, var(--rule));
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 .update-notice span {
@@ -4382,10 +4399,10 @@ button.gig-block:disabled {
 button.phone-chip {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 4px 10px;
+  gap: var(--s-2);
+  padding: var(--s-1) var(--s-2);
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: var(--f-1);
   letter-spacing: 0.06em;
   background: none;
 }
@@ -4394,7 +4411,7 @@ button.phone-chip {
    fault colour, because a link with no host on it is not a working link and
    should not be dressed as one. */
 button.phone-chip.compact {
-  padding: 3px var(--s-2);
+  padding: var(--s-1) var(--s-2);
   font-size: var(--f-1);
   border-color: transparent;
 }
@@ -4425,11 +4442,11 @@ button.phone-chip.off {
   max-width: calc(100vw - 20px);
   z-index: 30;
   width: min(300px, calc(100vw - 40px));
-  padding: 12px 14px;
+  padding: var(--s-3) var(--s-3);
   background: var(--panel);
   border: 1px solid var(--rule);
-  border-radius: 3px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  border-radius: var(--r-1);
+  box-shadow: var(--e-2);
 }
 
 .phone-pop .hint {
@@ -4456,13 +4473,13 @@ button.phone-chip.off {
 
 .phone-pop-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--s-2);
   margin-top: 10px;
 }
 
 @media (max-width: 620px) {
   .status-name {
-    font-size: 13px;
+    font-size: var(--f-4);
   }
 
   .status-dirty {
@@ -4481,7 +4498,7 @@ button.phone-chip.off {
    than a floating panel that happens to be nearby. */
 .turn.turn-result {
   border-left: 2px solid var(--rule);
-  padding-left: 12px;
+  padding-left: var(--s-3);
   margin-top: 10px;
 }
 
@@ -4530,12 +4547,12 @@ button.gig-tuner-btn {
   display: block;
   width: 100%;
   margin-top: 16px;
-  padding: 13px;
+  padding: var(--s-3);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
   background: var(--panel);
   font-family: var(--display);
-  font-size: 13px;
+  font-size: var(--f-4);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -4551,7 +4568,7 @@ button.gig-tuner-btn.on {
    panel, the needle bar is thick enough to read at arm's length in the dark. */
 .gig-tuner .tuner-panel {
   margin-top: 10px;
-  padding: 22px 18px 18px;
+  padding: var(--s-5) var(--s-4) var(--s-4);
 }
 
 .gig-tuner .tuner-note .note {
@@ -4560,7 +4577,7 @@ button.gig-tuner-btn.on {
 }
 
 .gig-tuner .tuner-note .octave {
-  font-size: 20px;
+  font-size: var(--f-6);
 }
 
 .gig-tuner .tuner-bar {
@@ -4574,42 +4591,42 @@ button.gig-tuner-btn.on {
 
 .gig-tuner .tuner-cents {
   margin-top: 10px;
-  font-size: 14px;
+  font-size: var(--f-4);
 }
 
 /* ---------- find a control ---------- */
 
 .param-search input[type='search'] {
   width: 100%;
-  padding: 11px 13px;
+  padding: var(--s-3) var(--s-3);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
   background: var(--panel);
   color: var(--silk);
-  font-size: 16px; /* iOS zooms anything smaller on focus */
+  font-size: var(--f-input); /* iOS zooms anything smaller on focus */
 }
 
 .param-search-hits {
   margin-top: 8px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--s-1);
 }
 
 .param-search-hit {
   display: flex;
   align-items: baseline;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
   background: var(--panel);
   text-align: left;
 }
 
 .param-search-hit .hit-block {
   flex: 0 0 auto;
-  font-size: 11px;
+  font-size: var(--f-2);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--silk-faint);
@@ -4626,7 +4643,7 @@ button.gig-tuner-btn.on {
 
 .param-search-hit .hit-value {
   flex: 0 0 auto;
-  font-size: 12px;
+  font-size: var(--f-3);
   color: var(--silk-dim);
 }
 
@@ -4661,24 +4678,24 @@ button.gig-tuner-btn.on {
 .xy-pickers {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: var(--s-2);
 }
 
 .xy-pickers label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--s-1);
   min-width: 0;
 }
 
 .xy-pickers select {
   width: 100%;
-  padding: 10px;
+  padding: var(--s-2);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
   background: var(--panel);
   color: var(--silk);
-  font-size: 16px;
+  font-size: var(--f-input);
 }
 
 /* Square, edge to edge, and it owns every touch that starts on it — without
@@ -4688,7 +4705,7 @@ button.gig-tuner-btn.on {
   margin-top: 10px;
   aspect-ratio: 1;
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
   background:
     linear-gradient(var(--rule) 1px, transparent 1px) 0 0 / 100% 25%,
     linear-gradient(90deg, var(--rule) 1px, transparent 1px) 0 0 / 25% 100%,
@@ -4725,7 +4742,7 @@ button.gig-tuner-btn.on {
   position: absolute;
   width: 26px;
   height: 26px;
-  border-radius: 50%;
+  border-radius: 50%;;
   transform: translate(-50%, -50%);
   background: var(--signal);
   box-shadow: 0 0 14px color-mix(in srgb, var(--signal) 60%, transparent);
@@ -4735,9 +4752,9 @@ button.gig-tuner-btn.on {
 .xy-readout {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--s-3);
   margin-top: 8px;
-  font-size: 12px;
+  font-size: var(--f-3);
   color: var(--silk-dim);
 }
 
@@ -4745,16 +4762,16 @@ button.gig-tuner-btn.on {
 
 .inspect {
   margin-top: 12px;
-  padding: 12px 14px;
+  padding: var(--s-3) var(--s-3);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: var(--r-1);
   background: var(--panel);
 }
 
 .inspect-head {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: var(--s-2);
 }
 
 .inspect-head .chip {
@@ -4765,15 +4782,15 @@ button.gig-tuner-btn.on {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 8px 12px;
-  padding: 9px 0;
+  gap: var(--s-2) var(--s-3);
+  padding: var(--s-2) 0;
   border-top: 1px solid var(--rule);
   margin-top: 9px;
 }
 
 .inspect-slot {
   flex: 0 0 auto;
-  font-size: 12px;
+  font-size: var(--f-3);
   color: var(--silk-faint);
 }
 
@@ -4785,17 +4802,17 @@ button.gig-tuner-btn.on {
 
 .inspect-scenes {
   flex-basis: 100%;
-  font-size: 12px;
+  font-size: var(--f-3);
   color: var(--silk-dim);
 }
 
 .inspect-ok {
-  font-size: 11px;
+  font-size: var(--f-2);
   color: var(--silk-faint);
 }
 
 .inspect-bad {
-  font-size: 12px;
+  font-size: var(--f-3);
   color: var(--live);
 }
 
@@ -4859,7 +4876,7 @@ button.gig-tuner-btn.on {
   background: var(--panel);
   border: 1px solid var(--rule);
   border-bottom: 0;
-  border-radius: var(--r-3) var(--r-3) 0 0;
+  border-radius: var(--r-3) var(--r-3) 0 0;;
   box-shadow: var(--e-3);
   padding-bottom: env(safe-area-inset-bottom, 0px);
   /* Off the bottom until shown. translate3d, so it is composited rather than
@@ -4898,7 +4915,7 @@ button.gig-tuner-btn.on {
   width: 38px;
   height: 4px;
   margin-left: -19px;
-  border-radius: 2px;
+  border-radius: var(--r-1);
   background: var(--silk-faint);
   opacity: 0.55;
 }
@@ -4908,13 +4925,13 @@ button.gig-tuner-btn.on {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--s-1);
 }
 
 .sheet-title {
   font-family: var(--display);
   font-weight: 700;
-  font-size: var(--f-4);
+  font-size: var(--f-5);
   letter-spacing: 0.04em;
   color: var(--silk);
   white-space: nowrap;
@@ -4936,12 +4953,12 @@ button.sheet-close {
   height: 34px;
   display: grid;
   place-items: center;
-  font-size: var(--f-5);
+  font-size: var(--f-6);
   line-height: 1;
   color: var(--silk-dim);
   background: var(--panel-hi);
   border: 1px solid var(--rule);
-  border-radius: 50%;
+  border-radius: 50%;;
   cursor: pointer;
   transition: transform var(--t-1) var(--ease), color var(--t-1) var(--ease);
 }
@@ -4972,7 +4989,7 @@ button.sheet-close:active {
 .sheet .block-panel {
   background: none;
   border: 0;
-  border-radius: 0;
+  border-radius: 0;;
 }
 
 /* ---------- docked, on a wide screen ----------
@@ -4993,7 +5010,7 @@ button.sheet-close:active {
     height: 100%;
     border: 0;
     border-left: 1px solid var(--rule);
-    border-radius: 0;
+    border-radius: 0;;
     box-shadow: var(--e-2);
     /* Docked: it arrives from the side, and it never leaves under a drag. */
     transform: translate3d(100%, 0, 0);
@@ -5078,7 +5095,7 @@ button.sheet-close:active {
   color: var(--silk-dim);
   background: var(--signal-wash);
   border: 1px solid color-mix(in srgb, var(--signal) 40%, var(--rule));
-  border-radius: var(--r-1);
+  border-radius: var(--r-1);;
 }
 
 .undo-strip span {
@@ -5094,7 +5111,7 @@ button.sheet-close:active {
 .knob-cell.found {
   outline: 2px solid var(--signal);
   outline-offset: 3px;
-  border-radius: var(--r-1);
+  border-radius: var(--r-1);;
 }
 
 /* The row of things Shape opens rather than contains. */

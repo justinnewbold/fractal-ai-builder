@@ -947,6 +947,10 @@ console.log('\nstructure')
 const { run: structure } = await import('./structure.mjs')
 structure(test)
 
+console.log('\nthe dimensional system')
+const { run: styles } = await import('./styles.mjs')
+styles(test)
+
 test('both file kinds are listed and told apart', async () => {
   // A .syx goes back to the unit verbatim; a design re-validates first. Load
   // treating one as the other would either corrupt or silently no-op.
