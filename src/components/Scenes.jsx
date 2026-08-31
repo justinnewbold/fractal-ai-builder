@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
-import { getScene, setScene, setSceneName, setChannel, forgetSceneNames } from '../lib/forgefx'
+import { useState } from 'react'
+import { setSceneName, setChannel, forgetSceneNames } from '../lib/forgefx'
+import { useDevice, refreshScene, writeScene } from '../lib/deviceState'
 
 /**
  * Scenes and per-block channels.
@@ -12,6 +13,11 @@ import { getScene, setScene, setSceneName, setChannel, forgetSceneNames } from '
  * its settings, so an amp can carry a clean and a lead voicing without a second
  * block.
  */
+/* Hoisted: one function for the life of the module, so the store isn't re-read
+   on every notify. */
+const ofScene = (s) => s.sceneIndex
+const ofSceneNames = (s) => s.sceneNames
+
 export default function Scenes({
   blocks,
   preset,
@@ -25,32 +31,23 @@ export default function Scenes({
   // Not every Fractal unit has both. Rendering eight scene buttons for a device
   // that reports none would be inventing hardware.
   const channels = channelNames?.length ? channelNames : ['A', 'B', 'C', 'D']
-  const [current, setCurrent] = useState(null)
-  const [names, setNames] = useState([])
+  /*
+   * From the store, so this panel keeps up.
+   *
+   * It read the scene once at mount and never again. Change scene from the gig
+   * screen, the home list or a footswitch, and this panel went on highlighting
+   * whatever was live when it rendered — confidently, and wrong, until
+   * something remounted it.
+   */
+  const current = useDevice(ofScene)
+  const names = useDevice(ofSceneNames)
   const [renaming, setRenaming] = useState(null)
   const [draft, setDraft] = useState('')
 
-  const load = async () => {
-    try {
-      const res = await getScene()
-      setCurrent(typeof res?.index === 'number' ? res.index : null)
-      setNames(Array.isArray(res?.names) ? res.names : [])
-    } catch (err) {
-      onError(err.message)
-    }
-  }
-
-  useEffect(() => {
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   const jump = async (index) => {
     try {
-      await setScene(index)
-      setCurrent(index)
+      await writeScene(index)
       onChanged(`Switched to scene ${index + 1}`)
-      await load()
     } catch (err) {
       onError(err.message)
     }
@@ -66,7 +63,7 @@ export default function Scenes({
       // the old name outlives the thing it named.
       forgetSceneNames(preset?.number)
       onChanged(`Named scene ${index + 1} "${name}"`)
-      await load()
+      await refreshScene()
     } catch (err) {
       onError(err.message)
     }

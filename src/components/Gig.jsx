@@ -1,15 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { selectPreset, liveMeters } from '../lib/forgefx'
 import {
-  getScene,
-  setScene,
-  selectPreset,
-  liveMeters,
-  readSceneNames,
-  presetBlocks,
-  setBypass,
-  setTuner,
-  subscribeEvents
-} from '../lib/forgefx'
+  useDevice,
+  refreshBlocks as reReadChain,
+  refreshScene,
+  refreshSceneNames,
+  writeScene,
+  writeBypass,
+  writeTuner
+} from '../lib/deviceState'
 import { remoteActive } from '../lib/remote'
 import { EXCLUDED_BLOCKS } from '../lib/guardrails'
 import { blockColor } from '../lib/blockColors'
@@ -28,16 +27,38 @@ import XYPad from './XYPad'
  * Everything else in this app is deliberately absent. A generate button within
  * reach of a stage tap is a hazard.
  */
+/* Hoisted: a selector rebuilt each render re-reads the store on every notify. */
+const ofScene = (s) => s.sceneIndex
+const ofSceneNames = (s) => s.sceneNames
+const ofBlocks = (s) => s.blocks
+const ofTunerOn = (s) => s.tunerOn
+const ofTuning = (s) => s.tuning
+
 export default function Gig({ preset, device, capabilities, onError, onChanged }) {
-  const [scene, setSceneIndex] = useState(0)
-  const [names, setNames] = useState([])
+  /*
+   * A view over the one device state, not a second client to the unit.
+   *
+   * This screen used to keep its own scene, its own block list, its own tuner
+   * and its own subscription to the event stream — so two clients contended
+   * for a serial port that serialises every request, and a footswitch press
+   * arrived twice and was answered with two preset dumps.
+   */
+  const scene = useDevice(ofScene)
+  const names = useDevice(ofSceneNames)
+  const allBlocks = useDevice(ofBlocks)
+  const tunerOn = useDevice(ofTunerOn)
+  const tuning = useDevice(ofTuning)
+
+  // Input, output, looper and gate are not stage controls.
+  const blocks = useMemo(
+    () => allBlocks.filter((b) => b.slug && !EXCLUDED_BLOCKS.includes(b.slug)),
+    [allBlocks]
+  )
+
   const [meters, setMeters] = useState([])
   const [working, setWorking] = useState(false)
-  const [blocks, setBlocks] = useState([])
   const [toggling, setToggling] = useState(null)
-  const [tunerOn, setTunerOn] = useState(false)
   const [xyOn, setXyOn] = useState(false)
-  const [tuning, setTuning] = useState(null)
   /*
    * Whether readings are actually arriving while the tuner is on.
    *
@@ -70,42 +91,24 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
    */
   const refreshBlocks = async ({ quiet = false } = {}) => {
     if (!quiet) setChain('reading')
-    try {
-      const list = await presetBlocks()
-      const usable = (Array.isArray(list) ? list : []).filter(
-        (b) => b.slug && !EXCLUDED_BLOCKS.includes(b.slug)
-      )
-      setBlocks(usable)
-      setChain('ok')
-    } catch {
-      // A unit that won't report its chain still gets scenes and preset steps —
-      // but it says so rather than showing an empty row and letting you assume
-      // the preset is empty.
-      setBlocks([])
-      setChain('failed')
-    }
+    // The list lives in the store; what's local is whether the last read
+    // worked. A unit that won't report its chain still gets scenes and preset
+    // steps — but it says so rather than showing an empty row and letting you
+    // assume the preset is empty.
+    setChain((await reReadChain()) ? 'ok' : 'failed')
   }
 
   /*
-   * A scene changed by footswitch is still a scene change.
-   *
-   * On stage most switching happens on the floor, not in this app. Without
-   * this the buttons would show the states of whatever scene was last picked
-   * here, which is worse than showing nothing — it would look authoritative and
-   * be wrong.
+   * A scene changed by footswitch is still a scene change — and it is the store
+   * that hears it now, for every screen at once. What is left here is noting
+   * that a reading arrived, which is how this screen tells a running tuner from
+   * a silent one.
    */
   useEffect(() => {
-    const unsubscribe = subscribeEvents((event) => {
-      if (event?.type === 'scene' && typeof event.index === 'number') setSceneIndex(event.index)
-      if (event?.type === 'scene' || event?.type === 'changed') refreshBlocks({ quiet: true })
-      if (event?.type === 'tuner') {
-        lastTunerAt.current = Date.now()
-        setTunerStalled(false)
-        setTuning(event)
-      }
-    })
-    return unsubscribe
-  }, [])
+    if (!tuning) return
+    lastTunerAt.current = Date.now()
+    setTunerStalled(false)
+  }, [tuning])
 
   // Five seconds of a running tuner with no reading is not "play louder".
   useEffect(() => {
@@ -126,28 +129,17 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
   useEffect(() => {
     let stop = false
     ;(async () => {
-      try {
-        const res = await getScene()
-        if (!stop && typeof res?.index === 'number' && res.index >= 0) setSceneIndex(res.index)
-      } catch {
-        /* a unit without scenes just shows none */
-      }
-
+      await refreshScene()
       // Names aren't in the scene query on either device family — they live in
       // the preset body. On stage the name is the whole point of the button:
       // "Lead" is findable at a glance, "3" means remembering what 3 was.
-      try {
-        const found = await readSceneNames(preset?.number)
-        if (!stop) setNames(found)
-      } catch {
-        if (!stop) setNames([])
-      }
-
+      await refreshSceneNames(preset?.number)
       if (!stop) await refreshBlocks()
     })()
     return () => {
       stop = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset])
 
   /*
@@ -189,19 +181,16 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
    */
   const toggleTuner = async () => {
     const next = !tunerOn
-    setTunerOn(next)
-    if (!next) setTuning(null)
     try {
-      const res = await setTuner(next)
       // ForgeFX answers {ok:false} — not an error — when the attached unit has
-      // no tuner path in this build. Silence here looked exactly like a tuner
-      // that was warming up, forever.
+      // no tuner path in this build. The store turns the tuner back off for
+      // that answer; silence here looked exactly like a tuner that was warming
+      // up, forever.
+      const res = await writeTuner(next)
       if (next && res && res.ok === false) {
-        setTunerOn(false)
         onError('ForgeFX refused the tuner for this unit — its build may predate tuner support for it.')
       }
     } catch (err) {
-      setTunerOn(!next)
       onError(err.message)
     }
   }
@@ -212,15 +201,21 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
    * shrug as the toggle itself.
    */
   useEffect(() => {
-    if (!tunerOn) return
-    return () => setTuner(false).catch(() => {})
+    if (!tunerOn) return undefined
+    // Through the store, so the shared tunerOn goes down with it. Turning the
+    // unit's tuner off while the store still believed it was on left the top
+    // bar's tuner button lit for a tuner nobody could see.
+    return () => {
+      writeTuner(false).catch(() => {})
+    }
   }, [tunerOn])
 
   const pickScene = async (index) => {
     haptic()
-    setSceneIndex(index) // optimistic: the footswitch feel matters more than the round trip
     try {
-      await setScene(index)
+      // Optimistic inside the store: the footswitch feel matters more than the
+      // round trip, and a refusal puts the old scene back.
+      await writeScene(index)
       // The new scene brings its own on/off states with it.
       await refreshBlocks()
     } catch (err) {
@@ -240,9 +235,8 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
     const eid = block.effectId
     const wanted = !block.bypassed
     setToggling(eid)
-    setBlocks((prev) => prev.map((b) => (b.effectId === eid ? { ...b, bypassed: wanted } : b)))
     try {
-      await setBypass(eid, wanted)
+      await writeBypass(eid, wanted)
       await refreshBlocks()
     } catch (err) {
       onError(err.message)

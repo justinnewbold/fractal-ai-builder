@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import TopBar from './components/TopBar'
 import Grid from './components/Grid'
 import { Preview } from './components/Generate'
@@ -23,6 +23,22 @@ import LocalLibrary from './components/LocalLibrary'
 import Remote from './components/Remote'
 import Section from './components/Section'
 import Sheet from './components/Sheet'
+import {
+  attachDriver,
+  listen as listenToDevice,
+  useDevice,
+  put as putDevice,
+  getSnapshot as deviceSnapshot,
+  refreshBlocks,
+  refreshScene,
+  refreshSceneNames,
+  refreshTempo,
+  tapBeat,
+  writeScene,
+  writeTempo,
+  writeBypass,
+  writeTuner
+} from './lib/deviceState'
 import SectionStack from './components/SectionStack'
 import ParamSearch from './components/ParamSearch'
 import Host from './components/Host'
@@ -106,6 +122,36 @@ import { blockCatalog } from './lib/forgefx'
  * reshaping the sound. Below it you know what you asked for; above it you want
  * to read the list first.
  */
+/*
+ * What the device store is allowed to do to the unit.
+ *
+ * Handed over rather than imported by the store, so the store stays a pure
+ * module that node can load and the whole optimistic-write path is testable
+ * without a browser. Done once, at module scope: there is one unit.
+ */
+attachDriver({
+  subscribeEvents,
+  presetBlocks,
+  getScene,
+  setScene,
+  getTempo,
+  setTempo,
+  tapTempo,
+  setBypass,
+  setTuner,
+  readSceneNames
+})
+
+/* Hoisted so each is one function for the life of the module: a selector
+   rebuilt every render makes useSyncExternalStore re-read on every notify. */
+const ofPreset = (s) => s.preset
+const ofBlocks = (s) => s.blocks
+const ofScene = (s) => s.sceneIndex
+const ofSceneNames = (s) => s.sceneNames
+const ofBpm = (s) => s.bpm
+const ofTunerOn = (s) => s.tunerOn
+const ofTuning = (s) => s.tuning
+
 const PREVIEW_ABOVE = 4
 
 /**
@@ -152,8 +198,17 @@ const HAND_EDIT_KINDS = new Set([
 export default function App() {
   const [status, setStatus] = useState('idle')
   const [device, setDevice] = useState(null)
-  const [preset, setPreset] = useState(null)
-  const [blocks, setBlocks] = useState([])
+  /*
+   * The unit's own state comes from the store, not from here.
+   *
+   * These used to be App's useStates, and Gig kept a second copy of four of
+   * them with its own event subscription — two clients contending for one
+   * serial port, and two answers to "which scene is live". The setters below
+   * keep their old names so every call site reads the same; what changed is
+   * where the value lives.
+   */
+  const preset = useDevice(ofPreset)
+  const blocks = useDevice(ofBlocks)
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
 
@@ -217,13 +272,27 @@ export default function App() {
   const [blockOpen, setBlockOpen] = useState(false)
   const [slots, setSlots] = useState([])
   const [scanning, setScanning] = useState(false)
-  const [scene, setSceneIdx] = useState(0)
-  const [sceneNames, setSceneNames] = useState([])
-  const [bpm, setBpm] = useState(null)
+  const scene = useDevice(ofScene)
+  const sceneNames = useDevice(ofSceneNames)
+  const bpm = useDevice(ofBpm)
   // One tempo read per burst of taps, not one per tap.
   const tapReadback = useRef(null)
-  const [tunerOn, setTunerOn] = useState(false)
-  const [tuning, setTuning] = useState(null)
+  const tunerOn = useDevice(ofTunerOn)
+  const tuning = useDevice(ofTuning)
+
+  /*
+   * Setter-shaped writers over the store, for the two facts App still reads
+   * and writes directly. Scene, tempo and the tuner have proper writers on the
+   * store — optimistic, confirmed, rolled back on refusal — and no longer need
+   * one of these; when the preset and the chain get theirs, these go too.
+   */
+  const into = useCallback((field) => (next) => {
+    putDevice({
+      [field]: typeof next === 'function' ? next(deviceSnapshot()[field]) : next
+    })
+  }, [])
+  const setPreset = useMemo(() => into('preset'), [into])
+  const setBlocks = useMemo(() => into('blocks'), [into])
   const [editorFocus, setEditorFocus] = useState(null)
   const [scanProgress, setScanProgress] = useState(null)
   const stopScan = useRef(false)
@@ -271,16 +340,12 @@ export default function App() {
    */
   const toggleBlock = async (block) => {
     const wanted = !block.bypassed
-    const flip = (to) =>
-      setBlocks((prev) =>
-        prev.map((b) => (b.effectId === block.effectId ? { ...b, bypassed: to } : b))
-      )
-    flip(wanted)
     try {
-      await setBypass(block.effectId, wanted)
+      // Optimistic-then-roll-back, in the store, where every write does it the
+      // same way — rather than hand-rolled once per call site.
+      await writeBypass(block.effectId, wanted)
       record('edit', `${block.name || block.slug} ${wanted ? 'bypassed' : 'engaged'}`)
     } catch (err) {
-      flip(!wanted)
       setError(err.message)
     }
   }
@@ -316,15 +381,12 @@ export default function App() {
 
       // The active index is a cheap query; the names require decoding the
       // preset body, so they're fetched separately and only when the preset
-      // changes rather than on every refresh.
-      getScene()
-        .then((sc) => typeof sc?.index === 'number' && sc.index >= 0 && setSceneIdx(sc.index))
-        .catch(() => {})
+      // changes rather than on every refresh. Both land in the store, so the
+      // gig screen and the scene panel get them without asking again.
+      refreshScene()
 
       if (typeof p?.number === 'number') {
-        readSceneNames(p.number)
-          .then((names) => setSceneNames(names))
-          .catch(() => setSceneNames([]))
+        refreshSceneNames(p.number)
 
         /*
          * A name a phone couldn't write, written now.
@@ -354,9 +416,7 @@ export default function App() {
         }
       }
 
-      getTempo()
-        .then((t) => typeof t?.bpm === 'number' && setBpm(t.bpm))
-        .catch(() => {})
+      refreshTempo()
 
       // Read off the attached unit rather than from committed data. An AM4
       // offers a different roster from an FM3 — 250 amp models against 331, one
@@ -542,19 +602,19 @@ export default function App() {
     // let that read overwrite the suggestion before it could be saved.
   }, [preset?.number])
 
-  // The tuner pushes readings over SSE rather than answering requests, so the
-  // subscription is what makes the button do anything visible.
+  /*
+   * The one subscription to the unit's event stream.
+   *
+   * There used to be two — this one, opened only while the tuner was on, and
+   * Gig's, opened always. A footswitch scene change therefore arrived twice and
+   * each listener answered it by re-reading the block list down a port that
+   * serialises every request. The store owns it now, and every surface reads
+   * the result, so a scene changed on the floor moves all of them.
+   */
   useEffect(() => {
-    if (!tunerOn || status !== 'live') return
-    const unsubscribe = subscribeEvents((event) => {
-      if (event?.type === 'tuner' || event?.note !== undefined) setTuning(event)
-      if (event?.type === 'tempo' && typeof event.bpm === 'number') setBpm(event.bpm)
-    })
-    return () => {
-      unsubscribe()
-      setTuning(null)
-    }
-  }, [tunerOn, status])
+    if (status !== 'live') return undefined
+    return listenToDevice()
+  }, [status])
 
   /** One path to the model, so generate, refine and compare can't drift apart. */
   const requestSpec = async (schema, description, previous) => {
@@ -1057,7 +1117,9 @@ export default function App() {
         if (runCost !== null) setSpend((p) => ({ total: p.total + runCost, runs: p.runs + 1 }))
       }
 
-      await setScene(0)
+      // Through the store, so every surface follows the return to scene 1
+      // rather than showing whichever scene the comparison left behind.
+      await writeScene(0)
       setCompare({ done: true, a: takes[0], b: takes[1] })
       record('compare', `Built two takes of "${description}" on channels A and B`, takes)
       await read()
@@ -1852,8 +1914,7 @@ export default function App() {
                 className={`strip-btn ${tunerOn ? 'armed' : ''}`}
                 onClick={async () => {
                   try {
-                    await setTuner(!tunerOn)
-                    setTunerOn(!tunerOn)
+                    await writeTuner(!tunerOn)
                   } catch (err) {
                     setError(err.message)
                   }
@@ -1868,7 +1929,7 @@ export default function App() {
                   // registered, at tap time, not at network time.
                   beatFlash(e.currentTarget)
                   try {
-                    await tapTempo()
+                    await tapBeat()
                     /*
                      * The device computes the tempo from the spacing of the
                      * taps, and /tempo/tap answers only {ok} — the new value
@@ -1877,14 +1938,7 @@ export default function App() {
                      * flicker through half-computed tempos mid-burst.
                      */
                     clearTimeout(tapReadback.current)
-                    tapReadback.current = setTimeout(async () => {
-                      try {
-                        const t = await getTempo()
-                        if (typeof t?.bpm === 'number') setBpm(t.bpm)
-                      } catch {
-                        /* the box keeps its last known value */
-                      }
-                    }, 700)
+                    tapReadback.current = setTimeout(refreshTempo, 700)
                   } catch (err) {
                     setError(err.message)
                   }
@@ -1897,8 +1951,7 @@ export default function App() {
                   bpm={bpm}
                   onSet={async (n) => {
                     try {
-                      await setTempo(n)
-                      setBpm(n)
+                      await writeTempo(n)
                       record('tempo', `Tempo → ${n} BPM`)
                     } catch (err) {
                       setError(err.message)
@@ -2007,9 +2060,8 @@ export default function App() {
                         key={i}
                         className={`scene-line ${i === scene ? 'current' : ''}`}
                         onClick={async () => {
-                          setSceneIdx(i)
                           try {
-                            await setScene(i)
+                            await writeScene(i)
                           } catch (err) {
                             setError(err.message)
                           }
