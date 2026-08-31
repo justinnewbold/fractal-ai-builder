@@ -1,15 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { beatFlash } from '../lib/feedback'
+import { modifierModel, bindModifier, sceneState, blockParams } from '../lib/forgefx'
 import {
-  modifierModel,
-  bindModifier,
-  sceneState,
-  getTempo,
-  setTempo,
-  tapTempo,
-  setTuner,
-  blockParams
-} from '../lib/forgefx'
+  useDevice,
+  refreshTempo,
+  tapBeat,
+  writeTempo,
+  writeTuner
+} from '../lib/deviceState'
+
+/* Hoisted: one function for the life of the module, so useSyncExternalStore
+   isn't re-reading the store on every notify. */
+const ofScene = (s) => s.sceneIndex
+const ofBpm = (s) => s.bpm
+const ofTunerOn = (s) => s.tunerOn
 import { isSilencingParam } from '../lib/guardrails'
 
 /**
@@ -221,6 +225,8 @@ export function SceneMatrix({ blocks, count = 8, names = [], onError, onChanged,
     }
   }
 
+  const live = useDevice(ofScene)
+
   const stateFor = (sceneIndex, eid) =>
     scenes?.find((s) => s.index === sceneIndex)?.blocks.find((b) => b.effectId === eid)
 
@@ -249,8 +255,14 @@ export function SceneMatrix({ blocks, count = 8, names = [], onError, onChanged,
               <thead>
                 <tr>
                   <th className="silk-label">Block</th>
+                  {/* Which column you are actually standing in. Eight numbered
+                      columns with no live one is a map with no "you are here". */}
                   {scenes.map((s) => (
-                    <th key={s.index} className="silk-label" title={names[s.index] || ''}>
+                    <th
+                      key={s.index}
+                      className={`silk-label ${s.index === live ? 'current' : ''}`}
+                      title={names[s.index] || ''}
+                    >
                       {s.index + 1}
                     </th>
                   ))}
@@ -298,34 +310,29 @@ export function SceneMatrix({ blocks, count = 8, names = [], onError, onChanged,
 
 /** Tempo and tuner — the two things that are always needed and never designed. */
 export function TempoTuner({ onError, onChanged, busy }) {
-  const [bpm, setBpm] = useState(null)
+  /*
+   * The third copy of the tempo and the third owner of the tuner, until this
+   * panel is folded away entirely. While it exists it reads the shared state,
+   * so it can no longer say the tuner is off while the bar above says it's on.
+   */
+  const bpm = useDevice(ofBpm)
+  const tuner = useDevice(ofTunerOn)
   const [draft, setDraft] = useState('')
-  const [tuner, setTunerOn] = useState(false)
 
   useEffect(() => {
-    let stop = false
-    ;(async () => {
-      try {
-        const res = await getTempo()
-        if (!stop && typeof res?.bpm === 'number') {
-          setBpm(res.bpm)
-          setDraft(String(res.bpm))
-        }
-      } catch {
-        /* unsupported on this unit */
-      }
-    })()
-    return () => {
-      stop = true
-    }
+    refreshTempo()
   }, [])
+
+  // The box follows the device unless it is being typed in.
+  useEffect(() => {
+    if (typeof bpm === 'number') setDraft((d) => (d === '' ? String(bpm) : d))
+  }, [bpm])
 
   const commit = async () => {
     const value = Number(draft)
     if (!Number.isFinite(value) || value < 20 || value > 400) return
     try {
-      await setTempo(value)
-      setBpm(value)
+      await writeTempo(value)
       onChanged(`Tempo set to ${value} BPM`)
     } catch (err) {
       onError(err.message)
@@ -338,18 +345,12 @@ export function TempoTuner({ onError, onChanged, busy }) {
   const tap = async (e) => {
     beatFlash(e.currentTarget)
     try {
-      await tapTempo()
+      // The tap goes now; only the read-back waits for the burst to finish.
+      await tapBeat()
       clearTimeout(tapReadback.current)
       tapReadback.current = setTimeout(async () => {
-        try {
-          const res = await getTempo()
-          if (typeof res?.bpm === 'number') {
-            setBpm(res.bpm)
-            setDraft(String(res.bpm))
-          }
-        } catch {
-          /* keep the last known value */
-        }
+        await refreshTempo()
+        setDraft('')
       }, 700)
     } catch (err) {
       onError(err.message)
@@ -358,8 +359,7 @@ export function TempoTuner({ onError, onChanged, busy }) {
 
   const toggleTuner = async () => {
     try {
-      await setTuner(!tuner)
-      setTunerOn(!tuner)
+      await writeTuner(!tuner)
     } catch (err) {
       onError(err.message)
     }

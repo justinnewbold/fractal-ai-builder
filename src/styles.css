@@ -5053,3 +5053,10 @@ button.sheet-close:active {
     transition: opacity var(--t-1) linear !important;
   }
 }
+
+/* The scene you are actually in, in the scene map. Eight numbered columns with
+   no live one is a map with no "you are here". */
+.matrix th.current {
+  color: var(--signal);
+  border-bottom: 2px solid var(--signal);
+}

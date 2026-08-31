@@ -20,16 +20,50 @@ import {
 } from '../src/lib/schemaCache.js'
 
 let passed = 0
+
+/*
+ * Async tests are awaited, not fired and forgotten.
+ *
+ * This used to call fn() and count the test passed on the spot. A test written
+ * `async () => {…}` therefore returned a promise nobody held: a failed
+ * assertion inside one became an unhandled rejection, which node turns into a
+ * crash — so instead of one FAIL line you got a stack trace, no tally, and
+ * every test after it never ran at all.
+ */
+let queue = Promise.resolve()
 const test = (name, fn) => {
-  try {
-    fn()
+  const ok = () => {
     passed++
     console.log(`  ok  ${name}`)
-  } catch (err) {
+  }
+  const bad = (err) => {
     console.error(`FAIL  ${name}\n      ${err.message}`)
     process.exitCode = 1
   }
+
+  /*
+   * An async test is queued behind the ones before it, not started alongside
+   * them. Awaiting a set of already-running promises is not the same as
+   * running them in order: the device-state tests share one module-level
+   * store, so concurrent bodies reset it out from under each other and the
+   * failure looks like a bug in the code under test rather than in the runner.
+   */
+  if (fn.constructor?.name === 'AsyncFunction') {
+    queue = queue.then(fn).then(ok, bad)
+    return
+  }
+
+  try {
+    const out = fn()
+    if (out && typeof out.then === 'function') queue = queue.then(() => out).then(ok, bad)
+    else ok()
+  } catch (err) {
+    bad(err)
+  }
 }
+
+/** Every queued test, settled, before anything counts the score. */
+const settle = () => queue
 
 const close = (a, b, tol = 0.0005) =>
   assert.ok(Math.abs(a - b) <= tol, `expected ${b}, got ${a}`)
@@ -1066,4 +1100,170 @@ test('pointer positions clamp to the pad and up means more', async () => {
   assert.deepEqual(padFraction(-50, 999, rect), { x: 0, y: 0 })
 })
 
+console.log('\ndevice state')
+
+/*
+ * The store is a pure module on purpose — it takes its device functions rather
+ * than importing them — so the whole write path is exercisable here, with no
+ * hardware, no browser and no mock. These are the cases that cost real
+ * evenings: an optimistic write that never rolls back, and an echo that fights
+ * the write that caused it.
+ */
+const ds = await import('../src/lib/deviceState.js')
+
+/** A fake unit: records what it was told, and can be made to refuse. */
+function fakeUnit(overrides = {}) {
+  const calls = []
+  const record = (name) => (...args) => {
+    calls.push([name, ...args])
+    return Promise.resolve({ ok: true })
+  }
+  return {
+    calls,
+    setScene: record('setScene'),
+    setTempo: record('setTempo'),
+    setBypass: record('setBypass'),
+    setTuner: record('setTuner'),
+    presetBlocks: () => Promise.resolve([]),
+    getScene: () => Promise.resolve({ index: 0, names: [] }),
+    ...overrides
+  }
+}
+
+const fresh = (unit) => {
+  ds.reset()
+  ds.attachDriver(unit)
+  return unit
+}
+
+test('a snapshot that did not change is the same snapshot', () => {
+  fresh(fakeUnit())
+  const before = ds.getSnapshot()
+  assert.equal(ds.set({ bpm: null }), false, 'setting a field to what it already is reported a change')
+  assert.equal(ds.getSnapshot(), before, 'an unchanged store handed back a new object')
+  assert.equal(ds.set({ bpm: 120 }), true)
+  assert.notEqual(ds.getSnapshot(), before)
+})
+
+test('subscribers hear a real change and only a real change', () => {
+  fresh(fakeUnit())
+  let heard = 0
+  const off = ds.subscribe(() => heard++)
+  ds.set({ bpm: 140 })
+  ds.set({ bpm: 140 })
+  assert.equal(heard, 1, 'an idempotent set woke every listener')
+  off()
+  ds.set({ bpm: 90 })
+  assert.equal(heard, 1, 'a listener kept being called after unsubscribing')
+})
+
+test('a scene write shows immediately and reaches the device', async () => {
+  const unit = fresh(fakeUnit())
+  const done = ds.writeScene(3)
+  assert.equal(ds.getSnapshot().sceneIndex, 3, 'the scene did not move until the device answered')
+  await done
+  assert.deepEqual(unit.calls, [['setScene', 3]])
+})
+
+test('a refused write rolls back to what was on screen before it', async () => {
+  fresh(fakeUnit({ setScene: () => Promise.reject(new Error('port busy')) }))
+  ds.set({ sceneIndex: 2 })
+  await assert.rejects(() => ds.writeScene(5), /port busy/)
+  assert.equal(ds.getSnapshot().sceneIndex, 2, 'a refusal left the optimistic value on screen')
+})
+
+test('a refused bypass restores the whole chain, not a rebuilt one', async () => {
+  fresh(fakeUnit({ setBypass: () => Promise.reject(new Error('nope')) }))
+  const chain = [
+    { effectId: 1, bypassed: false },
+    { effectId: 2, bypassed: false }
+  ]
+  ds.set({ blocks: chain })
+  await assert.rejects(() => ds.writeBypass(1, true), /nope/)
+  assert.equal(ds.getSnapshot().blocks, chain, 'the chain came back as a copy, not the array it was')
+})
+
+test("the device's echo of a local write does not fight it", () => {
+  fresh(fakeUnit())
+  ds.markLocal('sceneIndex', 4)
+  ds.set({ sceneIndex: 4 })
+  // The unit reports the scene it just changed to. Acting on it is harmless
+  // here, but the same echo arriving for a value already superseded is what
+  // makes a button flicker back through the old scene.
+  ds.handleEvent({ type: 'scene', index: 4 })
+  assert.equal(ds.getSnapshot().sceneIndex, 4)
+})
+
+test('a footswitch press is followed, an echo is not', () => {
+  fresh(fakeUnit())
+  ds.markLocal('sceneIndex', 1)
+  ds.set({ sceneIndex: 1 })
+  // Someone moves on to scene 6 in the app before the echo for 1 arrives.
+  ds.set({ sceneIndex: 6 })
+  ds.handleEvent({ type: 'scene', index: 1 })
+  assert.equal(ds.getSnapshot().sceneIndex, 6, 'a stale echo dragged the screen back')
+  // A genuine press on the floor is a different fact and must be followed.
+  ds.handleEvent({ type: 'scene', index: 2 })
+  assert.equal(ds.getSnapshot().sceneIndex, 2, 'a real footswitch press was ignored')
+})
+
+test('the guard is spent by one echo and expires on its own', () => {
+  fresh(fakeUnit())
+  ds.markLocal('sceneIndex', 7, 1000)
+  assert.equal(ds.isEcho('sceneIndex', 7, 1100), true)
+  assert.equal(ds.isEcho('sceneIndex', 7, 1150), false, 'one write silenced two echoes')
+
+  // An echo that never arrives must not leave the guard armed against a press
+  // a minute later.
+  ds.markLocal('sceneIndex', 8, 2000)
+  assert.equal(ds.isEcho('sceneIndex', 8, 2000 + ds.ECHO_MS + 1), false)
+})
+
+test('a chain read that fails says so and keeps the last chain', async () => {
+  fresh(fakeUnit({ presetBlocks: () => Promise.reject(new Error('timeout')) }))
+  const chain = [{ effectId: 1, slug: 'amp' }]
+  ds.set({ blocks: chain })
+  assert.equal(await ds.refreshBlocks(), null, 'a failed read reported success')
+  assert.equal(ds.getSnapshot().blocks, chain, 'a failed read emptied the chain on screen')
+})
+
+test('a reading with the tuner off is not a reading', () => {
+  fresh(fakeUnit())
+  ds.handleEvent({ type: 'tuner', note: 'E', cents: 3 })
+  assert.equal(ds.getSnapshot().tuning, null, 'a reading landed with no tuner open')
+  ds.set({ tunerOn: true })
+  ds.handleEvent({ type: 'tuner', note: 'E', cents: 3 })
+  assert.equal(ds.getSnapshot().tuning?.note, 'E')
+})
+
+test('a tuner the unit cannot run turns itself back off', async () => {
+  fresh(fakeUnit({ setTuner: () => Promise.resolve({ ok: false }) }))
+  await ds.writeTuner(true)
+  assert.equal(ds.getSnapshot().tunerOn, false, 'a refused tuner stayed lit, waiting forever')
+})
+
+test('there is one event subscription, however many times it is asked for', () => {
+  let bound = 0
+  let unbound = 0
+  fresh(
+    fakeUnit({
+      subscribeEvents: () => {
+        bound++
+        return () => unbound++
+      }
+    })
+  )
+  ds.listen()
+  ds.listen()
+  ds.listen()
+  assert.equal(bound, 1, 'the store subscribed to the event stream more than once')
+  assert.equal(ds.isListening(), true)
+  ds.stopListening()
+  assert.equal(unbound, 1)
+  assert.equal(ds.isListening(), false)
+})
+
+ds.reset()
+
+await settle()
 console.log(`\n${passed} passed\n`)

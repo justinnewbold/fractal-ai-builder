@@ -397,6 +397,67 @@ export function run(test) {
     assert.equal((src.match(/<Section /g) || []).length, (src.match(/<\/Section>/g) || []).length)
   })
 
+  test('one device, one copy of its state, one subscription', () => {
+    /*
+     * Gig was not a view over App's state — it was a second client to the same
+     * unit, with its own blocks, its own scene, its own tuner and its own
+     * subscription to the event stream. Two listeners meant a footswitch press
+     * arrived twice and each answered it by re-reading the block list down a
+     * port that serialises every request. Scenes read the scene once at mount
+     * and was then confidently wrong for the rest of its life.
+     *
+     * The store owns it. Anything that opens its own subscription, or keeps its
+     * own copy of a device fact, is that bug growing back.
+     */
+    const dir = new URL('../src/', import.meta.url)
+    const files = {}
+    const walk = (at, prefix = '') => {
+      for (const entry of readdirSync(at, { withFileTypes: true })) {
+        const next = new URL(entry.name + (entry.isDirectory() ? '/' : ''), at)
+        if (entry.isDirectory()) walk(next, prefix + entry.name + '/')
+        else if (/\.jsx?$/.test(entry.name)) files[prefix + entry.name] = readFileSync(next, 'utf8')
+      }
+    }
+    walk(dir)
+
+    // Where the subscription may be named at all: the client that defines it,
+    // the store that owns it, and the one line in App that hands it over.
+    const subscribers = Object.entries(files)
+      .filter(([name]) => name !== 'lib/forgefx.js' && name !== 'lib/deviceState.js')
+      .filter(([, body]) => /subscribeEvents\s*\(/.test(body))
+      .map(([name]) => name)
+    assert.deepEqual(subscribers, [], `${subscribers.join(', ')} subscribes to device events directly`)
+
+    const store = files['lib/deviceState.js']
+    assert.ok(store, 'the device store is gone')
+    assert.equal(
+      (store.match(/driver\.subscribeEvents\(/g) || []).length,
+      1,
+      'the store subscribes to the event stream more than once'
+    )
+
+    // The store must stay loadable by node: it is the only place the write
+    // path — optimistic set, confirm, roll back — is actually tested, and one
+    // import of the device client would pull in JSON that node cannot load.
+    assert.ok(
+      !/from '\.\/forgefx/.test(store),
+      'the device store imports the device client, so it can no longer be tested'
+    )
+
+    // Nobody keeps a private second copy of a fact the store owns.
+    const owned = [
+      ['sceneNames', /useState\(\s*\[\s*\]\s*\)[^\n]*\/\/\s*scene names/i],
+      ['tunerOn', /const \[\s*tunerOn\s*,/],
+      ['tuning', /const \[\s*tuning\s*,/]
+    ]
+    for (const [fact, pattern] of owned) {
+      for (const [name, body] of Object.entries(files)) {
+        if (name === 'lib/deviceState.js') continue
+        assert.ok(!pattern.test(body), `${name} keeps its own ${fact}; the store owns it`)
+      }
+    }
+  })
+
   test('the app reads the fields the device actually sends', () => {
     /*
      * The most expensive class of bug this codebase has, because it is
