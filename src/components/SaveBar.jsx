@@ -9,9 +9,8 @@ import { remoteActive } from '../lib/remote'
  * believed something had changed — out of sight and intermittent. Then it was
  * a bar pinned to the bottom of the viewport — always findable, but a
  * permanent floater eating a strip of every screen, which on a phone is a
- * strip you feel. Now it's a fixed point that costs nothing: the header, top
- * right, same place every time, with the StatusLine still carrying the
- * "Unsaved" flag on every screen for the scrolled-away case.
+ * strip you feel. Now it rides in the top bar, same place every time, with the
+ * bar itself carrying the "Unsaved" flag for the scrolled-away case.
  *
  * Options — name, slot, revert, the pre-edit copy — drop down from their own
  * button as an anchored menu, because the common save is to the slot already
@@ -21,6 +20,7 @@ export default function SaveBar({
   preset,
   dirty,
   busy,
+  compact,
   saveName,
   onName,
   slot,
@@ -54,18 +54,35 @@ export default function SaveBar({
   return (
     <div className="save-cluster">
       <div className="save-cluster-row">
-        {/* Unsaved gets the lit dot; the StatusLine says the word. */}
+        {/* Unsaved gets the lit dot; the bar around it says the word. */}
         {dirty ? <span className="lamp" data-state="live" title="Unsaved changes" /> : null}
 
         <button
-          className="save-options"
+          className={`save-options ${compact ? 'compact' : ''}`}
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-label="Name, slot and revert"
         >
-          {open ? 'Close' : 'Options'}
+          {/* A width, not a device: the same button reads "Options" where there
+              is room for the word and "⋯" where the preset name would pay for
+              it. Both are rendered; the stylesheet picks. */}
+          {compact ? (
+            <>
+              <span className="at-width">{open ? 'Close' : 'Options'}</span>
+              <span className="at-thumb" aria-hidden="true">
+                {open ? '×' : '⋯'}
+              </span>
+            </>
+          ) : open ? (
+            'Close'
+          ) : (
+            'Options'
+          )}
         </button>
 
+        {/* In the bar the label is a label, not a sentence: on a 390px screen
+            "Save at the Mac · 500" is most of the row. The slot is the fact
+            worth keeping — it's the one that can be wrong. */}
         {remote ? (
           <button
             className="save-now"
@@ -73,11 +90,17 @@ export default function SaveBar({
             disabled={busy || !!queued}
             title="The page at your Mac does the writing"
           >
-            {queued ? 'Waiting for the Mac…' : `Save at the Mac · ${targetLabel}`}
+            {queued
+              ? compact
+                ? 'Waiting…'
+                : 'Waiting for the Mac…'
+              : compact
+                ? `Mac · ${targetLabel}`
+                : `Save at the Mac · ${targetLabel}`}
           </button>
         ) : (
           <button className="save-now" onClick={onSave} disabled={busy}>
-            {busy ? 'Saving…' : `Save to slot ${targetLabel}`}
+            {busy ? 'Saving…' : compact ? `Save · ${targetLabel}` : `Save to slot ${targetLabel}`}
           </button>
         )}
       </div>

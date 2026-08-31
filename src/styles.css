@@ -22,8 +22,82 @@
   --fault: #e0684f;
   --ok: #63c68c; /* the green of a connection that is up, in words */
 
+  /*
+   * Surfaces and washes derived from the four above.
+   *
+   * These lived only inside [data-theme='light'] and were used unconditionally,
+   * which meant the DEFAULT theme quietly lost twelve rules: the current preset
+   * row had no highlight, all three lamps lost their halo, the knob face fell
+   * back to black, two panels lost their gradient, and amber buttons drew
+   * near-white text on a bright amber ground. Nobody had seen the dark theme
+   * render as it was drawn.
+   *
+   * Both selectors weigh the same, so the light block wins on source order
+   * alone — it sits 3300 lines below this one. Nothing here needs `html:root`,
+   * and adding it would break light instead.
+   */
+  --on-signal: #14161a; /* ink on an amber ground — dark here, near-white on paper */
+  --on-signal-dim: rgba(20, 22, 26, 0.72);
+  --strip-a: #1b1f26;
+  --strip-b: #15181d;
+  --hero-a: #1b1f26;
+  --row-current: #1b2530; /* the loaded slot, lifted and cooled toward --live */
+  --knob-face: #1c2027;
+  --knob-edge: #2c323b;
+  --signal-wash: rgba(240, 167, 60, 0.12);
+  --live-halo: rgba(95, 191, 209, 0.2);
+  --fault-halo: rgba(224, 104, 79, 0.2);
+  --dim-halo: rgba(135, 141, 151, 0.16);
+
+  /*
+   * Scales, so the next thing built has somewhere to get its numbers.
+   *
+   * The stylesheet currently holds 21 font sizes, 82 padding values and 22 gap
+   * values, and the one dimensional token it had was used once in 118 gap
+   * declarations. These are additive: nothing is retrofitted here, because a
+   * sweep and a restructure in the same commit is a regression nobody can
+   * bisect. New work uses them; old work is converted a region at a time.
+   */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+
+  /* Radius says what a thing IS. The hardware idiom is 3px and load-bearing —
+     panels, tiles, the chassis. The app's own furniture (sheets, scrims, pills)
+     is rounder, so the two never read as the same surface. */
+  --r-1: 3px;
+  --r-2: 10px;
+  --r-3: 20px;
+
+  --e-1: 0 1px 2px rgba(0, 0, 0, 0.28);
+  --e-2: 0 6px 20px rgba(0, 0, 0, 0.34);
+  --e-3: 0 18px 48px rgba(0, 0, 0, 0.44);
+
+  --t-1: 120ms; /* a state change you shouldn't notice */
+  --t-2: 200ms; /* something moving on purpose */
+  --t-3: 320ms; /* a surface arriving */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --z-bar: 40;
+  --z-scrim: 50;
+  --z-sheet: 60;
+  --z-toast: 70;
+
+  --f-1: 10px;
+  --f-2: 11px;
+  --f-3: 13px;
+  --f-4: 15px;
+  --f-5: 18px;
+  --f-6: 24px;
+  --f-7: 34px;
+
   --row-h: 60px;
-  --gutter: 8px;
+  --gutter: 8px; /* superseded by --s-2; kept until .grid is converted */
 
   --display: 'Archivo Expanded', 'Archivo', system-ui, sans-serif;
   --body: 'Archivo', system-ui, -apple-system, sans-serif;
@@ -115,6 +189,181 @@ body {
   align-items: flex-end;
   gap: 10px;
   margin-left: auto;
+}
+
+/* One label, two widths. The narrow one appears at the breakpoint below. */
+.at-thumb {
+  display: none;
+}
+
+/* ---------- press ----------
+   A tap that answers. These are the app's primary targets — chain tiles, the
+   gig's scene and block buttons, grid cells, preset rows, channel and strip
+   buttons — and until now the only thing any of them did under a finger was
+   ease a 1px border over 120ms, which lands after the finger has left.
+
+   Scale, because it reads at any contrast and in any theme, and it costs one
+   compositor property. */
+button.fx-tile:active:not(:disabled),
+button.fx-power:active:not(:disabled),
+button.gig-block:active:not(:disabled),
+button.gig-scene:active:not(:disabled),
+button.cell-btn:active:not(:disabled),
+button.preset-row:active:not(:disabled),
+button.chan-btn:active:not(:disabled),
+button.strip-btn:active:not(:disabled),
+button.topbar-preset:active:not(:disabled),
+button.scene-line:active:not(:disabled) {
+  transform: scale(0.97);
+  transition: transform var(--t-1) var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button.fx-tile:active:not(:disabled),
+  button.fx-power:active:not(:disabled),
+  button.gig-block:active:not(:disabled),
+  button.gig-scene:active:not(:disabled),
+  button.cell-btn:active:not(:disabled),
+  button.preset-row:active:not(:disabled),
+  button.chan-btn:active:not(:disabled),
+  button.strip-btn:active:not(:disabled),
+  button.topbar-preset:active:not(:disabled),
+  button.scene-line:active:not(:disabled) {
+    transform: none;
+    background: var(--panel-hi);
+  }
+}
+
+/* ---------- top bar ----------
+   One line, above everything, in every state. It replaced a masthead, a
+   tagline, a version badge, a device bar, a status line and a save cluster —
+   six stacked elements and about 290px before the first control.
+
+   Sticky, not fixed: a fixed bar is pinned to the layout viewport, so on iOS
+   the keyboard slides under it and the page scrolls behind it. Sticky moves
+   with the document and needs none of that compensation. */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-bar);
+  margin: 0 calc(var(--s-5) * -1);
+  padding: 0 var(--s-5);
+  padding-top: env(safe-area-inset-top, 0px);
+  background: color-mix(in srgb, var(--chassis) 82%, transparent);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* Blur is the depth: the content scrolling under the bar stays legible as
+   motion without competing as detail. Only where it's supported — elsewhere the
+   82% ground above carries it alone. */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .topbar {
+    background: color-mix(in srgb, var(--chassis) 72%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(1.4);
+    backdrop-filter: blur(18px) saturate(1.4);
+  }
+}
+
+.topbar-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 44px;
+}
+
+.topbar-unit {
+  flex: 0 0 auto;
+  font-size: var(--f-3);
+}
+
+.topbar-how {
+  flex: 0 0 auto;
+  font-size: var(--f-1);
+  color: var(--silk-dim);
+}
+
+.topbar-how[data-state='live'] {
+  color: var(--ok);
+}
+
+.topbar-how[data-state='fault'] {
+  color: var(--fault);
+}
+
+/* The preset takes the room that's going: it's the longest fact here and the
+   one you look for. */
+button.topbar-preset {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 5px var(--s-2);
+  background: none;
+  border-color: transparent;
+  border-radius: var(--r-2);
+}
+
+button.topbar-preset:active:not(:disabled) {
+  background: var(--panel);
+}
+
+.topbar-slot {
+  flex: 0 0 auto;
+  font-size: var(--f-2);
+  color: var(--silk-faint);
+}
+
+.topbar-name {
+  min-width: 4ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--f-4);
+  font-weight: 600;
+}
+
+.topbar-caret {
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  align-self: center;
+  border-right: 1.5px solid var(--silk-faint);
+  border-bottom: 1.5px solid var(--silk-faint);
+  transform: rotate(45deg) translate(-1px, -1px);
+}
+
+.topbar-gap {
+  flex: 1 1 auto;
+}
+
+.topbar-dirty {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: var(--f-1);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+
+button.topbar-gear {
+  flex: 0 0 auto;
+  padding: 6px var(--s-2);
+  background: none;
+  border-color: transparent;
+  color: var(--silk-dim);
+  font-size: var(--f-4);
+  line-height: 1;
+}
+
+button.topbar-gear.open {
+  color: var(--silk);
+  border-color: var(--rule);
+}
+
+.topbar .device-detail {
+  padding: 0 0 var(--s-3);
 }
 
 /* ---------- device bar ---------- */
@@ -524,6 +773,41 @@ input[type='text']:focus-visible {
    * with the preset. Two of those said the same thing twice and one was an
    * advertisement. What's left is what changes.
    */
+  .topbar {
+    margin: 0 calc(var(--s-4) * -1);
+    padding-left: var(--s-4);
+    padding-right: var(--s-4);
+  }
+
+  .topbar-row {
+    gap: 6px;
+  }
+
+  /* With a unit answering, its name and the word "connected" are the least of
+     it on a narrow screen: the lamp says the state, the gear holds the rest,
+     and the room goes to the preset — the one fact here you actually read.
+     With nothing answering there is no preset, and the bar's whole job is to
+     say so, so both come back. */
+  .topbar[data-status='live'] .topbar-how,
+  .topbar[data-status='live'] .topbar-unit,
+  .topbar[data-status='demo'] .topbar-how {
+    display: none;
+  }
+
+  button.save-options.compact {
+    padding-left: var(--s-2);
+    padding-right: var(--s-2);
+    min-width: 34px;
+  }
+
+  .at-width {
+    display: none;
+  }
+
+  .at-thumb {
+    display: inline;
+  }
+
   .tagline {
     display: none;
   }
@@ -3344,7 +3628,6 @@ ol.action-list li.destructive::marker {
   --live: #1f7f92;
   --fault: #b23b23;
   --ok: #1f7a45; /* darker on paper — the dark-theme green greys out on white */
-  --bypass: #c3bfb5;
 
   --on-signal: #fffaf2;
   --on-signal-dim: rgba(255, 250, 242, 0.7);
@@ -3905,7 +4188,7 @@ button.gig-block:disabled {
  * Top right of the screen, in the masthead — moved up from a bar pinned over
  * the bottom of every screen. A fixed floater buys findability by permanently
  * eating a strip of a phone screen; the header buys the same findability for
- * free. The StatusLine still carries "Unsaved" everywhere.
+ * free. The top bar still carries "Unsaved" everywhere.
  */
 .save-cluster {
   position: relative;
@@ -4124,6 +4407,12 @@ button.phone-chip {
 /* Live and answering gets the connection colour; joined-but-alone gets the
    fault colour, because a link with no host on it is not a working link and
    should not be dressed as one. */
+button.phone-chip.compact {
+  padding: 3px var(--s-2);
+  font-size: var(--f-1);
+  border-color: transparent;
+}
+
 button.phone-chip.on {
   color: var(--live);
   border-color: color-mix(in srgb, var(--live) 55%, var(--rule));

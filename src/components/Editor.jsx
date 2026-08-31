@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { bringIntoView } from '../lib/feedback'
 import { blockParams, blockTypes, setParamConfirmed, setType, setBypass } from '../lib/forgefx'
 import { isSilencingParam } from '../lib/guardrails'
 
@@ -42,7 +43,7 @@ export default function Editor({ blocks, onWritten, onError, focus }) {
     pendingFocus.current = null
     const el = document.getElementById(`p-${want.paramId}`)
     if (!el) return
-    el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    bringIntoView(el, { block: 'center' })
     el.focus({ preventScroll: true })
     const row = el.closest('.param-row')
     if (row) {

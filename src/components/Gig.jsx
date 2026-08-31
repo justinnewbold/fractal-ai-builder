@@ -13,6 +13,7 @@ import {
 import { remoteActive } from '../lib/remote'
 import { EXCLUDED_BLOCKS } from '../lib/guardrails'
 import { blockColor } from '../lib/blockColors'
+import { tick as haptic } from '../lib/feedback'
 import { Tuner } from './Console'
 import XYPad from './XYPad'
 
@@ -216,6 +217,7 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
   }, [tunerOn])
 
   const pickScene = async (index) => {
+    haptic()
     setSceneIndex(index) // optimistic: the footswitch feel matters more than the round trip
     try {
       await setScene(index)
@@ -234,6 +236,7 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
    * puts the button back if it didn't.
    */
   const toggle = async (block) => {
+    haptic()
     const eid = block.effectId
     const wanted = !block.bypassed
     setToggling(eid)

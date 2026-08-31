@@ -194,6 +194,89 @@ export function run(test) {
     )
   })
 
+  test('the chrome above the first control stays one bar deep', () => {
+    /*
+     * The number this restructure exists for. It was six stacked elements and
+     * about 290px on a phone — 35-40% of the screen spent before anything you
+     * came to do. A browser measures it properly (there's a harness for that);
+     * what a text test can hold is the shape that produced it, so it can't be
+     * rebuilt one well-meaning row at a time.
+     *
+     * The rule: between the update notice and the first view, the only things
+     * rendered are the bar, the states that mean the app can't work yet, and
+     * the assistant.
+     */
+    const from = src.indexOf('<TopBar')
+    const to = src.indexOf("view === 'console' ? (")
+    assert.ok(from !== -1 && to > from, 'the chrome no longer starts at the top bar')
+    const chrome = src.slice(from, to)
+    const allowed = new Set([
+      'TopBar', // the bar itself
+      'SaveBar', // rides in it
+      'Remote', // the sign-in, on the screen that says there's no connection
+      'Assistant', // the way the app is meant to be worked
+      'Thinking',
+      'Stages',
+      'LiveGeneration',
+      'Cost',
+      'Preview' // what a generation produces, where it was asked for
+    ])
+    for (const name of components(chrome)) {
+      assert.ok(allowed.has(name), `${name} is stacked above the first view — that is what took 290px`)
+    }
+  })
+
+  test('the bar that carries the whole app renders in every state', () => {
+    /*
+     * It replaced six stacked elements, all of which were gated on being
+     * connected — so the screen you get when nothing is connected had no way to
+     * reach the host address or the sign-in that fixes it. The bar is outside
+     * every status check, and the gear inside it is how setup is reached when
+     * setup is the thing that's wrong.
+     */
+    const at = src.indexOf('<TopBar')
+    assert.notEqual(at, -1, 'no top bar')
+    const before = src.slice(0, at)
+    const gate = before.lastIndexOf("status === 'live'")
+    const opened = before.lastIndexOf('{')
+    assert.ok(gate < opened, 'the top bar is behind a status check')
+  })
+
+  test('every class this app scrolls to exists somewhere that renders it', () => {
+    /*
+     * `.local-library` didn't. The stylesheet had a rule for it, the assistant
+     * scrolled to it after keeping something in the library, and no component
+     * ever rendered the class — so "show me what you changed" quietly did
+     * nothing, and a silent scroll is indistinguishable from a dead button.
+     *
+     * Anchors are strings matched at runtime against a DOM built somewhere
+     * else, which is exactly the seam a text test can hold shut.
+     */
+    const dir = new URL('../src/', import.meta.url)
+    const files = []
+    const walk = (at) => {
+      for (const entry of readdirSync(at, { withFileTypes: true })) {
+        const next = new URL(entry.name + (entry.isDirectory() ? '/' : ''), at)
+        if (entry.isDirectory()) walk(next)
+        else if (/\.(jsx?|css)$/.test(entry.name)) files.push(readFileSync(next, 'utf8'))
+      }
+    }
+    walk(dir)
+    const rendered = files
+      .flatMap((body) => [...body.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)])
+      .flatMap((m) => (m[1] || m[2] || '').split(/[\s${}?:'"]+/))
+      .filter(Boolean)
+
+    const anchors = [
+      ...[...src.matchAll(/querySelector\('\.([\w-]+)'\)/g)].map((m) => m[1]),
+      ...[...src.matchAll(/anchor: '\.([\w-]+)'/g)].map((m) => m[1])
+    ]
+    assert.ok(anchors.length >= 5, 'the anchor scan found nothing to check')
+    for (const name of new Set(anchors)) {
+      assert.ok(rendered.includes(name), `nothing renders .${name}, so scrolling to it does nothing`)
+    }
+  })
+
   test('the error banner is outside every view', () => {
     // It lived inside Design, so a failure in Library or Edit set the message
     // and rendered nothing. Silence reads as a dead button.

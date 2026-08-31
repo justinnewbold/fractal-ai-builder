@@ -237,7 +237,7 @@ export default function LocalLibrary({ preset, busy, onError, onChanged, onReloa
 
   if (!canPickFolder()) {
     return (
-      <p className="hint">
+      <p className="hint local-library">
         Choosing a folder needs Chrome. In other browsers you can still back up one preset at a
         time from Edit.
       </p>
@@ -246,7 +246,7 @@ export default function LocalLibrary({ preset, busy, onError, onChanged, onReloa
 
   if (!folder) {
     return (
-      <>
+      <section className="local-library">
         <p className="hint">
           Pick a folder and your presets get kept there as ordinary files &mdash; yours, on your own
           Mac, where your backups will pick them up.
@@ -254,25 +254,33 @@ export default function LocalLibrary({ preset, busy, onError, onChanged, onReloa
         <button className="save-now" onClick={choose} disabled={busy || working === 'choose'}>
           {working === 'choose' ? 'Choosing…' : 'Choose a folder'}
         </button>
-      </>
+      </section>
     )
   }
 
   if (needsPermission) {
     return (
-      <>
+      <section className="local-library">
         <p className="hint">
           Chrome needs you to allow access to &ldquo;{folder.name}&rdquo; again for this session.
         </p>
         <button className="save-now" onClick={regrant}>
           Allow access
         </button>
-      </>
+      </section>
     )
   }
 
+  /*
+   * A root, and a name on it.
+   *
+   * `showWhatChanged` scrolls to `.local-library` after the assistant keeps
+   * something here, and this component returned bare fragments — so the class
+   * existed in the stylesheet, the scroll found nothing, and "put what you
+   * changed on screen" silently did nothing after every library action.
+   */
   return (
-    <>
+    <section className="local-library">
       <p className="hint">
         Using <strong>{folder.name}</strong>
       </p>
@@ -369,6 +377,6 @@ export default function LocalLibrary({ preset, busy, onError, onChanged, onReloa
       ) : null}
 
       {note ? <p className="hint">{note}</p> : null}
-    </>
+    </section>
   )
 }
