@@ -40,6 +40,7 @@ const colorFor = (slug) => blockColor(slug).fill
 import Knob from './Knob'
 import { blockParams, blockTypes, setParamConfirmed, setType, setBypass, setChannel } from '../lib/forgefx'
 import { isSilencingParam } from '../lib/guardrails'
+import { bringIntoView } from '../lib/feedback'
 import { slotLabel, startsBank } from '../lib/slots'
 
 /**
@@ -75,7 +76,9 @@ export function Chain({ blocks, selected, onSelect, onToggle }) {
 
   return (
     <div className="fx-panel">
-      <p className="panel-title">Effects</p>
+      {/* No heading. A row of coloured, three-letter tiles between two signal
+          arrows is not something anyone needs told is the effects chain, and
+          on a phone that word cost more vertical space than a tile. */}
       <div className="chain-strip">
         <span className="io-arrow" aria-hidden="true">
           ▶
@@ -218,7 +221,7 @@ export function PresetList({
  * deliberate exception to this app's stage-then-send rule, which still governs
  * everything the generator produces.
  */
-export function BlockPanel({ block, channels, onError, onChanged, busy }) {
+export function BlockPanel({ block, channels, onError, onChanged, busy, focus }) {
   const [params, setParams] = useState([])
   const [models, setModels] = useState([])
   // Which model this block is actually on. It comes back on the params read
@@ -227,6 +230,10 @@ export function BlockPanel({ block, channels, onError, onChanged, busy }) {
   // the picker permanently read "N models…" instead of naming the model.
   const [type, setTypeState] = useState(null)
   const [tab, setTab] = useState('main')
+  // The model this block was on before the last swap, for the eight seconds
+  // during which taking it back is one tap.
+  const [undo, setUndo] = useState(null)
+  const undoTimer = useRef(null)
   const [loading, setLoading] = useState(false)
   const [local, setLocal] = useState({})
 
@@ -256,14 +263,20 @@ export function BlockPanel({ block, channels, onError, onChanged, busy }) {
     }
   }, [block, onError])
 
-  if (!block) {
-    return (
-      <div className="block-panel empty">
-        <p className="hint pad">Select a block from the chain.</p>
-      </div>
-    )
-  }
+  // The offer belongs to the block it was made on, and dies with the panel.
+  useEffect(() => {
+    setUndo(null)
+    return () => clearTimeout(undoTimer.current)
+  }, [block?.effectId])
 
+  /*
+   * Derived above the effects that read them, and above the early return.
+   *
+   * A dependency array is evaluated during render, so an effect listing `rest`
+   * while `rest` is declared further down throws on a const in its temporal
+   * dead zone — and it throws before the panel draws anything, so the sheet
+   * opens empty. React needs the early return after the hooks in any case.
+   */
   const editable = params.filter((p) => !isSilencingParam(p.name))
   const level = params.find((p) => /^.*\bLevel$/i.test(p.name) && !/boost|input/i.test(p.name))
 
@@ -272,6 +285,45 @@ export function BlockPanel({ block, channels, onError, onChanged, busy }) {
   const primary = editable.slice(0, 6)
   const rest = editable.slice(6)
   const shown = tab === 'main' ? primary : rest
+
+  /*
+   * Search hands over here: open the right block, then put your eyes — and the
+   * cursor — on the control you named.
+   *
+   * Ported from the staged editor this replaced. The highlight has to wait for
+   * the parameter read to finish and for the tab holding the control to be the
+   * one on screen: jumping before the cell exists scrolls to nothing, which is
+   * indistinguishable from a search result that did nothing.
+   */
+  const wanted = useRef(null)
+  useEffect(() => {
+    if (!focus?.nonce || focus.eid !== block?.effectId) return
+    wanted.current = focus
+    // A control on the second page is unreachable until that page is showing.
+    const onMore = rest.some((p) => p.id === focus.paramId)
+    setTab(onMore ? 'more' : 'main')
+  }, [focus, block?.effectId, rest])
+
+  useEffect(() => {
+    const want = wanted.current
+    if (!want || loading || !block || block.effectId !== want.eid) return
+    if (!shown.some((p) => p.id === want.paramId)) return
+    wanted.current = null
+    const cell = document.getElementById(`p-${want.paramId}`)
+    if (!cell) return
+    bringIntoView(cell, { block: 'center' })
+    cell.classList.add('found')
+    const clear = setTimeout(() => cell.classList.remove('found'), 2000)
+    return () => clearTimeout(clear)
+  }, [loading, shown, block])
+
+  if (!block) {
+    return (
+      <div className="block-panel empty">
+        <p className="hint pad">Select a block from the chain.</p>
+      </div>
+    )
+  }
 
   const valueOf = (p) => (local[p.id] !== undefined ? local[p.id] : p.value)
 
@@ -294,13 +346,50 @@ export function BlockPanel({ block, channels, onError, onChanged, busy }) {
     }
   }
 
+  /**
+   * Swapping the model, and being able to take it back.
+   *
+   * A model swap is structural: it replaces the whole parameter set, so every
+   * knob on this block means something different afterwards. That argues for a
+   * confirm — but a dialog in front of a tone control is the ceremony that
+   * sends people back to the hardware editor, and the one thing you want after
+   * hearing a wrong amp is to be somewhere else, quickly.
+   *
+   * So it writes immediately and offers the way back for eight seconds. The
+   * previous value is already in hand; nothing has to be read to undo it.
+   */
+  const applyModel = async (value, { undoable = true } = {}) => {
+    const was = type
+    await setType(block.effectId, Number(value))
+    const fresh = await blockParams(block.effectId)
+    setParams(fresh?.named || [])
+    setTypeState(fresh?.type ?? null)
+    setLocal({})
+    const name = models.find((m) => m.value === Number(value))?.name
+    onChanged(`${block.name} → ${name}`)
+    clearTimeout(undoTimer.current)
+    if (undoable && was && was.value !== Number(value)) {
+      setUndo(was)
+      undoTimer.current = setTimeout(() => setUndo(null), 8000)
+    } else {
+      setUndo(null)
+    }
+  }
+
   const swapModel = async (value) => {
     try {
-      await setType(block.effectId, Number(value))
-      const fresh = await blockParams(block.effectId)
-      setParams(fresh?.named || [])
-      setTypeState(fresh?.type ?? null)
-      onChanged(`${block.name} → ${models.find((m) => m.value === Number(value))?.name}`)
+      await applyModel(value)
+    } catch (err) {
+      onError(err.message)
+    }
+  }
+
+  const undoModel = async () => {
+    const back = undo
+    if (!back) return
+    setUndo(null)
+    try {
+      await applyModel(back.value, { undoable: false })
     } catch (err) {
       onError(err.message)
     }
@@ -358,6 +447,15 @@ export function BlockPanel({ block, channels, onError, onChanged, busy }) {
         </button>
       </div>
 
+      {undo ? (
+        <div className="undo-strip" role="status">
+          <span>Was {undo.name}</span>
+          <button className="chip" onClick={undoModel} disabled={busy}>
+            Undo
+          </button>
+        </div>
+      ) : null}
+
       {models.length ? (
         <select
           className="type-select"
@@ -397,7 +495,7 @@ export function BlockPanel({ block, channels, onError, onChanged, busy }) {
           <p className="hint pad">Reading {block.name}…</p>
         ) : (
           shown.map((p) => (
-            <div className="knob-cell" key={p.id}>
+            <div className="knob-cell" key={p.id} id={`p-${p.id}`}>
               <Knob
                 param={p}
                 label={p.name}

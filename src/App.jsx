@@ -1,20 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import TopBar from './components/TopBar'
-import Grid from './components/Grid'
 import { Preview } from './components/Generate'
 import { ChangeLog } from './components/ChangeLog'
-import Editor from './components/Editor'
 import Diagnostics from './components/Diagnostics'
 import Cost from './components/Cost'
 import Scenes from './components/Scenes'
 import History from './components/History'
-import { CabPicker, Backup, Meters } from './components/Hardware'
+import { CabPicker, Backup } from './components/Hardware'
 import { Compare } from './components/Refine'
 import Gig from './components/Gig'
 import SaveBar from './components/SaveBar'
 import { Stages, LiveGeneration, Thinking } from './components/LiveGeneration'
 import { streamSpec } from './lib/stream'
-import { Modifiers, SceneMatrix, TempoTuner } from './components/Modifiers'
+import { Modifiers, SceneMatrix } from './components/Modifiers'
 import { Versions, DeviceBackup } from './components/Versions'
 import Footswitches from './components/Footswitches'
 import GridEditor from './components/GridEditor'
@@ -23,6 +21,7 @@ import LocalLibrary from './components/LocalLibrary'
 import Remote from './components/Remote'
 import Section from './components/Section'
 import Sheet from './components/Sheet'
+import DeviceDetail from './components/DeviceDetail'
 import {
   attachDriver,
   listen as listenToDevice,
@@ -39,12 +38,12 @@ import {
   writeBypass,
   writeTuner
 } from './lib/deviceState'
-import SectionStack from './components/SectionStack'
 import ParamSearch from './components/ParamSearch'
 import Host from './components/Host'
 import Assistant from './components/Assistant'
 import UpdateNotice from './components/UpdateNotice'
 import { validatePlan, runPlan } from './lib/actions'
+import { listPresets } from './lib/history'
 import { timeLeft } from './lib/slots'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
 import {
@@ -105,7 +104,6 @@ import {
 import { newEntry, append } from './lib/log'
 import { EXCLUDED_BLOCKS } from './lib/guardrails'
 
-import { blockCatalog } from './lib/forgefx'
 
 /**
  * Which log entries are worth telling the assistant about.
@@ -242,9 +240,7 @@ export default function App() {
   const [atTheMac, setAtTheMac] = useState(false)
   // Where "Leave gig" returns to. Gig takes the screen over, so coming back out
   // should land where you were rather than at a fixed default.
-  const [lastView, setLastView] = useState('console')
   const [runningPlan, setRunningPlan] = useState(false)
-  const [catalog, setCatalog] = useState(null)
   const [partial, setPartial] = useState(null)
   const [liveOpen, setLiveOpen] = useState(false)
   const [thinking, setThinking] = useState(false)
@@ -261,7 +257,16 @@ export default function App() {
 
   // Fifteen stacked sections was a long scroll with the important things buried.
   // Grouped by what you're doing rather than by which endpoint it calls.
-  const [view, setView] = useState('console')
+  /*
+   * Three screens, not four plus a mode.
+   *
+   * Play is the stage screen and the one you land on: it is what this app is
+   * for when a guitar is plugged in. Shape is everything that changes the
+   * sound. Ask is the conversation, which used to sit above every screen at
+   * once and is a surface in its own right — it renders progress, streaming,
+   * cost, a preview and the applied report.
+   */
+  const [view, setView] = useState('play')
   const [selectedBlock, setSelectedBlock] = useState(null)
   /*
    * Whether the block editor is *showing*, which is not the same question as
@@ -269,7 +274,14 @@ export default function App() {
    * highlighted; if that alone opened the sheet, every connect and every read
    * would drop the editor over the screen unasked. Opening is a tap.
    */
-  const [blockOpen, setBlockOpen] = useState(false)
+  /*
+   * Which sheet is over the screen: 'block' | 'presets' | 'scenes' | 'settings'.
+   *
+   * One at a time, deliberately. Each sheet pushes a history entry so the back
+   * gesture closes it; two open at once would push two, and closing the outer
+   * one would take the inner one's entry with it.
+   */
+  const [sheet, setSheet] = useState(null)
   const [slots, setSlots] = useState([])
   const [scanning, setScanning] = useState(false)
   const scene = useDevice(ofScene)
@@ -418,13 +430,6 @@ export default function App() {
 
       refreshTempo()
 
-      // Read off the attached unit rather than from committed data. An AM4
-      // offers a different roster from an FM3 — 250 amp models against 331, one
-      // instance per family — and showing the FM3's numbers while an AM4 is
-      // plugged in would be stating something false about the thing in the room.
-      blockCatalog()
-        .then((res) => setCatalog(Array.isArray(res) ? res : null))
-        .catch(() => setCatalog(null))
     } catch (err) {
       setStatus('fault')
       setError(err.message)
@@ -1512,21 +1517,33 @@ export default function App() {
    */
   const showWhatChanged = (actions) => {
     const kinds = new Set(actions.map((a) => a.kind))
+    /*
+     * Where the thing that changed now lives. Two of these are sheets rather
+     * than screens, so "show me" opens the sheet instead of switching a tab —
+     * and the anchor is inside it, which is why the scroll waits a frame for
+     * it to exist. The class names are checked by a test: an anchor nothing
+     * renders scrolls to nothing, silently, which is what `.local-library`
+     * did for three releases.
+     */
     const target = kinds.has('keepInLibrary')
-      ? { view: 'library', anchor: '.local-library' }
+      ? { sheet: 'presets', anchor: '.local-library' }
       : kinds.has('placeBlock') || kinds.has('clearCell') || kinds.has('moveBlock')
-        ? { view: 'edit', anchor: '.grid-editor' }
+        ? { view: 'shape', anchor: '.grid-editor' }
         : kinds.has('setSceneBlock') || kinds.has('setScene')
-          ? { view: 'edit', anchor: '.scenes' }
+          ? { sheet: 'scenes', anchor: '.scenes' }
           : kinds.has('setParam') || kinds.has('setModel') || kinds.has('setChannel')
-            ? { view: 'edit', anchor: '.editor' }
+            ? { view: 'shape', anchor: '.chain-strip' }
             : null
     if (!target) return
-    setView(target.view)
-    // After the view swaps, not before — the element doesn't exist until then.
-    requestAnimationFrame(() => {
-      bringIntoView(document.querySelector(target.anchor), { block: 'start' })
-    })
+    if (target.view) setView(target.view)
+    if (target.sheet) setSheet(target.sheet)
+    // After the surface exists, not before — two frames, because a sheet
+    // mounts closed for one so it has somewhere to animate from.
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        bringIntoView(document.querySelector(target.anchor), { block: 'start' })
+      })
+    )
   }
 
   const confirmTurn = async (index) => {
@@ -1551,6 +1568,66 @@ export default function App() {
 
   const writeCount = result ? countWrites(result.changes) : 0
 
+  const hasScenes = device?.capabilities?.hasScenes !== false
+
+  /*
+   * Whether browser storage still holds anything.
+   *
+   * The panel that lists it is kept — it holds real work someone saved — but
+   * it is a migration route, not a feature. An empty one explains browser
+   * storage to a person who has never used it, which is a panel for nobody.
+   * Re-read on the key that changes when something moves out of it.
+   */
+  const hasBrowserSaves = useMemo(() => listPresets().length > 0, [historyKey])
+
+  /*
+   * Reading 512 preset names off a serial port, one at a time.
+   *
+   * Hoisted out of the panel that used to hold it: the list lives in a sheet
+   * now and the scan is a device operation, not a property of where its button
+   * happens to be drawn.
+   */
+  const scanPresets = async () => {
+    setScanning(true)
+    stopScan.current = false
+    const total = device?.capabilities?.presets?.count ?? 512
+    /*
+     * The pace is measured over the last stretch and smoothed, never taken
+     * from the start of the run: a resumed scan skips hundreds of known slots
+     * in a blink, and an average carrying that would promise four hundred
+     * dumps in ten seconds.
+     */
+    const pace = { at: Date.now(), done: 0, each: null }
+    try {
+      const found = await scanAllPresets(
+        total,
+        (done, all, partial) => {
+          const since = done - pace.done
+          if (since >= 8) {
+            const each = (Date.now() - pace.at) / since
+            pace.each = pace.each ? (pace.each + each) / 2 : each
+            pace.at = Date.now()
+            pace.done = done
+          }
+          setScanProgress({
+            done,
+            total: all,
+            pct: Math.round((done / all) * 100),
+            left: timeLeft(all - done, pace.each)
+          })
+          setSlots(partial)
+        },
+        () => stopScan.current
+      )
+      setSlots(found)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setScanning(false)
+      setScanProgress(null)
+    }
+  }
+
   // The block the sheet is showing. Resolved once: a selection can outlive the
   // chain it pointed into (a preset change lands before the refresh does), and
   // an id with no block behind it must not open an empty sheet.
@@ -1574,9 +1651,8 @@ export default function App() {
         device={device}
         preset={preset}
         dirty={dirty}
-        busy={busy}
-        onOpenPresets={() => setView('console')}
-        onRetry={reconnect}
+        onOpenPresets={() => setSheet('presets')}
+        onOpenSettings={() => setSheet('settings')}
         onError={setError}
         onRemoteChanged={(on) => {
           setRemote(on)
@@ -1762,12 +1838,121 @@ export default function App() {
         </div>
       ) : null}
 
-      {/*
-        The assistant sits above the tabs, not inside one. It is how the app is
-        meant to be worked: the views below are for when you'd rather reach for
-        the control yourself, not a separate mode with different powers.
-      */}
       {status === 'live' ? (
+        <nav className="views" aria-label="Screens">
+          {[
+            ['play', 'Play'],
+            ['shape', 'Shape'],
+            ['ask', 'Ask']
+          ].map(([id, label]) => (
+            <button
+              key={id}
+              className={`view-tab ${view === id ? 'current' : ''}`}
+              onClick={() => setView(id)}
+              aria-current={view === id}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      ) : null}
+
+      {status === 'live' && view === 'play' ? (
+        <Gig
+          preset={preset}
+          device={device}
+          capabilities={device?.capabilities}
+          onError={setError}
+          onChanged={read}
+        />
+      ) : null}
+
+      {status === 'live' && view === 'shape' ? (
+        <>
+          {/*
+            Everything that changes the sound, on one screen, with the chain as
+            the object you work through.
+
+            This is Home and Controls merged. Home drew the chain and then a
+            preset name, a scene list and a device strip that said what the bar
+            above already said; Controls drew a second chain, a third scene
+            list, a second tempo and a second tuner, behind twelve folds. The
+            chain is rendered once now, and tapping a block opens it.
+          */}
+          <Chain
+            blocks={blocks}
+            selected={selectedBlock}
+            onSelect={(id) => {
+              setSelectedBlock(id)
+              setSheet('block')
+            }}
+            onToggle={toggleBlock}
+          />
+
+          <div className="shape-row">
+            <button className="chip" onClick={() => setSheet('scenes')} disabled={!hasScenes}>
+              Scenes
+            </button>
+            <button className="chip" onClick={() => setSheet('presets')}>
+              Presets and backups
+            </button>
+            {dirty ? (
+              <button className="chip armed" onClick={revert} disabled={busy}>
+                Revert
+              </button>
+            ) : null}
+          </div>
+
+          {/*
+            Search opens the block that holds the control and lands on it. It
+            used to feed a separate staged editor, which is why the same knob
+            existed twice with two different write contracts.
+          */}
+          <ParamSearch
+            blocks={blocks}
+            onError={setError}
+            onPick={(eid, paramId) => {
+              setSelectedBlock(eid)
+              setSheet('block')
+              setEditorFocus({ eid, paramId, nonce: Date.now() })
+            }}
+          />
+
+          <Section key="chain" title="Chain" note="Add, remove and move blocks">
+            <GridEditor
+              blocks={blocks}
+              capabilities={device?.capabilities}
+              busy={busy}
+              onError={setError}
+              onChanged={(summary) => {
+                record('grid', summary)
+                read()
+              }}
+            />
+          </Section>
+
+          <Section key="modifiers" title="Modifiers" note="Let a pedal or the volume knob move a control">
+            <Modifiers
+              blocks={blocks}
+              busy={busy}
+              onError={setError}
+              onChanged={(summary) => record('modifier', `Modifier bound: ${summary}`)}
+            />
+          </Section>
+
+          <Section key="try-two-versions" title="Try two versions" note="Build a pair and switch between them">
+            <Compare
+              onCompare={buildComparison}
+              state={compare}
+              onClear={() => setCompare(null)}
+              busy={busy}
+              disabled={status !== 'live'}
+            />
+          </Section>
+        </>
+      ) : null}
+
+      {status === 'live' && view === 'ask' ? (
         <Assistant
           turns={turns}
           onAsk={askFor}
@@ -1859,438 +2044,84 @@ export default function App() {
         </Assistant>
       ) : null}
 
-      {status === 'live' ? (
-        <nav className="views" aria-label="Sections">
-          {/*
-            Gig is not a section like the others — it takes the screen over, and
-            it's the one you reach for on a stage, one-handed, in the dark. As
-            the last tab in a strip that scrolls sideways on a phone it was
-            simply off the edge. Sticky keeps it in view however far the rest
-            scrolls, and it leads rather than trails.
-          */}
-          <button
-            className={`view-tab gig-tab ${view === 'gig' ? 'current' : ''}`}
-            onClick={() => setView(view === 'gig' ? lastView : 'gig')}
-            aria-current={view === 'gig'}
-          >
-            {view === 'gig' ? 'Leave gig' : 'Gig'}
-          </button>
+      {/* ---------------------------------------------------------------
+          Sheets. Things you open, act on and dismiss — not places you go.
+          --------------------------------------------------------------- */}
 
-          {[
-            ['console', 'Home'],
-            ['edit', 'Controls'],
-            ['library', 'Presets']
-          ].map(([id, label]) => (
-            <button
-              key={id}
-              className={`view-tab ${view === id ? 'current' : ''}`}
-              onClick={() => {
-                setLastView(id)
-                setView(id)
-              }}
-              aria-current={view === id}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
-      ) : null}
-
-      {status === 'live' && view === 'console' ? (
-        <>
-          <div className="device-strip">
-            <span className="lamp" data-state={isDemo() ? 'demo' : 'live'} />
-            <span className="device-name">{device?.short || device?.name}</span>
-            <span className="device-meta mono">
-              {/* "Slots" already means presets one panel up — the same word for
-                  chain positions read as a contradiction (104 slots vs 4). */}
-              gen {device?.gen} · {device?.capabilities?.slotModel === 'linear'
-                ? `${device?.capabilities?.slotCount}-block chain`
-                : `${device?.capabilities?.grid?.rows}×${device?.capabilities?.grid?.cols} grid`}
-            </span>
-
-            <div className="strip-right">
-              <button
-                className={`strip-btn ${tunerOn ? 'armed' : ''}`}
-                onClick={async () => {
-                  try {
-                    await writeTuner(!tunerOn)
-                  } catch (err) {
-                    setError(err.message)
-                  }
-                }}
-              >
-                Tuner
-              </button>
-              <button
-                className="strip-btn"
-                onClick={async (e) => {
-                  // Feedback before the round trip: the flash confirms the tap
-                  // registered, at tap time, not at network time.
-                  beatFlash(e.currentTarget)
-                  try {
-                    await tapBeat()
-                    /*
-                     * The device computes the tempo from the spacing of the
-                     * taps, and /tempo/tap answers only {ok} — the new value
-                     * has to be read back. Debounced past the last tap so a
-                     * burst of taps costs one read, and the box doesn't
-                     * flicker through half-computed tempos mid-burst.
-                     */
-                    clearTimeout(tapReadback.current)
-                    tapReadback.current = setTimeout(refreshTempo, 700)
-                  } catch (err) {
-                    setError(err.message)
-                  }
-                }}
-              >
-                Tap
-              </button>
-              {bpm !== null ? (
-                <BpmBox
-                  bpm={bpm}
-                  onSet={async (n) => {
-                    try {
-                      await writeTempo(n)
-                      record('tempo', `Tempo → ${n} BPM`)
-                    } catch (err) {
-                      setError(err.message)
-                    }
-                  }}
-                  onError={setError}
-                />
-              ) : null}
-              {dirty ? (
-                <button className="strip-btn armed" onClick={revert} disabled={busy}>
-                  Revert
-                </button>
-              ) : null}
-            </div>
-          </div>
-
-          <Tuner reading={tuning} on={tunerOn} />
-
-          <div className="console">
-            <PresetList
-              slots={slots.length ? slots : cachedPresetNames()}
-              current={preset?.number}
-              deviceSlots={device?.capabilities?.presets?.count}
-              addressing={device?.capabilities?.presets?.addressing}
-              scanning={scanning}
-              progress={scanProgress}
-              onStop={() => {
-                stopScan.current = true
-              }}
-              onScan={async () => {
-                setScanning(true)
-                stopScan.current = false
-                const total = device?.capabilities?.presets?.count ?? 512
-                /*
-                 * The pace is measured over the last stretch and smoothed,
-                 * never taken from the start of the run: a resumed scan skips
-                 * hundreds of known slots in a blink, and an average carrying
-                 * that would promise four hundred dumps in ten seconds.
-                 */
-                const pace = { at: Date.now(), done: 0, each: null }
-                try {
-                  const found = await scanAllPresets(
-                    total,
-                    (done, all, partial) => {
-                      const since = done - pace.done
-                      if (since >= 8) {
-                        const each = (Date.now() - pace.at) / since
-                        pace.each = pace.each ? (pace.each + each) / 2 : each
-                        pace.at = Date.now()
-                        pace.done = done
-                      }
-                      setScanProgress({
-                        done,
-                        total: all,
-                        pct: Math.round((done / all) * 100),
-                        left: timeLeft(all - done, pace.each)
-                      })
-                      setSlots(partial)
-                    },
-                    () => stopScan.current
-                  )
-                  setSlots(found)
-                } catch (err) {
-                  setError(err.message)
-                } finally {
-                  setScanning(false)
-                  setScanProgress(null)
-                }
-              }}
-              onSelect={jumpTo}
-            />
-
-            <div className="center-panel">
-              <p className="panel-title" style={{ padding: 0 }}>
-                Preset name
-              </p>
-              <div className="preset-name-field">
-                <span className="num">{preset?.number}</span>
-                <span className="name">{preset?.name?.trim() || 'Untitled'}</span>
-                <span className="step-btns">
-                  <button
-                    className="icon-btn"
-                    onClick={() => jumpTo(Math.max(0, (preset?.number ?? 0) - 1))}
-                    disabled={busy}
-                  >
-                    ◁
-                  </button>
-                  <button
-                    className="icon-btn"
-                    onClick={() => jumpTo((preset?.number ?? 0) + 1)}
-                    disabled={busy}
-                  >
-                    ▷
-                  </button>
-                </span>
-              </div>
-
-              {device?.capabilities?.hasScenes !== false ? (
-                <>
-                  <p className="panel-title" style={{ padding: '14px 0 0' }}>
-                    Scenes
-                  </p>
-                  <div className="scene-list">
-                    {Array.from({ length: device?.capabilities?.sceneCount || 8 }, (_, i) => (
-                      <button
-                        key={i}
-                        className={`scene-line ${i === scene ? 'current' : ''}`}
-                        onClick={async () => {
-                          try {
-                            await writeScene(i)
-                          } catch (err) {
-                            setError(err.message)
-                          }
-                        }}
-                      >
-                        <span className="scene-tag">S{i + 1}</span>
-                        <span className={`scene-title ${sceneNames[i] ? '' : 'unnamed'}`}>
-                          {sceneNames[i] || `Scene ${i + 1}`}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </>
-              ) : null}
-
-              {/* The design preview and the grid builder live in Design and
-                  Edit. Duplicating them here made Home a third copy of two
-                  other screens, which is most of why this felt cluttered. */}
-            </div>
-
-            <Chain
-              blocks={blocks}
-              selected={selectedBlock}
-              onSelect={(id) => {
-                setSelectedBlock(id)
-                setBlockOpen(true)
-              }}
-              onToggle={toggleBlock}
-            />
-
-            {/*
-              The block editor arrives over the screen rather than stacking
-              under the chain. It used to be a full-width row at the bottom of
-              the console grid, which on a phone meant tapping a block scrolled
-              the thing you tapped off the top of the screen. A sheet is in
-              front of you the moment it exists; on a wide screen the same
-              component docks as a rail beside the chain, so nothing is hidden.
-            */}
-            <Sheet
-              open={blockOpen && !!openBlock}
-              onClose={() => setBlockOpen(false)}
-              title={openBlock?.name || 'Block'}
-              note={openBlock?.bypassed ? 'Bypassed' : null}
-            >
-              <BlockPanel
-                block={openBlock}
-                channels={device?.capabilities?.channelNames}
-                busy={busy}
-                onError={setError}
-                onChanged={(summary) => {
-                  record('edit', summary)
-                  setDirty(true)
-                  read()
-                }}
-              />
-            </Sheet>
-          </div>
-        </>
-      ) : null}
-
-      {status === 'live' && view === 'gig' ? (
-        <Gig
-          preset={preset}
-          device={device}
-          capabilities={device?.capabilities}
+      <Sheet
+        open={sheet === 'block' && !!openBlock}
+        onClose={() => setSheet(null)}
+        title={openBlock?.name || 'Block'}
+        note={openBlock?.bypassed ? 'Bypassed' : null}
+      >
+        <BlockPanel
+          block={openBlock}
+          channels={device?.capabilities?.channelNames}
+          busy={busy}
+          focus={editorFocus}
           onError={setError}
-          onChanged={read}
+          onChanged={(summary) => {
+            record('edit', summary)
+            setDirty(true)
+            read()
+          }}
         />
-      ) : null}
 
-      {status === 'live' && view === 'edit' ? (
-        <>
-          {/*
-            Twelve panels used to stand open in one column. Everything visible
-            at once means nothing stands out, and most of these are touched once
-            a month. The chain and the controls stay open because they're what
-            you came for; the rest fold away until wanted.
-          */}
-          {preset ? (
-            <Grid preset={preset} blocks={blocks} capabilities={device?.capabilities} />
-          ) : null}
+        {/*
+          Which impulse responses this cab is actually loaded with.
+          It had its own section, which is one panel for one read-only fact
+          about one block. Here it is where you would look for it — inside the
+          cab — and only when the cab is what you opened.
+        */}
+        {openBlock?.slug === 'cab' && device?.capabilities?.cabIrs !== false ? (
+          <CabPicker
+            blocks={blocks}
+            busy={busy}
+            onError={setError}
+            onChanged={(summary) => record('cab', summary)}
+          />
+        ) : null}
+      </Sheet>
 
-          <SectionStack id="edit">
-          <Section key="controls" title="Controls" note="Every knob on every block" defaultOpen>
-            <ParamSearch
-              blocks={blocks}
-              onError={setError}
-              onPick={(eid, paramId) => setEditorFocus({ eid, paramId, nonce: Date.now() })}
-            />
-            <Editor
-              focus={editorFocus}
-              blocks={blocks}
-              onWritten={(summary, detail) => {
-                record('edit', summary, detail)
-                read()
-              }}
-              onError={setError}
-            />
-          </Section>
+      <Sheet
+        open={sheet === 'presets'}
+        onClose={() => setSheet(null)}
+        title="Presets"
+        note={device?.capabilities?.presets?.count ? `${device.capabilities.presets.count} slots` : null}
+      >
+        <PresetList
+          slots={slots.length ? slots : cachedPresetNames()}
+          current={preset?.number}
+          deviceSlots={device?.capabilities?.presets?.count}
+          addressing={device?.capabilities?.presets?.addressing}
+          scanning={scanning}
+          progress={scanProgress}
+          onStop={() => {
+            stopScan.current = true
+          }}
+          onScan={scanPresets}
+          onSelect={(n) => {
+            jumpTo(n)
+            setSheet(null)
+          }}
+        />
 
-          <Section key="chain" title="Chain" note="Add, remove and move blocks">
-            <GridEditor
-              blocks={blocks}
-              capabilities={device?.capabilities}
-              busy={busy}
-              onError={setError}
-              onChanged={(summary) => {
-                record('grid', summary)
-                read()
-              }}
-            />
-          </Section>
+        <Section key="saved-presets" title="Saved presets" note="Captures and designs, as files in a folder you choose">
+          <LocalLibrary
+            preset={preset}
+            busy={busy}
+            remote={remote}
+            onError={setError}
+            onReload={reload}
+            onChanged={(summary) => record('library', summary)}
+          />
+        </Section>
 
-          {device?.capabilities?.hasScenes !== false ? (
-            <Section key="scenes" title="Scenes" note="Name them and set what each one does">
-              <Scenes
-                blocks={blocks}
-                preset={preset}
-                count={device?.capabilities?.sceneCount || 8}
-                channelNames={device?.capabilities?.channelNames}
-                hasScenes={device?.capabilities?.hasScenes !== false}
-                busy={busy}
-                onChanged={(summary) => {
-                  record('scene', summary)
-                  read()
-                }}
-                onError={setError}
-              />
-
-              <SceneMatrix
-                blocks={blocks}
-                count={device?.capabilities?.sceneCount || 8}
-                names={sceneNames}
-                busy={busy}
-                onError={setError}
-                onChanged={(summary) => {
-                  record('scene', summary)
-                  setDirty(true)
-                }}
-              />
-            </Section>
-          ) : null}
-
-          {device?.capabilities?.cabIrs !== false ? (
-            <Section key="speaker-cabinets" title="Speaker cabinets" note="Choose the cab this amp plays through">
-              <CabPicker
-                blocks={blocks}
-                busy={busy}
-                onError={setError}
-                onChanged={(summary) => record('cab', summary)}
-              />
-            </Section>
-          ) : null}
-
-          <Section key="tempo-and-tuner" title="Tempo and tuner">
-            <TempoTuner
-              busy={busy}
-              onError={setError}
-              onChanged={(summary) => record('tempo', summary)}
-            />
-          </Section>
-
-          <Section key="modifiers" title="Modifiers" note="Let a pedal or the volume knob move a control">
-            <Modifiers
-              blocks={blocks}
-              busy={busy}
-              onError={setError}
-              onChanged={(summary) => record('modifier', `Modifier bound: ${summary}`)}
-            />
-          </Section>
-
-          {device?.capabilities?.fc?.model !== false ? (
-            <Section key="footswitches" title="Footswitches">
-              <Footswitches onError={setError} />
-            </Section>
-          ) : null}
-
-          {device?.capabilities?.meters?.outputLevels !== false &&
-          device?.capabilities?.telemetry?.outputMeters !== false ? (
-            <Section key="output-levels" title="Output levels">
-              <Meters active={status === 'live'} />
-            </Section>
-          ) : null}
-
-          <Section key="try-two-versions" title="Try two versions" note="Build a pair and switch between them">
-            <Compare
-              onCompare={buildComparison}
-              state={compare}
-              onClear={() => setCompare(null)}
-              busy={busy}
-              disabled={status !== 'live'}
-            />
-          </Section>
-
-          <Section key="back-up-this-preset" title="Back up this preset">
-            <Backup
-              preset={preset}
-              busy={busy}
-              onError={setError}
-              onChanged={(summary) => {
-                record('backup', summary)
-                read()
-              }}
-            />
-          </Section>
-          </SectionStack>
-        </>
-      ) : null}
-
-      {status === 'live' && view === 'library' ? (
-        <>
-          {/*
-            Two different things shared one screen: presets you reach for, and
-            setup you touch once. Saved work comes first and open; anything you
-            configure and forget is folded away below it.
-          */}
-          <SectionStack id="library">
-          <Section key="presets-on-this-mac" title="Saved presets" note="Captures and designs, as files in a folder you choose" defaultOpen>
-            <LocalLibrary
-              preset={preset}
-              busy={busy}
-              remote={remote}
-              onError={setError}
-              onReload={reload}
-              onChanged={(summary) => record('library', summary)}
-            />
-          </Section>
-
-          <Section key="tones-you-ve-made-here" title="Older saves in this browser" note="Move these into the folder — files survive, browser storage doesn't">
+        {/* Only when there is something in there. It holds real work, so it is
+            kept — but an empty panel explaining browser storage to someone who
+            never used it is a panel for nobody. */}
+        {hasBrowserSaves ? (
+          <Section key="older-saves" title="Older saves in this browser" note="Move these into the folder — files survive, browser storage doesn't">
             <History
               key={historyKey}
               onReload={reload}
@@ -2299,121 +2130,142 @@ export default function App() {
               onMoved={() => setHistoryKey((k) => k + 1)}
             />
           </Section>
+        ) : null}
 
-          <Section key="whole-unit-backups" title="Whole-unit backups" note="Every slot at once, before something goes wrong">
-            <Versions
-              preset={preset}
-              busy={busy}
-              onError={setError}
-              onChanged={(summary) => {
-                record('version', summary)
-                read()
-              }}
-            />
+        <Section key="backups" title="Backups" note="This preset, and every slot at once">
+          <Backup
+            preset={preset}
+            busy={busy}
+            onError={setError}
+            onChanged={(summary) => {
+              record('backup', summary)
+              read()
+            }}
+          />
+          <Versions
+            preset={preset}
+            busy={busy}
+            onError={setError}
+            onChanged={(summary) => {
+              record('version', summary)
+              read()
+            }}
+          />
+          <DeviceBackup
+            busy={busy}
+            onError={setError}
+            onChanged={(summary) => record('backup', summary)}
+          />
+        </Section>
+      </Sheet>
 
-            <DeviceBackup
-              busy={busy}
-              onError={setError}
-              onChanged={(summary) => record('backup', summary)}
-            />
+      <Sheet
+        open={sheet === 'scenes'}
+        onClose={() => setSheet(null)}
+        title="Scenes"
+        note={sceneNames[scene] || `Scene ${scene + 1}`}
+      >
+        <Scenes
+          blocks={blocks}
+          preset={preset}
+          count={device?.capabilities?.sceneCount || 8}
+          channelNames={device?.capabilities?.channelNames}
+          hasScenes={hasScenes}
+          busy={busy}
+          onChanged={(summary) => {
+            record('scene', summary)
+            read()
+          }}
+          onError={setError}
+        />
+
+        <SceneMatrix
+          blocks={blocks}
+          count={device?.capabilities?.sceneCount || 8}
+          names={sceneNames}
+          busy={busy}
+          onError={setError}
+          onChanged={(summary) => {
+            record('scene', summary)
+            setDirty(true)
+          }}
+        />
+      </Sheet>
+
+      <Sheet
+        open={sheet === 'settings'}
+        onClose={() => setSheet(null)}
+        title="Setup"
+        note={device?.short || device?.name || null}
+      >
+        {/* `reconnect`, not `read`: a plain re-read is what the old Reconnect
+            button did, and it is why refreshing the page was the only thing
+            that worked when a relay went quiet. This one drops a dead relay
+            and rejoins the session before it reads. */}
+        <DeviceDetail status={status} device={device} onRetry={reconnect} busy={busy} />
+
+        <Section key="play-from-your-phone" title="Play from your phone" note={remote ? 'Connected' : 'Leave the Mac by the amp'}>
+          {/* Host controls only work on the machine holding the cable — from a
+              phone these calls are refused, and a button that cannot work is
+              worse than no button. But "not in a remote session" was the wrong
+              test for that: at the Mac, relaying to a host that isn't on is
+              exactly the situation this panel exists to fix, and it was
+              hiding itself for the duration. Ask localhost instead. */}
+          {atTheMac ? <Host onError={setError} /> : null}
+
+          <Remote
+            onConnected={(on) => {
+              setRemote(on)
+              record('remote', on ? 'Connected to the host remotely' : 'Back to the local connection')
+              // Everything about the device has to be re-read down the new path.
+              resetSchemaCache()
+              read()
+            }}
+            onError={setError}
+          />
+        </Section>
+
+        <Section key="connection" title="Connection" note="Which unit this app is talking to">
+          <Ports
+            busy={busy}
+            onError={setError}
+            onChanged={(summary) => {
+              record('port', summary)
+              read()
+            }}
+          />
+        </Section>
+
+        {device?.capabilities?.fc?.model !== false ? (
+          <Section key="footswitches" title="Footswitches">
+            <Footswitches onError={setError} />
           </Section>
+        ) : null}
 
-          <Section key="play-from-your-phone" title="Play from your phone" note={remote ? 'Connected' : 'Leave the Mac by the amp'}>
-            {/* Host controls only work on the machine holding the cable — from a
-                phone these calls are refused, and a button that cannot work is
-                worse than no button. But "not in a remote session" was the wrong
-                test for that: at the Mac, relaying to a host that isn't on is
-                exactly the situation this panel exists to fix, and it was
-                hiding itself for the duration. Ask localhost instead. */}
-            {atTheMac ? <Host onError={setError} /> : null}
+        <Section key="what-s-changed-this-session" title="What's changed this session">
+          <ChangeLog log={log} onClear={() => setLog([])} />
+        </Section>
 
-            <Remote
-              onConnected={(on) => {
-                setRemote(on)
-                record(
-                  'remote',
-                  on ? 'Connected to the host remotely' : 'Back to the local connection'
-                )
-                // Everything about the device has to be re-read down the new path.
-                resetSchemaCache()
-                read()
-              }}
-              onError={setError}
-            />
-          </Section>
+        <Section key="technical-details" title="Technical details" note="For working out why something went wrong">
+          <Diagnostics />
 
-          <Section key="connection" title="Connection" note="Which unit this app is talking to">
-            <Ports
-              busy={busy}
-              onError={setError}
-              onChanged={(summary) => {
-                record('port', summary)
-                read()
-              }}
-            />
-          </Section>
-
-          <Section key="what-s-changed-this-session" title="What's changed this session">
-            <ChangeLog log={log} onClear={() => setLog([])} />
-          </Section>
-
-          <Section key="technical-details" title="Technical details" note="For working out why something went wrong">
-            <Diagnostics />
-          </Section>
-          </SectionStack>
-        </>
-      ) : null}
-
-      <section hidden={status === 'live' && view !== 'library'}>
-        <p className="silk-label" style={{ marginTop: 34 }}>
-          {catalog ? `Read from your ${device?.short || device?.name}` : 'Catalog'}
-        </p>
-        {catalog ? (
-          <>
-            <div className="stats">
-              <div className="stat">
-                <div className="value">{catalog.length}</div>
-                <div className="silk-label label">Block families</div>
-              </div>
-              <div className="stat">
-                <div className="value">
-                  {catalog.reduce((n, b) => n + (b.typeCount || 0), 0).toLocaleString()}
-                </div>
-                <div className="silk-label label">Models</div>
-              </div>
-              <div className="stat">
-                <div className="value">
-                  {catalog.reduce((n, b) => n + (b.paramCount || 0), 0).toLocaleString()}
-                </div>
-                <div className="silk-label label">Parameters</div>
-              </div>
-              <div className="stat">
-                <div className="value">
-                  {catalog.find((b) => b.slug === 'amp')?.typeCount ?? '—'}
-                </div>
-                <div className="silk-label label">Amp models</div>
-              </div>
-              <div className="stat">
-                <div className="value">{device?.capabilities?.presets?.count ?? '—'}</div>
-                <div className="silk-label label">Preset slots</div>
-              </div>
-            </div>
-          </>
-        ) : (
-          <p className="hint">Connect a device to read its catalog.</p>
-        )}
-      </section>
-
-      <p className="footnote" hidden={status === 'live' && view === 'gig'}>
-        Models and parameter ranges are read off the attached unit at generation time, so the
-        designer can only pick models that unit actually has and only set values inside each
-        control&rsquo;s real range. Anything outside it is rejected before a single write goes out. Device access
-        via{' '}
-        <a href="https://github.com/sKuhLight/ForgeFX" target="_blank" rel="noreferrer">
-          ForgeFX
-        </a>
-        , an independent project not affiliated with Fractal Audio Systems.
-      </p>
+          {/*
+            This used to sit under every screen, permanently, including the one
+            you look at on a stage. It is worth saying once and worth being
+            findable — which is here, not there.
+          */}
+          <p className="footnote">
+            Models and parameter ranges are read off the attached unit at generation time, so the
+            designer can only pick models that unit actually has and only set values inside each
+            control&rsquo;s real range. Anything outside it is rejected before a single write goes
+            out. Device access via{' '}
+            <a href="https://github.com/sKuhLight/ForgeFX" target="_blank" rel="noreferrer">
+              ForgeFX
+            </a>
+            , an independent project not affiliated with Fractal Audio Systems.
+          </p>
+        </Section>
+      </Sheet>
 
     </div>
   )

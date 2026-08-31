@@ -163,25 +163,59 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
     }
   }
 
+  /*
+   * Locked: the grid as it is, and no way to change it by accident.
+   *
+   * This used to be a separate read-only Grid component rendered above the
+   * editor — the same picture drawn twice by two files, one of which could
+   * write. Editing behind an explicit mode is the same idea and one component:
+   * you can always see the chain, and you have to say so before you can move
+   * anything in it.
+   */
   if (!armed) {
     return (
       <section className="grid-editor">
-        <p className="silk-label">Build the chain</p>
-        <div className="notice" data-kind="fault">
-          <h2>Read this first</h2>
-          <p>
-            Placing blocks writes the preset&rsquo;s structure, not just its settings. ForgeFX
-            marks this as derived from the protocol spec rather than confirmed on hardware, so a
-            bad write here mangles a preset rather than mis-setting a knob.
-          </p>
-          <p>
-            Back up all slots first &mdash; there&rsquo;s a button for it above &mdash; and work on
-            a slot you don&rsquo;t care about.
-          </p>
-          <button className="chip" onClick={() => setArmed(true)}>
-            I&rsquo;ve backed up — let me edit the grid
-          </button>
+        <div className="history-head">
+          <p className="silk-label">The chain</p>
+          <div className="history-actions">
+            <button className="chip" onClick={() => setArmed(true)}>
+              Edit the grid
+            </button>
+          </div>
         </div>
+
+        <div className="grid-scroll">
+          <div
+            className="grid"
+            style={{ gridTemplateColumns: `repeat(${cols}, minmax(76px, 1fr))` }}
+          >
+            {Array.from({ length: rows * cols }, (_, i) => {
+              const row = Math.floor(i / cols) + 1
+              const col = linear ? (i % cols) + 1 : i % cols
+              const here = occupied.get(`${row}:${col}`)
+              return (
+                <div
+                  key={i}
+                  className={`cell ${here ? 'filled' : ''}`}
+                  title={`Row ${row}, column ${col}`}
+                >
+                  {here ? (
+                    <span className="cell-name">{here.name}</span>
+                  ) : (
+                    <span className="cell-coord mono">{linear ? col : `${row}·${col}`}</span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        <p className="hint">
+          Placing blocks writes the preset&rsquo;s structure, not just its settings, and ForgeFX
+          marks that as derived from the protocol spec rather than confirmed on hardware &mdash; a
+          bad write here mangles a preset rather than mis-setting a knob. Back up all slots first,
+          and work on a slot you don&rsquo;t care about.
+        </p>
       </section>
     )
   }

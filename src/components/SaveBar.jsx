@@ -51,6 +51,18 @@ export default function SaveBar({
   const target = slot === '' ? preset?.number : Number(slot)
   const targetLabel = Number.isInteger(target) ? target : '--'
 
+  /*
+   * Whether the button has to name the slot it will write.
+   *
+   * It always did, because the slot is the one fact here that can be wrong.
+   * That still holds — but this rides inside the top bar now, and the bar
+   * already prints the loaded slot two elements to its left. Saying it twice
+   * cost enough width to truncate the preset name to "DE…", which is the bar's
+   * actual job. So it names the slot exactly when the slot is not the one
+   * already on screen: writing somewhere else is the case worth spelling out.
+   */
+  const elsewhere = Number.isInteger(target) && target !== preset?.number
+
   return (
     <div className="save-cluster">
       <div className="save-cluster-row">
@@ -95,12 +107,20 @@ export default function SaveBar({
                 ? 'Waiting…'
                 : 'Waiting for the Mac…'
               : compact
-                ? `Mac · ${targetLabel}`
+                ? elsewhere
+                  ? `Mac · ${targetLabel}`
+                  : 'Mac'
                 : `Save at the Mac · ${targetLabel}`}
           </button>
         ) : (
           <button className="save-now" onClick={onSave} disabled={busy}>
-            {busy ? 'Saving…' : compact ? `Save · ${targetLabel}` : `Save to slot ${targetLabel}`}
+            {busy
+              ? 'Saving…'
+              : compact
+                ? elsewhere
+                  ? `Save · ${targetLabel}`
+                  : 'Save'
+                : `Save to slot ${targetLabel}`}
           </button>
         )}
       </div>

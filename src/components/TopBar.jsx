@@ -1,7 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
 import { isDemo } from '../lib/forgefx'
 import { remoteActive } from '../lib/remote'
-import DeviceDetail from './DeviceDetail'
 import PhoneLink from './PhoneLink'
 
 /**
@@ -33,16 +31,12 @@ export default function TopBar({
   device,
   preset,
   dirty,
-  busy,
   onOpenPresets,
-  onRetry,
+  onOpenSettings,
   onError,
   onRemoteChanged,
   children
 }) {
-  const [open, setOpen] = useState(false)
-  const wrap = useRef(null)
-
   const demo = isDemo()
   const remote = remoteActive()
 
@@ -64,23 +58,8 @@ export default function TopBar({
         ? 'offline'
         : ''
 
-  // A tap outside is the ordinary way to dismiss a menu on a phone.
-  useEffect(() => {
-    if (!open) return
-    const away = (e) => {
-      if (wrap.current && !wrap.current.contains(e.target)) setOpen(false)
-    }
-    const key = (e) => e.key === 'Escape' && setOpen(false)
-    document.addEventListener('pointerdown', away)
-    document.addEventListener('keydown', key)
-    return () => {
-      document.removeEventListener('pointerdown', away)
-      document.removeEventListener('keydown', key)
-    }
-  }, [open])
-
   return (
-    <div className="topbar" data-status={demo ? 'demo' : status} ref={wrap}>
+    <div className="topbar" data-status={demo ? 'demo' : status}>
       <div className="topbar-row">
         <span className="lamp" data-state={demo ? 'demo' : status} />
         <span className="topbar-unit silk-label">{unit}</span>
@@ -112,17 +91,18 @@ export default function TopBar({
 
         <PhoneLink compact onChanged={onRemoteChanged} onError={onError} />
 
+        {/* Setup is a sheet now, not a fold under the bar. It carries the
+            host address, the sign-in, the ports and the diagnostics, so it was
+            always too much to hang off a 44px bar — and a fold that pushes the
+            whole page down is the opposite of what this bar is for. */}
         <button
-          className={`topbar-gear ${open ? 'open' : ''}`}
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
+          className="topbar-gear"
+          onClick={onOpenSettings}
           aria-label="Connection and setup"
         >
           <span aria-hidden="true">⚙</span>
         </button>
       </div>
-
-      {open ? <DeviceDetail status={status} device={device} onRetry={onRetry} busy={busy} /> : null}
     </div>
   )
 }

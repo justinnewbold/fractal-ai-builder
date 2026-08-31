@@ -268,10 +268,15 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
 
   return (
     <div className="gig">
+      {/*
+        The name, big, and only the name.
+        The unit and the slot are in the bar above this, at every moment, on
+        every screen — repeating them here cost 30px on the one screen where
+        vertical space is scenes you have to hit without looking. The name
+        stays large because that is this screen's job: it is the thing you
+        read from arm's length, in the dark, to know where you are.
+      */}
       <div className="gig-preset">
-        <span className="silk-label">
-          {device?.short || device?.name || 'Device'} · slot {preset?.number}
-        </span>
         <h2 className="gig-name">{preset?.name?.trim() || 'Untitled'}</h2>
       </div>
 

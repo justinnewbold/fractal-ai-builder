@@ -23,10 +23,25 @@ function view(name) {
   const start = src.indexOf(`view === '${name}' ? (`)
   assert.notEqual(start, -1, `no ${name} view found`)
 
-  // Ends at the next view's conditional, or at the trailing sections.
+  /*
+   * Ends at the next view, or at the sheets that follow the last one. It used
+   * to end at a trailing `<section hidden=`, which Phase 4 deleted — without
+   * this the final view's segment ran to the end of the file and every
+   * placement assertion silently started reading components in no view at all.
+   */
   const rest = src.slice(start + 20)
-  const next = rest.search(/\{status === 'live' && view === '|\{status === 'live' \? \(|<section hidden=/)
+  const next = rest.search(/\{status === 'live' && view === '|\{status === 'live' \? \(|Sheets\. Things you open/)
   return rest.slice(0, next === -1 ? undefined : next)
+}
+
+/** Everything rendered inside one sheet, asserted against the sheet itself. */
+function sheet(title) {
+  const at = src.indexOf(`title="${title}"`)
+  assert.notEqual(at, -1, `no sheet titled ${title}`)
+  const open = src.lastIndexOf('<Sheet', at)
+  const shut = src.indexOf('</Sheet>', at)
+  assert.ok(open !== -1 && shut > open, `the ${title} sheet is not closed`)
+  return src.slice(open, shut)
 }
 
 const components = (segment) => [...new Set([...segment.matchAll(/<([A-Z]\w+)/g)].map((m) => m[1]))]
@@ -154,15 +169,82 @@ export function run(test) {
     }
   })
 
-  test('each screen holds the panels it is meant to', () => {
-    // Named in the UI as Library; they spent three PRs rendering in Edit.
-    for (const name of ['LocalLibrary', 'Remote', 'Host', 'Ports', 'Diagnostics']) {
-      assert.ok(components(view('library')).includes(name), `${name} should be in Library`)
-      assert.ok(!components(view('edit')).includes(name), `${name} should not be in Edit`)
+  test('every component rendered is one this file can actually see', () => {
+    /*
+     * `<DeviceDetail>` moved from the top bar into a sheet in App and was not
+     * imported there. The build was green — Vite bundles JSX without resolving
+     * identifiers — and every one of these tests passed. The app threw
+     * "DeviceDetail is not defined" on first paint, and only running it found
+     * that out.
+     *
+     * A component tag is a plain identifier. Either the file imports it or the
+     * file defines it; anything else is a reference error waiting for the
+     * branch that renders it to be reached, which may be a screen nobody
+     * opens in testing.
+     */
+    const dir = new URL('../src/', import.meta.url)
+    const files = {}
+    const walk = (at, prefix = '') => {
+      for (const entry of readdirSync(at, { withFileTypes: true })) {
+        const next = new URL(entry.name + (entry.isDirectory() ? '/' : ''), at)
+        if (entry.isDirectory()) walk(next, prefix + entry.name + '/')
+        else if (/\.jsx$/.test(entry.name)) files[prefix + entry.name] = readFileSync(next, 'utf8')
+      }
+    }
+    walk(dir)
+
+    // React's own, plus the fragment shorthand, which has no import.
+    const builtin = new Set(['Fragment', 'StrictMode', 'Suspense', 'Profiler'])
+
+    for (const [name, raw] of Object.entries(files)) {
+      const body = raw.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ')
+      const known = new Set(builtin)
+      for (const m of body.matchAll(/^import\s+([\s\S]*?)\s+from\s+/gm)) {
+        for (const part of m[1].replace(/[{}]/g, ',').split(',')) {
+          const id = part.trim().split(/\s+as\s+/).pop().trim()
+          if (/^[A-Za-z_$][\w$]*$/.test(id)) known.add(id)
+        }
+      }
+      for (const m of body.matchAll(/(?:function|const|class)\s+([A-Z]\w*)/g)) known.add(m[1])
+
+      for (const m of body.matchAll(/<([A-Z]\w*)[\s/>]/g)) {
+        assert.ok(
+          known.has(m[1]),
+          `${name} renders <${m[1]}> but neither imports nor defines it`
+        )
+      }
+    }
+  })
+
+  test('each screen holds what it is for, and nothing it is not', () => {
+    /*
+     * Three screens now, and the things you open are sheets. The original of
+     * this test existed because five panels named in the UI as Library spent
+     * three releases rendering in Edit; the same mistake is now possible in a
+     * new direction — setup leaking onto a screen you look at on a stage.
+     */
+    const play = components(view('play'))
+    assert.deepEqual(play, ['Gig'], `Play should be the gig screen alone, not ${play.join(', ')}`)
+
+    for (const name of ['Chain', 'ParamSearch', 'GridEditor', 'Modifiers', 'Compare']) {
+      assert.ok(components(view('shape')).includes(name), `${name} should be on Shape`)
     }
 
-    for (const name of ['Editor', 'GridEditor', 'Scenes', 'Modifiers', 'CabPicker', 'ParamSearch']) {
-      assert.ok(components(view('edit')).includes(name), `${name} should be in Edit`)
+    // Setup on the stage screen is how you change the host address by accident.
+    for (const name of ['Host', 'Remote', 'Ports', 'Diagnostics', 'LocalLibrary', 'Footswitches']) {
+      assert.ok(!play.includes(name), `${name} is on Play`)
+      assert.ok(!components(view('shape')).includes(name), `${name} is on Shape, not in a sheet`)
+    }
+
+    // And the sheets hold what was taken out of the views.
+    for (const [title, names] of [
+      ['Presets', ['PresetList', 'LocalLibrary', 'Backup', 'Versions', 'DeviceBackup']],
+      ['Scenes', ['Scenes', 'SceneMatrix']],
+      ['Setup', ['DeviceDetail', 'Host', 'Remote', 'Ports', 'ChangeLog', 'Diagnostics']]
+    ]) {
+      for (const name of names) {
+        assert.ok(components(sheet(title)).includes(name), `${name} should be in the ${title} sheet`)
+      }
     }
   })
 
@@ -220,20 +302,16 @@ export function run(test) {
      * the assistant.
      */
     const from = src.indexOf('<TopBar')
-    const to = src.indexOf("view === 'console' ? (")
+    const to = src.indexOf("view === 'play' ? (")
     assert.ok(from !== -1 && to > from, 'the chrome no longer starts at the top bar')
     const chrome = src.slice(from, to)
     const allowed = new Set([
       'TopBar', // the bar itself
       'SaveBar', // rides in it
-      'Remote', // the sign-in, on the screen that says there's no connection
-      'Assistant', // the way the app is meant to be worked
-      'Thinking',
-      'Stages',
-      'LiveGeneration',
-      'Cost',
-      'Preview' // what a generation produces, where it was asked for
+      'Remote' // the sign-in, on the screen that says there's no connection
     ])
+    // The assistant used to be on this list — it sat above every screen at
+    // once. It is the Ask tab now, which is what took the chrome down again.
     for (const name of components(chrome)) {
       assert.ok(allowed.has(name), `${name} is stacked above the first view — that is what took 290px`)
     }
@@ -344,20 +422,21 @@ export function run(test) {
     // and rendered nothing. Silence reads as a dead button.
     const banner = src.indexOf('data-kind="fault" role="alert"')
     assert.notEqual(banner, -1, 'no error banner found')
-    const firstView = src.indexOf("view === 'console' ? (")
+    const firstView = src.indexOf("view === 'play' ? (")
     assert.ok(banner < firstView, 'the banner must render before any view block')
   })
 
   test('panels that need a preset are given one', () => {
     // Scenes read preset?.number without being passed a preset: silently
-    // undefined, so its cache invalidation quietly did nothing.
+    // undefined, so its cache invalidation quietly did nothing. Three of these
+    // live in sheets now, which is the same seam wearing a different shape.
     for (const [name, prop] of [
       ['Scenes', 'preset'],
       ['LocalLibrary', 'preset'],
       ['Backup', 'preset'],
-      ['Grid', 'preset']
+      ['Versions', 'preset']
     ]) {
-      const seg = src.slice(src.indexOf("view === 'console' ? ("))
+      const seg = src.slice(src.indexOf("view === 'play' ? ("))
       const props = tag(seg, name)
       assert.ok(props, `${name} is not rendered anywhere`)
       assert.ok(new RegExp(`\\b${prop}=`).test(props), `${name} is missing ${prop}`)
@@ -366,7 +445,7 @@ export function run(test) {
 
   test('panels that can fail can report it', () => {
     // A panel with no onError swallows its failures.
-    for (const name of ['Editor', 'GridEditor', 'Scenes', 'Modifiers', 'TempoTuner', 'Remote']) {
+    for (const name of ['GridEditor', 'Scenes', 'Modifiers', 'Remote', 'BlockPanel', 'CabPicker']) {
       const props = tag(src, name)
       assert.ok(props, `${name} is not rendered`)
       assert.ok(/onError=/.test(props), `${name} cannot report errors`)
@@ -384,17 +463,19 @@ export function run(test) {
   test('every collapsible panel has a distinct key', () => {
     // The saved layout order is keyed on these; duplicates would render a panel
     // twice and hand React two children with the same key.
+    // No floor on the count any more: seventeen folds becoming a handful is
+    // the point of the restructure, so a test that demanded eleven of them
+    // would be defending exactly what it was written to help remove.
     const keys = [...src.matchAll(/<Section key="([^"]+)"/g)].map((m) => m[1])
-    assert.ok(keys.length > 10, 'expected the sections to be keyed')
+    assert.ok(keys.length, 'expected the sections to be keyed')
     assert.equal(keys.length, new Set(keys).size, 'duplicate Section keys')
   })
 
-  test('reorderable stacks are closed', () => {
-    assert.equal(
-      (src.match(/<SectionStack/g) || []).length,
-      (src.match(/<\/SectionStack>/g) || []).length
-    )
+  test('every panel and every sheet is closed', () => {
+    // SectionStack is gone with the drag-to-reorder it existed for; what is
+    // left is the pairing, which a bad splice still breaks.
     assert.equal((src.match(/<Section /g) || []).length, (src.match(/<\/Section>/g) || []).length)
+    assert.equal((src.match(/<Sheet\b/g) || []).length, (src.match(/<\/Sheet>/g) || []).length)
   })
 
   test('one device, one copy of its state, one subscription', () => {
@@ -523,6 +604,7 @@ export function run(test) {
     const gig = files['components/Gig.jsx']
     assert.ok(hw && gig, 'Hardware.jsx or Gig.jsx is gone')
 
+
     // The cab panel: names and the enum labels, never the enum objects.
     assert.ok(/slot\.irName/.test(hw), 'the cab panel no longer reads irName')
     assert.ok(/slot\.irIndex/.test(hw), 'the cab panel no longer reads irIndex')
@@ -531,13 +613,13 @@ export function run(test) {
       'the cab panel renders a {value,label} enum straight into JSX again — that throws'
     )
 
-    // The meters: one row per monitored parameter, level is norm.
-    assert.ok(/row\.norm/.test(hw), 'the meters no longer read norm')
+    /*
+     * The monitor readings. The standalone meters panel is gone — its whole
+     * content was a bar per block, which is what Play already draws — so the
+     * one surviving reader is the signal bar, and `norm` is still the field.
+     */
     assert.ok(/m\.norm/.test(gig), "the gig screen's signal bar no longer reads norm")
-    assert.ok(
-      /key=\{`\$\{row\.effectId\}/.test(hw),
-      'meter rows are keyed on something other than the effectId they arrive with'
-    )
+    assert.ok(!/\.level\b/.test(gig), 'the signal bar reads .level again — monitors have none')
 
     // Modifiers: the source ordinal is what gets written to the device, so a
     // wrong field name here is not a blank label, it is a bad write.
