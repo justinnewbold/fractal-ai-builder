@@ -1915,7 +1915,7 @@ input.refine-input {
 .views {
   display: flex;
   gap: 2px;
-  margin-top: 22px;
+  margin-top: var(--s-3);
   border-bottom: 1px solid var(--rule);
 }
 
@@ -5059,4 +5059,65 @@ button.sheet-close:active {
 .matrix th.current {
   color: var(--signal);
   border-bottom: 2px solid var(--signal);
+}
+
+/* ---------- the way back from a model swap ----------
+
+   A swap replaces every parameter on the block, so it is structural — but a
+   confirm dialog in front of a tone control is the ceremony that sends people
+   back to the hardware editor. It writes, and offers the way back for eight
+   seconds. */
+
+.undo-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--f-2);
+  color: var(--silk-dim);
+  background: var(--signal-wash);
+  border: 1px solid color-mix(in srgb, var(--signal) 40%, var(--rule));
+  border-radius: var(--r-1);
+}
+
+.undo-strip span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Where a search landed. It fades on its own — a highlight that stays is a
+   selection, and nothing here is selected. */
+.knob-cell.found {
+  outline: 2px solid var(--signal);
+  outline-offset: 3px;
+  border-radius: var(--r-1);
+}
+
+/* The row of things Shape opens rather than contains. */
+.shape-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+}
+
+/* On a phone the chrome above the first control is the whole brief: the bar,
+   the tabs, and then what you came for. Every pixel between them is spent
+   twice, once at the top of every screen. */
+@media (max-width: 620px) {
+  .shell {
+    padding-top: var(--s-3);
+  }
+
+  .views {
+    margin-top: var(--s-2);
+  }
+
+  .fx-panel {
+    margin-top: var(--s-2);
+  }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { cabState, listIrBanks, backupPreset, loadPresetBytes, liveMeters } from '../lib/forgefx'
+import { cabState, listIrBanks, backupPreset, loadPresetBytes } from '../lib/forgefx'
 
 /**
  * A device enum, as one readable word.
@@ -162,78 +162,6 @@ export function Backup({ preset, onError, onChanged, busy }) {
         anything. Save it from the bar at the top to keep it.
       </p>
       {note ? <p className="hint">{note}</p> : null}
-    </section>
-  )
-}
-
-/**
- * Live output meters.
- *
- * Polled rather than streamed: ForgeFX's browser runtime replaces the SSE
- * endpoint, and a poll every 400ms is enough to see where signal is without
- * saturating a serial port that writes also have to share.
- */
-export function Meters({ active }) {
-  const [rows, setRows] = useState([])
-  const [on, setOn] = useState(false)
-
-  useEffect(() => {
-    if (!on || !active) return
-    let stop = false
-
-    const tick = async () => {
-      try {
-        const data = await liveMeters()
-        if (!stop) setRows(Array.isArray(data) ? data : data?.blocks || [])
-      } catch {
-        if (!stop) setOn(false) // unsupported on this unit; don't hammer it
-      }
-      if (!stop) setTimeout(tick, 400)
-    }
-    tick()
-
-    return () => {
-      stop = true
-    }
-  }, [on, active])
-
-  return (
-    <section className="meters">
-      <div className="log-head">
-        <button className="chip" onClick={() => setOn(!on)} disabled={!active}>
-          {on ? 'Stop meters' : 'Live meters'}
-        </button>
-      </div>
-
-      {on ? (
-        rows.length ? (
-          <div className="meter-list">
-            {/*
-              One row per monitored parameter — a block can expose several, so
-              the key is the pair, not the block. The level is `norm`: `level`
-              was invented by the old mock and is undefined on a real unit,
-              which drew every bar at zero width under a blank label, with each
-              row claiming the same undefined React key.
-            */}
-            {rows.map((row) => (
-              <div className="meter-row" key={`${row.effectId}:${row.paramName}`}>
-                <span className="diff-label">{row.paramName || `Block ${row.effectId}`}</span>
-                <div className="meter-track">
-                  <div
-                    className="meter-fill"
-                    style={{ width: `${Math.round(Math.min(1, Math.max(0, row.norm ?? 0)) * 100)}%` }}
-                  />
-                </div>
-                {typeof row.db === 'number' ? (
-                  <span className="mono meter-db">{row.db.toFixed(1)} dB</span>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="hint">No meter data — this unit may not report per-block levels.</p>
-        )
-      ) : null}
     </section>
   )
 }
