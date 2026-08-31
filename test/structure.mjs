@@ -194,6 +194,54 @@ export function run(test) {
     )
   })
 
+  test('the chrome above the first control stays one bar deep', () => {
+    /*
+     * The number this restructure exists for. It was six stacked elements and
+     * about 290px on a phone — 35-40% of the screen spent before anything you
+     * came to do. A browser measures it properly (there's a harness for that);
+     * what a text test can hold is the shape that produced it, so it can't be
+     * rebuilt one well-meaning row at a time.
+     *
+     * The rule: between the update notice and the first view, the only things
+     * rendered are the bar, the states that mean the app can't work yet, and
+     * the assistant.
+     */
+    const from = src.indexOf('<TopBar')
+    const to = src.indexOf("view === 'console' ? (")
+    assert.ok(from !== -1 && to > from, 'the chrome no longer starts at the top bar')
+    const chrome = src.slice(from, to)
+    const allowed = new Set([
+      'TopBar', // the bar itself
+      'SaveBar', // rides in it
+      'Remote', // the sign-in, on the screen that says there's no connection
+      'Assistant', // the way the app is meant to be worked
+      'Thinking',
+      'Stages',
+      'LiveGeneration',
+      'Cost',
+      'Preview' // what a generation produces, where it was asked for
+    ])
+    for (const name of components(chrome)) {
+      assert.ok(allowed.has(name), `${name} is stacked above the first view — that is what took 290px`)
+    }
+  })
+
+  test('the bar that carries the whole app renders in every state', () => {
+    /*
+     * It replaced six stacked elements, all of which were gated on being
+     * connected — so the screen you get when nothing is connected had no way to
+     * reach the host address or the sign-in that fixes it. The bar is outside
+     * every status check, and the gear inside it is how setup is reached when
+     * setup is the thing that's wrong.
+     */
+    const at = src.indexOf('<TopBar')
+    assert.notEqual(at, -1, 'no top bar')
+    const before = src.slice(0, at)
+    const gate = before.lastIndexOf("status === 'live'")
+    const opened = before.lastIndexOf('{')
+    assert.ok(gate < opened, 'the top bar is behind a status check')
+  })
+
   test('every class this app scrolls to exists somewhere that renders it', () => {
     /*
      * `.local-library` didn't. The stylesheet had a rule for it, the assistant

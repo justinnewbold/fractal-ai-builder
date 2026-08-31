@@ -24,7 +24,7 @@ import {
  * So: a lit chip that says it in words, and opens what you'd want next — the
  * way out when connected, the way back when not.
  */
-export default function PhoneLink({ onChanged, onError }) {
+export default function PhoneLink({ onChanged, onError, compact }) {
   const [open, setOpen] = useState(false)
   const [working, setWorking] = useState(false)
   const [hostSeen, setHostSeen] = useState(remoteHostSeen())
@@ -125,16 +125,28 @@ export default function PhoneLink({ onChanged, onError }) {
       : 'Phone link · no answer'
     : 'Phone link off'
 
+  /*
+   * In the top bar it is a state, not a sentence.
+   *
+   * "Connected to phone" is a hundred pixels of a three-hundred-and-ninety
+   * pixel row, and it pushed the preset name — the one fact anyone reads there
+   * — down to nothing. The word still says which of the three states it is;
+   * the colour says whether that's good; the popover keeps the sentence.
+   */
+  const short = active ? (hostSeen ? 'phone' : 'no host') : 'phone off'
+
   return (
     <span className="phone-link" ref={wrap}>
       <button
-        className={`phone-chip ${active ? (hostSeen ? 'on' : 'lonely') : 'off'}`}
+        className={`phone-chip ${compact ? 'compact' : ''} ${
+          active ? (hostSeen ? 'on' : 'lonely') : 'off'
+        }`}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={`${label} — connection options`}
       >
-        <span className="lamp" data-state={active ? 'live' : 'idle'} />
-        {label}
+        {compact ? null : <span className="lamp" data-state={active ? 'live' : 'idle'} />}
+        {compact ? short : label}
       </button>
 
       {open ? (

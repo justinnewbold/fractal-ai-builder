@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import DeviceBar from './components/DeviceBar'
+import TopBar from './components/TopBar'
 import Grid from './components/Grid'
 import { Preview } from './components/Generate'
 import { ChangeLog } from './components/ChangeLog'
@@ -23,7 +23,6 @@ import LocalLibrary from './components/LocalLibrary'
 import Remote from './components/Remote'
 import Section from './components/Section'
 import SectionStack from './components/SectionStack'
-import StatusLine from './components/StatusLine'
 import ParamSearch from './components/ParamSearch'
 import Host from './components/Host'
 import Assistant from './components/Assistant'
@@ -87,7 +86,6 @@ import {
   subscribeRemoteState
 } from './lib/remote'
 import { newEntry, append } from './lib/log'
-import { VERSION } from './lib/version'
 import { EXCLUDED_BLOCKS } from './lib/guardrails'
 
 import { blockCatalog } from './lib/forgefx'
@@ -1489,63 +1487,49 @@ export default function App() {
           screen a possible lie about what the code does. */}
       <UpdateNotice />
 
-      <header className="masthead">
-        <div>
-          <h1 className="wordmark">
-            Fractal <span>AI</span> Builder
-          </h1>
-          <p className="tagline">Describe a tone. Get a preset on the unit.</p>
-        </div>
-        <div className="mast-right">
-          {/*
-            Saving, top right — moved up from a bar pinned over the bottom of
-            every screen. Absent in gig: that screen exists to switch sounds
-            with a thumb in the dark, and a slot overwrite is not something to
-            put within reach of a mis-tap mid-song. The StatusLine still says
-            "Unsaved" on every screen, so the state survives the scroll even
-            though the button doesn't follow it.
-          */}
-          {status === 'live' && view !== 'gig' ? (
-            <SaveBar
-              preset={preset}
-              dirty={dirty}
-              busy={busy}
-              saveName={saveName}
-              onName={setSaveName}
-              slot={slot}
-              onSlot={setSlot}
-              onSave={save}
-              queued={queuedSave}
-              onRevert={revert}
-              safety={safety}
-              onRestoreSafety={restoreSafety}
-              error={saveError}
-              onDismissError={() => setSaveError(null)}
-            />
-          ) : null}
-
-          {/*
-            Version, build stamp and commit used to sit here, above everything.
-            They are the first thing a guitarist saw and told them nothing; they
-            matter only when something has gone wrong, which is where they now
-            live — Library, Technical details. The theme toggle stays, because
-            that is a thing you actually want to change.
-          */}
-          {/* The one piece of "chrome" that earned its place back: the version
-              is how a deploy is confirmed after every change, and burying it
-              three taps deep in Technical details broke that habit. Just the
-              number — the phase, hash and build stamp stay buried.
-
-              The theme toggle used to sit beside it and cost a row of its own
-              on every screen for something set once a month. It moved in with
-              the other things you set once: the device bar's fold. */}
-          <div className="build-badge">
-            <span className="version mono">v{VERSION}</span>
-          </div>
-        </div>
-      </header>
-
-      <DeviceBar status={status} device={device} onRetry={reconnect} busy={busy} />
+      {/*
+        Saving rides in the bar, and stays off the gig screen: that screen
+        exists to switch sounds with a thumb in the dark, and a slot overwrite
+        is not something to put within reach of a mis-tap mid-song. The bar
+        still says "Unsaved" there, so the state survives even where the button
+        doesn't follow it.
+      */}
+      <TopBar
+        status={status}
+        device={device}
+        preset={preset}
+        dirty={dirty}
+        busy={busy}
+        onOpenPresets={() => setView('console')}
+        onRetry={reconnect}
+        onError={setError}
+        onRemoteChanged={(on) => {
+          setRemote(on)
+          record('remote', on ? 'Connected to the host remotely' : 'Back to the local connection')
+          resetSchemaCache()
+          read()
+        }}
+      >
+        {status === 'live' && view !== 'gig' ? (
+          <SaveBar
+            preset={preset}
+            dirty={dirty}
+            busy={busy}
+            compact
+            saveName={saveName}
+            onName={setSaveName}
+            slot={slot}
+            onSlot={setSlot}
+            onSave={save}
+            queued={queuedSave}
+            onRevert={revert}
+            safety={safety}
+            onRestoreSafety={restoreSafety}
+            error={saveError}
+            onDismissError={() => setSaveError(null)}
+          />
+        ) : null}
+      </TopBar>
 
       {isDemo() && status === 'live' ? (
         <p className="demo-banner">
@@ -1708,25 +1692,6 @@ export default function App() {
         meant to be worked: the views below are for when you'd rather reach for
         the control yourself, not a separate mode with different powers.
       */}
-      {/* Always on screen, above everything, on every view. */}
-      {status === 'live' ? (
-        <StatusLine
-          device={device}
-          preset={preset}
-          dirty={dirty}
-          remote={remote}
-          onError={setError}
-          /* Same consequences as the panel's own buttons: which unit answers
-             changes, so the cached schema and the whole read go with it. */
-          onRemoteChanged={(on) => {
-            setRemote(on)
-            record('remote', on ? 'Connected to the host remotely' : 'Back to the local connection')
-            resetSchemaCache()
-            read()
-          }}
-        />
-      ) : null}
-
       {status === 'live' ? (
         <Assistant
           turns={turns}

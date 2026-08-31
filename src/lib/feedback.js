@@ -75,3 +75,22 @@ export function beatFlash(el) {
     // Blocked or unsupported — the flash carries it alone.
   }
 }
+
+/**
+ * The confirmation you can feel without looking.
+ *
+ * Kept separate from the flash on purpose: amber means the audio path, and
+ * spending it on every scene button would make it mean "you tapped something".
+ * On stage the useful signal is that the write went out, delivered through the
+ * one sense that isn't busy watching the fretboard.
+ *
+ * Silent on iOS, which exposes no vibration API — there the press state carries
+ * it alone, which is why that had to be built first.
+ */
+export function tick(ms = 12) {
+  try {
+    navigator.vibrate?.(ms)
+  } catch {
+    // Blocked, unsupported, or a page that hasn't been interacted with yet.
+  }
+}
