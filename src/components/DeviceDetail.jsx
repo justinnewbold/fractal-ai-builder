@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { getHost, setHost, isDemo, setDemo } from '../lib/forgefx'
 import { remoteActive } from '../lib/remote'
 import Theme from './Theme'
-import { VERSION } from '../lib/version'
+import { FULL } from '../lib/version'
 
 /**
  * Everything about the connection that isn't its state.
@@ -44,7 +44,12 @@ export default function DeviceDetail({ status, device, onRetry, busy }) {
     <div className="device-detail">
       {status === 'live' && device ? (
         <div className="device-meta mono">
-          v{VERSION} · gen {device.gen}
+          {/* The commit rides with the number. A version is hand-written and can
+              be forgotten — seven merges went out under 6.9.5 — while the hash
+              changes on its own with every single build, so "am I looking at
+              the deploy that has my fix in it" is answerable without trusting
+              anyone's memory. */}
+          {FULL} · gen {device.gen}
           {/* The AM4 has a four-slot chain and reports no grid. "grid ×" with
               nothing either side of it isn't a fact about the unit. */}
           {grid?.rows && grid?.cols ? ` · grid ${grid.rows}×${grid.cols}` : ''} ·{' '}
@@ -52,7 +57,7 @@ export default function DeviceDetail({ status, device, onRetry, busy }) {
         </div>
       ) : null}
 
-      {status !== 'live' ? <div className="device-meta mono">v{VERSION}</div> : null}
+      {status !== 'live' ? <div className="device-meta mono">{FULL}</div> : null}
 
       <div className="device-detail-row">
         {editing ? (
