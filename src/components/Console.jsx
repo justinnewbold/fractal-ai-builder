@@ -301,60 +301,39 @@ export function BlockPanel({ block, channels, onError, onChanged, busy }) {
 
   return (
     <div className="block-panel">
-      <div className="block-side">
-        <p className="block-heading">{block.name}</p>
-
-        <div
-          className="block-icon"
-          style={{ '--tile': colorFor(block.slug) }}
-          aria-hidden="true"
-        >
-          {shortName(block.slug)}
-        </div>
-
+      {/*
+        Everything that isn't a knob, in two rows.
+        It used to be a 190px column down the left of a four-column grid,
+        because this panel was the bottom strip of a desktop console. It opens
+        as a sheet now, so the layout is vertical and the budget is a phone's:
+        282px of channel-type-bypass before the first control was most of what
+        you could see. The name and the block's own colour are on the sheet
+        header above, so neither is repeated here.
+      */}
+      <div className="block-meta">
         {channels?.length ? (
-          <>
-            <p className="silk-label">Channel</p>
-            <div className="chan-row">
-              {channels.map((ch) => (
-                <button
-                  key={ch}
-                  className={`chan-btn ${block.channel === ch ? 'current' : ''}`}
-                  onClick={async () => {
-                    try {
-                      await setChannel(block.effectId, ch)
-                      onChanged(`${block.name} → channel ${ch}`)
-                    } catch (err) {
-                      onError(err.message)
-                    }
-                  }}
-                  disabled={busy}
-                >
-                  {ch}
-                </button>
-              ))}
-            </div>
-          </>
-        ) : null}
-
-        {models.length ? (
-          <>
-            <p className="silk-label">Type</p>
-            <select
-              className="type-select"
-              value={models.find((m) => m.name === block.typeName)?.value ?? ''}
-              onChange={(e) => e.target.value !== '' && swapModel(e.target.value)}
-            >
-              <option value="">{models.length} models…</option>
-              {models.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.name}
-                  {m.basedOn ? ` — ${m.basedOn}` : ''}
-                </option>
-              ))}
-            </select>
-          </>
-        ) : null}
+          <div className="chan-row" role="group" aria-label="Channel">
+            {channels.map((ch) => (
+              <button
+                key={ch}
+                className={`chan-btn ${block.channel === ch ? 'current' : ''}`}
+                onClick={async () => {
+                  try {
+                    await setChannel(block.effectId, ch)
+                    onChanged(`${block.name} → channel ${ch}`)
+                  } catch (err) {
+                    onError(err.message)
+                  }
+                }}
+                disabled={busy}
+              >
+                {ch}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <span />
+        )}
 
         <button
           className={`bypass-btn ${block.bypassed ? 'off' : ''}`}
@@ -372,16 +351,33 @@ export function BlockPanel({ block, channels, onError, onChanged, busy }) {
         </button>
       </div>
 
-      <div className="block-tabs">
-        <button className={tab === 'main' ? 'current' : ''} onClick={() => setTab('main')}>
-          Main
-        </button>
-        {rest.length ? (
+      {models.length ? (
+        <select
+          className="type-select"
+          aria-label="Model"
+          value={models.find((m) => m.name === block.typeName)?.value ?? ''}
+          onChange={(e) => e.target.value !== '' && swapModel(e.target.value)}
+        >
+          <option value="">{models.length} models…</option>
+          {models.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.name}
+              {m.basedOn ? ` — ${m.basedOn}` : ''}
+            </option>
+          ))}
+        </select>
+      ) : null}
+
+      {rest.length ? (
+        <div className="block-tabs">
+          <button className={tab === 'main' ? 'current' : ''} onClick={() => setTab('main')}>
+            Main
+          </button>
           <button className={tab === 'more' ? 'current' : ''} onClick={() => setTab('more')}>
             More
           </button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       <div className="knob-deck">
         {loading ? (
@@ -409,12 +405,16 @@ export function BlockPanel({ block, channels, onError, onChanged, busy }) {
         )}
       </div>
 
+      {/* The block's output level: shown, never written. It's kept out of the
+          deck above because a generator that sets it to -60 dB makes a preset
+          that looks right and is silent — but gain staging is still something
+          you need to be able to read. A row, not the 164px column it was. */}
       {level ? (
-        <div className="level-column">
-          <Knob param={level} label="Level" value={level.value} onChange={() => {}} size={52} />
-          <div className="knob-readout mono">
+        <div className="block-level">
+          <span className="silk-label">Level</span>
+          <span className="mono">
             {fmt(level.value)} {level.unit}
-          </div>
+          </span>
           <span className="hint">read-only</span>
         </div>
       ) : null}

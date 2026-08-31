@@ -22,6 +22,7 @@ import Ports from './components/Ports'
 import LocalLibrary from './components/LocalLibrary'
 import Remote from './components/Remote'
 import Section from './components/Section'
+import Sheet from './components/Sheet'
 import SectionStack from './components/SectionStack'
 import ParamSearch from './components/ParamSearch'
 import Host from './components/Host'
@@ -207,6 +208,13 @@ export default function App() {
   // Grouped by what you're doing rather than by which endpoint it calls.
   const [view, setView] = useState('console')
   const [selectedBlock, setSelectedBlock] = useState(null)
+  /*
+   * Whether the block editor is *showing*, which is not the same question as
+   * which block is selected. A refresh picks the amp so the chain has something
+   * highlighted; if that alone opened the sheet, every connect and every read
+   * would drop the editor over the screen unasked. Opening is a tap.
+   */
+  const [blockOpen, setBlockOpen] = useState(false)
   const [slots, setSlots] = useState([])
   const [scanning, setScanning] = useState(false)
   const [scene, setSceneIdx] = useState(0)
@@ -1481,6 +1489,11 @@ export default function App() {
 
   const writeCount = result ? countWrites(result.changes) : 0
 
+  // The block the sheet is showing. Resolved once: a selection can outlive the
+  // chain it pointed into (a preset change lands before the refresh does), and
+  // an id with no block behind it must not open an empty sheet.
+  const openBlock = selectedBlock ? blocks.find((b) => b.effectId === selectedBlock) : null
+
   return (
     <div className="shell">
       {/* Above everything, because a stale tab makes every other thing on this
@@ -2020,21 +2033,39 @@ export default function App() {
             <Chain
               blocks={blocks}
               selected={selectedBlock}
-              onSelect={setSelectedBlock}
+              onSelect={(id) => {
+                setSelectedBlock(id)
+                setBlockOpen(true)
+              }}
               onToggle={toggleBlock}
             />
 
-            <BlockPanel
-              block={blocks.find((b) => b.effectId === selectedBlock)}
-              channels={device?.capabilities?.channelNames}
-              busy={busy}
-              onError={setError}
-              onChanged={(summary) => {
-                record('edit', summary)
-                setDirty(true)
-                read()
-              }}
-            />
+            {/*
+              The block editor arrives over the screen rather than stacking
+              under the chain. It used to be a full-width row at the bottom of
+              the console grid, which on a phone meant tapping a block scrolled
+              the thing you tapped off the top of the screen. A sheet is in
+              front of you the moment it exists; on a wide screen the same
+              component docks as a rail beside the chain, so nothing is hidden.
+            */}
+            <Sheet
+              open={blockOpen && !!openBlock}
+              onClose={() => setBlockOpen(false)}
+              title={openBlock?.name || 'Block'}
+              note={openBlock?.bypassed ? 'Bypassed' : null}
+            >
+              <BlockPanel
+                block={openBlock}
+                channels={device?.capabilities?.channelNames}
+                busy={busy}
+                onError={setError}
+                onChanged={(summary) => {
+                  record('edit', summary)
+                  setDirty(true)
+                  read()
+                }}
+              />
+            </Sheet>
           </div>
         </>
       ) : null}

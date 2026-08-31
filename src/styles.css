@@ -99,6 +99,9 @@
   --row-h: 60px;
   --gutter: 8px; /* superseded by --s-2; kept until .grid is converted */
 
+  --bar-h: 45px; /* the top bar plus its rule; what a docked rail starts under */
+  --rail-w: 380px;
+
   --display: 'Archivo Expanded', 'Archivo', system-ui, sans-serif;
   --body: 'Archivo', system-ui, -apple-system, sans-serif;
   --mono: 'DM Mono', ui-monospace, 'SF Mono', monospace;
@@ -755,6 +758,9 @@ input[type='text']:focus-visible {
     transition: none !important;
   }
 }
+/* One exception, at the bottom of this file: a sheet cross-fades instead. A
+   fade is not motion, and a surface that appears between two frames reads as a
+   glitch rather than as calm — see the sheet's own reduced-motion block. */
 
 @media (max-width: 620px) {
   .shell {
@@ -2415,30 +2421,26 @@ button.cell-btn.over {
    the selected block's controls across the bottom. The arrangement is
    the point — it's how these units are actually worked on, and it puts
    the chain and the block you're editing on screen together.
+
+   The block's controls used to be a fourth row spanning the whole grid.
+   They are a sheet now — over the screen on a phone, docked as a rail on
+   a wide one — so this holds three columns and one row.
    ================================================================== */
 
 .console {
   display: grid;
   grid-template-columns: 250px minmax(0, 1fr) minmax(300px, 0.9fr);
-  grid-template-rows: auto auto;
   gap: 10px;
   margin-top: 12px;
-}
-
-.console > .preset-panel {
-  grid-row: 1 / span 2;
-}
-
-.console > .block-panel {
-  grid-column: 1 / -1;
+  /* No align-items here. Below 1000px this same selector becomes a flex
+     column, and `start` there stops stretching the panels to the width — the
+     chain strip then sizes to its max-content, pushes the layout viewport out
+     to 572px, and the whole phone page renders zoomed out. */
 }
 
 @media (max-width: 1000px) {
   .console {
     grid-template-columns: 1fr;
-  }
-  .console > .preset-panel {
-    grid-row: auto;
   }
 }
 
@@ -2817,60 +2819,43 @@ button.edit-tab.current {
   border-color: var(--signal);
 }
 
-/* ---------- block panel ---------- */
+/* ---------- block panel ----------
+
+   It lives in a sheet, and only in a sheet. This used to be a four-column
+   grid because it was the bottom strip of a desktop console; as a sheet it
+   is one column, and everything above the knobs is on a budget — a phone
+   that has to scroll to reach the first control has not opened anything. */
 
 .block-panel {
-  display: grid;
-  grid-template-columns: 190px 76px minmax(0, 1fr) auto;
-  gap: 0;
-  min-height: 210px;
+  display: block;
+  padding: var(--s-3) var(--s-4) var(--s-4);
 }
 
 .block-panel.empty {
-  display: block;
-  min-height: 0;
+  padding: 0;
 }
 
-.block-side {
-  padding: 12px;
-  border-right: 1px solid var(--rule);
-}
-
-.block-heading {
-  font-family: var(--display);
-  font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  margin: 0 0 10px;
-}
-
-.block-icon {
+/* Channel on the left, engaged/bypassed on the right: the two things you flip
+   without thinking, on one row. */
+.block-meta {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 54px;
-  height: 54px;
-  border-radius: 6px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--tile) 88%, white), var(--tile));
-  font-family: var(--display);
-  font-weight: 700;
-  font-size: 13px;
-  color: #fff;
-  margin-bottom: 12px;
+  gap: var(--s-2);
 }
 
 .chan-row {
   display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
   gap: 4px;
-  margin: 5px 0 12px;
 }
 
 button.chan-btn {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   padding: 6px 0;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--f-3);
   background: var(--chassis);
 }
 
@@ -2881,47 +2866,48 @@ button.chan-btn.current {
 
 .type-select {
   width: 100%;
-  margin: 5px 0 12px;
-  padding: 7px 8px;
+  margin: var(--s-2) 0 0;
+  padding: 8px 10px;
   font-family: var(--body);
-  font-size: 12px;
+  font-size: var(--f-3);
   color: var(--silk);
   background: var(--chassis);
   border: 1px solid var(--rule);
-  border-radius: 2px;
+  border-radius: var(--r-1);
 }
 
 .bypass-btn {
-  width: 100%;
-  font-size: 11.5px;
+  flex: 0 0 auto;
+  font-size: var(--f-2);
 }
 
 .bypass-btn.off {
   color: var(--silk-faint);
 }
 
+/* Horizontal, and only present when there is a second page of controls. It was
+   a vertical rail down the middle of the old four-column grid. */
 .block-tabs {
   display: flex;
-  flex-direction: column;
-  border-right: 1px solid var(--rule);
-  padding-top: 12px;
+  gap: var(--s-1);
+  margin: var(--s-3) 0 0;
+  border-bottom: 1px solid var(--rule);
 }
 
 .block-tabs button {
   background: none;
   border: none;
   border-radius: 0;
-  border-left: 2px solid transparent;
-  text-align: left;
-  padding: 8px 10px;
-  font-size: 12px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 8px 12px;
+  font-size: var(--f-3);
   color: var(--silk-faint);
 }
 
 .block-tabs button.current {
   color: var(--silk);
-  border-left-color: var(--signal);
-  background: var(--panel-hi);
+  border-bottom-color: var(--signal);
 }
 
 .knob-deck {
@@ -3048,29 +3034,21 @@ input.knob-readout:focus {
   border-color: var(--live);
 }
 
-.level-column {
+/* Read-only, so it reads as a line rather than as a control you can reach for:
+   a small dial for the shape of the value, then the value itself in words. */
+.block-level {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 18px 18px;
-  border-left: 1px solid var(--rule);
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--rule);
 }
 
-@media (max-width: 860px) {
-  .block-panel {
-    grid-template-columns: 1fr;
-  }
-  .block-side,
-  .block-tabs,
-  .level-column {
-    border-right: none;
-    border-left: none;
-    border-bottom: 1px solid var(--rule);
-  }
-  .block-tabs {
-    flex-direction: row;
-  }
+.block-level .mono {
+  flex: 1 1 auto;
+  font-size: var(--f-3);
+  color: var(--silk);
 }
 
 /* ---------- preset scan and filter ---------- */
@@ -3451,14 +3429,11 @@ ol.action-list li.destructive::marker {
   .console > .fx-panel {
     order: 1;
   }
-  .console > .block-panel {
+  .console > .center-panel {
     order: 2;
   }
-  .console > .center-panel {
-    order: 3;
-  }
   .console > .preset-panel {
-    order: 4;
+    order: 3;
   }
 
   .preset-scroll {
@@ -3645,8 +3620,7 @@ ol.action-list li.destructive::marker {
 
 /* Block tiles carry their own colour, so on paper they need a darker face
    and light lettering rather than the lifted gradient used on the chassis. */
-[data-theme='light'] button.fx-tile,
-[data-theme='light'] .block-icon {
+[data-theme='light'] button.fx-tile {
   background: linear-gradient(180deg, var(--tile), color-mix(in srgb, var(--tile) 82%, black));
   color: #fff;
 }
@@ -4811,4 +4785,259 @@ button.gig-tuner-btn.on {
 .inspect-bad {
   font-size: 12px;
   color: var(--live);
+}
+
+/* ==================================================================
+   Sheets
+
+   The app's own furniture, not the hardware's: --r-2/--r-3 corners,
+   real elevation, and blur — where the panels above are 3px-cornered
+   and flat because they stand for something with screws in it.
+
+   Two structural rules, both learned by breaking them:
+
+   - The blur is on the scrim and the transform is on the sheet, always
+     on different elements. A backdrop-filter on a node that is also
+     animating its transform tears in Safari.
+   - The sheet transforms; the scrim only fades. Moving both means the
+     dim and the surface arrive at different rates and the layer reads
+     as two things.
+   ================================================================== */
+
+.sheet-layer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-scrim);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+.sheet-scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  cursor: default;
+  background: rgba(6, 7, 9, 0.58);
+  opacity: 0;
+  transition: opacity var(--t-3) var(--ease);
+  pointer-events: auto;
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .sheet-scrim {
+    background: rgba(6, 7, 9, 0.42);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    backdrop-filter: blur(14px) saturate(1.2);
+  }
+}
+
+.sheet-layer[data-shown='yes'] .sheet-scrim {
+  opacity: 1;
+}
+
+.sheet {
+  position: relative;
+  z-index: var(--z-sheet);
+  display: flex;
+  flex-direction: column;
+  max-height: min(88vh, 100% - var(--bar-h));
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-bottom: 0;
+  border-radius: var(--r-3) var(--r-3) 0 0;
+  box-shadow: var(--e-3);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* Off the bottom until shown. translate3d, so it is composited rather than
+     repainted on a phone that is also servicing a serial connection. */
+  transform: translate3d(0, 100%, 0);
+  transition: transform var(--t-3) var(--spring);
+  pointer-events: auto;
+  outline: none;
+}
+
+.sheet-layer[data-shown='yes'] .sheet {
+  transform: translate3d(0, 0, 0);
+}
+
+/* The grab handle, and the only place a drag dismisses from. The sheet body is
+   full of knobs, and a knob turn is a vertical drag: a dismiss handler on the
+   body would fight every one of them. */
+.sheet-head {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-4) var(--s-3);
+  border-bottom: 1px solid var(--rule);
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: grab;
+}
+
+.sheet-grip {
+  position: absolute;
+  top: 7px;
+  left: 50%;
+  width: 38px;
+  height: 4px;
+  margin-left: -19px;
+  border-radius: 2px;
+  background: var(--silk-faint);
+  opacity: 0.55;
+}
+
+.sheet-titles {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sheet-title {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: var(--f-4);
+  letter-spacing: 0.04em;
+  color: var(--silk);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sheet-note {
+  font-size: var(--f-2);
+  color: var(--silk-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+button.sheet-close {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  font-size: var(--f-5);
+  line-height: 1;
+  color: var(--silk-dim);
+  background: var(--panel-hi);
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform var(--t-1) var(--ease), color var(--t-1) var(--ease);
+}
+
+button.sheet-close:active {
+  transform: scale(0.92);
+  color: var(--silk);
+}
+
+/* Its own scroller, and its own overscroll: a sheet scrolled to its end must
+   not hand the gesture to the page underneath it. */
+.sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sheet-foot {
+  flex: 0 0 auto;
+  padding: var(--s-3) var(--s-4);
+  border-top: 1px solid var(--rule);
+}
+
+/* The sheet IS the surface, so what it carries stops drawing one of its own.
+   The block panel's own layout is written for this and needs nothing else. */
+.sheet .block-panel {
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+
+/* ---------- docked, on a wide screen ----------
+
+   The same component, beside the page rather than over it. A modal here
+   would dim and block the chain you opened the block from, which is the
+   one thing you want to keep looking at while you turn a knob. */
+
+@media (min-width: 1000px) {
+  .sheet-layer.rail {
+    inset: var(--bar-h) 0 0 auto;
+    width: var(--rail-w);
+    justify-content: stretch;
+  }
+
+  .sheet-layer.rail .sheet {
+    max-height: none;
+    height: 100%;
+    border: 0;
+    border-left: 1px solid var(--rule);
+    border-radius: 0;
+    box-shadow: var(--e-2);
+    /* Docked: it arrives from the side, and it never leaves under a drag. */
+    transform: translate3d(100%, 0, 0);
+  }
+
+  .sheet-layer.rail[data-shown='yes'] .sheet {
+    transform: translate3d(0, 0, 0);
+  }
+
+  .sheet-layer.rail .sheet-head {
+    cursor: default;
+    padding-top: var(--s-3);
+  }
+
+  .sheet-layer.rail .sheet-grip {
+    display: none;
+  }
+
+  /* Room for it, so a docked panel is a column and not a cover.
+
+     On #root rather than on .shell: the shell is a centred 1180px column, so
+     padding inside it shrinks the content without moving the column — and on a
+     wide window the page would still sit under the rail. Padding the element
+     the shell centres itself in moves the whole column instead. */
+  html[data-rail='on'] #root {
+    padding-right: var(--rail-w);
+  }
+}
+
+/*
+ * Reduced motion: the sheet still arrives, it just doesn't travel.
+ *
+ * A surface that appears with no transition at all is the thing people who ask
+ * for less motion complain about next — it reads as a glitch, and the setting
+ * asks for less movement, not for less explanation. A cross-fade moves nothing,
+ * so it's the substitute the guidance actually recommends.
+ *
+ * The !important is answering the blanket `* { transition: none !important }`
+ * near the top of this file, which is otherwise right and stays. This is the
+ * one surface that opts back in, and only into opacity: the transforms are
+ * cancelled outright, which is what the Playwright check asserts.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .sheet,
+  .sheet-layer.rail .sheet {
+    transform: none;
+    opacity: 0;
+    transition: opacity var(--t-1) linear !important;
+  }
+
+  .sheet-layer[data-shown='yes'] .sheet {
+    transform: none;
+    opacity: 1;
+  }
+
+  .sheet-scrim {
+    transition: opacity var(--t-1) linear !important;
+  }
 }
