@@ -255,6 +255,55 @@ export function run(test) {
     assert.ok(gate < opened, 'the top bar is behind a status check')
   })
 
+  test('the block editor arrives over the screen, not below it', () => {
+    /*
+     * It used to be the last row of the console grid. Tapping a block on a
+     * phone therefore scrolled the thing you tapped off the top of the screen,
+     * and the controls you asked for landed below the fold — which is the
+     * whole reason the sheet exists. Nesting is the guarantee: a BlockPanel
+     * rendered as a sibling of the chain again is the old bug returning.
+     */
+    const open = src.indexOf('<Sheet')
+    assert.notEqual(open, -1, 'nothing opens as a sheet')
+    const shut = src.indexOf('</Sheet>', open)
+    assert.notEqual(shut, -1, 'the sheet is never closed')
+    const inside = src.slice(open, shut)
+    assert.ok(inside.includes('<BlockPanel'), 'the block editor is not inside a sheet')
+    assert.equal(
+      (src.match(/<BlockPanel/g) || []).length,
+      1,
+      'the block editor is rendered more than once — one of them is not in a sheet'
+    )
+  })
+
+  test('a sheet is dismissed by its handle, never by its body', () => {
+    /*
+     * The single most likely way this restructure destroys the best existing
+     * work. The block editor is full of knobs and a knob turn is a vertical
+     * drag; a dismiss handler on the sheet body would fight every one of them,
+     * and the iOS touch handling underneath took three attempts to get right.
+     *
+     * So the touchstart goes on the grab handle's ref and on nothing else.
+     */
+    const sheet = readFileSync(new URL('../src/components/Sheet.jsx', import.meta.url), 'utf8')
+    const binds = [...sheet.matchAll(/(\w+)\.addEventListener\('touchstart'/g)].map((m) => m[1])
+    assert.deepEqual(binds, ['grip'], `touchstart is bound to ${binds.join(', ') || 'nothing'}`)
+    assert.ok(
+      /const grip = handle\.current/.test(sheet),
+      'the drag no longer reads the handle ref'
+    )
+    assert.ok(
+      !/panel\.current\.addEventListener\('touch/.test(sheet),
+      'the sheet body has a touch handler on it'
+    )
+    // Passive listeners ignore preventDefault, and React registers every touch
+    // handler as passive — which is why this one is native.
+    assert.ok(
+      /addEventListener\('touchstart', begin, \{ passive: false \}\)/.test(sheet),
+      'the drag listener is passive again, so iOS will take the gesture as a scroll'
+    )
+  })
+
   test('every class this app scrolls to exists somewhere that renders it', () => {
     /*
      * `.local-library` didn't. The stylesheet had a rule for it, the assistant
