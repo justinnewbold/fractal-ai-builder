@@ -194,6 +194,19 @@ export function run(test) {
     )
   })
 
+  test('the build says which build it is, not just which version', () => {
+    /*
+     * Seven merges shipped under v6.9.5, because the number is hand-written and
+     * hand-written numbers get forgotten. The commit doesn't: it changes with
+     * every build on its own. So the two travel together wherever the build
+     * identifies itself, and "is my fix in the thing I'm looking at" stops
+     * depending on anyone's memory.
+     */
+    const detail = readFileSync(new URL('../src/components/DeviceDetail.jsx', import.meta.url), 'utf8')
+    assert.ok(detail.includes('{FULL}'), 'the setup fold shows a version with no commit beside it')
+    assert.ok(!/\bVERSION\b/.test(detail), 'a bare version number is back on screen')
+  })
+
   test('the chrome above the first control stays one bar deep', () => {
     /*
      * The number this restructure exists for. It was six stacked elements and
