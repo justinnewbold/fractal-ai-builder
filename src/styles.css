@@ -1974,8 +1974,12 @@ button.view-tab.current {
   margin-top: 26px;
 }
 
+/* The 24px inset above and below dated from when this box also carried a
+   "FM3 · slot 500" line that the top bar was already printing. With only the
+   name left, that inset is padding around padding — and on this screen the
+   currency is scene buttons you can hit without looking. */
 .gig-preset {
-  padding: var(--s-5) var(--s-4);
+  padding: var(--s-3) var(--s-4);
   background: var(--panel);
   border: 1px solid var(--rule);
   border-left: 2px solid var(--signal);
@@ -1988,7 +1992,7 @@ button.view-tab.current {
   font-size: clamp(30px, 9vw, 52px);
   letter-spacing: 0.02em;
   line-height: 1.05;
-  margin: 6px 0 0;
+  margin: 0;
 }
 
 .gig-signal {
@@ -4541,12 +4545,19 @@ button.gig-block.off {
   opacity: 0.55;
 }
 
-/* ---------- the tuner, at stage size ---------- */
+/* ---------- the tuner and the pad, at stage size ---------- */
 
-button.gig-tuner-btn {
-  display: block;
-  width: 100%;
-  margin-top: 16px;
+/* Two modes on one row. Stacked full-width they cost 98px of a 664px screen,
+   between the preset you just changed and the scenes you are about to press. */
+.gig-modes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--s-2);
+  margin-top: var(--s-4);
+}
+
+button.gig-mode {
+  min-height: 48px;
   padding: var(--s-3);
   border: 1px solid var(--rule);
   border-radius: var(--r-1);
@@ -4559,9 +4570,12 @@ button.gig-tuner-btn {
   color: var(--silk-dim);
 }
 
-button.gig-tuner-btn.on {
+/* Lit, not merely outlined: on a dark stage the difference between a mode that
+   is on and one that is off has to survive being glanced at. */
+button.gig-mode.on {
   border-color: var(--live);
   color: var(--live);
+  background: var(--live-halo);
 }
 
 /* Everything scaled for a glance from standing height: the note fills the
@@ -5137,4 +5151,10 @@ button.sheet-close:active {
   .fx-panel {
     margin-top: var(--s-2);
   }
+}
+
+/* The way back to the pickers, once the pad has folded them away. */
+button.xy-change {
+  margin-left: auto;
+  align-self: center;
 }

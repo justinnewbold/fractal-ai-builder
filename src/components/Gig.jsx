@@ -293,18 +293,36 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
         </button>
       </div>
 
-      {/* Same rule as scenes: a unit whose driver reports no tuner doesn't get
-          a tuner button that can only disappoint. Absent means unknown (an
-          older ForgeFX that predates the flag), and unknown still gets to try. */}
-      {capabilities?.tuner !== false ? (
+      {/*
+        Two modes, one row.
+        They were a stacked pair of full-width buttons — 98px of the screen,
+        between the preset you just changed and the scenes you are about to
+        press, for two things you enter occasionally and never mid-phrase. Side
+        by side they cost one row, and the panel each opens still lands
+        directly underneath, in view, where the tap was.
+
+        Same rule as scenes for the tuner: a unit whose driver reports none
+        doesn't get a button that can only disappoint. Absent means unknown —
+        an older ForgeFX predating the flag — and unknown still gets to try.
+      */}
+      <div className="gig-modes">
+        {capabilities?.tuner !== false ? (
+          <button
+            className={`gig-mode ${tunerOn ? 'on' : ''}`}
+            onClick={toggleTuner}
+            aria-pressed={tunerOn}
+          >
+            Tuner
+          </button>
+        ) : null}
         <button
-          className={`gig-tuner-btn ${tunerOn ? 'on' : ''}`}
-          onClick={toggleTuner}
-          aria-pressed={tunerOn}
+          className={`gig-mode ${xyOn ? 'on' : ''}`}
+          onClick={() => setXyOn(!xyOn)}
+          aria-pressed={xyOn}
         >
-          {tunerOn ? 'Tuner off' : 'Tuner'}
+          XY pad
         </button>
-      ) : null}
+      </div>
 
       {tunerOn ? (
         <div className="gig-tuner">
@@ -324,14 +342,6 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
             : 'No readings are arriving from ForgeFX. If the unit is making sound, this ForgeFX build may not support the tuner on it — try updating ForgeFX.'}
         </p>
       ) : null}
-
-      <button
-        className={`gig-tuner-btn ${xyOn ? 'on' : ''}`}
-        onClick={() => setXyOn(!xyOn)}
-        aria-pressed={xyOn}
-      >
-        {xyOn ? 'Close XY pad' : 'XY pad'}
-      </button>
 
       {/* Live even while hidden would be wrong the other way: the pad holds no
           poll and writes only under a finger, so mount/unmount is free. */}

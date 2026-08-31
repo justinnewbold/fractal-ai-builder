@@ -34,6 +34,16 @@ export default function XYPad({ blocks, onError }) {
     }
   })
   const [dot, setDot] = useState(null)
+  /*
+   * The pickers are setup, and setup is not what this is for.
+   *
+   * "The pad you set up at home is the pad that opens at the gig" was already
+   * half-true — the choices persisted, but you still landed on two dropdowns
+   * with the pad underneath them. At a gig the pad is the thing; the dropdowns
+   * are how it got here. So once both axes are chosen they fold away, and the
+   * way back is one chip rather than a permanent pair of selects.
+   */
+  const [picking, setPicking] = useState(false)
   const padRef = useRef(null)
   const gate = useRef({ x: { at: 0, frac: null }, y: { at: 0, frac: null } })
   const errored = useRef(false)
@@ -195,26 +205,36 @@ export default function XYPad({ blocks, onError }) {
     </option>
   ))
 
+  const ready = !!(xCtl && yCtl)
+  /*
+   * No "done" here on purpose: choosing the second axis IS done. The pickers
+   * fold the moment both are set and the pad takes their place, so the only
+   * control needed afterwards is the way back.
+   */
+  const showPickers = picking || !ready
+
   return (
     <div className="xy">
-      <div className="xy-pickers">
-        <label>
-          <span className="silk-label">Across →</span>
-          <select value={axes.x || ''} onChange={(e) => pick('x', e.target.value)}>
-            <option value="">Choose…</option>
-            {options}
-          </select>
-        </label>
-        <label>
-          <span className="silk-label">Up ↑</span>
-          <select value={axes.y || ''} onChange={(e) => pick('y', e.target.value)}>
-            <option value="">Choose…</option>
-            {options}
-          </select>
-        </label>
-      </div>
+      {showPickers ? (
+        <div className="xy-pickers">
+          <label>
+            <span className="silk-label">Across →</span>
+            <select value={axes.x || ''} onChange={(e) => pick('x', e.target.value)}>
+              <option value="">Choose…</option>
+              {options}
+            </select>
+          </label>
+          <label>
+            <span className="silk-label">Up ↑</span>
+            <select value={axes.y || ''} onChange={(e) => pick('y', e.target.value)}>
+              <option value="">Choose…</option>
+              {options}
+            </select>
+          </label>
+        </div>
+      ) : null}
 
-      {xCtl && yCtl ? (
+      {ready ? (
         <>
           <div
             ref={padRef}
@@ -247,11 +267,14 @@ export default function XYPad({ blocks, onError }) {
               {dot ? Math.round(fromNormalized(dot.y, yCtl.param) * 100) / 100 : '—'}
               {yCtl.param.unit || ''}
             </span>
+            {showPickers ? null : (
+              <button className="chip xy-change" onClick={() => setPicking(true)}>
+                Change
+              </button>
+            )}
           </div>
         </>
-      ) : (
-        <p className="hint">Pick a control for each axis and the pad appears.</p>
-      )}
+      ) : null}
     </div>
   )
 }
