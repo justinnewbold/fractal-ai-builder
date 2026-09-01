@@ -73,6 +73,29 @@ export function run(test) {
     )
   })
 
+  test('picking a save destination cannot load it', () => {
+    /*
+     * The one way this feature can destroy work.
+     *
+     * The slot list in the save sheet is the same `PresetList` the preset menu
+     * uses, and there `onSelect` LOADS the preset — which is right there and
+     * catastrophic here: loading a preset replaces the edit buffer, so
+     * choosing where to save would discard the very thing being saved.
+     *
+     * The two call sites must therefore differ, and they look nearly
+     * identical. This asserts the save sheet's handler only sets the slot.
+     */
+    const sheet = read('src/components/SaveSheet.jsx').replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ' ')
+    const at = sheet.indexOf('onSelect=')
+    assert.ok(at !== -1, 'the save sheet no longer offers a slot list')
+    const handler = sheet.slice(at, at + 160)
+    assert.match(handler, /onSlot\(/, 'the save sheet does not set the slot when a row is picked')
+    assert.ok(
+      !/jumpTo|selectPreset|onLoad/.test(handler),
+      'the save sheet loads the preset it was asked to save into'
+    )
+  })
+
   test('the generator asks for an output ceiling rather than taking the default', () => {
     /*
      * The provider must send max_tokens on every request, so leaving it unset

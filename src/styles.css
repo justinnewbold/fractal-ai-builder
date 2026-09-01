@@ -5461,3 +5461,58 @@ button.topbar-preset.open .topbar-caret {
     flex-basis: 100%;
   }
 }
+
+/* ---------- save sheet ---------- */
+
+/*
+ * Saving moved out of a popover anchored to the top bar and into a sheet, so
+ * the slot list could come with it. The list is the point: a numeric field
+ * asks you to know that this tone belongs in 287 and to remember what is
+ * already there.
+ */
+.save-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.save-confirm {
+  width: 100%;
+}
+
+/* The one line that turns an overwrite into a decision. */
+.save-target-warn {
+  color: var(--silk);
+  border-left: 2px solid var(--signal);
+  padding-left: var(--s-3);
+}
+
+.save-pick-label {
+  margin-top: var(--s-4);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--rule);
+}
+
+/* ---------- where a write lands ---------- */
+
+/*
+ * Values belong to the preset; switching blocks on and off belongs to a scene.
+ * A generation therefore lands in two places at once, and only one of them was
+ * ever named. This says the other one, and lets it be changed.
+ */
+.write-target {
+  margin-top: var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+}
+
+.write-target .save-field {
+  margin-top: var(--s-2);
+}
+
+.write-target-now {
+  margin-top: var(--s-2);
+  color: var(--signal);
+}
