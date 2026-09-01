@@ -5681,3 +5681,60 @@ button.topbar-preset.open .topbar-caret {
     display: none;
   }
 }
+
+/* ---------- the introduction ---------- */
+
+/*
+ * Four cards in a sheet, shown once.
+ *
+ * Prose rather than the app's usual dense controls, so it reads at the size
+ * body text reads at. The sheet's own scroller handles a long card on a small
+ * phone; nothing here sets a height, because the cards are different lengths
+ * and a fixed one would leave the short ones with a hole in them.
+ */
+.tour-card p {
+  font-size: var(--f-3);
+  line-height: 1.55;
+  margin: 0 0 var(--s-4);
+  padding: 0 var(--s-4);
+  color: var(--silk-dim);
+}
+
+.tour-card p:first-child {
+  padding-top: var(--s-4);
+}
+
+.tour-card strong {
+  color: var(--silk);
+  font-weight: 600;
+}
+
+/*
+ * Skip on the left, the way forward on the right, the count between them.
+ *
+ * Skip keeps the same corner on every card: someone who has used a Fractal for
+ * ten years should be able to leave in one tap without reading, and a button
+ * that moves as Back appears is a button they have to find again each time.
+ */
+.tour-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.tour-dots {
+  display: flex;
+  gap: var(--s-2);
+  margin: 0 auto;
+}
+
+.tour-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--rule);
+}
+
+.tour-dot.on {
+  background: var(--signal);
+}

@@ -367,13 +367,21 @@ export default function Gig({ preset, device, capabilities, onError, onChanged, 
       {/* Scenes lead. A scene is the bigger move and it sets every block state
           below it, so cause sits above effect rather than under it. */}
       {hasScenes ? (
-        <div className="gig-scenes">
+        /* Named as a group. On screen the grid is obvious enough in context;
+           read aloud it was eight buttons called "1" through "8", between two
+           other grids of buttons, with nothing saying what any of them do. */
+        <div className="gig-scenes" role="group" aria-label="Scenes">
           {Array.from({ length: sceneCount }, (_, i) => (
             <button
               key={i}
               className={`gig-scene ${i === scene ? 'current' : ''} ${
                 names[i] ? 'named' : ''
               }`}
+              /* The word "Scene" belongs in the label even though it is left
+                 off the face, for the same reason the group is named: a bare
+                 "3" is not a control anyone can identify. */
+              aria-label={`Scene ${i + 1}${names[i] ? ` — ${names[i]}` : ''}`}
+              aria-pressed={i === scene}
               onClick={() => pickScene(i)}
             >
               <span className="gig-scene-num mono">{i + 1}</span>
@@ -384,6 +392,33 @@ export default function Gig({ preset, device, capabilities, onError, onChanged, 
             </button>
           ))}
         </div>
+      ) : null}
+
+      {/*
+        What that grid of numbers is, said once, to the only people who cannot
+        tell.
+
+        A preset whose scenes are named explains itself — "1 Rhythm, 2 Lead"
+        needs no caption, and adding one would put a permanent line of grey
+        text above the control every player uses most. A preset where none of
+        them are named is eight numbered buttons between two other grids of
+        buttons, which is exactly where a newcomer stalls. So the caption is
+        tied to the ambiguity rather than to being new: name one scene and it
+        goes, for good.
+
+        The remote case has its own note directly below saying the names could
+        not be read, which is a different and more specific thing to say — so
+        these two are mutually exclusive rather than stacked.
+      */}
+      {hasScenes && !names.some((n) => (n || '').trim()) && !remoteActive() ? (
+        <p className="gig-note">
+          {/* Both routes named here are ones that really exist: a scene plan
+              from Create writes each scene's name as it goes, and the Scenes
+              sheet on Edit renames one directly. */}
+          Those are scenes &mdash; the same blocks, switched on and off in different combinations.
+          Tap one to hear it. Ask Create for a rhythm and a lead and it builds them named, or name
+          them yourself under Scenes on Edit.
+        </p>
       ) : null}
 
       {/* An AM4 keeps its scene names inside a preset dump, and dumps don't

@@ -680,6 +680,90 @@ export function run(test) {
     }
   })
 
+  test('the introduction is offered once, and only when there is something to see', () => {
+    /*
+     * Two mistakes a tutorial can make, both of which turn it from help into
+     * the thing people remember hating. It can arrive over a broken
+     * connection, burying the one message that mattered and touring screens
+     * that cannot be reached. And it can come back after being dismissed.
+     */
+    assert.match(
+      src,
+      /if \(status !== 'live' \|\| tourSeen\(\)\) return\s*\n\s*markTourSeen\(\)/,
+      'the introduction no longer waits for a working connection, or no longer remembers being shown'
+    )
+
+    const tour = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
+    /*
+     * Marked seen wherever it closes, not only where it finishes. The X, the
+     * back gesture and a swipe down all arrive at Sheet's onClose, and all of
+     * them mean "not now" — so onClose has to be the thing that records it,
+     * rather than a Done handler the other three routes never touch.
+     */
+    assert.match(
+      tour,
+      /onClose=\{finish\}/,
+      'closing the introduction any way but Done no longer counts as having seen it, so it comes back'
+    )
+    assert.match(tour, /const finish = \(\) => \{\s*\n\s*markTourSeen\(\)/, 'finish no longer records the visit')
+
+    // The way forward keeps the same corner on every card. It was Done on the
+    // left and Back on the right, so the fourth tap where the last three were
+    // went backwards.
+    assert.match(
+      tour,
+      /onClick=\{last \? finish : \(\) => setCard\(card \+ 1\)\}/,
+      'the right-hand button is no longer the way forward on every card'
+    )
+
+    assert.match(src, /Show the introduction/, 'there is no way back to the introduction once it is dismissed')
+  })
+
+  test('a sheet that opens as another closes is not closed by its pop', () => {
+    /*
+     * Closing a sheet pops the history entry it pushed, and that pop lands a
+     * beat later — by which time a sheet opened in the same action has its own
+     * popstate listener up and catches it. The symptom is a sheet that opens
+     * and then closes on its own about a third of a second later, with nothing
+     * in the code that says to close it. "Show the introduction" from inside
+     * Settings did exactly that.
+     *
+     * The swallowed pop has to be paid back with a fresh entry, or the sheet
+     * survives but has no history of its own and the next back press leaves
+     * the app instead of closing it.
+     */
+    const sheet = readFileSync(new URL('../src/components/Sheet.jsx', import.meta.url), 'utf8')
+    assert.match(sheet, /let selfPops = 0/, 'nothing tracks the pops a sheet causes itself')
+    assert.match(sheet, /let listening = 0/, 'nothing tracks whether a pop will reach anyone')
+    assert.match(
+      sheet,
+      /if \(listening > 0\) selfPops\+\+\s*\n\s*window\.history\.back\(\)/,
+      'the debt is owed unconditionally again — with no sheet left to pay it the next real back gesture is swallowed, and after three open-and-close cycles back stops closing sheets at all'
+    )
+    /*
+     * And the whole thing has to be deferred a task. React flushes every
+     * cleanup before any setup, so at teardown a sheet handing over to another
+     * is indistinguishable from one closing alone: the incoming sheet has not
+     * registered yet, `listening` reads zero, and the handoff breaks again.
+     */
+    assert.match(
+      sheet,
+      /setTimeout\(\(\) => \{\s*\n\s*try \{\s*\n\s*\/\/ Only owe a swallowed pop/,
+      'the pop is no longer deferred, so a sheet opening as another closes cannot be told from a plain close'
+    )
+    assert.match(
+      sheet,
+      /if \(selfPops > 0\) \{\s*\n\s*selfPops--/,
+      'a sheet no longer ignores a pop another sheet caused — it will close itself the moment one opens over a closing one'
+    )
+    const swallow = sheet.slice(sheet.indexOf('if (selfPops > 0)'))
+    assert.match(
+      swallow.slice(0, swallow.indexOf('return')),
+      /mark\(\)/,
+      'the swallowed entry is never put back, so the back gesture leaves the app instead of closing the sheet'
+    )
+  })
+
   test('what the player has kept reaches the generator, and reaches them', () => {
     /*
      * Three links, and the feature is invisible if any one of them is missing

@@ -104,6 +104,7 @@ import {
 } from './lib/forgefx'
 import { aiUrl } from './lib/ai'
 import { saveCloudPreset, cloudReady, listCloudPresets } from './lib/cloudPresets'
+import Tour, { tourSeen, markTourSeen } from './components/Tour'
 import { validateSpec, countWrites, countSceneWrites } from './lib/validate'
 import { beatFlash, bringIntoView } from './lib/feedback'
 import {
@@ -265,6 +266,7 @@ export default function App() {
    */
   const [cloudSaves, setCloudSaves] = useState([])
   const [tasteOn, setTasteOn] = useState(() => tasteEnabled())
+  const [tour, setTour] = useState(false)
 
   /*
    * What this player tends to like, read off what they have kept.
@@ -742,6 +744,25 @@ export default function App() {
     // is an account to read presets from. historyKey covers a preset saved
     // here since the last read.
   }, [historyKey, remote])
+
+  /*
+   * The introduction, once, and only when there is something to introduce.
+   *
+   * Held until the app is live rather than shown on load. Before that the
+   * screen is either scanning or explaining a connection that isn't working,
+   * and a tour arriving over a real problem buries the one message that
+   * mattered — and tours the player through screens they cannot reach.
+   *
+   * Marked seen on open rather than on finish. Someone who opens it, reads a
+   * card and closes the tab has seen it; re-offering it next time treats
+   * closing as an accident, and a tutorial that keeps coming back is the
+   * thing everyone remembers hating.
+   */
+  useEffect(() => {
+    if (status !== 'live' || tourSeen()) return
+    markTourSeen()
+    setTour(true)
+  }, [status])
 
   /** One path to the model, so generate, refine and compare can't drift apart. */
   const requestSpec = async (schema, description, previous) => {
@@ -2409,6 +2430,13 @@ export default function App() {
         running generation, and a second copy of it existing quietly behind
         Create would be a second place for those to diverge.
       */}
+      {/*
+        The introduction. Rendered beside the sheets rather than among them
+        because it is not one of the app's places: it opens itself, once, and
+        the only way back to it is the button in Settings.
+      */}
+      <Tour open={tour} onClose={() => setTour(false)} />
+
       <Sheet
         open={sheet === 'chat'}
         onClose={() => setSheet(null)}
@@ -2635,6 +2663,33 @@ export default function App() {
             <Footswitches onError={setError} />
           </Section>
         ) : null}
+
+        {/*
+          The way back to the introduction.
+
+          It shows itself once and then never again, which is right, but it
+          leaves the four things it explains unreachable to anyone who skipped
+          it on a day they were busy — or who has handed the app to a
+          bandmate. This is the only route back, so it is a plain button
+          rather than a link inside a paragraph.
+        */}
+        <Section key="how-this-works" title="How this works" note="A short introduction">
+          <p className="hint">
+            Four cards: what the three screens are for, how to ask for a sound, where a change
+            actually goes, and what a scene is. It appears once the first time you connect.
+          </p>
+          <div className="history-actions">
+            <button
+              className="chip"
+              onClick={() => {
+                setSheet(null)
+                setTour(true)
+              }}
+            >
+              Show the introduction
+            </button>
+          </div>
+        </Section>
 
         {/*
           What the app has worked out about you, and the switch to stop it.
