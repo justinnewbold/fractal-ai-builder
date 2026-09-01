@@ -12,6 +12,8 @@ import Gig from './components/Gig'
 import SaveBar from './components/SaveBar'
 import SaveSheet from './components/SaveSheet'
 import PhoneSetup from './components/PhoneSetup'
+import Account from './components/Account'
+import CloudPresets from './components/CloudPresets'
 import { Stages, LiveGeneration, Thinking } from './components/LiveGeneration'
 import { streamSpec } from './lib/stream'
 import { Modifiers, SceneMatrix } from './components/Modifiers'
@@ -93,6 +95,7 @@ import {
   servedLocally
 } from './lib/forgefx'
 import { aiUrl } from './lib/ai'
+import { saveCloudPreset, cloudReady } from './lib/cloudPresets'
 import { validateSpec, countWrites, countSceneWrites } from './lib/validate'
 import { beatFlash, bringIntoView } from './lib/feedback'
 import {
@@ -905,6 +908,20 @@ export default function App() {
           }
         } else {
           savePreset(fields)
+        }
+        /*
+         * And to the account, when signed in. Additive rather than instead:
+         * the local copy is what makes this work with no account at all, and
+         * the cloud copy is what makes a new machine not a fresh start. A
+         * failure here must not lose the tone, so it is caught and reported
+         * through the log rather than thrown into the middle of a write.
+         */
+        if (cloudReady()) {
+          try {
+            await saveCloudPreset(buildEntry(fields))
+          } catch (err) {
+            record('library', `Kept locally, but not to your account — ${err.message}`)
+          }
         }
         setHistoryKey((k) => k + 1)
       }
@@ -2340,6 +2357,15 @@ export default function App() {
           }}
         />
 
+        {/* Three places a design can live, and they are different things: the
+            account follows you between machines, the folder survives a browser
+            being reinstalled, and browser storage is the fallback that needs
+            neither. Listed in that order because that is the order of how
+            much they survive. */}
+        <Section key="account-presets" title="Kept with your account" note="On any machine you sign in from">
+          <CloudPresets onLoad={reload} onError={setError} busy={busy} />
+        </Section>
+
         <Section key="saved-presets" title="Saved presets" note="Captures and designs, as files in a folder you choose">
           <LocalLibrary
             preset={preset}
@@ -2448,6 +2474,8 @@ export default function App() {
             the only route, because for a while it was.
           */}
           <PhoneSetup />
+
+          <Account onError={setError} />
 
           {/* Host controls only work on the machine holding the cable — from a
               phone these calls are refused, and a button that cannot work is

@@ -182,6 +182,82 @@ test('strips characters the hardware will not store', () => {
   assert.equal(r.presetName, 'Drop A metal rhythm')
 })
 
+console.log('\npresets that follow the account')
+
+const cloud = await import('../src/lib/cloudPresets.js')
+
+test('a cloud row is the same shape as a local one', () => {
+  /*
+   * The design claim of this feature: nothing above these two modules should
+   * have to care where a tone came from. The loader in App takes an entry and
+   * reads entry.spec, entry.name, entry.description — so a row that maps to a
+   * different shape breaks loading a cloud preset and nothing else, which is
+   * the kind of thing found by a person rather than a test.
+   */
+  const entry = cloud.toEntry({
+    id: 'abc',
+    name: 'Black Album',
+    description: 'tight and scooped',
+    summary: 'a summary',
+    spec: { blocks: [] },
+    device: { name: 'FM3' },
+    block_names: ['Amp 1', 'Cab 1'],
+    created_at: '2026-09-01T00:00:00Z'
+  })
+  const local = buildEntryShape()
+  assert.deepEqual(Object.keys(entry).filter((k) => k !== 'where').sort(), local.sort())
+  assert.equal(entry.name, 'Black Album')
+  assert.deepEqual(entry.blockNames, ['Amp 1', 'Cab 1'])
+  assert.equal(entry.where, 'cloud', 'the UI needs to know which store to delete from')
+})
+
+function buildEntryShape() {
+  // The local shape, from history.js — usage is local-only (token cost of the
+  // run that made it) and deliberately not stored per account.
+  return ['id', 'at', 'name', 'description', 'summary', 'spec', 'device', 'blockNames']
+}
+
+test('a row with nothing in it still yields a usable entry', () => {
+  const entry = cloud.toEntry({ id: 'x', spec: {} })
+  assert.equal(entry.name, 'Untitled')
+  assert.deepEqual(entry.blockNames, [])
+  assert.ok(Number.isFinite(entry.at))
+})
+
+test('a policy refusal is translated into something a player can act on', () => {
+  /*
+   * PostgREST reports it as code 42501 and "new row violates row-level
+   * security policy", which is true and useless. The only way to reach it here
+   * is a session that expired, and that has an obvious remedy.
+   */
+  const said = cloud.explain({ code: '42501', message: 'new row violates row-level security policy' })
+  assert.match(said, /session has expired/i)
+  assert.doesNotMatch(said, /row-level/i)
+})
+
+test('a missing table says the project is not set up, not "relation does not exist"', () => {
+  const said = cloud.explain({ message: 'relation "public.presets" does not exist' })
+  assert.match(said, /no preset storage/i)
+})
+
+test('anything else is passed through rather than swallowed', () => {
+  assert.equal(cloud.explain({ message: 'network unreachable' }), 'network unreachable')
+  assert.match(cloud.explain(null), /failed/i)
+})
+
+test('the client never sends user_id', async () => {
+  /*
+   * It is the column default, which is auth.uid(). A client-supplied value is
+   * one the client can get wrong, and the policy would then reject the insert
+   * for a reason the player cannot act on — while a correct one is redundant.
+   */
+  const src = await import('node:fs').then((fs) =>
+    fs.readFileSync(new URL('../src/lib/cloudPresets.js', import.meta.url), 'utf8')
+  )
+  const code = src.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ' ')
+  assert.ok(!/user_id\s*:/.test(code), 'cloudPresets sets user_id from the client')
+})
+
 console.log('\nserving it locally')
 
 const host = await import('../desktop/lib/host.mjs')
