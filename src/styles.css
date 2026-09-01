@@ -5544,3 +5544,54 @@ button.topbar-preset.open .topbar-caret {
   color: var(--signal);
   word-break: break-all;
 }
+
+/* ---------- the account, and what it keeps ---------- */
+
+.account {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding-bottom: var(--s-3);
+}
+
+.cloud-presets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.cloud-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cloud-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.cloud-list .preset-row {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  text-align: left;
+}
+
+.preset-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preset-row-when {
+  flex: 0 0 auto;
+  font-size: var(--f-1);
+  color: var(--silk-faint);
+}

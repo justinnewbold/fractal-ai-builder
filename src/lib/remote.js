@@ -350,6 +350,68 @@ export async function restoreSession({ url, anonKey } = {}) {
   }
 }
 
+/**
+ * The signed-in client, for everything that is not the relay.
+ *
+ * Signing in and joining a channel are separate things, and this is the seam
+ * between them: an account is enough to keep presets, change a password or
+ * sign out, none of which need a host at the other end. `restoreSession` sets
+ * this without joining anything, so a browser that signed in weeks ago has it
+ * on the next load.
+ */
+export const supabaseClient = () => client
+
+/** Who is signed in, or null. Email included because that is what a person recognises. */
+export async function currentAccount() {
+  if (!client) return null
+  try {
+    const { data } = await client.auth.getUser()
+    if (!data?.user) return null
+    return { id: data.user.id, email: data.user.email || '' }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Sign out here, and everywhere the session was written.
+ *
+ * Scope 'local' rather than 'global' on purpose: signing out on a phone should
+ * not sign out the Mac that is hosting, which would drop the link for everyone
+ * mid-set. Signing out of every device is a different request and deserves to
+ * be asked for explicitly.
+ */
+export async function signOut() {
+  if (!client) return
+  try {
+    await client.auth.signOut({ scope: 'local' })
+  } finally {
+    client = null
+    userId = null
+  }
+}
+
+/** Change the password of the account already signed in. */
+export async function changePassword(password) {
+  if (!client) throw new Error('Sign in first.')
+  const { error } = await client.auth.updateUser({ password })
+  if (error) throw new Error(explainAuth(error.message))
+}
+
+/**
+ * Start a reset for an account nobody can get into.
+ *
+ * Needs no session by definition, so it builds its own client. The redirect
+ * goes to this app rather than to Supabase's own page, and has to be on the
+ * project's allow-list or the link in the mail lands nowhere.
+ */
+export async function sendPasswordReset({ url, anonKey, email, redirectTo } = {}) {
+  const { createClient } = await import('@supabase/supabase-js')
+  const c = createClient(url || DEFAULT_PROJECT.url, anonKey || DEFAULT_PROJECT.anonKey)
+  const { error } = await c.auth.resetPasswordForEmail(email, redirectTo ? { redirectTo } : undefined)
+  if (error) throw new Error(explainAuth(error.message))
+}
+
 export async function remoteSignIn({ url, anonKey, email, password }) {
   // Loaded on demand: a realtime client is a couple of hundred KB and most
   // sessions are local, sitting at the machine with the cable in it.
