@@ -179,7 +179,7 @@ export default async function handler(req, res) {
     return
   }
 
-  const { description, device, blocks, previous, mode, sceneNames } = req.body || {}
+  const { description, device, blocks, previous, mode, sceneNames, taste } = req.body || {}
 
   if (!description || typeof description !== 'string') {
     res.status(400).json({ error: 'Describe the tone you want.' })
@@ -244,6 +244,23 @@ export default async function handler(req, res) {
       : `Tone wanted: ${description}`
 
   /*
+   * What this player has tended to keep, when the browser has enough history
+   * to say. It settles the questions a short request leaves open — which of
+   * four fitting amps, what "a lot of gain" means to this person — so the
+   * first attempt lands nearer their taste instead of the middle of the road.
+   *
+   * Client-supplied and therefore capped. It is prose assembled by
+   * src/lib/taste.js from the player's own presets, but this endpoint cannot
+   * verify that, and an unbounded string from a request body is a way to make
+   * every generation expensive. 4000 characters is several times what the
+   * builder produces at its most verbose.
+   *
+   * It goes after the request rather than before it. The request is the job;
+   * this is background, and background that arrives first reads as the brief.
+   */
+  const context = typeof taste === 'string' && taste.trim() ? taste.trim().slice(0, 4000) : null
+
+  /*
    * The output ceiling is set here rather than left to the provider default.
    *
    * The AI SDK's Anthropic provider has to send `max_tokens` on every request,
@@ -276,7 +293,9 @@ export default async function handler(req, res) {
           },
           {
             type: 'text',
-            text: `Current state of the loaded preset:\n${JSON.stringify(state)}\n\n${task}`
+            text:
+              `Current state of the loaded preset:\n${JSON.stringify(state)}\n\n${task}` +
+              (context ? `\n\n${context}` : '')
           }
         ]
       }
@@ -331,33 +350,17 @@ export default async function handler(req, res) {
     return
   }
 
+  /*
+   * The same request, unstreamed. `args` rather than a second copy of it.
+   *
+   * It was a second copy, and the copy had drifted: it never carried
+   * `maxOutputTokens`, so the path taken when streaming is refused — a proxy
+   * that buffers, a network that won't do chunked — ran against the provider's
+   * 4096 default and truncated exactly the presets the ceiling above exists to
+   * protect. Building the arguments once is why that cannot happen again.
+   */
   try {
-    const { object, usage, providerMetadata } = await generateObject({
-      model,
-      schema: PresetSpec,
-      schemaName: 'preset_spec',
-      system: SYSTEM,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text:
-                `Models available on this unit, by block family. The numeric "value" is what ` +
-                `you must use when changing a model:\n${JSON.stringify(rosters)}\n\n` +
-                `What each block and control actually does, from the device's own reference:\n` +
-                `${JSON.stringify(reference)}`,
-              providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } }
-            },
-            {
-              type: 'text',
-              text: `Current state of the loaded preset:\n${JSON.stringify(state)}\n\n${task}`
-            }
-          ]
-        }
-      ]
-    })
+    const { object, usage, providerMetadata } = await generateObject(args)
 
     const anthropicMeta = providerMetadata?.anthropic || {}
 

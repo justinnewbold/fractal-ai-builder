@@ -48,6 +48,14 @@ import Assistant from './components/Assistant'
 import UpdateNotice from './components/UpdateNotice'
 import { validatePlan, runPlan } from './lib/actions'
 import { listPresets } from './lib/history'
+import {
+  profileFrom,
+  describeProfile,
+  suggestionsFrom,
+  summariseProfile,
+  tasteEnabled,
+  setTasteEnabled
+} from './lib/taste'
 import { timeLeft } from './lib/slots'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
 import {
@@ -95,7 +103,7 @@ import {
   servedLocally
 } from './lib/forgefx'
 import { aiUrl } from './lib/ai'
-import { saveCloudPreset, cloudReady } from './lib/cloudPresets'
+import { saveCloudPreset, cloudReady, listCloudPresets } from './lib/cloudPresets'
 import { validateSpec, countWrites, countSceneWrites } from './lib/validate'
 import { beatFlash, bringIntoView } from './lib/feedback'
 import {
@@ -248,6 +256,32 @@ export default function App() {
   const [spend, setSpend] = useState({ total: 0, runs: 0 })
   const [lastPrompt, setLastPrompt] = useState('')
   const [historyKey, setHistoryKey] = useState(0)
+  /*
+   * The account's presets, held so the taste profile can see them.
+   *
+   * Read once when signed in rather than before every generation: this is
+   * background for a request, not a value the request depends on, and a round
+   * trip to Supabase in front of every "make it brighter" would be felt.
+   */
+  const [cloudSaves, setCloudSaves] = useState([])
+  const [tasteOn, setTasteOn] = useState(() => tasteEnabled())
+
+  /*
+   * What this player tends to like, read off what they have kept.
+   *
+   * Recomputed rather than stored. There is no taste table: the presets are
+   * the profile, so deriving it here means it can never disagree with the
+   * library it describes — deleting a preset un-learns it, which a cached
+   * profile would not.
+   *
+   * Both stores feed it. Someone who has copied this browser's presets to
+   * their account holds every one of them twice, and profileFrom dedupes for
+   * exactly that reason.
+   */
+  const taste = useMemo(
+    () => (tasteOn ? profileFrom([...listPresets(), ...cloudSaves]) : null),
+    [historyKey, cloudSaves, tasteOn]
+  )
   const [compare, setCompare] = useState(null)
   const [turns, setTurns] = useState([])
   const [remote, setRemote] = useState(false)
@@ -680,6 +714,35 @@ export default function App() {
     return listenToDevice()
   }, [status])
 
+  /*
+   * The account's presets, pulled in so the taste profile spans machines.
+   *
+   * The whole point of a profile is that it survives the move to a new Mac —
+   * the loss that started this — so it cannot read only what this browser
+   * happens to hold. Failure is silent on purpose: a profile is an
+   * improvement to a generation, never a precondition for one, and someone
+   * signed out or offline should notice nothing beyond slightly less
+   * personal results.
+   */
+  useEffect(() => {
+    if (!cloudReady()) {
+      setCloudSaves([])
+      return undefined
+    }
+    let live = true
+    listCloudPresets()
+      .then((rows) => {
+        if (live) setCloudSaves(rows)
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+    // `remote` flips when a session is established, which is the moment there
+    // is an account to read presets from. historyKey covers a preset saved
+    // here since the last read.
+  }, [historyKey, remote])
+
   /** One path to the model, so generate, refine and compare can't drift apart. */
   const requestSpec = async (schema, description, previous) => {
     setPartial(null)
@@ -700,7 +763,13 @@ export default function App() {
           blocks: schema,
           sceneNames,
           previous: previous || null,
-          mode: previous ? 'refine' : 'design'
+          mode: previous ? 'refine' : 'design',
+          /*
+           * Sent on a refine too. A refinement is a reaction to a tone the
+           * player has just heard, so their habits are exactly the thing that
+           * settles what "warmer" means to them in numbers.
+           */
+          taste: describeProfile(taste)
         },
         {
           onPartial: setPartial,
@@ -1784,6 +1853,7 @@ export default function App() {
       busy={busy || runningPlan}
       progress={progress}
       startedAt={genStarted}
+      suggestions={suggestionsFrom(taste)}
       onStop={
         genStarted
           ? () => {
@@ -2565,6 +2635,58 @@ export default function App() {
             <Footswitches onError={setError} />
           </Section>
         ) : null}
+
+        {/*
+          What the app has worked out about you, and the switch to stop it.
+
+          Anything inferred from someone's history has to be visible to them.
+          Without this the first surprising generation has no explanation and
+          no way to check one — and a profile you cannot see or refuse is the
+          kind of thing that reads as the app knowing too much, however
+          ordinary the arithmetic behind it turns out to be.
+        */}
+        <Section key="what-it-has-learned" title="What it has learned from you" note={taste ? `${taste.presets} presets` : 'Nothing yet'}>
+          <p className="hint">{summariseProfile(taste)}</p>
+          {/*
+            Say what actually happens, including the part that is a
+            disclosure. The summary above does travel — it goes to the model
+            with every request, which is the whole mechanism — and writing
+            "nothing leaves your device" here would have been a comfortable
+            sentence that was not true. What is worth saying instead is that
+            nothing is kept: no profile is stored, it is rebuilt from the
+            presets each time, and deleting a preset genuinely un-learns it.
+          */}
+          <p className="hint">
+            This summary &mdash; not your presets &mdash; is sent with each request, so a tone you
+            ask for lands nearer what you usually choose. Nothing is trained and no profile is
+            stored: it is worked out fresh from your own presets each time, so deleting one
+            un-learns it and turning this off stops it being sent at all.
+          </p>
+          {taste ? (
+            <ul className="cloud-list taste-list">
+              {taste.models.length ? (
+                <li className="hint">Models you pick: {taste.models.map((m) => m.name).join(', ')}</li>
+              ) : null}
+              {taste.controls.length ? (
+                <li className="hint">
+                  Where you land: {taste.controls.map((c) => `${c.name} ${c.typical}`).join(' · ')}
+                </li>
+              ) : null}
+              {taste.words.length ? (
+                <li className="hint">You ask for: {taste.words.map((w) => w.name).join(', ')}</li>
+              ) : null}
+            </ul>
+          ) : null}
+          <div className="history-actions">
+            <button
+              className="chip"
+              onClick={() => setTasteOn(setTasteEnabled(!tasteOn))}
+              aria-pressed={tasteOn}
+            >
+              {tasteOn ? 'Stop using my history' : 'Use my history again'}
+            </button>
+          </div>
+        </Section>
 
         <Section key="what-s-changed-this-session" title="What's changed this session">
           <ChangeLog log={log} onClear={() => setLog([])} />
