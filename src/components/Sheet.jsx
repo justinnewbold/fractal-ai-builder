@@ -67,6 +67,31 @@ function useAsks(query) {
   return yes
 }
 
+/*
+ * Pops a sheet caused itself, which no sheet may read as a back gesture.
+ *
+ * Closing a sheet pops the entry it pushed, and that pop lands a beat later —
+ * by which time a second sheet opened in the same action has registered its
+ * own listener and catches it. The symptom is a sheet that opens and closes
+ * again about a third of a second later, entirely on its own: "Show the
+ * introduction" from inside Settings did exactly that, and it would have hit
+ * anything that ever wanted to close one sheet and open another.
+ *
+ * A counter rather than a boolean because two sheets can tear down at once,
+ * and each teardown owes exactly one swallowed pop.
+ *
+ * The debt is only ever created when somebody is left to pay it. A sheet
+ * closing on its own removes its listener and then pops, and if no other
+ * sheet is listening that pop reaches nobody — so an unconditional increment
+ * is never spent, and the next genuine back gesture is swallowed instead.
+ * Three open-and-close cycles were enough to leave a sheet that would not
+ * close on back at all, which is far worse than the bug this fixes.
+ */
+let selfPops = 0
+
+/** Sheets currently listening for a pop — i.e. open, on a phone. */
+let listening = 0
+
 const FOCUSABLE =
   'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
 
@@ -121,29 +146,60 @@ export default function Sheet({ open, onClose, title, note, footer, children }) 
      router here to hear it. */
   useEffect(() => {
     if (!open || rail) return undefined
-    try {
-      window.history.pushState({ sheet: true }, '')
-      pushed.current = true
-    } catch {
-      pushed.current = false
+    const mark = () => {
+      try {
+        window.history.pushState({ sheet: true }, '')
+        pushed.current = true
+      } catch {
+        pushed.current = false
+      }
     }
+    mark()
     const back = () => {
+      if (selfPops > 0) {
+        selfPops--
+        /*
+         * Another sheet's teardown popped an entry, and this listener heard
+         * it. Not a back gesture, so this sheet stays — but the entry that
+         * went was the one this sheet pushed, so it has to be put back or the
+         * next real back press leaves the app instead of closing this.
+         */
+        mark()
+        return
+      }
       pushed.current = false
       close()
     }
     window.addEventListener('popstate', back)
+    listening++
     return () => {
       window.removeEventListener('popstate', back)
+      listening--
       // Closed by a button rather than by going back: take the entry with us,
       // or the next back press does nothing visible.
-      if (pushed.current) {
-        pushed.current = false
+      if (!pushed.current) return
+      pushed.current = false
+      /*
+       * Deferred by a task, and that is the whole trick.
+       *
+       * React flushes every cleanup before any setup, so at this instant a
+       * sheet handing over to another looks exactly like a sheet closing on
+       * its own — the incoming sheet has not run its effect yet, and asking
+       * "is anyone still listening?" here always answers no. One task later
+       * it has, and the question gives the right answer.
+       */
+      setTimeout(() => {
         try {
+          // Only owe a swallowed pop if a sheet is there to hear it. With
+          // none, this pop lands on nobody and the debt would sit waiting to
+          // eat someone's real back gesture instead.
+          if (listening > 0) selfPops++
           window.history.back()
         } catch {
           // A history the page isn't allowed to move is not worth failing over.
+          if (listening > 0) selfPops--
         }
-      }
+      }, 0)
     }
   }, [open, rail, close])
 
