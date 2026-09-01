@@ -29,7 +29,35 @@ import { preferredEncoding, rememberEncoding, getEncodingMap, disambiguate } fro
 export { preferredEncoding, rememberEncoding, getEncodingMap, disambiguate }
 import { createMockDevice } from './mockDevice.js'
 
-const DEFAULT_HOST = 'http://localhost:5056'
+/**
+ * Where the device server is, when nobody has said otherwise.
+ *
+ * This was the constant `http://localhost:5056`, which is right for every way
+ * the app has run until now: the browser is on the machine with the cable, and
+ * localhost is the device server.
+ *
+ * It is wrong in exactly the case local mode exists for. When ForgeFX serves
+ * this app over the network, the page arrives on a phone — and localhost on a
+ * phone is the phone. The default has to be the origin the page came from,
+ * because in that case the only thing that could have served it IS the device
+ * server.
+ *
+ * The test is the protocol plus the build. A production build reached over
+ * plain http was served by ForgeFX; the hosted app is https and keeps
+ * localhost, which is the browser exemption that makes it work on the Mac at
+ * all; a dev server is neither and keeps localhost too.
+ *
+ * Worth naming because of how it would have failed: on the Mac, where local
+ * mode gets tested, localhost and the origin are the same machine and both
+ * work. It would only have broken on the phone.
+ */
+const LOOPBACK = 'http://localhost:5056'
+
+function defaultHost() {
+  if (typeof window === 'undefined') return LOOPBACK
+  if (import.meta.env?.DEV) return LOOPBACK
+  return window.location.protocol === 'http:' ? window.location.origin : LOOPBACK
+}
 
 /**
  * Demo mode routes every device call to a simulated FM3 instead of the wire.
@@ -56,8 +84,11 @@ if (typeof localStorage !== 'undefined' && localStorage.getItem('forgefx.demo') 
 const tick = () => new Promise((r) => setTimeout(r, 12))
 
 export function getHost() {
-  return localStorage.getItem('forgefx.host') || DEFAULT_HOST
+  return localStorage.getItem('forgefx.host') || defaultHost()
 }
+
+/** The default, exported so the UI can say what it would fall back to. */
+export { defaultHost }
 
 export function setHost(host) {
   localStorage.setItem('forgefx.host', host.replace(/\/+$/, ''))

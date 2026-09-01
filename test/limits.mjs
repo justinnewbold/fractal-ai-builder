@@ -20,9 +20,19 @@
  * a truncated stream goes back to meaning something genuinely unusual.
  */
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
+
+/** Every .js/.jsx under a directory, so a new file cannot quietly opt out. */
+function* walk(dir) {
+  for (const entry of readdirSync(fileURLToPath(dir))) {
+    const path = fileURLToPath(new URL(entry, dir))
+    if (statSync(path).isDirectory()) yield* walk(new URL(`${entry}/`, dir))
+    else if (/\.(js|jsx)$/.test(entry)) yield path
+  }
+}
 
 export function run(test) {
   test('the server can run for as long as the browser will wait', () => {
@@ -93,6 +103,33 @@ export function run(test) {
     assert.ok(
       !/jumpTo|selectPreset|onLoad/.test(handler),
       'the save sheet loads the preset it was asked to save into'
+    )
+  })
+
+  test('every AI call goes through the one place that knows where the model lives', () => {
+    /*
+     * The failure this prevents is invisible where it is written.
+     *
+     * `fetch('/api/generate')` is correct on the hosted origin and always will
+     * be — which is why a new one would be added without a thought. Served by
+     * ForgeFX on the local network it is a 404 from a device server that has
+     * never heard of the model, and local mode is the whole point of Phase 4.
+     *
+     * So the rule is that nothing outside src/lib/ai.js names an /api/ path
+     * directly. There is exactly one place that decides absolute or relative.
+     */
+    const offenders = []
+    for (const file of walk(new URL('../src/', import.meta.url))) {
+      if (file.endsWith('/lib/ai.js')) continue
+      const code = readFileSync(file, 'utf8').replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ' ')
+      for (const m of code.matchAll(/fetch\(\s*['"`]\/api\/[^'"`]*/g)) {
+        offenders.push(`${file.split('/src/')[1]}: ${m[0].slice(0, 48)}`)
+      }
+    }
+    assert.deepEqual(
+      offenders,
+      [],
+      `AI routes fetched directly — these 404 when the app is served locally:\n  ${offenders.join('\n  ')}`
     )
   })
 

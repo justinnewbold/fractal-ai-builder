@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Fractal AI Builder">
+  <rect width="512" height="512" fill="#0d0f12"/>
+  <g fill="none" stroke="#f0a03c" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M144 256h40"/>
+    <path d="M328 256h40"/>
+    <path d="M184 256l26-58 32 116 32-116 26 58"/>
+  </g>
+  <circle cx="144" cy="256" r="16" fill="#4fd8e8"/>
+  <circle cx="368" cy="256" r="16" fill="#4fd8e8"/>
+</svg>

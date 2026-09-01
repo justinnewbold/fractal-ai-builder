@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Fractal AI Builder">
+  <rect width="512" height="512" rx="112" fill="#0d0f12"/>
+  <!-- A signal path through a chain: the one thing this app is about. -->
+  <g fill="none" stroke="#f0a03c" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M96 256h64"/>
+    <path d="M352 256h64"/>
+    <path d="M160 256l32-72 40 144 40-144 32 72"/>
+  </g>
+  <circle cx="96" cy="256" r="20" fill="#4fd8e8"/>
+  <circle cx="416" cy="256" r="20" fill="#4fd8e8"/>
+</svg>

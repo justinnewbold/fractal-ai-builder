@@ -5516,3 +5516,31 @@ button.topbar-preset.open .topbar-caret {
   margin-top: var(--s-2);
   color: var(--signal);
 }
+
+/* ---------- getting the phone here ---------- */
+
+/*
+ * The short route: a code to point a camera at. Shown only when this page is
+ * being served from the machine with the cable, because that is exactly when
+ * the phone can reach the unit without an account.
+ */
+.phone-setup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding-bottom: var(--s-3);
+}
+
+.phone-qr {
+  align-self: flex-start;
+  width: 160px;
+  height: 160px;
+  padding: var(--s-2);
+  background: #fff;
+  border-radius: var(--r-1);
+}
+
+.phone-url {
+  color: var(--signal);
+  word-break: break-all;
+}

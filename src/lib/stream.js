@@ -27,6 +27,8 @@
  * two files to that, since nothing else connects them.
  */
 
+import { aiUrl } from './ai.js'
+
 /** No bytes at all for this long means something upstream stopped talking.
  *  Generous, because the first token legitimately takes ~25s on a big preset. */
 const STALL_MS = 45000
@@ -52,7 +54,7 @@ function note(event, detail = {}) {
 export const getGenerationLog = () => genLog.slice()
 export const clearGenerationLog = () => genLog.splice(0, genLog.length)
 
-export async function streamSpec(body, { onPartial, onEvent, signal } = {}) {
+export async function streamSpec(body, { onPartial, onEvent, signal, host } = {}) {
   const started = Date.now()
   const since = () => Date.now() - started
   const control = new AbortController()
@@ -94,7 +96,7 @@ export async function streamSpec(body, { onPartial, onEvent, signal } = {}) {
   onEvent?.({ kind: 'request', ms: 0 })
 
   try {
-    const res = await fetch('/api/generate?stream=1', {
+    const res = await fetch(aiUrl('/api/generate?stream=1', host), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-stream': '1' },
       body: JSON.stringify(body),
@@ -105,7 +107,7 @@ export async function streamSpec(body, { onPartial, onEvent, signal } = {}) {
       // Streaming unavailable — fall back rather than failing the generation.
       note('fallback', { status: res.status, ms: since() })
       onEvent?.({ kind: 'fallback', ms: since() })
-      const fallback = await fetch('/api/generate', {
+      const fallback = await fetch(aiUrl('/api/generate', host), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

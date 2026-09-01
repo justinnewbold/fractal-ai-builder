@@ -182,6 +182,61 @@ test('strips characters the hardware will not store', () => {
   assert.equal(r.presetName, 'Drop A metal rhythm')
 })
 
+console.log('\nwho may call the model')
+
+const { allowedOrigin } = await import('../api/_cors.js')
+
+test('the hosted app and its previews are allowed', () => {
+  assert.equal(allowedOrigin('https://fractal.newbold.cloud'), 'https://fractal.newbold.cloud')
+  assert.ok(allowedOrigin('https://fractal-ai-builder-git-branch.vercel.app'))
+})
+
+test('a machine on the player own network is allowed', () => {
+  /*
+   * Local mode: ForgeFX serves the UI over plain http on the LAN so a phone
+   * can reach the unit without an account, which makes the page a cross-origin
+   * caller here. The address is whatever DHCP handed the Mac this morning, so
+   * the ranges are matched rather than listed.
+   */
+  for (const o of [
+    'http://localhost:5056',
+    'http://127.0.0.1:5056',
+    'http://10.0.0.191:5056',
+    'http://192.168.1.44:5056',
+    'http://172.16.9.9:5056',
+    'http://fractal.local:5056'
+  ]) {
+    assert.equal(allowedOrigin(o), o, o)
+  }
+})
+
+test('the open internet is not allowed', () => {
+  /*
+   * These functions spend money on every call, and the key lives on the server
+   * precisely so a browser never holds it. A wildcard would let any page on
+   * the internet spend it, which is why this is a list and not a `*`.
+   */
+  for (const o of [
+    'https://evil.example',
+    'http://evil.example',
+    'https://fractal.newbold.cloud.evil.example',
+    'http://8.8.8.8',
+    'http://172.32.0.1',
+    'https://notvercel.app',
+    null,
+    undefined,
+    'not a url'
+  ]) {
+    assert.equal(allowedOrigin(o), null, String(o))
+  }
+})
+
+test('a private address over https is still not a device serving the app', () => {
+  // ForgeFX serves plain http. An https private address is not the local case
+  // and does not need the allowance.
+  assert.equal(allowedOrigin('https://192.168.1.44'), null)
+})
+
 console.log('\nscenes')
 
 /* A preset with an amp, a cab and two pedals — enough to have a scene plan

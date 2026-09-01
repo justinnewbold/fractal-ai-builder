@@ -15,6 +15,7 @@
 import { generateObject, streamObject } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
+import { cors } from './_cors.js'
 
 /**
  * Two ways in, because they fail differently.
@@ -160,6 +161,10 @@ a player who knows the reference would rather hear that than be told a
 substitute is the real thing.`
 
 export default async function handler(req, res) {
+  // Local mode serves this app from the player's own machine, so the page is a
+  // cross-origin caller here. Preflight is answered and nothing else runs.
+  if (cors(req, res)) return
+
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Use POST.' })
     return
