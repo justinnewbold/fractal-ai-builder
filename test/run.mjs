@@ -12,6 +12,7 @@ import { validateSpec, countWrites, countSceneWrites } from '../src/lib/validate
 import { preferredEncoding, rememberEncoding, disambiguate } from '../src/lib/encoding.js'
 import { forbiddenRemotely, explainAuth, timeoutFor } from '../src/lib/remote.js'
 import * as taste from '../src/lib/taste.js'
+import * as link from '../src/lib/link.js'
 import {
   patchSchemaValue,
   invalidateSchema,
@@ -1828,6 +1829,83 @@ test('a low-gain library is offered the other direction', () => {
   const entries = [1, 2, 3, 4].map((n) => keptPreset(`Clean ${n}`, 'warm clean', [amp('Deluxe Verb', 2)]))
   const lines = taste.suggestionsFrom(taste.profileFrom(entries))
   assert.ok(lines.some((l) => /dirtier/.test(l)), lines.join(' | '))
+})
+
+/* ------------------------------------------------------------------
+   The phone remote — which end this is, and whether the other end answers.
+
+   The correction this whole module exists for: "connected" used to mean a
+   channel had been joined, which is true with the Mac off and nothing
+   answering. Nothing here may say connected unless the Mac answered.
+   ------------------------------------------------------------------ */
+
+test('connected means the Mac answered, never merely that a channel was joined', () => {
+  const base = { role: 'remote', hasSession: true, joining: false, channelUp: true }
+  assert.equal(
+    link.deriveLink({ ...base, hostSeen: false }),
+    'no-answer',
+    'a joined channel with nothing answering on it was called connected — the exact lie this replaces'
+  )
+  assert.equal(link.deriveLink({ ...base, hostSeen: true }), 'connected')
+  assert.equal(link.deriveLink({ ...base, channelUp: false, hostSeen: true }), 'no-answer', 'a dropped socket is not connected')
+  assert.equal(link.deriveLink({ ...base, joining: true }), 'joining')
+  assert.equal(link.deriveLink({ ...base, hasSession: false }), 'signed-out')
+  assert.equal(
+    link.deriveLink({ ...base, hostSeen: true, wantsAuto: false }),
+    'off',
+    'a deliberate Disconnect was reported as the Mac not answering'
+  )
+})
+
+test('the Mac is connected when it is listening, and wifi always is', () => {
+  assert.equal(link.deriveLink({ role: 'mac', cloudUser: null, hostOn: true }), 'signed-out')
+  assert.equal(link.deriveLink({ role: 'mac', cloudUser: { email: 'j@x' }, hostOn: false }), 'off')
+  assert.equal(link.deriveLink({ role: 'mac', cloudUser: { email: 'j@x' }, hostOn: true }), 'connected')
+  assert.equal(link.deriveLink({ role: 'wifi', hasSession: false, hostSeen: false }), 'connected')
+})
+
+test('a wifi phone is not mistaken for the Mac', () => {
+  /*
+   * A page served from the Mac has the helper as its own origin, so the
+   * "is the helper at localhost" probe answers yes on the phone too. Only
+   * the hostname tells the Mac app's own window from a phone that scanned
+   * the QR.
+   */
+  assert.equal(link.detectRole({ demo: false, served: true, hostname: 'localhost', helperAlive: true }), 'mac')
+  assert.equal(link.detectRole({ demo: false, served: true, hostname: '10.0.0.5', helperAlive: true }), 'wifi', 'a phone on wifi was told it is the Mac')
+  assert.equal(link.detectRole({ demo: false, served: false, hostname: 'fractal.newbold.cloud', helperAlive: true }), 'mac')
+  assert.equal(link.detectRole({ demo: false, served: false, hostname: 'fractal.newbold.cloud', helperAlive: false }), 'remote')
+  assert.equal(link.detectRole({ demo: true, served: false, hostname: 'x', helperAlive: false }), 'mac', 'demo simulates the Mac')
+})
+
+test('asking again backs off but never stops', () => {
+  const seq = []
+  let d = 0
+  for (let i = 0; i < 7; i++) {
+    d = link.nextDelay(d)
+    seq.push(d)
+  }
+  assert.deepEqual(seq, [3000, 6000, 12000, 24000, 30000, 30000, 30000])
+})
+
+test('what the link says contains no plumbing', () => {
+  const jargon = /supabase|relay|channel|helper|npm|\.env|uid|anon|realtime|forgefx/i
+  const states = []
+  for (const role of ['mac', 'wifi', 'remote']) {
+    for (const l of ['off', 'signed-out', 'joining', 'no-answer', 'connected']) {
+      states.push({ role, link: l, account: { email: 'j@x.com' }, macName: null })
+      states.push({ role, link: l, account: null, macName: 'Studio Mac' })
+    }
+  }
+  for (const st of states) {
+    const said = link.describeLink(st)
+    for (const key of ['word', 'sentence', 'note']) {
+      assert.ok(!jargon.test(said[key]), `${st.role}/${st.link} ${key}: "${said[key]}"`)
+    }
+  }
+  assert.match(link.describeLink({ role: 'remote', link: 'connected', macName: 'Studio Mac' }).sentence, /Connected to Studio Mac/)
+  assert.equal(link.describeLink({ role: 'remote', link: 'connected' }).tone, 'good')
+  assert.equal(link.describeLink({ role: 'remote', link: 'no-answer' }).tone, 'bad', 'no answer must read as a fault, not as connected')
 })
 
 await settle()

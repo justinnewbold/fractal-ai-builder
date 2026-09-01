@@ -67,7 +67,6 @@ import {
   subscribeEvents,
   scanAllPresets,
   cachedPresetNames,
-  localHelperAlive,
   parkSave,
   takeParkedSave,
   clearParkedSave,
@@ -106,18 +105,27 @@ import { aiUrl } from './lib/ai'
 import { saveCloudPreset, cloudReady, listCloudPresets } from './lib/cloudPresets'
 import Tour, { tourSeen, markTourSeen } from './components/Tour'
 import Recent from './components/Recent'
+import ConnectScreen from './components/ConnectScreen'
+import SignInSheet from './components/SignInSheet'
+import {
+  bootLink,
+  linkState,
+  subscribeLink,
+  describeLink,
+  pokeLink,
+  connectPhone,
+  reconnectPhone,
+  disconnectPhone,
+  setUpMac,
+  setMacRemote
+} from './lib/link'
 import { validateSpec, countWrites, countSceneWrites } from './lib/validate'
 import { beatFlash, bringIntoView } from './lib/feedback'
 import {
   remoteActive,
-  remoteLinked,
-  remoteConnect,
-  remoteDisconnect,
+  remoteHostSeen,
   hostResponds,
-  restoreSession,
   loadRemoteConfig,
-  wantsAutoConnect,
-  setAutoConnect,
   subscribeRemoteState
 } from './lib/remote'
 import { newEntry, append } from './lib/log'
@@ -170,18 +178,6 @@ const ofTunerOn = (s) => s.tunerOn
 const ofTuning = (s) => s.tuning
 
 const PREVIEW_ABOVE = 4
-
-/**
- * Whether this is plainly not the machine with the cable in it.
- *
- * Only used to choose which advice to give on the no-connection screen, so a
- * rough answer is the right kind: coarse enough not to matter when it's wrong,
- * and it spares someone on a phone a paragraph about npm.
- */
-const onAnotherDevice =
-  typeof navigator !== 'undefined' &&
-  (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-    (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent)))
 
 /**
  * What a remote session cannot do.
@@ -313,7 +309,33 @@ export default function App() {
    * remote session — the page had been relaying to a host that wasn't on — and
    * it is still the machine where the host switch lives.
    */
-  const [atTheMac, setAtTheMac] = useState(false)
+  /*
+   * Which end of the phone remote this is, and whether the other end answers.
+   * One object from one place; every indicator draws from it, and "connected"
+   * in it means the Mac answered, never merely that a channel was joined.
+   */
+  const [link, setLink] = useState(() => linkState())
+  const atTheMac = link.role === 'mac'
+  const [signIn, setSignIn] = useState(false)
+  /*
+   * Whether the phone has ever had the Mac answer this session. A blip after
+   * that keeps the screen (the chip goes red; the loop retries); before it,
+   * the connect screen is the screen.
+   */
+  const [everLinked, setEverLinked] = useState(false)
+  const [tick, setTick] = useState(0)
+  /*
+   * Whether the phone's screen is the connect screen. Signed out or
+   * deliberately disconnected: at once. Not answering: after a ten-second
+   * grace if the Mac has answered before this session — a socket lost for a
+   * moment in a pocket keeps Play and gets it back unnoticed. `tick` is
+   * bumped when that grace runs out so this is re-read.
+   */
+  const showConnect =
+    link.role === 'remote' &&
+    (link.link === 'signed-out' ||
+      link.link === 'off' ||
+      (link.link !== 'connected' && (!everLinked || Date.now() - link.since > 10000 || tick < 0)))
   // Where "Leave gig" returns to. Gig takes the screen over, so coming back out
   // should land where you were rather than at a fixed default.
   const [runningPlan, setRunningPlan] = useState(false)
@@ -476,11 +498,21 @@ export default function App() {
     setError(null)
     let fresh = null
     try {
+      /*
+       * A channel with nothing answering on it is the worst case: every call
+       * below waits out its own timeout — 20 s, 45 s for the block list —
+       * before this admits the fault. One short question first bounds that
+       * at six seconds.
+       */
+      if (remoteActive() && !remoteHostSeen() && !(await hostResponds())) {
+        setStatus('fault')
+        return null
+      }
       const info = await detect()
       setDevice(info)
       if (!info?.connected) {
         setStatus('fault')
-        setError('ForgeFX answered, but no Fractal unit is attached to it.')
+        setError('Your Mac is connected, but no Fractal is plugged into it.')
         return
       }
       const [p, b] = await Promise.all([currentPreset(), presetBlocks()])
@@ -565,25 +597,69 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      if (remoteActive() && !(await hostResponds())) await remoteDisconnect()
-
-      if (!remoteActive() && wantsAutoConnect() && !(await localHelperAlive())) {
-        const config = loadRemoteConfig()
-        try {
-          if (await restoreSession({ url: config?.url, anonKey: config?.anonKey })) {
-            await remoteConnect()
-            setRemote(true)
-          }
-        } catch {
-          // Nothing to rejoin, or the far end is down. The read below says so
-          // in the one place this app reports what it can't reach.
-        }
-      }
+      // A phone asks its Mac again; the loop in link.js does the rest.
+      if (linkState().role === 'remote') pokeLink()
     } catch {
-      // Every step above is best-effort; the read is what decides the verdict.
+      // Best-effort; the read is what decides the verdict.
     }
     await read()
   }, [read])
+
+  /**
+   * What the chip, the connect screen and the Setup section ask for.
+   *
+   * One handler, because the same five things are asked from three places
+   * and the failure of three copies is a Disconnect that behaves differently
+   * depending on which surface it was tapped on.
+   */
+  const linkAction = useCallback(
+    async (kind) => {
+      setError(null)
+      try {
+        if (kind === 'connect') {
+          if (linkState().account) await reconnectPhone()
+          else setSignIn(true)
+        } else if (kind === 'retry') {
+          pokeLink()
+          await reconnectPhone()
+        } else if (kind === 'disconnect') {
+          await disconnectPhone()
+          record('remote', 'Disconnected from the Mac')
+          resetSchemaCache()
+          read()
+        } else if (kind === 'switch') {
+          await disconnectPhone()
+          setSignIn(true)
+        } else if (kind === 'mac-setup') {
+          setSignIn(true)
+        } else if (kind === 'mac-on') {
+          await setMacRemote(true)
+          record('remote', 'Phone remote turned on')
+        } else if (kind === 'mac-off') {
+          await setMacRemote(false)
+          record('remote', 'Phone remote turned off')
+        }
+      } catch (err) {
+        setError(err.message)
+      }
+    },
+    [read, record]
+  )
+
+  /** The sign-in sheet's submit: the same form does a different job per role. */
+  const signInSubmit = useCallback(
+    async ({ email, password }) => {
+      if (linkState().role === 'mac') {
+        await setUpMac({ email, password })
+        record('remote', `Phone remote set up for ${email}`)
+      } else {
+        await connectPhone({ email, password })
+        record('remote', `Connected to the Mac as ${email}`)
+      }
+      setSignIn(false)
+    },
+    [record]
+  )
 
   /** Do at the Mac what the phone asked for, and say so at both ends. */
   const carryOutSave = useCallback(
@@ -668,13 +744,49 @@ export default function App() {
     read()
   }, [read])
 
+  /*
+   * Which end this is, and the saved sign-in, before anything else is judged.
+   *
+   * Once, at mount. This is what used to happen inside a panel that only
+   * mounted after the app had already failed — so a phone always saw an
+   * error screen first, and "not signed in" was shown over a good session.
+   */
   useEffect(() => {
-    let stop = false
-    localHelperAlive().then((alive) => !stop && setAtTheMac(alive))
-    return () => {
-      stop = true
+    const stop = subscribeLink(setLink)
+    bootLink().then(setLink)
+    return stop
+  }, [])
+
+  /*
+   * The Mac answering is the moment the phone's view of the unit is worth
+   * reading. Everything about the device is re-read down the new path.
+   */
+  useEffect(() => {
+    if (link.role !== 'remote') return
+    if (link.link === 'connected') {
+      setEverLinked(true)
+      setError(null)
+      resetSchemaCache()
+      read()
     }
-  }, [remote, status])
+    // Wait out a blip before swapping the screen: a second look at the same
+    // state ten seconds on is what decides between "reconnecting" and "gone".
+    if (link.link === 'no-answer') {
+      const id = setTimeout(() => setTick((t) => t + 1), 10500)
+      return () => clearTimeout(id)
+    }
+    return undefined
+  }, [link.role, link.link, read])
+
+  /*
+   * While the connect screen is up, the unit is not: the views are gated on
+   * a live status, and a Play screen under a "Connect to your Mac" heading
+   * would be two answers to one question. Coming back, the read that follows
+   * the Mac answering sets it live again.
+   */
+  useEffect(() => {
+    if (showConnect && status === 'live') setStatus('fault')
+  }, [showConnect, status])
 
   /*
    * A relay that comes and goes, followed rather than assumed.
@@ -690,12 +802,8 @@ export default function App() {
     () =>
       subscribeRemoteState((up) => {
         setRemote(up)
-        if (up) {
-          setError(null)
-          read()
-        } else {
-          setError('The remote session dropped. Rejoining — or press Reconnect to try now.')
-        }
+        // Coming back is handled where the Mac is known to have answered, not
+        // merely where the socket came up; going down is said by the chip.
       }),
     [read]
   )
@@ -754,10 +862,9 @@ export default function App() {
     return () => {
       live = false
     }
-    // `remote` flips when a session is established, which is the moment there
-    // is an account to read presets from. historyKey covers a preset saved
-    // here since the last read.
-  }, [historyKey, remote])
+    // The account is what there is to read presets from; historyKey covers a
+    // preset saved here since the last read.
+  }, [historyKey, link.account?.email])
 
   /*
    * The introduction, once, and only when there is something to introduce.
@@ -2047,13 +2154,8 @@ export default function App() {
             </div>
           ) : null
         }
-        onError={setError}
-        onRemoteChanged={(on) => {
-          setRemote(on)
-          record('remote', on ? 'Connected to the host remotely' : 'Back to the local connection')
-          resetSchemaCache()
-          read()
-        }}
+        link={link}
+        onLinkAction={linkAction}
       >
         {status === 'live' && view !== 'gig' ? (
           <SaveBar
@@ -2075,71 +2177,49 @@ export default function App() {
         </p>
       ) : null}
 
-      {status === 'fault' ? (
+      {/*
+        A phone that is not connected is not broken; it has one thing to do.
+        The connect screen says what and offers the button. It is also the
+        screen while the Mac stops answering mid-set — after a ten-second
+        grace, so a phone in a pocket losing a socket for a moment keeps the
+        Play screen and gets it back without anyone noticing.
+      */}
+      {showConnect ? (
+        <ConnectScreen
+          key={tick}
+          link={link}
+          busy={busy}
+          onConnect={() => linkAction('connect')}
+          onRetry={() => linkAction('retry')}
+          onSwitchAccount={() => linkAction('switch')}
+          onDemo={() => {
+            setDemo(true)
+            window.location.reload()
+          }}
+        />
+      ) : status === 'fault' ? (
         <div className="notice" data-kind="fault">
-          <h2>Can&rsquo;t reach your unit</h2>
-          <p>
-            This app runs on the web, but your Fractal unit is on your desk &mdash; so it needs the
-            helper app running on your Mac to reach it.
-          </p>
-          {/* On a phone the local advice is not just unhelpful, it's wrong:
-              localhost is the phone itself, and no browser choice changes that.
-              And with a relay already up, both versions are wrong — the Mac is
-              answering, so nothing about helper apps or browsers is the story. */}
-          {/* Which of the two remote failures this is, told apart by what the
-              read actually did: an answer saying "no unit" is a different
-              problem from no answer at all. Not by presence — the host joins
-              the channel without tracking any, so "is anyone else there?" is a
-              question the channel cannot answer. */}
-          {remoteActive() && device && !device.connected ? (
-            <p>
-              The Mac is answering but reports no unit attached to it. Check the cable, and that
-              nothing else &mdash; FM3-Edit, a second copy of the helper &mdash; is holding the
-              port, then press Reconnect.
-            </p>
-          ) : remoteActive() && atTheMac ? (
-            <p>
-              This machine is running the helper, so the relay is a long way round to a unit on
-              this desk &mdash; and the host it relays to isn&rsquo;t answering.{' '}
-              <button
-                className="chip"
-                onClick={async () => {
-                  setAutoConnect(false)
-                  await remoteDisconnect()
-                  setRemote(false)
-                  read()
-                }}
-              >
-                Use the cable instead
-              </button>{' '}
-              and the host switch appears under <strong>Play from your phone</strong>.
-            </p>
-          ) : remoteActive() ? (
-            <p>
-              You&rsquo;re on the channel and the Mac isn&rsquo;t answering on it. Signing in here
-              joins the channel; it doesn&rsquo;t put the Mac on it. Open this app at the Mac, find{' '}
-              <strong>Play from your phone</strong>, and turn the host on &mdash; signed in as this
-              same account, since that is what puts the two ends on the same channel.
-            </p>
-          ) : remoteLinked() ? (
-            <p>
-              The remote session dropped. It rejoins on its own when the network comes back, or you
-              can connect again below.
-            </p>
-          ) : onAnotherDevice ? (
-            <p>
-              Nothing is broken &mdash; a phone can&rsquo;t reach your unit directly, because the
-              unit is plugged into your Mac. Connect to the Mac below and you can play through it
-              from here.
-            </p>
+          {device && !device.connected ? (
+            <>
+              <h2>No unit found</h2>
+              <p>
+                Your Mac is connected, but no Fractal is plugged into it. Check the cable, and
+                that nothing else is using it, then tap Try again.
+              </p>
+            </>
           ) : (
-            <p>
-              Check the helper app is running on your Mac. If you&rsquo;re using Safari, try Chrome
-              instead &mdash; Safari won&rsquo;t let a website talk to your own computer.
-            </p>
+            <>
+              <h2>Can&rsquo;t find your Fractal</h2>
+              <p>
+                Open the Fractal app on this Mac &mdash; it&rsquo;s what talks to the unit. Using
+                Safari? Try Chrome; Safari won&rsquo;t let this page talk to your Mac.
+              </p>
+            </>
           )}
           <p>
-            No unit plugged in?{' '}
+            <button className="chip" onClick={reconnect} disabled={busy}>
+              Try again
+            </button>{' '}
             <button
               className="chip"
               onClick={() => {
@@ -2147,31 +2227,10 @@ export default function App() {
                 read()
               }}
             >
-              Try demo mode
-            </button>{' '}
-            lets you try everything against a simulated FM3.
+              Try the demo
+            </button>
           </p>
         </div>
-      ) : null}
-
-      {/*
-        On a phone this is the only screen that ever renders.
-        `localhost` is the machine you're holding, so a phone can never reach
-        ForgeFX directly and the status never becomes live — which meant the one
-        panel that could rescue it was behind a check for being live already.
-        A remote session is precisely the answer to having no local connection,
-        so it belongs on the screen that says there isn't one.
-      */}
-      {status === 'fault' ? (
-        <Remote
-          onConnected={(on) => {
-            setRemote(on)
-            record('remote', on ? 'Connected to the host remotely' : 'Back to the local connection')
-            resetSchemaCache()
-            read()
-          }}
-          onError={setError}
-        />
       ) : null}
 
       {/*
@@ -2467,6 +2526,16 @@ export default function App() {
       */}
       <Tour open={tour} onClose={() => setTour(false)} />
 
+      {/* The one sign-in, as a sheet: it pops up, you do the thing, it goes. */}
+      <SignInSheet
+        open={signIn}
+        role={link.role}
+        email={link.account?.email || loadRemoteConfig()?.email || ''}
+        busy={busy}
+        onClose={() => setSignIn(false)}
+        onSubmit={signInSubmit}
+      />
+
       <Sheet
         open={sheet === 'chat'}
         onClose={() => setSheet(null)}
@@ -2644,7 +2713,7 @@ export default function App() {
             and rejoins the session before it reads. */}
         <DeviceDetail status={status} device={device} onRetry={reconnect} busy={busy} />
 
-        <Section key="play-from-your-phone" title="Play from your phone" note={remote ? 'Connected' : 'Leave the Mac by the amp'}>
+        <Section key="play-from-your-phone" title="Phone remote" note={describeLink(link).note}>
           {/*
             The short route first, because it is the one most people want and
             the one that needs nothing: same wifi, open a link, done. The relay

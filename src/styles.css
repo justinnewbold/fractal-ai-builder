@@ -5809,3 +5809,167 @@ button.recent-row {
   font-size: var(--f-1);
   color: var(--silk-faint);
 }
+
+/* ---------- the phone remote ---------- */
+
+/*
+ * The chip in the bar. Four tones, one rule each: green is the Mac answering,
+ * red is the Mac not answering, busy is on its way, dim is nothing to watch.
+ * Colour says whether it is good; the word says which state.
+ */
+button.phone-chip.good {
+  color: var(--live);
+  border-color: color-mix(in srgb, var(--live) 55%, var(--rule));
+}
+
+button.phone-chip.bad {
+  color: var(--fault);
+  border-color: color-mix(in srgb, var(--fault) 55%, var(--rule));
+}
+
+button.phone-chip.bad .lamp {
+  background: var(--fault);
+  box-shadow: none;
+}
+
+button.phone-chip.busy {
+  color: var(--silk-dim);
+}
+
+button.phone-chip.dim {
+  color: var(--silk-faint);
+}
+
+/*
+ * The phone's connect screen. Centred and calm, because nothing is wrong:
+ * there is one thing to do and it is the big button. Room above it so it
+ * sits where a thumb rests rather than under the bar.
+ */
+.connect {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--s-3);
+  margin: var(--s-7) auto 0;
+  max-width: 420px;
+  padding: 0 var(--s-4);
+}
+
+.connect h2 {
+  font-family: var(--display);
+  font-size: var(--f-5);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+
+.connect > p {
+  margin: 0;
+  font-size: var(--f-3);
+  line-height: 1.55;
+  color: var(--silk-dim);
+}
+
+.connect-lamp {
+  width: 12px;
+  height: 12px;
+  margin-bottom: var(--s-2);
+}
+
+.lamp[data-state='busy'] {
+  background: var(--signal);
+  animation: connect-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes connect-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--signal) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lamp[data-state='busy'] {
+    animation: none;
+  }
+}
+
+.connect-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-3);
+  margin-top: var(--s-3);
+  width: 100%;
+}
+
+.connect-actions .primary {
+  min-height: 52px;
+  min-width: min(280px, 100%);
+  font-size: var(--f-3);
+}
+
+.connect-demo {
+  margin-top: var(--s-6);
+}
+
+/* The sign-in form: two fields stacked, the button under them, the two
+   side-doors as plain links. */
+.signin {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  padding: var(--s-4);
+}
+
+.signin-sheet > .hint {
+  margin: var(--s-3) var(--s-4) 0;
+}
+
+.signin-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+
+.signin-field span {
+  font-size: var(--f-2);
+  color: var(--silk-faint);
+}
+
+.signin-field input {
+  width: 100%;
+  min-height: 48px;
+  font-size: var(--f-input);
+}
+
+.signin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.signin-actions .primary {
+  min-height: 48px;
+  flex: 1 1 100%;
+}
+
+button.signin-link {
+  background: none;
+  border: 0;
+  padding: var(--s-2) 0;
+  min-height: 44px;
+  color: var(--silk-dim);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.signin .problem {
+  margin: 0;
+  color: var(--fault);
+}

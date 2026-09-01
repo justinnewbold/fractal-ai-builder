@@ -58,43 +58,9 @@ export default function Remote({ onConnected, onError }) {
    * channel silently — but only for someone who was connected when they left,
    * since having signed in once is not the same as wanting to be remote.
    */
-  useEffect(() => {
-    if (remoteActive() || !wantsAutoConnect()) return
-    let stop = false
-    ;(async () => {
-      /*
-       * Not at the Mac itself.
-       *
-       * The relay exists for browsers that cannot reach the helper. At the
-       * machine holding the cable it is a round trip through a datacentre to
-       * an amp on the desk — and a socket that drops every time the Mac sleeps
-       * or changes network, which is what "it keeps disconnecting" was. If
-       * localhost answers, that is the connection to use.
-       */
-      const { localHelperAlive } = await import('../lib/forgefx')
-      if (await localHelperAlive()) return
+  // Auto-reconnect on load moved to lib/link.js, which runs at app mount
+  // rather than after this panel happens to be opened.
 
-      const uid = await restoreSession({ url: saved?.url, anonKey: saved?.anonKey })
-      if (!uid || stop) return
-      try {
-        await remoteConnect()
-        if (stop) return
-        setState('connected')
-        setNote('Reconnected to the host.')
-        onConnected(true)
-        const answered = await hostResponds()
-        if (!stop && !answered) setNote(NO_ANSWER)
-      } catch {
-        // The host may simply be off. Leaving the form is the right answer, and
-        // an error on page load for something nobody asked for is not.
-        setAutoConnect(false)
-      }
-    })()
-    return () => {
-      stop = true
-    }
-    // Runs once on mount by design: this is about the state the app opened in.
-  }, [])
 
   /*
    * The panel follows the link rather than remembering what it last did.
@@ -263,9 +229,10 @@ export default function Remote({ onConnected, onError }) {
   }
 
   const disconnect = async () => {
-    // Disconnecting is a decision; don't undo it on the next load.
-    setAutoConnect(false)
-    await remoteDisconnect()
+    // The one place a phone stops being a remote, shared with the chip and
+    // the connect screen, so "Disconnect" means the same thing everywhere.
+    const { disconnectPhone } = await import('../lib/link')
+    await disconnectPhone()
     setState('idle')
     setNote('Back to the local connection.')
     onConnected(false)
