@@ -254,7 +254,7 @@ export function run(test) {
     }
 
     // Setup on the stage screen is how you change the host address by accident.
-    for (const name of ['Host', 'Remote', 'ConnectScreen', 'SignInSheet', 'Ports', 'Diagnostics', 'LocalLibrary', 'Footswitches']) {
+    for (const name of ['PhoneRemote', 'LinkDetails', 'ConnectScreen', 'SignInSheet', 'Ports', 'Diagnostics', 'LocalLibrary', 'Footswitches']) {
       assert.ok(!play.includes(name), `${name} is on Play`)
       assert.ok(!components(view('shape')).includes(name), `${name} is on Shape, not in a sheet`)
     }
@@ -263,7 +263,7 @@ export function run(test) {
     for (const [title, names] of [
       ['Presets', ['PresetList', 'LocalLibrary', 'Backup', 'Versions', 'DeviceBackup']],
       ['Scenes', ['Scenes', 'SceneMatrix']],
-      ['Setup', ['DeviceDetail', 'Host', 'Remote', 'Ports', 'ChangeLog', 'Diagnostics']]
+      ['Setup', ['DeviceDetail', 'PhoneRemote', 'Ports', 'ChangeLog', 'Diagnostics', 'LinkDetails']]
     ]) {
       for (const name of names) {
         assert.ok(components(sheet(title)).includes(name), `${name} should be in the ${title} sheet`)
@@ -475,7 +475,7 @@ export function run(test) {
 
   test('panels that can fail can report it', () => {
     // A panel with no onError swallows its failures.
-    for (const name of ['GridEditor', 'Scenes', 'Modifiers', 'Remote', 'BlockPanel', 'CabPicker']) {
+    for (const name of ['GridEditor', 'Scenes', 'Modifiers', 'PhoneRemote', 'BlockPanel', 'CabPicker']) {
       const props = tag(src, name)
       assert.ok(props, `${name} is not rendered`)
       assert.ok(/onError=/.test(props), `${name} cannot report errors`)
@@ -672,15 +672,60 @@ export function run(test) {
   })
 
   test('nothing user-facing talks about the plumbing', () => {
-    // Terms that mean something to whoever built this and nothing to a
-    // guitarist. Comments are allowed to say ForgeFX; the screen is not.
-    const prose = src
-      .split('\n')
-      .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
-      .join('\n')
-    for (const term of ['npm run dev', 'localhost:5056', 'SysEx']) {
-      assert.ok(!prose.includes(`>${term}`), `"${term}" is on screen`)
+    /*
+     * Terms that mean something to whoever built this and nothing to a
+     * guitarist. Every component is checked, not just App.jsx: the worst
+     * offenders — "run npm run serve", "relaying through your Supabase
+     * project", an AXIS_CLOUD block — were in panels this test never read,
+     * and they were the first thing a person saw on their phone.
+     *
+     * Comments are stripped first; a comment may say anything. Two files are
+     * exempt because they are the diagnostics, written for exactly these
+     * words: LinkDetails and Diagnostics live under Technical details.
+     */
+    const dir = new URL('../src/components/', import.meta.url)
+    /*
+     * Technical details is exempt in App.jsx too: it carries the attribution
+     * to the device server by name, with a link, which is credit rather than
+     * plumbing — and it is behind the fold that says "for working out why
+     * something went wrong".
+     */
+    const techStart = src.indexOf('key="technical-details"')
+    const techEnd = src.indexOf('</Section>', techStart)
+    const appProse = techStart === -1 ? src : src.slice(0, techStart) + src.slice(techEnd)
+    const files = { 'App.jsx': appProse }
+    for (const f of readdirSync(dir)) {
+      if (!f.endsWith('.jsx') || f === 'LinkDetails.jsx' || f === 'Diagnostics.jsx') continue
+      files[f] = readFileSync(new URL(f, dir), 'utf8')
     }
+    const terms = [
+      /npm run/,
+      /localhost:5056/,
+      /SysEx/,
+      /Supabase/,
+      /\brelay(ing|ed)?\b/i,
+      /helper app/i,
+      /AXIS_CLOUD/,
+      /anon key/i,
+      /the channel/i,
+      /remote session/i,
+      /ForgeFX/
+    ]
+    const hits = []
+    for (const [name, body] of Object.entries(files)) {
+      const prose = body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+      // Only what a person can read: text between tags, and string literals.
+      const seen = [
+        ...[...prose.matchAll(/>([^<>{}]+)</g)].map((m) => m[1]),
+        ...[...prose.matchAll(/(['"`])((?:\\.|(?!\1)[^\\])*)\1/g)].map((m) => m[2])
+      ]
+      for (const text of seen) {
+        for (const term of terms) {
+          if (term.test(text)) hits.push(`${name}: ${text.trim().slice(0, 70)}`)
+        }
+      }
+    }
+    assert.deepEqual(hits, [], `plumbing on screen:\n  ${hits.join('\n  ')}`)
   })
 
   test('the phone remote is honest about whether the Mac answered', () => {

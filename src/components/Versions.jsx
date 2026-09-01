@@ -75,7 +75,7 @@ export function Versions({ preset, onError, onChanged, busy }) {
 
       {versions.length === 0 ? (
         <p className="hint">
-          No snapshots yet. ForgeFX takes one before it overwrites a slot, so they appear as you
+          No snapshots yet. One is taken before a slot is overwritten, so they appear as you
           work.
         </p>
       ) : (

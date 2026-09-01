@@ -11,8 +11,6 @@ import { Compare } from './components/Refine'
 import Gig from './components/Gig'
 import SaveBar from './components/SaveBar'
 import SaveSheet from './components/SaveSheet'
-import PhoneSetup from './components/PhoneSetup'
-import Account from './components/Account'
 import CloudPresets from './components/CloudPresets'
 import { Stages, LiveGeneration, Thinking } from './components/LiveGeneration'
 import { streamSpec } from './lib/stream'
@@ -22,7 +20,6 @@ import Footswitches from './components/Footswitches'
 import GridEditor from './components/GridEditor'
 import Ports from './components/Ports'
 import LocalLibrary from './components/LocalLibrary'
-import Remote from './components/Remote'
 import Section from './components/Section'
 import Sheet from './components/Sheet'
 import DeviceDetail from './components/DeviceDetail'
@@ -43,7 +40,6 @@ import {
   writeTuner
 } from './lib/deviceState'
 import ParamSearch from './components/ParamSearch'
-import Host from './components/Host'
 import Assistant from './components/Assistant'
 import UpdateNotice from './components/UpdateNotice'
 import { validatePlan, runPlan } from './lib/actions'
@@ -106,6 +102,8 @@ import { saveCloudPreset, cloudReady, listCloudPresets } from './lib/cloudPreset
 import Tour, { tourSeen, markTourSeen } from './components/Tour'
 import Recent from './components/Recent'
 import ConnectScreen from './components/ConnectScreen'
+import PhoneRemote from './components/PhoneRemote'
+import LinkDetails from './components/LinkDetails'
 import SignInSheet from './components/SignInSheet'
 import {
   bootLink,
@@ -117,7 +115,8 @@ import {
   reconnectPhone,
   disconnectPhone,
   setUpMac,
-  setMacRemote
+  setMacRemote,
+  signOutHere
 } from './lib/link'
 import { validateSpec, countWrites, countSceneWrites } from './lib/validate'
 import { beatFlash, bringIntoView } from './lib/feedback'
@@ -638,6 +637,11 @@ export default function App() {
         } else if (kind === 'mac-off') {
           await setMacRemote(false)
           record('remote', 'Phone remote turned off')
+        } else if (kind === 'signout') {
+          await signOutHere()
+          record('remote', 'Signed out on this device')
+          resetSchemaCache()
+          read()
         }
       } catch (err) {
         setError(err.message)
@@ -1079,8 +1083,8 @@ export default function App() {
           setSaveError(
             err.remoteBlocked
               ? parked
-                ? `ForgeFX won't rename over a remote session, so the unit still shows the old name. “${generatedName}” is waiting on the host — open this app at the Mac and it gets written automatically.`
-                : `ForgeFX won't rename over a remote session, so the unit still shows the old name. “${generatedName}” is kept in the save options here — rename at the Mac to put it on the unit.`
+                ? `Renaming happens at the Mac, so the unit still shows the old name. “${generatedName}” is waiting there — open this app on the Mac and it gets written automatically.`
+                : `Renaming happens at the Mac, so the unit still shows the old name. “${generatedName}” is kept in the save options here — rename at the Mac to put it on the unit.`
               : `Couldn't write the name “${generatedName}” to the unit — it's kept in the save options and will be applied on save.`
           )
         }
@@ -1725,7 +1729,7 @@ export default function App() {
               role: 'assistant',
               text: `${blocked
                 .map((a) => a.label)
-                .join(', ')} — that has to happen at the Mac. ForgeFX won't let a remote session overwrite a preset, which is the right call mid-set.`
+                .join(', ')} — that has to happen at the Mac. A phone can't overwrite a preset, which is the right call mid-set.`
             }
           ])
           return
@@ -2713,37 +2717,14 @@ export default function App() {
             and rejoins the session before it reads. */}
         <DeviceDetail status={status} device={device} onRetry={reconnect} busy={busy} />
 
-        <Section key="play-from-your-phone" title="Phone remote" note={describeLink(link).note}>
+        <Section key="phone-remote" title="Phone remote" note={describeLink(link).note}>
           {/*
-            The short route first, because it is the one most people want and
-            the one that needs nothing: same wifi, open a link, done. The relay
-            below it is for reaching the rig from somewhere else, which is a
-            real thing to want and a much bigger ask — an account on both ends.
-            They used to be presented the other way round, with the account as
-            the only route, because for a while it was.
+            One panel for both ends. It says which end this is, whether the
+            other end answers, and offers the one thing that state calls for.
+            The four panels it replaces — each written for the person who built
+            the app — are gone, and the words they used with them.
           */}
-          <PhoneSetup />
-
-          <Account onError={setError} />
-
-          {/* Host controls only work on the machine holding the cable — from a
-              phone these calls are refused, and a button that cannot work is
-              worse than no button. But "not in a remote session" was the wrong
-              test for that: at the Mac, relaying to a host that isn't on is
-              exactly the situation this panel exists to fix, and it was
-              hiding itself for the duration. Ask localhost instead. */}
-          {atTheMac ? <Host onError={setError} /> : null}
-
-          <Remote
-            onConnected={(on) => {
-              setRemote(on)
-              record('remote', on ? 'Connected to the host remotely' : 'Back to the local connection')
-              // Everything about the device has to be re-read down the new path.
-              resetSchemaCache()
-              read()
-            }}
-            onError={setError}
-          />
+          <PhoneRemote link={link} onAction={linkAction} onError={setError} busy={busy} />
         </Section>
 
         <Section key="connection" title="Connection" note="Which unit this app is talking to">
@@ -2848,6 +2829,7 @@ export default function App() {
 
         <Section key="technical-details" title="Technical details" note="For working out why something went wrong">
           <Diagnostics />
+          <LinkDetails />
 
           {/*
             This used to sit under every screen, permanently, including the one

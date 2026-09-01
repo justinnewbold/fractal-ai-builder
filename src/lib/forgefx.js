@@ -144,7 +144,7 @@ async function directRequest(path, options = {}) {
     })
   } catch (cause) {
     throw new ForgeError(
-      'Could not reach ForgeFX. Check that the server is running and the Fractal unit is connected.',
+      'Can’t reach the Fractal app on your Mac. Check that it is open and the Fractal unit is connected.',
       { cause }
     )
   }
@@ -1647,21 +1647,14 @@ export function pageIsSecure() {
  * which means a browser address bar can't reach them, and that was the last
  * thing in this setup that needed a terminal.
  */
-export const cloudStatus = () =>
-  mock ? tick().then(() => ({ enabled: false, user: null })) : directRequest('/cloud/status')
+export const cloudStatus = () => directRequest('/cloud/status')
 
 export const cloudLogin = (email, password) =>
-  mock
-    ? tick().then(() => ({ user: { email } }))
-    : directRequest('/cloud/login', { method: 'POST', body: JSON.stringify({ email, password }) })
+  directRequest('/cloud/login', { method: 'POST', body: JSON.stringify({ email, password }) })
 
-export const cloudLogout = () =>
-  mock ? tick().then(() => ({ user: null })) : directRequest('/cloud/logout', { method: 'POST' })
+export const cloudLogout = () => directRequest('/cloud/logout', { method: 'POST' })
 
-export const remoteStatus = () =>
-  mock ? tick().then(() => ({ enabled: false, connected: false })) : directRequest('/remote/status')
+export const remoteStatus = () => directRequest('/remote/status')
 
 export const remoteEnable = (on) =>
-  mock
-    ? tick().then(() => ({ enabled: on, connected: on }))
-    : directRequest('/remote/enable', { method: 'POST', body: JSON.stringify({ on }) })
+  directRequest('/remote/enable', { method: 'POST', body: JSON.stringify({ on }) })

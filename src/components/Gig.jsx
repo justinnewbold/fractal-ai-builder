@@ -188,7 +188,7 @@ export default function Gig({ preset, device, capabilities, onError, onChanged, 
       // up, forever.
       const res = await writeTuner(next)
       if (next && res && res.ok === false) {
-        onError('ForgeFX refused the tuner for this unit — its build may predate tuner support for it.')
+        onError('The unit refused the tuner — the Fractal app on the Mac may need updating.')
       }
     } catch (err) {
       onError(err.message)
@@ -355,8 +355,8 @@ export default function Gig({ preset, device, capabilities, onError, onChanged, 
       {tunerOn && tunerStalled ? (
         <p className="gig-note">
           {remoteActive()
-            ? 'The tuner is running on the unit, but ForgeFX doesn’t send tuner readings over a remote session yet — they only reach the app at the Mac. Tune there, or from a browser on the Mac’s own address.'
-            : 'No readings are arriving from ForgeFX. If the unit is making sound, this ForgeFX build may not support the tuner on it — try updating ForgeFX.'}
+            ? 'The tuner is running on the unit, but its readings don’t reach a phone yet — only the app at the Mac. Tune there.'
+            : 'No tuner readings are arriving. If the unit is making sound, the Fractal app on the Mac may need updating.'}
         </p>
       ) : null}
 
@@ -426,7 +426,7 @@ export default function Gig({ preset, device, capabilities, onError, onChanged, 
           scenes", which is a different and wrong thing to believe. */}
       {hasScenes && !names.some((n) => (n || '').trim()) && remoteActive() ? (
         <p className="gig-note">
-          Scene names aren&rsquo;t readable over a remote session. Open this preset once at the
+          Scene names aren&rsquo;t readable from the phone. Open this preset once at the
           Mac and they&rsquo;ll show here from then on.
         </p>
       ) : null}
@@ -434,7 +434,7 @@ export default function Gig({ preset, device, capabilities, onError, onChanged, 
       {chain === 'failed' ? (
         <div className="gig-note gig-note-action">
           <span>
-            Couldn&rsquo;t read the chain{remoteActive() ? ' over the remote session' : ''}, so
+            Couldn&rsquo;t read the chain{remoteActive() ? ' from the phone' : ''}, so
             there&rsquo;s nothing to switch here yet.
           </span>
           <button onClick={() => refreshBlocks()}>Try again</button>
