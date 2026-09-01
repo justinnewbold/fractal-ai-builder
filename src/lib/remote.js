@@ -33,11 +33,13 @@ const STORE_KEY = 'fractal.remote.config'
  *
  * Both can still be overridden, for a second project or a rotated key.
  */
-export const DEFAULT_PROJECT = {
-  url: 'https://biznwrqeckviawjuhvyg.supabase.co',
-  anonKey:
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpem53cnFlY2t2aWF3anVodnlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MjIyNDksImV4cCI6MjEwMzQ5ODI0OX0.WT2K6kxqy5cMc1tL-Lr3JgTwwhFYY2t-NJsOXNJXgVU'
-}
+/*
+ * Defined beside the Mac launchers rather than here, because they need it too:
+ * ForgeFX is started already pointed at this project, so nobody edits a
+ * `.env` on the Mac. One constant, imported from both ends, cannot drift.
+ */
+export { DEFAULT_PROJECT } from '../../desktop/lib/project.mjs'
+import { DEFAULT_PROJECT } from '../../desktop/lib/project.mjs'
 
 /**
  * What the host will and won't do from a distance.

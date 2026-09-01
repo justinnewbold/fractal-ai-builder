@@ -25,6 +25,8 @@ let win = null
 let server = null
 let advert = { stop: async () => {} }
 let where = null
+/** What armHost found: null until it answers, then { on, email, reason }. */
+let phone = null
 
 /** The shared logic is ESM; this shell is CommonJS, so it is imported lazily. */
 const host = () => import('./lib/host.mjs')
@@ -39,6 +41,7 @@ async function start() {
     DEFAULT_PORT,
     MISSING_FORGEFX,
     addresses,
+    armHost,
     findForgeFX,
     lanAddress,
     publish,
@@ -77,6 +80,18 @@ async function start() {
   server.on('exit', (code) => {
     if (code) dialog.showErrorBox('The device server stopped', `ForgeFX exited with code ${code}.`)
   })
+
+  /*
+   * Turn the phone remote on once the server is up, and say so in the menu.
+   * Not awaited: the window and tray should not wait on the account service,
+   * and the line in the menu updates when the answer lands.
+   */
+  armHost({ port })
+    .then((result) => {
+      phone = result
+      if (tray) buildTray()
+    })
+    .catch(() => {})
 }
 
 function openWindow() {
@@ -106,8 +121,25 @@ function buildTray() {
   tray = new Tray(icon)
   tray.setToolTip('Fractal AI Builder')
 
+  /*
+   * One line about the phone remote, in words a person would use. "On for
+   * you@example.com" is the whole status; when it is off, the line says the
+   * one thing to do about it.
+   */
+  const phoneLine = !phone
+    ? 'Phone remote: starting…'
+    : phone.on
+      ? `Phone remote: on${phone.email ? ` — ${phone.email}` : ''}`
+      : phone.reason === 'signed-out'
+        ? 'Phone remote: off — open the app and sign in once'
+        : phone.reason === 'turned-off'
+          ? 'Phone remote: off — turn it on in the app'
+          : 'Phone remote: off'
+
   const menu = Menu.buildFromTemplate([
     { label: 'Open', click: openWindow },
+    { type: 'separator' },
+    { label: phoneLine, enabled: false },
     { type: 'separator' },
     { label: 'On your phone — same wifi, nothing to sign into:', enabled: false },
     ...(where?.all || []).map((u) => ({

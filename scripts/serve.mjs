@@ -26,6 +26,7 @@ import {
   DEFAULT_PORT,
   MISSING_FORGEFX,
   addresses,
+  armHost,
   findForgeFX,
   lanAddress,
   publish,
@@ -69,6 +70,14 @@ const server = spawn('npm', ['run', 'dev'], {
   stdio: 'inherit',
   env: serverEnv({ port, dist: join(root, 'dist') })
 })
+
+/*
+ * Turn the phone remote on once the server is up. Not awaited: the QR above
+ * is already printed and the server's own output is streaming past, and this
+ * says its one line when it knows. Nobody should have to open the app on this
+ * Mac just to flip a switch the Mac can flip itself.
+ */
+armHost({ port, log: (line) => console.log(`\n  ${line}\n`) })
 
 const shutdown = async (code = 0) => {
   await ad.stop()
