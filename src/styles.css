@@ -811,9 +811,14 @@ input[type='text']:focus-visible {
      and the room goes to the preset — the one fact here you actually read.
      With nothing answering there is no preset, and the bar's whole job is to
      say so, so both come back. */
+  /* The lamp already carries the state and the demo banner already says it is
+     a simulation, so on a narrow screen the unit's name and the connection
+     word are the two facts worth spending on the preset name instead — which
+     is the one thing the bar exists to show, and was being cut to "D…". */
   .topbar[data-status='live'] .topbar-how,
   .topbar[data-status='live'] .topbar-unit,
-  .topbar[data-status='demo'] .topbar-how {
+  .topbar[data-status='demo'] .topbar-how,
+  .topbar[data-status='demo'] .topbar-unit {
     display: none;
   }
 
@@ -5157,4 +5162,53 @@ button.sheet-close:active {
 button.xy-change {
   margin-left: auto;
   align-self: center;
+}
+
+/* ---------- the bar's popovers, on a phone ----------
+
+   The save popover is anchored to the save cluster and sits 380px wide. The
+   cluster ends where the phone chip and the gear begin, so on a 390px screen
+   a right-aligned popover of that width started 74px off the LEFT edge: the
+   slot field and the name field were both unreachable, which is the whole
+   popover.
+
+   Below 620px it stops hanging off the cluster and spans the bar instead.
+   .topbar is the containing block either way — it is sticky, and its
+   backdrop-filter makes it one regardless — and its padding box is the full
+   width of the screen, so left/right here are the screen's edges. */
+
+@media (max-width: 620px) {
+  .save-cluster {
+    position: static;
+  }
+
+  .save-pop {
+    left: var(--s-3);
+    right: var(--s-3);
+    width: auto;
+    max-width: none;
+  }
+
+  /* "phone off" is two words and was wrapping to two lines inside a 40px bar,
+     which is what made the chip twice as tall as everything beside it. */
+  button.phone-chip.compact {
+    white-space: nowrap;
+  }
+}
+
+/* What the app is actually talking to, at the top of the connection panel and
+   in the connection colour — the panel used to open with the absence of the
+   transport it wasn't using. */
+.port-live {
+  margin: 0 0 var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--f-3);
+  color: var(--silk-dim);
+  background: var(--live-halo);
+  border-left: 2px solid var(--live);
+  border-radius: var(--r-1);
+}
+
+.port-live strong {
+  color: var(--silk);
 }

@@ -65,9 +65,40 @@ export default function Ports({ onError, onChanged, busy }) {
    */
   const all = Array.isArray(ports?.ports) ? ports.ports : []
   const fractal = all.filter((p) => p.fractal && p.transport !== 'midi')
-  const overMidi = all.filter((p) => p.fractal && p.transport === 'midi')
   const others = all.filter((p) => !p.fractal)
   const chosenId = ports?.chosen?.id
+
+  /*
+   * MIDI names itself twice.
+   *
+   * A USB-MIDI unit exposes its input and its output as separate endpoints,
+   * usually under the same name — so listing them straight gave "Also
+   * reachable over MIDI: AM4, AM4", which reads as two units or as a bug.
+   * ForgeFX pairs the two halves itself; there is one unit there.
+   */
+  const overMidi = [
+    ...new Map(
+      all
+        .filter((p) => p.fractal && p.transport === 'midi')
+        .map((p) => [p.model || p.label || p.id, p])
+    ).values()
+  ]
+
+  /*
+   * What the app is talking to, said first.
+   *
+   * This panel led with "No Fractal units found on a serial port" — true, and
+   * the wrong fact to open with on a Mac driving an AM4 over MIDI, where the
+   * bar two inches above says "AM4 connected". It reported the absence of the
+   * transport it was not using instead of the presence of the one it was.
+   */
+  const chosen = ports?.chosen || null
+  const chosenEntry = chosen
+    ? all.find((p) => p.id === chosen.id || p.id === chosen.inId || p.id === chosen.outId)
+    : null
+  const chosenName =
+    chosenEntry?.model || chosenEntry?.label || ports?.profile?.name || chosen?.id || null
+  const overMidiNow = chosen?.transport === 'midi'
 
   return (
     <section className="ports">
@@ -87,8 +118,19 @@ export default function Ports({ onError, onChanged, busy }) {
             <p className="hint">Reading…</p>
           ) : (
             <div className="port-list">
+              {chosen && chosenName ? (
+                <p className="port-live">
+                  Talking to <strong>{chosenName}</strong> over{' '}
+                  {overMidiNow ? 'MIDI' : 'a serial port'}.
+                </p>
+              ) : null}
+
               {fractal.length === 0 ? (
-                <p className="hint pad">No Fractal units found on a serial port.</p>
+                <p className="hint pad">
+                  {overMidiNow
+                    ? 'Nothing on a serial port — MIDI is carrying it.'
+                    : 'No Fractal units found on a serial port.'}
+                </p>
               ) : (
                 fractal.map((port) => (
                   <button
@@ -104,10 +146,13 @@ export default function Ports({ onError, onChanged, busy }) {
                 ))
               )}
 
-              {overMidi.length ? (
+              {/* Only when MIDI is not already the answer: when it is, the line
+                  above has said so, and saying it twice invites the reading
+                  that these are two different things. */}
+              {overMidi.length && !overMidiNow ? (
                 <p className="hint pad">
-                  Also reachable over MIDI: {overMidi.map((p) => p.label || p.id).join(', ')} — used
-                  automatically when nothing is on a serial port.
+                  Also reachable over MIDI: {overMidi.map((p) => p.model || p.label || p.id).join(', ')} —
+                  used automatically when nothing is on a serial port.
                 </p>
               ) : null}
 

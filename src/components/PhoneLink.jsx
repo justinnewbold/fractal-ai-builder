@@ -132,8 +132,15 @@ export default function PhoneLink({ onChanged, onError, compact }) {
    * pixel row, and it pushed the preset name — the one fact anyone reads there
    * — down to nothing. The word still says which of the three states it is;
    * the colour says whether that's good; the popover keeps the sentence.
+   *
+   * Shortened again after seeing it on a real phone: "phone off" is two words,
+   * and at the width the bar could spare it wrapped to two lines and made the
+   * chip twice the height of everything beside it. The lamp is right there and
+   * the chip is next to a gear, so the noun was doing no work that its
+   * neighbours weren't. "no host" keeps both of its words — that one is a
+   * fault, and the one state here worth reading twice.
    */
-  const short = active ? (hostSeen ? 'phone' : 'no host') : 'phone off'
+  const short = active ? (hostSeen ? 'linked' : 'no host') : 'off'
 
   return (
     <span className="phone-link" ref={wrap}>
