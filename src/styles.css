@@ -5212,3 +5212,83 @@ button.xy-change {
 .port-live strong {
   color: var(--silk);
 }
+
+/* The live scene, on the screen where edits land in it. Reads as a state
+   rather than as a door: the tag carries the number, the name carries the
+   meaning, and the signal colour says this is the one you are editing. */
+button.chip.scene-now {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  border-color: color-mix(in srgb, var(--signal) 45%, var(--rule));
+}
+
+.scene-now-tag {
+  padding: 1px var(--s-1);
+  font-size: var(--f-1);
+  color: var(--on-signal);
+  background: var(--signal);
+  border-radius: var(--r-1);
+}
+
+.scene-now-name {
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- the preset menu ----------
+
+   Hung off the bar rather than off the button: the preset button sits
+   mid-row, and a 380px menu anchored to it runs off the edge of a phone —
+   the same way the save popover did. The bar spans the screen, so this
+   spans the bar. */
+
+.preset-menu {
+  position: absolute;
+  top: calc(100% + var(--s-2));
+  right: var(--s-5);
+  z-index: var(--z-sheet);
+  width: min(420px, calc(100vw - var(--s-5) * 2));
+  padding: var(--s-2);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2);
+  box-shadow: var(--e-3);
+}
+
+/* The list carries its own panel chrome; inside a menu that is a second
+   border around the first. */
+.preset-menu .preset-panel {
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+
+.preset-menu .preset-scroll {
+  max-height: min(52vh, 420px);
+}
+
+button.preset-menu-more {
+  width: 100%;
+  margin-top: var(--s-2);
+}
+
+button.topbar-preset.open .topbar-caret {
+  transform: rotate(180deg);
+}
+
+@media (max-width: 620px) {
+  .preset-menu {
+    left: var(--s-3);
+    right: var(--s-3);
+    width: auto;
+  }
+}
+
+/* A slot whose name has not been read yet. Not "empty" — that is a different
+   thing and one we would be claiming to know. */
+.preset-unread {
+  color: var(--silk-faint);
+}

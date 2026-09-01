@@ -35,6 +35,8 @@ export default function TopBar({
   onOpenSettings,
   onError,
   onRemoteChanged,
+  presetsOpen,
+  menu,
   children
 }) {
   const demo = isDemo()
@@ -74,7 +76,12 @@ export default function TopBar({
         {/* The preset is a button because it's the thing you change most, and
             because a slot number nobody can act on is trivia. */}
         {status === 'live' ? (
-          <button className="topbar-preset" onClick={onOpenPresets} aria-label="Choose a preset">
+          <button
+            className={`topbar-preset ${presetsOpen ? 'open' : ''}`}
+            onClick={onOpenPresets}
+            aria-label="Choose a preset"
+            aria-expanded={!!presetsOpen}
+          >
             <span className="topbar-slot mono">{preset?.number ?? '--'}</span>
             <span className="topbar-name">{preset?.name?.trim() || 'Untitled'}</span>
             <span className="topbar-caret" aria-hidden="true" />
@@ -103,6 +110,13 @@ export default function TopBar({
           <span aria-hidden="true">⚙</span>
         </button>
       </div>
+
+      {/*
+        The preset menu hangs off the bar rather than off the button, for the
+        same reason the save popover does: the button sits mid-row, and a menu
+        anchored to it runs off the edge of a phone. The bar spans the screen.
+      */}
+      {menu}
     </div>
   )
 }
