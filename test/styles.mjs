@@ -102,4 +102,77 @@ export function run(test) {
     // in 118 gap declarations. A token nobody uses is a token someone will.
     assert.ok(!code.includes('--gutter'), '--gutter is still declared')
   })
+
+  test('nothing on a touch screen is under the 44px floor', () => {
+    /*
+     * A sweep of the app on a phone found the whole chrome row at 40px, the
+     * on/off pill at 40, selects at 34, the theme toggle at 34 and the sign-in
+     * fields at 21 — each set deliberately, each a little short, none of them
+     * wrong enough to notice sitting at a desk.
+     *
+     * The trap is specificity. The touch floor is a blanket `button` rule at
+     * (0,0,1); any component that names itself — `button.fx-power` at (0,1,1) —
+     * outranks it and keeps whatever height it gave itself. So a small base
+     * height is fine only if the same selector is raised again for touch. That
+     * pairing is what this checks, and 40px survived one correction without it.
+     */
+    const coarseBodies = []
+    for (const m of code.matchAll(/@media \(pointer: coarse\)\s*\{/g)) {
+      let i = m.index + m[0].length
+      let depth = 1
+      const from = i
+      while (i < code.length && depth) {
+        if (code[i] === '{') depth++
+        else if (code[i] === '}') depth--
+        i++
+      }
+      coarseBodies.push(code.slice(from, i - 1))
+    }
+    const coarse = coarseBodies.join('\n')
+    const rules = (text) => {
+      const out = new Map()
+      for (const m of text.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const h = m[2].match(/min-height: (\d+)px/)
+        if (h) out.set(m[1].trim().replace(/\s+/g, ' '), Number(h[1]))
+      }
+      return out
+    }
+
+    // Inside a touch block, short is simply wrong.
+    const inside = [...rules(coarse)].filter(([, h]) => h < 44)
+    assert.deepEqual(inside.map(([s2, h]) => `${s2} → ${h}px`), [], 'short min-heights inside a touch block')
+
+    // Outside one, short is only allowed if touch raises the same selector.
+    const raised = rules(coarse)
+    const unraised = []
+    for (const [selector, h] of rules(code.split('@media (pointer: coarse)')[0])) {
+      if (h >= 44) continue
+      if (!/\b(button|input|select)\b|\.chip/.test(selector)) continue
+      if ((raised.get(selector) ?? 0) < 44) unraised.push(`${selector} → ${h}px, never raised for touch`)
+    }
+    assert.deepEqual(unraised, [], `under the floor with no touch override:\n  ${unraised.join('\n  ')}`)
+  })
+
+  test('every field a phone user must type into clears the iOS zoom floor', () => {
+    // Under 16px iOS zooms the page on focus. email and password were left out
+    // of this list for a long time — the two fields the phone flow cannot avoid.
+    // Specifically the rule that sets the floor — these types also appear in
+    // the min-height rule nearby, and checking for them anywhere in the touch
+    // block passes happily while the zoom bug is back.
+    // Five rules apply the floor to different corners of the app, so the test
+    // is whether a type is covered by ANY of them — not by whichever one comes
+    // first in the file.
+    const selectors = [...code.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .filter((m) => /font-size: var\(--f-input\)/.test(m[2]))
+      .map((m) => m[1])
+      .join(' ')
+    assert.ok(selectors, 'no rule applies the 16px input floor at all')
+    for (const type of ['email', 'password', 'text']) {
+      assert.match(
+        selectors,
+        new RegExp(`input\\[type='${type}'\\]`),
+        `input[type='${type}'] never gets the 16px floor — iOS will zoom the page on focus`
+      )
+    }
+  })
 }
