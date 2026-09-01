@@ -69,6 +69,53 @@ function clone(x) {
   return JSON.parse(JSON.stringify(x))
 }
 
+/*
+ * The shape ForgeFX actually serves from /ports: one `ports` list carrying
+ * both transports, each entry flagged, plus the chosen connection. The
+ * invented `serial` / `midiIn` / `midiOut` split that used to be here is why
+ * the picker read an always-undefined field and told everyone their unit
+ * wasn't plugged in.
+ */
+const SERIAL_PORTS = {
+  chosen: { transport: 'serial', id: '/dev/cu.usbmodem1104' },
+  override: null,
+  profileOverride: null,
+  profile: { key: 'fm3', name: 'FM3', model: '0x11' },
+  ports: [
+    { transport: 'serial', id: '/dev/cu.usbmodem1104', label: '/dev/cu.usbmodem1104 · FM3', fractal: true, model: 'FM3' },
+    { transport: 'serial', id: '/dev/cu.usbmodem2201', label: '/dev/cu.usbmodem2201 · AM4', fractal: true, model: 'AM4' },
+    { transport: 'serial', id: '/dev/cu.Bluetooth-Incoming-Port', label: '/dev/cu.Bluetooth-Incoming-Port', fractal: false },
+    { transport: 'midi', id: 'FM3 MIDI In', label: 'FM3 MIDI In', fractal: true, dir: 'input' },
+    { transport: 'midi', id: 'FM3 MIDI Out', label: 'FM3 MIDI Out', fractal: true, dir: 'output' }
+  ]
+}
+
+/*
+ * The same route with the unit on MIDI and nothing on a serial port: an AM4
+ * over USB-MIDI. Its input and output are separate endpoints under one name,
+ * which is why the panel used to say "Also reachable over MIDI: AM4, AM4".
+ */
+const MIDI_PORTS = {
+  chosen: { transport: 'midi', id: 'AM4', inId: 'AM4', outId: 'AM4' },
+  override: null,
+  profileOverride: null,
+  profile: { key: 'am4', name: 'AM4', model: '0x10' },
+  ports: [
+    { transport: 'midi', id: 'AM4', label: 'AM4', fractal: true, model: 'AM4', dir: 'input' },
+    { transport: 'midi', id: 'AM4', label: 'AM4', fractal: true, model: 'AM4', dir: 'output' },
+    { transport: 'midi', id: 'IAC Driver Bus 1', label: 'IAC Driver Bus 1', fractal: false, dir: 'input' },
+    { transport: 'midi', id: 'IAC Driver Bus 1', label: 'IAC Driver Bus 1', fractal: false, dir: 'output' }
+  ]
+}
+
+const midiCarried = () => {
+  try {
+    return localStorage.getItem('forgefx.demo.midi') === '1'
+  } catch {
+    return false
+  }
+}
+
 export function createMockDevice() {
   const state = {
     presetNumber: 500,
@@ -334,24 +381,15 @@ export function createMockDevice() {
         }),
 
     /*
-     * The shape ForgeFX actually serves: one `ports` list carrying both
-     * transports, each entry flagged. The invented `serial` / `midiIn` /
-     * `midiOut` split that used to be here is why the picker read an
-     * always-undefined field and told everyone their unit wasn't plugged in.
+     * Which shape /ports answers with.
+     *
+     * A unit reached over USB-MIDI with nothing on a serial port is a real and
+     * common setup — it is how an AM4 usually arrives — and this device could
+     * not produce it, so the connection panel's behaviour there was untestable
+     * without hardware. It opened with "No Fractal units found on a serial
+     * port" while the bar above it said the unit was connected.
      */
-    ports: () => ({
-      chosen: { transport: 'serial', id: '/dev/cu.usbmodem1104' },
-      override: null,
-      profileOverride: null,
-      profile: { key: 'fm3', name: 'FM3', model: '0x11' },
-      ports: [
-        { transport: 'serial', id: '/dev/cu.usbmodem1104', label: '/dev/cu.usbmodem1104 · FM3', fractal: true, model: 'FM3' },
-        { transport: 'serial', id: '/dev/cu.usbmodem2201', label: '/dev/cu.usbmodem2201 · AM4', fractal: true, model: 'AM4' },
-        { transport: 'serial', id: '/dev/cu.Bluetooth-Incoming-Port', label: '/dev/cu.Bluetooth-Incoming-Port', fractal: false },
-        { transport: 'midi', id: 'FM3 MIDI In', label: 'FM3 MIDI In', fractal: true, dir: 'input' },
-        { transport: 'midi', id: 'FM3 MIDI Out', label: 'FM3 MIDI Out', fractal: true, dir: 'output' }
-      ]
-    }),
+    ports: () => clone(midiCarried() ? MIDI_PORTS : SERIAL_PORTS),
 
     blockCatalog: () =>
       LAYOUT.filter((l) => !['input', 'output'].includes(l.slug)).map((l) => ({
