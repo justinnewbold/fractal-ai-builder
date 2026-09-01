@@ -5738,3 +5738,74 @@ button.topbar-preset.open .topbar-caret {
 .tour-dot.on {
   background: var(--signal);
 }
+
+/* ---------- earlier generations ---------- */
+
+/*
+ * The tail of what you have made, under the box that made it.
+ *
+ * Quiet by design: it sits below the conversation on the screen where you
+ * work, so it has to be findable without competing with the thing above it.
+ * Rows rather than cards — this is a list you scan for a name, not a gallery.
+ */
+.recent {
+  margin-top: var(--s-5);
+}
+
+.recent-head {
+  font-family: var(--display);
+  font-size: var(--f-2);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--silk-faint);
+  margin: 0 0 var(--s-2);
+}
+
+.recent-list {
+  list-style: none;
+  margin: 0 0 var(--s-3);
+  padding: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.recent-list li {
+  border-bottom: 1px solid var(--rule);
+}
+
+button.recent-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--s-2) 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  text-align: left;
+  color: var(--silk);
+}
+
+@media (hover: hover) {
+  button.recent-row:hover:not(:disabled) {
+    color: var(--signal);
+  }
+}
+
+/* The name takes the room; the time takes what it needs. A long preset name
+   truncates rather than pushing the date off the row or wrapping under it. */
+.recent-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-when {
+  flex: 0 0 auto;
+  font-size: var(--f-1);
+  color: var(--silk-faint);
+}

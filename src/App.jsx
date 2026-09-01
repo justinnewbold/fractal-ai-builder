@@ -47,7 +47,7 @@ import Host from './components/Host'
 import Assistant from './components/Assistant'
 import UpdateNotice from './components/UpdateNotice'
 import { validatePlan, runPlan } from './lib/actions'
-import { listPresets } from './lib/history'
+import { listPresets, newestFirst } from './lib/history'
 import {
   profileFrom,
   describeProfile,
@@ -105,6 +105,7 @@ import {
 import { aiUrl } from './lib/ai'
 import { saveCloudPreset, cloudReady, listCloudPresets } from './lib/cloudPresets'
 import Tour, { tourSeen, markTourSeen } from './components/Tour'
+import Recent from './components/Recent'
 import { validateSpec, countWrites, countSceneWrites } from './lib/validate'
 import { beatFlash, bringIntoView } from './lib/feedback'
 import {
@@ -280,9 +281,22 @@ export default function App() {
    * their account holds every one of them twice, and profileFrom dedupes for
    * exactly that reason.
    */
+  /*
+   * Everything generated on this account, from both stores, newest first.
+   *
+   * One list feeding two things: what Create shows under the box, and what
+   * the taste profile is read from. Deliberately the same list — a profile
+   * built from presets the player cannot see is a profile they cannot check,
+   * and the dedupe matters to both for the same reason.
+   */
+  const library = useMemo(
+    () => newestFirst(listPresets(), cloudSaves),
+    [historyKey, cloudSaves]
+  )
+
   const taste = useMemo(
-    () => (tasteOn ? profileFrom([...listPresets(), ...cloudSaves]) : null),
-    [historyKey, cloudSaves, tasteOn]
+    () => (tasteOn ? profileFrom(library) : null),
+    [library, tasteOn]
   )
   const [compare, setCompare] = useState(null)
   const [turns, setTurns] = useState([])
@@ -2366,6 +2380,22 @@ export default function App() {
       ) : null}
 
       {view === 'ask' ? chat : null}
+
+      {/*
+        What you have made, under the box you make it in — and only there.
+        `chat` is one element rendered in two places, so this sits outside it:
+        in the Ask sheet, which is for a quick change to the tone playing now,
+        a library would be the longest thing in a surface that exists to be
+        short.
+      */}
+      {status === 'live' && view === 'ask' ? (
+        <Recent
+          entries={library}
+          busy={busy}
+          onRestore={reload}
+          onSeeAll={() => setSheet('presets')}
+        />
+      ) : null}
 
       {/* ---------------------------------------------------------------
           Sheets. Things you open, act on and dismiss — not places you go.
