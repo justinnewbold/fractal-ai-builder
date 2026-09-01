@@ -2138,9 +2138,13 @@ export default function App() {
                     {applied.mismatches.length > 1 ? 's' : ''} read back different from what was
                     sent:
                   </p>
+                  {/* Field by field. A mismatch is an object — {block, param,
+                      wanted, got} — and rendering it bare took the whole page
+                      down with React #31 the first time a value actually
+                      failed to stick. */}
                   {applied.mismatches.map((m, i) => (
                     <p key={i} className="mono problem">
-                      {m}
+                      {`${m.block} ${m.param} — wanted ${m.wanted}, reads ${m.got ?? '—'}`}
                     </p>
                   ))}
                 </>
