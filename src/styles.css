@@ -168,9 +168,11 @@ body {
 .shell {
   max-width: 1180px;
   margin: 0 auto;
-  /* Nothing is pinned over the page any more, so the bottom padding only has
-     to clear the home indicator on a phone. */
-  padding: var(--s-5) var(--s-5) calc(40px + env(safe-area-inset-bottom, 0px));
+  /* The floating Ask button is pinned over the bottom-right of the page, so
+     the bottom padding has to be deep enough to scroll the last row of
+     controls out from under it. The @supports block further down sets the
+     figure that actually applies — this is the fallback. */
+  padding: var(--s-5) var(--s-5) calc(80px + env(safe-area-inset-bottom, 0px));
 }
 
 .masthead {
@@ -3682,12 +3684,24 @@ ol.action-list li.destructive::marker {
   }
 }
 
-/* Notched phones: keep the last row of controls off the home indicator. */
+/* Notched phones: keep the last row of controls off the home indicator.
+ *
+ * This block, not the `.shell` rule at the top of the file, is what actually
+ * sets the padding on every browser that ships `max()` — which is all of them.
+ * The figure below is therefore the real one, and raising it at the top of the
+ * file alone changes nothing.
+ *
+ * 80px is what the floating Ask button costs: 16px of inset, 48px of button
+ * and 16px of air. Below that, the last row of scene buttons has nowhere to
+ * scroll to and stays underneath it — on the Play screen, a scene you cannot
+ * reach. The home-indicator inset is added on top of that, not compared
+ * against it, because both need the room.
+ */
 @supports (padding: max(0px)) {
   .shell {
     padding-left: max(16px, env(safe-area-inset-left));
     padding-right: max(16px, env(safe-area-inset-right));
-    padding-bottom: max(40px, calc(env(safe-area-inset-bottom) + 24px));
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
   }
 }
 
@@ -5594,4 +5608,76 @@ button.topbar-preset.open .topbar-caret {
   flex: 0 0 auto;
   font-size: var(--f-1);
   color: var(--silk-faint);
+}
+
+/* ---------- asking from anywhere ---------- */
+
+/*
+ * The way into the conversation from the screen you are on.
+ *
+ * A floating button rather than a docked bar, and carrying no text field: a
+ * fixed bar with an input is what iOS Safari handles worst, and this app
+ * removed one once already. Pressing it opens a sheet, where the input can
+ * behave properly.
+ *
+ * Bottom right. The view tabs are at the top of the page, not the bottom, so
+ * there is no tab bar to clear down here — only the home indicator, which the
+ * safe-area inset accounts for.
+ */
+/*
+ * In a sheet the conversation is the whole content, not a card on a page.
+ * Its frame and its top margin were drawn for Create, where it sits among
+ * other panels; inside a sheet they land as a second border just inside the
+ * sheet's own and a strip of dead space under the title. The live left edge
+ * stays — it is the one part of that frame that says something.
+ */
+.sheet-body > .assistant {
+  margin-top: 0;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.ask-anywhere {
+  position: fixed;
+  right: var(--s-4);
+  bottom: calc(var(--s-4) + env(safe-area-inset-bottom, 0px));
+  /* Chrome level: above the page, below the scrim, so a sheet covers it
+     rather than leaving a button floating over its own conversation. */
+  z-index: var(--z-bar);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 48px;
+  padding: var(--s-2) var(--s-4);
+  background: var(--panel-hi);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-3);
+  box-shadow: var(--e-2);
+  color: var(--silk);
+  font-family: var(--display);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: var(--f-2);
+}
+
+.ask-anywhere:active:not(:disabled) {
+  transform: scale(0.97);
+  transition: transform var(--t-1) var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ask-anywhere:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* On a narrow screen the glyph carries it; the word is what gets cut. */
+@media (max-width: 380px) {
+  .ask-anywhere-word {
+    display: none;
+  }
 }

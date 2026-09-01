@@ -666,4 +666,42 @@ export function run(test) {
       assert.ok(!prose.includes(`>${term}`), `"${term}" is on screen`)
     }
   })
+
+  test('the conversation is written once and shown in two places', () => {
+    /*
+     * The Assistant now appears on Create as the screen and everywhere else in
+     * a sheet. The tempting way to do that is to write the tag twice, and it
+     * carries eleven props plus six children — so the second copy drifts, and
+     * what drifts is a conversation that behaves differently depending on how
+     * it was opened. Nobody tests both routes; they test the one they used.
+     *
+     * So: exactly one `<Assistant` in the file, hoisted into a variable, and
+     * both render sites reach for that variable.
+     */
+    const tags = src.match(/<Assistant[\s>]/g) || []
+    assert.equal(
+      tags.length,
+      1,
+      `${tags.length} <Assistant> tags in App.jsx — the conversation must be built once and rendered by reference`
+    )
+    assert.match(src, /const chat = /, 'the hoisted conversation is gone')
+    assert.match(
+      src,
+      /\{view === 'ask' \? chat : null\}/,
+      'Create no longer renders the hoisted conversation'
+    )
+    assert.match(
+      src,
+      /\{sheet === 'chat' \? chat : null\}/,
+      'the chat sheet no longer renders the hoisted conversation — and mounting it unconditionally would leave a second live turn list behind Create'
+    )
+
+    // The way in, on the screens that are not already it.
+    assert.match(src, /className="ask-anywhere"/, 'the button that opens the chat from elsewhere is gone')
+    assert.match(
+      src,
+      /status === 'live' && view !== 'ask' \? \(/,
+      'the ask button no longer hides on Create, where it would offer to open what is open'
+    )
+  })
 }

@@ -1757,6 +1757,137 @@ export default function App() {
   // an id with no block behind it must not open an empty sheet.
   const openBlock = selectedBlock ? blocks.find((b) => b.effectId === selectedBlock) : null
 
+  /*
+   * The conversation, built once and shown in two places.
+   *
+   * Create is its home and gives it the whole screen. Everywhere else it
+   * arrives in a sheet from a button, because a tone you want to change is
+   * usually one you are listening to right now — and walking off the screen
+   * you are playing on to go and ask was the wrong shape.
+   *
+   * One element, rendered into whichever place is open, rather than two
+   * call sites. The props here are numerous, and the failure mode of a
+   * second copy is a conversation that behaves subtly differently depending
+   * on how it was opened — which nobody would think to check.
+   *
+   * A button, never a pinned input. A fixed bar carrying a text field is the
+   * configuration iOS Safari handles worst, Assistant.submit already carries
+   * 30 lines of hard-won keyboard scroll-holding, and this app removed a
+   * pinned bottom bar once already.
+   */
+  const chat = status === 'live' ? (
+    <Assistant
+      turns={turns}
+      onAsk={askFor}
+      onConfirm={confirmTurn}
+      onCancel={cancelTurn}
+      busy={busy || runningPlan}
+      progress={progress}
+      startedAt={genStarted}
+      onStop={
+        genStarted
+          ? () => {
+              generationAbort.current?.abort()
+              setTurns((prev) => [
+                ...prev,
+                { role: 'system', text: 'Stopped. Nothing was written to the unit.' }
+              ])
+            }
+          : null
+      }
+    >
+      {/* A design shows up in the conversation that asked for it. */}
+      <Thinking message={progress} />
+
+      {thinking ? (
+        <div className="thinking" role="status" aria-live="polite">
+          <span className="thinking-bars" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+            <i />
+          </span>
+          <Stages active={thinking} startedAt={genStarted} />
+        </div>
+      ) : null}
+
+      <LiveGeneration
+        partial={partial}
+        open={liveOpen}
+        onToggle={() => setLiveOpen(!liveOpen)}
+      />
+
+      <Cost usage={result?.usage} sessionTotal={spend.total} runs={spend.runs} />
+
+      <Preview
+        result={result}
+        writeCount={writeCount}
+        sceneWriteCount={sceneWriteCount}
+        withScenes={withScenes}
+        onWithScenes={setWithScenes}
+        scene={scene}
+        sceneNames={sceneNames}
+        sceneCount={sceneCount}
+        /* Choosing a scene switches to it rather than remembering it for
+           later. Bypass is written into whatever scene is live, so making
+           the choice real immediately is both simpler and honest — and you
+           hear it, which is the confirmation that it took. */
+        onScene={async (index) => {
+          try {
+            await writeScene(index)
+          } catch (err) {
+            setError(err.message)
+          }
+        }}
+        busy={busy}
+        onApply={apply}
+        onDiscard={() => setResult(null)}
+      />
+
+      {/*
+        What applying actually did, including anything that read back
+        different from what was sent. This lived in the Design view; without
+        it here, applying a design would finish in silence.
+      */}
+      {applied ? (
+        <div className="notice">
+          <h2>{applied.savedTo !== undefined ? 'Saved' : 'Written to the unit'}</h2>
+          <p>
+            {applied.count} changes sent.
+            {applied.savedTo !== undefined
+              ? ` Stored to slot ${applied.savedTo}.`
+              : ' It\u2019s in the edit buffer \u2014 play it now. Nothing is permanent until you save it, and Revert puts the saved version back.'}
+          </p>
+          {applied.failures?.length
+            ? applied.failures.map((f, i) => (
+                <p key={i} className="mono problem">
+                  {f}
+                </p>
+              ))
+            : null}
+          {applied.mismatches?.length ? (
+            <>
+              <p className="mono problem">
+                {applied.mismatches.length} value
+                {applied.mismatches.length > 1 ? 's' : ''} read back different from what was
+                sent:
+              </p>
+              {/* Field by field. A mismatch is an object — {block, param,
+                  wanted, got} — and rendering it bare took the whole page
+                  down with React #31 the first time a value actually
+                  failed to stick. */}
+              {applied.mismatches.map((m, i) => (
+                <p key={i} className="mono problem">
+                  {`${m.block} ${m.param} — wanted ${m.wanted}, reads ${m.got ?? '—'}`}
+                </p>
+              ))}
+            </>
+          ) : null}
+        </div>
+      ) : null}
+    </Assistant>
+  ) : null
+
   return (
     <div className="shell">
       {/* Above everything, because a stale tab makes every other thing on this
@@ -2011,6 +2142,22 @@ export default function App() {
         </nav>
       ) : null}
 
+      {/*
+        A button, not a bar, on the two screens where the conversation is not
+        already the screen. Create has it full height and does not need a way
+        to open what is open.
+      */}
+      {status === 'live' && view !== 'ask' ? (
+        <button
+          className="ask-anywhere"
+          onClick={() => setSheet('chat')}
+          aria-label="Ask for a change"
+        >
+          <span aria-hidden="true">✦</span>
+          <span className="ask-anywhere-word">Ask</span>
+        </button>
+      ) : null}
+
       {status === 'live' && view === 'play' ? (
         <Gig
           preset={preset}
@@ -2127,118 +2274,7 @@ export default function App() {
         </>
       ) : null}
 
-      {status === 'live' && view === 'ask' ? (
-        <Assistant
-          turns={turns}
-          onAsk={askFor}
-          onConfirm={confirmTurn}
-          onCancel={cancelTurn}
-          busy={busy || runningPlan}
-          progress={progress}
-          startedAt={genStarted}
-          onStop={
-            genStarted
-              ? () => {
-                  generationAbort.current?.abort()
-                  setTurns((prev) => [
-                    ...prev,
-                    { role: 'system', text: 'Stopped. Nothing was written to the unit.' }
-                  ])
-                }
-              : null
-          }
-        >
-          {/* A design shows up in the conversation that asked for it. */}
-          <Thinking message={progress} />
-
-          {thinking ? (
-            <div className="thinking" role="status" aria-live="polite">
-              <span className="thinking-bars" aria-hidden="true">
-                <i />
-                <i />
-                <i />
-                <i />
-              </span>
-              <Stages active={thinking} startedAt={genStarted} />
-            </div>
-          ) : null}
-
-          <LiveGeneration
-            partial={partial}
-            open={liveOpen}
-            onToggle={() => setLiveOpen(!liveOpen)}
-          />
-
-          <Cost usage={result?.usage} sessionTotal={spend.total} runs={spend.runs} />
-
-          <Preview
-            result={result}
-            writeCount={writeCount}
-            sceneWriteCount={sceneWriteCount}
-            withScenes={withScenes}
-            onWithScenes={setWithScenes}
-            scene={scene}
-            sceneNames={sceneNames}
-            sceneCount={sceneCount}
-            /* Choosing a scene switches to it rather than remembering it for
-               later. Bypass is written into whatever scene is live, so making
-               the choice real immediately is both simpler and honest — and you
-               hear it, which is the confirmation that it took. */
-            onScene={async (index) => {
-              try {
-                await writeScene(index)
-              } catch (err) {
-                setError(err.message)
-              }
-            }}
-            busy={busy}
-            onApply={apply}
-            onDiscard={() => setResult(null)}
-          />
-
-          {/*
-            What applying actually did, including anything that read back
-            different from what was sent. This lived in the Design view; without
-            it here, applying a design would finish in silence.
-          */}
-          {applied ? (
-            <div className="notice">
-              <h2>{applied.savedTo !== undefined ? 'Saved' : 'Written to the unit'}</h2>
-              <p>
-                {applied.count} changes sent.
-                {applied.savedTo !== undefined
-                  ? ` Stored to slot ${applied.savedTo}.`
-                  : ' It\u2019s in the edit buffer \u2014 play it now. Nothing is permanent until you save it, and Revert puts the saved version back.'}
-              </p>
-              {applied.failures?.length
-                ? applied.failures.map((f, i) => (
-                    <p key={i} className="mono problem">
-                      {f}
-                    </p>
-                  ))
-                : null}
-              {applied.mismatches?.length ? (
-                <>
-                  <p className="mono problem">
-                    {applied.mismatches.length} value
-                    {applied.mismatches.length > 1 ? 's' : ''} read back different from what was
-                    sent:
-                  </p>
-                  {/* Field by field. A mismatch is an object — {block, param,
-                      wanted, got} — and rendering it bare took the whole page
-                      down with React #31 the first time a value actually
-                      failed to stick. */}
-                  {applied.mismatches.map((m, i) => (
-                    <p key={i} className="mono problem">
-                      {`${m.block} ${m.param} — wanted ${m.wanted}, reads ${m.got ?? '—'}`}
-                    </p>
-                  ))}
-                </>
-              ) : null}
-            </div>
-          ) : null}
-        </Assistant>
-      ) : null}
+      {view === 'ask' ? chat : null}
 
       {/* ---------------------------------------------------------------
           Sheets. Things you open, act on and dismiss — not places you go.
@@ -2291,11 +2327,27 @@ export default function App() {
 
       {/*
         Saving is a sheet now, not a button that writes.
-        
+
         The bar's Save opens this; the write happens on the button inside,
         which names the slot and sits under the list of what is in it. Two taps
         for the common case, and an overwrite you can see before you commit it.
       */}
+      {/*
+        The same conversation, over whatever you were looking at.
+
+        Only mounted while open: the Assistant holds a live turn list and a
+        running generation, and a second copy of it existing quietly behind
+        Create would be a second place for those to diverge.
+      */}
+      <Sheet
+        open={sheet === 'chat'}
+        onClose={() => setSheet(null)}
+        title="Ask"
+        note={preset?.name?.trim() || null}
+      >
+        {sheet === 'chat' ? chat : null}
+      </Sheet>
+
       <Sheet
         open={sheet === 'save'}
         onClose={() => setSheet(null)}
