@@ -11,6 +11,7 @@ import { isSilencingParam } from '../src/lib/guardrails.js'
 import { validateSpec, countWrites, countSceneWrites } from '../src/lib/validate.js'
 import { preferredEncoding, rememberEncoding, disambiguate } from '../src/lib/encoding.js'
 import { forbiddenRemotely, explainAuth, timeoutFor } from '../src/lib/remote.js'
+import * as taste from '../src/lib/taste.js'
 import {
   patchSchemaValue,
   invalidateSchema,
@@ -1566,6 +1567,141 @@ test('there is one event subscription, however many times it is asked for', () =
 })
 
 ds.reset()
+
+/* ------------------------------------------------------------------
+   Taste — what the generator is told about the player's own history.
+
+   This is the one feature whose failure mode is quiet. A wrong figure here
+   does not throw; it just steers every future generation slightly wrong, and
+   nobody can tell that from a tone they merely did not love.
+   ------------------------------------------------------------------ */
+
+/** A kept preset, shaped as history.js and cloudPresets.js both produce them. */
+const keptPreset = (name, description, blocks, at = Date.now()) => ({
+  id: name,
+  at,
+  name,
+  description,
+  spec: { blocks },
+  blockNames: blocks.map((b) => b.blockName).filter(Boolean)
+})
+
+const amp = (typeName, drive, extra = {}) => ({
+  eid: 1,
+  blockName: 'Amp 1',
+  typeName,
+  params: [
+    { id: 1, name: 'Drive', value: drive },
+    ...Object.entries(extra).map(([name, value], i) => ({ id: i + 2, name, value }))
+  ]
+})
+
+test('a profile needs enough history to mean anything', () => {
+  const three = [1, 2, 3].map((n) => keptPreset(`P${n}`, 'heavy rhythm', [amp('Brit Brown', 8)]))
+  assert.equal(
+    taste.profileFrom(three),
+    null,
+    'three presets produced a confident profile — a taste inferred from three is an accident, and it steers every generation after it'
+  )
+  assert.notEqual(taste.profileFrom([...three, keptPreset('P4', 'heavy lead', [amp('Brit Brown', 8)])]), null)
+})
+
+test('the typical value is the middle one, so a single outlier cannot move it', () => {
+  const entries = [2, 7, 7, 8, 90].map((d, i) => keptPreset(`P${i}`, 'rhythm tone', [amp('Brit Brown', d)]))
+  const drive = taste.profileFrom(entries).controls.find((c) => c.name === 'Drive')
+  assert.equal(drive.typical, 7, `the mean would have said ${(2 + 7 + 7 + 8 + 90) / 5}`)
+  assert.equal(drive.low, 2)
+  assert.equal(drive.high, 90)
+  assert.equal(drive.n, 5)
+})
+
+test('a preset kept in both stores is one preset', () => {
+  /*
+   * Copying this browser's presets to the account is a copy, not a move, so
+   * anyone who used the Phase 6 migration holds every preset twice. Counted
+   * twice, four real presets clear a threshold that asks for four.
+   */
+  const local = [1, 2].map((n) => keptPreset(`P${n}`, 'heavy rhythm', [amp('Brit Brown', 8)]))
+  const cloud = local.map((e) => ({ ...e, id: `cloud-${e.id}`, at: e.at + 4000, where: 'cloud' }))
+  assert.equal(
+    taste.profileFrom([...local, ...cloud]),
+    null,
+    'two presets counted from both stores passed for four'
+  )
+})
+
+test('a control set once is not a preference', () => {
+  const entries = [1, 2, 3, 4].map((n) =>
+    keptPreset(`P${n}`, 'rhythm', [amp('Brit Brown', 8, n === 1 ? { Presence: 6 } : {})])
+  )
+  const names = taste.profileFrom(entries).controls.map((c) => c.name)
+  assert.ok(names.includes('Drive'), 'Drive was set in all four and should count')
+  assert.ok(!names.includes('Presence'), 'a control touched in one preset was reported as a tendency')
+})
+
+test('the words counted are the ones that distinguish a player', () => {
+  const entries = [1, 2, 3, 4].map((n) =>
+    keptPreset(`P${n}`, 'I want a tight modern tone', [amp('Brit Brown', 8)])
+  )
+  const words = taste.profileFrom(entries).words.map((w) => w.name)
+  assert.ok(words.includes('tight') && words.includes('modern'), `got ${words.join(', ')}`)
+  for (const dull of ['want', 'tone', 'the']) {
+    assert.ok(!words.includes(dull), `"${dull}" was counted as taste — every request contains it`)
+  }
+})
+
+test('the profile sent to the model says the request outranks it', () => {
+  const entries = [1, 2, 3, 4].map((n) => keptPreset(`P${n}`, 'heavy rhythm', [amp('Brit Brown', 8)]))
+  const prose = taste.describeProfile(taste.profileFrom(entries))
+  assert.match(prose, /Brit Brown/)
+  assert.match(prose, /around 8/)
+  /*
+   * The failure this guards against is the profile behaving as an instruction:
+   * a player asking for a clean tone and being handed their usual gain because
+   * "they always use 8". Without this sentence that is exactly what a model
+   * does with a confident list of preferences.
+   */
+  assert.match(
+    prose,
+    /the request wins/i,
+    'nothing tells the model that an explicit request beats the profile'
+  )
+})
+
+test('nothing is described when there is nothing to describe', () => {
+  assert.equal(taste.describeProfile(null), null)
+  assert.deepEqual(taste.suggestionsFrom(null), [])
+  assert.match(taste.summariseProfile(null), /once you/i)
+})
+
+test('every suggestion is something the player actually did', () => {
+  const entries = [
+    keptPreset('Drop A Rhythm', 'tight modern metal rhythm in drop A', [amp('Brit Brown', 8)], 4),
+    keptPreset('Night Lead', 'singing lead with a long delay', [amp('Brit Brown', 8)], 3),
+    keptPreset('P3', 'heavy rhythm', [amp('Brit Brown', 8)], 2),
+    keptPreset('P4', 'heavy rhythm', [amp('Brit Brown', 8)], 1)
+  ]
+  const profile = taste.profileFrom(entries)
+  const lines = taste.suggestionsFrom(profile)
+  assert.ok(lines.length, 'no suggestions came out of four presets')
+  const said = entries.map((e) => e.description)
+  const names = entries.map((e) => e.name)
+  for (const line of lines) {
+    const grounded = said.includes(line) || names.some((n) => line.includes(n))
+    assert.ok(grounded, `"${line}" names nothing the player made — an invented suggestion is a bug wearing a friendly face`)
+  }
+  // A library that sits at drive 8 is offered the other direction, not more.
+  assert.ok(
+    lines.some((l) => /cleaner/.test(l)),
+    `a high-gain library was not offered a cleaner starting point: ${lines.join(' | ')}`
+  )
+})
+
+test('a low-gain library is offered the other direction', () => {
+  const entries = [1, 2, 3, 4].map((n) => keptPreset(`Clean ${n}`, 'warm clean', [amp('Deluxe Verb', 2)]))
+  const lines = taste.suggestionsFrom(taste.profileFrom(entries))
+  assert.ok(lines.some((l) => /dirtier/.test(l)), lines.join(' | '))
+})
 
 await settle()
 /*

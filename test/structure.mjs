@@ -119,7 +119,20 @@ export function run(test) {
     const everywhere = {}
     for (const [file, body] of Object.entries(bodies)) {
       perFile[file] = {}
-      for (const m of body.matchAll(
+      /*
+       * Comments out before the signature is read.
+       *
+       * The parameter list is matched as everything up to the first `}`, then
+       * split on commas — so a block comment explaining one prop puts its own
+       * prose and its own commas into the list, and every name it touches is
+       * dropped from the accepted set. The failure that follows is a call site
+       * being told a prop "does not accept", which is the opposite of true and
+       * sends you to fix the wrong file. This app comments almost everything;
+       * a guard that breaks when a prop is explained is a guard that punishes
+       * the house style.
+       */
+      const declarations = body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+      for (const m of declarations.matchAll(
         /(?:export default |export )?function ([A-Z]\w+)\s*\(\s*\{([^}]*)\}/gs
       )) {
         const props = m[2]
@@ -665,6 +678,66 @@ export function run(test) {
     for (const term of ['npm run dev', 'localhost:5056', 'SysEx']) {
       assert.ok(!prose.includes(`>${term}`), `"${term}" is on screen`)
     }
+  })
+
+  test('what the player has kept reaches the generator, and reaches them', () => {
+    /*
+     * Three links, and the feature is invisible if any one of them is missing
+     * — which is the problem with it. A profile that is computed and never
+     * sent, or sent and never shown, fails silently: generations carry on
+     * looking plausible, and nobody can tell a personalised one from a
+     * generic one by looking at it. Only the wiring can be checked cheaply,
+     * so it is.
+     */
+    assert.match(
+      src,
+      /taste: describeProfile\(taste\)/,
+      'the generation request no longer carries the taste profile — the whole feature is inert without this line, and nothing about a generation would look wrong'
+    )
+    assert.match(
+      src,
+      /suggestions=\{suggestionsFrom\(taste\)\}/,
+      'the conversation no longer offers starting points from past work'
+    )
+    assert.match(
+      src,
+      /summariseProfile\(taste\)/,
+      'the player can no longer see what has been inferred from their history'
+    )
+    assert.match(
+      src,
+      /setTasteEnabled\(!tasteOn\)/,
+      'the switch that turns the profile off is gone — an inference drawn from someone’s history has to be refusable'
+    )
+
+    // Derived, not stored. The moment this reads from a table it can disagree
+    // with the library it claims to describe, and deleting a preset stops
+    // un-learning it.
+    assert.match(
+      src,
+      /profileFrom\(\[\.\.\.listPresets\(\), \.\.\.cloudSaves\]\)/,
+      'the profile is no longer computed from both stores at the point of use'
+    )
+  })
+
+  test('the empty box offers the player their own past requests', () => {
+    const assistant = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
+    /*
+     * The personal suggestions have to join the rotation the empty box already
+     * runs, not sit beside it. This app shipped a row of suggestion buttons
+     * once and removed it — two copies of one list, and a wall of grey pills
+     * between the box and the page. A guard here is cheaper than rediscovering
+     * that.
+     */
+    assert.match(
+      assistant,
+      /\[\.\.\.own, \.\.\.SUGGESTIONS\]/,
+      'the player’s own suggestions are no longer merged into the rotating placeholder'
+    )
+    assert.ok(
+      !/suggestion-chip|suggestion-row|suggestions\.map/.test(assistant),
+      'the row of suggestion buttons is back — it was removed on purpose'
+    )
   })
 
   test('the conversation is written once and shown in two places', () => {
