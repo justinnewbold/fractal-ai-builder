@@ -1,0 +1,75 @@
+# Build the Mac app.
+#
+# This is the only place it can be built. macOS binaries need a macOS runner,
+# and the app carries native modules (serial, MIDI) that are compiled per
+# platform — so this workflow is where the desktop code is first proven to
+# assemble at all.
+#
+# Signing and notarisation are wired but dormant. Set the four secrets and the
+# .dmg opens with a double-click; leave them unset and it still builds, and
+# macOS asks for right-click → Open on first launch. That is the difference
+# between a build for yourself and a build for someone who signed up.
+name: desktop
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['desktop-v*']
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/desktop.yml'
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ForgeFX is a separate project and its codec is a sibling of it — the
+      # same side-by-side layout ForgeFX's own CI uses.
+      - uses: actions/checkout@v4
+        with:
+          repository: sKuhLight/forgefx
+          path: forgefx
+      - uses: actions/checkout@v4
+        with:
+          repository: sKuhLight/forgefx-midi
+          path: forgefx-midi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build the codec, then the device server
+        run: |
+          cd forgefx-midi && npm ci && npm run build && cd ..
+          cd forgefx/server && npm ci && npm run build
+
+      - name: Build the web app
+        run: |
+          npm ci
+          npm run build
+
+      - name: Check the shared serving logic
+        run: npm test
+
+      - name: Package
+        working-directory: desktop
+        env:
+          # Present → signed and notarised. Absent → an unsigned build that
+          # still runs, with a Gatekeeper prompt on first launch.
+          CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          npm install
+          npm run dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fractal-ai-builder-mac
+          path: desktop/release/*.dmg
+          if-no-files-found: error
