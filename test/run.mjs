@@ -328,6 +328,133 @@ test('the server is told to serve this app — the whole of local mode', () => {
   assert.equal(env.PATH, '/bin', 'the rest of the environment must survive')
 })
 
+test('ForgeFX is started already able to host a phone', async () => {
+  /*
+   * The three account variables used to be a `.env` edit on the Mac — the one
+   * step that stopped anyone who was not a developer. Set by the launcher,
+   * every launch, they are simply true. An operator's own values still win.
+   */
+  const { DEFAULT_PROJECT } = await import('../desktop/lib/project.mjs')
+  const env = host.serverEnv({ env: { PATH: '/bin' }, port: 5056, dist: '/app/dist' })
+  assert.equal(env.AXIS_CLOUD, '1', 'ForgeFX will not host a phone without this')
+  assert.equal(env.SUPABASE_URL, DEFAULT_PROJECT.url)
+  assert.equal(env.SUPABASE_ANON_KEY, DEFAULT_PROJECT.anonKey)
+
+  const own = host.serverEnv({
+    env: { SUPABASE_URL: 'https://mine.supabase.co', SUPABASE_ANON_KEY: 'k', AXIS_CLOUD: '0' },
+    port: 5056,
+    dist: '/d'
+  })
+  assert.equal(own.SUPABASE_URL, 'https://mine.supabase.co', "an operator's own project was overwritten")
+  assert.equal(own.SUPABASE_ANON_KEY, 'k')
+  assert.equal(own.AXIS_CLOUD, '0', 'an operator turning the cloud off was overruled')
+})
+
+test('the web app and the launchers name the same project', async () => {
+  // Two copies of a URL and a key drift; the phone then signs into one
+  // project and the Mac hosts on another, and neither ever hears the other.
+  const { DEFAULT_PROJECT } = await import('../desktop/lib/project.mjs')
+  const remote = await import('../src/lib/remote.js')
+  assert.equal(remote.DEFAULT_PROJECT, DEFAULT_PROJECT, 'remote.js carries its own copy of the project again')
+})
+
+test('a hostname reads like a name', () => {
+  assert.equal(host.prettyHostname('Justins-MacBook-Pro.local'), 'Justins MacBook Pro')
+  assert.equal(host.prettyHostname('studio_mac'), 'studio mac')
+  assert.equal(host.prettyHostname(''), 'your Mac')
+})
+
+/**
+ * A ForgeFX to arm: answers the routes armHost calls, records what was asked,
+ * and can be told to be slow to start, signed out, already on, or refusing.
+ */
+function fakeForgeFX({ healthzFails = 0, cloud = { enabled: true, user: { email: 'j@x.com' } }, enabled = false, doc = null, enableFails = 0 } = {}) {
+  const calls = []
+  let health = 0
+  let enables = 0
+  const reply = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body })
+  const fetch = async (url, init = {}) => {
+    const path = new URL(url).pathname
+    const method = init.method || 'GET'
+    calls.push(`${method} ${path}${init.body ? ' ' + init.body : ''}`)
+    if (path === '/healthz') return health++ < healthzFails ? reply(503, {}) : reply(200, { ok: true })
+    if (path === '/store/config/host.name' && method === 'PUT') return reply(200, {})
+    if (path === '/cloud/status') return reply(200, cloud)
+    if (path === '/remote/status') return reply(200, { enabled, connected: enabled, userId: 'u' })
+    if (path === '/store/config/remote.host') return doc ? reply(200, { data: doc }) : reply(404, { error: 'not found' })
+    if (path === '/remote/enable') {
+      if (enables++ < enableFails) return reply(200, { enabled: true, connected: false, error: 'realtime TIMED_OUT' })
+      return reply(200, { enabled: true, connected: true, userId: 'u' })
+    }
+    return reply(404, {})
+  }
+  return { fetch, calls }
+}
+const arm = (unit, extra = {}) =>
+  host.armHost({ port: 5056, fetch: unit.fetch, hostname: 'Studio Mac', sleep: async () => {}, ...extra })
+
+test('the launcher turns the phone remote on once the server is up', async () => {
+  const unit = fakeForgeFX({ healthzFails: 2 })
+  const result = await arm(unit)
+  assert.deepEqual(result, { on: true, email: 'j@x.com' })
+  assert.deepEqual(unit.calls, [
+    'GET /healthz',
+    'GET /healthz',
+    'GET /healthz',
+    'PUT /store/config/host.name {"data":{"name":"Studio Mac"},"origin":"fractal"}',
+    'GET /cloud/status',
+    'GET /remote/status',
+    'GET /store/config/remote.host',
+    'POST /remote/enable {"on":true}'
+  ])
+})
+
+test('a switch turned off on purpose stays off', async () => {
+  const unit = fakeForgeFX({ doc: { wanted: false, at: 1 } })
+  const result = await arm(unit)
+  assert.equal(result.on, false)
+  assert.equal(result.reason, 'turned-off')
+  assert.ok(!unit.calls.some((c) => c.startsWith('POST /remote/enable')), 'it overruled a person who turned it off')
+})
+
+test('nobody signed in means nothing to turn on, said plainly', async () => {
+  const lines = []
+  const unit = fakeForgeFX({ cloud: { enabled: true, user: null } })
+  const result = await arm(unit, { log: (l) => lines.push(l) })
+  assert.equal(result.reason, 'signed-out')
+  assert.ok(!unit.calls.some((c) => c.startsWith('POST')), 'it tried to enable with nobody signed in')
+  assert.match(lines.join('\n'), /sign in once/i)
+})
+
+test('already on is left alone', async () => {
+  const unit = fakeForgeFX({ enabled: true })
+  const result = await arm(unit)
+  assert.equal(result.on, true)
+  assert.ok(!unit.calls.some((c) => c.startsWith('POST')), 'it re-enabled a host that was already on, which drops the live channel')
+})
+
+test('a slow account service gets a few tries', async () => {
+  const unit = fakeForgeFX({ enableFails: 2 })
+  const result = await arm(unit)
+  assert.equal(result.on, true)
+  assert.equal(unit.calls.filter((c) => c.startsWith('POST /remote/enable')).length, 3)
+})
+
+test('a server that never comes up does not take the launcher with it', async () => {
+  const unit = fakeForgeFX({ healthzFails: 999 })
+  const result = await arm(unit, { attempts: 3 })
+  assert.equal(result.reason, 'no-server')
+  assert.equal(unit.calls.length, 3)
+})
+
+test('the name is written even when there is nobody to host for', async () => {
+  // The phone shows this name; a Mac that is signed out today may be signed
+  // in tomorrow, and the name should already be there.
+  const unit = fakeForgeFX({ cloud: { enabled: true, user: null } })
+  await arm(unit)
+  assert.ok(unit.calls.some((c) => c.startsWith('PUT /store/config/host.name')))
+})
+
 test('publishing without mDNS available still gives a usable stop', async () => {
   // The desktop app treats bonjour as optional — without it the IP still
   // works and only the .local name is lost, so this must not throw.
