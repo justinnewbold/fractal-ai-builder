@@ -39,6 +39,31 @@ export function listPresets() {
   return read().sort((a, b) => (b.at || 0) - (a.at || 0))
 }
 
+/**
+ * Several stores, one list, newest first and each preset once.
+ *
+ * A preset is very often in two places: copying this browser's presets to an
+ * account is a copy rather than a move, so anyone who used that migration
+ * holds every one of them twice. Shown twice it is a list that looks broken;
+ * counted twice it makes a habit look twice as settled as it is.
+ *
+ * The signature is name plus description, because the two copies carry
+ * different ids and their timestamps differ by however long the copy took.
+ * Sorted before deduplicating, so the surviving copy is the newest one.
+ */
+export function newestFirst(...groups) {
+  const seen = new Set()
+  const out = []
+  for (const entry of groups.flat().sort((a, b) => (b?.at || 0) - (a?.at || 0))) {
+    if (!entry) continue
+    const signature = `${entry.name || ''} ${entry.description || ''}`
+    if (seen.has(signature)) continue
+    seen.add(signature)
+    out.push(entry)
+  }
+  return out
+}
+
 export function buildEntry({ name, description, summary, spec, usage, device, blockNames }) {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,

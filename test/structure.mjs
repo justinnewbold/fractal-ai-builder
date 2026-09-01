@@ -794,13 +794,55 @@ export function run(test) {
       'the switch that turns the profile off is gone — an inference drawn from someone’s history has to be refusable'
     )
 
-    // Derived, not stored. The moment this reads from a table it can disagree
-    // with the library it claims to describe, and deleting a preset stops
-    // un-learning it.
+    /*
+     * Derived, not stored, and derived from the same list the player is shown.
+     *
+     * The moment this reads from a table it can disagree with the library it
+     * claims to describe, and deleting a preset stops un-learning it. And the
+     * moment it reads from a different set of presets than Create lists, the
+     * profile becomes something the player cannot check against anything.
+     */
     assert.match(
       src,
-      /profileFrom\(\[\.\.\.listPresets\(\), \.\.\.cloudSaves\]\)/,
-      'the profile is no longer computed from both stores at the point of use'
+      /const library = useMemo\(\s*\n\s*\(\) => newestFirst\(listPresets\(\), cloudSaves\)/,
+      'the library is no longer both stores merged at the point of use'
+    )
+    assert.match(
+      src,
+      /profileFrom\(library\)/,
+      'the profile is no longer read from the same list the player is shown'
+    )
+    assert.match(
+      src,
+      /entries=\{library\}/,
+      'the Create screen no longer lists the library it learns from'
+    )
+  })
+
+  test('earlier generations are one tap from where they were made', () => {
+    /*
+     * The most common recovery there is — "the one before this was better" —
+     * used to be two taps away behind the bar, on a screen you had to leave to
+     * reach. It belongs under the box that made it.
+     *
+     * Restoring goes through the same `reload` the presets sheet uses, which
+     * validates the saved spec against whatever the unit has loaded now and
+     * stops at the preview. A second path that wrote directly would be a way
+     * to replay a design onto a chain it was never checked against.
+     */
+    assert.match(src, /<Recent\b/, 'the Create screen no longer lists what was generated')
+    const call = src.slice(src.indexOf('<Recent'), src.indexOf('/>', src.indexOf('<Recent')))
+    assert.match(call, /onRestore=\{reload\}/, 'restoring no longer goes through the validated reload path')
+
+    /*
+     * Create only. `chat` is one element rendered in two places, so anything
+     * inside it appears in the Ask sheet too — and a library is the longest
+     * thing that could be put in a surface whose whole point is being short.
+     */
+    assert.match(
+      src,
+      /\{status === 'live' && view === 'ask' \? \(\s*\n\s*<Recent/,
+      'the list is no longer confined to the Create screen'
     )
   })
 
