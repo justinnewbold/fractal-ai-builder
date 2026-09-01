@@ -198,15 +198,27 @@ export function PresetList({
               onClick={() => onSelect(slot.number)}
             >
               <span className="preset-id mono">{slotLabel(slot.number, addressing)}:</span>
-              <span className="preset-title">{slot.name?.trim() || <em>empty</em>}</span>
+              {/*
+                Three states, not two. A slot whose name has been read and is
+                blank IS empty; one that has never been read is unknown, and
+                calling it empty is the app stating something it does not know
+                — on a gen-3 unit reading all 512 takes minutes, so most of the
+                list is unknown most of the time.
+              */}
+              <span className="preset-title">
+                {slot.name === undefined ? (
+                  <span className="preset-unread">—</span>
+                ) : (
+                  slot.name.trim() || <em>empty</em>
+                )}
+              </span>
             </button>
           ))
         )}
       </div>
-      {deviceSlots && slots.length ? (
+      {deviceSlots && named ? (
         <p className="hint pad">
-          {slots.length} of {deviceSlots} read
-          {slots.length && !named ? ' — this unit gave no names back' : ''}
+          {named} of {deviceSlots} named
         </p>
       ) : null}
     </div>

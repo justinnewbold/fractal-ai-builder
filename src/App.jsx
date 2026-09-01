@@ -282,6 +282,36 @@ export default function App() {
    * one would take the inner one's entry with it.
    */
   const [sheet, setSheet] = useState(null)
+
+  /*
+   * The preset menu is a menu, not a sheet.
+   *
+   * Changing preset is the single most frequent thing anyone does here, and it
+   * was two taps and a full-screen surface away. This drops the list under the
+   * bar the way the caret beside the name has always implied it would.
+   */
+  const [presetMenu, setPresetMenu] = useState(false)
+  const presetMenuRef = useRef(null)
+
+  /* A tap outside and Escape are the two ways anyone expects to dismiss a
+     menu; without them the only way out is finding the button again. */
+  useEffect(() => {
+    if (!presetMenu) return undefined
+    const away = (e) => {
+      if (presetMenuRef.current?.contains(e.target)) return
+      // The button that opened it toggles; letting this close it too would
+      // race the toggle and reopen on the same tap.
+      if (e.target.closest?.('.topbar-preset')) return
+      setPresetMenu(false)
+    }
+    const key = (e) => e.key === 'Escape' && setPresetMenu(false)
+    document.addEventListener('pointerdown', away)
+    document.addEventListener('keydown', key)
+    return () => {
+      document.removeEventListener('pointerdown', away)
+      document.removeEventListener('keydown', key)
+    }
+  }, [presetMenu])
   const [slots, setSlots] = useState([])
   const [scanning, setScanning] = useState(false)
   const scene = useDevice(ofScene)
@@ -1571,6 +1601,28 @@ export default function App() {
   const hasScenes = device?.capabilities?.hasScenes !== false
 
   /*
+   * Every slot the unit has, whether or not its name has been read.
+   *
+   * The preset menu was empty until someone ran a scan — and on a gen-3 unit a
+   * full scan is minutes of one-dump-per-slot down a serial port, because the
+   * firmware has no query for a stored name. So a dropdown you opened to
+   * change preset offered nothing to change to.
+   *
+   * The slots exist regardless; only the names are unknown. Listing them by
+   * number means "go to 46" works on the first tap, and the names fill in
+   * behind as they are learned.
+   */
+  const knownSlots = slots.length ? slots : cachedPresetNames()
+  const allSlots = useMemo(() => {
+    const count = device?.capabilities?.presets?.count
+    if (!count) return knownSlots
+    const byNumber = new Map(knownSlots.map((s) => [s.number, s]))
+    return Array.from({ length: count }, (_, i) => byNumber.get(i) || { number: i })
+    // knownSlots is rebuilt each render; its length and the count are what move.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [knownSlots.length, device?.capabilities?.presets?.count, preset?.number])
+
+  /*
    * Whether browser storage still holds anything.
    *
    * The panel that lists it is kept — it holds real work someone saved — but
@@ -1651,8 +1703,42 @@ export default function App() {
         device={device}
         preset={preset}
         dirty={dirty}
-        onOpenPresets={() => setSheet('presets')}
+        presetsOpen={presetMenu}
+        onOpenPresets={() => setPresetMenu((v) => !v)}
         onOpenSettings={() => setSheet('settings')}
+        menu={
+          presetMenu ? (
+            <div className="preset-menu" ref={presetMenuRef}>
+              <PresetList
+                slots={allSlots}
+                current={preset?.number}
+                deviceSlots={device?.capabilities?.presets?.count}
+                addressing={device?.capabilities?.presets?.addressing}
+                scanning={scanning}
+                progress={scanProgress}
+                onStop={() => {
+                  stopScan.current = true
+                }}
+                onScan={scanPresets}
+                onSelect={(n) => {
+                  jumpTo(n)
+                  setPresetMenu(false)
+                }}
+              />
+              {/* Changing preset is the bar's job; keeping, backing up and
+                  restoring them is a different job with its own surface. */}
+              <button
+                className="chip preset-menu-more"
+                onClick={() => {
+                  setPresetMenu(false)
+                  setSheet('presets')
+                }}
+              >
+                Saved presets and backups…
+              </button>
+            </div>
+          ) : null
+        }
         onError={setError}
         onRemoteChanged={(on) => {
           setRemote(on)
@@ -1890,8 +1976,28 @@ export default function App() {
           />
 
           <div className="shape-row">
-            <button className="chip" onClick={() => setSheet('scenes')} disabled={!hasScenes}>
-              Scenes
+            {/*
+              Which scene an edit lands in.
+
+              Every knob turned and every block switched on this screen writes
+              into the scene that is live — and nothing on this screen said
+              which one that was. A chip reading "Scenes" is a door; a chip
+              reading "Scene 2 · Lead" is the answer to the question you have
+              while you are turning the knob.
+            */}
+            <button
+              className={`chip ${hasScenes ? 'scene-now' : ''}`}
+              onClick={() => setSheet('scenes')}
+              disabled={!hasScenes}
+            >
+              {hasScenes ? (
+                <>
+                  <span className="scene-now-tag mono">S{scene + 1}</span>
+                  <span className="scene-now-name">{sceneNames[scene] || `Scene ${scene + 1}`}</span>
+                </>
+              ) : (
+                'Scenes'
+              )}
             </button>
             <button className="chip" onClick={() => setSheet('presets')}>
               Presets and backups
@@ -2052,7 +2158,17 @@ export default function App() {
         open={sheet === 'block' && !!openBlock}
         onClose={() => setSheet(null)}
         title={openBlock?.name || 'Block'}
-        note={openBlock?.bypassed ? 'Bypassed' : null}
+        /* Where these knobs land. A block's settings are per-scene, so an
+           editor that doesn't name the scene is an editor you have to
+           remember the context for. */
+        note={
+          [
+            openBlock?.bypassed ? 'Bypassed' : null,
+            hasScenes ? `Scene ${scene + 1}${sceneNames[scene] ? ` · ${sceneNames[scene]}` : ''}` : null
+          ]
+            .filter(Boolean)
+            .join(' · ') || null
+        }
       >
         <BlockPanel
           block={openBlock}
@@ -2090,7 +2206,7 @@ export default function App() {
         note={device?.capabilities?.presets?.count ? `${device.capabilities.presets.count} slots` : null}
       >
         <PresetList
-          slots={slots.length ? slots : cachedPresetNames()}
+          slots={allSlots}
           current={preset?.number}
           deviceSlots={device?.capabilities?.presets?.count}
           addressing={device?.capabilities?.presets?.addressing}

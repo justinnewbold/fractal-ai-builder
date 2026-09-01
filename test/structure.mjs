@@ -156,7 +156,17 @@ export function run(test) {
             else if (ch === '>' && depth === 0) break
             i++
           }
-          const passed = [...body.slice(at, i).matchAll(/(\w+)=/g)].map((m) => m[1])
+          /*
+           * Only this tag's own props.
+           *
+           * A prop whose value is JSX — <TopBar menu={<div className=…/>} /> —
+           * carries other components' props inside it, and a flat scan read
+           * every one of them as belonging to the outer tag. So the braced
+           * values are removed before the names are taken; what is left is the
+           * attribute list this tag actually writes.
+           */
+          const bare = body.slice(at, i).replace(/=\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\}/g, '=')
+          const passed = [...bare.matchAll(/(\w+)=/g)].map((m) => m[1])
           for (const prop of passed) {
             assert.ok(
               props.includes(prop) || prop === 'key' || prop === 'children',
@@ -308,6 +318,10 @@ export function run(test) {
     const allowed = new Set([
       'TopBar', // the bar itself
       'SaveBar', // rides in it
+      // The preset menu, passed to the bar as a prop and absolutely positioned
+      // under it. It is in the bar, not stacked above the view — the height it
+      // adds to the page is zero, which the browser pass measures directly.
+      'PresetList',
       'Remote' // the sign-in, on the screen that says there's no connection
     ])
     // The assistant used to be on this list — it sat above every screen at
