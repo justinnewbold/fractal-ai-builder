@@ -13,10 +13,25 @@
  * both say plainly what happened.
  */
 
-/** No bytes at all for this long means something upstream stopped talking. */
-const STALL_MS = 75000
-/** Even a healthy generation is over long before this. */
-const HARD_CAP_MS = 240000
+/*
+ * Both clocks are set by the server's ceiling, not by taste.
+ *
+ * The API function is capped at 60 seconds in vercel.json, and the platform
+ * kills it there without letting it write anything — no `done`, no `error`,
+ * just a severed stream. So the browser has to give up FIRST, or the only
+ * thing it can report is that the response stopped for reasons it can't see.
+ * That is exactly what happened while these sat at 75s and 240s: a generation
+ * cut off at 60s was reported as the model giving up.
+ *
+ * Keep both under the maxDuration in vercel.json. test/limits.mjs holds the
+ * two files to that, since nothing else connects them.
+ */
+
+/** No bytes at all for this long means something upstream stopped talking.
+ *  Generous, because the first token legitimately takes ~25s on a big preset. */
+const STALL_MS = 45000
+/** Just inside the function's own 60s ceiling, so this fires before the axe. */
+const HARD_CAP_MS = 55000
 
 /**
  * What happened, in order, on the last few generations.
@@ -150,9 +165,20 @@ export async function streamSpec(body, { onPartial, onEvent, signal } = {}) {
 
     if (failure) throw fail(failure, 'server')
     if (!final) {
+      /*
+       * Say what actually happened, which is not what this used to say.
+       *
+       * The server writes an `error` frame for anything it catches, so no
+       * `done` AND no `error` means the response was cut off from outside —
+       * the function hit its own time limit, or the connection dropped. The
+       * model did not stop; something killed the pipe it was writing to. The
+       * old wording sent a real debugging session off looking at the model
+       * while the cause was a 60-second serverless ceiling the client was
+       * happily waiting four minutes behind.
+       */
       throw fail(
         partials
-          ? 'The model stopped part way through the preset. Nothing was written — ask again.'
+          ? 'The preset was still being written when the connection closed — the server hit its time limit, or the link dropped. Nothing was written to your unit. Ask again; a shorter, more specific request finishes sooner.'
           : 'The connection closed before the model sent anything. Nothing was written — ask again.',
         'truncated'
       )
@@ -171,7 +197,7 @@ export async function streamSpec(body, { onPartial, onEvent, signal } = {}) {
       }
       if (reason === 'capped') {
         throw fail(
-          `The generation ran past ${Math.round(HARD_CAP_MS / 60000)} minutes and was dropped. Nothing was written to your unit.`,
+          `The generation ran past ${Math.round(HARD_CAP_MS / 1000)} seconds and was dropped — that is the server's own limit, so it would have been cut off a moment later anyway. Nothing was written to your unit. Ask again with a shorter, more specific request.`,
           'capped'
         )
       }

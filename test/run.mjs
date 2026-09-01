@@ -957,6 +957,10 @@ console.log('\ntouch')
 const { run: touch } = await import('./touch.mjs')
 touch(test)
 
+console.log('\nlimits')
+const { run: limits } = await import('./limits.mjs')
+limits(test)
+
 test('both file kinds are listed and told apart', async () => {
   // A .syx goes back to the unit verbatim; a design re-validates first. Load
   // treating one as the other would either corrupt or silently no-op.

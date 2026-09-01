@@ -191,8 +191,21 @@ export default async function handler(req, res) {
         `the direction asked for rather than a token nudge, but change as little else as possible.`
       : `Tone wanted: ${description}`
 
+  /*
+   * The output ceiling is set here rather than left to the provider default.
+   *
+   * The AI SDK's Anthropic provider has to send `max_tokens` on every request,
+   * so an unset one is not "no limit" — it is whatever the provider picked,
+   * which is 4096. A full chain with a dozen blocks and their parameter lists
+   * runs past that, and hitting the ceiling truncates the JSON mid-object: the
+   * schema then fails to validate and the whole generation is lost at the very
+   * end, after the player has watched it build. The cap is a ceiling, not a
+   * reservation, so a generous one costs nothing on the presets that don't
+   * need it.
+   */
   const args = {
     model,
+    maxOutputTokens: 16000,
     schema: PresetSpec,
     schemaName: 'preset_spec',
     system: SYSTEM,
