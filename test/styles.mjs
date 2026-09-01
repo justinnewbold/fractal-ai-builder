@@ -175,4 +175,38 @@ export function run(test) {
       )
     }
   })
+
+  test('the page reserves the room the floating Ask button takes up', () => {
+    /*
+     * `.ask-anywhere` is fixed over the bottom-right corner on Play and Edit.
+     * Whatever it covers there can only be got at by scrolling it out from
+     * under — so the shell's bottom padding has to be at least as deep as the
+     * button's inset plus its height. It was not, and the eighth scene button
+     * on a phone sat under it with nowhere to go.
+     *
+     * The padding that matters is the one in the `@supports (padding: max())`
+     * block, not the `.shell` rule at the top of the file: same specificity,
+     * later in the source, and supported everywhere. Raising the first one
+     * alone changes nothing on any real browser, which is exactly the mistake
+     * this test is here to catch.
+     */
+    const rule = code.match(/@supports \(padding: max\(0px\)\) \{\s*\.shell \{([^}]*)\}/)
+    assert.ok(rule, 'the @supports block that sets the real shell padding is gone')
+    const reserved = Number((rule[1].match(/padding-bottom: calc\((\d+)px \+/) || [])[1])
+    assert.ok(reserved, `shell padding-bottom is no longer a plain reservation: ${rule[1].trim()}`)
+
+    const button = code.match(/\.ask-anywhere \{([^}]*)\}/)
+    assert.ok(button, '.ask-anywhere is gone')
+    const inset = Number((button[1].match(/bottom: calc\(var\(--s-(\d)\)/) || [])[1])
+    const height = Number((button[1].match(/min-height: (\d+)px/) || [])[1])
+    assert.ok(inset && height, `cannot read the button's own geometry: ${button[1].trim()}`)
+    const scale = { 1: 4, 2: 8, 3: 12, 4: 16, 5: 24, 6: 32, 7: 48 }
+    const needed = scale[inset] + height
+
+    assert.ok(
+      reserved >= needed,
+      `the shell reserves ${reserved}px but the Ask button occupies ${needed}px ` +
+        `(${scale[inset]}px inset + ${height}px tall) — the last row of controls cannot be scrolled clear of it`
+    )
+  })
 }
