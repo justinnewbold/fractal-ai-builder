@@ -736,6 +736,77 @@ export async function applyChanges(changes, onProgress) {
   return failures
 }
 
+/**
+ * Write a scene plan: one rig, several states of it.
+ *
+ * Scenes carry which blocks are on, not what they sound like — parameters live
+ * on the block (and per channel), so every scene shares the models and values
+ * written by applyChanges. That is the whole reason this is a separate pass
+ * rather than part of one: the rig has to exist before the states over it mean
+ * anything.
+ *
+ * The player's own scene is put back at the end. Writing scenes moves the unit
+ * through all of them, and finishing on scene 6 because that was the last one
+ * in the list would be the app rearranging the stage while your back is turned.
+ */
+export async function applyScenes(scenes, onProgress) {
+  const failures = []
+  if (!scenes?.length) return failures
+
+  // Where the player was, so they can be put back. If this read fails the
+  // scenes are still worth writing — we just cannot restore, so we do not
+  // pretend to by guessing zero.
+  let cameFrom = null
+  try {
+    const now = await getScene()
+    cameFrom = typeof now?.index === 'number' ? now.index : null
+  } catch {
+    cameFrom = null
+  }
+
+  let step = 0
+  const total = scenes.reduce((n, s) => n + 1 + s.blocks.length, 0)
+  const advance = (label) => onProgress?.(++step, total, label)
+
+  for (const scene of scenes) {
+    const label = scene.name || `Scene ${scene.index + 1}`
+    advance(`Scene ${scene.index + 1} — ${label}`)
+    try {
+      await setScene(scene.index)
+    } catch (err) {
+      failures.push(`Scene ${scene.index + 1} — ${err.message}`)
+      continue
+    }
+
+    if (scene.name) {
+      try {
+        await setSceneName(scene.index, scene.name)
+      } catch {
+        // A scene that works but keeps its old name is not worth failing over.
+      }
+    }
+
+    for (const block of scene.blocks) {
+      advance(`${label} · ${block.name} ${block.bypassed ? 'off' : 'on'}`)
+      try {
+        await setBypass(block.eid, block.bypassed)
+      } catch (err) {
+        failures.push(`${label} · ${block.name} — ${err.message}`)
+      }
+    }
+  }
+
+  if (cameFrom !== null) {
+    try {
+      await setScene(cameFrom)
+    } catch {
+      failures.push(`Wrote the scenes but could not switch back to scene ${cameFrom + 1}.`)
+    }
+  }
+
+  return failures
+}
+
 /** Load a preset by slot number on the hardware. */
 export const selectPreset = (number) =>
   mock ? tick().then(() => mock.selectPreset(number)) : request('/preset/select', { method: 'POST', body: JSON.stringify({ number }) })
