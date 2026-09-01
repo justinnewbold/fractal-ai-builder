@@ -1,0 +1,31 @@
+# Packaging for the Mac app.
+#
+# The web app is built by the root project and copied in as an extra resource
+# rather than being part of this package — main.js finds it at
+# `process.resourcesPath/dist`, which is what makes ForgeFX able to serve it.
+appId: cloud.newbold.fractal
+productName: Fractal AI Builder
+directories:
+  output: release
+files:
+  - main.js
+  - lib/**
+  - trayTemplate*.png
+  - package.json
+extraResources:
+  - from: ../dist
+    to: dist
+mac:
+  category: public.app-category.music
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  # Signing and notarisation are switched on by the presence of a certificate.
+  # Without one this still builds; macOS then shows "unidentified developer"
+  # and the first launch needs right-click → Open.
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: entitlements.mac.plist
+  entitlementsInherit: entitlements.mac.plist
+dmg:
+  title: Fractal AI Builder

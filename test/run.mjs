@@ -182,6 +182,82 @@ test('strips characters the hardware will not store', () => {
   assert.equal(r.presetName, 'Drop A metal rhythm')
 })
 
+console.log('\nserving it locally')
+
+const host = await import('../desktop/lib/host.mjs')
+
+test('the phone is offered an address a phone can reach', () => {
+  /*
+   * Loopback is useless here by definition — the whole point is a second
+   * device. The QR carries the IP rather than the .local name because iOS
+   * resolves .local natively and Android often does not, and a scanned code
+   * that fails is the worst possible first impression.
+   */
+  const w = host.addresses({ port: 5056, name: 'fractal', ip: '10.0.0.191' })
+  assert.equal(w.forPhone, 'http://10.0.0.191:5056')
+  assert.ok(w.all.includes('http://fractal.local:5056'))
+  assert.ok(w.all.includes('http://localhost:5056'))
+})
+
+test('with no network there is nothing to scan, and it says so rather than lying', () => {
+  const w = host.addresses({ port: 5056, ip: null })
+  assert.equal(w.forPhone, null)
+  assert.equal(w.lan, null)
+  // localhost still works for the machine itself.
+  assert.ok(w.all.includes('http://localhost:5056'))
+})
+
+test('a loopback-only machine yields no phone address', () => {
+  const only = () => ({ lo0: [{ family: 'IPv4', address: '127.0.0.1', internal: true }] })
+  assert.equal(host.lanAddress(only), null)
+})
+
+test('the first real interface is the one offered', () => {
+  const nics = () => ({
+    lo0: [{ family: 'IPv4', address: '127.0.0.1', internal: true }],
+    en0: [
+      { family: 'IPv6', address: 'fe80::1', internal: false },
+      { family: 'IPv4', address: '192.168.1.44', internal: false }
+    ]
+  })
+  assert.equal(host.lanAddress(nics), '192.168.1.44')
+})
+
+test('ForgeFX is only found where the server actually is', () => {
+  /*
+   * A half-finished clone that merely exists is worse than no match: it fails
+   * later, further from the cause. So the check is for server/package.json,
+   * not for the directory.
+   */
+  const exists = (p) => p === '/Users/x/src/forgefx/server/package.json'
+  assert.equal(host.findForgeFX({ env: { HOME: '/Users/x' }, exists }), '/Users/x/src/forgefx')
+  assert.equal(host.findForgeFX({ env: { HOME: '/Users/x' }, exists: () => false }), null)
+})
+
+test('FORGEFX_PATH wins over the guesses', () => {
+  const exists = () => true
+  assert.equal(
+    host.findForgeFX({ env: { HOME: '/Users/x', FORGEFX_PATH: '/opt/ff' }, exists }),
+    '/opt/ff'
+  )
+})
+
+test('the server is told to serve this app — the whole of local mode', () => {
+  // FORGEFX_STATIC is what makes the page and the device API the same origin,
+  // which is what lets a phone skip the account entirely.
+  const env = host.serverEnv({ env: { PATH: '/bin' }, port: 5056, dist: '/app/dist' })
+  assert.equal(env.FORGEFX_STATIC, '/app/dist')
+  assert.equal(env.PORT, '5056')
+  assert.equal(env.PATH, '/bin', 'the rest of the environment must survive')
+})
+
+test('publishing without mDNS available still gives a usable stop', async () => {
+  // The desktop app treats bonjour as optional — without it the IP still
+  // works and only the .local name is lost, so this must not throw.
+  const ad = host.publish(null, { port: 5056 })
+  await ad.stop()
+})
+
 console.log('\nwho may call the model')
 
 const { allowedOrigin } = await import('../api/_cors.js')
