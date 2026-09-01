@@ -1,0 +1,70 @@
+/**
+ * The gestures, held apart from the taps.
+ *
+ * Three surfaces bind `touchstart` themselves rather than through React, for a
+ * reason each of them documents: React registers touch listeners as passive, so
+ * a `preventDefault` inside one is ignored and iOS takes the gesture as a page
+ * scroll before the first move is answered.
+ *
+ * That `preventDefault` has a second effect, and it is the one that bites. It
+ * also suppresses the click iOS would have synthesised from the press — so any
+ * control *inside* a grab surface stops working, silently, on a phone only, in
+ * a way no unit test and no desktop pass will show. The sheet's close button
+ * spent a release doing nothing for exactly this reason while the swipe it
+ * shares a header with worked perfectly.
+ *
+ * So: a grab surface either contains no controls, or it lets their touches
+ * through before it takes the grab.
+ */
+import assert from 'node:assert/strict'
+import { readdirSync, readFileSync } from 'node:fs'
+
+const dir = new URL('../src/components/', import.meta.url)
+const read = (file) => readFileSync(new URL(file, dir), 'utf8')
+
+export function run(test) {
+  test('only the known surfaces take a touch gesture themselves', () => {
+    /*
+     * Not a style rule — a review trigger. Binding a non-passive touchstart is
+     * how you opt out of the click, and a fourth one should be a decision
+     * somebody made on purpose rather than a paste of the other three.
+     */
+    const binds = readdirSync(dir)
+      .filter((f) => f.endsWith('.jsx'))
+      .filter((f) => /addEventListener\('touchstart'/.test(read(f)))
+      .sort()
+    assert.deepEqual(binds, ['Knob.jsx', 'Sheet.jsx', 'XYPad.jsx'])
+  })
+
+  test('a grab surface holding a control lets the control have its tap', () => {
+    /*
+     * The sheet's header is the handle *and* the home of the close button, so
+     * it is the one surface that has to make the distinction. Knob's element
+     * and XYPad's `.xy-pad` hold only decoration, which is why they can take
+     * every touch that reaches them.
+     */
+    // Comments out first: this very handler explains itself by naming
+    // preventDefault, and a test that reads the explanation instead of the
+    // code passes on a file that says the right thing and does the wrong one.
+    const sheet = read('Sheet.jsx').replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ' ')
+    const begin = sheet.slice(sheet.indexOf('const begin = ('))
+    const body = begin.slice(0, begin.indexOf('\n    }'))
+
+    const bail = body.indexOf('closest')
+    const stop = body.indexOf('preventDefault')
+    assert.ok(bail !== -1, 'the sheet grabs every touch on its header, close button included')
+    assert.ok(bail < stop, 'the sheet cancels the press before it checks what was pressed')
+  })
+
+  test('the swipe is still bound to the header, never the body', () => {
+    // The block sheet is full of knobs, and a knob is a vertical drag. A
+    // dismiss handler on the body would fight every one of them.
+    const sheet = read('Sheet.jsx')
+    assert.match(sheet, /const grip = handle\.current/)
+    assert.match(sheet, /<header className="sheet-head" ref={handle}>/)
+    assert.ok(
+      !/ref={panel}[\s\S]{0,400}addEventListener\('touchstart'/.test(sheet),
+      'drag-to-dismiss reached the sheet body'
+    )
+  })
+}

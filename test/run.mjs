@@ -20,6 +20,7 @@ import {
 } from '../src/lib/schemaCache.js'
 
 let passed = 0
+let failed = 0
 
 /*
  * Async tests are awaited, not fired and forgotten.
@@ -37,6 +38,7 @@ const test = (name, fn) => {
     console.log(`  ok  ${name}`)
   }
   const bad = (err) => {
+    failed++
     console.error(`FAIL  ${name}\n      ${err.message}`)
     process.exitCode = 1
   }
@@ -951,6 +953,10 @@ console.log('\nthe dimensional system')
 const { run: styles } = await import('./styles.mjs')
 styles(test)
 
+console.log('\ntouch')
+const { run: touch } = await import('./touch.mjs')
+touch(test)
+
 test('both file kinds are listed and told apart', async () => {
   // A .syx goes back to the unit verbatim; a design re-validates first. Load
   // treating one as the other would either corrupt or silently no-op.
@@ -1270,4 +1276,14 @@ test('there is one event subscription, however many times it is asked for', () =
 ds.reset()
 
 await settle()
-console.log(`\n${passed} passed\n`)
+/*
+ * The tally has to say when it is red.
+ *
+ * It used to print "141 passed" and nothing else, with the FAIL lines scrolled
+ * off above it — so the last line of a failing run read exactly like the last
+ * line of a passing one. The exit code was right the whole time; the summary
+ * was the part a person actually looks at.
+ */
+console.log(
+  process.exitCode ? `\n${passed} passed, ${failed} FAILED\n` : `\n${passed} passed\n`
+)

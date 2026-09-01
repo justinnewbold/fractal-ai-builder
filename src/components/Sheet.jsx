@@ -218,11 +218,15 @@ export default function Sheet({ open, onClose, title, note, footer, children }) 
   }, [open, rail, close])
 
   /*
-   * Drag to dismiss, from the handle alone.
+   * Drag to dismiss, from the header alone — never the body, which is full of
+   * knobs, and knobs are vertical drags.
    *
    * Native and non-passive, the same as the knob and the pad: React registers
    * touch listeners as passive, so preventDefault inside one is ignored and iOS
    * takes the gesture as a scroll before the first move is answered.
+   *
+   * The header is not only a handle, though: the close button lives in it. See
+   * `begin` for why that costs the press if the grab is taken indiscriminately.
    */
   useEffect(() => {
     const grip = handle.current
@@ -249,6 +253,11 @@ export default function Sheet({ open, onClose, title, note, footer, children }) 
     const begin = (e) => {
       const t = e.changedTouches[0]
       if (!t) return
+      // A control in the header is a tap, not a grab. preventDefault on a
+      // touchstart suppresses the click iOS would have synthesised from it, so
+      // grabbing this one would eat the press: the close button did nothing on
+      // a phone while the swipe it shares the header with worked fine.
+      if (e.target?.closest?.(FOCUSABLE)) return
       if (e.cancelable) e.preventDefault()
       from = { id: t.identifier, y: t.clientY }
       window.addEventListener('touchmove', move, { passive: false })
