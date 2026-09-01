@@ -204,8 +204,8 @@ function RemoteHelp() {
 
   return (
     <p className="hint">
-      To play from a phone, use <strong>Play from your phone</strong> above. Your Mac stays plugged
-      into the unit and the phone drives it from anywhere.
+      To play from a phone, use <strong>Phone remote</strong> above. Your Mac stays plugged into
+      the unit and the phone drives it from anywhere.
     </p>
   )
 }

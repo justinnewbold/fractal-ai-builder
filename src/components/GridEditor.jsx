@@ -211,8 +211,8 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
         </div>
 
         <p className="hint">
-          Placing blocks writes the preset&rsquo;s structure, not just its settings, and ForgeFX
-          marks that as derived from the protocol spec rather than confirmed on hardware &mdash; a
+          Placing blocks writes the preset&rsquo;s structure, not just its settings, and that part
+          of the write is worked out from the protocol rather than confirmed on hardware &mdash; a
           bad write here mangles a preset rather than mis-setting a knob. Back up all slots first,
           and work on a slot you don&rsquo;t care about.
         </p>

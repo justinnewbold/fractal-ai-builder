@@ -5973,3 +5973,51 @@ button.signin-link {
   margin: 0;
   color: var(--fault);
 }
+
+/* ---------- phone remote, in Setup ---------- */
+
+.phone-remote-state {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin: 0 0 var(--s-3);
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: var(--f-3);
+  color: var(--silk);
+}
+
+.phone-remote-state.tone-good {
+  color: var(--live);
+}
+
+.phone-remote-state.tone-bad {
+  color: var(--fault);
+}
+
+.phone-remote-state.tone-dim {
+  color: var(--silk-dim);
+}
+
+.account-fold {
+  margin-top: var(--s-4);
+  border-top: 1px solid var(--rule);
+  padding-top: var(--s-2);
+}
+
+.account-fold > .signin-link {
+  padding-left: 0;
+}
+
+.link-details {
+  margin-top: var(--s-4);
+}
+
+/* The two project fields under Technical details are inputs like any other,
+   and a finger needs the same 44px on them as everywhere else. */
+@media (pointer: coarse) {
+  .link-details input {
+    min-height: 44px;
+    font-size: var(--f-input);
+  }
+}

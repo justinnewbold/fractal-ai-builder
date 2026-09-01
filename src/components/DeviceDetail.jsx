@@ -67,14 +67,14 @@ export default function DeviceDetail({ status, device, onRetry, busy }) {
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && save()}
-              aria-label="Address of the helper app on your Mac"
+              aria-label="Address of the Fractal app on your Mac"
             />
             <button onClick={save}>Use this address</button>
           </>
         ) : (
           <>
             <span className="device-meta mono">
-              {demo ? 'simulated' : remote ? 'remote session' : getHost()}
+              {demo ? 'simulated' : remote ? 'through your Mac' : getHost()}
             </span>
             <button onClick={toggleDemo}>{demo ? 'Use real device' : 'Demo mode'}</button>
             {!demo && !remote ? (
