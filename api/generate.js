@@ -75,6 +75,28 @@ const PresetSpec = z.object({
       })
     )
     .describe('Only blocks you are changing.'),
+  scenes: z
+    .array(
+      z.object({
+        index: z
+          .number()
+          .int()
+          .describe('Scene number, zero-based. 0 is scene 1 on the unit front panel.'),
+        name: z
+          .string()
+          .describe('Short name for this scene — "Clean", "Rhythm", "Lead". Eight characters or fewer reads best on the unit.'),
+        engaged: z
+          .array(z.number().int())
+          .describe(
+            'Effect ids that are ON in this scene. Every other block placed in the preset is off. ' +
+              'Copy ids from the supplied block list.'
+          )
+      })
+    )
+    .describe(
+      'Optional. One rig, several usable states of it — the same amp and cab with different ' +
+        'blocks switched in. Empty array if the request is for a single sound.'
+    ),
   notes: z.string().describe('Anything the player should know. Empty string if nothing.')
 })
 
@@ -96,6 +118,26 @@ HARD RULES
 5. Bypass blocks that don't belong in the tone rather than leaving them engaged
    and neutral.
 6. Do not move blocks, add blocks, or change routing. Work with what is placed.
+
+SCENES
+
+A preset holds one set of blocks. A scene is a saved pattern of which of those
+blocks are on — so scenes give a player several usable sounds out of one rig,
+switched by footswitch without a gap.
+
+7. Scenes change what is ON, nothing else. Every scene shares the models and
+   parameter values you set in "blocks". You cannot give a scene its own gain
+   or its own amp: those live on the block, not the scene.
+8. Because of that, build the differences out of blocks. A lead scene is the
+   rhythm scene plus a boost and a delay, not a hotter amp.
+9. List in "engaged" every effect id that should be ON in that scene. Anything
+   placed in the preset and not listed is off in that scene. Amp and cab
+   belong in every scene — leaving them out silences it.
+10. Offer scenes when the request implies more than one sound — a song, a set,
+    a band whose parts differ, or any mention of rhythm and lead. For a single
+    specific sound, return an empty array rather than padding it out.
+11. Three or four well-judged scenes beat eight. Do not fill every slot for the
+    sake of it.
 
 TONE JUDGEMENT
 
@@ -132,7 +174,7 @@ export default async function handler(req, res) {
     return
   }
 
-  const { description, device, blocks, previous, mode } = req.body || {}
+  const { description, device, blocks, previous, mode, sceneNames } = req.body || {}
 
   if (!description || typeof description !== 'string') {
     res.status(400).json({ error: 'Describe the tone you want.' })
@@ -170,6 +212,11 @@ export default async function handler(req, res) {
   const state = {
     device: device?.name || 'FM3',
     grid: device?.capabilities?.grid,
+    // How many scenes exist to fill, and what they are called now. Without the
+    // count the model has to guess how many it may write, and eight is not
+    // universal across the family.
+    sceneCount: device?.capabilities?.sceneCount ?? 8,
+    sceneNames: Array.isArray(sceneNames) ? sceneNames : undefined,
     blocks: blocks.map((b) => ({
       eid: b.eid,
       name: b.name,

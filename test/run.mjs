@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict'
 import { toNormalized, fromNormalized } from '../src/lib/scale.js'
 import { isSilencingParam } from '../src/lib/guardrails.js'
-import { validateSpec, countWrites } from '../src/lib/validate.js'
+import { validateSpec, countWrites, countSceneWrites } from '../src/lib/validate.js'
 import { preferredEncoding, rememberEncoding, disambiguate } from '../src/lib/encoding.js'
 import { forbiddenRemotely, explainAuth, timeoutFor } from '../src/lib/remote.js'
 import {
@@ -180,6 +180,87 @@ test('preserves case and normal punctuation in preset names', () => {
 test('strips characters the hardware will not store', () => {
   const r = validateSpec({ presetName: 'Drop A  <metal>\n rhythm', blocks: [] }, schema)
   assert.equal(r.presetName, 'Drop A metal rhythm')
+})
+
+console.log('\nscenes')
+
+/* A preset with an amp, a cab and two pedals — enough to have a scene plan
+   that means something, and enough for a scene to be wrong in each way. */
+const sceneSchema = [
+  { eid: 58, name: 'Amp 1', slug: 'amp', models: [], params: [] },
+  { eid: 106, name: 'Cab 1', slug: 'cab', models: [], params: [] },
+  { eid: 118, name: 'Drive 1', slug: 'drive', models: [], params: [] },
+  { eid: 132, name: 'Delay 1', slug: 'delay', models: [], params: [] }
+]
+const scened = (scenes, count = 8) =>
+  validateSpec({ blocks: [], scenes }, sceneSchema, count)
+
+test('a scene plan becomes explicit per-block bypass', () => {
+  // The model says what is ON; the hardware is told what is OFF. That
+  // inversion happens once, in validation, not at every call site.
+  const r = scened([{ index: 0, name: 'Rhythm', engaged: [58, 106, 118] }])
+  assert.equal(r.scenes.length, 1)
+  const off = r.scenes[0].blocks.filter((b) => b.bypassed).map((b) => b.eid)
+  assert.deepEqual(off, [132], 'the delay was not listed, so it should be off')
+})
+
+test('a scene that forgets the amp is repaired, not shipped', () => {
+  /*
+   * The silent-scene case. The prompt tells the model amp and cab belong in
+   * every scene and it can still drop one on the eighth scene of a long reply
+   * — and the failure is inaudible until someone stands on a footswitch
+   * mid-set, which is the worst possible moment to find it.
+   */
+  const r = scened([{ index: 2, name: 'Lead', engaged: [118, 132] }])
+  const on = r.scenes[0].blocks.filter((b) => !b.bypassed).map((b) => b.eid)
+  assert.ok(on.includes(58) && on.includes(106), 'amp and cab should be switched back on')
+  assert.match(r.problems.join(' '), /would have silenced it/)
+})
+
+test('a scene past the end of the unit is dropped', () => {
+  // An AM4 has fewer scenes than an FM3. Writing scene 8 to a unit with four
+  // is eight round trips that end in a refusal, or worse.
+  const r = scened([{ index: 6, name: 'Too far', engaged: [58, 106] }], 4)
+  assert.deepEqual(r.scenes, [])
+  assert.match(r.problems.join(' '), /outside this unit/)
+})
+
+test('the same scene described twice keeps the first', () => {
+  const r = scened([
+    { index: 1, name: 'First', engaged: [58, 106] },
+    { index: 1, name: 'Second', engaged: [58, 106, 132] }
+  ])
+  assert.equal(r.scenes.length, 1)
+  assert.equal(r.scenes[0].name, 'First')
+})
+
+test('scenes come back in the order the unit holds them', () => {
+  const r = scened([
+    { index: 3, name: 'Solo', engaged: [58, 106] },
+    { index: 0, name: 'Clean', engaged: [58, 106] }
+  ])
+  assert.deepEqual(r.scenes.map((x) => x.index), [0, 3])
+})
+
+test('an unknown effect id in a scene is ignored, not written', () => {
+  const r = scened([{ index: 0, name: 'Ghost', engaged: [58, 106, 9999] }])
+  assert.ok(!r.scenes[0].blocks.some((b) => b.eid === 9999))
+})
+
+test('no scenes is a normal answer, not an error', () => {
+  const r = scened([])
+  assert.deepEqual(r.scenes, [])
+  assert.deepEqual(r.problems, [])
+})
+
+test('the cost of a scene plan is a switch plus a bypass each', () => {
+  // Shown on the button before anything is written, because this is the half
+  // that walks the unit through every scene.
+  const r = scened([
+    { index: 0, name: 'A', engaged: [58, 106] },
+    { index: 1, name: 'B', engaged: [58, 106, 118] }
+  ])
+  assert.equal(countSceneWrites(r.scenes), 2 * (1 + 4))
 })
 
 test('counts writes including model and bypass', () => {

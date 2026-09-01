@@ -74,6 +74,7 @@ import {
   readSchema,
   resetSchemaCache,
   applyChanges,
+  applyScenes,
   verifyChanges,
   storePreset,
   selectPreset,
@@ -87,7 +88,7 @@ import {
   takeParkedPresetName,
   clearParkedPresetName
 } from './lib/forgefx'
-import { validateSpec, countWrites } from './lib/validate'
+import { validateSpec, countWrites, countSceneWrites } from './lib/validate'
 import { beatFlash, bringIntoView } from './lib/feedback'
 import {
   remoteActive,
@@ -222,6 +223,12 @@ export default function App() {
   const [saving, setSaving] = useState(false)
 
   const [result, setResult] = useState(null)
+  /*
+   * Whether to write the scene plan too. Off by default: it is the one part of
+   * a generation that walks the unit through every scene, and someone who
+   * asked for a sound has not asked for their scene layout to be rearranged.
+   */
+  const [withScenes, setWithScenes] = useState(false)
   const [progress, setProgress] = useState(null)
   const [applied, setApplied] = useState(null)
   const [slot, setSlot] = useState('')
@@ -327,6 +334,9 @@ export default function App() {
   const [scanning, setScanning] = useState(false)
   const scene = useDevice(ofScene)
   const sceneNames = useDevice(ofSceneNames)
+  // How many scenes this unit actually has. Eight is the gen-3 answer and the
+  // safe fallback, but it is a capability, not a constant.
+  const sceneCount = device?.capabilities?.sceneCount || 8
   const bpm = useDevice(ofBpm)
   // One tempo read per burst of taps, not one per tap.
   const tapReadback = useRef(null)
@@ -680,6 +690,7 @@ export default function App() {
           description,
           device,
           blocks: schema,
+          sceneNames,
           previous: previous || null,
           mode: previous ? 'refine' : 'design'
         },
@@ -717,6 +728,7 @@ export default function App() {
     setBusy(true)
     setError(null)
     setResult(null)
+    setWithScenes(false)
     setApplied(null)
     try {
       setProgress('Reading what the unit has loaded...')
@@ -737,10 +749,16 @@ export default function App() {
       setProgress(null)
       const spec = await requestSpec(schema, description)
 
-      const validated = validateSpec(spec, schema)
+      const validated = validateSpec(spec, schema, sceneCount)
       validated.spec = spec
       validated.description = description
       setResult(validated)
+      /*
+       * Scenes are opt-in — unless they are the whole proposal. A plan that
+       * changes no block and only lays out scenes would otherwise arrive with
+       * its one useful half switched off and a button offering zero writes.
+       */
+      setWithScenes(validated.changes.length === 0 && validated.scenes.length > 0)
       setLastPrompt(description)
       revealResult()
 
@@ -783,6 +801,23 @@ export default function App() {
       const failures = await applyChanges(result.changes, (done, total, label) =>
         setProgress(`${done} of ${total} - ${label}`)
       )
+
+      /*
+       * Scenes go on after the rig, never with it.
+       *
+       * A scene records which blocks are on; it does not record what they sound
+       * like, because parameters belong to the block (and to its channel). So
+       * the models and values have to be in place before the states over them
+       * mean anything — write them the other way round and every scene is a
+       * pattern over a preset that has not been dialled yet.
+       */
+      const sceneFailures =
+        withScenes && result.scenes?.length
+          ? await applyScenes(result.scenes, (done, total, label) =>
+              setProgress(`Scenes — ${done} of ${total} · ${label}`)
+            )
+          : []
+      failures.push(...sceneFailures)
 
       // ForgeFX caches block parameters with no invalidation hook, so a read can
       // report a value the hardware doesn't hold. Check what actually stuck.
@@ -1045,7 +1080,7 @@ export default function App() {
         { force: true }
       )
 
-      const validated = validateSpec(entry.spec, schema)
+      const validated = validateSpec(entry.spec, schema, sceneCount)
       validated.spec = entry.spec
       validated.description = entry.description
       if (!validated.presetName) validated.presetName = entry.name
@@ -1099,7 +1134,7 @@ export default function App() {
       setProgress(null)
       const spec = await requestSpec(schema, instruction, previous)
 
-      const validated = validateSpec(spec, schema)
+      const validated = validateSpec(spec, schema, sceneCount)
       validated.spec = spec
       validated.description = instruction
       setResult(validated)
@@ -1149,7 +1184,7 @@ export default function App() {
       for (const [index, channel] of ['A', 'B'].entries()) {
         setProgress(`Take ${index + 1} of 2 — designing...`)
         const spec = await requestSpec(schema, description)
-        const validated = validateSpec(spec, schema)
+        const validated = validateSpec(spec, schema, sceneCount)
 
         setProgress(`Take ${index + 1} of 2 — switching to channel ${channel}...`)
         for (const block of withChannels) await setChannel(block.effectId, channel)
@@ -1610,6 +1645,7 @@ export default function App() {
   }
 
   const writeCount = result ? countWrites(result.changes) : 0
+  const sceneWriteCount = result ? countSceneWrites(result.scenes) : 0
 
   const hasScenes = device?.capabilities?.hasScenes !== false
 
@@ -2124,6 +2160,9 @@ export default function App() {
           <Preview
             result={result}
             writeCount={writeCount}
+            sceneWriteCount={sceneWriteCount}
+            withScenes={withScenes}
+            onWithScenes={setWithScenes}
             busy={busy}
             onApply={apply}
             onDiscard={() => setResult(null)}

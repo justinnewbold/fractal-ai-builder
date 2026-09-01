@@ -5373,3 +5373,91 @@ button.topbar-preset.open .topbar-caret {
 .preset-unread {
   color: var(--silk-faint);
 }
+
+/* ---------- scene plan ---------- */
+
+/*
+ * The scene half of a generation, and the decision about it.
+ *
+ * Presented as a proposal rather than a result: scenes are the part that moves
+ * the unit around — switching through every one of them and writing a bypass
+ * per block — so the list shows what would happen and the checkbox is what
+ * makes it happen. Dimmed while the box is clear, so the plan reads as an
+ * offer rather than a promise.
+ */
+.scene-plan {
+  margin-top: var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+}
+
+.scene-plan-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  cursor: pointer;
+}
+
+.scene-plan-head > span {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+
+.scene-plan-head input[type='checkbox'] {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  margin-top: var(--s-1);
+  accent-color: var(--signal);
+}
+
+.scene-plan-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: var(--s-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scene-plan-list li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--rule);
+}
+
+.scene-plan-list li.muted {
+  opacity: 0.55;
+}
+
+.scene-plan-tag {
+  flex: 0 0 auto;
+  font-size: var(--f-1);
+  color: var(--signal);
+}
+
+.scene-plan-name {
+  flex: 0 0 auto;
+  min-width: 74px;
+  font-weight: 600;
+}
+
+.scene-plan-blocks {
+  font-size: var(--f-1);
+  color: var(--silk-dim);
+}
+
+@media (max-width: 560px) {
+  .scene-plan-list li {
+    flex-wrap: wrap;
+  }
+
+  .scene-plan-blocks {
+    flex-basis: 100%;
+  }
+}
