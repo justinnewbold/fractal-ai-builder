@@ -254,7 +254,7 @@ export function run(test) {
     }
 
     // Setup on the stage screen is how you change the host address by accident.
-    for (const name of ['Host', 'Remote', 'Ports', 'Diagnostics', 'LocalLibrary', 'Footswitches']) {
+    for (const name of ['Host', 'Remote', 'ConnectScreen', 'SignInSheet', 'Ports', 'Diagnostics', 'LocalLibrary', 'Footswitches']) {
       assert.ok(!play.includes(name), `${name} is on Play`)
       assert.ok(!components(view('shape')).includes(name), `${name} is on Shape, not in a sheet`)
     }
@@ -335,7 +335,10 @@ export function run(test) {
       // under it. It is in the bar, not stacked above the view — the height it
       // adds to the page is zero, which the browser pass measures directly.
       'PresetList',
-      'Remote' // the sign-in, on the screen that says there's no connection
+      // The phone's connect screen: the one thing to do when it is not
+      // connected, on the screen where that is the case. Replaces the bare
+      // sign-in form that used to sit under an error notice here.
+      'ConnectScreen'
     ])
     // The assistant used to be on this list — it sat above every screen at
     // once. It is the Ask tab now, which is what took the chrome down again.
@@ -678,6 +681,68 @@ export function run(test) {
     for (const term of ['npm run dev', 'localhost:5056', 'SysEx']) {
       assert.ok(!prose.includes(`>${term}`), `"${term}" is on screen`)
     }
+  })
+
+  test('the phone remote is honest about whether the Mac answered', () => {
+    const remote = readFileSync(new URL('../src/lib/remote.js', import.meta.url), 'utf8')
+    const linkSrc = readFileSync(new URL('../src/lib/link.js', import.meta.url), 'utf8')
+
+    /*
+     * Restored at mount, for every role, before anything is judged. It used
+     * to happen inside a panel that only mounted after the app had already
+     * failed — so a phone always saw an error screen first.
+     */
+    assert.match(
+      src,
+      /useEffect\(\(\) => \{\s*\n\s*const stop = subscribeLink\(setLink\)\s*\n\s*bootLink\(\)/,
+      'the link is no longer booted at app mount — the phone will land on an error screen first again'
+    )
+
+    /*
+     * A dead presence check used to reset hostSeen on every sync, so the chip
+     * went red over a working link. The binding stays; the conclusion is gone.
+     */
+    assert.ok(
+      !/hostSeen\s*=[^=].*presenceState/s.test(remote) && !/seen\([^)]*presenceState/.test(remote),
+      'presence is deciding whether the Mac is there again — it never tracks presence, so this is always "no"'
+    )
+
+    // Every write to the fact goes through the setter that announces it.
+    const raw = remote.match(/^\s*hostSeen = (?!now\b)/gm) || []
+    assert.equal(raw.length, 0, `hostSeen is written directly ${raw.length}× — nothing watching it will hear`)
+
+    /*
+     * Auto-connect is only ever turned off by a deliberate Disconnect. A
+     * failed rejoin used to do it too, so a Mac that was merely asleep
+     * disarmed the phone for good.
+     */
+    const files = readdirSync(new URL('../src/components/', import.meta.url))
+      .filter((f) => f.endsWith('.jsx'))
+      .map((f) => readFileSync(new URL('../src/components/' + f, import.meta.url), 'utf8'))
+    const everywhere = [src, linkSrc, remote, ...files].join('\n')
+    const offs = everywhere.match(/setAutoConnect\(false\)/g) || []
+    assert.equal(offs.length, 1, `setAutoConnect(false) appears ${offs.length}× — it belongs in disconnectPhone alone`)
+    assert.match(linkSrc, /export async function disconnectPhone\(\) \{[^}]*setAutoConnect\(false\)/s)
+    assert.match(remote, /autoConnect !== false/, 'a sign-in no longer means "stay connected" by default')
+
+    // The six-second bound before a dead relay is allowed to hang read().
+    assert.match(
+      src,
+      /if \(remoteActive\(\) && !remoteHostSeen\(\) && !\(await hostResponds\(\)\)\) \{\s*\n\s*setStatus\('fault'\)/,
+      'read() no longer bounds a dead relay — every call waits out 20–45 s before admitting the fault'
+    )
+
+    // The phone gets a connect screen, not an error; the Mac keeps the notice.
+    assert.match(src, /const showConnect =\s*\n\s*link\.role === 'remote' &&/, 'the connect screen is no longer keyed to the phone role')
+    assert.match(src, /\{showConnect \? \(\s*\n\s*<ConnectScreen/, 'the connect screen is no longer the phone’s screen when not connected')
+    assert.match(src, /if \(showConnect && status === 'live'\) setStatus\('fault'\)/, 'Play is rendered under the connect screen again')
+    assert.ok(!/onAnotherDevice/.test(src), 'the user-agent guess is back; the role decides now')
+
+    // The bar draws the link from state, never from the module at render.
+    const topbar = readFileSync(new URL('../src/components/TopBar.jsx', import.meta.url), 'utf8')
+    const chip = readFileSync(new URL('../src/components/LinkChip.jsx', import.meta.url), 'utf8')
+    assert.ok(!/remoteActive|remoteHostSeen/.test(topbar + chip), 'the bar reads the connection module at render again — it is only as fresh as the last unrelated re-render')
+    assert.match(src, /note=\{describeLink\(link\)\.note\}/, 'the Setup note no longer says what the link is')
   })
 
   test('the introduction is offered once, and only when there is something to see', () => {

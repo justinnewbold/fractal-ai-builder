@@ -167,16 +167,55 @@ export const setAutoConnect = (on) => {
   saveRemoteConfig({ ...config, autoConnect: !!on })
 }
 
-export const wantsAutoConnect = () => !!loadRemoteConfig()?.autoConnect
+/*
+ * Absent means yes. A phone that signed in wants to be a remote — that is
+ * what signing in on a phone is for — and only a deliberate Disconnect says
+ * otherwise. It used to be the other way round, and a single failed rejoin
+ * (the Mac merely asleep) also switched it off for good.
+ */
+export const wantsAutoConnect = () => loadRemoteConfig()?.autoConnect !== false
 
 let client = null
 let channel = null // the joined channel, and null the moment it stops being joined
 let session = null // what we built: the channel object and the client it belongs to
 let userId = null
 let hostSeen = false
+let answeredAt = 0
 const waiting = new Map()
 const listeners = new Set()
 const watchers = new Set()
+const seers = new Set()
+
+/**
+ * The one way `hostSeen` changes, so anyone who cares hears about it.
+ *
+ * Every answered request is proof the Mac is there and every timeout is proof
+ * it is not, and until now that proof went into a variable nothing watched:
+ * the bar polled it every two seconds and a screen that had gone red had no
+ * way to turn green again except by asking. Announced on change, ordinary
+ * traffic keeps every indicator honest for free.
+ */
+function seen(v) {
+  const now = !!v
+  if (now) answeredAt = Date.now()
+  if (now === hostSeen) return
+  hostSeen = now
+  for (const fn of seers) {
+    try {
+      fn(now)
+    } catch {
+      // One bad listener shouldn't stop the others.
+    }
+  }
+}
+
+export function subscribeHostSeen(fn) {
+  seers.add(fn)
+  return () => seers.delete(fn)
+}
+
+/** When the Mac last answered anything, so a keepalive can be skipped while traffic flows. */
+export const lastAnswerAt = () => answeredAt
 
 export const remoteActive = () => !!channel
 
@@ -225,14 +264,14 @@ export const remoteHostSeen = () => hostSeen
  */
 export async function hostResponds() {
   if (!channel) {
-    hostSeen = false
+    seen(false)
     return false
   }
   try {
     await remoteRequest('/healthz', { timeoutMs: 6000 })
-    hostSeen = true
+    seen(true)
   } catch {
-    hostSeen = false
+    seen(false)
   }
   return hostSeen
 }
@@ -307,10 +346,10 @@ export function canReuseChannel(channel, session, client) {
 export function explainAuth(message) {
   const m = (message || '').toLowerCase()
   if (m.includes('not confirmed') || m.includes('email not confirmed')) {
-    return 'That account exists but its email was never confirmed. Check for a confirmation mail from Supabase, or tell me and I can confirm it directly.'
+    return 'That email hasn’t been confirmed yet. Look for the confirmation email, then try again.'
   }
   if (m.includes('invalid login')) {
-    return 'Email or password not accepted. If the account is new, its email may still need confirming.'
+    return 'Email or password didn’t match.'
   }
   return message
 }
@@ -490,15 +529,17 @@ export async function remoteConnect() {
     }
   })
 
-  // Registered before subscribe, which is both required and useful: it tells us
-  // whether the host agent is actually on the channel.
-  chan.on('presence', { event: 'sync' }, () => {
-    try {
-      hostSeen = Object.keys(chan.presenceState()).length > 1
-    } catch {
-      hostSeen = false
-    }
-  })
+  /*
+   * Presence is bound but deliberately says nothing.
+   *
+   * The Mac never tracks presence, so the only key ever in the state is our
+   * own — and this handler used to read that as "nobody else here" and set
+   * hostSeen false on every sync, undoing what answered traffic had just
+   * proved. The chip went red over a link that was working. The binding
+   * stays because presence has to be enabled for the Mac to see a phone
+   * watching and bridge live events to it; the conclusion is gone.
+   */
+  chan.on('presence', { event: 'sync' }, () => {})
 
   chan.on('broadcast', { event: 'evt' }, ({ payload }) => {
     for (const fn of listeners) {
@@ -544,13 +585,13 @@ export async function remoteConnect() {
       if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
         if (channel === chan) {
           channel = null
-          hostSeen = false
-          failWaiting('The remote session dropped before the host answered.')
+          seen(false)
+          failWaiting('The connection dropped before your Mac answered.')
         }
         if (!settled) {
           settled = true
           clearTimeout(timer)
-          reject(new Error(`Realtime ${status}. Is the host signed in and enabled?`))
+          reject(new Error(`Couldn’t connect (${status.toLowerCase().replace('_', ' ')}).`))
         }
         announce()
       }
@@ -569,8 +610,8 @@ export async function remoteDisconnect() {
   const going = session
   session = null
   channel = null
-  hostSeen = false
-  failWaiting('Remote disconnected.')
+  seen(false)
+  failWaiting('Disconnected.')
   announce()
 
   if (going?.chan) {
@@ -613,21 +654,21 @@ async function decode(payload) {
  * which answer belongs to which question.
  */
 export async function remoteRequest(path, options = {}) {
-  if (!channel) throw new Error('Not connected to the host.')
+  if (!channel) throw new Error('Not connected to your Mac.')
   // A channel can stop being joined between one request and the next, and
   // sending into it waits out the whole timeout for an answer nobody heard the
   // question. Catching it here costs nothing and says what actually happened.
   if (!isJoined(channel)) {
     channel = null
-    hostSeen = false
+    seen(false)
     announce()
-    throw new Error('The remote session dropped. Reconnect to the Mac to carry on.')
+    throw new Error('The connection to your Mac dropped.')
   }
   const method = (options.method || 'GET').toUpperCase()
 
   const why = forbiddenRemotely(method, path)
   if (why) {
-    const err = new Error(`You can't ${why} from a remote session — do that at the Mac.`)
+    const err = new Error(`You can't ${why} from your phone — do that at the Mac.`)
     err.status = 403
     err.remoteBlocked = true
     throw err
@@ -639,8 +680,8 @@ export async function remoteRequest(path, options = {}) {
       waiting.delete(id)
       // Nothing came back: whatever we last believed about the Mac being there,
       // this is better evidence.
-      hostSeen = false
-      reject(new Error('The host did not answer. Is ForgeFX still running?'))
+      seen(false)
+      reject(new Error('Your Mac didn’t answer.'))
     }, options.timeoutMs || timeoutFor(method, path))
     waiting.set(id, {
       resolve: (v) => {
@@ -663,7 +704,7 @@ export async function remoteRequest(path, options = {}) {
   const payload = await reply
   // An answer is proof the Mac is on the channel — better proof than any probe,
   // and free. Every request the app makes keeps this current.
-  hostSeen = true
+  seen(true)
   const text = await decode(payload)
 
   let parsed = null

@@ -1,6 +1,5 @@
 import { isDemo } from '../lib/forgefx'
-import { remoteActive } from '../lib/remote'
-import PhoneLink from './PhoneLink'
+import LinkChip from './LinkChip'
 
 /**
  * One line, above everything, in every state.
@@ -33,42 +32,60 @@ export default function TopBar({
   dirty,
   onOpenPresets,
   onOpenSettings,
-  onError,
-  onRemoteChanged,
+  link,
+  onLinkAction,
   presetsOpen,
   menu,
   children
 }) {
   const demo = isDemo()
-  const remote = remoteActive()
+  // A phone driving the Mac from a distance. Handed in as state rather than
+  // read from the connection module at render, which was only ever as fresh
+  // as the last unrelated re-render.
+  const remote = link?.role === 'remote'
 
-  // The short name is the point: "FM3", not a sentence.
-  const unit =
-    status === 'live'
+  /*
+   * The short name is the point: "FM3", not a sentence.
+   *
+   * A phone that is not connected is not a fault. "No device" in red over a
+   * screen that calmly says "Connect to your Mac" is two answers to one
+   * question, and the loud one is wrong — so on a phone the bar says the
+   * quiet thing and leaves the state to the chip.
+   */
+  const settled = remote && status !== 'live'
+  const unit = settled
+    ? 'Not connected'
+    : status === 'live'
       ? device?.short || device?.name || 'Connected'
       : status === 'fault'
         ? 'No device'
         : 'Looking…'
+  const lampState = demo ? 'demo' : settled ? 'idle' : status
 
+  /*
+   * The word beside the lamp. On a phone the chip on the right already says
+   * the state of the link — connected, no answer — so the bar does not say it
+   * twice; here the word is about the unit.
+   */
   const how = demo
     ? 'demo'
-    : status === 'live'
-      ? remote
-        ? 'remote'
-        : 'connected'
-      : status === 'fault'
-        ? 'offline'
-        : ''
+    : remote
+      ? ''
+      : status === 'live'
+        ? 'connected'
+        : status === 'fault'
+          ? 'offline'
+          : ''
 
   return (
-    <div className="topbar" data-status={demo ? 'demo' : status}>
+    <div className="topbar" data-status={lampState}>
       <div className="topbar-row">
-        <span className="lamp" data-state={demo ? 'demo' : status} />
+        <span className="lamp" data-state={lampState} />
         <span className="topbar-unit silk-label">{unit}</span>
         {/* The word carries the state as well as saying it: green when the unit
             is answering, red when it isn't, so the bar reads at a glance. */}
         {how ? (
-          <span className="topbar-how mono" data-state={demo ? 'demo' : status}>
+          <span className="topbar-how mono" data-state={lampState}>
             {how}
           </span>
         ) : null}
@@ -96,7 +113,7 @@ export default function TopBar({
 
         {children}
 
-        <PhoneLink compact onChanged={onRemoteChanged} onError={onError} />
+        <LinkChip compact link={link} onAction={onLinkAction} />
 
         {/* Setup is a sheet now, not a fold under the bar. It carries the
             host address, the sign-in, the ports and the diagnostics, so it was
