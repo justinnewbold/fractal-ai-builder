@@ -6,12 +6,27 @@ export function Preview({
   writeCount,
   withScenes,
   onWithScenes,
-  sceneWriteCount
+  sceneWriteCount,
+  scene,
+  sceneNames,
+  sceneCount,
+  onScene
 }) {
   if (!result) return null
 
   const { changes, problems, repairs = [], summary, notes, presetName, scenes = [] } = result
   const total = writeCount + (withScenes ? sceneWriteCount : 0)
+  /*
+   * Which half of a write is scene-bound.
+   *
+   * Parameter values and models belong to the preset (and to a block's
+   * channel); bypass belongs to the *scene*. So a generation that switches
+   * anything on or off lands partly in whichever scene happens to be live —
+   * silently, until now. This is the question that started the scene work:
+   * "how does the user know what scene this will be written to?"
+   */
+  const touchesBypass = changes.some((c) => c.bypassed !== undefined)
+  const sceneLabel = (i) => sceneNames?.[i]?.trim() || `Scene ${i + 1}`
 
   /*
    * No block changes is only "nothing to apply" if there are also no scenes.
@@ -127,6 +142,39 @@ export function Preview({
         serial port, and someone who only wanted the sound should not pay for it
         without having said so.
       */}
+      {/*
+        Where this actually lands. Only shown when there is a bypass to write
+        and no scene plan taking over — with a plan, the plan's own list says
+        which scenes are touched and this would contradict it.
+      */}
+      {touchesBypass && !scenes.length ? (
+        <div className="write-target">
+          <p className="hint">
+            Values go to the preset. Switching blocks on and off belongs to a scene, so that part
+            lands in:
+          </p>
+          {sceneCount > 1 && onScene ? (
+            <label className="save-field">
+              <span className="silk-label">Scene</span>
+              <select
+                value={scene ?? 0}
+                onChange={(e) => onScene(Number(e.target.value))}
+                disabled={busy}
+                aria-label="Scene the bypass changes are written to"
+              >
+                {Array.from({ length: sceneCount }, (_, i) => (
+                  <option key={i} value={i}>
+                    {i + 1} · {sceneLabel(i)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <p className="write-target-now mono">{sceneLabel(scene ?? 0)}</p>
+          )}
+        </div>
+      ) : null}
+
       {scenes.length ? (
         <div className="scene-plan">
           <label className="scene-plan-head">

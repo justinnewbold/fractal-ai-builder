@@ -10,6 +10,7 @@ import { CabPicker, Backup } from './components/Hardware'
 import { Compare } from './components/Refine'
 import Gig from './components/Gig'
 import SaveBar from './components/SaveBar'
+import SaveSheet from './components/SaveSheet'
 import { Stages, LiveGeneration, Thinking } from './components/LiveGeneration'
 import { streamSpec } from './lib/stream'
 import { Modifiers, SceneMatrix } from './components/Modifiers'
@@ -1803,17 +1804,8 @@ export default function App() {
             busy={busy}
             saving={saving}
             compact
-            saveName={saveName}
-            onName={setSaveName}
-            slot={slot}
-            onSlot={setSlot}
-            onSave={save}
             queued={queuedSave}
-            onRevert={revert}
-            safety={safety}
-            onRestoreSafety={restoreSafety}
-            error={saveError}
-            onDismissError={() => setSaveError(null)}
+            onOpenSave={() => setSheet('save')}
           />
         ) : null}
       </TopBar>
@@ -2163,6 +2155,20 @@ export default function App() {
             sceneWriteCount={sceneWriteCount}
             withScenes={withScenes}
             onWithScenes={setWithScenes}
+            scene={scene}
+            sceneNames={sceneNames}
+            sceneCount={sceneCount}
+            /* Choosing a scene switches to it rather than remembering it for
+               later. Bypass is written into whatever scene is live, so making
+               the choice real immediately is both simpler and honest — and you
+               hear it, which is the confirmation that it took. */
+            onScene={async (index) => {
+              try {
+                await writeScene(index)
+              } catch (err) {
+                setError(err.message)
+              }
+            }}
             busy={busy}
             onApply={apply}
             onDiscard={() => setResult(null)}
@@ -2259,6 +2265,51 @@ export default function App() {
             onChanged={(summary) => record('cab', summary)}
           />
         ) : null}
+      </Sheet>
+
+      {/*
+        Saving is a sheet now, not a button that writes.
+        
+        The bar's Save opens this; the write happens on the button inside,
+        which names the slot and sits under the list of what is in it. Two taps
+        for the common case, and an overwrite you can see before you commit it.
+      */}
+      <Sheet
+        open={sheet === 'save'}
+        onClose={() => setSheet(null)}
+        title="Save"
+        note={preset?.name?.trim() || null}
+      >
+        <SaveSheet
+          preset={preset}
+          saveName={saveName}
+          onName={setSaveName}
+          slot={slot}
+          onSlot={setSlot}
+          onSave={async () => {
+            await save()
+            setSheet(null)
+          }}
+          onRevert={revert}
+          safety={safety}
+          onRestoreSafety={restoreSafety}
+          busy={busy}
+          saving={saving}
+          dirty={dirty}
+          remote={remote}
+          queued={queuedSave}
+          error={saveError}
+          onDismissError={() => setSaveError(null)}
+          slots={allSlots}
+          deviceSlots={device?.capabilities?.presets?.count}
+          addressing={device?.capabilities?.presets?.addressing}
+          scanning={scanning}
+          progress={scanProgress}
+          onScan={scanPresets}
+          onStopScan={() => {
+            stopScan.current = true
+          }}
+        />
       </Sheet>
 
       <Sheet
