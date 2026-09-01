@@ -34,7 +34,7 @@ const ofBlocks = (s) => s.blocks
 const ofTunerOn = (s) => s.tunerOn
 const ofTuning = (s) => s.tuning
 
-export default function Gig({ preset, device, capabilities, onError, onChanged }) {
+export default function Gig({ preset, device, capabilities, onError, onChanged, onPickPreset }) {
   /*
    * A view over the one device state, not a second client to the unit.
    *
@@ -276,8 +276,25 @@ export default function Gig({ preset, device, capabilities, onError, onChanged }
         stays large because that is this screen's job: it is the thing you
         read from arm's length, in the dark, to know where you are.
       */}
+      {/*
+        The biggest word on the screen was the one thing you could not press.
+        Everyone tries — it names the preset, so it should be the way to a
+        different one. It opens the same menu the top bar opens rather than a
+        second list of its own: one preset picker, two ways in.
+      */}
       <div className="gig-preset">
-        <h2 className="gig-name">{preset?.name?.trim() || 'Untitled'}</h2>
+        <button
+          type="button"
+          className="gig-name"
+          onClick={onPickPreset}
+          disabled={!onPickPreset}
+          aria-label={`${preset?.name?.trim() || 'Untitled'} — choose another preset`}
+        >
+          <span>{preset?.name?.trim() || 'Untitled'}</span>
+          <span className="gig-name-caret" aria-hidden="true">
+            ⌄
+          </span>
+        </button>
       </div>
 
       <div className="gig-signal" aria-label="Signal level">

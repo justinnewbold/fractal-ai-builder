@@ -367,13 +367,24 @@ button.topbar-preset:active:not(:disabled) {
   color: var(--signal);
 }
 
+/*
+ * The way into every setting, and it was the smallest thing on the screen —
+ * 31px wide on a phone, because it is one glyph and the padding was all it
+ * had. It is now a square big enough to hit, and the glyph inside it is a size
+ * you can see at arm's length rather than one that hides in the corner.
+ */
 button.topbar-gear {
   flex: 0 0 auto;
-  padding: var(--s-1) var(--s-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: var(--s-1);
   background: none;
   border-color: transparent;
   color: var(--silk-dim);
-  font-size: var(--f-5);
+  font-size: var(--f-6);
   line-height: 1;
 }
 
@@ -1991,13 +2002,45 @@ button.view-tab.current {
   border-radius: var(--r-1);
 }
 
-.gig-name {
+/* A button that has to keep reading as a sign: the name is what you check from
+   arm's length in the dark, so it keeps its size and loses every other thing a
+   button brings with it. The caret is the only tell, and it is deliberately
+   quiet — it says "there is more here" without competing with the name. */
+button.gig-name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: var(--r-1);
+  text-align: left;
+  color: inherit;
   font-family: var(--display);
   font-weight: 700;
   font-size: clamp(30px, 9vw, 52px);
   letter-spacing: 0.02em;
   line-height: 1.05;
   margin: 0;
+}
+
+.gig-name-caret {
+  flex: 0 0 auto;
+  font-size: var(--f-5);
+  color: var(--silk-faint);
+}
+
+button.gig-name:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
+button.gig-name:disabled {
+  opacity: 1;
+}
+
+button.gig-name:disabled .gig-name-caret {
+  display: none;
 }
 
 .gig-signal {
@@ -3475,25 +3518,58 @@ ol.action-list li.destructive::marker {
 @media (pointer: coarse) {
   /* iOS zooms the page when a focused input is under 16px. That zoom then
      has to be undone by hand, so it is worth the extra size everywhere. */
+  /*
+   * email and password were missing from this list, and they are the two
+   * fields a phone user cannot avoid — signing in to play from the phone is
+   * the whole reason the panel exists. Under 16px iOS zooms the page on
+   * focus, so the one flow that starts on a phone was the one flow that
+   * threw the layout on the first tap.
+   */
   input[type='text'],
   input[type='number'],
+  input[type='email'],
+  input[type='password'],
+  input[type='search'],
   textarea,
   select {
     font-size: var(--f-input);
   }
 
-  /* A 24px chip is a miss more often than a hit. */
+  /*
+   * A 24px chip is a miss more often than a hit — and 40 was still short.
+   *
+   * 44 is the number every touch guideline lands on, and a sweep of the app on
+   * a phone found the whole chrome row sitting at 40: the tabs, the preset
+   * button, the gear. Four pixels reads like nothing written down and is the
+   * difference between hitting Play and hitting Edit with a thumb, standing up,
+   * holding a guitar.
+   */
   button,
   .chip,
   button.chip {
-    min-height: 40px;
+    min-height: 44px;
     padding-top: var(--s-2);
     padding-bottom: var(--s-2);
   }
 
   button.icon-btn {
-    min-width: 40px;
-    min-height: 40px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /*
+   * Fields are targets too, and these three set their own height at a
+   * specificity the bare `button` rule above can't reach — so they kept the
+   * sizes they were given and sat at 29, 37 and 40px while everything around
+   * them grew. Named individually because that is the only thing that wins.
+   */
+  input.preset-filter,
+  input.refine-input,
+  input.knob-readout,
+  input[type='email'],
+  input[type='password'],
+  select {
+    min-height: 44px;
   }
 
   button.preset-row,
@@ -3506,9 +3582,11 @@ ol.action-list li.destructive::marker {
   /* The On/Off pill under each chain tile — the thing you kick a drive in
      with, mid-song, standing up. It sat at 26px because `button.fx-power` is
      (0,1,1) and the blanket `button` rule above is (0,0,1), so the blanket
-     never reached it. This one matches specificity and wins on source order. */
+     never reached it. This one matches specificity and wins on source order.
+     40 was the first correction and was still under the 44 everything else
+     uses — the same four pixels, missed twice, on the busiest pill here. */
   button.fx-power {
-    min-height: 40px;
+    min-height: 44px;
   }
 
   /* The knob needs room for a thumb, and a bigger target than a cursor needs. */
@@ -3706,8 +3784,10 @@ ol.action-list li.destructive::marker {
 }
 
 @media (pointer: coarse) {
+  /* A segmented control is still three buttons, and 34px made it the smallest
+     thing left on the settings sheet. */
   .theme-toggle button {
-    min-height: 34px;
+    min-height: 44px;
     padding: var(--s-2) var(--s-3);
   }
 }
@@ -4189,8 +4269,9 @@ button.gig-block:disabled {
   gap: var(--s-2);
 }
 
+/* (0,1,1), so it outranks the 44px touch floor and has to carry it itself. */
 .gig-note-action button {
-  min-height: 40px;
+  min-height: 44px;
   padding: var(--s-2) var(--s-4);
 }
 

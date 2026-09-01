@@ -308,16 +308,6 @@ export default function Remote({ onConnected, onError }) {
             </div>
           ) : null}
 
-          <p className="hint">
-            On the Mac, add these to the helper app&rsquo;s <span className="mono">.env</span> file
-            and restart it, then sign in and turn the host on:
-          </p>
-          <pre className="mono env-block">
-{`AXIS_CLOUD=1
-SUPABASE_URL=${DEFAULT_PROJECT.url}
-SUPABASE_ANON_KEY=${DEFAULT_PROJECT.anonKey}`}
-          </pre>
-
           <div className="save-row">
             <input
               type="email"
@@ -345,12 +335,31 @@ SUPABASE_ANON_KEY=${DEFAULT_PROJECT.anonKey}`}
               Create the account
             </button>
             <button className="chip" onClick={() => setAdvanced((v) => !v)}>
-              {advanced ? 'Hide project settings' : 'Use a different project'}
+              {advanced ? 'Hide setup details' : 'Setup details'}
             </button>
           </div>
 
+          {/*
+            Everything below is for the person setting the Mac up, not the
+            person holding the guitar. It used to greet a player with an
+            AXIS_CLOUD block and a JWT — the first thing they saw under "play
+            from your phone" was a wall of environment variables. It is all
+            still here, one tap away, because it is genuinely needed once.
+          */}
           {advanced ? (
             <>
+              <p className="hint">
+                On the Mac, add these to the helper app&rsquo;s <span className="mono">.env</span>{' '}
+                file and restart it, then sign in and turn the host on:
+              </p>
+              <pre className="mono env-block">
+{`AXIS_CLOUD=1
+SUPABASE_URL=${DEFAULT_PROJECT.url}
+SUPABASE_ANON_KEY=${DEFAULT_PROJECT.anonKey}`}
+              </pre>
+
+              <p className="hint">To point this at a different project instead:</p>
+
               <div className="save-row">
                 <input
                   type="text"
@@ -371,14 +380,13 @@ SUPABASE_ANON_KEY=${DEFAULT_PROJECT.anonKey}`}
                   aria-label="Supabase anon key"
                 />
               </div>
+              <p className="hint">
+                The key above is the publishable one, which is why it can sit in plain sight. A
+                signed-in user can only reach their own channel, so it grants a stranger nothing.
+                Never put a service role key here.
+              </p>
             </>
           ) : null}
-
-          <p className="hint">
-            The key above is the publishable one, which is why it can sit in plain sight. A
-            signed-in user can only reach their own channel, so it grants a stranger nothing.
-            Never put a service role key here.
-          </p>
         </>
       )}
 

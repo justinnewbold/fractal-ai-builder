@@ -20,6 +20,7 @@ export default function SaveBar({
   preset,
   dirty,
   busy,
+  saving,
   compact,
   saveName,
   onName,
@@ -113,8 +114,12 @@ export default function SaveBar({
                 : `Save at the Mac · ${targetLabel}`}
           </button>
         ) : (
+          /* `saving`, not `busy`: busy is true for every long operation in the
+             app, so this button used to announce a slot write while a tone was
+             merely being designed. It still goes disabled on busy — you cannot
+             save mid-write — it just no longer claims to be doing it. */
           <button className="save-now" onClick={onSave} disabled={busy}>
-            {busy
+            {saving
               ? 'Saving…'
               : compact
                 ? elsewhere

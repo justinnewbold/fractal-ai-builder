@@ -209,6 +209,17 @@ export default function App() {
   const blocks = useDevice(ofBlocks)
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  /*
+   * Saving needs its own flag, because `busy` is not about saving.
+   *
+   * One boolean guards ten different operations here — generating, applying,
+   * jumping slots, reading the chain — and the save button was rendering
+   * `busy ? 'Saving…'`. So designing a tone lit up a button claiming to be
+   * writing to a slot, which is the one thing in this app you most want to be
+   * sure isn't happening by surprise. `busy` still does the disabling; only
+   * the word belongs to the save.
+   */
+  const [saving, setSaving] = useState(false)
 
   const [result, setResult] = useState(null)
   const [progress, setProgress] = useState(null)
@@ -886,6 +897,7 @@ export default function App() {
       return
     }
     setBusy(true)
+    setSaving(true)
     setError(null)
     setSaveError(null)
     try {
@@ -935,6 +947,7 @@ export default function App() {
       setError(err.message)
     } finally {
       setBusy(false)
+      setSaving(false)
     }
   }
 
@@ -1752,6 +1765,7 @@ export default function App() {
             preset={preset}
             dirty={dirty}
             busy={busy}
+            saving={saving}
             compact
             saveName={saveName}
             onName={setSaveName}
@@ -1926,10 +1940,14 @@ export default function App() {
 
       {status === 'live' ? (
         <nav className="views" aria-label="Screens">
+          {/* The ids are the app's own vocabulary and stay put — showWhatChanged
+              and revealResult anchor to them. Only the words a player reads
+              change: "Shape" and "Ask" described what the screen was to the
+              person building it, not what you go there to do. */}
           {[
             ['play', 'Play'],
-            ['shape', 'Shape'],
-            ['ask', 'Ask']
+            ['shape', 'Edit'],
+            ['ask', 'Create']
           ].map(([id, label]) => (
             <button
               key={id}
@@ -1950,6 +1968,7 @@ export default function App() {
           capabilities={device?.capabilities}
           onError={setError}
           onChanged={read}
+          onPickPreset={() => setPresetMenu(true)}
         />
       ) : null}
 
