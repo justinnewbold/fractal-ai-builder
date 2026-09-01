@@ -11,6 +11,7 @@ import { Compare } from './components/Refine'
 import Gig from './components/Gig'
 import SaveBar from './components/SaveBar'
 import SaveSheet from './components/SaveSheet'
+import PhoneSetup from './components/PhoneSetup'
 import { Stages, LiveGeneration, Thinking } from './components/LiveGeneration'
 import { streamSpec } from './lib/stream'
 import { Modifiers, SceneMatrix } from './components/Modifiers'
@@ -87,8 +88,11 @@ import {
   backupPreset,
   parkPresetName,
   takeParkedPresetName,
-  clearParkedPresetName
+  clearParkedPresetName,
+  getHost,
+  servedLocally
 } from './lib/forgefx'
+import { aiUrl } from './lib/ai'
 import { validateSpec, countWrites, countSceneWrites } from './lib/validate'
 import { beatFlash, bringIntoView } from './lib/feedback'
 import {
@@ -698,6 +702,7 @@ export default function App() {
         {
           onPartial: setPartial,
           signal: control.signal,
+          host: getHost(),
           /*
            * Say what is actually happening rather than what a timer guesses.
            * "Nearly there" was a scripted line that arrived 26 seconds in and
@@ -1300,7 +1305,7 @@ export default function App() {
         // A unit that won't list its palette just can't be added to by name.
       }
 
-      const res = await fetch('/api/command', {
+      const res = await fetch(aiUrl('/api/command', getHost()), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2434,6 +2439,16 @@ export default function App() {
         <DeviceDetail status={status} device={device} onRetry={reconnect} busy={busy} />
 
         <Section key="play-from-your-phone" title="Play from your phone" note={remote ? 'Connected' : 'Leave the Mac by the amp'}>
+          {/*
+            The short route first, because it is the one most people want and
+            the one that needs nothing: same wifi, open a link, done. The relay
+            below it is for reaching the rig from somewhere else, which is a
+            real thing to want and a much bigger ask — an account on both ends.
+            They used to be presented the other way round, with the account as
+            the only route, because for a while it was.
+          */}
+          <PhoneSetup />
+
           {/* Host controls only work on the machine holding the cable — from a
               phone these calls are refused, and a button that cannot work is
               worse than no button. But "not in a remote session" was the wrong

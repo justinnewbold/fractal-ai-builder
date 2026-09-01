@@ -15,6 +15,7 @@
 import { generateObject } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
+import { cors } from './_cors.js'
 
 const MODEL_NAME = process.env.GENERATOR_MODEL || 'claude-sonnet-5'
 
@@ -176,6 +177,10 @@ model resets that block's parameters, so set the model before its values.
 Reply with the actions and nothing else.`
 
 export default async function handler(req, res) {
+  // Local mode serves this app from the player's own machine, so the page is a
+  // cross-origin caller here. Preflight is answered and nothing else runs.
+  if (cors(req, res)) return
+
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Use POST.' })
     return

@@ -1,6 +1,6 @@
 {
   "name": "fractal-ai-builder",
-  "version": "6.20.0",
+  "version": "6.21.0",
   "private": true,
   "type": "module",
   "description": "Describe a tone, get a preset written to your Fractal device. Cloud UI over the ForgeFX device API.",
@@ -8,18 +8,21 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node test/run.mjs"
+    "test": "node test/run.mjs",
+    "serve": "node scripts/serve.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.42",
     "@supabase/supabase-js": "^2.112.4",
     "ai": "^7.0.79",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
+    "bonjour-service": "^1.4.4",
     "vite": "^5.4.11"
   }
 }
