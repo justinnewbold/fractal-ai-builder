@@ -879,10 +879,12 @@ export function run(test) {
     const console_ = readFileSync(new URL('../src/components/Console.jsx', import.meta.url), 'utf8')
     const list = console_.slice(console_.indexOf('export function PresetList'), console_.indexOf('export function BlockPanel'))
     assert.match(list, /const known = slots\.filter\(\(s\) => s\.name !== undefined\)/, 'the list no longer knows which slots have a name')
-    assert.match(list, /known\.length === 0/, 'the empty state is gated on the list length again, which is always the unit’s slot count')
+    assert.match(list, /const named = known\.filter/, 'the list shows slots read and found empty by default')
+    assert.match(list, /named\.length === 0/, 'the empty state is gated on the list length again, which is always the unit’s slot count')
     assert.ok(!/slots\.length === 0 \?/.test(list), 'the dead empty-state condition is back')
     assert.match(list, /Show all \$\{slots\.length\}/, 'the unnamed slots are shown by default again — or cannot be shown at all')
     assert.match(list, /No names read yet/, 'the empty state does not say what to do')
+    assert.match(list, /scanning \? \(\s*'Reading the names off the unit/, 'a list being read still tells you to press ⟳')
   })
 
   test('a scene is named with a tap, and the tiles are targets', () => {

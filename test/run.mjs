@@ -1695,6 +1695,91 @@ test('the failure paths in App drop the half chain', () => {
   assert.match(app, /e\.kind === 'retrying'/, 'the retry is invisible')
 })
 
+/* ------------------------------------------------------------------
+   Names that read themselves
+   ------------------------------------------------------------------ */
+
+const { createNameScan } = await import('../src/lib/nameScan.js')
+
+/** A scan over a fake unit: what was read, how it slept, and a hold you can set. */
+function scanRig({ total = 8, known = [], failAt = [], onRead, sleep } = {}) {
+  const cache = new Set(known)
+  const reads = []
+  const sleeps = []
+  let held = false
+  const scan = createNameScan({
+    total,
+    isKnown: (n) => cache.has(n),
+    read: async (n) => {
+      reads.push(n)
+      onRead?.(n)
+      if (failAt.includes(n)) throw new Error('no answer')
+      cache.add(n)
+    },
+    sleep: async (ms) => {
+      sleeps.push(ms)
+      await sleep?.(ms)
+    },
+    quietGap: 600,
+    holdPoll: 250,
+    giveUpAfter: 3
+  })
+  scan.setHold(() => held)
+  return { scan, reads, sleeps, cache, hold: (v) => (held = v) }
+}
+
+test('the quiet scan reads only what is unknown and leaves the port alone between slots', async () => {
+  const r = scanRig({ known: [0, 2, 4] })
+  assert.equal(await r.scan.run(), 'done')
+  assert.deepEqual(r.reads, [1, 3, 5, 6, 7])
+  assert.deepEqual(r.sleeps, [600, 600, 600, 600], 'a quiet scan slept somewhere other than between reads')
+})
+
+test('the quiet scan waits while the unit is in use; the eager one reads back to back', async () => {
+  let polls = 0
+  const r = scanRig({ total: 3, sleep: async (ms) => { if (ms === 250 && ++polls === 3) r.hold(false) } })
+  r.hold(true)
+  assert.equal(await r.scan.run(), 'done')
+  assert.equal(polls, 3, 'the hold was not polled')
+  assert.deepEqual(r.reads, [0, 1, 2])
+
+  const e = scanRig({ total: 3 })
+  e.hold(true)
+  e.scan.setEager(true)
+  assert.equal(await e.scan.run(), 'done')
+  assert.deepEqual(e.reads, [0, 1, 2])
+  assert.deepEqual(e.sleeps, [], 'an eager scan waited on the hold or slept between slots')
+})
+
+test('one slot failing is one slot; a run of them is a unit that has gone', async () => {
+  const one = scanRig({ total: 6, failAt: [2] })
+  assert.equal(await one.scan.run(), 'done')
+  assert.deepEqual(one.reads, [0, 1, 2, 3, 4, 5])
+  const gone = scanRig({ total: 10, failAt: [3, 4, 5, 6, 7] })
+  assert.equal(await gone.scan.run(), 'failed')
+  assert.deepEqual(gone.reads, [0, 1, 2, 3, 4, 5], 'three failures in a row and it kept asking')
+})
+
+test('stop ends the run after the read in flight, and the next run resumes from what is known', async () => {
+  const r = scanRig({ total: 6, onRead: (n) => n === 2 && r.scan.stop() })
+  assert.equal(await r.scan.run(), 'stopped')
+  assert.deepEqual(r.reads, [0, 1, 2])
+  assert.equal(r.scan.running, false)
+  assert.equal(await r.scan.run(), 'done')
+  assert.deepEqual(r.reads, [0, 1, 2, 3, 4, 5], 'the second run re-read what the first had learned')
+})
+
+test('a scan already running is not started twice', async () => {
+  let release
+  const r = scanRig({ total: 2, sleep: () => new Promise((res) => (release = res)) })
+  const first = r.scan.run()
+  await new Promise((res) => setTimeout(res, 0))
+  assert.equal(r.scan.running, true)
+  assert.equal(await r.scan.run(), 'running')
+  release()
+  assert.equal(await first, 'done')
+})
+
 console.log('\nstructure')
 const { run: structure } = await import('./structure.mjs')
 structure(test)

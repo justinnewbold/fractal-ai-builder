@@ -53,6 +53,7 @@ import {
   setTasteEnabled
 } from './lib/taste'
 import { timeLeft } from './lib/slots'
+import { createNameScan } from './lib/nameScan'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
 import Screens from './components/Screens'
 import {
@@ -62,8 +63,12 @@ import {
   setBypass,
   setTuner,
   subscribeEvents,
-  scanAllPresets,
   cachedPresetNames,
+  knowsName,
+  unreadSlots,
+  learnName,
+  importHostNames,
+  publishNames,
   namesCostADump,
   parkSave,
   takeParkedSave,
@@ -461,7 +466,10 @@ export default function App() {
   const setBlocks = useMemo(() => into('blocks'), [into])
   const [editorFocus, setEditorFocus] = useState(null)
   const [scanProgress, setScanProgress] = useState(null)
-  const stopScan = useRef(false)
+  // The scan that reads names on its own, and what it waits for. See readNames.
+  const nameScan = useRef(null)
+  const namesHeld = useRef(false)
+  const unitInUse = useRef({ busy: false, working: false, touched: 0 })
 
   /**
    * Everything that changed, in one place.
@@ -2016,52 +2024,131 @@ export default function App() {
   const hasBrowserSaves = useMemo(() => listPresets().length > 0, [historyKey])
 
   /*
-   * Reading 512 preset names off a serial port, one at a time.
+   * The names read themselves.
    *
-   * Hoisted out of the panel that used to hold it: the list lives in a sheet
-   * now and the scan is a device operation, not a property of where its button
-   * happens to be drawn.
+   * On a gen-3 unit a stored name costs a preset dump, so the list opened
+   * empty until someone pressed ⟳ and waited minutes. Now, once the unit is
+   * live: the host's copy first (the Mac learned them, the phone reads them
+   * back), then a scan of whatever is left. At the Mac the scan runs quietly
+   * — it leaves the port alone between slots and waits while the unit is in
+   * use — so the names are there before the picker is opened. When the picker
+   * opens with names still missing, the scan turns eager and the list fills in
+   * front of you; ■ holds it for the session and ⟳ resumes it. Over the relay
+   * there is no quiet pace: a phone reads only while its picker is open, so
+   * the relay carries nothing nobody is looking at. The demo has no port to
+   * protect and reads eagerly from the start.
    */
-  const scanPresets = async () => {
-    setScanning(true)
-    stopScan.current = false
-    const total = device?.capabilities?.presets?.count ?? 512
+  const namesTotal = device?.capabilities?.presets?.count ?? 512
+
+  useEffect(() => {
+    unitInUse.current.busy = busy
+  }, [busy])
+  useEffect(() => {
+    unitInUse.current.working = !!progress
+  }, [progress])
+  useEffect(() => {
+    const touch = () => {
+      unitInUse.current.touched = Date.now()
+    }
+    document.addEventListener('pointerdown', touch, { passive: true })
+    document.addEventListener('keydown', touch, { passive: true })
+    return () => {
+      document.removeEventListener('pointerdown', touch)
+      document.removeEventListener('keydown', touch)
+    }
+  }, [])
+
+  /** Start the scan, or change its pace. Nothing to do once every slot is known. */
+  const readNames = useCallback(
+    (eager) => {
+      const scan = nameScan.current
+      if (!scan || namesHeld.current) return
+      scan.setEager(eager)
+      if (scan.running || !unreadSlots(namesTotal)) return
+      setScanning(true)
+      scan.run()
+    },
+    [namesTotal]
+  )
+
+  /** ■ — and it stays stopped until ⟳, however many times the picker opens. */
+  const stopNames = () => {
+    namesHeld.current = true
+    nameScan.current?.stop()
+  }
+
+  /** ⟳ — read the rest now, back to back. */
+  const scanPresets = () => {
+    namesHeld.current = false
+    readNames(true)
+  }
+
+  useEffect(() => {
+    if (status !== 'live') return undefined
+    let gone = false
     /*
      * The pace is measured over the last stretch and smoothed, never taken
      * from the start of the run: a resumed scan skips hundreds of known slots
      * in a blink, and an average carrying that would promise four hundred
-     * dumps in ten seconds.
+     * dumps in ten seconds. Shown only while eager: a quiet scan's pace is
+     * mostly waiting, which is not a promise about anything.
      */
     const pace = { at: Date.now(), done: 0, each: null }
-    try {
-      const found = await scanAllPresets(
-        total,
-        (done, all, partial) => {
-          const since = done - pace.done
-          if (since >= 8) {
-            const each = (Date.now() - pace.at) / since
-            pace.each = pace.each ? (pace.each + each) / 2 : each
-            pace.at = Date.now()
-            pace.done = done
-          }
-          setScanProgress({
-            done,
-            total: all,
-            pct: Math.round((done / all) * 100),
-            left: timeLeft(all - done, pace.each)
-          })
-          setSlots(partial)
-        },
-        () => stopScan.current
-      )
-      setSlots(found)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setScanning(false)
-      setScanProgress(null)
+    const scan = createNameScan({
+      total: namesTotal,
+      isKnown: knowsName,
+      read: learnName,
+      onProgress: (done, all) => {
+        if (gone) return
+        const since = done - pace.done
+        if (since >= 8) {
+          const each = (Date.now() - pace.at) / since
+          pace.each = pace.each ? (pace.each + each) / 2 : each
+          pace.at = Date.now()
+          pace.done = done
+        }
+        setScanProgress({
+          done,
+          total: all,
+          pct: Math.round((done / all) * 100),
+          left: scan.eager ? timeLeft(all - done, pace.each) : null
+        })
+        setSlots(cachedPresetNames())
+        publishNames()
+      },
+      onDone: () => {
+        if (gone) return
+        setScanning(false)
+        setScanProgress(null)
+        setSlots(cachedPresetNames())
+        publishNames()
+      }
+    })
+    scan.setHold(() => {
+      const use = unitInUse.current
+      return use.busy || use.working || Date.now() - use.touched < 2000
+    })
+    nameScan.current = scan
+    importHostNames().then((added) => {
+      if (gone) return
+      if (added) setSlots(cachedPresetNames())
+      if (isDemo()) readNames(true)
+      else if (!remote) setTimeout(() => !gone && readNames(false), 4000)
+    })
+    return () => {
+      gone = true
+      scan.stop()
+      nameScan.current = null
     }
-  }
+  }, [status, namesTotal, remote, readNames])
+
+  // The picker: eager while it is open; quiet — or, over the relay, stopped — when it closes.
+  const pickerOpen = presetMenu || sheet === 'presets'
+  useEffect(() => {
+    if (pickerOpen) readNames(true)
+    else if (remote) nameScan.current?.stop()
+    else nameScan.current?.setEager(false)
+  }, [pickerOpen, remote, readNames])
 
   // The block the sheet is showing. Resolved once: a selection can outlive the
   // chain it pointed into (a preset change lands before the refresh does), and
@@ -2216,9 +2303,7 @@ export default function App() {
         addressing={device?.capabilities?.presets?.addressing}
         scanning={scanning}
         progress={scanProgress}
-        onStop={() => {
-          stopScan.current = true
-        }}
+        onStop={stopNames}
         onScan={scanPresets}
         onSelect={(n) => {
           jumpTo(n)
@@ -2704,9 +2789,7 @@ export default function App() {
           scanning={scanning}
           progress={scanProgress}
           onScan={scanPresets}
-          onStopScan={() => {
-            stopScan.current = true
-          }}
+          onStopScan={stopNames}
         />
       </Sheet>
 
@@ -2724,9 +2807,7 @@ export default function App() {
           addressing={device?.capabilities?.presets?.addressing}
           scanning={scanning}
           progress={scanProgress}
-          onStop={() => {
-            stopScan.current = true
-          }}
+          onStop={stopNames}
           onScan={scanPresets}
           onSelect={(n) => {
             jumpTo(n)
