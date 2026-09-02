@@ -22,6 +22,7 @@ import driveTypes from '../data/drive-types.json'
 import cabTypes from '../data/cab-types.json'
 import ampParams from '../data/amp-params.json'
 import { fromNormalized } from './scale.js'
+import { createSceneBypass } from './sceneBypass.js'
 
 const GRID = { rows: 4, cols: 12 }
 
@@ -39,6 +40,21 @@ const LAYOUT = [
 ]
 
 const ROSTERS = { amp: ampTypes, drive: driveTypes, cab: cabTypes }
+
+/*
+ * What each scene switches off, by effect id. The first three are named —
+ * Rhythm, Lead, Clean — and each is a pattern a player would recognise:
+ * rhythm is drive into the amp with the time effects off; lead adds delay and
+ * reverb and the compressor; clean drops the drive and keeps the reverb. The
+ * rest start as rhythm. Scene 1 matches the LAYOUT flags, which the block
+ * catalogue and the starter chain still read.
+ */
+const eid = (slug) => LAYOUT.find((l) => l.slug === slug).effectId
+const SCENE_SEEDS = {
+  default: LAYOUT.filter((l) => l.bypassed).map((l) => l.effectId),
+  1: [eid('wah')],
+  2: [eid('wah'), eid('drive'), eid('delay')]
+}
 
 /*
  * GET /cab/irs, as the device serves it: bank name → a plain list of IR names.
@@ -122,11 +138,15 @@ export function createMockDevice() {
     presetName: 'DEMO',
     scene: 0,
     sceneNames: ['Rhythm', 'Lead', 'Clean', '', '', '', '', ''],
+    // Bypass lives per scene, not on the block — see sceneBypass.js.
+    scenes: createSceneBypass({ count: 8, seeds: SCENE_SEEDS }),
     blocks: LAYOUT.map((b, i) => ({
-      ...b,
+      slug: b.slug,
+      name: b.name,
+      effectId: b.effectId,
+      col: b.col,
       row: 1,
       fromRows: i === 0 ? [] : [1],
-      bypassed: !!b.bypassed,
       channel: b.channel || 'A',
       type: 0
     })),
@@ -141,6 +161,9 @@ export function createMockDevice() {
   for (const block of state.blocks) {
     state.params.set(block.effectId, paramsFor(block.slug))
   }
+
+  /** Whether a block is off in the scene the unit is in. */
+  const off = (effectId) => state.scenes.isOff(state.scene, effectId)
 
   function paramsFor(slug) {
     if (slug === 'amp') {
@@ -205,7 +228,7 @@ export function createMockDevice() {
         row: b.row,
         col: b.col,
         fromRows: b.fromRows,
-        bypassed: b.bypassed,
+        bypassed: off(b.effectId),
         channel: b.channel
       })),
 
@@ -249,9 +272,9 @@ export function createMockDevice() {
       return { ok: true }
     },
 
+    /* Per scene, like the hardware: a bypass written in scene 2 is scene 2's. */
     setBypass: (eid, bypassed) => {
-      const block = state.blocks.find((b) => b.effectId === eid)
-      if (block) block.bypassed = bypassed
+      if (state.blocks.some((b) => b.effectId === eid)) state.scenes.set(state.scene, eid, !!bypassed)
       return { ok: true }
     },
 
@@ -365,7 +388,7 @@ export function createMockDevice() {
      */
     meters: () =>
       state.blocks
-        .filter((b) => !b.bypassed && !['input'].includes(b.slug))
+        .filter((b) => !off(b.effectId) && !['input'].includes(b.slug))
         .map((b) => {
           const norm = Math.random() * 0.7 + 0.15
           return {
@@ -416,12 +439,13 @@ export function createMockDevice() {
         row,
         col,
         fromRows: [row],
-        bypassed: false,
         channel: 'A',
         type: 0
       }
       if (existing >= 0) state.blocks[existing] = block
       else state.blocks.push(block)
+      // A block just placed is on in every scene.
+      state.scenes.forget(blockId)
       if (!state.params.has(blockId)) state.params.set(blockId, paramsFor(block.slug))
       return { ok: true }
     },
@@ -442,7 +466,7 @@ export function createMockDevice() {
     presetSummary: (n) => ({
       number: n,
       name: state.stored.get(n) || '',
-      blocks: state.blocks.filter((b) => !b.bypassed).map((b) => b.name)
+      blocks: state.blocks.filter((b) => !off(b.effectId)).map((b) => b.name)
     }),
 
     /*
@@ -470,13 +494,13 @@ export function createMockDevice() {
 
     bindModifier: () => ({ ok: true }),
 
+    /* The same store the chain is drawn from, so the scene map and Play agree. */
     sceneStateNow: () =>
       state.blocks
         .filter((b) => !['input', 'output'].includes(b.slug))
         .map((b) => ({
           effectId: b.effectId,
-          bypassed:
-            state.scene === 0 ? b.bypassed : (b.effectId + state.scene) % 3 === 0,
+          bypassed: off(b.effectId),
           channel: b.channel
         })),
 
