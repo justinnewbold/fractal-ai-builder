@@ -1426,6 +1426,47 @@ test('a phone restoring its sign-in reads as connecting, never as signed out', (
   assert.match(linkSrc, /joining: joining \|\| restoring/)
 })
 
+/* ------------------------------------------------------------------
+   Scenes in the simulated unit
+   ------------------------------------------------------------------ */
+
+const { createSceneBypass } = await import('../src/lib/sceneBypass.js')
+
+test('a scene is its own pattern of what is off', () => {
+  const scenes = createSceneBypass({ count: 8, seeds: { default: [46, 70], 1: [94], 2: [94, 118] } })
+  assert.deepEqual(scenes.snapshot(0), [46, 70])
+  assert.deepEqual(scenes.snapshot(1), [94], 'a seeded scene took the default')
+  assert.deepEqual(scenes.snapshot(5), [46, 70], 'an unseeded scene starts as the default')
+  assert.ok(scenes.isOff(0, 46) && !scenes.isOff(1, 46), 'the same block reads the same in every scene — that is the bug')
+
+  // A bypass written in one scene is that scene's.
+  scenes.set(1, 118, true)
+  assert.ok(scenes.isOff(1, 118))
+  assert.ok(!scenes.isOff(0, 118), 'switching a block off in scene 2 switched it off in scene 1')
+  scenes.set(1, 118, false)
+  assert.ok(!scenes.isOff(1, 118))
+
+  // A block just placed is on everywhere; out-of-range scenes clamp rather than throw.
+  scenes.set(3, 46, true)
+  scenes.forget(46)
+  for (let i = 0; i < 8; i++) assert.ok(!scenes.isOff(i, 46))
+  assert.equal(scenes.isOff(99, 70), scenes.isOff(7, 70))
+})
+
+test('the simulated unit answers for the chain from the scene it is in', () => {
+  const mock = readSrc(new URL('../src/lib/mockDevice.js', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '')
+  assert.match(mock, /createSceneBypass\(/, 'the mock keeps one bypass flag per block again')
+  const map = mock.slice(mock.indexOf('sceneStateNow:'), mock.indexOf('sceneStateNow:') + 700)
+  assert.ok(!/% 3|state\.scene === 0 \?/.test(map), 'the scene map is a made-up pattern again, disagreeing with Play')
+  assert.ok(!/b\.bypassed/.test(mock), 'something in the mock reads a per-block bypass flag, which no longer follows the scene')
+  for (const answer of ['presetBlocks', 'meters', 'presetSummary', 'sceneStateNow']) {
+    const body = mock.slice(mock.indexOf(`${answer}:`), mock.indexOf(`${answer}:`) + 700)
+    assert.match(body, /off\(b\.effectId\)/, `${answer} does not ask the scene which blocks are off`)
+  }
+  const setBypass = mock.slice(mock.indexOf('setBypass:'), mock.indexOf('setBypass:') + 300)
+  assert.match(setBypass, /state\.scenes\.set\(state\.scene/, 'a bypass write no longer lands in the scene the unit is in')
+})
+
 console.log('\nstructure')
 const { run: structure } = await import('./structure.mjs')
 structure(test)
