@@ -175,6 +175,27 @@ export const setAutoConnect = (on) => {
  */
 export const wantsAutoConnect = () => loadRemoteConfig()?.autoConnect !== false
 
+/**
+ * Whether a sign-in was saved here — without loading the client to ask.
+ *
+ * The client is a few hundred KB fetched on demand, and asking it means a
+ * network round trip. A phone that signed in last time should say
+ * "Connecting…" from its first frame, not "Connect" for the second it takes
+ * to find out; this reads the key the client wrote and answers at once.
+ */
+export function hasSavedSession({ url, storage } = {}) {
+  try {
+    const ref = new URL(url || DEFAULT_PROJECT.url).hostname.split('.')[0]
+    const store = storage || (typeof localStorage !== 'undefined' ? localStorage : null)
+    const raw = store?.getItem(`sb-${ref}-auth-token`)
+    if (!raw) return false
+    const saved = JSON.parse(raw)
+    return !!(saved?.access_token || saved?.currentSession?.access_token)
+  } catch {
+    return false
+  }
+}
+
 let client = null
 let channel = null // the joined channel, and null the moment it stops being joined
 let session = null // what we built: the channel object and the client it belongs to

@@ -1362,6 +1362,70 @@ test('a scan says how long it has left, in words', async () => {
   assert.equal(timeLeft(0, 300), null)
 })
 
+
+/* ------------------------------------------------------------------
+   The first frame on a phone
+   ------------------------------------------------------------------ */
+
+const remoteMod = await import('../src/lib/remote.js')
+const { readFileSync: readSrc } = await import('node:fs')
+
+test('a saved sign-in is known before the client is loaded', () => {
+  const store = (items) => ({ getItem: (k) => (k in items ? items[k] : null) })
+  const key = 'sb-biznwrqeckviawjuhvyg-auth-token'
+  assert.equal(remoteMod.hasSavedSession({ storage: store({}) }), false)
+  assert.equal(remoteMod.hasSavedSession({ storage: store({ [key]: JSON.stringify({ access_token: 'a.b.c' }) }) }), true)
+  assert.equal(remoteMod.hasSavedSession({ storage: store({ [key]: 'not json' }) }), false, 'a corrupt token is not a session')
+  assert.equal(
+    remoteMod.hasSavedSession({ url: 'https://other.supabase.co', storage: store({ [key]: JSON.stringify({ access_token: 'x' }) }) }),
+    false,
+    'the key follows the project'
+  )
+  assert.equal(
+    remoteMod.hasSavedSession({ storage: { getItem: () => { throw new Error('blocked') } } }),
+    false,
+    'blocked storage is no session, not a crash'
+  )
+})
+
+test('the fault notice speaks to the end it is on', () => {
+  const ios = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
+  const crios = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/126.0 Mobile/15E148 Safari/604.1'
+  const macSafari = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15'
+  const chrome = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'
+
+  assert.equal(link.faultCopy({ role: 'unknown' }), null, 'a notice was written before anyone knew which end this is')
+
+  const mac = link.faultCopy({ role: 'mac', secure: true, userAgent: macSafari })
+  assert.match(mac.body, /this Mac/)
+  assert.match(mac.body, /Safari/, 'Safari on an https page at the Mac is the one case the advice is for')
+  assert.ok(!/Safari/.test(link.faultCopy({ role: 'mac', secure: true, userAgent: chrome }).body), 'Chrome was told to try Chrome')
+  assert.ok(!/Safari/.test(link.faultCopy({ role: 'mac', secure: false, userAgent: macSafari }).body), 'Safari over plain http can talk to the Mac fine')
+  assert.equal(link.whySafari({ secure: true, userAgent: ios }), '', 'an iPhone was told to try Chrome, which is Safari underneath')
+  assert.equal(link.whySafari({ secure: true, userAgent: crios }), '')
+
+  const phone = link.faultCopy({ role: 'remote', secure: true, userAgent: ios })
+  assert.ok(phone && !/this Mac|Safari/.test(phone.body), 'a phone was told to open an app on "this Mac"')
+  assert.match(link.faultCopy({ role: 'wifi' }).title, /Lost the Mac/)
+  for (const role of ['mac', 'wifi', 'remote']) {
+    assert.equal(link.faultCopy({ role, device: { connected: false } }).title, 'No unit found')
+  }
+})
+
+test('a phone restoring its sign-in reads as connecting, never as signed out', () => {
+  const linkSrc = readSrc(new URL('../src/lib/link.js', import.meta.url), 'utf8')
+  const boot = linkSrc.slice(linkSrc.indexOf('export async function bootLink'))
+  const published = boot.indexOf('refresh({ role })')
+  const restored = boot.indexOf('await restoreSession(')
+  assert.ok(
+    published !== -1 && restored !== -1 && published < restored,
+    'bootLink withholds the role until the session round-trip is done — a phone gets the Mac’s error in the meantime'
+  )
+  assert.match(linkSrc, /restoring = role === 'remote' && hasSavedSession\(/, 'a phone that signed in last time is asked to Connect while its session is picked up')
+  assert.match(linkSrc, /hasSession: !!merged\.account \|\| restoring/)
+  assert.match(linkSrc, /joining: joining \|\| restoring/)
+})
+
 console.log('\nstructure')
 const { run: structure } = await import('./structure.mjs')
 structure(test)

@@ -35,9 +35,14 @@ export default function DeviceDetail({ status, device, onRetry, busy }) {
   const remote = remoteActive()
   const grid = device?.capabilities?.grid
 
+  /*
+   * A reload, not a re-read. Which end this is was decided when the page
+   * loaded, and the demo decides it: a phone leaving the demo must be told
+   * it is a phone again, or it keeps the Mac's error for good.
+   */
   const toggleDemo = () => {
     setDemo(!demo)
-    onRetry()
+    window.location.reload()
   }
 
   return (
