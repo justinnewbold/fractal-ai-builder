@@ -54,8 +54,38 @@ function note(event, detail = {}) {
 export const getGenerationLog = () => genLog.slice()
 export const clearGenerationLog = () => genLog.splice(0, genLog.length)
 
-export async function streamSpec(body, { onPartial, onEvent, signal, host } = {}) {
+/**
+ * One request to the model, streamed.
+ *
+ * Two clocks, and which one owns the first byte is the whole point. The
+ * stall clock used to start at the request, so its 45 seconds were spent on
+ * time-to-first-byte — which the note above admits is ~25 s cold, and which a
+ * big preset on a cold function pushes past 45 routinely. The result was an
+ * intermittent "nothing came back for 45 seconds" that blamed the model
+ * service for a request the model had not started answering. Now the stall
+ * clock starts at the first byte; the hard cap owns the wait before it, with
+ * its own words.
+ *
+ * And one retry, only when nothing worth keeping had arrived: a stall before
+ * the first partial is idempotent to retry, since nothing was written anywhere.
+ */
+export async function streamSpec(body, opts = {}) {
   const started = Date.now()
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await attemptOnce(body, opts, started)
+    } catch (err) {
+      const canRetry = err?.generationFailure === 'stalled' && !err.partials && attempt === 0 && !opts.signal?.aborted
+      if (!canRetry) throw err
+      note('retrying', { ms: Date.now() - started })
+      opts.onEvent?.({ kind: 'retrying', ms: Date.now() - started })
+    }
+  }
+}
+
+async function attemptOnce(body, { onPartial, onEvent, signal, host, timing } = {}, started = Date.now()) {
+  const stallMs = timing?.stallMs ?? STALL_MS
+  const capMs = timing?.capMs ?? HARD_CAP_MS
   const since = () => Date.now() - started
   const control = new AbortController()
   // The caller's Stop button and our own clocks both land on one signal.
@@ -66,17 +96,21 @@ export async function streamSpec(body, { onPartial, onEvent, signal, host } = {}
   }
 
   let reason = null
-  let lastByteAt = Date.now()
+  // Null until the first byte: the stall clock measures silence in a stream,
+  // not the wait for one to start. That wait belongs to the cap below.
+  let lastByteAt = null
+  let partials = 0
+  let firstByte = false
   const stallTimer = setInterval(() => {
-    if (Date.now() - lastByteAt > STALL_MS) {
+    if (lastByteAt !== null && Date.now() - lastByteAt > stallMs) {
       reason = 'stalled'
       control.abort()
     }
-  }, 2000)
+  }, Math.min(2000, Math.max(5, Math.floor(stallMs / 4))))
   const capTimer = setTimeout(() => {
     reason = 'capped'
     control.abort()
-  }, HARD_CAP_MS)
+  }, capMs)
 
   const finish = () => {
     clearInterval(stallTimer)
@@ -85,10 +119,11 @@ export async function streamSpec(body, { onPartial, onEvent, signal, host } = {}
   }
 
   const fail = (message, kind) => {
-    note('failed', { kind, ms: since(), message })
+    note('failed', { kind, ms: since(), message, partials })
     onEvent?.({ kind: 'failed', ms: since(), message })
     const err = new Error(message)
     err.generationFailure = kind
+    err.partials = partials
     return err
   }
 
@@ -125,8 +160,6 @@ export async function streamSpec(body, { onPartial, onEvent, signal, host } = {}
     let buffer = ''
     let final = null
     let failure = null
-    let partials = 0
-    let firstByte = false
 
     while (true) {
       const { value, done } = await reader.read()
@@ -193,13 +226,19 @@ export async function streamSpec(body, { onPartial, onEvent, signal, host } = {}
     if (control.signal.aborted) {
       if (reason === 'stalled') {
         throw fail(
-          `Nothing came back from the model for ${Math.round(STALL_MS / 1000)} seconds, so the request was dropped. Nothing was written to your unit. Ask again — if it keeps happening, the model service is the place to look.`,
+          `The model went quiet for ${Math.round(stallMs / 1000)} seconds mid-answer, so the request was dropped. Nothing was written to your unit. Ask again — if it keeps happening, the model service is the place to look.`,
           'stalled'
+        )
+      }
+      if (reason === 'capped' && !firstByte) {
+        throw fail(
+          `The model hasn't started answering after ${Math.round(capMs / 1000)} seconds, so the request was dropped. Nothing was written to your unit. Try again.`,
+          'capped'
         )
       }
       if (reason === 'capped') {
         throw fail(
-          `The generation ran past ${Math.round(HARD_CAP_MS / 1000)} seconds and was dropped — that is the server's own limit, so it would have been cut off a moment later anyway. Nothing was written to your unit. Ask again with a shorter, more specific request.`,
+          `The generation ran past ${Math.round(capMs / 1000)} seconds and was dropped — that is the server's own limit, so it would have been cut off a moment later anyway. Nothing was written to your unit. Ask again with a shorter, more specific request.`,
           'capped'
         )
       }

@@ -1602,6 +1602,99 @@ test('a closing sheet takes its own entry and owes a pop only to a sheet that is
   delete globalThis.window
 })
 
+/* ------------------------------------------------------------------
+   The model's first minute
+   ------------------------------------------------------------------ */
+
+const { streamSpec } = await import('../src/lib/stream.js')
+
+/**
+ * A fetch whose body arrives on a schedule: [{ at, chunk }] then done, or
+ * silence forever (`end: false`). Reads reject when the caller aborts, as a
+ * real body does.
+ */
+function scheduledFetch(scripts) {
+  let calls = 0
+  const fetch = (_url, init) => {
+    const script = scripts[Math.min(calls, scripts.length - 1)]
+    calls++
+    const signal = init.signal
+    let i = 0
+    const t0 = Date.now()
+    const reader = {
+      read: () =>
+        new Promise((resolve, reject) => {
+          if (signal.aborted) return reject(new Error('aborted'))
+          const onAbort = () => reject(new Error('aborted'))
+          signal.addEventListener('abort', onAbort, { once: true })
+          if (i < script.steps.length) {
+            const step = script.steps[i++]
+            setTimeout(() => {
+              signal.removeEventListener('abort', onAbort)
+              resolve({ value: new TextEncoder().encode(step.chunk), done: false })
+            }, Math.max(0, step.at - (Date.now() - t0)))
+          } else if (script.end !== false) {
+            setTimeout(() => {
+              signal.removeEventListener('abort', onAbort)
+              resolve({ value: undefined, done: true })
+            }, 0)
+          }
+          // else: silence forever — only an abort ends this read
+        })
+    }
+    return Promise.resolve({ ok: true, status: 200, body: { getReader: () => reader } })
+  }
+  return { fetch, calls: () => calls }
+}
+const DONE = JSON.stringify({ type: 'done', object: { blocks: [] } }) + '\n'
+const PARTIAL = JSON.stringify({ type: 'partial', object: { blocks: [{ slug: 'amp' }] } }) + '\n'
+const timing = { stallMs: 60, capMs: 400 }
+
+test('a slow first byte is not a stall', async () => {
+  // The old clock started at the request: 45 s of waiting for the first token read as the model going quiet.
+  const f = scheduledFetch([{ steps: [{ at: 150, chunk: DONE }] }])
+  globalThis.fetch = f.fetch
+  const events = []
+  const spec = await streamSpec({}, { timing, onEvent: (e) => events.push(e.kind) })
+  assert.deepEqual(spec, { blocks: [] })
+  assert.equal(f.calls(), 1)
+  assert.ok(!events.includes('failed'), events.join(','))
+})
+
+test('silence mid-answer is a stall, and it is not retried once something arrived', async () => {
+  const f = scheduledFetch([{ steps: [{ at: 5, chunk: PARTIAL }], end: false }])
+  globalThis.fetch = f.fetch
+  await assert.rejects(streamSpec({}, { timing }), (err) => err.generationFailure === 'stalled' && /went quiet/.test(err.message))
+  assert.equal(f.calls(), 1, 'a stall after a partial was retried — a retry is only safe before anything arrived')
+})
+
+test('a stall before anything arrived is asked again, once', async () => {
+  const f = scheduledFetch([{ steps: [{ at: 5, chunk: '\n' }], end: false }, { steps: [{ at: 5, chunk: DONE }] }])
+  globalThis.fetch = f.fetch
+  const events = []
+  const spec = await streamSpec({}, { timing, onEvent: (e) => events.push(e.kind) })
+  assert.deepEqual(spec, { blocks: [] })
+  assert.equal(f.calls(), 2)
+  assert.equal(events.filter((k) => k === 'retrying').length, 1)
+})
+
+test('no first byte by the cap says the model never started, and is not retried', async () => {
+  const f = scheduledFetch([{ steps: [], end: false }])
+  globalThis.fetch = f.fetch
+  await assert.rejects(streamSpec({}, { timing }), (err) => err.generationFailure === 'capped' && /hasn't started answering/.test(err.message))
+  assert.equal(f.calls(), 1)
+})
+
+test('the failure paths in App drop the half chain', () => {
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  for (const name of ['const generate = async', 'const refine = async']) {
+    const at = app.indexOf(name)
+    const c = app.indexOf('} catch (err) {', at)
+    assert.match(app.slice(c, c + 160), /setPartial\(null\)/, `${name}'s catch leaves the partial chain on screen`)
+  }
+  assert.match(app, /e\.kind === 'retrying'/, 'the retry is invisible')
+})
+
 console.log('\nstructure')
 const { run: structure } = await import('./structure.mjs')
 structure(test)

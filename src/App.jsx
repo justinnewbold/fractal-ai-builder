@@ -1021,6 +1021,7 @@ export default function App() {
                   : 'Building the preset…'
               )
             } else if (e.kind === 'fallback') setProgress('Streaming refused — asking again in one piece…')
+            else if (e.kind === 'retrying') setProgress('The model went quiet before it said anything — asking again…')
           }
         }
       )
@@ -1081,6 +1082,8 @@ export default function App() {
         ...validated.problems
       ])
     } catch (err) {
+      // A run that failed leaves no half chain on screen beside its error.
+      setPartial(null)
       setError(err.message)
     } finally {
       setProgress(null)
@@ -1472,6 +1475,8 @@ export default function App() {
         ...validated.problems
       ])
     } catch (err) {
+      // A run that failed leaves no half chain on screen beside its error.
+      setPartial(null)
       setError(err.message)
     } finally {
       setProgress(null)
