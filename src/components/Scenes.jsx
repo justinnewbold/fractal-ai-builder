@@ -44,6 +44,11 @@ export default function Scenes({
   const [renaming, setRenaming] = useState(null)
   const [draft, setDraft] = useState('')
 
+  const startRename = (i) => {
+    setDraft(names[i] || '')
+    setRenaming(i)
+  }
+
   const jump = async (index) => {
     try {
       await writeScene(index)
@@ -88,18 +93,30 @@ export default function Scenes({
       <div className="scene-row" hidden={!hasScenes}>
         {Array.from({ length: hasScenes ? count : 0 }, (_, i) => (
           <div key={i} className="scene-cell">
+            {/*
+              Tap to go there; tap the one you are in to name it. This was a
+              double-click, which never fired: the first click jumped, the jump
+              re-read the unit, the re-read disabled the button, and a disabled
+              button dispatches no second click. A phone had no path at all.
+            */}
             <button
               className={`scene ${i === current ? 'current' : ''}`}
-              onClick={() => jump(i)}
+              onClick={() => (i === current ? startRename(i) : jump(i))}
               disabled={busy}
-              onDoubleClick={() => {
-                setDraft(names[i] || '')
-                setRenaming(i)
-              }}
-              title="Double-click to rename"
+              title={i === current ? 'Tap again to name this scene' : `Switch to scene ${i + 1}`}
             >
               <span className="scene-num mono">{i + 1}</span>
               <span className="scene-name">{names[i] || '—'}</span>
+            </button>
+            {/* And a pencil, for naming a scene without switching to it. */}
+            <button
+              className="scene-pencil"
+              onClick={() => startRename(i)}
+              disabled={busy}
+              aria-label={`Name scene ${i + 1}`}
+              title="Name this scene"
+            >
+              ✎
             </button>
           </div>
         ))}
@@ -120,7 +137,7 @@ export default function Scenes({
           <button onClick={() => setRenaming(null)}>Cancel</button>
         </div>
       ) : (
-        <p className="hint">Double-click a scene to name it.</p>
+        <p className="hint">Tap the scene you&rsquo;re in again to name it, or ✎ on any scene.</p>
       )}
 
       {channelled.length ? (

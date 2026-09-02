@@ -862,6 +862,43 @@ export function run(test) {
     assert.match(xy, /calc\(13px \+ /, 'the puck is centred by percent again and hangs over the pad’s edge')
   })
 
+  test('the preset list shows names it has, not 512 dashes', () => {
+    /*
+     * The demo's Presets sheet was 512 rows of "000: —", the loaded "500 DEMO"
+     * among them as "—", and the empty-state copy could never render because
+     * the list was always 512 long. On a real gen-3 unit reading the names
+     * takes minutes, so this is most of the list most of the time.
+     */
+    const at = src.indexOf('const allSlots = useMemo')
+    const memo = src.slice(at, at + 900)
+    assert.match(memo, /byNumber\.set\(preset\.number, \{ number: preset\.number, name: preset\.name \}\)/, 'the loaded preset’s own name is not in the list')
+    for (const site of [...src.matchAll(/<PresetList\b/g)]) {
+      const props = tag(src.slice(site.index), 'PresetList') || ''
+      assert.match(props, /slowNames=/, 'a PresetList is not told whether names cost a dump')
+    }
+    const console_ = readFileSync(new URL('../src/components/Console.jsx', import.meta.url), 'utf8')
+    const list = console_.slice(console_.indexOf('export function PresetList'), console_.indexOf('export function BlockPanel'))
+    assert.match(list, /const known = slots\.filter\(\(s\) => s\.name !== undefined\)/, 'the list no longer knows which slots have a name')
+    assert.match(list, /known\.length === 0/, 'the empty state is gated on the list length again, which is always the unit’s slot count')
+    assert.ok(!/slots\.length === 0 \?/.test(list), 'the dead empty-state condition is back')
+    assert.match(list, /Show all \$\{slots\.length\}/, 'the unnamed slots are shown by default again — or cannot be shown at all')
+    assert.match(list, /No names read yet/, 'the empty state does not say what to do')
+  })
+
+  test('a scene is named with a tap, and the tiles are targets', () => {
+    /*
+     * "Double-click a scene to name it" never worked: the first click jumped
+     * to the scene, the jump re-read the unit, the re-read disabled the
+     * button, and a disabled button dispatches no second click. On a phone
+     * there was no path at all.
+     */
+    const scenes = readFileSync(new URL('../src/components/Scenes.jsx', import.meta.url), 'utf8')
+    assert.ok(!/Double-click a scene/.test(scenes), 'the hint still promises a double-click')
+    assert.match(scenes, /i === current \? startRename\(i\) : jump\(i\)/, 'tapping the scene you are in does not open the name field')
+    assert.match(scenes, /aria-label=\{`Name scene \$\{i \+ 1\}`\}/, 'no visible way to name a scene on a phone')
+    assert.ok(!/onDoubleClick/.test(scenes), 'the double-click path is back — it races the re-read and never fires')
+  })
+
   test('the introduction is offered once, and only when there is something to see', () => {
     /*
      * Two mistakes a tutorial can make, both of which turn it from help into

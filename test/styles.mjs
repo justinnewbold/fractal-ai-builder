@@ -225,4 +225,36 @@ export function run(test) {
     assert.match(rule, /aspect-ratio: 1/, 'the pad is no longer square')
   })
 
+  test('inside a sheet the preset list is not a second scroller', () => {
+    /*
+     * A 300px window over a 23,000px list, inside a sheet body that scrolls
+     * itself: two nested scrollers fighting for the same thumb, seven rows
+     * visible at a time. The sheet is the one scroll surface; the top-bar
+     * menu, which is not a sheet, keeps its cap.
+     */
+    const at = code.indexOf('.sheet-body .preset-scroll {')
+    assert.notEqual(at, -1, 'the preset list inside a sheet has its own scroll window again')
+    const rule = code.slice(at, code.indexOf('}', at))
+    assert.match(rule, /max-height: none/)
+    assert.match(code, /\.preset-menu \.preset-scroll \{[^}]*max-height: min\(52vh, 420px\)/, 'the top-bar menu lost its cap')
+  })
+
+  test('a sheet keeps its contents off the screen edge, and a scene tile is a tile', () => {
+    /*
+     * The sheet body had no inline padding, so every sheet's first column
+     * started at x=1 — inside the iOS edge-swipe zone — and the scene tiles,
+     * with no width rule, shrank to the width of a dash: 38px targets on a
+     * touch screen.
+     */
+    const body = code.slice(code.indexOf('.sheet-body {'), code.indexOf('}', code.indexOf('.sheet-body {')))
+    const pad = body.match(/padding: ([^;]+);/)?.[1] || ''
+    assert.match(pad, /var\(--s-[3-9]\) var\(--s-4\)/, `the sheet body is flush to the edge: "${pad}"`)
+    const tile = code.slice(code.indexOf('button.scene {'), code.indexOf('}', code.indexOf('button.scene {')))
+    assert.match(tile, /width: 100%/, 'a scene tile shrinks to its content again')
+    assert.match(tile, /min-height: 44px/, 'a scene tile is under the touch floor')
+    // The tour card compensated for the missing padding on its own; with the body padded it would double up.
+    const tour = code.slice(code.indexOf('.tour-card p {'), code.indexOf('}', code.indexOf('.tour-card p {')))
+    assert.ok(!/padding: 0 var\(--s-4\)/.test(tour), 'the tour card still pads itself on top of the sheet body')
+  })
+
 }

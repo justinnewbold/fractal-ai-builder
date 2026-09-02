@@ -64,6 +64,7 @@ import {
   subscribeEvents,
   scanAllPresets,
   cachedPresetNames,
+  namesCostADump,
   parkSave,
   takeParkedSave,
   clearParkedSave,
@@ -1939,10 +1940,15 @@ export default function App() {
     const count = device?.capabilities?.presets?.count
     if (!count) return knownSlots
     const byNumber = new Map(knownSlots.map((s) => [s.number, s]))
+    // The loaded preset's name is one the unit has already told us. Its slot
+    // read "—" in a list of 512 of them, the one name on screen missing.
+    if (typeof preset?.number === 'number' && typeof preset?.name === 'string' && !byNumber.has(preset.number)) {
+      byNumber.set(preset.number, { number: preset.number, name: preset.name })
+    }
     return Array.from({ length: count }, (_, i) => byNumber.get(i) || { number: i })
     // knownSlots is rebuilt each render; its length and the count are what move.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [knownSlots.length, device?.capabilities?.presets?.count, preset?.number])
+  }, [knownSlots.length, device?.capabilities?.presets?.count, preset?.number, preset?.name])
 
   /*
    * Whether browser storage still holds anything.
@@ -2165,6 +2171,7 @@ export default function App() {
             <div className="preset-menu" ref={presetMenuRef}>
               <PresetList
                 slots={allSlots}
+                slowNames={namesCostADump()}
                 current={preset?.number}
                 deviceSlots={device?.capabilities?.presets?.count}
                 addressing={device?.capabilities?.presets?.addressing}
@@ -2622,6 +2629,7 @@ export default function App() {
       >
         <PresetList
           slots={allSlots}
+          slowNames={namesCostADump()}
           current={preset?.number}
           deviceSlots={device?.capabilities?.presets?.count}
           addressing={device?.capabilities?.presets?.addressing}
