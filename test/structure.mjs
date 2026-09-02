@@ -794,6 +794,42 @@ export function run(test) {
     assert.match(src, /note=\{describeLink\(link\)\.note\}/, 'the Setup note no longer says what the link is')
   })
 
+  test('the phone is never shown the Mac’s error while the app works out which end it is', () => {
+    /*
+     * Every first-time phone visitor saw a red "Can't find your Fractal —
+     * open the app on this Mac — try Chrome" before the connect screen: the
+     * first read went to localhost before the role was known, and the words
+     * were the Mac's, written in App where the role could not be checked.
+     */
+    assert.ok(
+      !/useEffect\(\(\) => \{\s*\n\s*read\(\)\s*\n\s*\}, \[read\]\)/.test(src),
+      'the unit is read at mount before anyone knows which end this is'
+    )
+    assert.match(src, /if \(isDemo\(\) \|\| servedLocally\(\)\) \{\s*\n\s*read\(\)/, 'the Mac and the demo no longer read at once')
+    assert.match(src, /if \(s\.role !== 'remote'\) read\(\)/, 'the phone reads the unit over localhost')
+
+    // The words are chosen by role, in one tested place.
+    assert.match(src, /faultCopy\(\{/, 'the fault notice writes its own copy again')
+    assert.match(src, /status === 'fault' && fault \? \(/, 'a notice renders before the role is known')
+    const code = src.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '')
+    assert.ok(!/Try Chrome/.test(code), 'the Safari sentence is back in App, shown to everyone')
+    assert.ok(!/this Mac/.test(code), '"this Mac" is written in App, where the role cannot be checked')
+
+    // Leaving or entering the demo is a reload: the role was decided at load.
+    const dir = new URL('../src/components/', import.meta.url)
+    const files = readdirSync(dir).filter((f) => f.endsWith('.jsx')).map((f) => readFileSync(new URL(f, dir), 'utf8'))
+    for (const body of [src, ...files]) {
+      for (const m of body.matchAll(/setDemo\((true|false|!demo)\)/g)) {
+        const after = body.slice(m.index, m.index + 120)
+        assert.match(after, /window\.location\.reload\(\)/, `setDemo without a reload — the tab keeps the role it had: ${after.split('\n')[0]}`)
+      }
+    }
+    const libDir = new URL('../src/lib/', import.meta.url)
+    const libs = readdirSync(libDir).filter((f) => f.endsWith('.js')).map((f) => readFileSync(new URL(f, libDir), 'utf8'))
+    const removals = [src, ...files, ...libs].join('\n').match(/removeItem\('forgefx\.demo'\)/g) || []
+    assert.equal(removals.length, 1, 'something other than setDemo drops the demo flag')
+  })
+
   test('the introduction is offered once, and only when there is something to see', () => {
     /*
      * Two mistakes a tutorial can make, both of which turn it from help into

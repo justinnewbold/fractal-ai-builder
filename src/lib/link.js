@@ -40,6 +40,7 @@ import {
   saveRemoteConfig,
   setAutoConnect,
   wantsAutoConnect,
+  hasSavedSession,
   remoteSignIn,
   signOut
 } from './remote.js'
@@ -178,6 +179,61 @@ export function describeLink(state) {
   return { word: '', sentence: '', note: '', tone: 'dim' }
 }
 
+/**
+ * The one sentence about Safari, only where it is true.
+ *
+ * A page served over https cannot talk to the plain-http Fractal app on the
+ * same Mac from Safari; Chrome can. That is the whole fact, and it is only a
+ * fact at the Mac, in Safari, on an https page. The sentence used to be shown
+ * everywhere the unit could not be read — to phones, where Chrome is Safari
+ * underneath, and to Chrome itself.
+ */
+export function whySafari({ secure, userAgent }) {
+  if (!secure) return ''
+  const ua = String(userAgent || '')
+  const webkit =
+    /Safari/i.test(ua) && !/Chrome|CriOS|Chromium|Edg|OPR|FxiOS|Android|iPhone|iPad|iPod/i.test(ua)
+  return webkit ? 'Using Safari? Try Chrome — Safari won’t let this page talk to the Fractal app on your Mac.' : ''
+}
+
+/**
+ * What to say when the unit cannot be read, by which end this is.
+ *
+ * The same failure means different things at different ends. At the Mac it
+ * is the app not running; on a wifi phone it is the Mac gone; on a phone on
+ * the web app it is the Mac answering but the unit not. Before the role is
+ * known it means nothing yet, and nothing is what to say — the old notice
+ * told every phone to open an app on "this Mac" and try Chrome.
+ */
+export function faultCopy({ role, device, secure = false, userAgent = '' }) {
+  if (device && device.connected === false) {
+    return {
+      title: 'No unit found',
+      body: 'Your Mac is connected, but no Fractal is plugged into it. Check the cable, and that nothing else is using it, then tap Try again.'
+    }
+  }
+  if (role === 'mac') {
+    const safari = whySafari({ secure, userAgent })
+    return {
+      title: 'Can’t find your Fractal',
+      body: `Open the Fractal app on this Mac — it’s what talks to the unit.${safari ? ` ${safari}` : ''}`
+    }
+  }
+  if (role === 'wifi') {
+    return {
+      title: 'Lost the Mac',
+      body: 'Make sure the Fractal app is still open on the Mac and this phone is on the same wifi, then tap Try again.'
+    }
+  }
+  if (role === 'remote') {
+    return {
+      title: 'Your Mac answered, but the unit didn’t',
+      body: 'Check the Fractal app is open on the Mac and the unit is plugged in and switched on, then tap Try again.'
+    }
+  }
+  return null
+}
+
 /* ------------------------------------------------------------------
    State and subscription
    ------------------------------------------------------------------ */
@@ -193,6 +249,13 @@ let state = {
   cloud: null
 }
 let joining = false
+/*
+ * A saved sign-in is being picked up. Until the client has loaded and asked,
+ * there is no account object — but there is a session, and a phone with one
+ * is connecting, not signed out. Without this the connect screen asked a
+ * signed-in phone to Connect for the second the restore took.
+ */
+let restoring = false
 const watchers = new Set()
 
 export const linkState = () => state
@@ -222,9 +285,9 @@ function refresh(patch = {}) {
   const merged = { ...state, ...patch }
   const link = deriveLink({
     role: merged.role,
-    hasSession: !!merged.account,
+    hasSession: !!merged.account || restoring,
     wantsAuto: wantsAutoConnect(),
-    joining,
+    joining: joining || restoring,
     channelUp: remoteActive(),
     hostSeen: remoteHostSeen(),
     hostOn: merged.hostOn,
@@ -381,10 +444,20 @@ export async function bootLink() {
   const helperAlive = isDemo() || served ? false : await localHelperAlive()
   const role = detectRole({ demo: isDemo(), served, hostname, helperAlive })
 
+  /*
+   * The role, now — before the network is asked anything. Everything that
+   * decides what the screen is hangs on it, and while it was withheld until
+   * the session round-trip finished, the app showed the Mac's error to every
+   * phone. A phone with a saved sign-in reads as connecting from this moment.
+   */
   const config = loadRemoteConfig()
+  restoring = role === 'remote' && hasSavedSession({ url: config?.url }) && wantsAutoConnect() !== false
+  refresh({ role })
+
   await restoreSession({ url: config?.url, anonKey: config?.anonKey })
   const account = await currentAccount()
-  set({ role, account })
+  restoring = false
+  set({ account })
 
   subscribeRemoteState(() => refresh())
   subscribeHostSeen(() => refresh())
@@ -392,10 +465,13 @@ export async function bootLink() {
   if (role === 'mac') {
     await readMac()
   } else if (role === 'remote') {
-    refresh()
     if (account && wantsAutoConnect() !== false) {
+      // join() announces itself as joining first, so the screen goes from
+      // "connecting" to "connecting" — never through "isn't answering".
       await join()
       schedule(state.link === 'connected' ? KEEPALIVE : PROBE_FIRST)
+    } else {
+      refresh()
     }
   } else {
     refresh()
@@ -519,6 +595,7 @@ export function _resetLink() {
   timer = null
   delay = 0
   joining = false
+  restoring = false
   booted = false
   state = { role: 'unknown', link: 'off', account: null, hostOn: false, macName: null, since: Date.now(), cloud: null }
   watchers.clear()

@@ -117,7 +117,8 @@ import {
   disconnectPhone,
   setUpMac,
   setMacRemote,
-  signOutHere
+  signOutHere,
+  faultCopy
 } from './lib/link'
 import { validateSpec, countWrites, countSceneWrites } from './lib/validate'
 import { beatFlash, bringIntoView } from './lib/feedback'
@@ -336,6 +337,17 @@ export default function App() {
     (link.link === 'signed-out' ||
       link.link === 'off' ||
       (link.link !== 'connected' && (!everLinked || Date.now() - link.since > 10000 || tick < 0)))
+  // What the notice says when the unit cannot be read — by role, in one tested
+  // place, and nothing at all until the role is known.
+  const fault =
+    status === 'fault'
+      ? faultCopy({
+          role: link.role,
+          device,
+          secure: typeof window !== 'undefined' && window.location.protocol === 'https:',
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : ''
+        })
+      : null
   // Where "Leave gig" returns to. Gig takes the screen over, so coming back out
   // should land where you were rather than at a fixed default.
   const [runningPlan, setRunningPlan] = useState(false)
@@ -745,8 +757,28 @@ export default function App() {
     }
   }, [queuedSave, read, record])
 
+  /*
+   * The unit, once it is known which end this is.
+   *
+   * At the Mac and in the demo the role is decided without asking anyone, so
+   * the read starts at once. Anywhere else it waits for the role: the first
+   * read used to go straight to localhost from a phone, fail, and put the
+   * Mac's error on the screen for the second it took to learn this was a
+   * phone. A phone reads once the Mac answers, from the effect below.
+   */
   useEffect(() => {
-    read()
+    if (isDemo() || servedLocally()) {
+      read()
+      return undefined
+    }
+    let done = false
+    const onRole = (s) => {
+      if (done || s.role === 'unknown') return
+      done = true
+      if (s.role !== 'remote') read()
+    }
+    onRole(linkState())
+    return subscribeLink(onRole)
   }, [read])
 
   /*
@@ -2202,25 +2234,10 @@ export default function App() {
             window.location.reload()
           }}
         />
-      ) : status === 'fault' ? (
+      ) : status === 'fault' && fault ? (
         <div className="notice" data-kind="fault">
-          {device && !device.connected ? (
-            <>
-              <h2>No unit found</h2>
-              <p>
-                Your Mac is connected, but no Fractal is plugged into it. Check the cable, and
-                that nothing else is using it, then tap Try again.
-              </p>
-            </>
-          ) : (
-            <>
-              <h2>Can&rsquo;t find your Fractal</h2>
-              <p>
-                Open the Fractal app on this Mac &mdash; it&rsquo;s what talks to the unit. Using
-                Safari? Try Chrome; Safari won&rsquo;t let this page talk to your Mac.
-              </p>
-            </>
-          )}
+          <h2>{fault.title}</h2>
+          <p>{fault.body}</p>
           <p>
             <button className="chip" onClick={reconnect} disabled={busy}>
               Try again
@@ -2229,7 +2246,7 @@ export default function App() {
               className="chip"
               onClick={() => {
                 setDemo(true)
-                read()
+                window.location.reload()
               }}
             >
               Try the demo
