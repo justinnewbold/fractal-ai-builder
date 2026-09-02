@@ -2334,6 +2334,21 @@ export default function App() {
               {label}
             </button>
           ))}
+          {/*
+            Ask, as a tab, on a phone. The floating button below sat over the
+            bottom-right corner — scene tile 6, the pad's Change, Edit's
+            Modifiers — because that corner is where the last control in every
+            grid lands. Up here nothing is under it. On Create the
+            conversation is the screen, so the tab has nothing to open.
+          */}
+          <button
+            className="view-tab ask-tab"
+            onClick={() => setSheet('chat')}
+            disabled={view === 'ask'}
+            aria-label="Ask for a change"
+          >
+            <span aria-hidden="true">✦</span> Ask
+          </button>
         </nav>
       ) : null}
 
