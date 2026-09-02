@@ -257,4 +257,28 @@ export function run(test) {
     assert.ok(!/padding: 0 var\(--s-4\)/.test(tour), 'the tour card still pads itself on top of the sheet body')
   })
 
+  test('the floating Ask and the Ask tab swap at the phone breakpoint', () => {
+    const at = code.indexOf('button.ask-tab {')
+    assert.notEqual(at, -1, 'the phone/desktop swap for Ask is gone')
+    const block = code.slice(at, at + 600)
+    assert.match(block, /^button\.ask-tab \{\s*display: none/, 'the Ask tab shows on wide screens too')
+    assert.match(block, /@media \(max-width: 700px\) \{[^@]*\.ask-anywhere \{\s*display: none/, 'the floating Ask still floats over a phone’s controls')
+    assert.match(block, /@media \(max-width: 700px\) \{[^@]*button\.ask-tab \{\s*display: inline-flex/, 'the Ask tab is missing on a phone')
+  })
+
+  test('a docked sheet is clipped to its rail and arrives without overshoot', () => {
+    /*
+     * The tour is a sheet; on a desktop it docks as a rail that animates in
+     * from translateX(100%) inside an unclipped fixed layer, with a spring
+     * that overshoots — so its first frames painted past the right edge of
+     * the screen, and so did its exit.
+     */
+    const at = code.indexOf('.sheet-layer.rail {')
+    assert.notEqual(at, -1)
+    const rail = code.slice(at, code.indexOf('}', at))
+    assert.match(rail, /overflow: clip/, 'the rail layer does not clip the sheet sliding into it')
+    const sheet = code.slice(code.indexOf('.sheet-layer.rail .sheet {'), code.indexOf('}', code.indexOf('.sheet-layer.rail .sheet {')))
+    assert.match(sheet, /transition-timing-function: var\(--ease\)/, 'the rail still springs past its docked position')
+  })
+
 }

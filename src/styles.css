@@ -5164,12 +5164,16 @@ button.sheet-close:active {
     inset: var(--bar-h) 0 0 auto;
     width: var(--rail-w);
     justify-content: stretch;
+    /* The sheet slides in from beyond the right edge; without this it painted there. */
+    overflow: clip;
   }
 
   .sheet-layer.rail .sheet {
     max-height: none;
     height: 100%;
     border: 0;
+    /* No spring on a rail: a bounce sideways is a panel jerking, not settling. */
+    transition-timing-function: var(--ease);
     border-left: 1px solid var(--rule);
     border-radius: 0;;
     box-shadow: var(--e-2);
@@ -5726,6 +5730,25 @@ button.topbar-preset.open .topbar-caret {
 @media (max-width: 380px) {
   .ask-anywhere-word {
     display: none;
+  }
+}
+
+/* Ask: a tab on a phone, a floating button on a wide screen. */
+button.ask-tab {
+  display: none;
+  margin-left: auto;
+  gap: var(--s-1);
+  color: var(--silk-dim);
+}
+
+@media (max-width: 700px) {
+  .ask-anywhere {
+    display: none;
+  }
+
+  button.ask-tab {
+    display: inline-flex;
+    align-items: center;
   }
 }
 

@@ -899,6 +899,20 @@ export function run(test) {
     assert.ok(!/onDoubleClick/.test(scenes), 'the double-click path is back — it races the re-read and never fires')
   })
 
+  test('on a phone, Ask lives in the tab row, not over the controls', () => {
+    /*
+     * The floating Ask button sat over scene tile 6 on Play, the pad's
+     * Change button and Edit's Modifiers on a phone — the bottom-right corner
+     * is where the last control in every grid lands. On a phone it is a
+     * fourth tab now; the floating button stays for wide screens, where
+     * nothing sits under it.
+     */
+    const nav = src.slice(src.indexOf('<nav className="views"'), src.indexOf('</nav>'))
+    assert.match(nav, /className="view-tab ask-tab"/, 'the tab row has no Ask')
+    assert.match(nav, /onClick=\{\(\) => setSheet\('chat'\)\}/, 'the Ask tab does not open the conversation')
+    assert.match(nav, /disabled=\{view === 'ask'\}/, 'the Ask tab offers to open what is already open on Create')
+  })
+
   test('the introduction is offered once, and only when there is something to see', () => {
     /*
      * Two mistakes a tutorial can make, both of which turn it from help into
