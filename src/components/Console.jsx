@@ -137,17 +137,29 @@ export function PresetList({
   scanning,
   progress,
   deviceSlots,
-  addressing
+  addressing,
+  slowNames
 }) {
   const [filter, setFilter] = useState('')
+  const [showAll, setShowAll] = useState(false)
 
   const needle = filter.trim().toLowerCase()
+  /*
+   * The list shows what it knows. A slot never read used to be a row reading
+   * "—", five hundred and twelve times over, with the empty-state sentence
+   * underneath unreachable because the list was never empty. Now the unread
+   * slots are one sentence and one chip: "Show all 512" is for going to 46
+   * by eye, and a typed number always searches the whole unit.
+   */
+  const known = slots.filter((s) => s.name !== undefined)
+  const base = needle || showAll ? slots : known
   const shown = needle
-    ? slots.filter(
+    ? base.filter(
         (s) => (s.name || '').toLowerCase().includes(needle) || String(s.number) === needle
       )
-    : slots
+    : base
   const named = slots.filter((s) => (s.name || '').trim()).length
+  const unread = slots.length - known.length
 
   return (
     <div className="preset-panel">
@@ -182,8 +194,14 @@ export function PresetList({
       ) : null}
 
       <div className="preset-scroll">
-        {slots.length === 0 ? (
-          <p className="hint pad">Press ⟳ to read preset names off the unit.</p>
+        {known.length === 0 && !needle && !showAll ? (
+          <p className="hint pad">
+            No names read yet. Press ⟳ to read them off the unit
+            {slowNames
+              ? ' — on this unit that means reading every preset, which takes a few minutes'
+              : ''}
+            .
+          </p>
         ) : shown.length === 0 ? (
           <p className="hint pad">Nothing matches “{filter}”.</p>
         ) : (
@@ -215,6 +233,19 @@ export function PresetList({
             </button>
           ))
         )}
+        {!needle && unread > 0 ? (
+          <p className="hint pad preset-unread-note">
+            {known.length ? (
+              <>
+                {unread} slot{unread === 1 ? '' : 's'} not read yet — ⟳ reads them off the unit
+                {slowNames ? ' (a few minutes on this unit)' : ''}.{' '}
+              </>
+            ) : null}
+            <button className="chip" onClick={() => setShowAll((v) => !v)}>
+              {showAll ? `Only the ${known.length} with names` : `Show all ${slots.length} slots`}
+            </button>
+          </p>
+        ) : null}
       </div>
       {deviceSlots && named ? (
         <p className="hint pad">

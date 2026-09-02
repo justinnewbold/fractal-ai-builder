@@ -1617,12 +1617,32 @@ button.chip.active {
   margin-top: 8px;
 }
 
+/* The tile and its pencil share the cell; the tile takes the room. Without a
+   width the tile shrank to its content — 38px for an unnamed scene's dash. */
+.scene-cell {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--s-1);
+  align-items: stretch;
+}
+
 button.scene {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--s-1);
+  width: 100%;
+  min-height: 44px;
+  min-width: 0;
   padding: var(--s-2) var(--s-3);
+  background: var(--panel);
+}
+
+button.scene-pencil {
+  min-width: 44px;
+  min-height: 44px;
+  padding: var(--s-2);
+  color: var(--silk-dim);
   background: var(--panel);
 }
 
@@ -2646,6 +2666,12 @@ input.bpm-box:focus {
 .preset-scroll {
   max-height: 420px;
   overflow-y: auto;
+}
+
+/* Inside a sheet the sheet scrolls. A second window inside it — 300px over a
+   list of 512 — fought the same thumb, seven rows at a time. */
+.sheet-body .preset-scroll {
+  max-height: none;
 }
 
 button.preset-row {
@@ -5102,9 +5128,12 @@ button.sheet-close:active {
 
 /* Its own scroller, and its own overscroll: a sheet scrolled to its end must
    not hand the gesture to the page underneath it. */
+/* Padded on the sides: with none, every sheet's first column started at x=1,
+   inside the iOS edge-swipe zone, and a label sat on the screen's edge. */
 .sheet-body {
   flex: 1 1 auto;
   min-height: 0;
+  padding: var(--s-3) var(--s-4);
   overflow-y: auto;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
@@ -5714,7 +5743,6 @@ button.topbar-preset.open .topbar-caret {
   font-size: var(--f-3);
   line-height: 1.55;
   margin: 0 0 var(--s-4);
-  padding: 0 var(--s-4);
   color: var(--silk-dim);
 }
 
