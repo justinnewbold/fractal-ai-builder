@@ -76,7 +76,14 @@ const Action = z.object({
   fromCol: z.number().int().nullable().describe('Source column for moveBlock. Null otherwise.'),
   row: z.number().int().nullable().describe('Target row for moveBlock, placeBlock, clearCell.'),
   col: z.number().int().nullable().describe('Target column for those same actions.'),
-  scene: z.number().int().nullable().describe('Scene index for setSceneBlock. Null otherwise.'),
+  scene: z
+    .number()
+    .int()
+    .nullable()
+    .describe(
+      'Scene index, 0-based, for setSceneBlock — and for setBypass when the player named a ' +
+        'scene other than the one the unit is in. Null means the scene the unit is in.'
+    ),
   why: z.string().describe('One short line the player will read, in plain language.')
 })
 
@@ -164,6 +171,19 @@ Slots are addressed by the numbers the unit uses. "Save this to 67" is
 savePreset with value 67. "Save it" with no number means the slot that is
 already loaded, which you are given.
 
+SCENES
+
+A scene is a saved pattern of which blocks are on. You are given the scene the
+unit is in (activeScene, 0-based) and the scene names (sceneNames, by index), so
+"the lead scene" means the scene whose name is Lead. Bypass is per scene: to
+switch a block on or off in a scene the unit is not in, give setBypass that
+scene's index in "scene". Parameter values are shared by every scene on this
+unit — there is no such thing as brighter treble in scene 2 alone. Asked for a
+scene-specific tone change, do one of two things: switch blocks on or off in
+that scene, or say in "refused" that values are shared by every scene and ask
+whether to change it for the whole preset. Never present a preset-wide value
+change as a change to one scene.
+
 READING INTENT
 
 "A little" is a small move — roughly a tenth of the range. "A lot" or "much
@@ -192,7 +212,7 @@ export default async function handler(req, res) {
     return
   }
 
-  const { instruction, device, blocks, grid, scene, presetName, presetNumber, history } =
+  const { instruction, device, blocks, grid, scene, sceneNames, sceneCount, presetName, presetNumber, history } =
     req.body || {}
 
   if (!instruction || typeof instruction !== 'string') {
@@ -216,6 +236,8 @@ export default async function handler(req, res) {
     presetName,
     presetNumber,
     activeScene: scene,
+    sceneNames: Array.isArray(sceneNames) ? sceneNames : undefined,
+    sceneCount: sceneCount ?? device?.capabilities?.sceneCount ?? 8,
     blocks: blocks.map((b) => ({
       eid: b.eid,
       name: b.name,
