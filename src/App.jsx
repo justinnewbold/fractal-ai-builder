@@ -1579,6 +1579,8 @@ export default function App() {
           grid: { ...(device?.capabilities?.grid || {}), palette },
           blocks: withPositions,
           scene,
+          sceneNames,
+          sceneCount: device?.capabilities?.sceneCount,
           presetName: preset?.name,
           presetNumber: preset?.number,
           history: turns.map((t) =>
@@ -1724,7 +1726,7 @@ export default function App() {
         return
       }
 
-      const checked = validatePlan(body, withPositions, device?.capabilities)
+      const checked = validatePlan(body, withPositions, { ...(device?.capabilities || {}), activeScene: scene, sceneNames })
       record(
         'ask',
         `Asked: ${instruction}`,

@@ -108,6 +108,20 @@ export function validatePlan(plan, blocks, capabilities) {
       ? capabilities?.slotCount ?? 4
       : capabilities?.grid?.cols ?? 12
 
+  /*
+   * Which scene the unit is in, and what the scenes are called — so a plan
+   * aimed at another scene is written there or refused, never quietly landed
+   * in the live one. "Brighten scene 2" with scene 3 live used to nudge the
+   * amp on scene 3: parameter values are shared by every scene on this
+   * hardware, and only bypass and channel are per scene.
+   */
+  const activeScene = typeof capabilities?.activeScene === 'number' ? capabilities.activeScene : null
+  const sceneNames = Array.isArray(capabilities?.sceneNames) ? capabilities.sceneNames : []
+  const sceneCount = capabilities?.sceneCount ?? 8
+  const sceneLabel = (i) => (sceneNames[i] ? `scene ${i + 1} · ${sceneNames[i]}` : `scene ${i + 1}`)
+  const aimedElsewhere = (raw) =>
+    typeof raw.scene === 'number' && activeScene !== null && raw.scene !== activeScene
+
   for (const raw of plan?.actions || []) {
     const block = raw.eid !== null && raw.eid !== undefined ? byEid.get(raw.eid) : null
     const need = (ok, message) => {
@@ -121,6 +135,15 @@ export function validatePlan(plan, blocks, capabilities) {
         const param = (block.params || []).find((p) => p.id === raw.paramId)
         if (!need(param, `${block.name}: no parameter ${raw.paramId}.`)) break
         if (!need(typeof raw.value === 'number', `${block.name} / ${param.name}: no value given.`))
+          break
+        if (
+          !need(
+            !aimedElsewhere(raw),
+            `${block.name} / ${param.name}: parameter values are shared by every scene on this unit, so this can't be changed for ${sceneLabel(
+              raw.scene
+            )} alone. Switch a block on or off in that scene, or change it for the whole preset.`
+          )
+        )
           break
         if (
           !need(
@@ -179,10 +202,25 @@ export function validatePlan(plan, blocks, capabilities) {
       case 'setBypass': {
         if (!need(block, `No block with effect id ${raw.eid}.`)) break
         if (!need(typeof raw.flag === 'boolean', `${block.name}: bypass needs true or false.`)) break
+        const scene = typeof raw.scene === 'number' ? raw.scene : null
+        if (scene !== null && !need(scene >= 0 && scene < sceneCount, `There's no scene ${scene + 1}.`))
+          break
+        const eid = block.eid ?? block.effectId
+        if (scene !== null && scene !== activeScene) {
+          // A scene the unit is not in: switch there, write, come back.
+          actions.push({
+            ...raw,
+            label: `${block.name} ${raw.flag ? 'off' : 'on'} in ${sceneLabel(scene)}`,
+            run: async () => (await device()).setSceneBlock(scene, eid, { bypassed: !!raw.flag })
+          })
+          break
+        }
+        // The scene the unit is in — said out loud, because that is where it lands.
+        const where = activeScene !== null ? ` in ${sceneLabel(activeScene)}` : ''
         actions.push({
           ...raw,
-          label: `${block.name} ${raw.flag ? 'bypassed' : 'engaged'}`,
-          run: async () => (await device()).setBypass(block.eid ?? block.effectId, raw.flag)
+          label: `${block.name} ${raw.flag ? 'off' : 'on'}${where}`,
+          run: async () => (await device()).setBypass(eid, raw.flag)
         })
         break
       }
@@ -312,11 +350,10 @@ export function validatePlan(plan, blocks, capabilities) {
 
       case 'setSceneBlock': {
         if (!need(block, `No block with effect id ${raw.eid}.`)) break
-        const count = capabilities?.sceneCount ?? 8
-        if (!need(raw.scene >= 0 && raw.scene < count, `There's no scene ${raw.scene + 1}.`)) break
+        if (!need(raw.scene >= 0 && raw.scene < sceneCount, `There's no scene ${raw.scene + 1}.`)) break
         actions.push({
           ...raw,
-          label: `${block.name} ${raw.flag ? 'off' : 'on'} in scene ${raw.scene + 1}`,
+          label: `${block.name} ${raw.flag ? 'off' : 'on'} in ${sceneLabel(raw.scene)}`,
           run: async () =>
             (await device()).setSceneBlock(raw.scene, block.eid ?? block.effectId, {
               bypassed: !!raw.flag

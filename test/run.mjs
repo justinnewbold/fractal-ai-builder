@@ -13,6 +13,7 @@ import { preferredEncoding, rememberEncoding, disambiguate } from '../src/lib/en
 import { forbiddenRemotely, explainAuth, timeoutFor } from '../src/lib/remote.js'
 import * as taste from '../src/lib/taste.js'
 import * as link from '../src/lib/link.js'
+import { readFileSync as readSrc } from 'node:fs'
 import {
   patchSchemaValue,
   invalidateSchema,
@@ -707,6 +708,80 @@ test('refuses a scene the device does not have', () => {
   assert.equal(r.actions.length, 0)
 })
 
+/*
+ * "Brighten scene 2" with scene 3 live used to nudge Amp Treble on scene 3 —
+ * parameter values are shared by every scene on this hardware, and nothing
+ * refused the ask or said where the write would land.
+ */
+const sceneCaps = { ...caps, activeScene: 2, sceneNames: ['Rhythm', 'Lead', 'Clean'] }
+
+test('a parameter change aimed at another scene is refused, never written elsewhere', () => {
+  const r = validatePlan(
+    { actions: [{ kind: 'setParam', eid: 58, paramId: 7, value: 7.5, scene: 1, why: '' }] },
+    cmdBlocks,
+    sceneCaps
+  )
+  assert.equal(r.actions.length, 0, 'the write went to the live scene under a scene-2 label')
+  assert.match(r.problems[0] || '', /shared by every scene/, r.problems.join(' | '))
+  assert.match(r.problems[0] || '', /scene 2 · Lead/, 'the refusal does not name the scene the player named')
+
+  // The live scene, named or not, is fine: that is where the value lives anyway.
+  for (const scene of [2, null, undefined]) {
+    const ok = validatePlan(
+      { actions: [{ kind: 'setParam', eid: 58, paramId: 7, value: 7.5, scene, why: '' }] },
+      cmdBlocks,
+      sceneCaps
+    )
+    assert.equal(ok.actions.length, 1, `scene ${scene} should be allowed`)
+  }
+})
+
+test('a bypass aimed at another scene lands in that scene and says so', () => {
+  const r = validatePlan(
+    { actions: [{ kind: 'setBypass', eid: 118, flag: false, scene: 1, why: '' }] },
+    cmdBlocks,
+    sceneCaps
+  )
+  assert.equal(r.actions.length, 1)
+  assert.match(r.actions[0].label, /Drive 1 on in scene 2 · Lead/, r.actions[0].label)
+  assert.equal(r.actions[0].scene, 1)
+
+  // No scene given: it lands where the unit is, and the label admits it.
+  const live = validatePlan(
+    { actions: [{ kind: 'setBypass', eid: 118, flag: true, why: '' }] },
+    cmdBlocks,
+    sceneCaps
+  )
+  assert.match(live.actions[0].label, /Drive 1 off in scene 3 · Clean/, live.actions[0].label)
+
+  // A scene the unit does not have is refused, as it is for setSceneBlock.
+  const none = validatePlan(
+    { actions: [{ kind: 'setBypass', eid: 118, flag: true, scene: 9, why: '' }] },
+    cmdBlocks,
+    sceneCaps
+  )
+  assert.equal(none.actions.length, 0)
+  assert.match(none.problems[0] || '', /no scene 10/)
+
+  // And the routing itself: another scene goes through the switch-write-return path.
+  const src = readSrc(new URL('../src/lib/actions.js', import.meta.url), 'utf8')
+  const bypass = src.slice(src.indexOf("case 'setBypass'"), src.indexOf("case 'setChannel'"))
+  assert.match(bypass, /setSceneBlock\((raw\.)?scene/, 'a scene-targeted bypass is written wherever the unit happens to be')
+})
+
+test('the chat is told the scene names, like the designer already is', () => {
+  const command = readSrc(new URL('../api/command.js', import.meta.url), 'utf8')
+  assert.match(command, /sceneNames/, 'the command route never sees the scene names — "it only has indexes"')
+  assert.match(command, /sceneCount/)
+  const handler = command.slice(command.indexOf('export default async function handler'))
+  assert.match(handler, /const \{[^}]*sceneNames[^}]*\} =\s*\n?\s*req\.body/, 'sceneNames is not read from the request')
+  assert.match(handler, /activeScene: scene,\s*\n\s*sceneNames/, 'the model state has the index and not the names')
+  const scene = command.slice(command.indexOf('  scene: z'), command.indexOf('  scene: z') + 400)
+  assert.match(scene, /setBypass/, 'the scene field is still scoped to setSceneBlock alone')
+  assert.match(command, /\nSCENES\n/, 'the system prompt says nothing about scenes')
+  assert.match(command, /shared by every scene/, 'the model is not told parameter values are shared across scenes')
+})
+
 test('writes start on the continuous path', () => {
   // Every parameter the app can reach comes from a block's `named` list, which
   // is ForgeFX's continuous-knob half. Defaulting to discrete floored AM4
@@ -1368,7 +1443,6 @@ test('a scan says how long it has left, in words', async () => {
    ------------------------------------------------------------------ */
 
 const remoteMod = await import('../src/lib/remote.js')
-const { readFileSync: readSrc } = await import('node:fs')
 
 test('a saved sign-in is known before the client is loaded', () => {
   const store = (items) => ({ getItem: (k) => (k in items ? items[k] : null) })

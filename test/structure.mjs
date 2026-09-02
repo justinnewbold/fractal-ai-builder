@@ -830,6 +830,23 @@ export function run(test) {
     assert.equal(removals.length, 1, 'something other than setDemo drops the demo flag')
   })
 
+  test('the chat carries the scene names and the live scene into the plan', () => {
+    /*
+     * CREATE could not use PLAY's scene names — "make the lead scene brighter"
+     * came back with "I only have indexes" — and a plan aimed at scene 2 was
+     * checked without knowing scene 3 was live, so it wrote to scene 3.
+     */
+    const at = src.indexOf("aiUrl('/api/command'")
+    assert.notEqual(at, -1)
+    const body = src.slice(at, at + 900)
+    assert.match(body, /\n\s*scene,\s*\n\s*sceneNames,\s*\n\s*sceneCount/, 'the chat request no longer carries the scene names')
+    assert.match(
+      src,
+      /validatePlan\(body, withPositions, \{ \.\.\.\(device\?\.capabilities \|\| \{\}\), activeScene: scene, sceneNames \}\)/,
+      'the plan is checked without knowing which scene is live'
+    )
+  })
+
   test('the introduction is offered once, and only when there is something to see', () => {
     /*
      * Two mistakes a tutorial can make, both of which turn it from help into
