@@ -782,6 +782,31 @@ test('the chat is told the scene names, like the designer already is', () => {
   assert.match(command, /shared by every scene/, 'the model is not told parameter values are shared across scenes')
 })
 
+test('the chat is told the player counts scenes from 1', () => {
+  /*
+   * Every layer here is 0-based and consistent — Play renders i+1, actions.js
+   * labels index 1 "scene 2 · Lead" — but the model was handed a bare array
+   * and never told the player counts from 1, so "brighten scene 2" was read
+   * as sceneNames[2]: Clean. The designer route already says it (generate.js:
+   * "0 is scene 1 on the unit front panel"); the chat route now does too, in
+   * the schema, in the prompt, and as a numbered list in the state.
+   */
+  const command = readSrc(new URL('../api/command.js', import.meta.url), 'utf8')
+  const scene = command.slice(command.indexOf('  scene: z'), command.indexOf('  scene: z') + 600)
+  assert.match(scene, /0 is the scene the player calls scene 1/, 'the scene field does not say what index the player’s "scene 1" is')
+  assert.match(command, /their "scene 2" is index 1/, 'the prompt does not bridge the player’s numbering to the index')
+  assert.match(command, /Every scene number\s+you return is an index/)
+  const handler = command.slice(command.indexOf('export default async function handler'))
+  assert.match(handler, /scenes: Array\.isArray\(sceneNames\)/, 'the state carries no numbered scene list')
+  assert.match(handler, /`scene \$\{i \+ 1\} = index \$\{i\}/, 'the numbered list does not pair the player’s number with the index')
+  // The rendering itself, indexes 1–8, the way a player says them.
+  const render = (names) => names.map((name, i) => `scene ${i + 1} = index ${i}${name ? ` (${name})` : ''}`)
+  const out = render(['Rhythm', 'Lead', 'Clean', '', '', '', '', ''])
+  assert.equal(out[1], 'scene 2 = index 1 (Lead)')
+  assert.equal(out[7], 'scene 8 = index 7')
+  assert.equal(out.length, 8)
+})
+
 test('writes start on the continuous path', () => {
   // Every parameter the app can reach comes from a block's `named` list, which
   // is ForgeFX's continuous-knob half. Defaulting to discrete floored AM4
