@@ -82,7 +82,8 @@ const Action = z.object({
     .nullable()
     .describe(
       'Scene index, 0-based, for setSceneBlock — and for setBypass when the player named a ' +
-        'scene other than the one the unit is in. Null means the scene the unit is in.'
+        'scene other than the one the unit is in. Null means the scene the unit is in. ' +
+        'Zero-based: 0 is the scene the player calls scene 1, so "scene 2" is index 1.'
     ),
   why: z.string().describe('One short line the player will read, in plain language.')
 })
@@ -175,7 +176,10 @@ SCENES
 
 A scene is a saved pattern of which blocks are on. You are given the scene the
 unit is in (activeScene, 0-based) and the scene names (sceneNames, by index), so
-"the lead scene" means the scene whose name is Lead. Bypass is per scene: to
+"the lead scene" means the scene whose name is Lead. The player counts from 1
+and these are indexed from 0: their "scene 2" is index 1, the second entry in
+sceneNames — the "scenes" list spells this out per scene. Every scene number
+you return is an index. Bypass is per scene: to
 switch a block on or off in a scene the unit is not in, give setBypass that
 scene's index in "scene". Parameter values are shared by every scene on this
 unit — there is no such thing as brighter treble in scene 2 alone. Asked for a
@@ -237,6 +241,11 @@ export default async function handler(req, res) {
     presetNumber,
     activeScene: scene,
     sceneNames: Array.isArray(sceneNames) ? sceneNames : undefined,
+    // The same names, numbered the way the player says them: "scene 2" is
+    // index 1. Without this the model read "scene 2" as sceneNames[2].
+    scenes: Array.isArray(sceneNames)
+      ? sceneNames.map((name, i) => `scene ${i + 1} = index ${i}${name ? ` (${name})` : ''}`)
+      : undefined,
     sceneCount: sceneCount ?? device?.capabilities?.sceneCount ?? 8,
     blocks: blocks.map((b) => ({
       eid: b.eid,
