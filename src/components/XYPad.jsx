@@ -251,9 +251,15 @@ export default function XYPad({ blocks, onError }) {
           >
             <div className="xy-line-h" style={{ top: `${(1 - (dot?.y ?? 0.5)) * 100}%` }} />
             <div className="xy-line-v" style={{ left: `${(dot?.x ?? 0.5) * 100}%` }} />
+            {/* The puck is 26px across. Placed by percent its centre could sit
+                on the edge and half of it hung outside; its centre now travels
+                from 13px in to 13px short of the far side, so all of it stays. */}
             <div
               className="xy-dot"
-              style={{ left: `${(dot?.x ?? 0.5) * 100}%`, top: `${(1 - (dot?.y ?? 0.5)) * 100}%` }}
+              style={{
+                left: `calc(13px + ${dot?.x ?? 0.5} * (100% - 26px))`,
+                top: `calc(13px + ${1 - (dot?.y ?? 0.5)} * (100% - 26px))`
+              }}
             />
           </div>
           <div className="xy-readout mono">
