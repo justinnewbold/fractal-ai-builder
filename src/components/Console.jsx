@@ -175,14 +175,18 @@ export function PresetList({
    * by eye, and a typed number always searches the whole unit.
    */
   const known = slots.filter((s) => s.name !== undefined)
-  const base = needle || showAll ? slots : known
+  // The list is the presets, not the slots: a slot read and found empty is
+  // hidden with the unread ones, behind the same "Show all" chip. On a
+  // factory unit every slot is named, so this hides nothing there.
+  const named = known.filter((s) => (s.name || '').trim())
+  const base = needle || showAll ? slots : named
   const shown = needle
     ? base.filter(
         (s) => (s.name || '').toLowerCase().includes(needle) || String(s.number) === needle
       )
     : base
-  const named = slots.filter((s) => (s.name || '').trim()).length
   const unread = slots.length - known.length
+  const hidden = slots.length - named.length
 
   return (
     <div className="preset-panel">
@@ -217,13 +221,21 @@ export function PresetList({
       ) : null}
 
       <div className="preset-scroll">
-        {known.length === 0 && !needle && !showAll ? (
+        {named.length === 0 && !needle && !showAll ? (
           <p className="hint pad">
-            No names read yet. Press ⟳ to read them off the unit
-            {slowNames
-              ? ' — on this unit that means reading every preset, which takes a few minutes'
-              : ''}
-            .
+            {scanning ? (
+              'Reading the names off the unit — they appear here as they come in.'
+            ) : unread > 0 ? (
+              <>
+                No names read yet. Press ⟳ to read them off the unit
+                {slowNames
+                  ? ' — on this unit that means reading every preset, which takes a few minutes'
+                  : ''}
+                .
+              </>
+            ) : (
+              'No named presets on this unit.'
+            )}
           </p>
         ) : shown.length === 0 ? (
           <p className="hint pad">Nothing matches “{filter}”.</p>
@@ -256,23 +268,27 @@ export function PresetList({
             </button>
           ))
         )}
-        {!needle && unread > 0 ? (
+        {!needle && hidden > 0 ? (
           <p className="hint pad preset-unread-note">
-            {known.length ? (
-              <>
-                {unread} slot{unread === 1 ? '' : 's'} not read yet — ⟳ reads them off the unit
-                {slowNames ? ' (a few minutes on this unit)' : ''}.{' '}
-              </>
+            {named.length && unread > 0 ? (
+              scanning ? (
+                <>{unread} still to read. </>
+              ) : (
+                <>
+                  {unread} slot{unread === 1 ? '' : 's'} not read yet — ⟳ reads them off the unit
+                  {slowNames ? ' (a few minutes on this unit)' : ''}.{' '}
+                </>
+              )
             ) : null}
             <button className="chip" onClick={() => setShowAll((v) => !v)}>
-              {showAll ? `Only the ${known.length} with names` : `Show all ${slots.length} slots`}
+              {showAll ? `Only the ${named.length} with names` : `Show all ${slots.length} slots`}
             </button>
           </p>
         ) : null}
       </div>
-      {deviceSlots && named ? (
+      {deviceSlots && named.length ? (
         <p className="hint pad">
-          {named} of {deviceSlots} named
+          {named.length} of {deviceSlots} named
         </p>
       ) : null}
     </div>

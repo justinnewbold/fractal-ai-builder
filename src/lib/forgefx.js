@@ -1319,7 +1319,86 @@ export function cachedPresetNames() {
 
 export function forgetPresetName(number) {
   restoreNames()
-  if (nameCache.delete(number)) persistNames()
+  if (nameCache.delete(number)) {
+    persistNames()
+    // The host copy loses the slot too, so a phone reading it later asks
+    // the unit rather than trusting a name that was just overwritten.
+    publishNames()
+  }
+}
+
+/** Whether this slot's name has been learned (a learned "empty" counts). */
+export function knowsName(number) {
+  restoreNames()
+  return nameCache.has(number)
+}
+
+/** How many slots the unit has not been asked about yet. */
+export function unreadSlots(total) {
+  restoreNames()
+  let n = 0
+  for (let i = 0; i < total; i++) if (!nameCache.has(i)) n++
+  return n
+}
+
+/**
+ * One slot, learned and kept — for the scan that reads names on its own.
+ *
+ * Unlike rememberedName it throws when the unit would not say: a slot that
+ * came back unknown is not an answer, and a run of them is a unit that has
+ * gone quiet, which the scan should notice rather than ask 500 more times.
+ */
+export async function learnName(number) {
+  restoreNames()
+  if (nameCache.has(number)) return nameCache.get(number)
+  const { name, known } = await storedName(number)
+  if (!known) throw new ForgeError(`Slot ${number} did not answer`)
+  nameCache.set(number, name)
+  persistNames()
+  return name
+}
+
+/**
+ * The names, shared through the host.
+ *
+ * localStorage is one browser's memory. The Mac is the end with the cable,
+ * so it is the end that learns the names — and the phone at the gig is the
+ * end that needs them. Like the scene names, they go into ForgeFX's document
+ * store, which every browser that talks to the host can read, over the relay
+ * included. Only a direct connection writes: a phone publishing back over the
+ * relay would be telling the Mac what the Mac told it.
+ */
+const namesDocId = () => `preset-names-${currentDeviceSlug()}`
+
+let publishTimer = null
+
+/**
+ * Put what this browser knows on the host. At most once every few seconds: a
+ * scan learns a name at a time, and a timer that restarted on each one never
+ * fired while the scan was moving — which is exactly when there was news.
+ */
+export function publishNames() {
+  if (mock || remoteActive() || publishTimer) return
+  publishTimer = setTimeout(() => {
+    publishTimer = null
+    writeHostDoc(namesDocId(), Object.fromEntries(nameCache))
+  }, 5000)
+}
+
+/** Take the host's copy for every slot this browser doesn't know. Returns how many it learned. */
+export async function importHostNames() {
+  restoreNames()
+  const doc = await readHostDoc(namesDocId())
+  if (!doc || typeof doc !== 'object') return 0
+  let added = 0
+  for (const [key, name] of Object.entries(doc)) {
+    const number = Number(key)
+    if (!Number.isInteger(number) || typeof name !== 'string' || nameCache.has(number)) continue
+    nameCache.set(number, name)
+    added++
+  }
+  if (added) persistNames()
+  return added
 }
 
 /** One slot's name: from what's already known, and from the unit when it isn't. */
@@ -1332,36 +1411,6 @@ export async function rememberedName(number) {
     persistNames()
   }
   return name
-}
-
-/**
- * Read every preset name on the unit.
- *
- * Slow by nature: sequential reads down one serial port, and a whole preset
- * dump for each one on a unit that has no name query. So it reports progress
- * every slot and it can be stopped — and it never re-reads a slot it already
- * knows, which is what makes stopping it half way harmless.
- */
-export async function scanAllPresets(total, onProgress, shouldStop) {
-  restoreNames()
-  let read = 0
-  for (let number = 0; number < total; number++) {
-    if (shouldStop?.()) break
-    if (nameCache.has(number)) {
-      // Already known: worth showing the scan moving through them, not worth a
-      // redraw per slot when a resumed scan skips four hundred in a row.
-      if (number % 32 === 0) onProgress?.(number + 1, total, cachedPresetNames())
-      continue
-    }
-    const { name, known } = await storedName(number)
-    if (known) nameCache.set(number, name)
-    read++
-    // A dump per slot is seconds, not milliseconds, on a slow link. Progress
-    // moves every slot because every slot is now something you can watch.
-    onProgress?.(number + 1, total, cachedPresetNames())
-  }
-  if (read) persistNames()
-  return cachedPresetNames()
 }
 
 
