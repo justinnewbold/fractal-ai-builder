@@ -2146,6 +2146,8 @@ test('what the link says contains no plumbing', () => {
   assert.match(link.describeLink({ role: 'remote', link: 'connected', macName: 'Studio Mac' }).sentence, /Connected to Studio Mac/)
   assert.equal(link.describeLink({ role: 'remote', link: 'connected' }).tone, 'good')
   assert.equal(link.describeLink({ role: 'remote', link: 'no-answer' }).tone, 'bad', 'no answer must read as a fault, not as connected')
+  // The Mac's chip names the thing, not the chore: "set up" beside Save read as another verb.
+  assert.equal(link.describeLink({ role: 'mac', link: 'signed-out', account: null }).word, 'remote')
 })
 
 await settle()

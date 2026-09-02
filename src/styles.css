@@ -14,7 +14,7 @@
   --rule: #262b33;
   --silk: #e6e3dc;
   --silk-dim: #878d97;
-  --silk-faint: #565c66;
+  --silk-faint: #7a8189; /* 4.9:1 on the chassis — #565c66 was 2.9:1, the same fault the cream theme had */
 
   /* semantic, not decorative */
   --signal: #f0a73c; /* the audio path, and only that */
@@ -317,14 +317,25 @@ button.scene-line:active:not(:disabled) {
    one you look for. */
 button.topbar-preset {
   display: flex;
-  align-items: baseline;
-  gap: var(--s-2);
+  align-items: center;
   flex: 1 1 auto;
   min-width: 0;
   padding: var(--s-1) var(--s-2);
   background: none;
   border-color: transparent;
-  border-radius: var(--r-2);;
+  border-radius: var(--r-2);
+}
+
+/* The slot, the name and the caret share a baseline on one line; the line is
+   what the button centres. With the children baseline-aligned directly in the
+   button they sat at its top, because the touch floor makes the button 44px
+   and baseline alignment packs to the cross start. */
+.topbar-preset-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 button.topbar-preset:active:not(:disabled) {
@@ -3767,8 +3778,8 @@ ol.action-list li.destructive::marker {
   --panel-hi: #ffffff;
   --rule: #d8d3c8;
   --silk: #23262b;
-  --silk-dim: #5f6670;
-  --silk-faint: #62676f; /* 4.9:1 on the chassis — #8b9099 was 2.8:1, below even the large-text floor */
+  --silk-dim: #3f444c; /* 8.5:1 on the chassis */
+  --silk-faint: #4d525a; /* 6.8:1 — #62676f (4.9:1) still read as "a little light" on a phone in daylight */
 
   --signal: #b5711a;
   --live: #1f7f92;
@@ -4558,7 +4569,7 @@ button.phone-chip {
    should not be dressed as one. */
 button.phone-chip.compact {
   padding: var(--s-1) var(--s-2);
-  font-size: var(--f-1);
+  font-size: var(--f-2);
   border-color: transparent;
 }
 
