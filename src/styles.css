@@ -342,7 +342,7 @@ button.topbar-preset:active:not(:disabled) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--f-5);
+  font-size: var(--f-4);
   font-weight: 600;
 }
 
@@ -2104,14 +2104,16 @@ button.gig-name:disabled .gig-name-caret {
   margin-top: 12px;
 }
 
+/* The same size as the effect blocks below them — they were a third taller,
+   and on a phone the eight of them were most of the screen. */
 button.gig-scene {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: var(--s-1);
-  min-height: 88px;
-  padding: var(--s-3) var(--s-2);
+  min-height: 62px;
+  padding: var(--s-2) var(--s-2);
   background: var(--panel);
 }
 
@@ -2150,7 +2152,7 @@ button.gig-scene.named.current .gig-scene-num {
 button.gig-scene.named .gig-scene-name {
   font-family: var(--display);
   font-weight: 700;
-  font-size: var(--f-4);
+  font-size: var(--f-5);
   color: var(--silk);
   white-space: normal;
   line-height: 1.15;
@@ -4257,7 +4259,7 @@ button.gig-block {
 
 .gig-block-name {
   font-family: var(--display);
-  font-size: var(--f-4);
+  font-size: var(--f-5);
   font-weight: 600;
   letter-spacing: 0.03em;
   text-transform: uppercase;
@@ -4266,7 +4268,7 @@ button.gig-block {
 
 .gig-block-state {
   font-family: var(--mono);
-  font-size: var(--f-2);
+  font-size: var(--f-3);
   letter-spacing: 0.08em;
   color: var(--silk-faint);
 }
@@ -4299,7 +4301,8 @@ button.gig-block:disabled {
     grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
   }
 
-  button.gig-block {
+  button.gig-block,
+  button.gig-scene {
     min-height: 66px;
   }
 }
@@ -5352,6 +5355,19 @@ button.xy-change {
      which is what made the chip twice as tall as everything beside it. */
   button.phone-chip.compact {
     white-space: nowrap;
+  }
+
+  /* The preset name had one letter left: "500 D…" beside UNSAVED, a dot, Save,
+     the phone chip and the gear. The Save button is orange when there is
+     something to save, so on a phone it carries "unsaved" alone and the word
+     and the dot go; the name keeps at least eight characters. */
+  .topbar-dirty,
+  .save-cluster .lamp {
+    display: none;
+  }
+
+  .topbar-name {
+    min-width: 8ch;
   }
 }
 

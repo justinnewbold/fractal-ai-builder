@@ -962,6 +962,24 @@ export function run(test) {
     assert.match(src, /replaceEntry\(\{ view(: viewRef\.current)? \}\)/, 'the entry the app opened on carries no screen')
   })
 
+  test('on a phone the preset picker is a sheet, and the bar leaves the name its room', () => {
+    /*
+     * The popover under the bar filled a phone's screen with the slot list:
+     * no room outside it to tap, no X, no swipe. A sheet has all three and
+     * Back closes it. And the loaded preset's name was down to one letter
+     * beside UNSAVED, a dot, Save, the phone chip and the gear.
+     */
+    assert.match(src, /const narrow = useAsks\('\(max-width: 620px\)'\)/, 'the bar no longer knows it is on a phone')
+    assert.match(src, /menu=\{\s*\n\s*presetMenu && !narrow \? \(/, 'the popover still opens on a phone')
+    const at = src.indexOf('title="Choose a preset"')
+    assert.notEqual(at, -1, 'the phone has no preset sheet')
+    const picker = src.slice(src.lastIndexOf('<Sheet', at), src.indexOf('</Sheet>', at))
+    assert.match(picker, /open=\{presetMenu && narrow\}/)
+    assert.match(picker, /\{presetPicker\}/, 'the sheet does not carry the same picker as the popover')
+    assert.equal((src.match(/<PresetList\b/g) || []).length, 2, 'the picker is written more than once')
+    assert.match(src, /if \(!presetMenu \|\| narrow\) return undefined/, 'the popover’s outside-tap listener runs under the sheet')
+  })
+
   test('the introduction is offered once, and only when there is something to see', () => {
     /*
      * Two mistakes a tutorial can make, both of which turn it from help into

@@ -122,6 +122,7 @@ import {
   faultCopy
 } from './lib/link'
 import { pushEntry, replaceEntry } from './lib/nav'
+import { useAsks } from './lib/asks'
 import { validateSpec, countWrites, countSceneWrites } from './lib/validate'
 import { beatFlash, bringIntoView } from './lib/feedback'
 import {
@@ -404,11 +405,19 @@ export default function App() {
    */
   const [presetMenu, setPresetMenu] = useState(false)
   const presetMenuRef = useRef(null)
+  /*
+   * On a phone the picker is a sheet, not a popover. The popover filled the
+   * screen with a list and left no room outside it to tap, no X, and no swipe
+   * — a sheet has all three, and Back closes it. A desktop keeps the popover
+   * under the bar, where there is a page around it to tap.
+   */
+  const narrow = useAsks('(max-width: 620px)')
 
   /* A tap outside and Escape are the two ways anyone expects to dismiss a
-     menu; without them the only way out is finding the button again. */
+     menu; without them the only way out is finding the button again. The
+     sheet on a phone brings its own. */
   useEffect(() => {
-    if (!presetMenu) return undefined
+    if (!presetMenu || narrow) return undefined
     const away = (e) => {
       if (presetMenuRef.current?.contains(e.target)) return
       // The button that opened it toggles; letting this close it too would
@@ -423,7 +432,7 @@ export default function App() {
       document.removeEventListener('pointerdown', away)
       document.removeEventListener('keydown', key)
     }
-  }, [presetMenu])
+  }, [presetMenu, narrow])
   const [slots, setSlots] = useState([])
   const [scanning, setScanning] = useState(false)
   const scene = useDevice(ofScene)
@@ -2186,6 +2195,43 @@ export default function App() {
     </Assistant>
   ) : null
 
+  /*
+   * The picker, written once and shown in one of two places: a popover under
+   * the bar on a desktop, a sheet on a phone. Changing preset is the bar's
+   * job; keeping, backing up and restoring them is a different job with its
+   * own surface, which the last line hands over to.
+   */
+  const presetPicker = (
+    <>
+      <PresetList
+        slots={allSlots}
+        slowNames={namesCostADump()}
+        current={preset?.number}
+        deviceSlots={device?.capabilities?.presets?.count}
+        addressing={device?.capabilities?.presets?.addressing}
+        scanning={scanning}
+        progress={scanProgress}
+        onStop={() => {
+          stopScan.current = true
+        }}
+        onScan={scanPresets}
+        onSelect={(n) => {
+          jumpTo(n)
+          setPresetMenu(false)
+        }}
+      />
+      <button
+        className="chip preset-menu-more"
+        onClick={() => {
+          setPresetMenu(false)
+          setSheet('presets')
+        }}
+      >
+        Saved presets and backups…
+      </button>
+    </>
+  )
+
   return (
     <div className="shell">
       {/* Above everything, because a stale tab makes every other thing on this
@@ -2208,36 +2254,9 @@ export default function App() {
         onOpenPresets={() => setPresetMenu((v) => !v)}
         onOpenSettings={() => setSheet('settings')}
         menu={
-          presetMenu ? (
+          presetMenu && !narrow ? (
             <div className="preset-menu" ref={presetMenuRef}>
-              <PresetList
-                slots={allSlots}
-                slowNames={namesCostADump()}
-                current={preset?.number}
-                deviceSlots={device?.capabilities?.presets?.count}
-                addressing={device?.capabilities?.presets?.addressing}
-                scanning={scanning}
-                progress={scanProgress}
-                onStop={() => {
-                  stopScan.current = true
-                }}
-                onScan={scanPresets}
-                onSelect={(n) => {
-                  jumpTo(n)
-                  setPresetMenu(false)
-                }}
-              />
-              {/* Changing preset is the bar's job; keeping, backing up and
-                  restoring them is a different job with its own surface. */}
-              <button
-                className="chip preset-menu-more"
-                onClick={() => {
-                  setPresetMenu(false)
-                  setSheet('presets')
-                }}
-              >
-                Saved presets and backups…
-              </button>
+              {presetPicker}
             </div>
           ) : null
         }
@@ -2597,6 +2616,15 @@ export default function App() {
             onChanged={(summary) => record('cab', summary)}
           />
         ) : null}
+      </Sheet>
+
+      <Sheet
+        open={presetMenu && narrow}
+        onClose={() => setPresetMenu(false)}
+        title="Choose a preset"
+        note={preset ? `${preset.number} · ${preset.name?.trim() || 'Untitled'} is loaded` : null}
+      >
+        {presetPicker}
       </Sheet>
 
       {/*

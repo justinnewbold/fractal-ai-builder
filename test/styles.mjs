@@ -317,4 +317,24 @@ export function run(test) {
     }
   })
 
+  test('on a phone the bar drops the unsaved word so the preset keeps its name', () => {
+    const at = code.indexOf('@media (max-width: 620px) {\n  .save-cluster {')
+    assert.notEqual(at, -1)
+    const block = code.slice(at, at + 1200)
+    assert.match(block, /\.topbar-dirty,\s*\n\s*\.save-cluster \.lamp \{\s*display: none/, 'UNSAVED and its dot still crowd the name on a phone')
+    assert.match(block, /\.topbar-name \{\s*min-width: 8ch/, 'the preset name can shrink to one letter again')
+  })
+
+  test('on Play a scene is the size of a block, the words in both are readable, and the bar name is not a headline', () => {
+    const rule = (sel) => code.slice(code.indexOf(sel + ' {'), code.indexOf('}', code.indexOf(sel + ' {')))
+    const height = (text) => text.match(/min-height: (\d+)px/)?.[1]
+    assert.equal(height(rule('button.gig-scene')), height(rule('button.gig-block')), 'scene tiles and effect blocks differ in height')
+    const phone = code.slice(code.indexOf('@media (max-width: 620px) {\n  .gig-blocks {'))
+    assert.match(phone.slice(0, 400), /button\.gig-block,\s*\n\s*button\.gig-scene \{\s*min-height: 66px/, 'on a phone the scenes and the blocks are sized apart again')
+    assert.match(rule('.gig-block-name'), /font-size: var\(--f-5\)/, 'the block name is small again')
+    assert.match(rule('button.gig-scene.named .gig-scene-name'), /font-size: var\(--f-5\)/, 'the scene name is small again')
+    assert.match(rule('.gig-block-state'), /font-size: var\(--f-3\)/)
+    assert.match(rule('.topbar-name'), /font-size: var\(--f-4\)/, 'the preset name in the bar is a headline again')
+  })
+
 }
