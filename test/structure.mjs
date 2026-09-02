@@ -847,6 +847,21 @@ export function run(test) {
     )
   })
 
+  test('the pad sits under the scenes and says which one it is playing', () => {
+    /*
+     * The pad was rendered above the scene grid, so opening it pushed the
+     * scene you were in off a phone's screen — on the screen whose whole
+     * purpose is scene buttons you can hit without looking.
+     */
+    const gig = readFileSync(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8')
+    const scenes = gig.indexOf('className="gig-scenes"')
+    const pad = gig.indexOf('<XYPad')
+    assert.ok(scenes !== -1 && pad !== -1 && pad > scenes, 'the pad is above the scene grid again')
+    assert.match(gig, /className="gig-pad-scene/, 'the pad no longer says which scene it is playing')
+    const xy = readFileSync(new URL('../src/components/XYPad.jsx', import.meta.url), 'utf8')
+    assert.match(xy, /calc\(13px \+ /, 'the puck is centred by percent again and hangs over the pad’s edge')
+  })
+
   test('the introduction is offered once, and only when there is something to see', () => {
     /*
      * Two mistakes a tutorial can make, both of which turn it from help into

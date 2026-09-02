@@ -360,10 +360,6 @@ export default function Gig({ preset, device, capabilities, onError, onChanged, 
         </p>
       ) : null}
 
-      {/* Live even while hidden would be wrong the other way: the pad holds no
-          poll and writes only under a finger, so mount/unmount is free. */}
-      {xyOn ? <XYPad blocks={blocks} onError={onError} /> : null}
-
       {/* Scenes lead. A scene is the bigger move and it sets every block state
           below it, so cause sits above effect rather than under it. */}
       {hasScenes ? (
@@ -391,6 +387,23 @@ export default function Gig({ preset, device, capabilities, onError, onChanged, 
               {names[i] ? <span className="gig-scene-name">{names[i]}</span> : null}
             </button>
           ))}
+        </div>
+      ) : null}
+
+      {/* Under the scenes, not over them: opening the pad must not take the
+          scene you are in off the screen. It says which scene it plays into,
+          since the grid may have scrolled away by the time a thumb is on it.
+          Live even while hidden would be wrong the other way: the pad holds
+          no poll and writes only under a finger, so mount/unmount is free. */}
+      {xyOn ? (
+        <div className="gig-pad">
+          {hasScenes ? (
+            <p className="gig-pad-scene mono">
+              Scene {scene + 1}
+              {names[scene] ? ` · ${names[scene]}` : ''}
+            </p>
+          ) : null}
+          <XYPad blocks={blocks} onError={onError} />
         </div>
       ) : null}
 
