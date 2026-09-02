@@ -99,9 +99,16 @@ export default function TopBar({
             aria-label="Choose a preset"
             aria-expanded={!!presetsOpen}
           >
-            <span className="topbar-slot mono">{preset?.number ?? '--'}</span>
-            <span className="topbar-name">{preset?.name?.trim() || 'Untitled'}</span>
-            <span className="topbar-caret" aria-hidden="true" />
+            {/* One line inside the button, so the slot and the name share a
+                baseline while the line itself sits in the middle of a button
+                that the touch floor makes 44px tall. Baseline-aligned children
+                of the button sat at its top edge — the name rode high beside
+                Save and the gear on every phone. */}
+            <span className="topbar-preset-line">
+              <span className="topbar-slot mono">{preset?.number ?? '--'}</span>
+              <span className="topbar-name">{preset?.name?.trim() || 'Untitled'}</span>
+              <span className="topbar-caret" aria-hidden="true" />
+            </span>
           </button>
         ) : (
           <span className="topbar-gap" />

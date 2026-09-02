@@ -296,25 +296,40 @@ export function run(test) {
     assert.match(code, /\.chain-strip\[data-overflow='yes'\] \{[^}]*mask-image/, 'the chain strip has no edge fade when it scrolls')
   })
 
-  test('on paper the faint type still reads', () => {
+  test('the faint type reads, in both themes', () => {
     /*
      * The cream theme's --silk-faint was #8b9099 on #f2efe9: 2.8:1, under
-     * even the large-text floor, on every "FM3", "500", "set up", "Off" and
-     * inactive tab. WCAG AA for text is 4.5:1.
+     * even the large-text floor, on every "FM3", "500", "remote", "Off" and
+     * inactive tab. WCAG AA for text is 4.5:1; at 4.9:1 it was still "a
+     * little light" on a phone in daylight, so the cream theme's floor is
+     * higher. The dark theme's --silk-faint had the same 2.9:1 fault.
      */
-    const block = code.slice(code.indexOf("[data-theme='light'] {"), code.indexOf('}', code.indexOf("[data-theme='light'] {")))
-    const token = (name) => block.match(new RegExp(`--${name}: (#[0-9a-f]{6})`))?.[1]
     const lum = (hex) => {
       const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
       return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
     }
     const ratio = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05)
-    for (const ground of ['chassis', 'panel']) {
-      for (const ink of ['silk', 'silk-dim', 'silk-faint']) {
-        const r = ratio(token(ink), token(ground))
-        assert.ok(r >= 4.5, `--${ink} on --${ground} is ${r.toFixed(2)}:1 in the light theme`)
+    const themes = [
+      ['dark', ':root {', 4.5],
+      ['light', "[data-theme='light'] {", 6.5]
+    ]
+    for (const [name, open, floor] of themes) {
+      const block = code.slice(code.indexOf(open), code.indexOf('}', code.indexOf(open)))
+      const token = (t) => block.match(new RegExp(`--${t}: (#[0-9a-f]{6})`))?.[1]
+      for (const ground of ['chassis', 'panel']) {
+        for (const ink of ['silk', 'silk-dim', 'silk-faint']) {
+          const r = ratio(token(ink), token(ground))
+          assert.ok(r >= floor, `--${ink} on --${ground} is ${r.toFixed(2)}:1 in the ${name} theme (floor ${floor})`)
+        }
       }
     }
+  })
+
+  test('the preset sits in the middle of the bar, and the chip’s word is not the smallest type in it', () => {
+    const rule = (sel) => code.slice(code.indexOf(sel + ' {'), code.indexOf('}', code.indexOf(sel + ' {')))
+    assert.match(rule('button.topbar-preset'), /align-items: center/, 'the preset button packs its line to the top of a 44px box again')
+    assert.match(rule('.topbar-preset-line'), /align-items: baseline/, 'the slot and the name no longer share a baseline')
+    assert.match(rule('button.phone-chip.compact'), /font-size: var\(--f-2\)/, 'the chip is back at 10px')
   })
 
   test('on a phone the bar drops the unsaved word so the preset keeps its name', () => {

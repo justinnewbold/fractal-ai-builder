@@ -144,7 +144,9 @@ export function describeLink(state) {
     }
     if (link === 'signed-out') {
       return {
-        word: 'set up',
+        // The word names the thing, not the chore: "set up" beside Save read
+        // as another verb in the bar.
+        word: 'remote',
         sentence: 'Phone remote is not set up yet',
         note: 'Set up once',
         tone: 'dim'

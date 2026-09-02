@@ -980,6 +980,16 @@ export function run(test) {
     assert.match(src, /if \(!presetMenu \|\| narrow\) return undefined/, 'the popover’s outside-tap listener runs under the sheet')
   })
 
+  test('the bar’s preset line is one span inside the button', () => {
+    const bar = readFileSync(new URL('../src/components/TopBar.jsx', import.meta.url), 'utf8')
+    const at = bar.indexOf('<span className="topbar-preset-line">')
+    assert.notEqual(at, -1, 'the slot and the name are direct children of the button, which packs them to its top edge')
+    const line = bar.slice(at, bar.indexOf('</span>\n            </span>', at))
+    assert.match(line, /topbar-slot/)
+    assert.match(line, /topbar-name/)
+    assert.match(line, /topbar-caret/)
+  })
+
   test('the introduction is offered once, and only when there is something to see', () => {
     /*
      * Two mistakes a tutorial can make, both of which turn it from help into
