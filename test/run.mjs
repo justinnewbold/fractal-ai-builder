@@ -1541,6 +1541,67 @@ test('the simulated unit answers for the chain from the scene it is in', () => {
   assert.match(setBypass, /state\.scenes\.set\(state\.scene/, 'a bypass write no longer lands in the scene the unit is in')
 })
 
+/* ------------------------------------------------------------------
+   One history ledger for sheets and screens
+   ------------------------------------------------------------------ */
+
+const nav = await import('../src/lib/nav.js')
+
+test('a closing sheet takes its own entry and owes a pop only to a sheet that is listening', () => {
+  // A fake window: history entries, and popstate delivered to listeners.
+  const entries = [{}]
+  const handlers = new Set()
+  const w = {
+    history: {
+      get state() { return entries[entries.length - 1] },
+      pushState: (st) => entries.push(st),
+      replaceState: (st) => { entries[entries.length - 1] = st },
+      back: () => { entries.pop(); for (const h of [...handlers]) h({ state: w.history.state }) }
+    },
+    addEventListener: (_, h) => handlers.add(h),
+    removeEventListener: (_, h) => handlers.delete(h)
+  }
+  globalThis.window = w
+  nav._resetNav()
+  const now = (fn) => fn()
+
+  // The app's own screen entries.
+  nav.replaceEntry({ view: 'play' })
+  nav.pushEntry({ view: 'shape' })
+  assert.deepEqual(entries, [{ view: 'play' }, { view: 'shape' }])
+
+  // One sheet, closed by its button: the entry goes, nobody is owed a pop.
+  let closedA = 0
+  const backA = () => { if (nav.swallowedPop()) return; closedA++ }
+  const stopA = nav.listen(backA)
+  nav.pushEntry({ sheet: true })
+  stopA()
+  nav.popSelf(now)
+  assert.deepEqual(entries, [{ view: 'play' }, { view: 'shape' }], 'the sheet did not take its entry with it')
+  assert.equal(nav._ledger().selfPops, 0, 'a pop is owed with no sheet there to be owed it — the next real Back would be swallowed')
+  assert.equal(closedA, 0)
+
+  // A handoff: sheet A closes as sheet B opens. A's teardown pops B's entry; B must not take that for a Back gesture.
+  let closedB = 0
+  let remarked = 0
+  const stopA2 = nav.listen(() => {})
+  nav.pushEntry({ sheet: true })
+  const backB = () => { if (nav.swallowedPop()) { remarked++; nav.pushEntry({ sheet: true }); return } closedB++ }
+  const stopB = nav.listen(backB)
+  nav.pushEntry({ sheet: true })
+  stopA2()
+  nav.popSelf(now)
+  assert.equal(closedB, 0, 'the sheet that had just opened closed itself — the introduction bug')
+  assert.equal(remarked, 1, 'the incoming sheet did not put its entry back')
+  assert.equal(nav._ledger().selfPops, 0)
+  // Now a real Back closes B, and the screen entry is what is left.
+  w.history.back()
+  assert.equal(closedB, 1)
+  stopB()
+  assert.equal(nav._ledger().listening, 0)
+  delete globalThis.window
+})
+
 console.log('\nstructure')
 const { run: structure } = await import('./structure.mjs')
 structure(test)

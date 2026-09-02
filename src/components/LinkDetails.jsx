@@ -1,12 +1,5 @@
 import { useState } from 'react'
-import {
-  DEFAULT_PROJECT,
-  loadRemoteConfig,
-  saveRemoteConfig,
-  remoteActive,
-  hostResponds,
-  currentAccount
-} from '../lib/remote'
+import { DEFAULT_PROJECT, remoteActive, hostResponds, currentAccount } from '../lib/remote'
 
 /**
  * What the link is doing, for working out why it is not.
@@ -18,14 +11,11 @@ import {
  * the first thing a person saw when they opened Setup on their phone.
  */
 export default function LinkDetails() {
-  const saved = loadRemoteConfig() || {}
-  const [url, setUrl] = useState(saved.url || '')
-  const [anonKey, setAnonKey] = useState(saved.anonKey || '')
   const [report, setReport] = useState(null)
   const [checking, setChecking] = useState(false)
-  const [note, setNote] = useState(null)
-
-  const project = { url: url.trim() || DEFAULT_PROJECT.url, anonKey: anonKey.trim() || DEFAULT_PROJECT.anonKey }
+  // Everyone uses the one project. The fields for typing in another one were
+  // removed: they were a place to break the link by accident, in Setup.
+  const project = DEFAULT_PROJECT
 
   /**
    * Read-only, step by step, stopping at the first thing that is wrong.
@@ -90,43 +80,10 @@ export default function LinkDetails() {
       <pre className="mono env-block">
         {`AXIS_CLOUD=1\nSUPABASE_URL=${project.url}\nSUPABASE_ANON_KEY=${project.anonKey}`}
       </pre>
-
-      <p className="hint">To use a different Supabase project instead:</p>
-      <div className="save-row">
-        <input
-          type="text"
-          className="name-field"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder={DEFAULT_PROJECT.url}
-          aria-label="Supabase project URL"
-        />
-      </div>
-      <div className="save-row">
-        <input
-          type="text"
-          className="name-field"
-          value={anonKey}
-          onChange={(e) => setAnonKey(e.target.value)}
-          placeholder="Supabase anon key"
-          aria-label="Supabase anon key"
-        />
-        <button
-          className="chip"
-          onClick={() => {
-            saveRemoteConfig({ ...saved, url: url.trim(), anonKey: anonKey.trim() })
-            setNote('Saved. Sign in again for it to take effect.')
-          }}
-        >
-          Use this project
-        </button>
-      </div>
       <p className="hint">
         The key is the publishable one, which is why it can sit in plain sight: a signed-in user
-        can only reach their own channel, so it grants a stranger nothing. Never put a service
-        role key here.
+        can only reach their own channel, so it grants a stranger nothing.
       </p>
-      {note ? <p className="hint">{note}</p> : null}
     </section>
   )
 }
