@@ -54,6 +54,7 @@ import {
 } from './lib/taste'
 import { timeLeft } from './lib/slots'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
+import Screens from './components/Screens'
 import {
   getTempo,
   setTempo,
@@ -2326,6 +2327,12 @@ export default function App() {
         </button>
       ) : null}
 
+      {/*
+        The three screens, one shown, swiped between on a phone. The wrapper
+        takes nothing on touchstart — every control on every screen is inside
+        it — and only claims a drag that has plainly gone sideways.
+      */}
+      <Screens view={view} enabled={status === 'live'} onChange={setView}>
       {status === 'live' && view === 'play' ? (
         <Gig
           preset={preset}
@@ -2459,6 +2466,7 @@ export default function App() {
           onSeeAll={() => setSheet('presets')}
         />
       ) : null}
+      </Screens>
 
       {/* ---------------------------------------------------------------
           Sheets. Things you open, act on and dismiss — not places you go.

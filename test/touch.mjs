@@ -33,7 +33,50 @@ export function run(test) {
       .filter((f) => f.endsWith('.jsx'))
       .filter((f) => /addEventListener\('touchstart'/.test(read(f)))
       .sort()
-    assert.deepEqual(binds, ['Knob.jsx', 'Sheet.jsx', 'XYPad.jsx'])
+    assert.deepEqual(binds, ['Knob.jsx', 'Screens.jsx', 'Sheet.jsx', 'XYPad.jsx'])
+  })
+
+  test('the screens take nothing on the press and yield to anything sideways', () => {
+    /*
+     * The fourth surface is the whole page. Every control on every screen is
+     * inside it, so the two rules the others can bend are absolute here: the
+     * touchstart is passive and never cancels the press, and a drag that begins
+     * on something with its own sideways gesture — the chain strip, a grid, a
+     * knob, a pad, a text field — is not a swipe.
+     */
+    const screens = read('Screens.jsx').replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ' ')
+    assert.match(
+      screens,
+      /addEventListener\('touchstart', begin, \{ passive: true \}\)/,
+      'the screens now grab the press — every tap on every screen goes with it'
+    )
+    const begin = screens.slice(screens.indexOf('const begin = ('))
+    const body = begin.slice(0, begin.indexOf('\n    }'))
+    assert.ok(!/preventDefault/.test(body), 'the screens cancel the press on touchstart')
+    assert.ok(/closest\?\.\(YIELDS\)/.test(body), 'the screens no longer yield to surfaces that own a sideways drag')
+
+    const yields = screens.match(/YIELDS =\s*'([^']+)'/)?.[1] || ''
+    for (const owner of ['.chain-strip', '.grid-scroll', '.knob', '.xy', 'input', '[data-no-swipe]']) {
+      assert.ok(yields.split(',').map((s) => s.trim()).includes(owner), `${owner} is no longer left its own gesture`)
+    }
+
+    // Sideways only after the finger has plainly gone sideways; vertical scroll wins until then.
+    assert.match(screens, /Math\.abs\(dx\) > INTENT && Math\.abs\(dx\) > SLACK \* Math\.abs\(dy\)/)
+    assert.match(screens, /if \(!touch\.still\) page\.style\.transform/, 'reduced motion still drags the page under the finger')
+  })
+
+  test('all three screens sit inside the swipe surface', () => {
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    const open = app.indexOf('<Screens ')
+    const shut = app.indexOf('</Screens>')
+    assert.ok(open !== -1 && shut > open, 'the screens are no longer wrapped')
+    const inside = app.slice(open, shut)
+    for (const v of ['play', 'shape', 'ask']) {
+      assert.ok(inside.includes(`view === '${v}'`), `the ${v} screen is outside the swipe surface`)
+    }
+    assert.ok(!/<Sheet\b/.test(inside), 'a sheet is inside the swipe surface — it would travel with the page')
+    assert.ok(!inside.includes('className="views"'), 'the tabs are inside the surface they switch')
+    assert.match(app, /<Screens view=\{view\} enabled=\{status === 'live'\} onChange=\{setView\}>/)
   })
 
   test('a grab surface holding a control lets the control have its tap', () => {

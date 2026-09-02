@@ -6021,3 +6021,63 @@ button.signin-link {
     font-size: var(--f-input);
   }
 }
+
+/* ---------- screens: swipe between Play, Edit and Create ----------
+   The wrapper clips sideways so a page travelling under a thumb, or arriving
+   from the side, never widens the document. pan-y hands the browser the
+   vertical scroll and nothing else: a sideways drag reaches the listener
+   cancelable, which is what lets the page follow the finger instead of
+   jittering between the two. */
+.screens {
+  overflow-x: clip;
+  touch-action: pan-y pinch-zoom;
+}
+
+.screen {
+  will-change: transform;
+}
+
+.screens[data-enter='right'] .screen {
+  animation: screen-in-right var(--t-2) ease;
+}
+
+.screens[data-enter='left'] .screen {
+  animation: screen-in-left var(--t-2) ease;
+}
+
+@keyframes screen-in-right {
+  from {
+    transform: translateX(28px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes screen-in-left {
+  from {
+    transform: translateX(-28px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* The tab underline moves at the same pace as the screen under it. */
+button.view-tab {
+  transition: color var(--t-2) ease, border-color var(--t-2) ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screens[data-enter] .screen {
+    animation: none;
+  }
+
+  button.view-tab {
+    transition: none;
+  }
+}

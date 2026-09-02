@@ -338,7 +338,11 @@ export function run(test) {
       // The phone's connect screen: the one thing to do when it is not
       // connected, on the screen where that is the case. Replaces the bare
       // sign-in form that used to sit under an error notice here.
-      'ConnectScreen'
+      'ConnectScreen',
+      // The swipe surface. It wraps the views rather than sitting above them
+      // and adds no height of its own: the opening tag falls in this slice
+      // only because the first view is inside it.
+      'Screens'
     ])
     // The assistant used to be on this list — it sat above every screen at
     // once. It is the Ask tab now, which is what took the chrome down again.
