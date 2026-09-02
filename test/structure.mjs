@@ -913,6 +913,55 @@ export function run(test) {
     assert.match(nav, /disabled=\{view === 'ask'\}/, 'the Ask tab offers to open what is already open on Create')
   })
 
+  test('polish: sheets close with the screen, hand edits are the only "You:", and the rest', () => {
+    const read = (f) => readFileSync(new URL('../src/components/' + f, import.meta.url), 'utf8')
+    // A block sheet stayed open across a tab press and its scrim ate the first tap on the new screen.
+    assert.match(src, /useEffect\(\(\) => setSheet\(null\), \[view\]\)/, 'a sheet no longer closes when the screen changes under it')
+    // "You: Done — 3 changes." — the app's own narration wore the player's label.
+    assert.equal((src.match(/role: 'hand'/g) || []).length, 1, 'hand edits are not the one producer of the hand role')
+    assert.match(src, /t\.role === 'hand'\s*\n?\s*\? \{ role: 'user', text: `\(I did this by hand/, 'the model is no longer told which turns were hand edits')
+    const assistant = read('Assistant.jsx')
+    assert.match(assistant, /turn\.role === 'hand' \? `You: \$\{turn\.text\}`/, 'the "You:" prefix is back on narration')
+    assert.ok(!/'system' \? `You:/.test(assistant), 'narration is labelled as something the player said')
+    // The typed placeholder follows the reduced-motion setting live, through the one shared hook.
+    assert.match(assistant, /import \{ useAsks \} from '\.\.\/lib\/asks'/, 'Assistant reads reduced motion once at mount again')
+    assert.match(assistant, /useAsks\('\(prefers-reduced-motion: reduce\)'\)/)
+    assert.match(read('Sheet.jsx'), /import \{ useAsks \} from '\.\.\/lib\/asks'/, 'Sheet keeps a private copy of the media hook')
+    // Tour dots are controls or nothing; search hits announce as buttons.
+    const tour = read('Tour.jsx')
+    assert.match(tour, /<button[^>]*className=\{i === card \? 'tour-dot on' : 'tour-dot'\}/, 'the tour dots look like a control and are not one')
+    assert.match(tour, /aria-label=\{'Step ' \+ \(i \+ 1\) \+ ' of ' \+ CARDS\.length\}/)
+    const search = read('ParamSearch.jsx')
+    assert.ok(!/role="list"|role="listitem"/.test(search), 'a search hit announces as a list item, not a button')
+    // The chain strip says when it scrolls.
+    const console_ = read('Console.jsx')
+    assert.match(console_, /el\.dataset\.overflow = /, 'the chain strip no longer says whether there is more to the right')
+    assert.match(console_, /new ResizeObserver\(look\)/)
+    // The account project is not something to type into Setup.
+    const details = read('LinkDetails.jsx')
+    assert.ok(!/<input/.test(details), 'the Supabase project fields are back in Setup')
+    assert.ok(!/saveRemoteConfig/.test(details))
+    assert.match(details, /Test the link/, 'the link test went with the fields')
+  })
+
+  test('Back moves between screens, through the one history ledger the sheets use', () => {
+    /*
+     * With no history for the screens, Back on a phone left the app from any
+     * of them. The sheets already owned popstate with a ledger of their own
+     * pops; a second writer that did not share it would bring back the
+     * introduction that closed itself a third of a second after opening.
+     */
+    const sheet = readFileSync(new URL('../src/components/Sheet.jsx', import.meta.url), 'utf8')
+    assert.match(sheet, /import \{ pushEntry, listen, swallowedPop, popSelf \} from '\.\.\/lib\/nav'/, 'Sheet keeps a private history ledger')
+    const sheetCode = sheet.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '')
+    assert.ok(!/let selfPops|let listening|history\.pushState|history\.back\(\)/.test(sheetCode), 'Sheet still touches history directly')
+    assert.match(src, /import \{ pushEntry, replaceEntry \} from '\.\/lib\/nav'/, 'App writes history without the ledger')
+    assert.match(src, /window\.addEventListener\('popstate', onPop\)/, 'App does not hear Back')
+    assert.match(src, /if \(!st \|\| st\.sheet \|\| typeof st\.view !== 'string'\) return/, 'a sheet’s own pop is taken for a screen change')
+    assert.match(src, /pushEntry\(\{ view \}\)/, 'a screen change leaves no entry for Back to return to')
+    assert.match(src, /replaceEntry\(\{ view(: viewRef\.current)? \}\)/, 'the entry the app opened on carries no screen')
+  })
+
   test('the introduction is offered once, and only when there is something to see', () => {
     /*
      * Two mistakes a tutorial can make, both of which turn it from help into
@@ -961,40 +1010,24 @@ export function run(test) {
      * in the code that says to close it. "Show the introduction" from inside
      * Settings did exactly that.
      *
-     * The swallowed pop has to be paid back with a fresh entry, or the sheet
-     * survives but has no history of its own and the next back press leaves
-     * the app instead of closing it.
+     * The books live in lib/nav.js now, shared with the screens' own history
+     * entries; the invariants are the same.
      */
-    const sheet = readFileSync(new URL('../src/components/Sheet.jsx', import.meta.url), 'utf8')
-    assert.match(sheet, /let selfPops = 0/, 'nothing tracks the pops a sheet causes itself')
-    assert.match(sheet, /let listening = 0/, 'nothing tracks whether a pop will reach anyone')
+    const nav = readFileSync(new URL('../src/lib/nav.js', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '')
+    assert.match(nav, /let selfPops = 0/, 'nothing tracks the pops a sheet causes itself')
+    assert.match(nav, /let listening = 0/, 'nothing tracks whether a pop will reach anyone')
     assert.match(
-      sheet,
-      /if \(listening > 0\) selfPops\+\+\s*\n\s*window\.history\.back\(\)/,
+      nav,
+      /if \(listening > 0\) selfPops\+\+\s*\n\s*win\(\)\.history\.back\(\)/,
       'the debt is owed unconditionally again — with no sheet left to pay it the next real back gesture is swallowed, and after three open-and-close cycles back stops closing sheets at all'
     )
-    /*
-     * And the whole thing has to be deferred a task. React flushes every
-     * cleanup before any setup, so at teardown a sheet handing over to another
-     * is indistinguishable from one closing alone: the incoming sheet has not
-     * registered yet, `listening` reads zero, and the handoff breaks again.
-     */
-    assert.match(
-      sheet,
-      /setTimeout\(\(\) => \{\s*\n\s*try \{\s*\n\s*\/\/ Only owe a swallowed pop/,
-      'the pop is no longer deferred, so a sheet opening as another closes cannot be told from a plain close'
-    )
-    assert.match(
-      sheet,
-      /if \(selfPops > 0\) \{\s*\n\s*selfPops--/,
-      'a sheet no longer ignores a pop another sheet caused — it will close itself the moment one opens over a closing one'
-    )
-    const swallow = sheet.slice(sheet.indexOf('if (selfPops > 0)'))
-    assert.match(
-      swallow.slice(0, swallow.indexOf('return')),
-      /mark\(\)/,
-      'the swallowed entry is never put back, so the back gesture leaves the app instead of closing the sheet'
-    )
+    // Deferred a task: at teardown a handoff is indistinguishable from a plain close.
+    assert.match(nav, /export function popSelf\(defer = \(fn\) => setTimeout\(fn, 0\)\) \{\s*\n\s*defer\(\(\) => \{/, 'the pop is no longer deferred')
+    assert.match(nav, /if \(selfPops > 0\) \{\s*\n\s*selfPops--/, 'a pop another sheet caused is no longer told apart from a back gesture')
+    // And the sheet puts its entry back when it swallows one.
+    const sheet = readFileSync(new URL('../src/components/Sheet.jsx', import.meta.url), 'utf8')
+    const swallow = sheet.slice(sheet.indexOf('if (swallowedPop())'))
+    assert.match(swallow.slice(0, swallow.indexOf('return')), /mark\(\)/, 'a swallowed pop is not paid back with a fresh entry — the sheet survives with no history and the next back press leaves the app')
   })
 
   test('what the player has kept reaches the generator, and reaches them', () => {

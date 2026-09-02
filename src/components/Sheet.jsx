@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useAsks } from '../lib/asks'
+import { pushEntry, listen, swallowedPop, popSelf } from '../lib/nav'
 import { createPortal } from 'react-dom'
 
 /**
@@ -29,43 +31,6 @@ import { createPortal } from 'react-dom'
  */
 const DESK = '(min-width: 1000px)'
 
-const asks = (query) => {
-  try {
-    return window.matchMedia(query).matches
-  } catch {
-    return false
-  }
-}
-
-/**
- * A media query, answered and then kept answered.
- *
- * Read once at mount and this is wrong the moment a window is resized or a
- * phone is turned — and being wrong here isn't cosmetic: `rail` decides whether
- * the page behind is made inert and whether the scroll is locked, so a stale
- * answer can leave a desktop window unscrollable with nothing over it.
- */
-function useAsks(query) {
-  const [yes, setYes] = useState(() => asks(query))
-  useEffect(() => {
-    let mq
-    try {
-      mq = window.matchMedia(query)
-    } catch {
-      return undefined
-    }
-    const answer = () => setYes(mq.matches)
-    answer()
-    // Safari didn't have addEventListener on a MediaQueryList until 14.
-    if (mq.addEventListener) mq.addEventListener('change', answer)
-    else mq.addListener(answer)
-    return () => {
-      if (mq.removeEventListener) mq.removeEventListener('change', answer)
-      else mq.removeListener(answer)
-    }
-  }, [query])
-  return yes
-}
 
 /*
  * Pops a sheet caused itself, which no sheet may read as a back gesture.
@@ -87,10 +52,6 @@ function useAsks(query) {
  * Three open-and-close cycles were enough to leave a sheet that would not
  * close on back at all, which is far worse than the bug this fixes.
  */
-let selfPops = 0
-
-/** Sheets currently listening for a pop — i.e. open, on a phone. */
-let listening = 0
 
 const FOCUSABLE =
   'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
@@ -147,17 +108,11 @@ export default function Sheet({ open, onClose, title, note, footer, children }) 
   useEffect(() => {
     if (!open || rail) return undefined
     const mark = () => {
-      try {
-        window.history.pushState({ sheet: true }, '')
-        pushed.current = true
-      } catch {
-        pushed.current = false
-      }
+      pushed.current = pushEntry({ sheet: true })
     }
     mark()
     const back = () => {
-      if (selfPops > 0) {
-        selfPops--
+      if (swallowedPop()) {
         /*
          * Another sheet's teardown popped an entry, and this listener heard
          * it. Not a back gesture, so this sheet stays — but the entry that
@@ -170,36 +125,15 @@ export default function Sheet({ open, onClose, title, note, footer, children }) 
       pushed.current = false
       close()
     }
-    window.addEventListener('popstate', back)
-    listening++
+    const stop = listen(back)
     return () => {
-      window.removeEventListener('popstate', back)
-      listening--
+      stop()
       // Closed by a button rather than by going back: take the entry with us,
-      // or the next back press does nothing visible.
+      // or the next back press does nothing visible. The ledger in nav.js
+      // decides whether anyone is owed the pop this causes.
       if (!pushed.current) return
       pushed.current = false
-      /*
-       * Deferred by a task, and that is the whole trick.
-       *
-       * React flushes every cleanup before any setup, so at this instant a
-       * sheet handing over to another looks exactly like a sheet closing on
-       * its own — the incoming sheet has not run its effect yet, and asking
-       * "is anyone still listening?" here always answers no. One task later
-       * it has, and the question gives the right answer.
-       */
-      setTimeout(() => {
-        try {
-          // Only owe a swallowed pop if a sheet is there to hear it. With
-          // none, this pop lands on nobody and the debt would sit waiting to
-          // eat someone's real back gesture instead.
-          if (listening > 0) selfPops++
-          window.history.back()
-        } catch {
-          // A history the page isn't allowed to move is not worth failing over.
-          if (listening > 0) selfPops--
-        }
-      }, 0)
+      popSelf()
     }
   }, [open, rail, close])
 

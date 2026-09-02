@@ -160,9 +160,18 @@ export default function Tour({ open, onClose }) {
               Skip
             </button>
           )}
-          <div className="tour-dots" aria-hidden="true">
+          {/* Dots that do what they look like they do. Inert ones read as a
+              paging control that ignores the finger. */}
+          <div className="tour-dots">
             {CARDS.map((c, i) => (
-              <span key={c.title} className={i === card ? 'tour-dot on' : 'tour-dot'} />
+              <button
+                key={c.title}
+                type="button"
+                className={i === card ? 'tour-dot on' : 'tour-dot'}
+                onClick={() => setCard(i)}
+                aria-label={'Step ' + (i + 1) + ' of ' + CARDS.length}
+                aria-current={i === card}
+              />
             ))}
           </div>
           {card > 0 ? (

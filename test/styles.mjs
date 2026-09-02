@@ -281,4 +281,40 @@ export function run(test) {
     assert.match(sheet, /transition-timing-function: var\(--ease\)/, 'the rail still springs past its docked position')
   })
 
+  test('the tab you pressed is underlined, on paper the small type is readable, and the rest', () => {
+    // :active at (0,3,1) outranked .current at (0,2,1): the grey press underline stuck on iOS.
+    const current = code.indexOf('button.view-tab.current:not(:disabled) {')
+    const active = code.indexOf('button.view-tab:active:not(:disabled) {')
+    assert.ok(current !== -1 && active !== -1 && current > active, 'the current tab’s underline loses to the press state')
+    const tab = code.slice(code.indexOf('button.view-tab {'), code.indexOf('}', code.indexOf('button.view-tab {')))
+    assert.match(tab, /min-height: 44px/, 'the tab bar is under the touch floor')
+    const toggle = code.slice(code.indexOf('.theme-toggle button {'), code.indexOf('}', code.indexOf('.theme-toggle button {')))
+    assert.ok(!/min-height: 0/.test(toggle), 'the theme toggle opts out of the touch floor')
+    // Tour dots and hand edits have their styles.
+    assert.match(code, /button\.tour-dot \{/, 'the tour dots are not styled as buttons')
+    assert.match(code, /\.turn-hand \.turn-text \{/, 'hand edits lost their quiet style')
+    assert.match(code, /\.chain-strip\[data-overflow='yes'\] \{[^}]*mask-image/, 'the chain strip has no edge fade when it scrolls')
+  })
+
+  test('on paper the faint type still reads', () => {
+    /*
+     * The cream theme's --silk-faint was #8b9099 on #f2efe9: 2.8:1, under
+     * even the large-text floor, on every "FM3", "500", "set up", "Off" and
+     * inactive tab. WCAG AA for text is 4.5:1.
+     */
+    const block = code.slice(code.indexOf("[data-theme='light'] {"), code.indexOf('}', code.indexOf("[data-theme='light'] {")))
+    const token = (name) => block.match(new RegExp(`--${name}: (#[0-9a-f]{6})`))?.[1]
+    const lum = (hex) => {
+      const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+      return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+    }
+    const ratio = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05)
+    for (const ground of ['chassis', 'panel']) {
+      for (const ink of ['silk', 'silk-dim', 'silk-faint']) {
+        const r = ratio(token(ink), token(ground))
+        assert.ok(r >= 4.5, `--${ink} on --${ground} is ${r.toFixed(2)}:1 in the light theme`)
+      }
+    }
+  })
+
 }

@@ -66,12 +66,11 @@ export default function ParamSearch({ blocks, onPick, onError }) {
 
       {needle.length >= 2 && index && !reading ? (
         hits.length ? (
-          <div className="param-search-hits" role="list">
+          <div className="param-search-hits">
             {hits.map(({ block, param }) => (
               <button
                 key={`${block.effectId}-${param.id}`}
                 className="param-search-hit"
-                role="listitem"
                 onClick={() => onPick(block.effectId, param.id)}
               >
                 <span className="hit-block">{block.name}</span>

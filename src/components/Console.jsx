@@ -62,6 +62,29 @@ import { slotLabel, startsBank } from '../lib/slots'
 export function Chain({ blocks, selected, onSelect, onToggle }) {
   const chain = blocks.filter((b) => !['input', 'output'].includes(b.slug))
   const lastTap = useRef({ id: null, at: 0 })
+  const strip = useRef(null)
+
+  /*
+   * Whether there is more chain off the right edge. On a phone the strip
+   * scrolls sideways with its scrollbar hidden, so a full chain simply ran off
+   * the edge with a hard cut and nothing to say so. The fade that says so is
+   * CSS; this is the one fact it needs, kept current on resize and scroll.
+   */
+  useEffect(() => {
+    const el = strip.current
+    if (!el || typeof ResizeObserver === 'undefined') return undefined
+    const look = () => {
+      el.dataset.overflow = el.scrollWidth - el.clientWidth - el.scrollLeft > 1 ? 'yes' : 'no'
+    }
+    look()
+    const ro = new ResizeObserver(look)
+    ro.observe(el)
+    el.addEventListener('scroll', look, { passive: true })
+    return () => {
+      ro.disconnect()
+      el.removeEventListener('scroll', look)
+    }
+  }, [chain.length])
 
   const tap = (block) => {
     const now = Date.now()
@@ -79,7 +102,7 @@ export function Chain({ blocks, selected, onSelect, onToggle }) {
       {/* No heading. A row of coloured, three-letter tiles between two signal
           arrows is not something anyone needs told is the effects chain, and
           on a phone that word cost more vertical space than a tile. */}
-      <div className="chain-strip">
+      <div className="chain-strip" ref={strip}>
         <span className="io-arrow" aria-hidden="true">
           ▶
         </span>

@@ -121,6 +121,7 @@ import {
   signOutHere,
   faultCopy
 } from './lib/link'
+import { pushEntry, replaceEntry } from './lib/nav'
 import { validateSpec, countWrites, countSceneWrites } from './lib/validate'
 import { beatFlash, bringIntoView } from './lib/feedback'
 import {
@@ -483,7 +484,7 @@ export default function App() {
     if (!fromAssistant && UNSAVES_PRESET.has(kind)) setDirty(true)
 
     if (fromAssistant || !HAND_EDIT_KINDS.has(kind)) return
-    setTurns((prev) => [...prev, { role: 'system', text: summary }])
+    setTurns((prev) => [...prev, { role: 'hand', text: summary }])
   }, [])
 
   /**
@@ -794,6 +795,46 @@ export default function App() {
     bootLink().then(setLink)
     return stop
   }, [])
+
+  /*
+   * A sheet belongs to the screen it was opened from. A block sheet left open
+   * across a tab press sat over Create with its scrim taking the first tap.
+   * On `view` alone: a handler that opens a sheet never changes the screen in
+   * the same breath, so this cannot close what it just opened.
+   */
+  useEffect(() => setSheet(null), [view])
+
+  /*
+   * Back moves between screens.
+   *
+   * There is no router, so without an entry per screen Back left the app from
+   * any of them. The entries go through the same ledger the sheets use
+   * (lib/nav.js); this listener reads the entry's state and never swallows a
+   * pop, so it does not count as a sheet in the sheets' books.
+   */
+  const fromPop = useRef(false)
+  const viewRef = useRef(view)
+  viewRef.current = view
+  useEffect(() => {
+    replaceEntry({ view: viewRef.current })
+    const onPop = (e) => {
+      const st = e.state
+      if (!st || st.sheet || typeof st.view !== 'string') return
+      if (st.view === viewRef.current) return
+      fromPop.current = true
+      setView(st.view)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+  useEffect(() => {
+    if (fromPop.current) {
+      fromPop.current = false
+      return
+    }
+    if (window.history.state?.view === view) return
+    pushEntry({ view })
+  }, [view])
 
   /*
    * The Mac answering is the moment the phone's view of the unit is worth
@@ -1585,7 +1626,7 @@ export default function App() {
           presetName: preset?.name,
           presetNumber: preset?.number,
           history: turns.map((t) =>
-            t.role === 'system'
+            t.role === 'hand'
               ? { role: 'user', text: `(I did this by hand: ${t.text})` }
               : { role: t.role, text: t.text }
           )
