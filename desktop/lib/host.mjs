@@ -261,6 +261,49 @@ export async function armHost({
 }
 
 /**
+ * Whether macOS is likely to be stopping a phone from reaching this Mac.
+ *
+ * The address in the menu works from the Mac and fails from a phone, and
+ * nothing says why. macOS asks separately about connections that arrive from
+ * other machines, and until that is allowed the server is listening to a door
+ * nobody can knock on. It is the first thing to check and the last thing
+ * anyone thinks of.
+ *
+ * Best effort by design: the answer is used to add a line to a menu, so
+ * anything unclear returns `known: false` and the menu says nothing rather
+ * than guessing. An app that cries wolf about a firewall is worse than one
+ * that stays quiet.
+ */
+export function readFirewall({ run, appPath } = {}) {
+  const tool = '/usr/libexec/ApplicationFirewall/socketfilterfw'
+  if (!run) return { known: false }
+
+  let on
+  try {
+    const state = run(tool, ['--getglobalstate'])
+    if (/disabled|State\s*=\s*0/i.test(state)) on = false
+    else if (/enabled|State\s*=\s*[12]/i.test(state)) on = true
+    else return { known: false }
+  } catch {
+    return { known: false }
+  }
+  if (!on) return { known: true, on: false, blocked: false }
+
+  // On, so the question is whether this app in particular is let through.
+  let blocked = null
+  if (appPath) {
+    try {
+      const app = run(tool, ['--getappblocked', appPath])
+      if (/allow incoming/i.test(app)) blocked = false
+      else if (/block/i.test(app)) blocked = true
+    } catch {
+      // Unknown. The firewall is on, which is worth mentioning on its own.
+    }
+  }
+  return { known: true, on: true, blocked }
+}
+
+/**
  * Wait until the device server is actually answering.
  *
  * Spawning it is not starting it: the process exists long before Fastify is

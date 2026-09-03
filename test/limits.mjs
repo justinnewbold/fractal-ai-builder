@@ -191,6 +191,18 @@ export function run(test) {
     )
   })
 
+  test('the menu offers the way in that works, and names the usual reason one does not', () => {
+    /*
+     * Two ways to a phone, and the menu only ever mentioned one — the wifi
+     * address, with nothing said when macOS was quietly refusing connections
+     * from other machines, and no mention of the relay even once it was on.
+     */
+    const main = read('desktop/main.js')
+    assert.match(main, /firewall\.known && firewall\.on && firewall\.blocked !== false/, 'the menu never mentions the firewall, or mentions it when it is not the problem')
+    assert.match(main, /phone\?\.on\n?\s*\?/, 'the relay is offered whether or not it works')
+    assert.match(main, /fractal\.newbold\.cloud/, 'the other way in is not offered at all')
+  })
+
   test('nothing is shown until there is something to show', () => {
     /*
      * Electron-only, so structural. The window is opened on a URL the server

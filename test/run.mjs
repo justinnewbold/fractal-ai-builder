@@ -313,6 +313,56 @@ test('ForgeFX is only found where the server actually is', () => {
   assert.equal(host.findForgeFX({ env: { HOME: '/Users/x' }, exists: () => false }), null)
 })
 
+test('a phone that cannot reach the Mac is told the likely reason', async () => {
+  /*
+   * The address in the menu works from the Mac and fails from a phone, and
+   * nothing said why. macOS asks separately about connections arriving from
+   * other machines, and until that is allowed the server is listening at a
+   * door nobody can knock on.
+   *
+   * Best effort on purpose: it adds a line to a menu, so anything unclear says
+   * nothing. An app that cries wolf about a firewall is worse than a quiet one.
+   */
+  const say = (out) => () => out
+  assert.deepEqual(
+    host.readFirewall({ run: say('Firewall is disabled. (State = 0)') }),
+    { known: true, on: false, blocked: false }
+  )
+
+  // On, and this app explicitly allowed through: nothing to report.
+  const allowed = host.readFirewall({
+    appPath: '/Applications/Fractal AI Builder.app',
+    run: (_cmd, args) =>
+      args[0] === '--getglobalstate'
+        ? 'Firewall is enabled. (State = 1)'
+        : 'ALF: Fractal AI Builder is set to allow incoming connections'
+  })
+  assert.deepEqual(allowed, { known: true, on: true, blocked: false })
+
+  // On and blocking: the case worth a line in the menu.
+  const blocked = host.readFirewall({
+    appPath: '/Applications/Fractal AI Builder.app',
+    run: (_cmd, args) =>
+      args[0] === '--getglobalstate'
+        ? 'Firewall is enabled. (State = 1)'
+        : 'ALF: Fractal AI Builder is set to block all incoming connections'
+  })
+  assert.equal(blocked.blocked, true)
+
+  // Anything it cannot read is not guessed at.
+  assert.deepEqual(host.readFirewall({}), { known: false }, 'it guesses when it cannot run the tool')
+  assert.deepEqual(
+    host.readFirewall({
+      run: () => {
+        throw new Error('no such tool')
+      }
+    }),
+    { known: false },
+    'a missing tool is reported as a firewall answer'
+  )
+  assert.deepEqual(host.readFirewall({ run: say('something unexpected') }), { known: false })
+})
+
 test('the window waits for the server to answer, rather than racing it', async () => {
   /*
    * Spawning is not starting. Fastify listens a second or two after the
