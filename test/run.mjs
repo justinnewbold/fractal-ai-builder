@@ -313,6 +313,27 @@ test('ForgeFX is only found where the server actually is', () => {
   assert.equal(host.findForgeFX({ env: { HOME: '/Users/x' }, exists: () => false }), null)
 })
 
+test('an installed app uses the server it shipped with', () => {
+  /*
+   * The packaged app hands findForgeFX the copy inside its own bundle. That has
+   * to beat the developer locations, or an app installed on a machine that also
+   * has a checkout would run the checkout — which is the kind of thing that
+   * works on the machine it was built on and nowhere else.
+   *
+   * FORGEFX_PATH still wins over both: it is somebody deliberately saying where.
+   */
+  const exists = () => true
+  const vendored = '/Applications/Fractal AI Builder.app/Contents/Resources/vendor/forgefx'
+  assert.equal(host.findForgeFX({ env: { HOME: '/Users/x' }, exists, extra: [vendored] }), vendored)
+  assert.equal(
+    host.findForgeFX({ env: { HOME: '/Users/x', FORGEFX_PATH: '/opt/ff' }, exists, extra: [vendored] }),
+    '/opt/ff',
+    'pointing FORGEFX_PATH at a checkout no longer overrides the bundled copy'
+  )
+  // And with nothing bundled, the old behaviour is untouched.
+  assert.equal(host.findForgeFX({ env: { HOME: '/Users/x' }, exists }), '/Users/x/src/forgefx')
+})
+
 test('FORGEFX_PATH wins over the guesses', () => {
   const exists = () => true
   assert.equal(

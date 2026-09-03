@@ -15,6 +15,11 @@ files:
 extraResources:
   - from: ../dist
     to: dist
+  # ForgeFX and its codec, pinned and built by scripts/vendor-forgefx.mjs. They
+  # travel together because the server depends on the codec by relative path,
+  # and they sit outside the asar so their native modules load normally.
+  - from: vendor
+    to: vendor
 mac:
   category: public.app-category.music
   # A PNG, not an .icns: electron-builder converts it with its own bundled
