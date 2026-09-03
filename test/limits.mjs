@@ -167,6 +167,39 @@ export function run(test) {
     assert.match(tray, /if \(!tray\) \{/, 'buildTray constructs a Tray every time it draws the menu')
   })
 
+  test('a build with no certificate does not try to sign with an empty one', () => {
+    /*
+     * electron-builder decides whether to sign from whether CSC_LINK is
+     * *defined*, not whether it is useful: `getCscLink` is commented "allow to
+     * specify as empty string" and the gate is `cscLink == null`. GitHub turns
+     * a secret that does not exist into an empty string, which is not null — so
+     * naming the secret unconditionally means "sign, with this empty
+     * certificate", and the build dies with "<dir> not a file".
+     *
+     * It cost a green pull request and a red manual build to find, because
+     * electron-builder refuses to sign PR builds at all: the one trigger that
+     * runs on every change is the one trigger that cannot reproduce it.
+     *
+     * An `env:` block cannot leave a variable unset, so the fix is two steps
+     * and the guard is that the signing one is gated.
+     */
+    const wf = read('.github/workflows/desktop.yml')
+    const signing = wf.slice(wf.indexOf('- name: Package, signed'))
+    assert.ok(signing.includes('CSC_LINK'), 'the signed build no longer names the certificate — retarget this test')
+    assert.match(
+      signing.slice(0, signing.indexOf('run:')),
+      /if: .*SIGNABLE == 'true'/,
+      'the certificate is named by a step that can run without one, which reads as "sign with nothing"'
+    )
+    const unsigned = wf.slice(wf.indexOf('- name: Package\n'), wf.indexOf('- name: Package, signed'))
+    assert.match(
+      unsigned,
+      /CSC_IDENTITY_AUTO_DISCOVERY: 'false'/,
+      'the unsigned build does not say it has nothing to sign with, so it goes looking'
+    )
+    assert.ok(!/CSC_LINK/.test(unsigned), 'the unsigned build names a certificate')
+  })
+
   test('the device server the app ships is pinned to a commit, and travels with it', () => {
     /*
      * We copy someone else's project into an installer we sign. What goes in
