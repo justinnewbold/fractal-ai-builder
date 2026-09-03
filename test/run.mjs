@@ -352,6 +352,23 @@ test('ForgeFX is started already able to host a phone', async () => {
   assert.equal(own.AXIS_CLOUD, '0', 'an operator turning the cloud off was overruled')
 })
 
+test('the packaged app starts a device server, not a second copy of itself', () => {
+  /*
+   * `process.execPath` in a packaged Electron app is the Electron binary, so
+   * spawning it with a script launches the app again rather than running the
+   * script. The whole of the fix is one variable, and the failure it prevents
+   * is the app opening perfectly and never finding the unit — which reads like
+   * a cable problem and is not one.
+   *
+   * The terminal launcher is already Node and must not set it: Node exits on
+   * an unknown flag it does not have, and more to the point it would be a lie.
+   */
+  const asNode = host.serverEnv({ env: {}, port: 5056, dist: '/d', asNode: true })
+  assert.equal(asNode.ELECTRON_RUN_AS_NODE, '1')
+  const plain = host.serverEnv({ env: {}, port: 5056, dist: '/d' })
+  assert.equal(plain.ELECTRON_RUN_AS_NODE, undefined, 'the terminal launcher claims to be Electron')
+})
+
 test('the web app and the launchers name the same project', async () => {
   // Two copies of a URL and a key drift; the phone then signs into one
   // project and the Mac hosts on another, and neither ever hears the other.

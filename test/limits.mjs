@@ -145,6 +145,28 @@ export function run(test) {
     assert.ok(Number.isFinite(cap), 'no maxOutputTokens — the request runs on the provider default')
     assert.ok(cap >= 8000, `maxOutputTokens is ${cap}, low enough to truncate a full chain`)
   })
+  test('the Mac app spawns Node and keeps one menu-bar icon', () => {
+    /*
+     * Both of these are Electron-only, so nothing here can run them — but both
+     * are visible in the shape of the code, which is the same trade the rest of
+     * the structural checks make.
+     *
+     * The spawn is the one that matters: without the flag the packaged app
+     * launches a second copy of itself instead of the device server. The tray
+     * is the one that would look like a mystery: buildTray runs twice, once at
+     * launch and once when the phone status lands, and constructing the Tray
+     * unconditionally leaves two icons in the menu bar.
+     */
+    const main = read('desktop/main.js')
+    assert.match(
+      main,
+      /serverEnv\(\{ port, dist: distPath\(\), asNode: true \}\)/,
+      'the device server is spawned without ELECTRON_RUN_AS_NODE, so a packaged app starts itself again'
+    )
+    const tray = main.slice(main.indexOf('function buildTray()'), main.indexOf('app.whenReady'))
+    assert.match(tray, /if \(!tray\) \{/, 'buildTray constructs a Tray every time it draws the menu')
+  })
+
   test('the Mac app and the app it carries claim the same version', () => {
     /*
      * The desktop package sat at 0.1.0 through six major versions of the thing

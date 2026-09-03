@@ -89,9 +89,26 @@ export function addresses({ port = DEFAULT_PORT, name = DEFAULT_NAME, ip } = {})
  * and ForgeFX's own `.env` cannot override these, because Node's loader does
  * not replace a variable that is already in the environment.
  */
-export function serverEnv({ env = process.env, port = DEFAULT_PORT, dist, project = DEFAULT_PROJECT }) {
+export function serverEnv({
+  env = process.env,
+  port = DEFAULT_PORT,
+  dist,
+  project = DEFAULT_PROJECT,
+  asNode = false
+}) {
   return {
     ...env,
+    /*
+     * Electron, told to be Node.
+     *
+     * The desktop app starts the server with `process.execPath`, which in a
+     * packaged app is the Electron binary — so without this it launches a
+     * second copy of the app rather than running the server, and the unit is
+     * never reachable. It reads as "run this script with the binary I am", and
+     * that is only true of a binary that is already Node. The terminal
+     * launcher is already Node and passes nothing.
+     */
+    ...(asNode ? { ELECTRON_RUN_AS_NODE: '1' } : {}),
     PORT: String(port),
     FORGEFX_STATIC: dist,
     AXIS_CLOUD: env.AXIS_CLOUD ?? '1',
