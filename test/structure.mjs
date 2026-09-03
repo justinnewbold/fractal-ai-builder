@@ -923,8 +923,12 @@ export function run(test) {
     assert.equal((src.match(/role: 'hand'/g) || []).length, 1, 'hand edits are not the one producer of the hand role')
     assert.match(src, /t\.role === 'hand'\s*\n?\s*\? \{ role: 'user', text: `\(I did this by hand/, 'the model is no longer told which turns were hand edits')
     const assistant = read('Assistant.jsx')
-    assert.match(assistant, /turn\.role === 'hand' \? `You: \$\{turn\.text\}`/, 'the "You:" prefix is back on narration')
-    assert.ok(!/'system' \? `You:/.test(assistant), 'narration is labelled as something the player said')
+    // "You: Named scene 4 Solo" — a hand edit is an event, not speech. Nothing in the transcript wears "You:".
+    assert.ok(!/You:/.test(assistant), 'a "You:" prefix is back in the transcript')
+    assert.match(assistant, /<p className="turn-text">\{turn\.text\}<\/p>/, 'the turn text is decorated')
+    // Two narration sites were filed as hand edits: the app's own words about itself must pass fromAssistant.
+    assert.match(src, /record\('grid', 'Built a chain into the empty slot', \[\], true\)/, 'the design’s own chain build is recorded as a hand edit')
+    assert.match(src, /record\('library', `Kept locally, but not to your account — \$\{err\.message\}`, \[\], true\)/, 'a cloud-save failure is recorded as a hand edit')
     // The typed placeholder follows the reduced-motion setting live, through the one shared hook.
     assert.match(assistant, /import \{ useAsks \} from '\.\.\/lib\/asks'/, 'Assistant reads reduced motion once at mount again')
     assert.match(assistant, /useAsks\('\(prefers-reduced-motion: reduce\)'\)/)
