@@ -261,6 +261,46 @@ export async function armHost({
 }
 
 /**
+ * Who, if anyone, already has the port.
+ *
+ * ForgeFX allocates its own port when the one it is given is taken: it catches
+ * EADDRINUSE and re-listens on 0, letting the OS choose. That is sensible for a
+ * server started by hand and quietly wrong for one started by an app, because
+ * the app goes on believing the port it asked for is the port it got — it opens
+ * a window on 5056, and whatever was already there answers.
+ *
+ * That is not hypothetical: it is what the first person to run this app saw. A
+ * ForgeFX they already had running answered, knew nothing about serving the
+ * page, and returned a bare 404 into the app's own window.
+ *
+ * So the launcher asks first, and asks specifically: is anything there, and is
+ * it a ForgeFX? Two instances must not both open the same serial port, so the
+ * answer decides between carrying on, standing aside, and moving.
+ */
+export async function whoHasPort({ port = DEFAULT_PORT, fetch = globalThis.fetch, connect } = {}) {
+  const listening = await new Promise((done) => {
+    // Injected so this is testable without binding anything.
+    if (!connect) return done(null)
+    connect(port, done)
+  })
+  if (!listening) return { free: true }
+  try {
+    const res = await fetch(`http://localhost:${port}/healthz`)
+    if (res.ok) return { free: false, forgefx: true }
+  } catch {
+    // Something is there and it is not answering as ForgeFX does.
+  }
+  return { free: false, forgefx: false }
+}
+
+/** What to say when the port is held by a ForgeFX we did not start. */
+export const PORT_TAKEN = (port = DEFAULT_PORT) =>
+  `ForgeFX is already running on this Mac, on port ${port}.\n\n` +
+  'This app carries its own copy and cannot share the unit with another one — two of\n' +
+  'them cannot both hold the serial port. Quit the ForgeFX you have running (a Terminal\n' +
+  'window, a Docker container, or another copy of this app) and open this again.'
+
+/**
  * Publish the name, and hand back the way to stop.
  *
  * `Bonjour` is injected because this module has to stay importable without it

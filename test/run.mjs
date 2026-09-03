@@ -313,6 +313,40 @@ test('ForgeFX is only found where the server actually is', () => {
   assert.equal(host.findForgeFX({ env: { HOME: '/Users/x' }, exists: () => false }), null)
 })
 
+test('the app refuses to serve from a port something else already holds', async () => {
+  /*
+   * The first person to run this app got a bare 404 in the window, and the
+   * cause was ForgeFX being helpful: it catches EADDRINUSE and re-listens on a
+   * port the OS picks. Started by hand that is kind. Started by an app it is a
+   * trap, because the app still opens a window on the port it asked for — and
+   * a ForgeFX the person already had running answered it, knowing nothing
+   * about serving the page.
+   *
+   * Two of them must not both hold the serial port either, so the launcher
+   * asks before it starts anything, and distinguishes a ForgeFX from anything
+   * else because the two need different sentences.
+   */
+  const free = await host.whoHasPort({ connect: (_p, done) => done(false) })
+  assert.deepEqual(free, { free: true })
+
+  const theirs = await host.whoHasPort({
+    connect: (_p, done) => done(true),
+    fetch: async () => ({ ok: true })
+  })
+  assert.deepEqual(theirs, { free: false, forgefx: true })
+
+  const stranger = await host.whoHasPort({
+    connect: (_p, done) => done(true),
+    fetch: async () => {
+      throw new Error('connection refused')
+    }
+  })
+  assert.deepEqual(stranger, { free: false, forgefx: false })
+
+  assert.match(host.PORT_TAKEN(5056), /already running on this Mac, on port 5056/)
+  assert.match(host.PORT_TAKEN(), /serial port/, 'the reason two cannot share is not explained')
+})
+
 test('an installed app uses the server it shipped with', () => {
   /*
    * The packaged app hands findForgeFX the copy inside its own bundle. That has
