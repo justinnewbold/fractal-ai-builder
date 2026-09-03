@@ -7,9 +7,14 @@
     <true/>
     <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
     <true/>
-    <!-- ForgeFX opens a USB serial port, and answers a phone on the LAN. -->
-    <key>com.apple.security.device.usb</key>
-    <true/>
+    <!--
+      ForgeFX answers a phone on the LAN, and reaches the account service.
+
+      No com.apple.security.device.usb: that is an App Sandbox entitlement, and
+      this app is not sandboxed — there is no com.apple.security.app-sandbox
+      key here, so it was inert. Serial access under the hardened runtime needs
+      no entitlement; claiming one that does nothing only reads as an oversight.
+    -->
     <key>com.apple.security.network.server</key>
     <true/>
     <key>com.apple.security.network.client</key>

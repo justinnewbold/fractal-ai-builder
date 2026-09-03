@@ -167,6 +167,49 @@ export function run(test) {
     assert.match(tray, /if \(!tray\) \{/, 'buildTray constructs a Tray every time it draws the menu')
   })
 
+  test('the Mac app has a face, and claims only entitlements it uses', () => {
+    /*
+     * The first real Mac build reported "default Electron icon is used —
+     * application icon is not set", which is what ships if nobody looks: an
+     * installer whose icon belongs to the framework it happens to be built on.
+     *
+     * The icon is a PNG rather than an .icns because electron-builder converts
+     * one with its own bundled tool, so it can be generated from public/icon.svg
+     * (npm run icon) on any machine instead of being a second hand-made copy of
+     * the artwork that drifts from the first.
+     */
+    const png = readFileSync(new URL('../desktop/build/icon.png', import.meta.url))
+    assert.deepEqual(
+      [...png.subarray(0, 8)],
+      [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+      'the Mac icon is not a PNG'
+    )
+    // IHDR: 8 bytes of signature, a length and a type, then width and height.
+    const width = png.readUInt32BE(16)
+    const height = png.readUInt32BE(20)
+    assert.ok(width >= 512 && height >= 512, `the Mac icon is ${width}x${height}; macOS wants 512 upwards`)
+    assert.match(
+      read('desktop/electron-builder.yml'),
+      /^\s*icon: build\/icon\.png$/m,
+      'the icon is committed but the build does not name it, which is the same as not having one'
+    )
+
+    /*
+     * App Sandbox entitlements are inert without com.apple.security.app-sandbox,
+     * and this app is not sandboxed — it opens a serial port and listens on the
+     * LAN, neither of which the sandbox permits. It carried device.usb anyway,
+     * which does nothing and reads as an oversight. Parsed as keys rather than
+     * matched as text, because the file explains the absence in a comment.
+     */
+    const plist = read('desktop/entitlements.mac.plist')
+    const keys = [...plist.matchAll(/<key>([^<]+)<\/key>/g)].map((m) => m[1])
+    assert.ok(keys.includes('com.apple.security.network.client'), 'the entitlements moved')
+    const sandboxOnly = keys.filter((k) => /^com\.apple\.security\.(device|files|personal-information|assets)\./.test(k))
+    if (!keys.includes('com.apple.security.app-sandbox')) {
+      assert.deepEqual(sandboxOnly, [], `sandbox-only entitlements in an app with no sandbox: ${sandboxOnly.join(', ')}`)
+    }
+  })
+
   test('the Mac app and the app it carries claim the same version', () => {
     /*
      * The desktop package sat at 0.1.0 through six major versions of the thing
