@@ -20,47 +20,6 @@ const STAGES = [
 ]
 
 /**
- * How long this has been going, and after a while, the truth.
- *
- * These lines are a guess at what a model is doing, and they were presented as
- * if they were status: the script ran out after half a minute, parked on
- * "Nearly there…", and then said that identical thing whether the model was a
- * token from finishing or the request had died two minutes earlier. Someone
- * watching it for four minutes was watching an animation.
- *
- * So the script now describes only the window it can honestly describe, and
- * after that this counts out loud. A generation that is genuinely working shows
- * its work in the live output beside this; one that isn't shows a clock going
- * up, which is the fact.
- */
-export function Stages({ active, startedAt }) {
-  const [now, setNow] = useState(Date.now())
-
-  useEffect(() => {
-    if (!active) return
-    const id = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(id)
-  }, [active])
-
-  if (!active) return null
-
-  const seconds = startedAt ? Math.max(0, Math.round((now - startedAt) / 1000)) : 0
-  const scripted = STAGES[Math.min(Math.floor(seconds / 3), STAGES.length - 1)]
-  const clock = seconds >= 60 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${seconds}s`
-
-  // Under half a minute a generation is simply running; past it, the honest
-  // thing is the clock and, further out, that this is no longer normal.
-  if (!startedAt) return <span>{scripted}…</span>
-  if (seconds < 24) return <span>{scripted}…</span>
-  if (seconds < 60) return <span>Waiting on the model — {clock}</span>
-  return (
-    <span>
-      Still waiting — {clock}. Longer than usual; Stop is safe, nothing has been written.
-    </span>
-  )
-}
-
-/**
  * What the model is producing, as it produces it.
  *
  * Partials arrive in the order the model decides things, so the chain appears
@@ -117,8 +76,50 @@ export function LiveGeneration({ partial, open, onToggle }) {
   )
 }
 
-export function Thinking({ message }) {
-  if (!message) return null
+/**
+ * The one line that says what is happening, and how long it has been happening.
+ *
+ * There were three of them. The conversation printed `progress` as a plain
+ * hint, this printed the identical string again with meter bars beside it, and
+ * a third row — a hand-built copy of these same bars wrapped around a `Stages`
+ * component — printed a scripted guess and a clock. Three lines, stacked, two
+ * of them word-for-word the same, and the only one carrying the elapsed time
+ * was the one that knew least about what the model was actually doing.
+ *
+ * So there is one line now and it owns both halves: the message, which comes
+ * from the events the request really emits, and the clock, which is the fact
+ * nothing else can supply. `STAGES` remains as the opening guess — it fills the
+ * second or two before the first event lands, and nothing more.
+ *
+ * The old script kept talking long after it had anything to say: it ran out
+ * after half a minute, parked on "Nearly there…", and said that identical thing
+ * whether the model was a token from finishing or had died two minutes earlier.
+ * A real message always wins over it here, and past a minute the line says
+ * plainly that this is no longer normal.
+ */
+export function Thinking({ message, active, startedAt }) {
+  const [now, setNow] = useState(Date.now())
+  const running = !!(active || message)
+
+  useEffect(() => {
+    if (!running || !startedAt) return
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [running, startedAt])
+
+  if (!running) return null
+
+  const seconds = startedAt ? Math.max(0, Math.round((now - startedAt) / 1000)) : null
+  const scripted = STAGES[Math.min(Math.floor((seconds ?? 0) / 3), STAGES.length - 1)]
+  const text = message || `${scripted}…`
+
+  let clock = null
+  if (seconds !== null) {
+    clock = seconds >= 60 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${seconds}s`
+    // Past a minute the clock alone reads as patience. Say what it means.
+    if (seconds >= 60) clock += ' · longer than usual, Stop is safe'
+  }
+
   return (
     <div className="thinking" role="status" aria-live="polite">
       <span className="thinking-bars" aria-hidden="true">
@@ -127,7 +128,10 @@ export function Thinking({ message }) {
         <i />
         <i />
       </span>
-      <span className="mono">{message}</span>
+      <span className="mono thinking-text">
+        {text}
+        {clock ? <span className="thinking-clock"> · {clock}</span> : null}
+      </span>
     </div>
   )
 }
