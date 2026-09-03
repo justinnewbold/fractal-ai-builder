@@ -293,6 +293,8 @@ export function run(test) {
     // Tour dots and hand edits have their styles.
     assert.match(code, /button\.tour-dot \{/, 'the tour dots are not styled as buttons')
     assert.match(code, /\.turn-hand \.turn-text \{/, 'hand edits lost their quiet style')
+    const hand = code.slice(code.lastIndexOf('.turn-hand .turn-text {'), code.indexOf('}', code.lastIndexOf('.turn-hand .turn-text {')))
+    assert.match(hand, /border-left: 2px solid var\(--silk-faint\)/, 'a hand edit has no mark of its own now that it has no word')
     assert.match(code, /\.chain-strip\[data-overflow='yes'\] \{[^}]*mask-image/, 'the chain strip has no edge fade when it scrolls')
   })
 

@@ -3998,6 +3998,13 @@ ol.action-list li.destructive::marker {
   font-style: italic;
 }
 
+/* A hand edit is an event in the conversation: a quiet rule and a mark in
+   the margin say "this happened" without a word that makes it speech. */
+.turn-hand .turn-text {
+  padding-left: var(--s-3);
+  border-left: 2px solid var(--silk-faint);
+}
+
 /* Design view no longer takes input — it explains where the input went. */
 .design-hint {
   margin-top: 18px;

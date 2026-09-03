@@ -1230,7 +1230,8 @@ export default function App() {
           try {
             await saveCloudPreset(buildEntry(fields))
           } catch (err) {
-            record('library', `Kept locally, but not to your account — ${err.message}`)
+            // The app talking about itself, not a hand on the unit.
+            record('library', `Kept locally, but not to your account — ${err.message}`, [], true)
           }
         }
         setHistoryKey((k) => k + 1)
@@ -1737,7 +1738,8 @@ export default function App() {
           }
           // Design computes against what is on the grid, so it has to see it.
           // Taken from read's return rather than state, which hasn't caught up.
-          record('grid', 'Built a chain into the empty slot')
+          // The app's own step inside a design, not a hand edit.
+          record('grid', 'Built a chain into the empty slot', [], true)
           builtBlocks = (await read()) || []
           // The same raw-count trap as above: input and output rows would pass
           // this guard even if placement wrote nothing. Count what's editable.
