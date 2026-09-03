@@ -34,10 +34,10 @@ export function run(test) {
     const bare = declarations('font-size').filter((v) => /^[0-9.]+px$/.test(v) && !sign.has(v))
     assert.deepEqual(bare, [], `font sizes off the scale: ${[...new Set(bare)].join(', ')}`)
 
-    // And the scale itself is seven steps, not seven plus whatever crept in.
+    // And the scale itself is six steps, not six plus whatever crept in.
     const steps = [...code.matchAll(/--f-(\d): ([0-9]+)px/g)].map((m) => m[2])
-    assert.equal(steps.length, 7, `the type scale has ${steps.length} steps`)
-    assert.deepEqual(steps, ['10', '11', '12', '13', '15', '20', '28'])
+    assert.equal(steps.length, 6, `the type scale has ${steps.length} steps`)
+    assert.deepEqual(steps, ['11', '12', '13', '15', '20', '28'])
   })
 
   test('every padding and gap comes off the spacing scale', () => {
@@ -331,7 +331,7 @@ export function run(test) {
     const rule = (sel) => code.slice(code.indexOf(sel + ' {'), code.indexOf('}', code.indexOf(sel + ' {')))
     assert.match(rule('button.topbar-preset'), /align-items: center/, 'the preset button packs its line to the top of a 44px box again')
     assert.match(rule('.topbar-preset-line'), /align-items: baseline/, 'the slot and the name no longer share a baseline')
-    assert.match(rule('button.phone-chip.compact'), /font-size: var\(--f-2\)/, 'the chip is back at 10px')
+    assert.match(rule('button.phone-chip.compact'), /font-size: var\(--f-1\)/, 'the chip is off the scale')
   })
 
   test('on a phone the bar drops the unsaved word so the preset keeps its name', () => {
@@ -348,15 +348,34 @@ export function run(test) {
     assert.equal(height(rule('button.gig-scene')), height(rule('button.gig-block')), 'scene tiles and effect blocks differ in height')
     const phone = code.slice(code.indexOf('@media (max-width: 620px) {\n  .gig-blocks {'))
     assert.match(phone.slice(0, 400), /button\.gig-block,\s*\n\s*button\.gig-scene \{\s*min-height: 66px/, 'on a phone the scenes and the blocks are sized apart again')
-    assert.match(rule('.gig-block-name'), /font-size: var\(--f-5\)/, 'the block name is small again')
-    assert.match(rule('button.gig-scene.named .gig-scene-name'), /font-size: var\(--f-5\)/, 'the scene name is small again')
-    assert.match(rule('.gig-block-state'), /font-size: var\(--f-3\)/)
-    assert.match(rule('.topbar-name'), /font-size: var\(--f-4\)/, 'the preset name in the bar is a headline again')
+    assert.match(rule('.gig-block-name'), /font-size: var\(--f-4\)/, 'the block name is small again')
+    assert.match(rule('button.gig-scene.named .gig-scene-name'), /font-size: var\(--f-4\)/, 'the scene name is small again')
+    assert.match(rule('.gig-block-state'), /font-size: var\(--f-2\)/)
+    assert.match(rule('.topbar-name'), /font-size: var\(--f-3\)/, 'the preset name in the bar is a headline again')
   })
 
   test('the search row the arrows are on is visible', () => {
     const rule = code.slice(code.indexOf('.param-search-hit.active {'), code.indexOf('}', code.indexOf('.param-search-hit.active {')))
     assert.match(rule, /border-color: var\(--signal\)/, 'the active search row looks like every other row')
+  })
+
+  test('the small type is 11px, state words are opaque, pills are targets with a mouse, and the bar says what it means', () => {
+    const rule = (sel) => code.slice(code.indexOf(sel + ' {'), code.indexOf('}', code.indexOf(sel + ' {')))
+    assert.match(code, /--f-1: 11px/, 'the smallest step of the scale is under 11px again')
+    assert.ok(!/--f-\d: 10px/.test(code), 'a 10px step is back on the scale')
+    assert.ok(!/opacity/.test(rule('.fx-chan')), 'the channel letter is see-through')
+    for (const sel of ['button.gig-block.on .gig-block-state', 'button.gig-block.off']) {
+      const every = [...code.matchAll(new RegExp(sel.replace(/[.()]/g, '\\$&') + ' \\{[^}]*\\}', 'g'))].map((m) => m[0])
+      assert.ok(every.length >= 1)
+      for (const r of every) assert.ok(!/opacity/.test(r), `${sel} dims with transparency, which takes the state word with it`)
+    }
+    assert.match(rule('button.fx-power'), /min-height: 44px/, 'the power pill is under 44px with a mouse')
+    assert.match(rule('.strip-btn'), /min-height: 44px/, 'the strip buttons are under 44px with a mouse')
+    assert.match(rule('.channel-buttons .chip'), /min-width: 44px/, 'the channel chips are narrow targets')
+    const how = rule('.topbar-how')
+    assert.match(how, /font-family: var\(--display\)/, '"demo" is set in the mono face again, where it read as "deno"')
+    assert.match(how, /text-transform: uppercase/)
+    assert.match(code, /\.topbar-slot::before \{\s*content: 'slot '/, 'the slot number has no noun')
   })
 
 }

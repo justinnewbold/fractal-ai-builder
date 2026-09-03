@@ -85,7 +85,7 @@ export default function TopBar({
         {/* The word carries the state as well as saying it: green when the unit
             is answering, red when it isn't, so the bar reads at a glance. */}
         {how ? (
-          <span className="topbar-how mono" data-state={lampState}>
+          <span className="topbar-how" data-state={lampState}>
             {how}
           </span>
         ) : null}
@@ -105,7 +105,10 @@ export default function TopBar({
                 of the button sat at its top edge — the name rode high beside
                 Save and the gear on every phone. */}
             <span className="topbar-preset-line">
-              <span className="topbar-slot mono">{preset?.number ?? '--'}</span>
+              <span className="topbar-slot mono">
+                <span className="sr-only">Preset </span>
+                {preset?.number ?? '--'}
+              </span>
               <span className="topbar-name">{preset?.name?.trim() || 'Untitled'}</span>
               <span className="topbar-caret" aria-hidden="true" />
             </span>
