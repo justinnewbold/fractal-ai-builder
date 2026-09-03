@@ -19,6 +19,7 @@
 const { app, BrowserWindow, Tray, Menu, shell, nativeImage, dialog } = require('electron')
 const { spawn } = require('node:child_process')
 const { join } = require('node:path')
+const net = require('node:net')
 
 let tray = null
 let win = null
@@ -58,11 +59,46 @@ async function start() {
     findForgeFX,
     lanAddress,
     publish,
-    serverEnv
+    serverEnv,
+    whoHasPort,
+    PORT_TAKEN
   } = await host()
 
   const port = Number(process.env.PORT || DEFAULT_PORT)
   const name = process.env.FRACTAL_MDNS_NAME || DEFAULT_NAME
+
+  /*
+   * Nothing else may already be on the port. ForgeFX moves itself when the port
+   * is taken — quietly, by design — and an app that then opens a window on the
+   * port it asked for is showing whatever else is there. Better to say so.
+   */
+  const held = await whoHasPort({
+    port,
+    connect: (p, done) => {
+      const socket = net.connect({ port: p, host: '127.0.0.1' })
+      const settle = (answer) => {
+        socket.destroy()
+        done(answer)
+      }
+      socket.once('connect', () => settle(true))
+      socket.once('error', () => settle(false))
+      socket.setTimeout(1000, () => settle(false))
+    }
+  })
+  if (held.forgefx) {
+    dialog.showErrorBox('ForgeFX is already running', PORT_TAKEN(port))
+    app.quit()
+    return
+  }
+  if (!held.free) {
+    dialog.showErrorBox(
+      'Something else is using this port',
+      `Port ${port} is in use by another program, so the app cannot serve from it.\n\n` +
+        'Quit whatever is using it and open this again.'
+    )
+    app.quit()
+    return
+  }
 
   const forgefx = findForgeFX({ extra: [vendored()] })
   if (!forgefx) {

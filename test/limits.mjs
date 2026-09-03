@@ -167,6 +167,20 @@ export function run(test) {
     assert.match(tray, /if \(!tray\) \{/, 'buildTray constructs a Tray every time it draws the menu')
   })
 
+  test('the app asks who has the port before it starts a server on it', () => {
+    /*
+     * Structural because it is Electron-only. The window is opened on the port
+     * the app asked for, so the check has to happen before anything is spawned
+     * or the window shows a stranger's answer — which is exactly what the first
+     * real run did.
+     */
+    const main = read('desktop/main.js')
+    const at = main.indexOf('await whoHasPort(')
+    assert.notEqual(at, -1, 'the app starts a server without asking whether the port is free')
+    assert.ok(at < main.indexOf('spawn(process.execPath'), 'the port is checked after the server is started, which is too late')
+    assert.match(main, /if \(held\.forgefx\)/, 'a ForgeFX already running is not told apart from anything else on the port')
+  })
+
   test('a build with no certificate does not try to sign with an empty one', () => {
     /*
      * electron-builder decides whether to sign from whether CSC_LINK is
