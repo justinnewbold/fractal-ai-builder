@@ -43,7 +43,11 @@ export function run(test) {
     const stream = read('src/lib/stream.js')
     const capMs = Number(stream.match(/const HARD_CAP_MS = (\d+)/)?.[1])
     const stallMs = Number(stream.match(/const STALL_MS = (\d+)/)?.[1])
-    assert.ok(Number.isFinite(capMs) && Number.isFinite(stallMs), 'the client caps moved')
+    const firstMs = Number(stream.match(/const FIRST_MS = (\d+)/)?.[1])
+    assert.ok(
+      Number.isFinite(capMs) && Number.isFinite(stallMs) && Number.isFinite(firstMs),
+      'the client caps moved'
+    )
 
     assert.ok(
       seconds * 1000 >= capMs,
@@ -53,6 +57,34 @@ export function run(test) {
     // A stall is meant to catch a silent connection, so it has to be the
     // shorter of the two or it never fires before the cap does.
     assert.ok(stallMs < capMs, 'the stall timeout is not shorter than the hard cap')
+    // Same for the model's first word: a budget the cap beats to the punch is
+    // not a budget, and the message the person reads would be the wrong one.
+    assert.ok(
+      firstMs < capMs,
+      'the first-answer budget is not shorter than the hard cap, so the cap fires first and blames the wrong thing'
+    )
+  })
+
+  test('the server says hello before it asks the model anything', () => {
+    /*
+     * Node holds the response until the first write, so with nothing written up
+     * front a browser waiting on `fetch` learns nothing until the first partial
+     * — and waiting for the first partial is the entire wait. Every timeout
+     * then looks identical from the browser, whether the server was never
+     * reached, the model never started, or the answer stopped halfway.
+     *
+     * The frame has to come before the model call, not merely exist: written
+     * after it, it says exactly as little as writing nothing did.
+     */
+    const api = read('api/generate.js')
+    const hello = api.indexOf("{ type: 'open' }")
+    const ask = api.indexOf('streamObject(args)')
+    assert.notEqual(hello, -1, 'the server no longer opens the stream before it asks the model')
+    assert.notEqual(ask, -1, 'the streaming call moved')
+    assert.ok(
+      hello < ask,
+      'the hello is written after the model call, which is the same as not writing it: nothing reaches the browser until the model does'
+    )
   })
 
   test('a verification report is rendered field by field, never as the object', () => {

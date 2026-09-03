@@ -1829,7 +1829,9 @@ function scheduledFetch(scripts) {
 }
 const DONE = JSON.stringify({ type: 'done', object: { blocks: [] } }) + '\n'
 const PARTIAL = JSON.stringify({ type: 'partial', object: { blocks: [{ slug: 'amp' }] } }) + '\n'
-const timing = { stallMs: 60, capMs: 400 }
+/** The server's hello, written before the model is asked anything. */
+const OPEN = JSON.stringify({ type: 'open' }) + '\n'
+const timing = { stallMs: 60, firstMs: 60, capMs: 400 }
 
 test('a slow first byte is not a stall', async () => {
   // The old clock started at the request: 45 s of waiting for the first token read as the model going quiet.
@@ -1859,11 +1861,64 @@ test('a stall before anything arrived is asked again, once', async () => {
   assert.equal(events.filter((k) => k === 'retrying').length, 1)
 })
 
-test('no first byte by the cap says the model never started, and is not retried', async () => {
+test('nothing at all by the cap blames the server, not the model', async () => {
+  // Not a distinction worth drawing until the server said hello first. Now it
+  // is: no bytes whatsoever means the request never got anywhere near a model,
+  // and telling someone the model was slow sends them to look in the wrong place.
   const f = scheduledFetch([{ steps: [], end: false }])
   globalThis.fetch = f.fetch
-  await assert.rejects(streamSpec({}, { timing }), (err) => err.generationFailure === 'capped' && /hasn't started answering/.test(err.message))
+  await assert.rejects(
+    streamSpec({}, { timing }),
+    (err) => err.generationFailure === 'capped' && /the server never answered/.test(err.message)
+  )
   assert.equal(f.calls(), 1)
+})
+
+test('the hello is the server talking, not the model answering', async () => {
+  /*
+   * The bug this exists for: the opening frame is bytes, and a clock that
+   * counts bytes would call it the model's first word and start the short
+   * mid-answer stall clock against it. It is neither — it is proof the round
+   * trip works and nothing more, and what follows it gets the long budget.
+   */
+  const f = scheduledFetch([
+    { steps: [{ at: 5, chunk: OPEN }], end: false },
+    { steps: [{ at: 5, chunk: OPEN }, { at: 10, chunk: DONE }] }
+  ])
+  globalThis.fetch = f.fetch
+  const events = []
+  const spec = await streamSpec({}, { timing, onEvent: (e) => events.push(e.kind) })
+  assert.deepEqual(spec, { blocks: [] })
+  assert.ok(events.includes('open'), `no open event: ${events.join(',')}`)
+  // Quiet after the hello is idempotent — nothing was written anywhere — so it
+  // is asked again rather than reported.
+  assert.equal(f.calls(), 2)
+  assert.equal(events.filter((k) => k === 'retrying').length, 1)
+})
+
+test('a hello with no answer behind it says so in those words', async () => {
+  const f = scheduledFetch([{ steps: [{ at: 5, chunk: OPEN }], end: false }])
+  globalThis.fetch = f.fetch
+  await assert.rejects(
+    // firstMs out of reach, so the cap is what fires: the server took it and
+    // the model never began.
+    streamSpec({}, { timing: { ...timing, firstMs: 10000 } }),
+    (err) => err.generationFailure === 'capped' && /the model hadn't started answering/.test(err.message)
+  )
+  assert.equal(f.calls(), 1)
+})
+
+test('quiet after the hello is the model, and it says the model', async () => {
+  const f = scheduledFetch([
+    { steps: [{ at: 5, chunk: OPEN }], end: false },
+    { steps: [{ at: 5, chunk: OPEN }], end: false }
+  ])
+  globalThis.fetch = f.fetch
+  await assert.rejects(
+    streamSpec({}, { timing }),
+    (err) => err.generationFailure === 'stalled' && /without starting to answer/.test(err.message)
+  )
+  assert.equal(f.calls(), 2, 'a quiet start was not retried — nothing had been written, so it was free to ask again')
 })
 
 test('the failure paths in App drop the half chain', () => {

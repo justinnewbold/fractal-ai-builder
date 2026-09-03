@@ -1333,5 +1333,19 @@ export function run(test) {
       /<Thinking message=\{progress\} active=\{thinking\} startedAt=\{genStarted\} \/>/,
       'the one working line has lost the elapsed clock, which was the only thing the third line knew that the other two did not'
     )
+
+    /*
+     * And it says which of the two waits is running. The server sends a hello
+     * before it asks the model anything, so this line changing at all is proof
+     * to the person watching that the round trip works — which is most of what
+     * anyone staring at a long wait actually wants to know. Dropped, the line
+     * would sit on "Reaching the server…" for the whole generation and say
+     * something false for most of it.
+     */
+    assert.match(
+      src,
+      /e\.kind === 'open'\) setProgress\(/,
+      "the working line ignores the server's hello, so it claims to be reaching the server long after it has"
+    )
   })
 }

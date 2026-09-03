@@ -311,6 +311,20 @@ export default async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store')
     res.setHeader('X-Accel-Buffering', 'no')
 
+    /*
+     * Say hello before the model is asked anything.
+     *
+     * Node holds the whole response until the first write, so a browser
+     * awaiting `fetch` learns nothing at all until the first partial — and
+     * waiting for the first partial IS the wait. One frame up front costs
+     * nothing and splits a failure that used to be a single word into two with
+     * different fixes: the server never answered, or the model never started.
+     * It also settles, from the browser, whether anything in between is
+     * buffering the stream — which is not a question a server log can answer.
+     */
+    res.write(JSON.stringify({ type: 'open' }) + '\n')
+    if (typeof res.flush === 'function') res.flush()
+
     try {
       const result = streamObject(args)
       for await (const partial of result.partialObjectStream) {
