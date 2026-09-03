@@ -352,4 +352,9 @@ export function run(test) {
     assert.match(rule('.topbar-name'), /font-size: var\(--f-4\)/, 'the preset name in the bar is a headline again')
   })
 
+  test('the search row the arrows are on is visible', () => {
+    const rule = code.slice(code.indexOf('.param-search-hit.active {'), code.indexOf('}', code.indexOf('.param-search-hit.active {')))
+    assert.match(rule, /border-color: var\(--signal\)/, 'the active search row looks like every other row')
+  })
+
 }
