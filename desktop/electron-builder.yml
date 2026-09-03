@@ -17,6 +17,10 @@ extraResources:
     to: dist
 mac:
   category: public.app-category.music
+  # A PNG, not an .icns: electron-builder converts it with its own bundled
+  # tool, so the icon stays generated from public/icon.svg (npm run icon) and
+  # nothing here needs a Mac to produce it.
+  icon: build/icon.png
   target:
     - target: dmg
       arch: [arm64, x64]
