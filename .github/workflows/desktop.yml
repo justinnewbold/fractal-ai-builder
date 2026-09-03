@@ -30,6 +30,11 @@ on:
 jobs:
   mac:
     runs-on: macos-latest
+    env:
+      # Whether a certificate exists at all. The `secrets` context cannot be
+      # read from a step's `if`, but `env` can, so the question is answered once
+      # here and asked by name below.
+      SIGNABLE: ${{ secrets.MAC_CERT_P12 != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -70,11 +75,30 @@ jobs:
             console.log('serial and MIDI both load under Electron-as-Node');
           "
 
+      # Two steps rather than one, and the reason is worth writing down.
+      #
+      # electron-builder decides whether to sign from whether CSC_LINK is
+      # *defined*: `getCscLink` is commented "allow to specify as empty string",
+      # and the gate is `cscLink == null`. GitHub turns a secret that does not
+      # exist into an empty string — which is not null — so naming the secret in
+      # `env:` says "sign, with this empty certificate", and the build dies with
+      # "<dir> not a file". A pull request hides it, because electron-builder
+      # refuses to sign PR builds at all; every other trigger hits it.
+      #
+      # An `env:` block cannot leave a variable unset, so the choice has to be
+      # which step runs. Signing belongs to a release tag anyway.
       - name: Package
+        if: ${{ !startsWith(github.ref, 'refs/tags/desktop-v') || env.SIGNABLE != 'true' }}
         working-directory: desktop
         env:
-          # Present → signed and notarised. Absent → an unsigned build that
-          # still runs, with a Gatekeeper prompt on first launch.
+          # Nothing to sign with, and say so rather than letting it look.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run dist
+
+      - name: Package, signed and notarised
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') && env.SIGNABLE == 'true' }}
+        working-directory: desktop
+        env:
           CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
