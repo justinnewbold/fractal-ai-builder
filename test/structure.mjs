@@ -1069,6 +1069,25 @@ export function run(test) {
     assert.match(read('Console.jsx'), /useOverflow\(strip, \[chain\.length\]\)/, 'the chain strip keeps a private observer')
   })
 
+  test('the pad remembers its labels, the model picker says its name, and Modifiers says what it needs', () => {
+    const read = (f) => readFileSync(new URL('../src/components/' + f, import.meta.url), 'utf8')
+    const xy = read('XYPad.jsx')
+    // ACROSS/UP showed "Choose…" over a pad that was set up, until the index arrived.
+    assert.match(xy, /\[`\$\{axis\}Name`\]: ctl \? `\$\{ctl\.block\.name\} · \$\{ctl\.param\.name\}` : undefined/, 'a choice is kept without its name')
+    assert.match(xy, /const saved = !index && axes\.x && axes\.y/, 'a saved pad is not told apart from an unset one while the controls are read')
+    assert.match(xy, /Reading \{savedName\('x'\)\} and \{savedName\('y'\)\}/, 'the saved names are not shown while reading')
+    assert.match(xy, /if \(next\.x && next\.y\) setPicking\(false\)/, 'the pickers never fold after Change')
+    assert.match(xy, /indexes\.set\(key, built\)/, 'every open of the pad re-reads every block')
+    const console_ = read('Console.jsx')
+    assert.ok(!/\{m\.basedOn \? ` — \$\{m\.basedOn\}` : ''\}/.test(console_), 'the model option carries the whole "based on" sentence again')
+    assert.match(console_, /className="hint pad based-on">Based on \{basedOn\}/, 'what a model is based on is not shown under the picker')
+    const mods = read('Modifiers.jsx')
+    assert.match(mods, /id="mod-why" role="status"/, 'the disabled Attach button gives no reason')
+    assert.match(mods, /aria-describedby=\{why \? 'mod-why' : undefined\}/)
+    assert.ok(!/<span className="hint">\{model\.sourcesNote\}<\/span>\n\s*\) : null\}\n\s*<\/label>/.test(mods), 'the sources note is inside the Source label again, naming the select with a sentence')
+    assert.match(mods, /id="mod-sources-note"/)
+  })
+
   test('the introduction is offered once, and only when there is something to see', () => {
     /*
      * Two mistakes a tutorial can make, both of which turn it from help into

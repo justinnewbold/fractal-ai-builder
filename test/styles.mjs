@@ -391,4 +391,10 @@ export function run(test) {
     assert.ok(!/\.scenes \{\s*margin-top: 34px/.test(code), 'the dead air under the Scenes sheet head is back')
   })
 
+  test('the model picker clips with an ellipsis, not mid-word', () => {
+    const rule = code.slice(code.indexOf('.type-select {'), code.indexOf('}', code.indexOf('.type-select {')))
+    assert.match(rule, /text-overflow: ellipsis/)
+    assert.ok(!/;;/.test(rule), 'a stray double semicolon is back')
+  })
+
 }
