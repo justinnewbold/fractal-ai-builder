@@ -191,6 +191,21 @@ export function run(test) {
     )
   })
 
+  test('nothing is shown until there is something to show', () => {
+    /*
+     * Electron-only, so structural. The window is opened on a URL the server
+     * may not be answering yet, and Electron does not retry a page that failed
+     * — so the order matters more than anything else here.
+     */
+    const main = read('desktop/main.js')
+    assert.match(main, /return waitForServer\(\{ port \}\)/, 'start() does not wait for the server it spawned')
+    const ready = main.indexOf('const answering = await start()')
+    assert.notEqual(ready, -1, 'the launch no longer waits on start()')
+    assert.ok(ready < main.indexOf('openWindow()\n})'), 'the window is opened before the server is known to answer')
+    assert.match(main, /if \(!answering\) \{/, 'a server that never answers leaves a blank window and no explanation')
+    assert.match(main, /did-fail-load/, 'a page that fails to load is never retried')
+  })
+
   test('the app asks who has the port before it starts a server on it', () => {
     /*
      * Structural because it is Electron-only. The window is opened on the port
