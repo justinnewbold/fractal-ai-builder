@@ -23,6 +23,8 @@ import cabTypes from '../data/cab-types.json'
 import ampParams from '../data/amp-params.json'
 import { fromNormalized } from './scale.js'
 import { createSceneBypass } from './sceneBypass.js'
+import { storedSceneNames, keepSceneNames, DEFAULT_SCENE_NAMES } from './demoMemory.js'
+import { createTunerStream } from './tunerStream.js'
 
 const GRID = { rows: 4, cols: 12 }
 
@@ -137,7 +139,7 @@ export function createMockDevice() {
     presetNumber: 500,
     presetName: 'DEMO',
     scene: 0,
-    sceneNames: ['Rhythm', 'Lead', 'Clean', '', '', '', '', ''],
+    sceneNames: storedSceneNames() || DEFAULT_SCENE_NAMES.slice(),
     // Bypass lives per scene, not on the block — see sceneBypass.js.
     scenes: createSceneBypass({ count: 8, seeds: SCENE_SEEDS }),
     blocks: LAYOUT.map((b, i) => ({
@@ -535,8 +537,11 @@ export function createMockDevice() {
 
     setSceneName: (index, name) => {
       state.sceneNames[index] = name
+      keepSceneNames(state.sceneNames)
       return { ok: true }
-    }
+    },
+
+    tunerStream: () => createTunerStream()
   }
 }
 
