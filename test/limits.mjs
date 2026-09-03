@@ -374,6 +374,45 @@ export function run(test) {
     assert.match(read('.gitignore'), /^desktop\/vendor$/m, 'the vendored tree is not ignored')
   })
 
+  test('a build that can sign, signs — and then proves it did', () => {
+    /*
+     * The gate used to be "only on a desktop-v* tag", which read as caution and
+     * was actually a guess. The real constraint is narrower and has a reason:
+     * electron-builder refuses to sign pull-request builds, because a PR from a
+     * fork would otherwise get at the certificate. Every other trigger can sign,
+     * and an artefact somebody installs is worth signing whether or not anyone
+     * called it a release — the tag rule mostly meant the .dmg people actually
+     * downloaded from a hand-started run was the unsigned one.
+     */
+    const wf = read('.github/workflows/desktop.yml')
+    const signed = wf.slice(wf.indexOf('- name: Package, signed and notarised'))
+    const gate = signed.slice(0, signed.indexOf('\n', signed.indexOf('if:')))
+    assert.match(
+      gate,
+      /github\.event_name != 'pull_request'/,
+      'the signed build is not gated on the one thing that actually forbids signing'
+    )
+    assert.ok(
+      !/refs\/tags\/desktop-v/.test(gate),
+      'signing is tied to a release tag again, so a hand-started build produces an unsigned .dmg'
+    )
+
+    /*
+     * And it is checked. Three questions, and an artefact can pass one while
+     * failing another: is the signature intact and complete, would Gatekeeper
+     * open it, and did notarisation actually attach a ticket. The last is the
+     * one nobody can answer by reading configuration — which is the whole point
+     * of asking the build instead of guessing.
+     */
+    for (const [cmd, why] of [
+      ['codesign --verify', 'nothing checks the signature covers what it should'],
+      ['spctl --assess', "nothing asks whether Gatekeeper would open it"],
+      ['stapler validate', 'nothing proves notarisation happened — a signed but un-notarised .dmg is still quarantined on a stranger\'s Mac']
+    ]) {
+      assert.ok(wf.includes(cmd), `${cmd} is gone: ${why}`)
+    }
+  })
+
   test('the Mac app has a face, and claims only entitlements it uses', () => {
     /*
      * The first real Mac build reported "default Electron icon is used —

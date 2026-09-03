@@ -10,11 +10,16 @@
 # is the difference between a .dmg that works on the machine that built it and
 # one that works on someone else's.
 #
-# Signing and notarisation are wired but dormant. Set the four secrets and the
-# .dmg opens with a double-click; leave them unset and it still builds, and
-# macOS asks for right-click → Open on first launch. Note that electron-builder
-# refuses to sign pull-request builds by design, so a PR only ever proves the
-# app assembles; the signed artefact comes from a desktop-v* tag.
+# Signing and notarisation happen whenever there is a certificate to sign with
+# and the run is not a pull request. Those are the two real constraints, and it
+# is worth saying why the second one is not "only on a release tag":
+# electron-builder refuses to sign PR builds by design, because a pull request
+# from a fork would otherwise get at the certificate. Everything else — a tag, a
+# push, a hand-started run — can sign, and should, because an artefact someone
+# installs is worth signing whether or not it was called a release.
+#
+# Without the secrets this still builds, and macOS then reports an unidentified
+# developer on first launch.
 name: desktop
 
 on:
@@ -88,9 +93,9 @@ jobs:
       # refuses to sign PR builds at all; every other trigger hits it.
       #
       # An `env:` block cannot leave a variable unset, so the choice has to be
-      # which step runs. Signing belongs to a release tag anyway.
+      # which step runs.
       - name: Package
-        if: ${{ !startsWith(github.ref, 'refs/tags/desktop-v') || env.SIGNABLE != 'true' }}
+        if: ${{ github.event_name == 'pull_request' || env.SIGNABLE != 'true' }}
         working-directory: desktop
         env:
           # Nothing to sign with, and say so rather than letting it look.
@@ -98,7 +103,7 @@ jobs:
         run: npm run dist
 
       - name: Package, signed and notarised
-        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') && env.SIGNABLE == 'true' }}
+        if: ${{ github.event_name != 'pull_request' && env.SIGNABLE == 'true' }}
         working-directory: desktop
         env:
           CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
@@ -107,6 +112,48 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npm run dist
+
+      # What the step above claims, checked against what macOS will actually do
+      # with the file. Three different questions, and a build can pass one while
+      # failing another:
+      #
+      #   codesign --verify   is the signature intact, and does it cover
+      #                       everything inside — the vendored server's native
+      #                       modules included
+      #   spctl --assess      would Gatekeeper let a person open this
+      #   stapler validate    did notarisation actually happen, and is the
+      #                       ticket attached so it works with no network
+      #
+      # The last one is why this step exists rather than a comment guessing at
+      # whether electron-builder notarises on the strength of credentials alone.
+      # If it does not, this goes red and names the missing piece, which beats
+      # shipping a .dmg that Gatekeeper quarantines on someone else's Mac.
+      - name: Prove the artefact is what it claims
+        if: ${{ github.event_name != 'pull_request' && env.SIGNABLE == 'true' }}
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          # Globs rather than `find | for`: the product name has spaces in it.
+          shopt -s nullglob
+
+          seen=0
+          for app in release/mac*/*.app; do
+            seen=1
+            echo "── $app"
+            codesign --verify --deep --strict --verbose=2 "$app"
+            spctl --assess --type exec --verbose=4 "$app"
+            xcrun stapler validate "$app"
+          done
+          [ "$seen" = 1 ] || { echo "no .app was produced to check"; exit 1; }
+
+          seen=0
+          for dmg in release/*.dmg; do
+            seen=1
+            echo "── $dmg"
+            codesign --verify --strict --verbose=2 "$dmg"
+            xcrun stapler validate "$dmg"
+          done
+          [ "$seen" = 1 ] || { echo "no .dmg was produced to check"; exit 1; }
 
       - uses: actions/upload-artifact@v4
         with:
