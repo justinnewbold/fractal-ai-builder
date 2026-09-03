@@ -8,11 +8,16 @@
  * installed" on any machine that was not already set up to build it. Carrying
  * a copy is the difference between a demo and something a person installs.
  *
- * What is copied is pinned rather than current. `desktop/forgefx.lock.json`
- * names a tag for people and a commit for the machine — a tag can be moved by
- * whoever owns the repo, a commit cannot, so the tag is a label and the commit
- * is the check. If they ever disagree this stops, because the alternative is
- * silently shipping different code inside a signed installer.
+ * What is copied is pinned rather than current, and it comes from our own
+ * private mirrors rather than from upstream — what goes inside something we sign
+ * should not depend on someone else's repository still being there, still being
+ * public, and still having the history it had last week.
+ *
+ * `desktop/forgefx.lock.json` names a tag for people and a commit for the
+ * machine, and the commit is what is asked for. A tag can be moved by whoever
+ * owns the repo; a commit cannot, and asking for it by name means there is no
+ * window in which the wrong code is on disk waiting to be checked. Where a
+ * remote does carry the tag, it is still verified to point at what we pinned.
  *
  * The codec's version is not ours to pick. ForgeFX pins its own sibling in
  * stack.lock.json for exactly the tag builds we are copying, so we read that
@@ -25,9 +30,9 @@
  *
  *   npm run vendor:forgefx
  *
- * FORGEFX_TOKEN is read from the environment when the repositories are private.
- * It is passed through a credential helper rather than embedded in the URL, so
- * it cannot end up in an error message or a CI log.
+ * FORGEFX_TOKEN is required, because the mirrors are private. It is passed
+ * through a credential helper rather than embedded in the URL, so it cannot end
+ * up in an error message or a CI log.
  */
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
@@ -54,12 +59,61 @@ const auth = process.env.FORGEFX_TOKEN
 function fetchPinned(name, spec) {
   const dir = join(vendor, name)
   rmSync(dir, { recursive: true, force: true })
+  mkdirSync(dir, { recursive: true })
   console.log(`\n· ${spec.repo} @ ${spec.tag}`)
-  run('git', [...auth, '-c', 'advice.detachedHead=false', 'clone', '--quiet', '--depth', '1', '--branch', spec.tag, `https://github.com/${spec.repo}`, dir])
-  const head = capture('git', ['rev-parse', 'HEAD'], dir)
-  if (head !== spec.commit) {
+
+  /*
+   * Asked for by commit rather than cloned at a tag.
+   *
+   * The mirrors carry every branch and the whole history but no tags, so there
+   * is no tag to clone — and that turns out to be the better shape anyway.
+   * Cloning a tag and comparing afterwards puts whatever the tag points at on
+   * disk first and asks questions second; naming the commit means the only
+   * thing that can arrive is the thing we pinned.
+   */
+  run('git', ['init', '--quiet'], dir)
+  run('git', ['remote', 'add', 'origin', `https://github.com/${spec.repo}`], dir)
+  try {
+    run('git', [...auth, 'fetch', '--quiet', '--depth', '1', 'origin', spec.commit], dir)
+  } catch {
+    /*
+     * Said plainly, because the git error underneath is "could not read
+     * Username for 'https://github.com'", which sends people to look at
+     * everything except the one missing secret.
+     */
     throw new Error(
-      `${spec.repo} tag ${spec.tag} is ${head}, but the lock file pins ${spec.commit}.\n` +
+      `Could not fetch ${spec.commit.slice(0, 12)} from ${spec.repo}.\n` +
+        (process.env.FORGEFX_TOKEN
+          ? 'FORGEFX_TOKEN is set, so either that commit is no longer in the mirror or the\n' +
+            'token cannot read that repository.'
+          : 'FORGEFX_TOKEN is not set and these mirrors are private, which is almost always\n' +
+            'the reason. In CI it is a repository secret of that name; locally, export a token\n' +
+            'that can read them.')
+    )
+  }
+  run('git', ['-c', 'advice.detachedHead=false', 'checkout', '--quiet', 'FETCH_HEAD'], dir)
+
+  const head = capture('git', ['rev-parse', 'HEAD'], dir)
+  // Belt and braces: git resolving a name to something other than that name
+  // would be a bug in git, but this costs one process and the failure it would
+  // otherwise catch is code inside a signed installer.
+  if (head !== spec.commit) {
+    throw new Error(`asked ${spec.repo} for ${spec.commit} and got ${head}`)
+  }
+
+  /*
+   * And the label, wherever there is one to check. Upstream has tags and the
+   * mirrors do not, so this is a check that finds nothing here and would find a
+   * moved tag anywhere it can be run at all — rather than a check deleted
+   * because one remote happened not to support it.
+   */
+  const refs = capture('git', [...auth, 'ls-remote', '--tags', 'origin', `refs/tags/${spec.tag}`], dir)
+  const rows = refs.split('\n').filter(Boolean).map((line) => line.split(/\s+/))
+  // An annotated tag lists the tag object and then the commit it peels to.
+  const points = (rows.find(([, ref]) => ref.endsWith('^{}')) || rows[0])?.[0]
+  if (points && points !== spec.commit) {
+    throw new Error(
+      `${spec.repo} tag ${spec.tag} is ${points}, but the lock file pins ${spec.commit}.\n` +
         'A tag that moved is the one thing pinning by tag alone cannot catch. Confirm what\n' +
         'changed upstream, then update desktop/forgefx.lock.json deliberately.'
     )
@@ -86,8 +140,15 @@ if (theirs?.ref && theirs.ref !== lock['forgefx-midi'].tag) {
       `${lock['forgefx-midi'].tag}. Upstream decides this one — update desktop/forgefx.lock.json to match.`
   )
 }
-if (theirs?.repo && theirs.repo !== lock['forgefx-midi'].repo) {
-  console.warn(`  note: upstream names the codec ${theirs.repo}; we vendor ${lock['forgefx-midi'].repo}`)
+/*
+ * Compared against the upstream name, not ours. We vendor from a mirror on
+ * purpose, so `justinnewbold/forgefx-midi` differing from what ForgeFX names is
+ * the expected state and printing a note about it every build would train
+ * everyone to ignore the one that matters.
+ */
+const oursUpstream = lock['forgefx-midi'].upstream || lock['forgefx-midi'].repo
+if (theirs?.repo && theirs.repo !== oursUpstream) {
+  console.warn(`  note: upstream names the codec ${theirs.repo}; we mirror ${oursUpstream}`)
 }
 fetchPinned('forgefx-midi', lock['forgefx-midi'])
 

@@ -48,8 +48,10 @@ jobs:
           npm test
           npm run build
 
-      # Pinned by desktop/forgefx.lock.json: a tag to read, a commit to verify.
-      # FORGEFX_TOKEN is only needed if the pinned repositories are private.
+      # Pinned by desktop/forgefx.lock.json: a tag to read, a commit to fetch.
+      # FORGEFX_TOKEN is required — the mirrors it reads are private. Without it
+      # the script stops and says so by name rather than failing on git's own
+      # "could not read Username", which sends people looking anywhere but here.
       - name: Vendor the device server
         env:
           FORGEFX_TOKEN: ${{ secrets.FORGEFX_TOKEN }}
