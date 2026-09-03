@@ -935,6 +935,26 @@ export function run(test) {
     assert.match(tour, /aria-label=\{'Step ' \+ \(i \+ 1\) \+ ' of ' \+ CARDS\.length\}/)
     const search = read('ParamSearch.jsx')
     assert.ok(!/role="list"|role="listitem"/.test(search), 'a search hit announces as a list item, not a button')
+    /*
+     * The search was mouse-only: no keys on the field, thirty tab stops to
+     * the row you wanted. The field is a combobox driving a listbox now —
+     * arrows move, Enter opens, Escape clears — and the rows sit outside the
+     * Tab order. "Reading the blocks…" flickered because every keystroke
+     * started another read of every block; one read per chain, debounced,
+     * and the line only when a first read is taking its time.
+     */
+    assert.match(search, /role="combobox"/, 'the search field is not a combobox')
+    assert.match(search, /aria-activedescendant=/, 'the active row is not announced')
+    assert.match(search, /role="listbox"/, 'the hits are not a listbox')
+    assert.match(search, /role="option"/, 'a hit is not an option')
+    assert.match(search, /tabIndex=\{-1\}/, 'the hits are back in the Tab order')
+    for (const key of ['ArrowDown', 'ArrowUp', 'Enter', 'Escape']) {
+      assert.match(search, new RegExp(`e\\.key === '${key}'`), `${key} does nothing in the search`)
+    }
+    assert.match(search, /pending\.current\?\.key === chainKey/, 'a read already in flight is started again on the next keystroke')
+    assert.match(search, /setTimeout\(\(\) => \{\s*ensureIndex\(\)/, 'the read is not debounced')
+    assert.match(search, /slow && index === null \? <p className="hint mono">Reading the blocks/, 'the reading line still shows on every read, at once')
+    assert.ok(!/index && !reading \?/.test(search), 'the hits are hidden again while a re-read runs')
     // The chain strip says when it scrolls.
     const console_ = read('Console.jsx')
     assert.match(console_, /el\.dataset\.overflow = /, 'the chain strip no longer says whether there is more to the right')

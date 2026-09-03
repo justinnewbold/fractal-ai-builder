@@ -4791,6 +4791,13 @@ button.gig-mode.on {
   text-align: left;
 }
 
+/* The row the arrow keys are on. Announced through aria-activedescendant and
+   shown here, because a position you can only hear is not a position. */
+.param-search-hit.active {
+  border-color: var(--signal);
+  background: var(--panel-hi);
+}
+
 .param-search-hit .hit-block {
   flex: 0 0 auto;
   font-size: var(--f-2);
