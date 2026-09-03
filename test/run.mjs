@@ -313,6 +313,40 @@ test('ForgeFX is only found where the server actually is', () => {
   assert.equal(host.findForgeFX({ env: { HOME: '/Users/x' }, exists: () => false }), null)
 })
 
+test('the window waits for the server to answer, rather than racing it', async () => {
+  /*
+   * Spawning is not starting. Fastify listens a second or two after the
+   * process exists, and a window opened into that gap gets a refused
+   * connection and shows nothing at all — for ever, because a page that failed
+   * to load is not retried.
+   *
+   * That is what the first genuinely working install did: a blank window, no
+   * error, and an app that had started correctly. It had looked fine before
+   * only because a ForgeFX someone else had running answered instantly.
+   */
+  let asked = 0
+  const up = await host.waitForServer({
+    sleep: async () => {},
+    fetch: async () => {
+      asked += 1
+      if (asked < 4) throw new Error('connection refused')
+      return { ok: true }
+    }
+  })
+  assert.equal(up, true)
+  assert.equal(asked, 4, 'it gave up before the server had a chance to wake')
+
+  // And it does not wait for ever.
+  const never = await host.waitForServer({
+    attempts: 3,
+    sleep: async () => {},
+    fetch: async () => {
+      throw new Error('connection refused')
+    }
+  })
+  assert.equal(never, false, 'a server that never answers would hang the launch')
+})
+
 test('the app refuses to serve from a port something else already holds', async () => {
   /*
    * The first person to run this app got a bare 404 in the window, and the

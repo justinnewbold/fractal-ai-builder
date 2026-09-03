@@ -60,6 +60,7 @@ async function start() {
     lanAddress,
     publish,
     serverEnv,
+    waitForServer,
     whoHasPort,
     PORT_TAKEN
   } = await host()
@@ -141,6 +142,15 @@ async function start() {
       if (tray) buildTray()
     })
     .catch(() => {})
+
+  /*
+   * Spawning the server is not starting it. Fastify is listening a second or
+   * two after the process exists, and a window opened into that gap gets a
+   * refused connection and shows nothing — for ever, because a page that
+   * failed to load is not retried. Wait for it to answer before opening
+   * anything.
+   */
+  return waitForServer({ port })
 }
 
 function openWindow() {
@@ -158,6 +168,17 @@ function openWindow() {
     webPreferences: { contextIsolation: true, nodeIntegration: false }
   })
   win.loadURL(where?.local || 'about:blank')
+  /*
+   * Belt and braces for the same failure: if the page does not load, retry it
+   * rather than sitting on an empty window. Once, after a second — enough for
+   * a server that was a moment slower than the wait above allowed for.
+   */
+  win.webContents.on('did-fail-load', (_e, code, description) => {
+    console.error(`the page did not load (${code} ${description}); retrying once`)
+    setTimeout(() => {
+      if (win && where?.local) win.loadURL(where.local)
+    }, 1000)
+  })
   win.on('closed', () => {
     win = null
   })
@@ -214,9 +235,23 @@ function buildTray() {
 app.whenReady().then(async () => {
   // A service, not a document: no dock icon, no window until asked.
   if (app.dock) app.dock.hide()
-  await start()
+  const answering = await start()
   if (!where) return
   buildTray()
+  if (!answering) {
+    /*
+     * A minute is long enough that this is not slowness. Said out loud,
+     * because the alternative is a window showing nothing and a person with no
+     * idea whether the app is broken or their unit is.
+     */
+    dialog.showErrorBox(
+      'The device server did not start',
+      'It was started but never answered, so there is nothing to show yet.\n\n' +
+        'Quit and open the app again. If it keeps happening, the log is in\n' +
+        'Console.app under "Fractal AI Builder".'
+    )
+    return
+  }
   openWindow()
 })
 

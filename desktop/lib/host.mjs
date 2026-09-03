@@ -261,6 +261,38 @@ export async function armHost({
 }
 
 /**
+ * Wait until the device server is actually answering.
+ *
+ * Spawning it is not starting it: the process exists long before Fastify is
+ * listening, and a window opened in that gap gets a refused connection and
+ * shows nothing at all, for ever, because nothing retries a page that failed.
+ *
+ * That is what the first working install did — a blank window, no error, and
+ * an app that had in fact started correctly. It only looked fine before
+ * because another ForgeFX was already listening and answered instantly.
+ *
+ * Half a second between tries, a minute in total: a cold start compiling on a
+ * slow morning is still a start, and the alternative is telling someone their
+ * unit is missing when the server simply had not finished waking up.
+ */
+export async function waitForServer({
+  port = DEFAULT_PORT,
+  fetch = globalThis.fetch,
+  sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
+  attempts = 120
+} = {}) {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      if ((await fetch(`http://localhost:${port}/healthz`)).ok) return true
+    } catch {
+      // Not up yet. That is the normal case for the first second or two.
+    }
+    await sleep(500)
+  }
+  return false
+}
+
+/**
  * Who, if anyone, already has the port.
  *
  * ForgeFX allocates its own port when the one it is given is taken: it catches
