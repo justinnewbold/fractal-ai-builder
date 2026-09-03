@@ -1003,7 +1003,7 @@ export function run(test) {
     assert.match(picker, /open=\{presetMenu && narrow\}/)
     assert.match(picker, /\{presetPicker\}/, 'the sheet does not carry the same picker as the popover')
     assert.equal((src.match(/<PresetList\b/g) || []).length, 2, 'the picker is written more than once')
-    assert.match(src, /if \(!presetMenu \|\| narrow\) return undefined/, 'the popover’s outside-tap listener runs under the sheet')
+    assert.match(src, /useDismiss\(presetMenuRef, \(\) => setPresetMenu\(false\), \{ open: presetMenu && !narrow, ignore: '\.topbar-preset' \}\)/, 'the popover’s outside-tap listener runs under the sheet, or the menu no longer dismisses through the shared hook')
   })
 
   test('the bar’s preset line is one span inside the button', () => {
@@ -1027,6 +1027,28 @@ export function run(test) {
     assert.match(mock, /tunerStream: \(\) => createTunerStream\(\)/, 'the mock has no tuner of its own')
     const tuner = readFileSync(new URL('../src/components/Console.jsx', import.meta.url), 'utf8')
     assert.match(tuner, /left: reading\?\.note \? `calc\(50% \+ \$\{offset\}%\)` : '50%'/, 'the needle keeps its last position when nothing is playing')
+  })
+
+  test('Escape leaves any popover, and the row it left gets its focus back', () => {
+    /*
+     * The link chip's popover closed on a tap outside and nothing else; the
+     * scene-rename row closed on Enter and nothing else. One hook now owns
+     * "tap outside or Escape, then focus goes back", and the two popovers
+     * use it; the rename row, an inline thing and not an overlay, just
+     * learned Escape. The save popover it would also have covered no longer
+     * exists — its rules were orphans and are gone.
+     */
+    const read = (f) => readFileSync(new URL('../src/' + f, import.meta.url), 'utf8')
+    const hook = read('lib/dismiss.js')
+    assert.match(hook, /e\.key !== 'Escape'/, 'the hook does not listen for Escape')
+    assert.match(hook, /addEventListener\('pointerdown', away\)/, 'the hook does not listen for a tap outside')
+    assert.match(hook, /cameFrom\.focus\?\.\(\{ preventScroll: true \}\)/, 'focus does not return to where it was')
+    const chip = read('components/LinkChip.jsx')
+    assert.match(chip, /useDismiss\(wrap, \(\) => setOpen\(false\), \{ open, ignore: '\.phone-chip' \}\)/, 'the link chip does not dismiss through the shared hook')
+    assert.ok(!/addEventListener\('pointerdown'/.test(chip), 'the link chip keeps a private outside-tap listener')
+    const scenes = read('components/Scenes.jsx')
+    assert.match(scenes, /e\.key === 'Escape'\) \{\s*e\.stopPropagation\(\)\s*setRenaming\(null\)/, 'Escape does not leave the rename row, or leaves the sheet with it')
+    assert.ok(!/\.save-pop/.test(read('styles.css')), 'the orphaned save popover rules are back')
   })
 
   test('the introduction is offered once, and only when there is something to see', () => {

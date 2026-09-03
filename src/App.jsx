@@ -128,6 +128,7 @@ import {
 } from './lib/link'
 import { pushEntry, replaceEntry } from './lib/nav'
 import { useAsks } from './lib/asks'
+import { useDismiss } from './lib/dismiss'
 import { validateSpec, countWrites, countSceneWrites } from './lib/validate'
 import { beatFlash, bringIntoView } from './lib/feedback'
 import {
@@ -420,24 +421,8 @@ export default function App() {
 
   /* A tap outside and Escape are the two ways anyone expects to dismiss a
      menu; without them the only way out is finding the button again. The
-     sheet on a phone brings its own. */
-  useEffect(() => {
-    if (!presetMenu || narrow) return undefined
-    const away = (e) => {
-      if (presetMenuRef.current?.contains(e.target)) return
-      // The button that opened it toggles; letting this close it too would
-      // race the toggle and reopen on the same tap.
-      if (e.target.closest?.('.topbar-preset')) return
-      setPresetMenu(false)
-    }
-    const key = (e) => e.key === 'Escape' && setPresetMenu(false)
-    document.addEventListener('pointerdown', away)
-    document.addEventListener('keydown', key)
-    return () => {
-      document.removeEventListener('pointerdown', away)
-      document.removeEventListener('keydown', key)
-    }
-  }, [presetMenu, narrow])
+     sheet on a phone brings its own, so the listener stands down under it. */
+  useDismiss(presetMenuRef, () => setPresetMenu(false), { open: presetMenu && !narrow, ignore: '.topbar-preset' })
   const [slots, setSlots] = useState([])
   const [scanning, setScanning] = useState(false)
   const scene = useDevice(ofScene)
