@@ -1,0 +1,25 @@
+{
+  "_why": [
+    "The device server this app carries inside itself.",
+    "ForgeFX is a separate project (MIT, sKuhLight) and we ship a copy of it in the",
+    "installer, so what goes in has to be a fixed thing rather than whatever its",
+    "default branch says today. `tag` is what a person reads; `commit` is what is",
+    "actually checked, because a tag can be moved and a commit cannot.",
+    "",
+    "forgefx-midi is the preset codec ForgeFX depends on. Its ref is not ours to",
+    "choose: ForgeFX pins its own sibling in stack.lock.json for exactly the tag",
+    "builds we are copying, so scripts/vendor-forgefx.mjs cross-checks the tag",
+    "below against that file and refuses to build a pair upstream never released",
+    "together."
+  ],
+  "forgefx": {
+    "repo": "sKuhLight/forgefx",
+    "tag": "v0.7.1-beta",
+    "commit": "c22862a5b2f2078f3cb92a2735e51f94c39a0062"
+  },
+  "forgefx-midi": {
+    "repo": "sKuhLight/forgefx-midi",
+    "tag": "v0.5.0",
+    "commit": "553d24b7409302908d5c7e46a71b45e07dffdc05"
+  }
+}

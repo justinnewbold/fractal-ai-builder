@@ -2,13 +2,19 @@
 #
 # This is the only place it can be built. macOS binaries need a macOS runner,
 # and the app carries native modules (serial, MIDI) that are compiled per
-# platform — so this workflow is where the desktop code is first proven to
-# assemble at all.
+# platform.
+#
+# The device server is no longer checked out beside the app and then thrown
+# away — scripts/vendor-forgefx.mjs fetches it at the pinned commit and builds
+# it into desktop/vendor, which electron-builder copies into the bundle. That
+# is the difference between a .dmg that works on the machine that built it and
+# one that works on someone else's.
 #
 # Signing and notarisation are wired but dormant. Set the four secrets and the
 # .dmg opens with a double-click; leave them unset and it still builds, and
-# macOS asks for right-click → Open on first launch. That is the difference
-# between a build for yourself and a build for someone who signed up.
+# macOS asks for right-click → Open on first launch. Note that electron-builder
+# refuses to sign pull-request builds by design, so a PR only ever proves the
+# app assembles; the signed artefact comes from a desktop-v* tag.
 name: desktop
 
 on:
@@ -18,6 +24,7 @@ on:
   pull_request:
     paths:
       - 'desktop/**'
+      - 'scripts/vendor-forgefx.mjs'
       - '.github/workflows/desktop.yml'
 
 jobs:
@@ -26,33 +33,42 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ForgeFX is a separate project and its codec is a sibling of it — the
-      # same side-by-side layout ForgeFX's own CI uses.
-      - uses: actions/checkout@v4
-        with:
-          repository: sKuhLight/forgefx
-          path: forgefx
-      - uses: actions/checkout@v4
-        with:
-          repository: sKuhLight/forgefx-midi
-          path: forgefx-midi
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Build the codec, then the device server
-        run: |
-          cd forgefx-midi && npm ci && npm run build && cd ..
-          cd forgefx/server && npm ci && npm run build
-
-      - name: Build the web app
+      - name: The web app, and the logic the launchers share
         run: |
           npm ci
+          npm test
           npm run build
 
-      - name: Check the shared serving logic
-        run: npm test
+      # Pinned by desktop/forgefx.lock.json: a tag to read, a commit to verify.
+      # FORGEFX_TOKEN is only needed if the pinned repositories are private.
+      - name: Vendor the device server
+        env:
+          FORGEFX_TOKEN: ${{ secrets.FORGEFX_TOKEN }}
+        run: npm run vendor:forgefx
+
+      - name: Install the shell
+        working-directory: desktop
+        run: npm install
+
+      # The question this answers cannot be answered anywhere but here: the
+      # server's native modules are built against system Node, and the app runs
+      # them under Electron-as-Node, whose ABI differs. N-API modules do not
+      # care; anything else does, and the symptom would be an app that opens
+      # perfectly and never sees the unit. Better a red build than that.
+      - name: The native modules load under Electron
+        working-directory: desktop/vendor/forgefx/server
+        run: |
+          ELECTRON="$(cd "$GITHUB_WORKSPACE/desktop" && node -p 'require("electron")')"
+          echo "electron: $ELECTRON"
+          ELECTRON_RUN_AS_NODE=1 "$ELECTRON" -e "
+            require('serialport');
+            require('@julusian/midi');
+            console.log('serial and MIDI both load under Electron-as-Node');
+          "
 
       - name: Package
         working-directory: desktop
@@ -64,9 +80,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          npm install
-          npm run dist
+        run: npm run dist
 
       - uses: actions/upload-artifact@v4
         with:

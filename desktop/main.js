@@ -35,6 +35,19 @@ const host = () => import('./lib/host.mjs')
 const distPath = () =>
   app.isPackaged ? join(process.resourcesPath, 'dist') : join(__dirname, '..', 'dist')
 
+/*
+ * The device server the app carries.
+ *
+ * `vendor` holds ForgeFX and its codec as siblings, because the server depends
+ * on the codec by relative path. Offered to findForgeFX ahead of the developer
+ * locations so an installed app uses what it shipped with, while FORGEFX_PATH
+ * still wins for anyone deliberately pointing it at a checkout.
+ */
+const vendored = () =>
+  app.isPackaged
+    ? join(process.resourcesPath, 'vendor', 'forgefx')
+    : join(__dirname, 'vendor', 'forgefx')
+
 async function start() {
   const {
     DEFAULT_NAME,
@@ -51,7 +64,7 @@ async function start() {
   const port = Number(process.env.PORT || DEFAULT_PORT)
   const name = process.env.FRACTAL_MDNS_NAME || DEFAULT_NAME
 
-  const forgefx = findForgeFX()
+  const forgefx = findForgeFX({ extra: [vendored()] })
   if (!forgefx) {
     /*
      * Said in a dialog rather than a log, because the whole point of this app

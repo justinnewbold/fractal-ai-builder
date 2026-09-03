@@ -167,6 +167,46 @@ export function run(test) {
     assert.match(tray, /if \(!tray\) \{/, 'buildTray constructs a Tray every time it draws the menu')
   })
 
+  test('the device server the app ships is pinned to a commit, and travels with it', () => {
+    /*
+     * We copy someone else's project into an installer we sign. What goes in
+     * therefore has to be a fixed thing, and a tag is not one — whoever owns the
+     * repository can move it. The lock file carries both: a tag to read and a
+     * commit to verify, and scripts/vendor-forgefx.mjs refuses to build when
+     * they disagree.
+     */
+    const lock = JSON.parse(read('desktop/forgefx.lock.json'))
+    for (const name of ['forgefx', 'forgefx-midi']) {
+      const spec = lock[name]
+      assert.ok(spec, `${name} is not pinned at all`)
+      assert.match(spec.repo, /^[\w.-]+\/[\w.-]+$/, `${name}.repo is not owner/name`)
+      assert.match(
+        spec.commit || '',
+        /^[0-9a-f]{40}$/,
+        `${name} is pinned by ${spec.tag || 'nothing'} alone — a tag can be moved, so the commit is what is checked`
+      )
+      assert.ok(spec.tag, `${name} has no tag, so nobody can read what version this is`)
+    }
+
+    /*
+     * And the app has to be given it. Vendoring without wiring it up is the
+     * state this replaced: a .dmg that says "ForgeFX is not installed" on every
+     * machine that is not the one it was built on.
+     */
+    assert.match(
+      read('desktop/main.js'),
+      /findForgeFX\(\{ extra: \[vendored\(\)\] \}\)/,
+      'the app does not offer findForgeFX the copy it ships with'
+    )
+    assert.match(
+      read('desktop/electron-builder.yml'),
+      /- from: vendor\n\s+to: vendor/,
+      'the vendored server is not copied into the bundle'
+    )
+    // Built, not committed: it carries node_modules and a compiled tree.
+    assert.match(read('.gitignore'), /^desktop\/vendor$/m, 'the vendored tree is not ignored')
+  })
+
   test('the Mac app has a face, and claims only entitlements it uses', () => {
     /*
      * The first real Mac build reported "default Electron icon is used —
