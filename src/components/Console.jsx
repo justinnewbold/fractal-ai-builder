@@ -395,6 +395,13 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
     )
   }
 
+  // What the chosen model is modelled on, for the line under the picker.
+  const chosenValue =
+    type && models.some((m) => m.value === type.value)
+      ? type.value
+      : (models.find((m) => m.name === type?.name)?.value ?? '')
+  const basedOn = models.find((m) => m.value === chosenValue)?.basedOn
+
   const valueOf = (p) => (local[p.id] !== undefined ? local[p.id] : p.value)
 
   const commit = async (p, override) => {
@@ -540,14 +547,18 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
           {/* Only reachable while the model is genuinely unknown — an older
               firmware that doesn't report one, or the read still in flight. */}
           <option value="">{type?.name || `${models.length} models…`}</option>
+          {/* The name alone: with "— 1959 narrow-panel Fender Tweed Bassman,
+              5F6-A" inside the option, the closed control clipped the model
+              mid-word on a phone. What it is based on goes under the control,
+              where it can be read. */}
           {models.map((m) => (
             <option key={m.value} value={m.value}>
               {m.name}
-              {m.basedOn ? ` — ${m.basedOn}` : ''}
             </option>
           ))}
         </select>
       ) : null}
+      {models.length && basedOn ? <p className="hint pad based-on">Based on {basedOn}</p> : null}
 
       {rest.length ? (
         <div className="block-tabs">

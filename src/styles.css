@@ -3018,6 +3018,7 @@ button.chan-btn.current {
 
 .type-select {
   width: 100%;
+  text-overflow: ellipsis;
   margin: var(--s-2) 0 0;
   padding: var(--s-2) var(--s-2);
   font-family: var(--body);
@@ -3025,7 +3026,7 @@ button.chan-btn.current {
   color: var(--silk);
   background: var(--chassis);
   border: 1px solid var(--rule);
-  border-radius: var(--r-1);;
+  border-radius: var(--r-1);
 }
 
 .bypass-btn {

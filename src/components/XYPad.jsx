@@ -7,6 +7,16 @@ import { gateWrite, padFraction } from '../lib/xy'
 
 const STORE = 'fractal.xy'
 
+/*
+ * The flat control index, kept per unit and chain.
+ *
+ * The pad is unmounted whenever it is folded away, and every open rebuilt the
+ * index from the wire — a serial read of every block — with "Choose…" on the
+ * pickers for the duration, over a pad someone had already set up.
+ */
+const indexes = new Map()
+const chainKey = (blocks) => `${currentDeviceSlug()}:${blocks.map((b) => b.effectId).join(',')}`
+
 /**
  * Two controls under one finger.
  *
@@ -49,8 +59,17 @@ export default function XYPad({ blocks, onError }) {
   const errored = useRef(false)
 
   useEffect(() => {
+    const key = chainKey(blocks)
+    const kept = indexes.get(key)
+    if (kept) {
+      setIndex(kept)
+      return
+    }
     buildParamIndex(blocks)
-      .then(setIndex)
+      .then((built) => {
+        indexes.set(key, built)
+        setIndex(built)
+      })
       .catch((err) => onError(err.message))
     // eslint-disable-next-line
   }, [blocks])
@@ -72,10 +91,24 @@ export default function XYPad({ blocks, onError }) {
     if (x !== null && y !== null) setDot({ x, y })
   }, [xCtl, yCtl, dot])
 
+  /*
+   * The choice is kept with its name. The label on the picker is the selected
+   * option's text, and the options come from the index — so until the index
+   * arrived a saved pad showed "Choose…" for controls it had already chosen.
+   * With the name kept, the label is right from the first paint.
+   */
   const pick = (axis, key) => {
-    const next = { ...axes, [axis]: key || undefined }
+    const ctl = lookup(key)
+    const next = {
+      ...axes,
+      [axis]: key || undefined,
+      [`${axis}Name`]: ctl ? `${ctl.block.name} · ${ctl.param.name}` : undefined
+    }
     setAxes(next)
     setDot(null)
+    // Choosing the second axis is done: the pickers fold. They used to stay
+    // open for good once "Change" had been pressed.
+    if (next.x && next.y) setPicking(false)
     try {
       localStorage.setItem(`${STORE}.${currentDeviceSlug()}`, JSON.stringify(next))
     } catch {
@@ -212,22 +245,33 @@ export default function XYPad({ blocks, onError }) {
    * control needed afterwards is the way back.
    */
   const showPickers = picking || !ready
+  // A pad that was set up, before the controls have been read: say so, by
+  // name, rather than showing two pickers that claim nothing is chosen.
+  const saved = !index && axes.x && axes.y
+  // A choice kept before names were kept with it: the key alone, until it is re-picked.
+  const savedName = (axis) => axes[`${axis}Name`] || 'the saved control'
 
   return (
     <div className="xy">
-      {showPickers ? (
+      {saved ? (
+        <p className="hint mono xy-reading">
+          Reading {savedName('x')} and {savedName('y')}…
+        </p>
+      ) : showPickers ? (
         <div className="xy-pickers">
           <label>
             <span className="silk-label">Across →</span>
-            <select value={axes.x || ''} onChange={(e) => pick('x', e.target.value)}>
-              <option value="">Choose…</option>
+            <select value={axes.x || ''} onChange={(e) => pick('x', e.target.value)} disabled={!index}>
+              <option value="">{index ? 'Choose…' : 'Reading the controls…'}</option>
+              {!index && axes.x ? <option value={axes.x}>{savedName('x')}</option> : null}
               {options}
             </select>
           </label>
           <label>
             <span className="silk-label">Up ↑</span>
-            <select value={axes.y || ''} onChange={(e) => pick('y', e.target.value)}>
-              <option value="">Choose…</option>
+            <select value={axes.y || ''} onChange={(e) => pick('y', e.target.value)} disabled={!index}>
+              <option value="">{index ? 'Choose…' : 'Reading the controls…'}</option>
+              {!index && axes.y ? <option value={axes.y}>{savedName('y')}</option> : null}
               {options}
             </select>
           </label>

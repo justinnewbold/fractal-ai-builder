@@ -89,6 +89,16 @@ export function Modifiers({ blocks, onError, onChanged, busy }) {
   }
 
   const ready = eid && paramId && source !== ''
+  // What is still to pick, said beside the button rather than left to a
+  // disabled button that says nothing. A disabled button cannot take focus,
+  // so the reason is a visible line with role=status.
+  const missing = [!eid && 'a block', !paramId && 'a control', source === '' && 'a source'].filter(Boolean)
+  const why =
+    missing.length === 0
+      ? null
+      : missing.length === 1
+        ? `Pick ${missing[0]} to attach.`
+        : `Pick ${missing.slice(0, -1).join(', ')} and ${missing[missing.length - 1]} to attach.`
 
   return (
     <section className="modifiers">
@@ -136,7 +146,11 @@ export function Modifiers({ blocks, onError, onChanged, busy }) {
 
         <label className="mod-field">
           <span className="diff-label">Source</span>
-          <select value={source} onChange={(e) => setSource(e.target.value)}>
+          <select
+            value={source}
+            onChange={(e) => setSource(e.target.value)}
+            aria-describedby={!model.sources?.length && model.sourcesNote ? 'mod-sources-note' : undefined}
+          >
             <option value="">Choose…</option>
             {/*
               `ordinal`, not `value`. A source has never carried a `value`, so
@@ -151,17 +165,30 @@ export function Modifiers({ blocks, onError, onChanged, busy }) {
               </option>
             ))}
           </select>
-          {/* Some units build their source enum at runtime and ForgeFX hasn't
-              captured it; it says so rather than leaving an empty list. */}
-          {!model.sources?.length && model.sourcesNote ? (
-            <span className="hint">{model.sourcesNote}</span>
-          ) : null}
         </label>
+        {/* Some units build their source enum at runtime and ForgeFX hasn't
+            captured it; it says so rather than leaving an empty list. Outside
+            the label, so the select is named "Source" and not the whole note. */}
+        {!model.sources?.length && model.sourcesNote ? (
+          <span className="hint" id="mod-sources-note">
+            {model.sourcesNote}
+          </span>
+        ) : null}
       </div>
 
-      <button className="primary mod-bind" onClick={bind} disabled={busy || !ready}>
+      <button
+        className="primary mod-bind"
+        onClick={bind}
+        disabled={busy || !ready}
+        aria-describedby={why ? 'mod-why' : undefined}
+      >
         Attach
       </button>
+      {why ? (
+        <p className="hint mod-why" id="mod-why" role="status">
+          {why}
+        </p>
+      ) : null}
     </section>
   )
 }
