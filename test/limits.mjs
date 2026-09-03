@@ -411,6 +411,27 @@ export function run(test) {
     ]) {
       assert.ok(wf.includes(cmd), `${cmd} is gone: ${why}`)
     }
+
+    /*
+     * And the disk image gets its own ticket.
+     *
+     * electron-builder notarises the app and stops: `notarizeIfProvided` takes
+     * the app path and runs during signing, before a .dmg exists. The first
+     * build to reach the check above said so in one line — "does not have a
+     * ticket stapled to it" — with the app beside it already "accepted,
+     * source=Notarized Developer ID".
+     *
+     * The image is what macOS assesses first, so without this the download
+     * still warns however well signed the app inside it is.
+     */
+    assert.ok(
+      wf.includes('notarytool submit'),
+      'the disk image is no longer notarised — electron-builder only ever does the app, and the image is what someone downloads'
+    )
+    assert.ok(
+      wf.includes('stapler staple'),
+      'the disk image is notarised but its ticket is never attached, so the check only passes with a network and a stranger offline still sees a warning'
+    )
   })
 
   test('the Mac app has a face, and claims only entitlements it uses', () => {
