@@ -1865,6 +1865,66 @@ test('a scan already running is not started twice', async () => {
   delete globalThis.localStorage
 }
 
+/* ------------------------------------------------------------------
+   Leaving a popover
+   ------------------------------------------------------------------ */
+
+test('useDismiss: a tap outside or Escape closes, the trigger is ignored, focus goes back', async () => {
+  // React's useEffect/useRef, driven by hand: run the effect, collect its cleanup.
+  const listeners = new Map()
+  let focused = null
+  const trigger = { closest: (sel) => (sel === '.trigger' ? trigger : null) }
+  const inside = { closest: () => null }
+  const outside = { closest: () => null }
+  const origin = { focus: () => (focused = origin) }
+  globalThis.document = {
+    activeElement: origin,
+    contains: () => true,
+    addEventListener: (type, fn) => listeners.set(type, fn),
+    removeEventListener: (type) => listeners.delete(type)
+  }
+  const React = await import('react')
+  let cleanup = null
+  const effects = []
+  const fakeReact = {
+    useRef: (v) => ({ current: v }),
+    useEffect: (fn) => effects.push(fn)
+  }
+  // The hook imports React's hooks by name; run it against the fakes by re-binding.
+  const src = readSrc(new URL('../src/lib/dismiss.js', import.meta.url), 'utf8')
+    .replace("import { useEffect, useRef } from 'react'", '')
+    .replace('export function useDismiss', 'function useDismiss')
+  const useDismiss = new Function('useEffect', 'useRef', src + '\nreturn useDismiss')(fakeReact.useEffect, fakeReact.useRef)
+  const closes = []
+  const ref = { current: { contains: (el) => el === inside } }
+
+  useDismiss(ref, () => closes.push('closed'), { open: true, ignore: '.trigger' })
+  cleanup = effects.pop()()
+  listeners.get('pointerdown')({ target: inside })
+  assert.equal(closes.length, 0, 'a tap inside closed it')
+  listeners.get('pointerdown')({ target: trigger })
+  assert.equal(closes.length, 0, 'a tap on the trigger closed it (and would reopen it on the same tap)')
+  listeners.get('pointerdown')({ target: outside })
+  assert.equal(closes.length, 1, 'a tap outside did not close it')
+  let stopped = false
+  listeners.get('keydown')({ key: 'Escape', stopPropagation: () => (stopped = true) })
+  assert.equal(closes.length, 2, 'Escape did not close it')
+  assert.ok(stopped, 'Escape was let through to whatever else listens')
+  listeners.get('keydown')({ key: 'Enter', stopPropagation: () => {} })
+  assert.equal(closes.length, 2, 'a key other than Escape closed it')
+  cleanup()
+  assert.equal(listeners.size, 0, 'the listeners outlive the popover')
+  assert.equal(focused, origin, 'focus did not go back to where it was')
+
+  // Closed: nothing is listened for.
+  effects.length = 0
+  useDismiss(ref, () => closes.push('never'), { open: false })
+  assert.equal(effects.pop()(), undefined)
+  assert.equal(listeners.size, 0)
+  delete globalThis.document
+  void React
+})
+
 console.log('\nstructure')
 const { run: structure } = await import('./structure.mjs')
 structure(test)

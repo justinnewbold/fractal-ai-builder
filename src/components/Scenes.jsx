@@ -130,7 +130,15 @@ export default function Scenes({
             maxLength={31}
             autoFocus
             onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && rename(renaming)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') rename(renaming)
+              // Escape leaves the row the way Cancel does — a half-typed name is not a
+              // name. Stopped here, or the sheet takes the same key and closes too.
+              else if (e.key === 'Escape') {
+                e.stopPropagation()
+                setRenaming(null)
+              }
+            }}
             aria-label={`Name for scene ${renaming + 1}`}
           />
           <button onClick={() => rename(renaming)}>Name scene {renaming + 1}</button>

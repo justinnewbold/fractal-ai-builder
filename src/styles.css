@@ -4398,27 +4398,6 @@ button.gig-block:disabled {
   font-size: var(--f-3);
 }
 
-/* Name, slot and the undo actions — an anchored menu under the buttons,
-   because the common save is to the slot already loaded and needs no fields
-   at all. Anchored and dismissible is not a floater: it exists only while
-   asked for. */
-.save-pop {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 30;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--s-2);
-  width: min(380px, calc(100vw - 40px));
-  padding: var(--s-3);
-  background: var(--panel);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-1);
-  box-shadow: var(--e-2);
-}
-
 .save-field {
   display: flex;
   flex-direction: column;
@@ -5367,13 +5346,6 @@ button.xy-change {
 @media (max-width: 620px) {
   .save-cluster {
     position: static;
-  }
-
-  .save-pop {
-    left: var(--s-3);
-    right: var(--s-3);
-    width: auto;
-    max-width: none;
   }
 
   /* "phone off" is two words and was wrapping to two lines inside a 40px bar,

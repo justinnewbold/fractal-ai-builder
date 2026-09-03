@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { describeLink } from '../lib/link'
+import { useDismiss } from '../lib/dismiss'
 
 /**
  * The state of the phone remote, in the bar, on every screen.
@@ -17,14 +18,8 @@ export default function LinkChip({ link, compact, onAction, busy }) {
   const [open, setOpen] = useState(false)
   const wrap = useRef(null)
 
-  useEffect(() => {
-    if (!open) return undefined
-    const away = (e) => {
-      if (wrap.current && !wrap.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('pointerdown', away)
-    return () => document.removeEventListener('pointerdown', away)
-  }, [open])
+  // A tap outside or Escape closes it, and focus returns to the chip.
+  useDismiss(wrap, () => setOpen(false), { open, ignore: '.phone-chip' })
 
   // Nothing to say until the role is known, and nothing worth a chip in the
   // wifi role either — that link has no state to watch.
