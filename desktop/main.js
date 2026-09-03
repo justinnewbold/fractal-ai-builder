@@ -74,7 +74,7 @@ async function start() {
   advert = publish(Bonjour, { port, name })
 
   server = spawn(process.execPath, [join(forgefx, 'server', 'dist', 'index.js')], {
-    env: serverEnv({ port, dist: distPath() }),
+    env: serverEnv({ port, dist: distPath(), asNode: true }),
     stdio: 'inherit'
   })
   server.on('exit', (code) => {
@@ -114,12 +114,22 @@ function openWindow() {
   })
 }
 
+/*
+ * Draw the menu, and make the icon the first time only.
+ *
+ * This runs twice — once at launch and again when armHost answers, because the
+ * phone line is the whole point of drawing it again — and it used to construct
+ * a second Tray on that second call. Two icons in the menu bar, one of them
+ * permanently stale, and no way to tell them apart.
+ */
 function buildTray() {
-  // A template image lets macOS invert it for light and dark menu bars.
-  const icon = nativeImage.createFromPath(join(__dirname, 'trayTemplate.png'))
-  icon.setTemplateImage(true)
-  tray = new Tray(icon)
-  tray.setToolTip('Fractal AI Builder')
+  if (!tray) {
+    // A template image lets macOS invert it for light and dark menu bars.
+    const icon = nativeImage.createFromPath(join(__dirname, 'trayTemplate.png'))
+    icon.setTemplateImage(true)
+    tray = new Tray(icon)
+    tray.setToolTip('Fractal AI Builder')
+  }
 
   /*
    * One line about the phone remote, in words a person would use. "On for
