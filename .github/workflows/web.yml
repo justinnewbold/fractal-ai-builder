@@ -1,0 +1,52 @@
+# Check every change before it is merged.
+#
+# Until now `desktop.yml` was the only workflow, and it runs the test suite only
+# when `desktop/**` changes — so every change to the app itself merged with
+# nothing checking it. That was survivable while the tests were run by hand
+# before each push, and stops being survivable the moment a build artifact is
+# something a person downloads and installs.
+#
+# The version job is the standing rule — every change gets a new version — made
+# mechanical. It is separate from the tests because it answers a different
+# question: not "does this work" but "can this be told apart from what came
+# before", which is what an installed app comparing itself to a release needs.
+name: web
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Unit, structure, styles, touch and limits
+        run: npm test
+      - name: The app builds
+        run: npm run build
+
+  version:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The version moved
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$BASE"
+          before=$(git show FETCH_HEAD:package.json | node -pe "JSON.parse(require('fs').readFileSync(0,'utf8')).version")
+          now=$(node -pe "require('./package.json').version")
+          echo "$BASE is $before; this branch is $now"
+          if [ "$before" = "$now" ]; then
+            echo "::error file=package.json::Still $now. Every change gets a new version."
+            exit 1
+          fi
