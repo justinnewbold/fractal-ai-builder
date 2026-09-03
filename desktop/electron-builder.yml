@@ -20,6 +20,11 @@ extraResources:
   # and they sit outside the asar so their native modules load normally.
   - from: vendor
     to: vendor
+# Runs on the packaged .app before the disk image is built. Ad-hoc signs when
+# there is no certificate, because Apple Silicon refuses to run a binary with
+# no signature at all and calls it "damaged".
+afterPack: afterPack.js
+
 mac:
   category: public.app-category.music
   # A PNG, not an .icns: electron-builder converts it with its own bundled

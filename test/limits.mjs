@@ -167,6 +167,30 @@ export function run(test) {
     assert.match(tray, /if \(!tray\) \{/, 'buildTray constructs a Tray every time it draws the menu')
   })
 
+  test('an unsigned build is still signed with nothing, so it can run at all', () => {
+    /*
+     * Apple Silicon will not execute a Mach-O binary with no signature, and
+     * packaging invalidates the one Electron ships with — its binary is signed,
+     * then renamed, given resources and repacked. Leave it there and macOS says
+     * "damaged and can\'t be opened", which reads as a corrupt download and is
+     * not one: there is nothing to check.
+     *
+     * The first person to install a build of this got exactly that, and it has
+     * no way past it — unlike "unidentified developer", which does. An ad-hoc
+     * signature proves nothing about who built the app, which is the honest
+     * state of a test build, and is enough to make it runnable.
+     */
+    const yml = read('desktop/electron-builder.yml')
+    assert.match(yml, /^afterPack: afterPack\.js$/m, 'nothing signs an unsigned build, so it will not open on Apple Silicon')
+    const hook = read('desktop/afterPack.js')
+    assert.match(hook, /'--sign', '-'/, 'the hook does not ad-hoc sign')
+    assert.match(
+      hook,
+      /if \(process\.env\.CSC_LINK\) return/,
+      'the hook would overwrite a real signature with an ad-hoc one, throwing away the thing people trust'
+    )
+  })
+
   test('the app asks who has the port before it starts a server on it', () => {
     /*
      * Structural because it is Electron-only. The window is opened on the port
