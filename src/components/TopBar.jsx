@@ -117,10 +117,8 @@ export default function TopBar({
           <span className="topbar-gap" />
         )}
 
-        {/* Said plainly rather than as a coloured dot on its own: unsaved is the
-            one state here with a consequence, and a dot needs a legend. */}
-        {dirty ? <span className="topbar-dirty">Unsaved</span> : null}
-
+        {/* The Save button says whether there is anything to save; there is
+            no separate word for it any more. */}
         {children}
 
         <LinkChip compact link={link} onAction={onLinkAction} />

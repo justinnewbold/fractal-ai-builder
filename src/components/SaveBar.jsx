@@ -35,12 +35,17 @@ export default function SaveBar({ preset, dirty, busy, saving, compact, onOpenSa
    */
   const remote = remoteActive()
 
+  /*
+   * The button carries the state. There used to be a tiny amber UNSAVED
+   * word beside it and a cyan dot in front of it, while the button itself
+   * was amber whether or not anything had changed — so the one control
+   * everyone looks at said nothing, and the word that did was the smallest
+   * thing in the bar (and hidden on phones). Now: quiet "Saved" when there
+   * is nothing to save, amber "Save" when there is.
+   */
   return (
-    <div className="save-cluster">
+    <div className="save-cluster" data-dirty={dirty ? 'yes' : 'no'}>
       <div className="save-cluster-row">
-        {/* Unsaved gets the lit dot; the bar around it says the word. */}
-        {dirty ? <span className="lamp" data-state="live" title="Unsaved changes" /> : null}
-
         <button
           className="save-now"
           onClick={onOpenSave}
@@ -56,9 +61,11 @@ export default function SaveBar({ preset, dirty, busy, saving, compact, onOpenSa
               : 'Waiting for the Mac…'
             : saving
               ? 'Saving…'
-              : remote && !compact
-                ? 'Save at the Mac'
-                : 'Save'}
+              : !dirty
+                ? 'Saved'
+                : remote && !compact
+                  ? 'Save at the Mac'
+                  : 'Save'}
         </button>
       </div>
     </div>

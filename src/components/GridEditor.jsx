@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import { useOverflow } from '../lib/overflow'
 import { pointAtCell, placeBlock, clearCell, readGrid, blockCatalog } from '../lib/forgefx'
 
 /**
@@ -38,6 +39,12 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
   const linear = capabilities?.slotModel === 'linear'
   const rows = linear ? 1 : capabilities?.grid?.rows ?? 4
   const cols = linear ? capabilities?.slotCount ?? 4 : capabilities?.grid?.cols ?? 12
+  // Both grids scroll sideways at every width; the fade that says so needs the
+  // fact. After `cols`: the observer re-looks when the column count changes.
+  const lockedScroll = useRef(null)
+  const editScroll = useRef(null)
+  useOverflow(lockedScroll, [cols])
+  useOverflow(editScroll, [cols])
 
   useEffect(() => {
     let stop = false
@@ -184,7 +191,7 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
           </div>
         </div>
 
-        <div className="grid-scroll">
+        <div className="grid-scroll" ref={lockedScroll}>
           <div
             className="grid"
             style={{ gridTemplateColumns: `repeat(${cols}, minmax(76px, 1fr))` }}
@@ -240,7 +247,7 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
         is which.
       </p>
 
-      <div className="grid-scroll">
+      <div className="grid-scroll" ref={editScroll}>
         <div
           className="grid editable"
           style={{ gridTemplateColumns: `repeat(${cols}, minmax(76px, 1fr))` }}

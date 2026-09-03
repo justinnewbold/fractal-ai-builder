@@ -236,7 +236,8 @@ export function run(test) {
     assert.notEqual(at, -1, 'the preset list inside a sheet has its own scroll window again')
     const rule = code.slice(at, code.indexOf('}', at))
     assert.match(rule, /max-height: none/)
-    assert.match(code, /\.preset-menu \.preset-scroll \{[^}]*max-height: min\(52vh, 420px\)/, 'the top-bar menu lost its cap')
+    assert.match(code, /\.preset-menu \{[^}]*max-height: min\(72vh, 560px\)[^}]*overflow-y: auto/, 'the top-bar menu lost its cap')
+    assert.match(code, /\.preset-menu \.preset-scroll \{\s*max-height: none/, 'the menu has a second scroller inside it again')
   })
 
   test('a sheet keeps its contents off the screen edge, and a scene tile is a tile', () => {
@@ -295,7 +296,7 @@ export function run(test) {
     assert.match(code, /\.turn-hand \.turn-text \{/, 'hand edits lost their quiet style')
     const hand = code.slice(code.lastIndexOf('.turn-hand .turn-text {'), code.indexOf('}', code.lastIndexOf('.turn-hand .turn-text {')))
     assert.match(hand, /border-left: 2px solid var\(--silk-faint\)/, 'a hand edit has no mark of its own now that it has no word')
-    assert.match(code, /\.chain-strip\[data-overflow='yes'\] \{[^}]*mask-image/, 'the chain strip has no edge fade when it scrolls')
+    assert.match(code, /\.chain-strip\[data-overflow='yes'\],\s*\.grid-scroll\[data-overflow='yes'\] \{[^}]*mask-image/, 'the chain strip has no edge fade when it scrolls')
   })
 
   test('the faint type reads, in both themes', () => {
@@ -338,7 +339,8 @@ export function run(test) {
     const at = code.indexOf('@media (max-width: 620px) {\n  .save-cluster {')
     assert.notEqual(at, -1)
     const block = code.slice(at, at + 1200)
-    assert.match(block, /\.topbar-dirty,\s*\n\s*\.save-cluster \.lamp \{\s*display: none/, 'UNSAVED and its dot still crowd the name on a phone')
+    assert.ok(!/topbar-dirty/.test(code), 'the separate UNSAVED word is back')
+    assert.match(code, /\.save-cluster\[data-dirty='no'\] button\.save-now \{[^}]*background: none/, 'the Save button is amber with nothing to save')
     assert.match(block, /\.topbar-name \{\s*min-width: 8ch/, 'the preset name can shrink to one letter again')
   })
 
@@ -376,6 +378,17 @@ export function run(test) {
     assert.match(how, /font-family: var\(--display\)/, '"demo" is set in the mono face again, where it read as "deno"')
     assert.match(how, /text-transform: uppercase/)
     assert.match(code, /\.topbar-slot::before \{\s*content: 'slot '/, 'the slot number has no noun')
+  })
+
+  test('the edge fade is at every width and on the grid, scene names wrap, the menu is one scroller', () => {
+    // Unindented, so at base scope: every rule inside a media block is indented two spaces.
+    const base = code.indexOf("\n.chain-strip[data-overflow='yes'],\n.grid-scroll[data-overflow='yes'] {")
+    assert.notEqual(base, -1, 'the overflow fade is not shared by the strip and the grid at base scope (or sits inside the phone block)')
+    const name = code.slice(code.indexOf('.scene-name {'), code.indexOf('}', code.indexOf('.scene-name {')))
+    assert.match(name, /white-space: normal/, 'a scene name is cut to "Rhyt…" again')
+    assert.ok(!/text-overflow: ellipsis/.test(name))
+    assert.match(code, /\.scene-row \{[^}]*minmax\(120px, 1fr\)/, 'the scene cell is too narrow for a name and a pencil')
+    assert.ok(!/\.scenes \{\s*margin-top: 34px/.test(code), 'the dead air under the Scenes sheet head is back')
   })
 
 }
