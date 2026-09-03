@@ -1295,4 +1295,43 @@ export function run(test) {
       'the ask button no longer hides on Create, where it would offer to open what is open'
     )
   })
+
+  test('the working line is drawn once, and carries the clock', () => {
+    /*
+     * There were three of them on screen at the same time, and a photograph of
+     * it is what made this a bug rather than a quibble:
+     *
+     *     Sent to the model - waiting for the first line...
+     *   ||| Sent to the model - waiting for the first line...
+     *   ..| Waiting on the model - 27s
+     *
+     * Assistant printed `progress` plainly, App printed the identical string
+     * again inside <Thinking>, and App then hand-built a second copy of
+     * Thinking's own meter bars around <Stages>, which counted. Nothing was
+     * wrong with any one of them; there were simply three.
+     *
+     * These three assertions are those three lines. The bars belong to one
+     * component, so no caller may draw its own; the message belongs to that
+     * component, so the transcript may not print it; and the clock has to reach
+     * it, or the merge would have thrown away the only thing the third line
+     * knew that the other two did not.
+     */
+    const assistant = readFileSync(
+      new URL('../src/components/Assistant.jsx', import.meta.url),
+      'utf8'
+    )
+    assert.ok(
+      !/>\s*\{progress\}\s*</.test(assistant),
+      'the transcript prints the progress message itself again - <Thinking> already says it, one line lower'
+    )
+    assert.ok(
+      !/className="thinking-bars"/.test(src),
+      'App draws its own copy of the working line - the bars belong to <Thinking>, and a second set of them is a second line saying the same thing'
+    )
+    assert.match(
+      src,
+      /<Thinking message=\{progress\} active=\{thinking\} startedAt=\{genStarted\} \/>/,
+      'the one working line has lost the elapsed clock, which was the only thing the third line knew that the other two did not'
+    )
+  })
 }

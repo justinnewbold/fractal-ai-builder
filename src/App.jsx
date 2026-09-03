@@ -12,7 +12,7 @@ import Gig from './components/Gig'
 import SaveBar from './components/SaveBar'
 import SaveSheet from './components/SaveSheet'
 import CloudPresets from './components/CloudPresets'
-import { Stages, LiveGeneration, Thinking } from './components/LiveGeneration'
+import { LiveGeneration, Thinking } from './components/LiveGeneration'
 import { streamSpec } from './lib/stream'
 import { Modifiers, SceneMatrix } from './components/Modifiers'
 import { Versions, DeviceBackup } from './components/Versions'
@@ -2167,8 +2167,9 @@ export default function App() {
       onConfirm={confirmTurn}
       onCancel={cancelTurn}
       busy={busy || runningPlan}
+      /* Not drawn there — Thinking below draws it. Passed so the transcript
+         scrolls with each tick, which is the one thing Assistant needs it for. */
       progress={progress}
-      startedAt={genStarted}
       suggestions={suggestionsFrom(taste)}
       onStop={
         genStarted
@@ -2183,19 +2184,7 @@ export default function App() {
       }
     >
       {/* A design shows up in the conversation that asked for it. */}
-      <Thinking message={progress} />
-
-      {thinking ? (
-        <div className="thinking" role="status" aria-live="polite">
-          <span className="thinking-bars" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-            <i />
-          </span>
-          <Stages active={thinking} startedAt={genStarted} />
-        </div>
-      ) : null}
+      <Thinking message={progress} active={thinking} startedAt={genStarted} />
 
       <LiveGeneration
         partial={partial}

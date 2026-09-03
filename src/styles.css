@@ -1269,11 +1269,28 @@ button.slot.current {
 
 .thinking {
   display: flex;
-  align-items: center;
+  /* Bars beside the first line of the message, not beside the middle of two. */
+  align-items: flex-start;
   gap: var(--s-3);
   margin-top: 14px;
   font-size: var(--f-2);
   color: var(--signal);
+}
+
+.thinking-text {
+  flex: 1;
+  min-width: 0;
+}
+
+/*
+ * The clock ends the sentence rather than being pinned to the right edge.
+ * Pinned, it stranded itself on a line of its own the moment the message
+ * wrapped — which on a phone is always — and a number alone on a third row is
+ * how this looked like three status lines in the first place.
+ */
+.thinking-clock {
+  opacity: 0.72;
+  white-space: nowrap;
 }
 
 .thinking-bars {
@@ -1281,6 +1298,9 @@ button.slot.current {
   align-items: flex-end;
   gap: var(--s-1);
   height: 13px;
+  flex: 0 0 auto;
+  /* Sit on the first line of the message, whatever the line-height. */
+  margin-top: 2px;
 }
 
 .thinking-bars i {
@@ -3951,10 +3971,6 @@ ol.action-list li.destructive::marker {
   gap: var(--s-2);
   flex-wrap: wrap;
   margin-top: 9px;
-}
-
-.assistant-progress {
-  margin: 4px 0 0;
 }
 
 .assistant-row {
