@@ -316,7 +316,44 @@ export function run(test) {
         `${name} is pinned by ${spec.tag || 'nothing'} alone — a tag can be moved, so the commit is what is checked`
       )
       assert.ok(spec.tag, `${name} has no tag, so nobody can read what version this is`)
+
+      /*
+       * And it is ours. We vendor from private mirrors rather than from
+       * upstream, because what goes inside something we sign should not depend
+       * on another account's repository still being there, still being public,
+       * and still having the history it had last week. `upstream` is what a
+       * copy loses first, so it is written down.
+       */
+      assert.match(
+        spec.repo,
+        /^justinnewbold\//,
+        `${name} is vendored straight from ${spec.repo} — the installer would then depend on an account we do not control`
+      )
+      assert.match(
+        spec.upstream || '',
+        /^[\w.-]+\/[\w.-]+$/,
+        `${name} does not say where it was mirrored from, which is the thing a copy loses first`
+      )
     }
+
+    /*
+     * Asked for by commit, not cloned at a tag.
+     *
+     * The mirrors carry every branch and the whole history but no tags, so
+     * there is nothing to clone — and naming the commit is the stricter shape
+     * regardless: cloning a tag puts whatever it points at on disk and asks
+     * questions afterwards, which is a window this has no reason to have.
+     */
+    const script = read('scripts/vendor-forgefx.mjs')
+    assert.match(
+      script,
+      /'fetch', '--quiet', '--depth', '1', 'origin', spec\.commit/,
+      'the vendor script no longer asks for the pinned commit by name'
+    )
+    assert.ok(
+      !/'--branch', spec\.tag/.test(script),
+      'the vendor script clones at the tag again — the mirrors have no tags, and a tag is not the pin'
+    )
 
     /*
      * And the app has to be given it. Vendoring without wiring it up is the
