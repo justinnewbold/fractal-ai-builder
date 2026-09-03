@@ -399,15 +399,6 @@ button.topbar-preset:active:not(:disabled) {
   flex: 1 1 auto;
 }
 
-.topbar-dirty {
-  flex: 0 0 auto;
-  font-family: var(--mono);
-  font-size: var(--f-1);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--signal);
-}
-
 /*
  * The way into every setting, and it was the smallest thing on the screen —
  * 31px wide on a phone, because it is one glyph and the padding was all it
@@ -685,6 +676,7 @@ input[type='text']:focus-visible {
 .grid-scroll {
   overflow-x: auto;
   padding-bottom: var(--s-1);
+  scroll-padding-right: 24px;
 }
 
 .grid {
@@ -1645,13 +1637,11 @@ button.chip.active {
 
 /* ---------- scenes and channels ---------- */
 
-.scenes {
-  margin-top: 34px;
-}
-
 .scene-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  /* 120, not 96: the cell also holds a 44px pencil, and at 96 the name had
+     one letter and an ellipsis. */
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: var(--s-1);
   margin-top: 8px;
 }
@@ -1699,11 +1689,13 @@ button.scene.current .scene-num {
   color: var(--signal);
 }
 
+/* Wraps, the way the same name does on Play. "RHYTHM" was "Rhyt…" in a
+   tile a thumb wide. */
 .scene-name {
-  font-size: var(--f-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: var(--f-1);
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
   max-width: 100%;
 }
 
@@ -2783,6 +2775,18 @@ button.preset-row.current .preset-id {
   gap: var(--s-2);
   flex-wrap: wrap;
   padding: var(--s-5) var(--s-3) var(--s-6);
+  scroll-padding-right: 24px;
+}
+
+/* More to the right: the edge fades rather than cutting, only while there is
+   something past it. The strip and the grid set the attribute themselves; on
+   a desktop the strip wraps and never overflows; the 12-column grid does in
+   any window narrower than about 1000px — it clipped CAB, DELAY and REVERB
+   with nothing to say so. */
+.chain-strip[data-overflow='yes'],
+.grid-scroll[data-overflow='yes'] {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
 }
 
 .io-arrow {
@@ -3737,13 +3741,6 @@ ol.action-list li.destructive::marker {
     display: none;
   }
 
-  /* More to the right: the edge fades rather than cutting, only while there
-     is something past it. The strip itself sets the attribute. */
-  .chain-strip[data-overflow='yes'] {
-    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
-    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
-  }
-
   button.fx-tile,
   .fx-cell {
     flex: none;
@@ -4411,6 +4408,14 @@ button.gig-block:disabled {
   background: var(--signal);
   border-color: var(--signal);
   color: var(--on-signal);
+}
+
+/* Nothing to save: the button says so, quietly. Amber is for a change that
+   would be lost, and it was amber all the time, which is the same as never. */
+.save-cluster[data-dirty='no'] button.save-now {
+  background: none;
+  border-color: var(--rule);
+  color: var(--silk-dim);
 }
 
 .save-cluster button.save-now:disabled {
@@ -5382,15 +5387,10 @@ button.xy-change {
     white-space: nowrap;
   }
 
-  /* The preset name had one letter left: "500 D…" beside UNSAVED, a dot, Save,
-     the phone chip and the gear. The Save button is orange when there is
-     something to save, so on a phone it carries "unsaved" alone and the word
-     and the dot go; the name keeps at least eight characters. */
-  .topbar-dirty,
-  .save-cluster .lamp {
-    display: none;
-  }
-
+  /* The preset name had one letter left beside a word, a dot, Save, the
+     phone chip and the gear. The word and the dot are gone everywhere now —
+     the Save button carries the state — and the name keeps at least eight
+     characters. */
   .topbar-name {
     min-width: 8ch;
   }
@@ -5466,8 +5466,24 @@ button.chip.scene-now {
   border-radius: 0;
 }
 
+/* The menu is the one scroll surface. With a scroller inside it the "Show
+   all 512 slots" chip lived inside the window it was about to overflow, and
+   a wheel at the end of the list carried on into the page behind. */
+.preset-menu {
+  max-height: min(72vh, 560px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .preset-menu .preset-scroll {
-  max-height: min(52vh, 420px);
+  max-height: none;
+}
+
+.preset-menu input.preset-filter {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel);
 }
 
 button.preset-menu-more {

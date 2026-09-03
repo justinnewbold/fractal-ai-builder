@@ -41,6 +41,7 @@ import Knob from './Knob'
 import { blockParams, blockTypes, setParamConfirmed, setType, setBypass, setChannel } from '../lib/forgefx'
 import { isSilencingParam } from '../lib/guardrails'
 import { bringIntoView } from '../lib/feedback'
+import { useOverflow } from '../lib/overflow'
 import { slotLabel, startsBank } from '../lib/slots'
 
 /**
@@ -68,23 +69,10 @@ export function Chain({ blocks, selected, onSelect, onToggle }) {
    * Whether there is more chain off the right edge. On a phone the strip
    * scrolls sideways with its scrollbar hidden, so a full chain simply ran off
    * the edge with a hard cut and nothing to say so. The fade that says so is
-   * CSS; this is the one fact it needs, kept current on resize and scroll.
+   * CSS; this is the one fact it needs, kept current on resize and scroll —
+   * and shared with the grid, which has the same problem at every width.
    */
-  useEffect(() => {
-    const el = strip.current
-    if (!el || typeof ResizeObserver === 'undefined') return undefined
-    const look = () => {
-      el.dataset.overflow = el.scrollWidth - el.clientWidth - el.scrollLeft > 1 ? 'yes' : 'no'
-    }
-    look()
-    const ro = new ResizeObserver(look)
-    ro.observe(el)
-    el.addEventListener('scroll', look, { passive: true })
-    return () => {
-      ro.disconnect()
-      el.removeEventListener('scroll', look)
-    }
-  }, [chain.length])
+  useOverflow(strip, [chain.length])
 
   const tap = (block) => {
     const now = Date.now()

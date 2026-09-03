@@ -959,10 +959,11 @@ export function run(test) {
     assert.match(search, /setTimeout\(\(\) => \{\s*ensureIndex\(\)/, 'the read is not debounced')
     assert.match(search, /slow && index === null \? <p className="hint mono">Reading the blocks/, 'the reading line still shows on every read, at once')
     assert.ok(!/index && !reading \?/.test(search), 'the hits are hidden again while a re-read runs')
-    // The chain strip says when it scrolls.
-    const console_ = read('Console.jsx')
-    assert.match(console_, /el\.dataset\.overflow = /, 'the chain strip no longer says whether there is more to the right')
-    assert.match(console_, /new ResizeObserver\(look\)/)
+    // The chain strip says when it scrolls — through the observer it now shares with the grid.
+    const overflow = readFileSync(new URL('../src/lib/overflow.js', import.meta.url), 'utf8')
+    assert.match(overflow, /el\.dataset\.overflow = /, 'the chain strip no longer says whether there is more to the right')
+    assert.match(overflow, /new ResizeObserver\(look\)/)
+    assert.match(read('Console.jsx'), /useOverflow\(strip/, 'the chain strip does not use the shared observer')
     // The account project is not something to type into Setup.
     const details = read('LinkDetails.jsx')
     assert.ok(!/<input/.test(details), 'the Supabase project fields are back in Setup')
@@ -1052,6 +1053,20 @@ export function run(test) {
     const scenes = read('components/Scenes.jsx')
     assert.match(scenes, /e\.key === 'Escape'\) \{\s*e\.stopPropagation\(\)\s*setRenaming\(null\)/, 'Escape does not leave the rename row, or leaves the sheet with it')
     assert.ok(!/\.save-pop/.test(read('styles.css')), 'the orphaned save popover rules are back')
+  })
+
+  test('Save carries its state, and both grids know when they overflow', () => {
+    const read = (f) => readFileSync(new URL('../src/components/' + f, import.meta.url), 'utf8')
+    const save = read('SaveBar.jsx')
+    assert.match(save, /data-dirty=\{dirty \? 'yes' : 'no'\}/, 'the save cluster does not say whether anything is unsaved')
+    assert.match(save, /: !dirty\s*\n?\s*\? 'Saved'/, 'a clean preset still shows "Save"')
+    assert.ok(!/className="lamp"/.test(save), 'the cyan dot is back beside Save')
+    assert.ok(!/topbar-dirty/.test(read('TopBar.jsx')), 'the separate UNSAVED word is back in the bar')
+    const grid = read('GridEditor.jsx')
+    assert.equal((grid.match(/useOverflow\(/g) || []).length, 2, 'a grid scroller has no overflow observer')
+    // Hooked before `cols` existed, the panel threw in the temporal dead zone and the error boundary drew "Chain couldn’t draw" in its place.
+    assert.ok(grid.indexOf('useOverflow(') > grid.indexOf('const cols ='), 'the overflow observer reads `cols` before it is declared')
+    assert.match(read('Console.jsx'), /useOverflow\(strip, \[chain\.length\]\)/, 'the chain strip keeps a private observer')
   })
 
   test('the introduction is offered once, and only when there is something to see', () => {
