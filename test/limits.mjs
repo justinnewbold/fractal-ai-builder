@@ -145,4 +145,27 @@ export function run(test) {
     assert.ok(Number.isFinite(cap), 'no maxOutputTokens — the request runs on the provider default')
     assert.ok(cap >= 8000, `maxOutputTokens is ${cap}, low enough to truncate a full chain`)
   })
+  test('the Mac app and the app it carries claim the same version', () => {
+    /*
+     * The desktop package sat at 0.1.0 through six major versions of the thing
+     * it packages, and nothing noticed because nothing compares them — until
+     * something does. electron-updater decides whether an installed app is out
+     * of date by comparing exactly this number against the newest release, and
+     * the DMG is named with it. Left frozen, every build claims to be the same
+     * version as the last one and no update ever installs; worse, the number a
+     * person reads in About is not the number of the app they are running.
+     *
+     * One version, stamped from the root at build time. This is the check that
+     * the stamping happened.
+     */
+    const root = JSON.parse(read('package.json')).version
+    const desktop = JSON.parse(read('desktop/package.json')).version
+    assert.equal(
+      desktop,
+      root,
+      `the Mac app says ${desktop} while the app inside it says ${root} — ` +
+        'an update compares the first and a person reads the second'
+    )
+  })
+
 }

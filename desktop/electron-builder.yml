@@ -27,5 +27,10 @@ mac:
   gatekeeperAssess: false
   entitlements: entitlements.mac.plist
   entitlementsInherit: entitlements.mac.plist
-dmg:
-  title: Fractal AI Builder
+# No `dmg.title` on purpose. That string is the volume name the disk image
+# mounts under, and it was set to a constant — so both architectures asked for
+# /Volumes/Fractal AI Builder at the same time, and the second build spent six
+# retries failing to detach a volume the first one was still using before it
+# killed the job. electron-builder's own default is "<product> <version>" plus
+# an arch suffix, which is exactly the uniqueness this needs, so the fix is to
+# stop overriding it rather than to invent a new name.
