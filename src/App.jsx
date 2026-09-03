@@ -1005,7 +1005,11 @@ export default function App() {
            * one token from done or had died two minutes ago.
            */
           onEvent: (e) => {
-            if (e.kind === 'request') setProgress('Sent to the model — waiting for the first line…')
+            if (e.kind === 'request') setProgress('Reaching the server…')
+            // The server says hello before it asks the model anything, so this
+            // line changing at all is proof the round trip works — which is
+            // most of what someone staring at a long wait wants to know.
+            else if (e.kind === 'open') setProgress('Sent to the model — waiting for the first line…')
             else if (e.kind === 'first-output') setProgress('The model is answering…')
             else if (e.kind === 'partial') {
               setProgress(
