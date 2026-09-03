@@ -17,7 +17,7 @@
  * run on real hardware for a while; not worth guessing at from a container.
  */
 const { app, BrowserWindow, Tray, Menu, shell, nativeImage, dialog } = require('electron')
-const { spawn } = require('node:child_process')
+const { spawn, execFileSync } = require('node:child_process')
 const { join } = require('node:path')
 const net = require('node:net')
 
@@ -28,6 +28,8 @@ let advert = { stop: async () => {} }
 let where = null
 /** What armHost found: null until it answers, then { on, email, reason }. */
 let phone = null
+/** Whether macOS is likely stopping a phone from reaching us. Best effort. */
+let firewall = { known: false }
 
 /** The shared logic is ESM; this shell is CommonJS, so it is imported lazily. */
 const host = () => import('./lib/host.mjs')
@@ -59,6 +61,7 @@ async function start() {
     findForgeFX,
     lanAddress,
     publish,
+    readFirewall,
     serverEnv,
     waitForServer,
     whoHasPort,
@@ -144,6 +147,16 @@ async function start() {
     .catch(() => {})
 
   /*
+   * The address in the menu works here and fails from a phone when macOS has
+   * not been told to accept connections from other machines. Asked once, and
+   * quietly: it only adds a line to a menu.
+   */
+  firewall = readFirewall({
+    appPath: app.getPath('exe'),
+    run: (cmd, args) => execFileSync(cmd, args, { encoding: 'utf8', timeout: 4000 })
+  })
+
+  /*
    * Spawning the server is not starting it. Fastify is listening a second or
    * two after the process exists, and a window opened into that gap gets a
    * refused connection and shows nothing — for ever, because a page that
@@ -226,6 +239,35 @@ function buildTray() {
       label: u,
       click: () => shell.openExternal(u)
     })),
+    /*
+     * Said only when there is something to say. A phone that cannot reach this
+     * Mac over wifi is nearly always this, and nearly nobody thinks of it —
+     * the address plainly works when you try it here.
+     */
+    ...(firewall.known && firewall.on && firewall.blocked !== false
+      ? [
+          {
+            label: "…not working? macOS's firewall has to allow this app",
+            click: () =>
+              shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Firewall')
+          }
+        ]
+      : []),
+    /*
+     * The other way in, offered only once it actually works. It needs an
+     * account on both ends, and in exchange it does not care which network the
+     * phone is on.
+     */
+    ...(phone?.on
+      ? [
+          { type: 'separator' },
+          { label: 'Or from anywhere, signed in on both:', enabled: false },
+          {
+            label: 'fractal.newbold.cloud',
+            click: () => shell.openExternal('https://fractal.newbold.cloud')
+          }
+        ]
+      : []),
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() }
   ])
