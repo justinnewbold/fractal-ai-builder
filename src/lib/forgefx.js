@@ -1166,10 +1166,8 @@ export const revertPreset = (number) => selectPreset(number)
  */
 export function subscribeEvents(onEvent) {
   if (mock) {
-    const id = setInterval(() => {
-      const cents = Math.round((Math.random() - 0.5) * 30)
-      onEvent({ type: 'tuner', note: ['E', 'A', 'D', 'G', 'B'][Math.floor(Math.random() * 5)], octave: 2, cents })
-    }, 400)
+    const tuner = mock.tunerStream()
+    const id = setInterval(() => onEvent(tuner.next()), 400)
     return () => clearInterval(id)
   }
 

@@ -1016,6 +1016,19 @@ export function run(test) {
     assert.match(line, /topbar-caret/)
   })
 
+  test('the demo keeps its names and its tuner is the mock’s, not a dice roll', () => {
+    const forgefx = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+    const events = forgefx.slice(forgefx.indexOf('export function subscribeEvents'), forgefx.indexOf('export function subscribeEvents') + 400)
+    assert.match(events, /mock\.tunerStream\(\)/, 'the mock event stream rolls its own tuner again')
+    assert.ok(!/Math\.random/.test(events), 'the tuner reading is random per tick')
+    const mock = readFileSync(new URL('../src/lib/mockDevice.js', import.meta.url), 'utf8')
+    assert.match(mock, /keepSceneNames\(state\.sceneNames\)/, 'a demo rename is not kept')
+    assert.match(mock, /sceneNames: storedSceneNames\(\) \|\|/, 'the demo does not read its kept names on load')
+    assert.match(mock, /tunerStream: \(\) => createTunerStream\(\)/, 'the mock has no tuner of its own')
+    const tuner = readFileSync(new URL('../src/components/Console.jsx', import.meta.url), 'utf8')
+    assert.match(tuner, /left: reading\?\.note \? `calc\(50% \+ \$\{offset\}%\)` : '50%'/, 'the needle keeps its last position when nothing is playing')
+  })
+
   test('the introduction is offered once, and only when there is something to see', () => {
     /*
      * Two mistakes a tutorial can make, both of which turn it from help into

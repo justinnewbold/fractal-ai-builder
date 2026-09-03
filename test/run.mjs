@@ -1805,6 +1805,66 @@ test('a scan already running is not started twice', async () => {
   assert.equal(await first, 'done')
 })
 
+/* ------------------------------------------------------------------
+   The demo remembers its scene names, and its tuner holds a note
+   ------------------------------------------------------------------ */
+
+{
+  const store = new Map()
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k)
+  }
+  const { storedSceneNames, keepSceneNames, DEFAULT_SCENE_NAMES, DEMO_SCENE_NAMES } = await import('../src/lib/demoMemory.js')
+  const { createTunerStream } = await import('../src/lib/tunerStream.js')
+
+  test('a demo scene name survives the mock being rebuilt', () => {
+    // "Solo" was "4" again after a reload: the array came from a literal every time.
+    assert.equal(storedSceneNames(), null, 'a fresh demo has kept names from nowhere')
+    const names = DEFAULT_SCENE_NAMES.slice()
+    names[3] = 'Solo'
+    keepSceneNames(names)
+    assert.deepEqual(storedSceneNames(), names)
+    assert.ok(store.has(DEMO_SCENE_NAMES), 'the demo did not keep its own key')
+    assert.ok(!store.has('fractal.sceneNames'), 'the demo wrote into the real-device cache')
+    store.set(DEMO_SCENE_NAMES, '"not an array"')
+    assert.equal(storedSceneNames(), null, 'a bad key is survived')
+    store.set(DEMO_SCENE_NAMES, JSON.stringify(['a', 'b']))
+    assert.equal(storedSceneNames(), null, 'the wrong number of names is survived')
+    store.clear()
+    // And the mock reads them: pinned by the structure guard on mockDevice.js.
+  })
+
+  test('the demo tuner holds a string, drifts a little and sometimes goes quiet', () => {
+    // A seeded generator so the run is the same every time.
+    let seed = 7
+    const random = () => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff
+      return seed / 0x7fffffff
+    }
+    const tuner = createTunerStream(random)
+    const readings = Array.from({ length: 300 }, () => tuner.next())
+    const sounding = readings.filter((r) => r.note)
+    assert.ok(sounding.length >= 200, `the tuner was quiet ${300 - sounding.length} of 300 ticks`)
+    assert.ok(readings.some((r) => r.note === '' && r.cents === null), 'the tuner never goes quiet, so the panel never shows "Play a string"')
+    let changes = 0
+    let jumps = 0
+    for (let i = 1; i < readings.length; i++) {
+      const a = readings[i - 1]
+      const b = readings[i]
+      if (!a.note || !b.note) continue
+      if (a.note !== b.note || a.octave !== b.octave) changes++
+      else if (Math.abs(a.cents - b.cents) > 4) jumps++
+    }
+    assert.ok(changes < sounding.length * 0.2, `the string changed on ${changes} of ${sounding.length} sounding ticks`)
+    assert.equal(jumps, 0, `cents jumped by more than 4 between ticks ${jumps} times while the string held`)
+    assert.ok(sounding.every((r) => Number.isInteger(r.cents) && Math.abs(r.cents) <= 50), 'a reading is not an integer within ±50 cents')
+  })
+
+  delete globalThis.localStorage
+}
+
 console.log('\nstructure')
 const { run: structure } = await import('./structure.mjs')
 structure(test)

@@ -707,9 +707,10 @@ export function Tuner({ reading, on }) {
 
       <div className="tuner-bar">
         <div className="tuner-centre" />
+        {/* Nothing to show is the centre, not wherever the last string left it. */}
         <div
           className={`tuner-needle ${inTune ? 'in' : ''}`}
-          style={{ left: `calc(50% + ${offset}%)` }}
+          style={{ left: reading?.note ? `calc(50% + ${offset}%)` : '50%' }}
         />
       </div>
 
