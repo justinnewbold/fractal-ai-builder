@@ -1769,6 +1769,13 @@ export function run(test) {
       'electron-updater is not shipped inside the app'
     )
 
+    /*
+     * And published rather than drafted. electron-builder's default is a
+     * draft, which is invisible to the updater — so the app would check, find
+     * nothing, and be right, while the release sat waiting for a click.
+     */
+    assert.match(yml, /releaseType:\s*release/, 'the release would be a draft nobody can install')
+
     // Published from a release tag and from nothing else.
     const flow = readFileSync(new URL('../.github/workflows/desktop.yml', import.meta.url), 'utf8')
     assert.match(flow, /PUBLISH:.*refs\/tags\/desktop-v/, 'every build would publish, or none would')

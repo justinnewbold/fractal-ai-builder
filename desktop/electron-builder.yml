@@ -35,6 +35,19 @@ publish:
   provider: github
   owner: justinnewbold
   repo: fractal-ai-builder
+  # Published, not drafted.
+  #
+  # electron-builder's own default here is `draft`, and a draft release is
+  # invisible to everything except a person logged into this repository — so
+  # the app would check for updates, find nothing, and be right, while a
+  # perfectly good release sat there waiting for a click nobody knew to make.
+  # The same shape of failure as building only a .dmg: it looks like it works.
+  #
+  # Note that the release this creates is tagged `v<version>` by
+  # electron-builder, which is not the `desktop-v<version>` tag that triggers
+  # the build. Two tags, one job each: one says "release this", the other is
+  # the release. The app only ever reads the latter.
+  releaseType: release
 
 mac:
   category: public.app-category.music
