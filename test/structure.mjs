@@ -1778,7 +1778,25 @@ export function run(test) {
 
     // Published from a release tag and from nothing else.
     const flow = readFileSync(new URL('../.github/workflows/desktop.yml', import.meta.url), 'utf8')
-    assert.match(flow, /PUBLISH:.*refs\/tags\/desktop-v/, 'every build would publish, or none would')
+    assert.match(flow, /refs\/tags\/desktop-v/, 'every build would publish, or none would')
+
+    /*
+     * And a release can be asked for without pushing a tag, because pushing
+     * one is not always available: a credential scoped to a branch is refused
+     * with a 403 and there is nothing to retry. It was never required either —
+     * electron-builder creates the release through GitHub's API and GitHub
+     * makes the tag, so the tag is a result of releasing, not the trigger.
+     *
+     * Only from the default branch, though. `createRelease` does not say which
+     * commit to tag, so GitHub tags the default branch's head; published from
+     * anywhere else, a release would carry that name and someone else's code.
+     */
+    assert.match(flow, /inputs\.publish/, 'a release can only be cut by pushing a tag')
+    assert.match(
+      flow,
+      /inputs\.publish && github\.ref == 'refs\/heads\/main'/,
+      'a branch build could publish a release tagged against main'
+    )
   })
 
   test('the tour teaches what a scene actually is', () => {
