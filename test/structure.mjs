@@ -1899,6 +1899,36 @@ export function run(test) {
     )
   })
 
+  test('the chat keeps moving while a tone is being built', () => {
+    /*
+     * "When generating a new tone the suggestion typewriter stops and freezes.
+     * Can we keep the live suggestions going? Maybe queue messages sent while
+     * generating?"
+     *
+     * The suggestions stopped on `busy`, which is the whole of a generation —
+     * so the one moment nothing else is happening on screen is the moment the
+     * screen went still, and a thirty-second wait looked like a hang. And
+     * sending returned early while busy with the box disabled, so a thought
+     * had mid-run was simply dropped.
+     */
+    const a = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
+    assert.match(
+      a,
+      /useTypedSuggestion\(!text && !focused, suggestions\)/,
+      'the suggestions still freeze for the whole of a generation'
+    )
+
+    // What is typed mid-run is kept, and goes one at a time afterwards.
+    assert.match(a, /if \(busy\) \{\s*\n\s*setQueue/, 'anything sent mid-generation is still dropped')
+    assert.match(a, /const \[next, \.\.\.rest\] = queue/, 'the queue is not drained one at a time')
+    assert.match(a, /ask\.current\(next\)/, 'the queue is drained through a changing function identity')
+    assert.match(a, /turn-queued/, 'what is waiting is never shown, so it looks ignored')
+
+    // And the box stays usable, or there is nothing to queue with.
+    const box = a.slice(a.indexOf('className="refine-input"') - 400, a.indexOf('className="refine-input"') + 400)
+    assert.ok(!/disabled=\{busy\}/.test(box), 'the box is still disabled while the model works')
+  })
+
   test('the tour teaches what a scene actually is', () => {
     const tour = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
     const card = tour.slice(tour.indexOf('Scenes are one rig'), tour.indexOf('Scenes are one rig') + 1200)
