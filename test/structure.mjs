@@ -839,21 +839,6 @@ export function run(test) {
     )
   })
 
-  test('the pad sits under the scenes and says which one it is playing', () => {
-    /*
-     * The pad was rendered above the scene grid, so opening it pushed the
-     * scene you were in off a phone's screen — on the screen whose whole
-     * purpose is scene buttons you can hit without looking.
-     */
-    const gig = readFileSync(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8')
-    const scenes = gig.indexOf('className="gig-scenes"')
-    const pad = gig.indexOf('<XYPad')
-    assert.ok(scenes !== -1 && pad !== -1 && pad > scenes, 'the pad is above the scene grid again')
-    assert.match(gig, /className="gig-pad-scene/, 'the pad no longer says which scene it is playing')
-    const xy = readFileSync(new URL('../src/components/XYPad.jsx', import.meta.url), 'utf8')
-    assert.match(xy, /calc\(13px \+ /, 'the puck is centred by percent again and hangs over the pad’s edge')
-  })
-
   test('the preset list shows names it has, not 512 dashes', () => {
     /*
      * The demo's Presets sheet was 512 rows of "000: —", the loaded "500 DEMO"
@@ -1108,15 +1093,8 @@ export function run(test) {
     assert.match(read('Console.jsx'), /useOverflow\(strip, \[chain\.length\]\)/, 'the chain strip keeps a private observer')
   })
 
-  test('the pad remembers its labels, the model picker says its name, and Modifiers says what it needs', () => {
+  test('the model picker says its name, and Modifiers says what it needs', () => {
     const read = (f) => readFileSync(new URL('../src/components/' + f, import.meta.url), 'utf8')
-    const xy = read('XYPad.jsx')
-    // ACROSS/UP showed "Choose…" over a pad that was set up, until the index arrived.
-    assert.match(xy, /\[`\$\{axis\}Name`\]: ctl \? `\$\{ctl\.block\.name\} · \$\{ctl\.param\.name\}` : undefined/, 'a choice is kept without its name')
-    assert.match(xy, /const saved = !index && axes\.x && axes\.y/, 'a saved pad is not told apart from an unset one while the controls are read')
-    assert.match(xy, /Reading \{savedName\('x'\)\} and \{savedName\('y'\)\}/, 'the saved names are not shown while reading')
-    assert.match(xy, /if \(next\.x && next\.y\) setPicking\(false\)/, 'the pickers never fold after Change')
-    assert.match(xy, /indexes\.set\(key, built\)/, 'every open of the pad re-reads every block')
     const console_ = read('Console.jsx')
     assert.ok(!/\{m\.basedOn \? ` — \$\{m\.basedOn\}` : ''\}/.test(console_), 'the model option carries the whole "based on" sentence again')
     assert.match(console_, /className="hint pad based-on">Based on \{basedOn\}/, 'what a model is based on is not shown under the picker')
@@ -1938,6 +1916,29 @@ export function run(test) {
     // And the box stays usable, or there is nothing to queue with.
     const box = a.slice(a.indexOf('className="refine-input"') - 400, a.indexOf('className="refine-input"') + 400)
     assert.ok(!/disabled=\{busy\}/.test(box), 'the box is still disabled while the model works')
+  })
+
+  test('the XY pad is gone, not half removed', () => {
+    /*
+     * "Let's just remove the XY pad. It's kind of weird."
+     *
+     * Removed rather than hidden, like the two-take comparison before it: a
+     * panel that is still built and still wired is a thing that breaks in the
+     * dark, and this one held a drag handler, a set of touch listeners and a
+     * live write path per pointer move.
+     */
+    assert.ok(
+      !existsSync(new URL('../src/components/XYPad.jsx', import.meta.url)),
+      'XYPad.jsx is still there'
+    )
+    const gig = readFileSync(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8')
+    for (const gone of ['XYPad', 'xyOn', 'gig-pad']) {
+      assert.ok(!gig.includes(gone), `${gone} is still wired into the Play screen`)
+    }
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    assert.ok(!/\.xy[-\s{,]/.test(css), 'the pad styles are still shipped')
+    const screens = readFileSync(new URL('../src/components/Screens.jsx', import.meta.url), 'utf8')
+    assert.ok(!/\.xy/.test(screens), 'the swipe guard still exempts a surface that no longer exists')
   })
 
   test('the tour teaches what a scene actually is', () => {

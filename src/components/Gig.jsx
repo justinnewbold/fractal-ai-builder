@@ -14,7 +14,6 @@ import { EXCLUDED_BLOCKS } from '../lib/guardrails'
 import { blockColor } from '../lib/blockColors'
 import { tick as haptic } from '../lib/feedback'
 import { Tuner } from './Console'
-import XYPad from './XYPad'
 
 /**
  * The stand, not the bench.
@@ -58,7 +57,6 @@ export default function Gig({ preset, device, capabilities, onError, onChanged, 
   const [meters, setMeters] = useState([])
   const [working, setWorking] = useState(false)
   const [toggling, setToggling] = useState(null)
-  const [xyOn, setXyOn] = useState(false)
   /*
    * Whether readings are actually arriving while the tuner is on.
    *
@@ -332,13 +330,6 @@ export default function Gig({ preset, device, capabilities, onError, onChanged, 
             Tuner
           </button>
         ) : null}
-        <button
-          className={`gig-mode ${xyOn ? 'on' : ''}`}
-          onClick={() => setXyOn(!xyOn)}
-          aria-pressed={xyOn}
-        >
-          XY pad
-        </button>
       </div>
 
       {tunerOn ? (
@@ -387,23 +378,6 @@ export default function Gig({ preset, device, capabilities, onError, onChanged, 
               {names[i] ? <span className="gig-scene-name">{names[i]}</span> : null}
             </button>
           ))}
-        </div>
-      ) : null}
-
-      {/* Under the scenes, not over them: opening the pad must not take the
-          scene you are in off the screen. It says which scene it plays into,
-          since the grid may have scrolled away by the time a thumb is on it.
-          Live even while hidden would be wrong the other way: the pad holds
-          no poll and writes only under a finger, so mount/unmount is free. */}
-      {xyOn ? (
-        <div className="gig-pad">
-          {hasScenes ? (
-            <p className="gig-pad-scene mono">
-              Scene {scene + 1}
-              {names[scene] ? ` · ${names[scene]}` : ''}
-            </p>
-          ) : null}
-          <XYPad blocks={blocks} onError={onError} />
         </div>
       ) : null}
 

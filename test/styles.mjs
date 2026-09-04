@@ -209,22 +209,6 @@ export function run(test) {
         `(${scale[inset]}px inset + ${height}px tall) — the last row of controls cannot be scrolled clear of it`
     )
   })
-  test('the pad fits the screen instead of filling the column', () => {
-    /*
-     * A square pad with no cap was as wide as the column: 358px on a phone,
-     * where it pushed the scene you were in off the screen, and 1148px on a
-     * desktop, where it was the page. It is a control, not a screen.
-     */
-    const at = code.indexOf('.xy-pad {')
-    assert.notEqual(at, -1)
-    const rule = code.slice(at, code.indexOf('}', at))
-    const width = rule.match(/width: ([^;]+);/)?.[1] || ''
-    assert.match(width, /min\(/, 'the pad is as wide as whatever it is in')
-    assert.match(width, /\d+px/, 'no pixel cap on the pad')
-    assert.match(width, /\d+vh/, 'no cap against the screen height, so a phone in landscape gets a pad taller than the screen')
-    assert.match(rule, /aspect-ratio: 1/, 'the pad is no longer square')
-  })
-
   test('inside a sheet the preset list is not a second scroller', () => {
     /*
      * A 300px window over a 23,000px list, inside a sheet body that scrolls
