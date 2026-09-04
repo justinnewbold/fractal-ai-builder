@@ -143,8 +143,16 @@ async function directRequest(path, options = {}) {
       headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
     })
   } catch (cause) {
+    /*
+     * Two different failures, and telling someone the wrong one sends them to
+     * check a machine that was never the problem. In the demo there is no
+     * helper anywhere by definition, so blaming their Mac is simply false —
+     * and it is the exact sentence a phone stuck in the demo used to show.
+     */
     throw new ForgeError(
-      'Can’t reach the Fractal app on your Mac. Check that it is open and the Fractal unit is connected.',
+      mock
+        ? 'This is the demo, so there is no Fractal app to reach. Switch to a real device to connect.'
+        : 'Can’t reach the Fractal app on your Mac. Check that it is open and the Fractal unit is connected.',
       { cause }
     )
   }
@@ -175,6 +183,24 @@ async function directRequest(path, options = {}) {
  * yours to throw, and whether a remote session on this machine is a relay to
  * somewhere else or a relay to the desk you're sitting at.
  */
+/**
+ * Could this browser ever be the machine with the cable in it?
+ *
+ * `localHelperAlive` answers false in the demo on purpose — the demo has no
+ * helper and nothing should try to reach one. But "no helper because we are
+ * pretending" and "no helper because this is a phone" are different facts, and
+ * only the second one is permanent. Asked separately, and past the mock, so
+ * the demo can be left for the right reason rather than trapping a phone in it.
+ */
+export async function canReachHelper() {
+  try {
+    const res = await fetch(`${getHost()}/healthz`, { signal: AbortSignal.timeout(2500) })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
 export async function localHelperAlive() {
   if (mock) return false
   try {

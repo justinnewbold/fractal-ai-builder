@@ -247,6 +247,12 @@ let state = {
   hostOn: false,
   macName: null,
   since: Date.now(),
+  /*
+   * Whether this browser could be the machine with the cable in it. False on
+   * a phone for ever, and the demo does not change that — which is the whole
+   * point of asking, because the demo claims the Mac role on every device.
+   */
+  canHost: true,
   /** mac role: whether this ForgeFX can host at all, and who it is signed in as. */
   cloud: null
 }
@@ -440,7 +446,7 @@ export async function bootLink() {
   if (booted) return state
   booted = true
 
-  const { isDemo, servedLocally, localHelperAlive } = await device()
+  const { isDemo, servedLocally, localHelperAlive, canReachHelper } = await device()
   const served = servedLocally()
   const hostname = typeof window !== 'undefined' ? window.location.hostname : ''
   const helperAlive = isDemo() || served ? false : await localHelperAlive()
@@ -455,6 +461,32 @@ export async function bootLink() {
   const config = loadRemoteConfig()
   restoring = role === 'remote' && hasSavedSession({ url: config?.url }) && wantsAutoConnect() !== false
   refresh({ role })
+
+  /*
+   * Whether this browser could ever host, asked only where the answer is not
+   * already known — and never awaited, because the role above must be
+   * published before anything on a network is waited for.
+   *
+   * The demo takes the Mac role on whatever device it runs on: that is what
+   * makes the app explorable without hardware, and it should stay. But on a
+   * phone it left someone holding a screen headed "Set up phone remote —
+   * once, on this Mac", above a button whose first act is to call a helper on
+   * localhost. There is none, and there never can be, so it failed with
+   * "Can't reach the Fractal app on your Mac" and sent them to check a Mac
+   * that was working perfectly. Tapping "Try the demo" once made it a one-way
+   * door.
+   *
+   * So the role still says Mac and the demo still works everywhere, and the
+   * app now knows a Mac pretending from a phone pretending — and offers the
+   * phone the way out rather than the way that cannot work. It starts true so
+   * a real Mac never flickers through the phone's wording; only a probe that
+   * comes back empty moves it.
+   */
+  if (isDemo() && !served) {
+    canReachHelper()
+      .then((can) => set({ canHost: can }))
+      .catch(() => {})
+  }
 
   await restoreSession({ url: config?.url, anonKey: config?.anonKey })
   const account = await currentAccount()
