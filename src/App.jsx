@@ -2586,10 +2586,12 @@ export default function App() {
               and revealResult anchor to them. Only the words a player reads
               change: "Shape" and "Ask" described what the screen was to the
               person building it, not what you go there to do. */}
+          {/* Create before Edit: you make a tone, then you adjust it, and the
+              tabs now run in that order. */}
           {[
             ['play', 'Play'],
-            ['shape', 'Edit'],
-            ['ask', 'Create']
+            ['ask', 'Create'],
+            ['shape', 'Edit']
           ].map(([id, label]) => (
             <button
               key={id}
@@ -3046,7 +3048,6 @@ export default function App() {
         open={sheet === 'scenes'}
         onClose={() => setSheet(null)}
         title="Scenes"
-        note={sceneNames[scene] || `Scene ${scene + 1}`}
       >
         <Scenes
           blocks={blocks}

@@ -90,37 +90,44 @@ export default function Scenes({
   return (
     <section className="scenes">
       {hasScenes ? <p className="silk-label">Scenes</p> : null}
+      {/*
+        One tile per scene, and the tile is the whole target.
+
+        There was a pencil beside every one of them — eight extra 44px buttons
+        for something you do once a preset — and the tile itself was two
+        different actions depending on which one you tapped, with the
+        difference explained in a hint. "Let's make the bigger buttons where
+        you tap them to switch, and then if you wanna edit the scene just have
+        a single button that says edit name."
+
+        So: tapping a tile goes there, always. Naming is one button, below,
+        about the scene you are in.
+      */}
       <div className="scene-row" hidden={!hasScenes}>
         {Array.from({ length: hasScenes ? count : 0 }, (_, i) => (
-          <div key={i} className="scene-cell">
-            {/*
-              Tap to go there; tap the one you are in to name it. This was a
-              double-click, which never fired: the first click jumped, the jump
-              re-read the unit, the re-read disabled the button, and a disabled
-              button dispatches no second click. A phone had no path at all.
-            */}
-            <button
-              className={`scene ${i === current ? 'current' : ''}`}
-              onClick={() => (i === current ? startRename(i) : jump(i))}
-              disabled={busy}
-              title={i === current ? 'Tap again to name this scene' : `Switch to scene ${i + 1}`}
-            >
-              <span className="scene-num mono">{i + 1}</span>
-              <span className="scene-name">{names[i] || '—'}</span>
-            </button>
-            {/* And a pencil, for naming a scene without switching to it. */}
-            <button
-              className="scene-pencil"
-              onClick={() => startRename(i)}
-              disabled={busy}
-              aria-label={`Name scene ${i + 1}`}
-              title="Name this scene"
-            >
-              ✎
-            </button>
-          </div>
+          <button
+            key={i}
+            className={`scene ${i === current ? 'current' : ''}`}
+            onClick={() => jump(i)}
+            disabled={busy}
+            title={`Switch to scene ${i + 1}`}
+            aria-current={i === current}
+          >
+            <span className="scene-num mono">{i + 1}</span>
+            <span className="scene-name">{names[i] || '\u2014'}</span>
+          </button>
         ))}
       </div>
+
+      {hasScenes && renaming === null ? (
+        <button
+          className="chip scene-edit-name"
+          onClick={() => startRename(current)}
+          disabled={busy}
+        >
+          Edit name
+        </button>
+      ) : null}
 
       {renaming !== null ? (
         <div className="rename-row">
@@ -144,9 +151,7 @@ export default function Scenes({
           <button onClick={() => rename(renaming)}>Name scene {renaming + 1}</button>
           <button onClick={() => setRenaming(null)}>Cancel</button>
         </div>
-      ) : (
-        <p className="hint">Tap the scene you&rsquo;re in again to name it, or ✎ on any scene.</p>
-      )}
+      ) : null}
 
       {channelled.length ? (
         <>

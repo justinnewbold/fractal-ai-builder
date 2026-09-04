@@ -18,7 +18,7 @@ import { useEffect, useRef, useState } from 'react'
  * them: React registers touch listeners as passive, so a preventDefault inside
  * one is ignored and the page scrolls under the drag.
  */
-export const ORDER = ['play', 'shape', 'ask']
+export const ORDER = ['play', 'ask', 'shape']
 
 /** Where a sideways drag already means something else. */
 export const YIELDS =
