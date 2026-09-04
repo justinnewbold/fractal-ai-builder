@@ -14,6 +14,8 @@ import CloudPresets from './components/CloudPresets'
 import { LiveGeneration, Thinking } from './components/LiveGeneration'
 import { streamSpec } from './lib/stream'
 import { Modifiers, SceneMatrix } from './components/Modifiers'
+import Feedback from './components/Feedback'
+import { platform } from './lib/platform'
 import { Versions, DeviceBackup } from './components/Versions'
 import Footswitches from './components/Footswitches'
 import GridEditor from './components/GridEditor'
@@ -2971,6 +2973,16 @@ export default function App() {
             the app — are gone, and the words they used with them.
           */}
           <PhoneRemote link={link} onAction={linkAction} onError={setError} busy={busy} />
+        </Section>
+
+        <Section key="feedback" title="Tell us" note="Something broken, or something you want">
+          {/*
+            Where a person looks when the app has annoyed them: settings,
+            before the technical panels rather than buried under them. It needs
+            no account, because most people driving a unit from their own Mac
+            never sign in and are exactly the ones who find the bugs.
+          */}
+          <Feedback device={device} link={link} platform={platform()} />
         </Section>
 
         <Section key="connection" title="Connection" note="Which unit this app is talking to">

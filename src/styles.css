@@ -4377,6 +4377,22 @@ button.gig-block {
   font-size: var(--f-2);
   letter-spacing: 0.08em;
   color: var(--silk-faint);
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+}
+
+/* The channel this block is on in this scene.
+   Quieter than the on/off beside it: which channel a block is on matters, but
+   whether it is making a sound at all matters more, and the two sit together. */
+.gig-block-channel {
+  margin-left: auto;
+  padding: 0 var(--s-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-1);
+  font-size: var(--f-1);
+  letter-spacing: 0.1em;
+  color: var(--silk-dim);
 }
 
 /* On carries the signal colour and a lit edge, so which blocks are live reads
@@ -6412,4 +6428,45 @@ button.view-tab {
   button.view-tab {
     transition: none;
   }
+}
+
+/* Telling us something is broken, or asking for something.
+   Two taps and a sentence: nothing here asks for a title, a category or steps
+   to reproduce, because every one of those is a reason not to bother. */
+.feedback {
+  display: grid;
+  gap: var(--s-3);
+}
+
+.feedback-kind {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.feedback-text,
+.feedback-contact {
+  width: 100%;
+  font: inherit;
+  font-size: var(--f-3);
+  color: var(--silk);
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-2);
+  padding: var(--s-3);
+}
+
+.feedback-text {
+  resize: vertical;
+  min-height: 96px;
+  line-height: 1.5;
+}
+
+.feedback-actions {
+  display: grid;
+  gap: var(--s-2);
+}
+
+.feedback-sent p {
+  color: var(--silk);
 }

@@ -473,7 +473,22 @@ export default function Gig({ preset, device, capabilities, onError, onChanged, 
               aria-pressed={!block.bypassed}
             >
               <span className="gig-block-name">{block.name || block.slug}</span>
-              <span className="gig-block-state">{block.bypassed ? 'Off' : 'On'}</span>
+              <span className="gig-block-state">
+                {block.bypassed ? 'Off' : 'On'}
+                {/*
+                  The channel, beside the on/off.
+
+                  A scene remembers a channel per block, and each channel holds
+                  its own models and values — so which one a block is on is half
+                  of what the scene is, and the tile said nothing about it. "On
+                  this screen, also list the channels (A/B/C/D) on each block."
+
+                  Only when the block has one: not every block is channelled,
+                  and a bare letter on something without channels would be a
+                  lie about the hardware.
+                */}
+                {block.channel ? <span className="gig-block-channel">{block.channel}</span> : null}
+              </span>
             </button>
           ))}
         </div>
