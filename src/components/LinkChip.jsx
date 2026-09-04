@@ -41,7 +41,11 @@ export default function LinkChip({ link, compact, onAction, busy }) {
       : link.link === 'connected'
         ? { label: 'Turn off', kind: 'mac-off' }
         : link.link === 'signed-out'
-          ? { label: 'Set up', kind: 'mac-setup' }
+          ? // A phone in the demo wears this role and can never host: "Set up"
+            // would call a helper on localhost that cannot exist.
+            link.canHost
+            ? { label: 'Set up', kind: 'mac-setup' }
+            : { label: 'Connect', kind: 'leave-demo' }
           : { label: 'Turn on', kind: 'mac-on' }
 
   return (

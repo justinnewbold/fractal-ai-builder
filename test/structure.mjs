@@ -1296,6 +1296,57 @@ export function run(test) {
     )
   })
 
+  test('the demo is not a one-way door on a phone', () => {
+    /*
+     * Reported from a real phone: a sheet headed "Set up phone remote — once,
+     * on this Mac", a Turn on button, and under it "Can't reach the Fractal app
+     * on your Mac. Check that it is open." The Mac was open. The phone was in
+     * the demo, which takes the Mac role on whatever device it runs on, and the
+     * button's first act is a call to a helper on localhost that a phone can
+     * never have. Tapping "Try the demo" once had made the door one-way, and
+     * the way back was three taps deep in Setup.
+     *
+     * Three things hold it open, and each was a separate way to be stuck.
+     */
+    const link = readFileSync(new URL('../src/lib/link.js', import.meta.url), 'utf8')
+    const chip = readFileSync(new URL('../src/components/LinkChip.jsx', import.meta.url), 'utf8')
+
+    // The app has to be able to tell a Mac pretending from a phone pretending.
+    assert.match(
+      link,
+      /canReachHelper\(\)[\s\S]{0,120}set\(\{ canHost/,
+      'nothing asks whether this browser could host, so the demo cannot tell a Mac from a phone'
+    )
+
+    /*
+     * The bar's chip is the live path — Setup's panel already refuses in the
+     * demo (`cloud?.demo`), and the reported screenshot came from tapping the
+     * chip. It must not offer a setup that calls a helper this end cannot have.
+     */
+    assert.match(
+      chip,
+      /link\.canHost/,
+      "the bar offers the Mac's setup without asking whether this end could ever be one"
+    )
+    assert.match(
+      chip,
+      /'leave-demo'/,
+      'the bar has no way out of the demo, which is how a phone got stuck wearing the Mac’s screen'
+    )
+
+    /*
+     * And leaving it is the whole job. A reload is what re-decides which end
+     * this is; without it the phone keeps the Mac's role until something else
+     * happens to reload the page, which is the shape of the original bug.
+     */
+    const act = src.slice(src.indexOf("kind === 'leave-demo'"))
+    assert.match(
+      act.slice(0, 600),
+      /setDemo\(false\)[\s\S]{0,200}location\.reload\(\)/,
+      'leaving the demo does not reload, so the phone goes on believing it is the Mac'
+    )
+  })
+
   test('the working line is drawn once, and carries the clock', () => {
     /*
      * There were three of them on screen at the same time, and a photograph of

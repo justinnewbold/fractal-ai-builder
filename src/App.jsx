@@ -648,6 +648,18 @@ export default function App() {
           setSignIn(true)
         } else if (kind === 'mac-setup') {
           setSignIn(true)
+        } else if (kind === 'leave-demo') {
+          /*
+           * The whole of "connect this phone" for someone stuck in the demo.
+           *
+           * A reload, because which end this is was decided when the page
+           * loaded. After it there is nothing left to do by hand: the phone
+           * reads as a phone, and bootLink connects a saved sign-in on its own
+           * or shows the connect screen to someone who has none.
+           */
+          const { setDemo } = await import('./lib/forgefx')
+          setDemo(false)
+          window.location.reload()
         } else if (kind === 'mac-on') {
           await setMacRemote(true)
           record('remote', 'Phone remote turned on')
