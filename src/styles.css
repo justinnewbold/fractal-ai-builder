@@ -6227,6 +6227,46 @@ button.phone-chip.dim {
   font-size: var(--f-2);
 }
 
+/*
+ * The second way in, given the same weight as the first.
+ *
+ * Ruled off rather than tucked under, because it is not a footnote: a phone on
+ * the same wifi needs no account at all, and that route worked for months
+ * while being visible only to people who had already found it.
+ */
+.connect-local {
+  width: 100%;
+  max-width: 420px;
+  margin-top: var(--s-6);
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--rule);
+  text-align: left;
+}
+
+.connect-local-row {
+  display: flex;
+  gap: var(--s-2);
+  margin: var(--s-3) 0;
+}
+
+.connect-local-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  padding: var(--s-2) var(--s-3);
+  font-family: var(--body);
+  font-size: var(--f-2);
+  color: var(--silk);
+  background: var(--chassis);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+}
+
+.connect-local-row button {
+  flex: 0 0 auto;
+  min-height: 44px;
+}
+
 .connect-demo {
   margin-top: var(--s-6);
 }
