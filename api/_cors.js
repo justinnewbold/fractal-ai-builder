@@ -40,6 +40,20 @@ export function allowedOrigin(origin) {
     return null
   }
 
+  /*
+   * The phone app.
+   *
+   * A Capacitor shell ships this bundle rather than fetching it, and serves it
+   * to its own WebView from a scheme of its own — `capacitor://localhost` on
+   * iOS. There is no host on the internet behind that, which is the point: the
+   * only page that can ever carry this origin is one running inside an app
+   * signed by us and installed from a store.
+   *
+   * Android's shell serves over `http://localhost`, which the private-network
+   * rule below already covers, so it needs nothing here.
+   */
+  if (url.protocol === 'capacitor:' && url.hostname === 'localhost') return origin
+
   // A device on the player's own network, serving the UI itself.
   if (url.protocol === 'http:' && PRIVATE_HOST.test(url.hostname)) return origin
 
