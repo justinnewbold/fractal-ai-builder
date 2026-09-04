@@ -1079,7 +1079,19 @@ export function run(test) {
     const read = (f) => readFileSync(new URL('../src/components/' + f, import.meta.url), 'utf8')
     const save = read('SaveBar.jsx')
     assert.match(save, /data-dirty=\{dirty \? 'yes' : 'no'\}/, 'the save cluster does not say whether anything is unsaved')
-    assert.match(save, /: !dirty\s*\n?\s*\? 'Saved'/, 'a clean preset still shows "Save"')
+    /*
+     * "Saved" is claimed only once something actually was saved. `dirty`
+     * answers "is anything unsaved", which is a different question — on a
+     * preset freshly loaded, or generated and written to the unit but never
+     * put in a slot, there is nothing pending and nothing saved either, and
+     * the button used to claim the second. Both halves are required: without
+     * savedHere it lies, without !dirty it hides pending changes.
+     */
+    assert.match(
+      save,
+      /: !dirty && savedHere\s*\n?\s*\? 'Saved'/,
+      'the button says "Saved" about a preset that has never been saved'
+    )
     assert.ok(!/className="lamp"/.test(save), 'the cyan dot is back beside Save')
     assert.ok(!/topbar-dirty/.test(read('TopBar.jsx')), 'the separate UNSAVED word is back in the bar')
     /*
@@ -1825,6 +1837,66 @@ export function run(test) {
     assert.ok(!existsSync(new URL('../src/components/Refine.jsx', import.meta.url)), 'Refine.jsx is still there')
     const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
     assert.ok(!/^\.compare\b/m.test(css), 'the compare styles are still shipped')
+  })
+
+  test('an empty preset reaches the model instead of being refused', () => {
+    /*
+     * "Still need to fix the issue when generating on an empty preset."
+     *
+     * One guard clause defeated a feature that was already finished. buildChain
+     * exists precisely to lay a chain into an empty preset; the instructions
+     * already explain it, and already say that a tone description on an empty
+     * preset is still designTone because the chain is put there first. None of
+     * it could run: the request was refused before the model was ever asked.
+     *
+     * So the route checks the shape of `blocks` and not its length. The length
+     * check is the defect, which is why it is named here rather than described.
+     */
+    const command = readFileSync(new URL('../api/command.js', import.meta.url), 'utf8')
+    assert.ok(
+      !/blocks\.length === 0/.test(command),
+      'an empty preset is refused before the model can offer to build a chain'
+    )
+    assert.match(command, /if \(!Array\.isArray\(blocks\)\)/, 'the shape of blocks is no longer checked at all')
+
+    // And the instructions that make it work have to still be there.
+    assert.match(command, /buildChain places blocks into it/, 'the model is not told how to fill an empty preset')
+    assert.match(
+      command,
+      /still just designTone/,
+      'the model is not told that a tone on an empty preset builds the chain first'
+    )
+  })
+
+  test('a window you can see is a window you can force quit', () => {
+    /*
+     * "The Fractal AI Builder isn't showing up in the active programs running,
+     * so no option to force close if it's having issues."
+     *
+     * Hiding the dock icon is what makes this a menu-bar service, and that is
+     * right. What it also does, less obviously, is take the app out of Force
+     * Quit Applications — macOS leaves accessory apps out of that list. Which
+     * bites exactly when it matters: a window that has stopped responding, and
+     * no way to reach the one tool everybody knows.
+     *
+     * So the icon follows the window rather than being hidden for good.
+     */
+    const main = readFileSync(new URL('../desktop/main.js', import.meta.url), 'utf8')
+    assert.match(main, /function showInDock\(/, 'the dock icon is set in more than one place')
+    assert.match(
+      main,
+      /function openWindow\(\) \{\s*\n\s*showInDock\(true\)/,
+      'opening a window does not put the app in the dock, so it stays out of Force Quit'
+    )
+    assert.match(
+      main,
+      /win\.on\('closed', \(\) => \{[^}]*showInDock\(false\)/s,
+      'the app stays in the dock after its window closes'
+    )
+    assert.ok(
+      !/app\.dock\.hide\(\)/.test(main.slice(main.indexOf('app.whenReady'))),
+      'startup hides the dock directly instead of through the one helper'
+    )
   })
 
   test('the tour teaches what a scene actually is', () => {
