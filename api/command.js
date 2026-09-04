@@ -42,6 +42,7 @@ const Action = z.object({
       'clearCell',
       'setScene',
       'setSceneBlock',
+      'renameScene',
       'renamePreset',
       'setTempo',
       'savePreset',
@@ -67,7 +68,7 @@ const Action = z.object({
     .string()
     .nullable()
     .describe(
-      'For renamePreset: the name. For setChannel: A/B/C/D. For savePreset and keepInLibrary: ' +
+      'For renamePreset and renameScene: the name. For setChannel: A/B/C/D. For savePreset and keepInLibrary: ' +
         'an optional name to save it under. For designTone: the tone description in the ' +
         'player own words. For buildChain: the block slugs in signal order, comma separated, ' +
         'or null for a sensible default. Null otherwise.'
@@ -81,9 +82,10 @@ const Action = z.object({
     .int()
     .nullable()
     .describe(
-      'Scene index, 0-based, for setSceneBlock — and for setBypass and setChannel when the ' +
-        'player named a scene other than the one the unit is in. Null means the scene the unit ' +
-        'is in. Zero-based: 0 is the scene the player calls scene 1, so "scene 2" is index 1.'
+      'Scene index, 0-based, for setSceneBlock and renameScene — and for setBypass and ' +
+        'setChannel when the player named a scene other than the one the unit is in. Null means ' +
+        'the scene the unit is in. Zero-based: 0 is the scene the player calls scene 1, so ' +
+        '"scene 2" is index 1.'
     ),
   why: z.string().describe('One short line the player will read, in plain language.')
 })
@@ -186,6 +188,11 @@ index.
 Both halves are per scene: to switch a block on or off, or to put it on a
 different channel, in a scene the unit is not in, give setBypass or setChannel
 that scene's index in "scene".
+
+A scene has a name of its own, and renameScene changes it: the index in "scene"
+(null means the scene the unit is in) and the name in "text". That is a
+different thing from renamePreset, which names the whole preset — "call this
+scene Dimebag" is renameScene and must never be answered with renamePreset.
 
 A value is not per scene — it belongs to the channel the block is on, so
 setting it changes every scene playing that channel. Asked for a tone change in
