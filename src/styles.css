@@ -1965,28 +1965,6 @@ button.chip.more {
 /* ---------- refine and compare ---------- */
 
 .refine,
-.compare {
-  margin-top: 26px;
-}
-
-.refine-row {
-  display: flex;
-  gap: var(--s-2);
-  flex-wrap: wrap;
-  margin-top: 8px;
-}
-
-input.refine-input {
-  flex: 1 1 280px;
-  font-family: var(--body);
-  font-size: var(--f-3);
-}
-
-.compare .notice strong {
-  color: var(--signal);
-  font-weight: 600;
-}
-
 /* ---------- linear chain (AM4) ---------- */
 
 .chain {

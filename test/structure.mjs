@@ -14,7 +14,7 @@
  * conditional are all things you can see without a browser.
  */
 import assert from 'node:assert/strict'
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 
 const src = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
 
@@ -249,7 +249,7 @@ export function run(test) {
     const play = components(view('play'))
     assert.deepEqual(play, ['Gig'], `Play should be the gig screen alone, not ${play.join(', ')}`)
 
-    for (const name of ['Chain', 'ParamSearch', 'GridEditor', 'Modifiers', 'Compare']) {
+    for (const name of ['Chain', 'ParamSearch', 'GridEditor', 'Modifiers']) {
       assert.ok(components(view('shape')).includes(name), `${name} should be on Shape`)
     }
 
@@ -484,14 +484,6 @@ export function run(test) {
       assert.ok(props, `${name} is not rendered`)
       assert.ok(/onError=/.test(props), `${name} cannot report errors`)
     }
-  })
-
-  test('Compare can show what it built', () => {
-    // It lost state and onClear in a rewrite, which would have left it able to
-    // build a comparison and unable to display one.
-    const props = tag(src, 'Compare')
-    assert.ok(/\bstate=/.test(props), 'Compare has no state to render')
-    assert.ok(/\bonClear=/.test(props), 'Compare cannot be dismissed')
   })
 
   test('every collapsible panel has a distinct key', () => {
@@ -1663,31 +1655,6 @@ export function run(test) {
    * threw away every write failure and every rejected setting, and rendered
    * its progress on a screen the person was not looking at.
    */
-  test('two takes really are two scenes, and say what did not land', () => {
-    const from = src.indexOf('const buildComparison')
-    const compare = src.slice(from, src.indexOf('const revert = async', from))
-    assert.ok(compare, 'buildComparison is gone')
-    assert.match(
-      compare,
-      /await writeScene\(index\)\s*\n\s*for \(const block of withChannels\) await setChannel/,
-      'the takes still choose a channel without standing in the scene that plays it'
-    )
-    assert.match(compare, /failures\.push\(\.\.\.failed/, 'write failures are discarded again')
-    assert.match(compare, /rejected\.push\(\.\.\.validated\.problems/, 'rejected settings are discarded again')
-    assert.match(compare, /revealCompare\(\)/, 'the panel is never scrolled to, so its progress and errors are off screen')
-    assert.match(compare, /Nothing in this preset has channels/, 'a preset with no channels pays for two generations before failing')
-    assert.match(compare, /one scene, so there is nothing to footswitch/, 'a one-scene unit is offered a comparison it cannot play')
-
-    const refine = readFileSync(new URL('../src/components/Refine.jsx', import.meta.url), 'utf8')
-    assert.ok(!/twice the cost/.test(refine), 'the panel still prices itself in money')
-    assert.ok(
-      !/points scenes 1 and 2 at\s*\n?\s*them/.test(refine),
-      'the panel still claims to point scenes at the takes in the words it never honoured'
-    )
-    assert.match(refine, /state\.failures/, 'the result never shows what the unit refused')
-    assert.match(refine, /compare-progress/, 'the wait says nothing while it happens')
-  })
-
   test('both ways in are offered, and the local one says what it costs', () => {
     /*
      * "Currently can a user login if they're just on the same network without
@@ -1810,6 +1777,54 @@ export function run(test) {
       /inputs\.publish && github\.ref == 'refs\/heads\/main'/,
       'a branch build could publish a release tagged against main'
     )
+  })
+
+  test('the newest thing in the chat is at the bottom', () => {
+    /*
+     * "It puts recent messages above the generated tones, which is weird. Most
+     * recent generations should be at the bottom of the chat. Shouldn't have to
+     * scroll to find what was just talked about."
+     *
+     * The design was rendered after every turn, which pinned it to the bottom
+     * of the log for good — so anything said afterwards appeared above it, and
+     * the newest thing on screen was an old design. It is placed where it
+     * happened instead: after the turns that existed when it started, and above
+     * everything said since.
+     */
+    const a = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
+    assert.match(a, /const before = turns\.slice\(0, cut\)/, 'the log does not split around the design')
+    assert.match(a, /const since = turns\.slice\(cut\)/, 'nothing renders below the design')
+    assert.match(a, /since\.map/, 'turns said after the design are dropped')
+
+    // One renderer, so a turn below the design keeps its confirm buttons.
+    assert.match(a, /const renderTurn = /, 'the turn markup is duplicated and will drift')
+    assert.equal(
+      (a.match(/className="turn-confirm"/g) || []).length,
+      1,
+      'a pending turn is drawn twice, or only on one side of the design'
+    )
+
+    // And App has to say when the design started, or the split is always a no-op.
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    assert.match(app, /setGenAt\(turns\.length\)/, 'nothing records where the design belongs')
+    assert.match(app, /at=\{genAt\}/, 'the chat is never told where the design belongs')
+  })
+
+  test('the two-take comparison is gone, not half removed', () => {
+    /*
+     * "Comparing 2 tones still doesn't work well, just hangs on this screen.
+     * Let's scratch that 2 scene generation for now. Get rid of it."
+     *
+     * Removed rather than hidden: a fold that is still built and still wired
+     * is a thing that breaks in the dark.
+     */
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    for (const gone of ['buildComparison', 'setCompare', 'revealCompare', 'try-two-versions']) {
+      assert.ok(!app.includes(gone), `${gone} is still wired into the app`)
+    }
+    assert.ok(!existsSync(new URL('../src/components/Refine.jsx', import.meta.url)), 'Refine.jsx is still there')
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    assert.ok(!/^\.compare\b/m.test(css), 'the compare styles are still shipped')
   })
 
   test('the tour teaches what a scene actually is', () => {
