@@ -416,3 +416,75 @@ export const MISSING_FORGEFX =
   '  git clone https://github.com/sKuhLight/forgefx-midi ~/src/forgefx-midi\n' +
   '  cd ~/src/forgefx-midi && npm install && npm run build\n' +
   '  cd ~/src/forgefx/server && npm install\n'
+
+/**
+ * Stop serving, and actually stop.
+ *
+ * Quitting used to be able to fail in a way that left the app unquittable and
+ * the Mac unable to open it again — which is what one person hit: close the
+ * window, click the app, nothing; Force Quit and start over.
+ *
+ * Three things went wrong and they compound.
+ *
+ * The quit handler cancelled the quit, awaited the mDNS teardown and then asked
+ * to quit again. If that await threw — and stopping an advert on a network that
+ * has changed underneath you is exactly where it would — the second quit was
+ * never asked for, so the app sat there refusing to close.
+ *
+ * The server was sent SIGINT and then abandoned. A child that ignores SIGINT
+ * outlives the app holding port 5056, and the next launch finds a ForgeFX it
+ * did not start, says so, and quits — so the app really cannot be opened again
+ * until the stray process is killed. So: SIGINT, wait, and SIGKILL what is
+ * still there.
+ *
+ * Every side effect is injected, which is the only reason this can be tested
+ * from a machine with no Electron and no serial port.
+ */
+export async function shutdown({
+  server = null,
+  advert = null,
+  kill = (proc, signal) => proc.kill(signal),
+  alive = (proc) => proc.exitCode === null && proc.signalCode === null,
+  sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
+  grace = 2000,
+  step = 100
+} = {}) {
+  const report = { advert: 'none', server: 'none' }
+
+  if (advert?.stop) {
+    try {
+      await advert.stop()
+      report.advert = 'stopped'
+    } catch {
+      // Never a reason to stay open. The advert dies with the process anyway.
+      report.advert = 'failed'
+    }
+  }
+
+  if (server) {
+    try {
+      if (!alive(server)) {
+        report.server = 'already gone'
+      } else {
+        kill(server, 'SIGINT')
+        let waited = 0
+        while (waited < grace && alive(server)) {
+          await sleep(step)
+          waited += step
+        }
+        if (alive(server)) {
+          // It had its chance. A server left holding the port is the thing that
+          // stops the app opening next time.
+          kill(server, 'SIGKILL')
+          report.server = 'killed'
+        } else {
+          report.server = 'stopped'
+        }
+      }
+    } catch {
+      report.server = 'failed'
+    }
+  }
+
+  return report
+}

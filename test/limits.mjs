@@ -243,9 +243,17 @@ export function run(test) {
      */
     const main = read('desktop/main.js')
     assert.match(main, /return waitForServer\(\{ port \}\)/, 'start() does not wait for the server it spawned')
-    const ready = main.indexOf('const answering = await start()')
+    /*
+     * Read inside the launch itself. A loose search for the call found the
+     * first `openWindow()` anywhere in the file, which is now the one that
+     * reopens the window after it was closed — a different question, and one
+     * that has nothing to wait for.
+     */
+    const launch = main.slice(main.indexOf('app.whenReady()'))
+    assert.ok(launch, 'there is no launch block to read')
+    const ready = launch.indexOf('const answering = await start()')
     assert.notEqual(ready, -1, 'the launch no longer waits on start()')
-    assert.ok(ready < main.indexOf('openWindow()\n})'), 'the window is opened before the server is known to answer')
+    assert.ok(ready < launch.indexOf('openWindow()'), 'the window is opened before the server is known to answer')
     assert.match(main, /if \(!answering\) \{/, 'a server that never answers leaves a blank window and no explanation')
     assert.match(main, /did-fail-load/, 'a page that fails to load is never retried')
   })

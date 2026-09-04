@@ -198,6 +198,19 @@ function openWindow() {
 }
 
 /*
+ * Clicking the app when it is already running.
+ *
+ * A menu-bar app has no dock icon, so closing its window leaves nothing on
+ * screen at all. macOS does not start a second copy when you click the app
+ * again — it activates the one that is running and sends this — and with
+ * nothing listening for it, the click did nothing, the app looked dead, and
+ * the only way out was Force Quit. Reported exactly that way.
+ */
+app.on('activate', () => {
+  if (where) openWindow()
+})
+
+/*
  * Draw the menu, and make the icon the first time only.
  *
  * This runs twice — once at launch and again when armHost answers, because the
@@ -212,6 +225,10 @@ function buildTray() {
     icon.setTemplateImage(true)
     tray = new Tray(icon)
     tray.setToolTip('Fractal AI Builder')
+    // The menu is where everything is, but the obvious thing to do with an
+    // icon is click it, and the obvious thing to want is the window.
+    tray.on('click', openWindow)
+    tray.on('double-click', openWindow)
   }
 
   /*
@@ -300,12 +317,31 @@ app.whenReady().then(async () => {
 // The window closing is not the app closing — it is still serving.
 app.on('window-all-closed', () => {})
 
-app.on('before-quit', async (e) => {
-  if (!server && !advert) return
+/*
+ * Quitting, in a way that always finishes.
+ *
+ * This cancelled the quit, awaited the mDNS teardown and then asked to quit
+ * again — so anything thrown in between left the app refusing to close. And the
+ * server was sent SIGINT and abandoned, which on a child that ignores it means
+ * a process still holding port 5056 after the app is gone: the next launch
+ * finds a ForgeFX it did not start, says so, and quits. Between them that is
+ * "it won't let you reopen it, you have to force close then restart".
+ *
+ * The work itself lives in host.mjs, where it can be tested. Here there is only
+ * the flag that stops this handler from cancelling its own second quit.
+ */
+let quitting = false
+
+app.on('before-quit', (e) => {
+  if (quitting) return
+  quitting = true
   e.preventDefault()
-  await advert.stop()
-  if (server) server.kill('SIGINT')
-  server = null
-  advert = null
-  app.quit()
+  const done = () => {
+    server = null
+    advert = null
+    app.quit()
+  }
+  host()
+    .then(({ shutdown }) => shutdown({ server, advert }))
+    .then(done, done)
 })
