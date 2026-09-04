@@ -531,7 +531,13 @@ export function createMockDevice() {
      * device NaN.
      */
     modModel: () => ({
-      bindingSupported: true,
+      /*
+       * The AM4 serves the modifier data and reports the wire binding
+       * unsupported — the data is there, the binding is not. The demo said
+       * "supported" whichever unit it was pretending to be, so the one screen
+       * that behaves differently between the two could not be seen in it.
+       */
+      bindingSupported: !midiCarried(),
       effectId: 190,
       slotCount: 4,
       fields: { source: { pid: 0 }, targetEffectId: { pid: 8 }, targetParam: { pid: 9 } },

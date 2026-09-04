@@ -74,7 +74,25 @@ export function Modifiers({ blocks, onError, onChanged, busy }) {
   // The field is `bindingSupported`. It was `bindable`, which ForgeFX has never
   // served anywhere — so this guard could not fire, and the AM4 got exactly the
   // dead Attach button the comment above says it must not.
-  if (!model || model.bindingSupported === false) return null
+  /*
+   * A unit that cannot bind gets a sentence, not an empty fold.
+   *
+   * Returning null left the Section drawing its own header over nothing at
+   * all: "The modifiers drop down also doesn't show anything." It was not
+   * broken — an AM4 serves the modifier data and reports the wire binding
+   * unsupported — but a fold that opens onto blank space says "broken" to
+   * everyone who opens it.
+   */
+  if (!model || model.bindingSupported === false) {
+    return (
+      <p className="hint">
+        {model
+          ? 'This unit doesn\u2019t let an app attach a modifier — the FM3 and larger units do. ' +
+            'You can still set one up on the unit itself.'
+          : 'Couldn\u2019t read the modifier list from your unit.'}
+      </p>
+    )
+  }
 
   const bind = async () => {
     try {

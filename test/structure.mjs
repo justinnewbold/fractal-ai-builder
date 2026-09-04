@@ -887,18 +887,46 @@ export function run(test) {
     assert.match(list, /scanning \? \(\s*'Reading the names off the unit/, 'a list being read still tells you to press ⟳')
   })
 
-  test('a scene is named with a tap, and the tiles are targets', () => {
+  test('a scene tile does one thing, and naming is one button', () => {
     /*
-     * "Double-click a scene to name it" never worked: the first click jumped
-     * to the scene, the jump re-read the unit, the re-read disabled the
-     * button, and a disabled button dispatches no second click. On a phone
-     * there was no path at all.
+     * Three designs, each fixing the last. "Double-click a scene to name it"
+     * never fired at all — the first click jumped, the jump re-read the unit,
+     * the re-read disabled the button. Tap-the-one-you-are-in worked but was a
+     * hidden gesture, so it grew a pencil beside every tile: eight extra
+     * targets for something you do once a preset.
+     *
+     * Now the tile is one action — go there — and naming is a button that says
+     * "Edit name", about the scene you are in. Which is what was asked for.
      */
     const scenes = readFileSync(new URL('../src/components/Scenes.jsx', import.meta.url), 'utf8')
     assert.ok(!/Double-click a scene/.test(scenes), 'the hint still promises a double-click')
-    assert.match(scenes, /i === current \? startRename\(i\) : jump\(i\)/, 'tapping the scene you are in does not open the name field')
-    assert.match(scenes, /aria-label=\{`Name scene \$\{i \+ 1\}`\}/, 'no visible way to name a scene on a phone')
     assert.ok(!/onDoubleClick/.test(scenes), 'the double-click path is back — it races the re-read and never fires')
+    assert.ok(!/scene-pencil/.test(scenes), 'the pencil beside every scene is back')
+    assert.match(scenes, /onClick=\{\(\) => jump\(i\)\}/, 'a scene tile does something other than go to that scene')
+    assert.match(scenes, /scene-edit-name/, 'there is no single button for naming a scene')
+    assert.match(scenes, /startRename\(current\)/, 'the name button does not name the scene you are in')
+
+    // And the name is said once. It was in the sheet's subtitle, on the tile
+    // and in the field, all at the same time.
+    const sheet = src.slice(src.indexOf('title="Scenes"'), src.indexOf('title="Scenes"') + 200)
+    assert.ok(!/note=\{sceneNames\[scene\]/.test(sheet), 'the Scenes sheet still repeats the live scene name in its subtitle')
+  })
+
+  test('the tabs run Play, Create, Edit — and a swipe agrees', () => {
+    /*
+     * "Move the edit button to the right of create." You make a tone and then
+     * adjust it, so that is the order. The swipe order is a separate list and
+     * has to move with it, or a swipe left goes somewhere the eye did not.
+     */
+    const tabs = src.slice(src.indexOf("['play', 'Play']"), src.indexOf("].map(([id, label])"))
+    const at = (id) => tabs.indexOf(`'${id}'`)
+    assert.ok(at('play') < at('ask') && at('ask') < at('shape'), `the tabs are not Play, Create, Edit — ${tabs}`)
+    const screens = readFileSync(new URL('../src/components/Screens.jsx', import.meta.url), 'utf8')
+    assert.match(
+      screens,
+      /export const ORDER = \['play', 'ask', 'shape'\]/,
+      'a swipe still moves between the screens in the old order'
+    )
   })
 
   test('on a phone, Ask lives in the tab row, not over the controls', () => {
@@ -1093,6 +1121,16 @@ export function run(test) {
     assert.match(mods, /aria-describedby=\{why \? 'mod-why' : undefined\}/)
     assert.ok(!/<span className="hint">\{model\.sourcesNote\}<\/span>\n\s*\) : null\}\n\s*<\/label>/.test(mods), 'the sources note is inside the Source label again, naming the select with a sentence')
     assert.match(mods, /id="mod-sources-note"/)
+    /*
+     * "The modifiers drop down also doesn't show anything." A unit that cannot
+     * bind returned null, so the fold drew its header over blank space — which
+     * reads as broken even though the panel was right to offer nothing.
+     */
+    assert.ok(
+      !/bindingSupported === false\) return null/.test(mods),
+      'a unit that cannot bind gets an empty fold again, with nothing to explain it'
+    )
+    assert.match(mods, /doesn.{1,8}t let an app attach a modifier/, 'nothing says why the panel is empty')
   })
 
   test('the introduction is offered once, and only when there is something to see', () => {
