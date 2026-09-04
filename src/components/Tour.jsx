@@ -105,13 +105,16 @@ const CARDS = [
     body: (
       <>
         <p>
-          A scene is not another preset. One preset holds one set of blocks, and a scene is a saved
-          pattern of which of them are switched on &mdash; so you get several usable sounds out of
-          one rig, changed by footswitch with no gap in the audio.
+          A scene is not another preset. One preset holds one set of blocks, and a scene remembers
+          two things about each of them: whether it&rsquo;s switched on, and which of its channels
+          it&rsquo;s playing.
         </p>
         <p>
-          That&rsquo;s why a lead scene is the rhythm scene plus a boost and a delay, rather than a
-          hotter amp: the gain lives on the block, and every scene shares it.
+          Channels are where the sound lives. The amp, the drive and most blocks worth switching
+          carry four &mdash; A to D &mdash; and each holds its own model and its own settings, so a
+          lead scene really can have a hotter amp, not
+          just the rhythm amp with a boost in front of it. Put that scene&rsquo;s amp on channel B,
+          dial it there, and the rhythm scene never hears it.
         </p>
       </>
     )

@@ -680,9 +680,11 @@ console.log('\nscenes')
 /* A preset with an amp, a cab and two pedals — enough to have a scene plan
    that means something, and enough for a scene to be wrong in each way. */
 const sceneSchema = [
-  { eid: 58, name: 'Amp 1', slug: 'amp', models: [], params: [] },
+  // The amp and the drive carry channels, as they do on the unit; the cab and
+  // the delay here do not, which is the other half of what has to be checked.
+  { eid: 58, name: 'Amp 1', slug: 'amp', channel: 'A', models: [], params: [] },
   { eid: 106, name: 'Cab 1', slug: 'cab', models: [], params: [] },
-  { eid: 118, name: 'Drive 1', slug: 'drive', models: [], params: [] },
+  { eid: 118, name: 'Drive 1', slug: 'drive', channel: 'A', models: [], params: [] },
   { eid: 132, name: 'Delay 1', slug: 'delay', models: [], params: [] }
 ]
 const scened = (scenes, count = 8) =>
@@ -746,6 +748,76 @@ test('no scenes is a normal answer, not an error', () => {
   assert.deepEqual(r.problems, [])
 })
 
+/*
+ * The half of a scene that had no way through the app at all.
+ *
+ * A scene remembers a channel per block as well as a bypass, and the device
+ * layer has always been able to write one — setSceneBlock takes it. Nothing
+ * ever passed it, because the generator was told scenes could not carry one.
+ */
+test('a scene carries the channel it plays, block by block', () => {
+  const r = scened([
+    { index: 0, name: 'Rhythm', engaged: [58, 106, 118], channels: [{ eid: 58, channel: 'A' }] },
+    { index: 1, name: 'Lead', engaged: [58, 106, 118], channels: [{ eid: 58, channel: 'b' }] }
+  ])
+  assert.deepEqual(r.problems, [])
+  const amp = (i) => r.scenes[i].blocks.find((b) => b.eid === 58)
+  assert.equal(amp(0).channel, 'A')
+  assert.equal(amp(1).channel, 'B', 'a lower-case letter is the same channel')
+  assert.equal(
+    r.scenes[1].blocks.find((b) => b.eid === 118).channel,
+    undefined,
+    'a block the scene said nothing about was moved anyway'
+  )
+})
+
+test('a scene channel the unit cannot honour is dropped, not sent', () => {
+  const r = scened([
+    {
+      index: 0,
+      name: 'Odd',
+      engaged: [58, 106, 132],
+      channels: [
+        { eid: 132, channel: 'B' },
+        { eid: 58, channel: 'Q' }
+      ]
+    }
+  ])
+  assert.ok(!r.scenes[0].blocks.some((b) => b.channel), 'a channel that cannot be written was kept')
+  assert.match(r.problems.join(' | '), /Delay 1 has no channels/)
+  assert.match(r.problems.join(' | '), /no channel "Q"/)
+})
+
+test('a block spec carries the channel its values belong to', () => {
+  const withChannel = validateSpec(
+    { blocks: [{ eid: 58, channel: 'b', params: [] }] },
+    sceneSchema
+  )
+  assert.equal(withChannel.changes.length, 1, 'a channel on its own is not a change worth writing')
+  assert.equal(withChannel.changes[0].channel, 'B')
+
+  // Two entries for one block: the lead sound on its own channel, which is the
+  // whole point — one amp block, two sounds, a scene each.
+  const two = validateSpec(
+    {
+      blocks: [
+        { eid: 58, channel: 'A', params: [] },
+        { eid: 58, channel: 'D', params: [] }
+      ]
+    },
+    sceneSchema
+  )
+  assert.deepEqual(two.changes.map((c) => c.channel), ['A', 'D'])
+
+  const none = validateSpec({ blocks: [{ eid: 132, channel: 'B', params: [] }] }, sceneSchema)
+  assert.equal(none.changes.length, 0)
+  assert.match(none.problems[0] || '', /no channels/)
+
+  const bad = validateSpec({ blocks: [{ eid: 58, channel: 'Z', params: [] }] }, sceneSchema)
+  assert.equal(bad.changes.length, 0)
+  assert.match(bad.problems[0] || '', /no channel "Z"/)
+})
+
 test('the cost of a scene plan is a switch plus a bypass each', () => {
   // Shown on the button before anything is written, because this is the half
   // that walks the unit through every scene.
@@ -754,6 +826,13 @@ test('the cost of a scene plan is a switch plus a bypass each', () => {
     { index: 1, name: 'B', engaged: [58, 106, 118] }
   ])
   assert.equal(countSceneWrites(r.scenes), 2 * (1 + 4))
+
+  // A channel is a write of its own, and the count is what the button promises.
+  const withChannels = scened([
+    { index: 0, name: 'A', engaged: [58, 106], channels: [{ eid: 58, channel: 'A' }] },
+    { index: 1, name: 'B', engaged: [58, 106, 118], channels: [{ eid: 58, channel: 'D' }] }
+  ])
+  assert.equal(countSceneWrites(withChannels.scenes), 2 * (1 + 4 + 1))
 })
 
 test('counts writes including model and bypass', () => {
@@ -865,9 +944,10 @@ test('refuses a scene the device does not have', () => {
 })
 
 /*
- * "Brighten scene 2" with scene 3 live used to nudge Amp Treble on scene 3 —
- * parameter values are shared by every scene on this hardware, and nothing
- * refused the ask or said where the write would land.
+ * "Brighten scene 2" with scene 3 live used to nudge Amp Treble on scene 3.
+ * A value belongs to the channel a block is on, not to a scene, so writing it
+ * "for scene 2" reaches every scene playing that channel — and nothing refused
+ * the ask or said where the write would land.
  */
 const sceneCaps = { ...caps, activeScene: 2, sceneNames: ['Rhythm', 'Lead', 'Clean'] }
 
@@ -878,7 +958,8 @@ test('a parameter change aimed at another scene is refused, never written elsewh
     sceneCaps
   )
   assert.equal(r.actions.length, 0, 'the write went to the live scene under a scene-2 label')
-  assert.match(r.problems[0] || '', /shared by every scene/, r.problems.join(' | '))
+  assert.match(r.problems[0] || '', /belongs to the channel/, r.problems.join(' | '))
+  assert.match(r.problems[0] || '', /own channel/, 'the refusal does not say what would actually work')
   assert.match(r.problems[0] || '', /scene 2 · Lead/, 'the refusal does not name the scene the player named')
 
   // The live scene, named or not, is fine: that is where the value lives anyway.
@@ -925,6 +1006,51 @@ test('a bypass aimed at another scene lands in that scene and says so', () => {
   assert.match(bypass, /setSceneBlock\((raw\.)?scene/, 'a scene-targeted bypass is written wherever the unit happens to be')
 })
 
+test('a channel aimed at another scene lands in that scene, like a bypass does', () => {
+  /*
+   * The pair is what a scene is. Bypass has been written into a named scene
+   * for a while; a channel — the half that actually changes the sound — was
+   * written wherever the unit happened to be standing, so "put the lead scene
+   * on channel B" moved whichever scene the player was in.
+   */
+  const r = validatePlan(
+    { actions: [{ kind: 'setChannel', eid: 58, text: 'B', scene: 1, why: '' }] },
+    cmdBlocks,
+    sceneCaps
+  )
+  assert.equal(r.actions.length, 1)
+  assert.match(r.actions[0].label, /channel B in scene 2 · Lead/, r.actions[0].label)
+
+  // No scene named: the live one, and the label says which that is.
+  const live = validatePlan(
+    { actions: [{ kind: 'setChannel', eid: 58, text: 'B', why: '' }] },
+    cmdBlocks,
+    sceneCaps
+  )
+  assert.match(live.actions[0].label, /channel B in scene 3 · Clean/, live.actions[0].label)
+
+  // A scene the unit does not have is refused, as it is for a bypass.
+  const none = validatePlan(
+    { actions: [{ kind: 'setChannel', eid: 58, text: 'B', scene: 9, why: '' }] },
+    cmdBlocks,
+    sceneCaps
+  )
+  assert.equal(none.actions.length, 0)
+  assert.match(none.problems[0] || '', /no scene 10/)
+
+  // And the routing itself: another scene goes through the switch-write-return path.
+  const src = readSrc(new URL('../src/lib/actions.js', import.meta.url), 'utf8')
+  const chan = src.slice(src.indexOf("case 'setChannel'"), src.indexOf("case 'moveBlock'"))
+  assert.match(chan, /setSceneBlock\(chanScene/, 'a scene-targeted channel is written wherever the unit happens to be')
+
+  // A channel must be chosen before a model is set on it, or the model lands
+  // on the channel being left behind.
+  const order = src.slice(src.indexOf('const ORDER = {'), src.indexOf('export function validatePlan'))
+  const at = (kind) => Number(order.match(new RegExp(`${kind}: (-?[0-9.]+)`))[1])
+  assert.ok(at('setChannel') < at('setModel'), 'the model is set before the channel it belongs to')
+  assert.ok(at('setChannel') < at('setParam'), 'values are written before the channel they belong to')
+})
+
 test('the chat is told the scene names, like the designer already is', () => {
   const command = readSrc(new URL('../api/command.js', import.meta.url), 'utf8')
   assert.match(command, /sceneNames/, 'the command route never sees the scene names — "it only has indexes"')
@@ -934,8 +1060,16 @@ test('the chat is told the scene names, like the designer already is', () => {
   assert.match(handler, /activeScene: scene,\s*\n\s*sceneNames/, 'the model state has the index and not the names')
   const scene = command.slice(command.indexOf('  scene: z'), command.indexOf('  scene: z') + 400)
   assert.match(scene, /setBypass/, 'the scene field is still scoped to setSceneBlock alone')
-  assert.match(command, /\nSCENES\n/, 'the system prompt says nothing about scenes')
-  assert.match(command, /shared by every scene/, 'the model is not told parameter values are shared across scenes')
+  assert.match(command, /\nSCENES AND CHANNELS\n/, 'the system prompt says nothing about scenes')
+  assert.match(
+    command,
+    /belongs to the channel the block is on/,
+    'the model is not told where a value actually lives'
+  )
+  assert.ok(
+    !/shared by every scene/.test(command),
+    'the model is still told parameter values are shared by every scene, which is not true of this hardware'
+  )
 })
 
 test('the chat is told the player counts scenes from 1', () => {
@@ -951,7 +1085,7 @@ test('the chat is told the player counts scenes from 1', () => {
   const scene = command.slice(command.indexOf('  scene: z'), command.indexOf('  scene: z') + 600)
   assert.match(scene, /0 is the scene the player calls scene 1/, 'the scene field does not say what index the player’s "scene 1" is')
   assert.match(command, /their "scene 2" is index 1/, 'the prompt does not bridge the player’s numbering to the index')
-  assert.match(command, /Every scene number\s+you return is an index/)
+  assert.match(command, /Every scene number you return is an\s+index/)
   const handler = command.slice(command.indexOf('export default async function handler'))
   assert.match(handler, /scenes: Array\.isArray\(sceneNames\)/, 'the state carries no numbered scene list')
   assert.match(handler, /`scene \$\{i \+ 1\} = index \$\{i\}/, 'the numbered list does not pair the player’s number with the index')
@@ -1685,10 +1819,10 @@ test('a phone restoring its sign-in reads as connecting, never as signed out', (
    Scenes in the simulated unit
    ------------------------------------------------------------------ */
 
-const { createSceneBypass } = await import('../src/lib/sceneBypass.js')
+const { createSceneState } = await import('../src/lib/sceneState.js')
 
 test('a scene is its own pattern of what is off', () => {
-  const scenes = createSceneBypass({ count: 8, seeds: { default: [46, 70], 1: [94], 2: [94, 118] } })
+  const scenes = createSceneState({ count: 8, seeds: { default: [46, 70], 1: [94], 2: [94, 118] } })
   assert.deepEqual(scenes.snapshot(0), [46, 70])
   assert.deepEqual(scenes.snapshot(1), [94], 'a seeded scene took the default')
   assert.deepEqual(scenes.snapshot(5), [46, 70], 'an unseeded scene starts as the default')
@@ -1708,9 +1842,31 @@ test('a scene is its own pattern of what is off', () => {
   assert.equal(scenes.isOff(99, 70), scenes.isOff(7, 70))
 })
 
+/*
+ * The half that was missing. A scene remembers which channel each block plays,
+ * and a channel holds its own model and its own values — which is why a lead
+ * scene can have a genuinely hotter amp rather than the rhythm amp with a
+ * boost in front of it. Everything above this line was true of the old file;
+ * none of this was possible in it.
+ */
+test('a scene remembers which channel each block plays', () => {
+  const scenes = createSceneState({ count: 8, seeds: {}, channels: { 1: { 58: 'D' } } })
+  assert.equal(scenes.channelOf(1, 58), 'D', 'a seeded scene channel was lost')
+  assert.equal(scenes.channelOf(0, 58), null, 'a scene that never chose a channel claims one anyway')
+
+  scenes.setChannel(2, 58, 'B')
+  assert.equal(scenes.channelOf(2, 58), 'B')
+  assert.equal(scenes.channelOf(1, 58), 'D', 'a channel written in scene 3 followed the block into scene 2')
+  assert.equal(scenes.channelOf(0, 58), null, 'a channel written in scene 3 leaked into scene 1')
+
+  // A block just placed plays whatever channel it was placed on, everywhere.
+  scenes.forget(58)
+  for (let i = 0; i < 8; i++) assert.equal(scenes.channelOf(i, 58), null)
+})
+
 test('the simulated unit answers for the chain from the scene it is in', () => {
   const mock = readSrc(new URL('../src/lib/mockDevice.js', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '')
-  assert.match(mock, /createSceneBypass\(/, 'the mock keeps one bypass flag per block again')
+  assert.match(mock, /createSceneState\(/, 'the mock keeps one bypass flag per block again')
   const map = mock.slice(mock.indexOf('sceneStateNow:'), mock.indexOf('sceneStateNow:') + 700)
   assert.ok(!/% 3|state\.scene === 0 \?/.test(map), 'the scene map is a made-up pattern again, disagreeing with Play')
   assert.ok(!/b\.bypassed/.test(mock), 'something in the mock reads a per-block bypass flag, which no longer follows the scene')
@@ -1720,6 +1876,30 @@ test('the simulated unit answers for the chain from the scene it is in', () => {
   }
   const setBypass = mock.slice(mock.indexOf('setBypass:'), mock.indexOf('setBypass:') + 300)
   assert.match(setBypass, /state\.scenes\.set\(state\.scene/, 'a bypass write no longer lands in the scene the unit is in')
+})
+
+test('the simulated unit gives each scene its own channel, and each channel its own values', () => {
+  /*
+   * The demo used to keep one channel per block and one set of values per
+   * block, so the tour's own claim — a scene can carry a different amp — was
+   * untestable in the only unit most people will ever run this against.
+   */
+  const mock = readSrc(new URL('../src/lib/mockDevice.js', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '')
+  const setChannel = mock.slice(mock.indexOf('setChannel:'), mock.indexOf('setChannel:') + 300)
+  assert.match(
+    setChannel,
+    /state\.scenes\.setChannel\(state\.scene/,
+    'a channel write still lands on the block, so every scene shares it'
+  )
+  for (const answer of ['presetBlocks', 'sceneStateNow']) {
+    const body = mock.slice(mock.indexOf(`${answer}:`), mock.indexOf(`${answer}:`) + 700)
+    assert.match(body, /chan\(b\.effectId\)/, `${answer} reports a channel that does not follow the scene`)
+  }
+  assert.match(mock, /params\.set\(`\$\{eid\}:\$\{chan\(eid\)\}`/, 'a model swap writes over every channel of the block')
+  assert.ok(
+    !/state\.params\.get\(eid\)/.test(mock),
+    'something reads a block\u2019s values without asking which channel it is playing'
+  )
 })
 
 /* ------------------------------------------------------------------

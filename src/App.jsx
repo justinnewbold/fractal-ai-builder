@@ -430,6 +430,10 @@ export default function App() {
   // How many scenes this unit actually has. Eight is the gen-3 answer and the
   // safe fallback, but it is a capability, not a constant.
   const sceneCount = device?.capabilities?.sceneCount || 8
+  // Which channels a block can be put on. A scene remembers one per block, so
+  // a generated scene plan can name them and this is what a name is checked
+  // against.
+  const channelNames = device?.capabilities?.channelNames || ['A', 'B', 'C', 'D']
   const bpm = useDevice(ofBpm)
   // One tempo read per burst of taps, not one per tap.
   const tapReadback = useRef(null)
@@ -1079,7 +1083,7 @@ export default function App() {
       setProgress(null)
       const spec = await requestSpec(schema, description)
 
-      const validated = validateSpec(spec, schema, sceneCount)
+      const validated = validateSpec(spec, schema, sceneCount, channelNames)
       validated.spec = spec
       validated.description = description
       setResult(validated)
@@ -1427,7 +1431,7 @@ export default function App() {
         { force: true }
       )
 
-      const validated = validateSpec(entry.spec, schema, sceneCount)
+      const validated = validateSpec(entry.spec, schema, sceneCount, channelNames)
       validated.spec = entry.spec
       validated.description = entry.description
       if (!validated.presetName) validated.presetName = entry.name
@@ -1481,7 +1485,7 @@ export default function App() {
       setProgress(null)
       const spec = await requestSpec(schema, instruction, previous)
 
-      const validated = validateSpec(spec, schema, sceneCount)
+      const validated = validateSpec(spec, schema, sceneCount, channelNames)
       validated.spec = spec
       validated.description = instruction
       setResult(validated)
@@ -1533,7 +1537,7 @@ export default function App() {
       for (const [index, channel] of ['A', 'B'].entries()) {
         setProgress(`Take ${index + 1} of 2 — designing...`)
         const spec = await requestSpec(schema, description)
-        const validated = validateSpec(spec, schema, sceneCount)
+        const validated = validateSpec(spec, schema, sceneCount, channelNames)
 
         setProgress(`Take ${index + 1} of 2 — switching to channel ${channel}...`)
         for (const block of withChannels) await setChannel(block.effectId, channel)

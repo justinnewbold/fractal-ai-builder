@@ -54,6 +54,15 @@ const PresetSpec = z.object({
       z.object({
         eid: z.number().int().describe('Effect id, copied from the supplied block list.'),
         bypassed: z.boolean().describe('Whether this block should be bypassed.'),
+        channel: z
+          .string()
+          .nullable()
+          .describe(
+            'Channel letter — A, B, C or D — that this model and these values belong to, or null ' +
+              'for the channel the block is already on. Only for blocks whose entry in the list ' +
+              'has a channel. List the same block twice with two channels to dial two sounds out ' +
+              'of it, then point scenes at whichever they need.'
+          ),
         type: z
           .number()
           .int()
@@ -91,12 +100,24 @@ const PresetSpec = z.object({
           .describe(
             'Effect ids that are ON in this scene. Every other block placed in the preset is off. ' +
               'Copy ids from the supplied block list.'
+          ),
+        channels: z
+          .array(
+            z.object({
+              eid: z.number().int().describe('Effect id from the supplied block list.'),
+              channel: z.string().describe('Channel letter A, B, C or D this scene plays.')
+            })
+          )
+          .describe(
+            'Blocks that play a particular channel in this scene. Leave a block out to keep it ' +
+              'on the channel it is already on. Empty array if every block stays put.'
           )
       })
     )
     .describe(
-      'Optional. One rig, several usable states of it — the same amp and cab with different ' +
-        'blocks switched in. Empty array if the request is for a single sound.'
+      'Optional. One rig, several usable states of it — different blocks switched in, and ' +
+        'different channels where the sound needs to change. Empty array if the request is for ' +
+        'a single sound.'
     ),
   notes: z.string().describe('Anything the player should know. Empty string if nothing.')
 })
@@ -120,17 +141,25 @@ HARD RULES
    and neutral.
 6. Do not move blocks, add blocks, or change routing. Work with what is placed.
 
-SCENES
+SCENES AND CHANNELS
 
-A preset holds one set of blocks. A scene is a saved pattern of which of those
-blocks are on — so scenes give a player several usable sounds out of one rig,
+A preset holds one set of blocks. A scene is a saved snapshot of two things per
+block: whether it is ON, and which of its channels it is playing. Channels are
+A to D, and each channel of a block holds its own model and its own values. So
+scenes give a player several genuinely different sounds out of one rig,
 switched by footswitch without a gap.
 
-7. Scenes change what is ON, nothing else. Every scene shares the models and
-   parameter values you set in "blocks". You cannot give a scene its own gain
-   or its own amp: those live on the block, not the scene.
-8. Because of that, build the differences out of blocks. A lead scene is the
-   rhythm scene plus a boost and a delay, not a hotter amp.
+7. A scene can change two things: which blocks are on, and which channel each
+   block plays. It cannot change anything else on its own — a model or a value
+   belongs to the channel it was written to, so writing it in one scene changes
+   every scene playing that channel.
+8. That is how a lead scene gets a hotter amp: dial the lead sound on a second
+   channel of the amp block (list the block twice in "blocks", once per
+   channel), then point the lead scene at that channel in its "channels".
+   Use a channel where it earns one — a real change of sound — and leave a
+   block where it is when switching it in or out does the job. Only a block
+   whose entry in the list carries a "channel" has channels at all; leave the
+   field null for every other block.
 9. List in "engaged" every effect id that should be ON in that scene. Anything
    placed in the preset and not listed is off in that scene. Amp and cab
    belong in every scene — leaving them out silences it.
