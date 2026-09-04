@@ -868,8 +868,23 @@ export async function applyScenes(scenes, onProgress) {
     if (scene.name) {
       try {
         await setSceneName(scene.index, scene.name)
-      } catch {
-        // A scene that works but keeps its old name is not worth failing over.
+      } catch (err) {
+        /*
+         * Said out loud rather than swallowed.
+         *
+         * This used to be an empty catch, on the reasoning that a scene which
+         * works but keeps its old name is not worth failing the build over.
+         * That reasoning is fine and the silence was not: naming was refused
+         * outright over a remote session for months, and because nothing here
+         * said so, it read as the feature simply not working. "The scene name
+         * generation and saving is also still not working. I thought we
+         * addressed that?"
+         *
+         * Still not a failure — the scene itself was written and the preset is
+         * good. It goes in the same list the caller already shows, so the
+         * person is told which names did not land and can see why.
+         */
+        failures.push(`Scene ${scene.index + 1} — kept its old name: ${err.message}`)
       }
     }
 

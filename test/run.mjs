@@ -1605,10 +1605,8 @@ test('the relay refuses what the host refuses', () => {
   assert.ok(forbiddenRemotely('POST', '/preset/store'))
   assert.ok(forbiddenRemotely('POST', '/preset/backup'))
   assert.ok(forbiddenRemotely('POST', '/ports/select'))
-  // Renames and version moves are host-refused too; the mirror used to allow
-  // them, so a phone rename died as a raw relay error instead of an explanation.
-  assert.ok(forbiddenRemotely('POST', '/preset/name'))
-  assert.ok(forbiddenRemotely('POST', '/scene/name'))
+  // Version moves are host-refused too; the mirror used to allow them, so the
+  // request died as a raw relay error instead of an explanation.
   assert.ok(forbiddenRemotely('POST', '/version/3/restore'))
   assert.ok(forbiddenRemotely('DELETE', '/device/cache'))
 })
@@ -1618,6 +1616,15 @@ test('live performance edits travel fine', () => {
   assert.equal(forbiddenRemotely('POST', '/scene'), null)
   assert.equal(forbiddenRemotely('POST', '/tempo'), null)
   assert.equal(forbiddenRemotely('POST', '/preset/select'), null)
+  /*
+   * Naming travels now. It was refused by the host — absent from the writes
+   * remoteAllowed() permits and absent from the list of things it says are
+   * never remotely reachable, which was an oversight rather than a boundary.
+   * It is an edit-buffer write like every other one allowed here, and putting
+   * anything in a slot is still /preset/store, which stays refused below.
+   */
+  assert.equal(forbiddenRemotely('POST', '/preset/name'), null)
+  assert.equal(forbiddenRemotely('POST', '/scene/name'), null)
   // GETs are broadly allowed by the host — the old mirror needlessly killed the
   // backup and port lists on the phone, and these assertions encoded that bug.
   assert.equal(forbiddenRemotely('GET', '/backups'), null)
@@ -1660,7 +1667,11 @@ test('the mirror agrees with the host about every route this app calls', () => {
           '/tempo',
           '/tempo/tap',
           '/tuner',
-          '/mod/bind'
+          '/mod/bind',
+          // Added to the host in the pinned fork — see desktop/forgefx.lock.json.
+          // Edit-buffer writes; putting anything in a slot is still refused.
+          '/preset/name',
+          '/scene/name'
         ].includes(p) ||
         /^\/am4\/(bypass|scene|preset)$/.test(p)
       )

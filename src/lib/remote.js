@@ -85,6 +85,8 @@ function hostAllows(method, p) {
       p === '/tempo/tap' ||
       p === '/tuner' ||
       p === '/mod/bind' ||
+      p === '/preset/name' ||
+      p === '/scene/name' ||
       /^\/am4\/(bypass|scene|preset)$/.test(p)
     )
   return false
@@ -97,7 +99,6 @@ export const REMOTE_FORBIDDEN = [
   { match: (m, p) => p.startsWith('/preset/restore'), why: 'restore a preset' },
   { match: (m, p) => p.startsWith('/backup'), why: 'back up the device' },
   { match: (m, p) => p.startsWith('/version'), why: 'load or restore a version' },
-  { match: (m, p) => p === '/preset/name' || p === '/scene/name', why: 'rename anything' },
   { match: (m, p) => p.startsWith('/local'), why: 'reach the library on your Mac' },
   { match: (m, p) => m !== 'GET' && p.startsWith('/ports'), why: 'change which port is used' },
   { match: (m, p) => p.startsWith('/firmware'), why: 'touch firmware' },

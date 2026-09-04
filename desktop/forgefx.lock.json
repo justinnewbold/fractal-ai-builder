@@ -20,13 +20,24 @@
     "forgefx-midi is the preset codec ForgeFX depends on. Its ref is not ours to",
     "choose: ForgeFX pins its own sibling in stack.lock.json for exactly the tag",
     "builds we are copying, so the script cross-checks the tag below against that",
-    "file and refuses to build a pair upstream never released together."
+    "file and refuses to build a pair upstream never released together.",
+    "",
+    "The pin is a branch of the mirror rather than a plain upstream commit. Naming",
+    "the preset or a scene was refused by the host's own remoteAllowed() \u2014 absent",
+    "from the writes it permits and absent from the list of things it says are",
+    "never remotely reachable, which reads as an oversight rather than a boundary.",
+    "It is an edit-buffer write like every other one allowed there, and committing",
+    "to a slot is still refused, so it cannot overwrite anything on the unit.",
+    "",
+    "Kept on a branch so the mirror's main stays a clean copy of upstream: the next",
+    "upstream release is a rebase of one commit rather than a merge conflict."
   ],
   "forgefx": {
     "repo": "justinnewbold/forgefx",
     "upstream": "sKuhLight/forgefx",
-    "tag": "v0.7.1-beta",
-    "commit": "c22862a5b2f2078f3cb92a2735e51f94c39a0062"
+    "tag": "v0.7.1-beta+rename",
+    "commit": "70c3e76046279ba4a048a618e7f576c480f1ef2b",
+    "branch": "claude/allow-renaming-remotely"
   },
   "forgefx-midi": {
     "repo": "justinnewbold/forgefx-midi",
