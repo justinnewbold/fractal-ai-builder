@@ -431,6 +431,89 @@ test('the app refuses to serve from a port something else already holds', async 
   assert.match(host.PORT_TAKEN(), /serial port/, 'the reason two cannot share is not explained')
 })
 
+test('quitting always finishes, and never leaves the server holding the port', async () => {
+  /*
+   * Reported from a real Mac: "after closing it, it won't let you reopen it.
+   * You have to force close then restart."
+   *
+   * Two halves of that are here. The quit handler cancelled the quit, awaited
+   * the mDNS teardown and then asked to quit again — so anything thrown in
+   * between left an app that would not close. And the server was sent SIGINT
+   * and abandoned, so a child that ignores it outlives the app still holding
+   * port 5056, and the next launch finds a ForgeFX it did not start, says so,
+   * and quits.
+   */
+  const sleep = async () => {}
+
+  // An advert that throws on the way down must not stop anything.
+  const angry = await host.shutdown({
+    advert: {
+      stop: async () => {
+        throw new Error('the network went away')
+      }
+    }
+  })
+  assert.equal(angry.advert, 'failed', 'a thrown teardown was not contained')
+
+  // A server that goes on SIGINT is left alone.
+  const signals = []
+  let running = true
+  const polite = await host.shutdown({
+    server: {},
+    kill: (_p, sig) => {
+      signals.push(sig)
+      running = false
+    },
+    alive: () => running,
+    sleep
+  })
+  assert.deepEqual(signals, ['SIGINT'])
+  assert.equal(polite.server, 'stopped')
+
+  // One that ignores it is killed, so the port is free for the next launch.
+  const stubborn = []
+  const killed = await host.shutdown({
+    server: {},
+    kill: (_p, sig) => stubborn.push(sig),
+    alive: () => true,
+    sleep,
+    grace: 300,
+    step: 100
+  })
+  assert.deepEqual(stubborn, ['SIGINT', 'SIGKILL'], 'a server that ignores SIGINT is left running')
+  assert.equal(killed.server, 'killed')
+
+  // A server that is already gone is not signalled at all.
+  const dead = []
+  const gone = await host.shutdown({
+    server: {},
+    kill: (_p, sig) => dead.push(sig),
+    alive: () => false,
+    sleep
+  })
+  assert.deepEqual(dead, [])
+  assert.equal(gone.server, 'already gone')
+
+  // Nothing to do is a normal answer, not a throw.
+  assert.deepEqual(await host.shutdown(), { advert: 'none', server: 'none' })
+})
+
+test('closing the window is not the end of the app', () => {
+  /*
+   * A menu-bar app has no dock icon, so closing its window leaves nothing on
+   * screen. macOS does not start a second copy when the app is clicked again;
+   * it activates the running one and sends `activate`. With nothing listening
+   * for that, the click did nothing and the app looked dead.
+   */
+  const main = readSrc(new URL('../desktop/main.js', import.meta.url), 'utf8')
+  assert.match(main, /app\.on\('activate', \(\) => \{\s*\n\s*if \(where\) openWindow\(\)/, 'clicking the app again opens nothing')
+  assert.match(main, /tray\.on\('click', openWindow\)/, 'clicking the menu-bar icon opens nothing')
+  // And the quit path no longer cancels a quit it might never re-ask for.
+  assert.match(main, /let quitting = false/, 'the quit handler can cancel its own second quit again')
+  assert.match(main, /shutdown\(\{ server, advert \}\)/, 'quitting does not go through the tested shutdown')
+  assert.ok(!/await advert\.stop\(\)/.test(main), 'the un-caught teardown that could block a quit is back')
+})
+
 test('an installed app uses the server it shipped with', () => {
   /*
    * The packaged app hands findForgeFX the copy inside its own bundle. That has
