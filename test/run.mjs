@@ -1151,6 +1151,57 @@ test('a channel aimed at another scene lands in that scene, like a bypass does',
   assert.ok(at('setChannel') < at('setParam'), 'values are written before the channel they belong to')
 })
 
+test('a scene can be named by saying so', () => {
+  /*
+   * "Change scene name to Dimebag" came back as "I don't have a way to rename
+   * an individual scene — only the whole preset can be renamed". That was
+   * true: renameScene was not in the list of actions the chat may return, so
+   * the model correctly said it had no way. It is a different write from
+   * renamePreset and lands somewhere else — the preset keeps its name.
+   */
+  const r = validatePlan(
+    { actions: [{ kind: 'renameScene', text: 'Dimebag', scene: 1, why: '' }] },
+    cmdBlocks,
+    sceneCaps
+  )
+  assert.equal(r.actions.length, 1, r.problems.join(' | '))
+  assert.match(r.actions[0].label, /Name scene 2 · Lead "Dimebag"/, r.actions[0].label)
+
+  // No scene named: the one the unit is in, said out loud.
+  const live = validatePlan(
+    { actions: [{ kind: 'renameScene', text: 'Solo', why: '' }] },
+    cmdBlocks,
+    sceneCaps
+  )
+  assert.match(live.actions[0].label, /Name scene 3 · Clean "Solo"/, live.actions[0].label)
+
+  // A scene the unit does not have, and a name that is not one, are refused.
+  for (const [action, why] of [
+    [{ kind: 'renameScene', text: 'Nope', scene: 9, why: '' }, /no scene 10/],
+    [{ kind: 'renameScene', text: '   ', scene: 1, why: '' }, /No name given for the scene/]
+  ]) {
+    const bad = validatePlan({ actions: [action] }, cmdBlocks, sceneCaps)
+    assert.equal(bad.actions.length, 0)
+    assert.match(bad.problems[0] || '', why, bad.problems.join(' | '))
+  }
+
+  // And it is not the preset's name. Both exist, and they say which they are.
+  const preset = validatePlan(
+    { actions: [{ kind: 'renamePreset', text: 'Dimebag', why: '' }] },
+    cmdBlocks,
+    sceneCaps
+  )
+  assert.match(preset.actions[0].label, /Rename the preset to "Dimebag"/, preset.actions[0].label)
+
+  const command = readSrc(new URL('../api/command.js', import.meta.url), 'utf8')
+  assert.match(command, /'renameScene',/, 'the chat may not return a scene rename at all')
+  assert.match(
+    command,
+    /must never be answered with renamePreset/,
+    'nothing stops a scene rename being answered by renaming the preset'
+  )
+})
+
 test('the chat is told the scene names, like the designer already is', () => {
   const command = readSrc(new URL('../api/command.js', import.meta.url), 'utf8')
   assert.match(command, /sceneNames/, 'the command route never sees the scene names — "it only has indexes"')

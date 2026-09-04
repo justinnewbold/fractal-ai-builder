@@ -94,6 +94,7 @@ const ORDER = {
   setBypass: 6,
   setSceneBlock: 7,
   setScene: 8,
+  renameScene: 8.5,
   renamePreset: 9,
   setTempo: 10,
   savePreset: 20,
@@ -393,12 +394,35 @@ export function validatePlan(plan, blocks, capabilities) {
         break
       }
 
+      case 'renameScene': {
+        /*
+         * Naming a scene, by saying so.
+         *
+         * The chat could rename the preset and nothing else, so "change scene
+         * name to Dimebag" came back as "I don't have a way to rename an
+         * individual scene" — which was true, and the reason was that this case
+         * did not exist. It is a different write from renamePreset and lands in
+         * a different place: the preset keeps its name.
+         */
+        const sceneName = (raw.text || '').trim().slice(0, 31)
+        if (!need(sceneName, 'No name given for the scene.')) break
+        const which = typeof raw.scene === 'number' ? raw.scene : activeScene
+        if (!need(typeof which === 'number', 'Say which scene to name.')) break
+        if (!need(which >= 0 && which < sceneCount, `There's no scene ${which + 1}.`)) break
+        actions.push({
+          ...raw,
+          label: `Name ${sceneLabel(which)} "${sceneName}"`,
+          run: async () => (await device()).setSceneName(which, sceneName)
+        })
+        break
+      }
+
       case 'renamePreset': {
         const name = (raw.text || '').trim().slice(0, 31)
         if (!need(name, 'No name given.')) break
         actions.push({
           ...raw,
-          label: `Rename to "${name}"`,
+          label: `Rename the preset to "${name}"`,
           run: async () => (await device()).setPresetName(name)
         })
         break
