@@ -1711,6 +1711,30 @@ export function run(test) {
     assert.match(connect, /:5056/, 'a bare hostname is not given the port the Mac serves on')
   })
 
+  test('watching a pull request does not need asking about', () => {
+    /*
+     * "Can you always approve PR subscribe/unsubscribe without my input?
+     * That's the one I always have to confirm and it's tedious."
+     *
+     * Watching a pull request reads its comments and CI — it writes nothing
+     * and sends nothing anywhere — so it is exactly the kind of step that
+     * should not interrupt someone. The container this work runs in is thrown
+     * away between sessions, so a setting written there dies with it; this
+     * file travels with the repository, which is the only place the answer
+     * stays answered.
+     */
+    const settings = JSON.parse(
+      readFileSync(new URL('../.claude/settings.json', import.meta.url), 'utf8')
+    )
+    const allowed = settings.permissions?.allow || []
+    for (const tool of ['subscribe_pr_activity', 'unsubscribe_pr_activity']) {
+      assert.ok(
+        allowed.some((entry) => entry.endsWith(tool)),
+        `${tool} still asks before it runs`
+      )
+    }
+  })
+
   test('the tour teaches what a scene actually is', () => {
     const tour = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
     const card = tour.slice(tour.indexOf('Scenes are one rig'), tour.indexOf('Scenes are one rig') + 1200)
