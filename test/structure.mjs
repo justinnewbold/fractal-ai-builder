@@ -1792,6 +1792,19 @@ export function run(test) {
      * anywhere else, a release would carry that name and someone else's code.
      */
     assert.match(flow, /inputs\.publish/, 'a release can only be cut by pushing a tag')
+
+    /*
+     * And the job is allowed to create one. A workflow that says nothing about
+     * permissions gets the repository default, which here is read only — so
+     * the build signed, notarised and verified perfectly and then failed on
+     * the last step, handing the finished thing to GitHub. Asked for by name
+     * so it cannot quietly change underneath the release again.
+     */
+    assert.match(
+      flow,
+      /permissions:\s*\n\s*contents:\s*write/,
+      'the release build cannot publish what it built'
+    )
     assert.match(
       flow,
       /inputs\.publish && github\.ref == 'refs\/heads\/main'/,
