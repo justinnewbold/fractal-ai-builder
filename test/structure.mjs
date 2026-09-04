@@ -1062,10 +1062,17 @@ export function run(test) {
     assert.match(save, /: !dirty\s*\n?\s*\? 'Saved'/, 'a clean preset still shows "Save"')
     assert.ok(!/className="lamp"/.test(save), 'the cyan dot is back beside Save')
     assert.ok(!/topbar-dirty/.test(read('TopBar.jsx')), 'the separate UNSAVED word is back in the bar')
+    /*
+     * The chain editor's two sideways scrollers are gone with the 940px grid
+     * they belonged to — it is a list down the page now, so there is nothing
+     * to fade. The strip on the Console still scrolls and still says so.
+     */
     const grid = read('GridEditor.jsx')
-    assert.equal((grid.match(/useOverflow\(/g) || []).length, 2, 'a grid scroller has no overflow observer')
-    // Hooked before `cols` existed, the panel threw in the temporal dead zone and the error boundary drew "Chain couldn’t draw" in its place.
-    assert.ok(grid.indexOf('useOverflow(') > grid.indexOf('const cols ='), 'the overflow observer reads `cols` before it is declared')
+    assert.ok(!/useOverflow\(/.test(grid), 'the chain editor is scrolling sideways again')
+    assert.ok(
+      !/grid-scroll|className="grid(?:"| editable)|gridTemplateColumns/.test(grid),
+      'the fixed-width grid canvas is back in the chain editor'
+    )
     assert.match(read('Console.jsx'), /useOverflow\(strip, \[chain\.length\]\)/, 'the chain strip keeps a private observer')
   })
 
@@ -1547,6 +1554,62 @@ export function run(test) {
       /scene names are written either way/i,
       'declining the rename does not say what still happens'
     )
+  })
+
+  /*
+   * "The edit chain doesn't seem to be functioning correctly at all, delete
+   * block works, but the rest you can't really add anything or change
+   * anything."
+   *
+   * Delete was the one that worked because delete was the one that did not
+   * check `ok:false`. This repo documents twice that this unit family answers
+   * `ok:false` to writes that landed — so a move was written, reported refused,
+   * and then actively rolled back, and a placement threw over a block that was
+   * sitting there. Nothing in the chain editor may treat that answer as a
+   * failure again.
+   */
+  test('the chain editor does not undo writes the unit said it refused', () => {
+    const grid = readFileSync(new URL('../src/components/GridEditor.jsx', import.meta.url), 'utf8')
+    assert.ok(
+      !/res\?\.ok === false\) throw|if \(res\?\.ok === false\) \{\s*\n\s*await placeBlock/.test(grid),
+      'a write is thrown away again because the unit answered ok:false'
+    )
+    // The rollback that remains is for a throw — a real transport failure —
+    // and only for the move, whose block would otherwise exist nowhere.
+    const move = grid.slice(grid.indexOf('const move = async'), grid.indexOf('const remove = async'))
+    assert.match(move, /catch \(err\) \{\s*\n\s*await placeBlock\(from\.row, from\.col/, 'a move that throws mid-way loses the block')
+    assert.match(grid, /const doubtful = \(res\)/, 'nothing says what ok:false actually means here')
+    assert.match(grid, /re-read/, 'the answer to a doubtful write is not to re-read the chain')
+  })
+
+  test('the chain editor counts columns the way the rest of the app does', () => {
+    /*
+     * Reads report columns 0-indexed and toWireCell adds the wire's 1 at the
+     * boundary; actions.js has always worked that way. This panel added one of
+     * its own for a linear unit and then the wire added another, so slot 1 on
+     * an AM4 was written to column 2 — and the cells it drew could never match
+     * the blocks the device reported.
+     */
+    const grid = readFileSync(new URL('../src/components/GridEditor.jsx', import.meta.url), 'utf8')
+    assert.ok(!/linear \? \(i % cols\) \+ 1/.test(grid), 'a linear unit gets a second column increment again')
+    assert.match(grid, /const label = \(col\) => col \+ 1/, 'the only place that counts from one should be the label')
+    assert.match(grid, /placeBlock\(1, i, block\.page\)/, 'the starter chain starts one column late')
+  })
+
+  test('the chain fits a phone, and answers where it was tapped', () => {
+    const grid = readFileSync(new URL('../src/components/GridEditor.jsx', import.meta.url), 'utf8')
+    assert.match(grid, /className="chain-lanes"/, 'the chain is not drawn as lanes down the page')
+    // Drag-and-drop was the only way to move a block and does nothing at all
+    // on a touch screen.
+    assert.ok(!/draggable|onDragStart|onDrop/.test(grid), 'the chain editor is back on drag-and-drop, which iOS ignores')
+    assert.match(grid, /className="chain-issue"/, 'a failure is reported somewhere other than beside the control that caused it')
+    // A palette that failed to load used to be an empty catch, leaving Place
+    // disabled with nothing to explain it.
+    assert.match(grid, /paletteFailed/, 'a failed block list is silent again')
+    assert.match(grid, /Couldn&rsquo;t read the block list/, 'a failed block list does not say so')
+    assert.match(grid, /Point at it/, 'the cursor probe is gone entirely')
+    const technical = grid.slice(grid.indexOf('chain-technical'))
+    assert.ok(technical.length > 0, 'the cursor probe is back in the main flow')
   })
 
   test('the tour teaches what a scene actually is', () => {

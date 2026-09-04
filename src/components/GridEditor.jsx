@@ -1,5 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
-import { useOverflow } from '../lib/overflow'
+import { useEffect, useState } from 'react'
 import { pointAtCell, placeBlock, clearCell, readGrid, blockCatalog } from '../lib/forgefx'
 
 /**
@@ -12,48 +11,91 @@ import { pointAtCell, placeBlock, clearCell, readGrid, blockCatalog } from '../l
 const STARTER_ORDER = ['drive', 'amp', 'cab', 'delay', 'reverb']
 
 /**
- * Building a preset from an empty slot.
+ * The chain, as a chain.
  *
- * This is the one part of ForgeFX flagged as spec-derived rather than
- * hardware-confirmed, and it writes structure rather than values — so the
- * failure mode is a mangled preset, not a wrong knob.
+ * This was a 4x12 grid of cells 940px wide, laid out on a canvas that scrolled
+ * sideways on every screen and needed drag-and-drop — which does nothing at all
+ * on iOS — to move anything. On a 390px phone you saw three cells of forty-eight
+ * and had to scroll to find the one you wanted, and every error printed at the
+ * top of a long page, far above the fold, so a tap that failed looked like a tap
+ * that did nothing. The report was blunt and correct: "the rest you can't really
+ * add anything or change anything… let's rethink that whole thing."
  *
- * Two things make that manageable. Placement writes are reject-watched, so a
- * refusal comes back rather than passing silently. And the cursor probe writes
- * nothing at all: it moves the unit's edit cursor, so you can confirm the app
- * and the hardware agree about which cell is which before trusting a placement.
- * Two indexing conventions are in play — reads are 0-indexed by column, writes
- * are 1-indexed — and that probe is what catches a mistake.
+ * So: one lane per row of the grid, each lane a vertical list of what is
+ * actually in it, in signal order, with the free cells between them shown as
+ * gaps you can tap. Nothing is hidden — the column number is on every card, and
+ * a preset with parallel rows shows a lane each — but nothing is drawn that
+ * isn't there either, which is what turned forty-eight cells into five.
+ *
+ * Tap a block for what you can do to it; tap a gap to put something in it. Every
+ * answer, and every failure, appears in that same row, under your thumb.
+ *
+ * Two things about writing here are worth knowing. Placement writes structure
+ * rather than values, and that part of ForgeFX is worked out from the protocol
+ * rather than confirmed on hardware — so a bad write mangles a preset rather
+ * than mis-setting a knob. And this unit family answers `ok:false` to writes
+ * that landed (documented twice in this repo), which is why nothing here treats
+ * that answer as a failure: it re-reads the chain from the unit instead and
+ * lets you look.
  */
 export default function GridEditor({ blocks, capabilities, busy, onError, onChanged }) {
   const [armed, setArmed] = useState(false)
-  const [target, setTarget] = useState(null)
+  // Which card's actions are open, as "row:col". One at a time.
+  const [open, setOpen] = useState(null)
+  const [moving, setMoving] = useState(null)
   const [choice, setChoice] = useState('')
   const [working, setWorking] = useState(null)
-  const [probe, setProbe] = useState(null)
-  const [dragging, setDragging] = useState(null)
-  const [over, setOver] = useState(null)
-
+  // Said beside the control that caused it, never at the top of the page.
+  const [issue, setIssue] = useState(null)
   const [palette, setPalette] = useState([])
+  const [paletteFailed, setPaletteFailed] = useState(false)
+  const [coords, setCoords] = useState(false)
+  const [probe, setProbe] = useState(null)
 
   const linear = capabilities?.slotModel === 'linear'
   const rows = linear ? 1 : capabilities?.grid?.rows ?? 4
   const cols = linear ? capabilities?.slotCount ?? 4 : capabilities?.grid?.cols ?? 12
-  // Both grids scroll sideways at every width; the fade that says so needs the
-  // fact. After `cols`: the observer re-looks when the column count changes.
-  const lockedScroll = useRef(null)
-  const editScroll = useRef(null)
-  useOverflow(lockedScroll, [cols])
-  useOverflow(editScroll, [cols])
+
+  /*
+   * Columns are 0-indexed here, as /preset/blocks reports them and as
+   * actions.js has always assumed; the wire's 1-indexing is added once, at the
+   * boundary, by toWireCell. This panel used to add one of its own for a linear
+   * unit and then add the wire's on top, so slot 1 on an AM4 was written to
+   * column 2 — and the cells it drew could never match the blocks the device
+   * reported, because those come back 0-indexed. The label is the only place
+   * that counts from one, because that is how a person counts.
+   */
+  const label = (col) => col + 1
+
+  const loadPalette = async () => {
+    setPaletteFailed(false)
+    try {
+      const res = await blockCatalog()
+      const list = Array.isArray(res) ? res : []
+      setPalette(list)
+      if (!list.length) setPaletteFailed(true)
+    } catch {
+      setPalette([])
+      setPaletteFailed(true)
+    }
+  }
 
   useEffect(() => {
     let stop = false
     ;(async () => {
       try {
         const res = await blockCatalog()
-        if (!stop) setPalette(Array.isArray(res) ? res : [])
+        if (stop) return
+        const list = Array.isArray(res) ? res : []
+        setPalette(list)
+        if (!list.length) setPaletteFailed(true)
       } catch {
-        if (!stop) setPalette([])
+        // Silently emptying the list left Place disabled with nothing to
+        // explain it — a control that does nothing and says nothing.
+        if (!stop) {
+          setPalette([])
+          setPaletteFailed(true)
+        }
       }
     })()
     return () => {
@@ -61,33 +103,72 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
     }
   }, [])
 
-  const occupied = new Map(blocks.map((b) => [`${b.row}:${b.col}`, b]))
+  /**
+   * The rows of the grid, each as what is in it and where the gaps are.
+   *
+   * Only rows that hold something are shown, plus the first empty one so a bare
+   * preset can be started and a parallel row can be begun. A gap is a real
+   * empty cell — never drawn between two blocks that are already adjacent,
+   * because there is nowhere there to put anything.
+   */
+  const lanes = []
+  for (let row = 1; row <= rows; row++) {
+    const inRow = blocks
+      .filter((b) => b.row === row && typeof b.col === 'number')
+      .sort((a, b) => a.col - b.col)
+    const taken = new Set(inRow.map((b) => b.col))
+    const gaps = []
+    for (let col = 0; col < cols; col++) if (!taken.has(col)) gaps.push(col)
+    lanes.push({ row, blocks: inRow, gaps })
+  }
+  const firstEmpty = lanes.findIndex((l) => !l.blocks.length)
+  const shown = lanes.filter((l, i) => l.blocks.length || i === firstEmpty)
 
-  const point = async (row, col) => {
-    setProbe(`${row}:${col}`)
-    try {
-      await pointAtCell(row, col)
-      onChanged(`Pointed the cursor at row ${row}, column ${col} — nothing written`)
-    } catch (err) {
-      onError(err.message)
-    }
+  /** Cards and gaps in one list, in column order, so a lane reads as a chain. */
+  const laneItems = (lane) =>
+    [
+      ...lane.blocks.map((b) => ({ kind: 'block', col: b.col, block: b })),
+      ...lane.gaps.map((col) => ({ kind: 'gap', col }))
+    ].sort((a, b) => a.col - b.col)
+
+  const close = () => {
+    setOpen(null)
+    setChoice('')
+    setIssue(null)
   }
 
-  const place = async () => {
-    if (!target || !choice) return
-    setWorking('placing')
+  /*
+   * A write is done when the unit has been asked and the chain re-read.
+   *
+   * `ok:false` is not a failure here. The AM4 answers it on writes that
+   * actually landed — this repo documents that in two other places — and the
+   * old editor took it at its word: a successful move was rolled straight back,
+   * which is exactly why "delete works, the rest doesn't". So the answer is
+   * reported as a note, the chain above is re-read from the unit, and the
+   * person can see for themselves which it was.
+   */
+  const doubtful = (res) =>
+    res?.ok === false
+      ? 'Your unit answered “refused”. Some units say that even when the write landed — the chain above has been re-read, so check it.'
+      : null
+
+  const add = async (row, col) => {
+    if (!choice) return
+    setWorking(`add:${row}:${col}`)
+    setIssue(null)
     try {
-      const res = await placeBlock(target.row, target.col, Number(choice))
-      if (res?.ok === false) throw new Error('The unit refused that placement.')
+      const res = await placeBlock(row, col, Number(choice))
       const block = palette.find((b) => b.page === Number(choice))
       onChanged(
         linear
-          ? `Placed ${block?.name} in slot ${target.col}`
-          : `Placed ${block?.name} at row ${target.row}, column ${target.col}`
+          ? `Placed ${block?.name} in slot ${label(col)}`
+          : `Placed ${block?.name} at row ${row}, column ${label(col)}`
       )
-      setTarget(null)
-      setChoice('')
+      const note = doubtful(res)
+      if (note) setIssue(note)
+      else close()
     } catch (err) {
+      setIssue(err.message)
       onError(err.message)
     } finally {
       setWorking(null)
@@ -103,81 +184,235 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
    * first avoids asking that question.
    *
    * The cost is a window where the block exists nowhere, so its id is held and
-   * put back if the placement fails. Losing a block to a half-finished move
-   * would be a worse bug than refusing the move outright.
+   * put back if the placement *throws*. It is not put back on `ok:false`: that
+   * answer means nothing on this hardware, and undoing a move because of it is
+   * the bug this panel was reported for.
    */
   const move = async (from, to) => {
-    const block = occupied.get(`${from.row}:${from.col}`)
-    if (!block) return
-    if (occupied.has(`${to.row}:${to.col}`)) {
-      onError('That cell is taken — clear it first.')
-      return
-    }
-
+    const block = from.block
     setWorking('moving')
+    setIssue(null)
     try {
       await clearCell(from.row, from.col)
-      const res = await placeBlock(to.row, to.col, block.effectId)
-      if (res?.ok === false) {
-        await placeBlock(from.row, from.col, block.effectId)
-        throw new Error('The unit refused that position — the block was put back.')
+      let res
+      try {
+        res = await placeBlock(to.row, to.col, block.effectId)
+      } catch (err) {
+        await placeBlock(from.row, from.col, block.effectId).catch(() => {})
+        throw err
       }
       onChanged(
         linear
-          ? `Moved ${block.name} to slot ${to.col}`
-          : `Moved ${block.name} to row ${to.row}, column ${to.col}`
+          ? `Moved ${block.name} to slot ${label(to.col)}`
+          : `Moved ${block.name} to row ${to.row}, column ${label(to.col)}`
       )
-      setTarget(null)
+      const note = doubtful(res)
+      if (note) setIssue(note)
+      else close()
+      setMoving(null)
     } catch (err) {
+      setIssue(err.message)
       onError(err.message)
+      setMoving(null)
     } finally {
       setWorking(null)
-      setDragging(null)
-      setOver(null)
     }
   }
 
-  const remove = async (row, col) => {
+  const remove = async (row, col, name) => {
     setWorking('clearing')
+    setIssue(null)
     try {
       await clearCell(row, col)
-      onChanged(`Cleared row ${row}, column ${col}`)
-      setTarget(null)
+      onChanged(linear ? `Cleared slot ${label(col)}` : `Cleared row ${row}, column ${label(col)}`)
+      close()
     } catch (err) {
+      setIssue(err.message)
       onError(err.message)
     } finally {
       setWorking(null)
+    }
+  }
+
+  const point = async (row, col) => {
+    setProbe(`${row}:${col}`)
+    setIssue(null)
+    try {
+      await pointAtCell(row, col)
+      onChanged(`Pointed the cursor at row ${row}, column ${label(col)} — nothing written`)
+    } catch (err) {
+      setIssue(err.message)
+      onError(err.message)
     }
   }
 
   const buildStarter = async () => {
     setWorking('starter')
+    setIssue(null)
     try {
-      const chain = STARTER_ORDER.map((slug) => palette.find((b) => b.slug === slug)).filter(
-        Boolean
-      )
+      const chain = STARTER_ORDER.map((slug) => palette.find((b) => b.slug === slug)).filter(Boolean)
       const fits = chain.slice(0, cols)
-      for (const [i, block] of fits.entries()) {
-        const res = await placeBlock(1, linear ? i + 1 : i + 1, block.page)
-        if (res?.ok === false) throw new Error(`The unit refused ${block.name}.`)
-      }
+      for (const [i, block] of fits.entries()) await placeBlock(1, i, block.page)
       onChanged(`Built a starter chain — ${fits.map((b) => b.name).join(', ')}`)
       await readGrid().catch(() => {})
     } catch (err) {
+      setIssue(err.message)
       onError(err.message)
     } finally {
       setWorking(null)
     }
   }
 
+  /** The picker, or the reason there isn't one. */
+  const picker = (onPick, verb, key) =>
+    paletteFailed ? (
+      <div className="chain-note">
+        <p className="hint">Couldn&rsquo;t read the block list from your unit.</p>
+        <button className="chip" onClick={loadPalette}>
+          Try again
+        </button>
+      </div>
+    ) : (
+      <>
+        <select
+          value={choice}
+          onChange={(e) => setChoice(e.target.value)}
+          aria-label="Block to place"
+        >
+          <option value="">Choose a block…</option>
+          {palette.map((b) => (
+            <option key={`${b.slug}-${b.page}`} value={b.page}>
+              {b.name}
+            </option>
+          ))}
+        </select>
+        <button className="primary" onClick={onPick} disabled={busy || !choice || !!working}>
+          {working === key ? `${verb}…` : verb}
+        </button>
+      </>
+    )
+
+  const laneList = (editable) => (
+    <div className="chain-lanes">
+      {shown.map((lane) => (
+        <div className="chain-lane" key={lane.row}>
+          {rows > 1 ? (
+            <p className="silk-label chain-lane-head">
+              {lane.blocks.length ? `Row ${lane.row}` : `Row ${lane.row} — empty`}
+            </p>
+          ) : null}
+
+          {laneItems(lane).map((item) => {
+            const at = `${lane.row}:${item.col}`
+            const isOpen = open === at
+
+            if (item.kind === 'gap') {
+              const target = moving && moving.at !== at
+              return (
+                <div className="chain-slot" key={at}>
+                  <button
+                    className={`chain-gap ${isOpen ? 'open' : ''} ${target ? 'target' : ''}`}
+                    onClick={() => {
+                      if (!editable) return
+                      if (target) return move(moving, { row: lane.row, col: item.col })
+                      setIssue(null)
+                      setOpen(isOpen ? null : at)
+                    }}
+                    disabled={!editable || busy || !!working}
+                  >
+                    <span className="chain-col mono">{label(item.col)}</span>
+                    <span className="chain-gap-word">
+                      {target ? `Move ${moving.block.name} here` : 'Empty — tap to add'}
+                    </span>
+                  </button>
+
+                  {isOpen && editable && !moving ? (
+                    <div className="chain-actions">
+                      {picker(() => add(lane.row, item.col), 'Add', `add:${at}`)}
+                      <button className="chip" onClick={close}>
+                        Cancel
+                      </button>
+                      {issue ? <p className="chain-issue">{issue}</p> : null}
+                    </div>
+                  ) : null}
+                </div>
+              )
+            }
+
+            const b = item.block
+            return (
+              <div className="chain-slot" key={at}>
+                <button
+                  className={`chain-block ${isOpen ? 'open' : ''} ${
+                    probe === at ? 'probed' : ''
+                  } ${moving?.at === at ? 'lifting' : ''}`}
+                  onClick={() => {
+                    if (!editable) return
+                    setIssue(null)
+                    setOpen(isOpen ? null : at)
+                    setMoving(null)
+                  }}
+                  disabled={!editable || busy || !!working}
+                >
+                  <span className="chain-col mono">{label(item.col)}</span>
+                  <span className="chain-block-name">{b.name}</span>
+                </button>
+
+                {isOpen && editable ? (
+                  <div className="chain-actions">
+                    {moving?.at === at ? (
+                      <>
+                        <p className="hint">Tap an empty slot to move it there.</p>
+                        <button className="chip" onClick={() => setMoving(null)}>
+                          Cancel move
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          className="chip"
+                          onClick={() => setMoving({ at, row: lane.row, col: item.col, block: b })}
+                          disabled={busy || !!working || !lanes.some((l) => l.gaps.length)}
+                        >
+                          Move
+                        </button>
+                        {picker(() => add(lane.row, item.col), 'Replace', `add:${at}`)}
+                        <button
+                          className="chip"
+                          onClick={() => remove(lane.row, item.col, b.name)}
+                          disabled={busy || !!working}
+                        >
+                          {working === 'clearing' ? 'Removing…' : 'Remove'}
+                        </button>
+                        <button className="chip" onClick={close}>
+                          Cancel
+                        </button>
+                      </>
+                    )}
+                    {coords ? (
+                      <button
+                        className="chip"
+                        onClick={() => point(lane.row, item.col)}
+                        disabled={busy}
+                      >
+                        Point at it
+                      </button>
+                    ) : null}
+                    {issue ? <p className="chain-issue">{issue}</p> : null}
+                  </div>
+                ) : null}
+              </div>
+            )
+          })}
+        </div>
+      ))}
+    </div>
+  )
+
   /*
-   * Locked: the grid as it is, and no way to change it by accident.
-   *
-   * This used to be a separate read-only Grid component rendered above the
-   * editor — the same picture drawn twice by two files, one of which could
-   * write. Editing behind an explicit mode is the same idea and one component:
-   * you can always see the chain, and you have to say so before you can move
-   * anything in it.
+   * Locked: the chain as it is, and no way to change it by accident. Editing
+   * behind an explicit mode means you can always see the chain, and have to say
+   * so before you can move anything in it.
    */
   if (!armed) {
     return (
@@ -186,36 +421,12 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
           <p className="silk-label">The chain</p>
           <div className="history-actions">
             <button className="chip" onClick={() => setArmed(true)}>
-              Edit the grid
+              Edit the chain
             </button>
           </div>
         </div>
 
-        <div className="grid-scroll" ref={lockedScroll}>
-          <div
-            className="grid"
-            style={{ gridTemplateColumns: `repeat(${cols}, minmax(76px, 1fr))` }}
-          >
-            {Array.from({ length: rows * cols }, (_, i) => {
-              const row = Math.floor(i / cols) + 1
-              const col = linear ? (i % cols) + 1 : i % cols
-              const here = occupied.get(`${row}:${col}`)
-              return (
-                <div
-                  key={i}
-                  className={`cell ${here ? 'filled' : ''}`}
-                  title={`Row ${row}, column ${col}`}
-                >
-                  {here ? (
-                    <span className="cell-name">{here.name}</span>
-                  ) : (
-                    <span className="cell-coord mono">{linear ? col : `${row}·${col}`}</span>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
+        {laneList(false)}
 
         <p className="hint">
           Placing blocks writes the preset&rsquo;s structure, not just its settings, and that part
@@ -230,146 +441,52 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
   return (
     <section className="grid-editor">
       <div className="history-head">
-        <p className="silk-label">Build the chain</p>
+        <p className="silk-label">Edit the chain</p>
         <div className="history-actions">
-          <button className="chip" onClick={buildStarter} disabled={busy || !!working}>
+          <button className="chip" onClick={buildStarter} disabled={busy || !!working || paletteFailed}>
             {working === 'starter' ? 'Building…' : 'Starter chain'}
           </button>
-          <button className="chip" onClick={() => setArmed(false)}>
-            Lock
+          <button
+            className="chip"
+            onClick={() => {
+              setArmed(false)
+              setMoving(null)
+              close()
+            }}
+          >
+            Done
           </button>
         </div>
       </div>
 
       <p className="hint">
-        Click a cell to select it. <strong>Point</strong> moves the unit&rsquo;s cursor without
-        writing anything — use it once to confirm the app and the hardware agree about which cell
-        is which.
+        Tap a block for what you can do to it, or an empty slot to put something in it.
       </p>
 
-      <div className="grid-scroll" ref={editScroll}>
-        <div
-          className="grid editable"
-          style={{ gridTemplateColumns: `repeat(${cols}, minmax(76px, 1fr))` }}
-        >
-          {Array.from({ length: rows * cols }, (_, i) => {
-            const row = Math.floor(i / cols) + 1
-            // Linear devices address slots 1..n; matrix devices report columns
-            // 0-indexed and the client shifts them at the wire boundary.
-            const col = linear ? (i % cols) + 1 : i % cols
-            const here = occupied.get(`${row}:${col}`)
-            const selected = target?.row === row && target?.col === col
-            const probed = probe === `${row}:${col}`
+      {laneList(true)}
 
-            return (
-              <button
-                key={i}
-                className={`cell-btn ${here ? 'filled' : ''} ${selected ? 'selected' : ''} ${
-                  probed ? 'probed' : ''
-                } ${over === `${row}:${col}` ? 'over' : ''} ${
-                  dragging?.row === row && dragging?.col === col ? 'lifting' : ''
-                }`}
-                onClick={() => setTarget({ row, col })}
-                draggable={!!here && !working}
-                onDragStart={(e) => {
-                  setDragging({ row, col })
-                  e.dataTransfer.effectAllowed = 'move'
-                  // Firefox won't start a drag without payload, even unused.
-                  e.dataTransfer.setData('text/plain', `${row}:${col}`)
-                }}
-                onDragEnd={() => {
-                  setDragging(null)
-                  setOver(null)
-                }}
-                onDragOver={(e) => {
-                  if (!dragging || here) return
-                  e.preventDefault()
-                  e.dataTransfer.dropEffect = 'move'
-                  setOver(`${row}:${col}`)
-                }}
-                onDragLeave={() => setOver((o) => (o === `${row}:${col}` ? null : o))}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  if (dragging && !here) move(dragging, { row, col })
-                }}
-                title={`Row ${row}, column ${col}`}
-              >
-                {here ? (
-                  <span className="cell-name">{here.name}</span>
-                ) : (
-                  <span className="cell-coord mono">{linear ? col : `${row}·${col}`}</span>
-                )}
-              </button>
-            )
-          })}
-        </div>
-      </div>
+      {/*
+        The cursor probe, out of the way.
 
-      {target ? (
-        <div className="cell-actions">
-          <span className="diff-label mono">
-            {linear ? `slot ${target.col}` : `row ${target.row}, column ${target.col}`}
-          </span>
-
-          <button className="chip" onClick={() => point(target.row, target.col)} disabled={busy}>
-            Point at it
-          </button>
-
-          {occupied.has(`${target.row}:${target.col}`) ? (
-            <button
-              className="chip"
-              onClick={() => remove(target.row, target.col)}
-              disabled={busy || !!working}
-            >
-              {working === 'clearing' ? 'Clearing…' : 'Clear cell'}
-            </button>
-          ) : (
-            <>
-              <select value={choice} onChange={(e) => setChoice(e.target.value)}>
-                <option value="">
-                  {palette.length ? 'Choose a block…' : 'No palette from this unit'}
-                </option>
-                {palette.map((b) => (
-                  <option key={`${b.slug}-${b.page}`} value={b.page}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-              <button className="primary" onClick={place} disabled={busy || !choice || !!working}>
-                {working === 'placing' ? 'Placing…' : 'Place'}
-              </button>
-            </>
-          )}
-
-          {occupied.has(`${target.row}:${target.col}`) ? (
-            <button
-              className="chip"
-              onClick={() => setDragging(dragging ? null : { ...target })}
-              disabled={busy || !!working}
-            >
-              {dragging ? 'Cancel move' : 'Move to…'}
-            </button>
-          ) : dragging ? (
-            <button
-              className="primary"
-              onClick={() => move(dragging, target)}
-              disabled={busy || !!working}
-            >
-              {working === 'moving' ? 'Moving…' : 'Move here'}
-            </button>
-          ) : null}
-
-          <button
-            className="chip"
-            onClick={() => {
-              setTarget(null)
-              setDragging(null)
-            }}
-          >
-            Cancel
-          </button>
-        </div>
-      ) : null}
+        It writes nothing — it moves the unit's own edit cursor so you can check
+        the app and the hardware agree about which cell is which. Worth having,
+        and worth doing once ever, which is not a reason to put it in the middle
+        of the thing people do every time.
+      */}
+      <details className="chain-technical">
+        <summary onClick={() => setCoords(true)}>Technical details</summary>
+        <p className="hint">
+          Two indexing conventions are in play, so <strong>Point at it</strong> appears on every
+          block while this is open: it moves the unit&rsquo;s cursor without writing anything, and
+          the unit&rsquo;s own screen tells you whether it landed where you meant.
+        </p>
+        {coords ? (
+          <label className="chain-coords">
+            <input type="checkbox" checked={coords} onChange={(e) => setCoords(e.target.checked)} />
+            <span>Show “Point at it” on each block</span>
+          </label>
+        ) : null}
+      </details>
     </section>
   )
 }
