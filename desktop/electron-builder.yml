@@ -25,6 +25,17 @@ extraResources:
 # no signature at all and calls it "damaged".
 afterPack: afterPack.js
 
+# Where a new version comes from, and where a release build puts one.
+#
+# The same block answers both questions, which is the point: electron-updater
+# reads this out of the packaged app to know where to look, and electron-builder
+# writes latest-mac.yml beside the disk images when a tag build publishes. If
+# they could disagree the app would check somewhere nothing is ever released.
+publish:
+  provider: github
+  owner: justinnewbold
+  repo: fractal-ai-builder
+
 mac:
   category: public.app-category.music
   # A PNG, not an .icns: electron-builder converts it with its own bundled
@@ -33,6 +44,15 @@ mac:
   icon: build/icon.png
   target:
     - target: dmg
+      arch: [arm64, x64]
+    # A zip as well as the image, and not for people to download.
+    #
+    # electron-updater cannot update from a .dmg: it downloads the new version
+    # in the background and swaps it in, and mounting a disk image is not
+    # something it can do unattended. The zip is what it actually fetches, and
+    # latest-mac.yml points at it. Without this the app checks, finds a release,
+    # and can never install it.
+    - target: zip
       arch: [arm64, x64]
   # Signing and notarisation are switched on by the presence of a certificate.
   # Without one this still builds; macOS then shows "unidentified developer"

@@ -1744,6 +1744,36 @@ export function run(test) {
     }
   })
 
+  test('the Mac app can actually install what it downloads', () => {
+    /*
+     * Three things have to agree or the app checks for updates forever and can
+     * never take one, which looks identical to working.
+     *
+     * electron-updater cannot update from a disk image — it downloads in the
+     * background and swaps the app in, and mounting a .dmg is not something it
+     * can do unattended. So a zip is built alongside, and latest-mac.yml points
+     * at that. And the publish block is read twice over: electron-builder
+     * writes the feed from it, and the packaged app reads it back to know where
+     * to look. If they could disagree the app would check somewhere nothing is
+     * ever released.
+     */
+    const yml = readFileSync(new URL('../desktop/electron-builder.yml', import.meta.url), 'utf8')
+    assert.match(yml, /target:\s*zip/, 'there is nothing electron-updater can install')
+    assert.match(yml, /publish:\s*\n\s*provider:\s*github/, 'the app has nowhere to check')
+
+    const pkg = JSON.parse(
+      readFileSync(new URL('../desktop/package.json', import.meta.url), 'utf8')
+    )
+    assert.ok(
+      pkg.dependencies?.['electron-updater'],
+      'electron-updater is not shipped inside the app'
+    )
+
+    // Published from a release tag and from nothing else.
+    const flow = readFileSync(new URL('../.github/workflows/desktop.yml', import.meta.url), 'utf8')
+    assert.match(flow, /PUBLISH:.*refs\/tags\/desktop-v/, 'every build would publish, or none would')
+  })
+
   test('the tour teaches what a scene actually is', () => {
     const tour = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
     const card = tour.slice(tour.indexOf('Scenes are one rig'), tour.indexOf('Scenes are one rig') + 1200)

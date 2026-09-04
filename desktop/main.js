@@ -30,9 +30,21 @@ let where = null
 let phone = null
 /** Whether macOS is likely stopping a phone from reaching us. Best effort. */
 let firewall = { known: false }
+/** How the update is going: null until anything has happened. See lib/updates.mjs. */
+let update = null
+/** `check` from wireUpdates, so the menu item can ask again by hand. */
+let updates = null
 
 /** The shared logic is ESM; this shell is CommonJS, so it is imported lazily. */
 const host = () => import('./lib/host.mjs')
+
+/**
+ * The update wording, needed synchronously while building the menu.
+ *
+ * Filled in by beginUpdates once the ESM module has loaded; until then there
+ * is nothing to say anyway, which is exactly what the null it returns means.
+ */
+let updateLine = () => null
 
 /** The built web app, bundled beside this file by electron-builder. */
 const distPath = () =>
@@ -285,10 +297,55 @@ function buildTray() {
           }
         ]
       : []),
+    /*
+     * How the update is going, said in one line and only once there is
+     * something to say. Never a dialog: a failed check means the network was
+     * down, and the app works regardless.
+     */
+    { type: 'separator' },
+    ...(updateLine(update) ? [{ label: updateLine(update), enabled: false }] : []),
+    {
+      label: 'Check for updates…',
+      enabled: Boolean(updates) && update?.kind !== 'checking',
+      click: () => updates?.check()
+    },
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() }
   ])
   tray.setContextMenu(menu)
+}
+
+/*
+ * Start looking for a new version, quietly.
+ *
+ * Only in a packaged app: electron-updater has nothing to compare against in a
+ * checkout, and would report an error on every launch during development for
+ * no reason. Everything else — downloading in the background, installing on
+ * quit, never restarting on its own — lives in lib/updates.mjs, where it can
+ * be tested without a Mac.
+ *
+ * Failure here is not fatal and not reported: an app that cannot reach GitHub
+ * still serves the unit, which is the whole job.
+ */
+async function beginUpdates() {
+  if (!app.isPackaged) return
+  try {
+    const { autoUpdater } = require('electron-updater')
+    const mod = await import('./lib/updates.mjs')
+    const { wireUpdates } = mod
+    updateLine = mod.updateLine
+    updates = wireUpdates({
+      updater: autoUpdater,
+      onState: (state) => {
+        update = state
+        if (tray) buildTray()
+      },
+      log: (err) => console.error('[updates]', err?.message || err)
+    })
+    await updates.check()
+  } catch (err) {
+    console.error('[updates] not available', err?.message || err)
+  }
 }
 
 app.whenReady().then(async () => {
@@ -297,6 +354,7 @@ app.whenReady().then(async () => {
   const answering = await start()
   if (!where) return
   buildTray()
+  await beginUpdates()
   if (!answering) {
     /*
      * A minute is long enough that this is not slowness. Said out loud,
