@@ -24,6 +24,11 @@ name: desktop
 
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish a release from this build'
+        type: boolean
+        default: false
   push:
     tags: ['desktop-v*']
   pull_request:
@@ -109,7 +114,23 @@ jobs:
           # Published only from a release tag. Every other run builds the same
           # artefact and keeps it, so a dispatch can prove the signing chain
           # without putting a version on the update feed that nobody asked for.
-          PUBLISH: ${{ startsWith(github.ref, 'refs/tags/desktop-v') && 'always' || 'never' }}
+          # Two ways to say "release this", and one of them is a button.
+          #
+          # A tag was the only way, and pushing one is not always available —
+          # a credential scoped to a branch is refused with a 403, and there is
+          # nothing to retry. It was never required either: electron-builder
+          # creates the release through GitHub's API and GitHub makes the tag,
+          # so the tag is a *result* of releasing rather than the trigger for
+          # it. The run that publishes is the record of what was released.
+          #
+          # Only ever from the default branch. `createRelease` does not send a
+          # commit to tag, so GitHub tags the default branch's head — a release
+          # published from anywhere else would carry that name and someone
+          # else's code.
+          PUBLISH: >-
+            ${{ (startsWith(github.ref, 'refs/tags/desktop-v')
+                 || (inputs.publish && github.ref == 'refs/heads/main'))
+                && 'always' || 'never' }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
