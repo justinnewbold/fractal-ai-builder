@@ -703,6 +703,78 @@ test('publishing without mDNS available still gives a usable stop', async () => 
   await ad.stop()
 })
 
+console.log('\nwhere this copy of the app is running')
+
+const platform = await import('../src/lib/platform.js')
+
+test('the phone app announces itself rather than being guessed at', () => {
+  /*
+   * Guessing the device from its user agent is forbidden elsewhere in this
+   * codebase for good reasons — an iPad claims to be a Mac, and every WebView
+   * claims to be Safari. The shell says what it is, so nothing has to guess.
+   */
+  const phone = { Capacitor: { isNativePlatform: () => true, getPlatform: () => 'ios' } }
+  assert.equal(platform.isCapacitor(phone), true)
+  assert.equal(platform.nativePlatform(phone), 'ios')
+  assert.equal(platform.platform(phone), 'ios')
+
+  // A browser has no such global, which is the common case and not an error.
+  const browser = { location: { hostname: 'fractal.newbold.cloud' } }
+  assert.equal(platform.isCapacitor(browser), false)
+  assert.equal(platform.nativePlatform(browser), null)
+  assert.equal(platform.platform(browser), 'web')
+})
+
+test('a shell that answers nonsense is not believed', () => {
+  // Present but not native: a browser with the library loaded is still a browser.
+  const web = { Capacitor: { isNativePlatform: () => false, getPlatform: () => 'web' } }
+  assert.equal(platform.isCapacitor(web), false)
+  assert.equal(platform.nativePlatform(web), null)
+
+  // Native but naming a platform we do not ship: no answer beats a wrong one.
+  const odd = { Capacitor: { isNativePlatform: () => true, getPlatform: () => 'electron' } }
+  assert.equal(platform.nativePlatform(odd), null)
+
+  // And a shell that throws is a browser as far as anything here is concerned.
+  const angry = { Capacitor: { isNativePlatform: () => { throw new Error('no') } } }
+  assert.equal(platform.isCapacitor(angry), false)
+})
+
+test('only the hosted site thinks it is the hosted site', () => {
+  /*
+   * What the service worker and the "add to home screen" nudge hang off. The
+   * Mac serves this bundle too, and so does the phone app, and neither should
+   * be offering to install itself or caching a shell it cannot update.
+   */
+  assert.equal(platform.isHostedOrigin({ location: { hostname: 'fractal.newbold.cloud' } }), true)
+  assert.equal(platform.isHostedOrigin({ location: { hostname: '192.168.1.44' } }), false)
+  assert.equal(platform.isHostedOrigin({ location: { hostname: 'localhost' } }), false)
+  assert.equal(platform.isHostedOrigin(null), false)
+})
+
+test('nothing here needs a window', () => {
+  // These modules load on a server and in this test runner, where there is none.
+  assert.equal(platform.isCapacitor(null), false)
+  assert.equal(platform.isStandalone(null), false)
+  assert.equal(platform.platform(null), 'server')
+})
+
+test('the phone app counts as standalone without being asked twice', () => {
+  const phone = { Capacitor: { isNativePlatform: () => true, getPlatform: () => 'ios' } }
+  assert.equal(platform.isStandalone(phone), true)
+
+  // iOS says so on navigator; everyone else reports a display mode.
+  assert.equal(platform.isStandalone({ navigator: { standalone: true } }), true)
+  assert.equal(
+    platform.isStandalone({ matchMedia: () => ({ matches: true }) }),
+    true
+  )
+  assert.equal(
+    platform.isStandalone({ matchMedia: () => ({ matches: false }) }),
+    false
+  )
+})
+
 console.log('\nwho may call the model')
 
 const { allowedOrigin } = await import('../api/_cors.js')
@@ -729,6 +801,23 @@ test('a machine on the player own network is allowed', () => {
   ]) {
     assert.equal(allowedOrigin(o), o, o)
   }
+})
+
+test('the phone app is allowed, and only the phone app', () => {
+  /*
+   * A Capacitor shell serves this bundle to its own WebView from a scheme of
+   * its own. Nothing on the internet can claim that origin — only a page
+   * inside an app we signed — which is why it is allowed at all.
+   *
+   * Android serves over http://localhost and is covered by the private-network
+   * rule above; it is asserted here so that stays true.
+   */
+  assert.equal(allowedOrigin('capacitor://localhost'), 'capacitor://localhost')
+  assert.equal(allowedOrigin('http://localhost'), 'http://localhost')
+
+  // The scheme is not a skeleton key: it buys nothing away from localhost.
+  assert.equal(allowedOrigin('capacitor://evil.example'), null)
+  assert.equal(allowedOrigin('capacitor://localhost.evil.example'), null)
 })
 
 test('the open internet is not allowed', () => {
