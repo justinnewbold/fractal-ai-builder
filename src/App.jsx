@@ -1017,20 +1017,32 @@ export default function App() {
            * one token from done or had died two minutes ago.
            */
           onEvent: (e) => {
-            if (e.kind === 'request') setProgress('Reaching the server…')
-            // The server says hello before it asks the model anything, so this
-            // line changing at all is proof the round trip works — which is
-            // most of what someone staring at a long wait wants to know.
-            else if (e.kind === 'open') setProgress('Sent to the model — waiting for the first line…')
-            else if (e.kind === 'first-output') setProgress('The model is answering…')
+            /*
+             * Said to a guitarist waiting on their tone, not to whoever wrote
+             * this. "Sent to the model — waiting for the first line" was every
+             * word true and none of it anyone's business but mine: it names
+             * machines a player has no reason to know about and describes a
+             * milestone — the first line of the answer — that means nothing
+             * from the outside.
+             *
+             * Each line still marks a real event, so none of it is a guess.
+             * The exact names go to the generation log in Technical details,
+             * which is where they belong and where they are still precise.
+             */
+            if (e.kind === 'request') setProgress('Sending your description…')
+            // The far end answers before the AI is asked anything, so this
+            // line changing at all means the round trip works — which is most
+            // of what someone staring at a long wait wants to know, even if
+            // they would never put it that way.
+            else if (e.kind === 'open') setProgress('Working on your tone…')
             else if (e.kind === 'partial') {
               setProgress(
                 e.blocks
-                  ? `Building the preset — ${e.blocks} block${e.blocks === 1 ? '' : 's'} so far`
-                  : 'Building the preset…'
+                  ? `Building your chain — ${e.blocks} block${e.blocks === 1 ? '' : 's'} so far`
+                  : 'Building your chain…'
               )
-            } else if (e.kind === 'fallback') setProgress('Streaming refused — asking again in one piece…')
-            else if (e.kind === 'retrying') setProgress('The model went quiet before it said anything — asking again…')
+            } else if (e.kind === 'fallback') setProgress('Trying another way…')
+            else if (e.kind === 'retrying') setProgress('No answer yet — asking again…')
           }
         }
       )

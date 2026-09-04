@@ -1847,7 +1847,7 @@ test('a slow first byte is not a stall', async () => {
 test('silence mid-answer is a stall, and it is not retried once something arrived', async () => {
   const f = scheduledFetch([{ steps: [{ at: 5, chunk: PARTIAL }], end: false }])
   globalThis.fetch = f.fetch
-  await assert.rejects(streamSpec({}, { timing }), (err) => err.generationFailure === 'stalled' && /went quiet/.test(err.message))
+  await assert.rejects(streamSpec({}, { timing }), (err) => err.generationFailure === 'stalled' && /stopped partway through/.test(err.message))
   assert.equal(f.calls(), 1, 'a stall after a partial was retried — a retry is only safe before anything arrived')
 })
 
@@ -1861,7 +1861,7 @@ test('a stall before anything arrived is asked again, once', async () => {
   assert.equal(events.filter((k) => k === 'retrying').length, 1)
 })
 
-test('nothing at all by the cap blames the server, not the model', async () => {
+test('nothing at all by the cap blames the connection, not the AI', async () => {
   // Not a distinction worth drawing until the server said hello first. Now it
   // is: no bytes whatsoever means the request never got anywhere near a model,
   // and telling someone the model was slow sends them to look in the wrong place.
@@ -1869,7 +1869,7 @@ test('nothing at all by the cap blames the server, not the model', async () => {
   globalThis.fetch = f.fetch
   await assert.rejects(
     streamSpec({}, { timing }),
-    (err) => err.generationFailure === 'capped' && /the server never answered/.test(err.message)
+    (err) => err.generationFailure === 'capped' && /get through at all/.test(err.message)
   )
   assert.equal(f.calls(), 1)
 })
@@ -1903,12 +1903,12 @@ test('a hello with no answer behind it says so in those words', async () => {
     // firstMs out of reach, so the cap is what fires: the server took it and
     // the model never began.
     streamSpec({}, { timing: { ...timing, firstMs: 10000 } }),
-    (err) => err.generationFailure === 'capped' && /the model hadn't started answering/.test(err.message)
+    (err) => err.generationFailure === 'capped' && /never started answering/.test(err.message)
   )
   assert.equal(f.calls(), 1)
 })
 
-test('quiet after the hello is the model, and it says the model', async () => {
+test('quiet after the hello is the AI, and it says so without naming machines', async () => {
   const f = scheduledFetch([
     { steps: [{ at: 5, chunk: OPEN }], end: false },
     { steps: [{ at: 5, chunk: OPEN }], end: false }
@@ -1916,9 +1916,72 @@ test('quiet after the hello is the model, and it says the model', async () => {
   globalThis.fetch = f.fetch
   await assert.rejects(
     streamSpec({}, { timing }),
-    (err) => err.generationFailure === 'stalled' && /without starting to answer/.test(err.message)
+    (err) => err.generationFailure === 'stalled' && /took the request but never started/.test(err.message)
   )
   assert.equal(f.calls(), 2, 'a quiet start was not retried — nothing had been written, so it was free to ask again')
+})
+
+test('the wait speaks to a guitarist, not to whoever wrote it', () => {
+  /*
+   * Photographed mid-generation on a phone:
+   *
+   *   ||| Sent to the model — waiting for the first line… · 6s
+   *
+   * Every word true, and none of it anybody's business but mine. It names
+   * machines a player has no reason to know about, and it turns on a milestone
+   * — the first line of the answer — that means nothing at all from outside.
+   * The failure messages were worse: a server, a browser and a deployment, in
+   * one sentence, to someone who wanted a rhythm tone.
+   *
+   * There is already a rule like this over the connection wording; it simply
+   * never reached the part of the app that runs while somebody waits. The
+   * words the model call actually uses stay exact in the generation log, which
+   * is in Technical details, where a person goes to find out why rather than
+   * what.
+   */
+  const jargon = /\bmodels?\b|\bservers?\b|\bbrowsers?\b|deployment|\bstream(ing)?\b|first line|\bpartials?\b|\btokens?\b|\bendpoint/i
+
+  /** Sentences only: 'quiet-start' and the like are names, not words to read. */
+  const sentences = (code) => {
+    const bare = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    return [...bare.matchAll(/'([^'\n]{12,})'|`([^`\n]{12,})`/g)]
+      .map((m) => m[1] ?? m[2])
+      // A quote-to-quote match can span the code between two literals, so
+      // anything carrying punctuation prose never has is not prose.
+      .filter((t) => t.includes(' ') && !/[{}<>[\]]|=>|\|\||\?\.|===/.test(t))
+  }
+
+  /*
+   * Anchored on the call rather than sliced out of the file. A slice that
+   * begins mid-expression starts counting quotes from the wrong one, and the
+   * pairs come out shifted: the first draft of this test read ") setProgress("
+   * as the sentence and never looked at the sentence itself — so it passed
+   * with the photographed line put back.
+   */
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  const shown = [...app.matchAll(/setProgress\(\s*(?:'([^']*)'|`([^`]*)`)/g)]
+    .map((m) => (m[1] ?? m[2]).replace(/\$\{[^}]*\}/g, 'N'))
+    .filter((t) => t.includes(' '))
+  assert.ok(shown.length >= 8, `only ${shown.length} progress lines found — the match is not finding them`)
+  for (const said of shown) {
+    assert.ok(!jargon.test(said), `shown while the app is working: "${said}"`)
+  }
+
+  const stream = readSrc(new URL('../src/lib/stream.js', import.meta.url), 'utf8')
+  for (const said of sentences(stream)) {
+    assert.ok(!jargon.test(said), `shown when a generation fails: "${said}"`)
+  }
+
+  // And the one thing a person actually wants to know when it goes wrong.
+  const failures = sentences(stream).filter((t) => /ask again|try again/i.test(t))
+  assert.ok(failures.length >= 4, `only ${failures.length} failure messages found — the slice missed some`)
+  for (const said of failures) {
+    assert.match(
+      said,
+      /written to your unit/,
+      `a generation failed and never said whether the rig was touched: "${said}"`
+    )
+  }
 })
 
 test('the failure paths in App drop the half chain', () => {
