@@ -15,6 +15,8 @@ import { LiveGeneration, Thinking } from './components/LiveGeneration'
 import { streamSpec } from './lib/stream'
 import { Modifiers, SceneMatrix } from './components/Modifiers'
 import Feedback from './components/Feedback'
+import DevTrace, { TraceSwitch } from './components/DevTrace'
+import { traceEnabled } from './lib/devtrace'
 import { platform } from './lib/platform'
 import { Versions, DeviceBackup } from './components/Versions'
 import Footswitches from './components/Footswitches'
@@ -1042,6 +1044,8 @@ export default function App() {
           sceneNames,
           previous: previous || null,
           mode: previous ? 'refine' : 'design',
+          // Only when someone has asked to see it — see lib/devtrace.js.
+          trace: traceEnabled(),
           /*
            * Sent on a refine too. A refinement is a reaction to a tone the
            * player has just heard, so their habits are exactly the thing that
@@ -1145,6 +1149,12 @@ export default function App() {
       const validated = validateSpec(spec, schema, sceneCount, channelNames)
       validated.spec = spec
       validated.description = description
+      /*
+       * Carried up beside the result rather than left buried in the spec, so
+       * the panel that explains a tone reads it from one place whether the
+       * generation streamed or fell back. Absent unless someone asked for it.
+       */
+      if (spec?._trace) validated._trace = spec._trace
       setResult(validated)
       /*
        * Scenes are opt-in — unless they are the whole proposal. A plan that
@@ -2266,6 +2276,15 @@ export default function App() {
       />
 
       {/*
+        Why a tone came out the way it did, when someone has asked to see.
+        Under the design rather than in Setup, because that is where a tone
+        that missed is being looked at.
+      */}
+      {result?._trace || result?.spec ? (
+        <DevTrace trace={result._trace} spec={result.spec} problems={result.problems} />
+      ) : null}
+
+      {/*
         What applying actually did, including anything that read back
         different from what was sent. This lived in the Design view; without
         it here, applying a design would finish in silence.
@@ -2992,6 +3011,10 @@ export default function App() {
             the app — are gone, and the words they used with them.
           */}
           <PhoneRemote link={link} onAction={linkAction} onError={setError} busy={busy} />
+        </Section>
+
+        <Section key="developer" title="Developer" note="See what the AI was given">
+          <TraceSwitch />
         </Section>
 
         <Section key="feedback" title="Tell us" note="Something broken, or something you want">

@@ -211,7 +211,7 @@ export default async function handler(req, res) {
     return
   }
 
-  const { description, device, blocks, previous, mode, sceneNames, taste, wantScenes } =
+  const { description, device, blocks, previous, mode, sceneNames, taste, wantScenes, trace } =
     req.body || {}
 
   if (!description || typeof description !== 'string') {
@@ -323,6 +323,48 @@ export default async function handler(req, res) {
    * reservation, so a generous one costs nothing on the presets that don't
    * need it.
    */
+  /*
+   * Everything the model was given, for a person trying to work out why a tone
+   * missed.
+   *
+   * "Can you look into how the AI actually is figuring out what tones to
+   * generate and what knobs to do, where the source is coming from? A lot of
+   * the tones don't really match up very well."
+   *
+   * The honest answer is worth being able to see rather than take on trust:
+   * apart from the unit's own model names and parameter ranges, there is no
+   * reference material here at all. No corpus of real presets, no per-artist
+   * data, nothing retrieved. The model is working from what it knows about
+   * amps and pedals, aimed by the rules below and by this player's own
+   * history. When a tone misses, it missed for a reason that is in here.
+   *
+   * Off unless asked for. The rosters alone are ~11k tokens and there is no
+   * sense paying to send them back to every player who will never look.
+   * Summarised even then — the counts and the names are what tells you whether
+   * the model could have picked the thing you wanted; the full roster is
+   * already on screen in the block pickers.
+   */
+  const traced = trace
+    ? {
+        model: MODEL_NAME,
+        system: SYSTEM,
+        task: task + asked,
+        taste: context,
+        // What it was told is on the unit right now.
+        state,
+        // What it was allowed to choose from, by family.
+        rosters: Object.fromEntries(
+          Object.entries(rosters).map(([slug, models]) => [
+            slug,
+            { count: models.length, names: models.map((m) => m.name ?? m.label ?? String(m)) }
+          ])
+        ),
+        // What the unit says its own controls do, which is the only tone
+        // knowledge in the request that did not come from the model itself.
+        reference
+      }
+    : null
+
   const args = {
     model,
     maxOutputTokens: 16000,
@@ -391,6 +433,9 @@ export default async function handler(req, res) {
           type: 'done',
           object: {
             ...object,
+            // Same trace as the non-streaming path, so a person looking at why
+            // a tone missed sees the same thing whichever route it came by.
+            ...(traced ? { _trace: traced } : {}),
             _usage: {
               inputTokens: usage?.inputTokens ?? null,
               outputTokens: usage?.outputTokens ?? null,
@@ -433,6 +478,7 @@ export default async function handler(req, res) {
     // input side is dominated by the model roster and block schema, which grow
     // with the preset — worth seeing rather than assuming.
     res.status(200).json({
+      ...(traced ? { _trace: traced } : {}),
       ...object,
       _usage: {
         inputTokens: usage?.inputTokens ?? null,
