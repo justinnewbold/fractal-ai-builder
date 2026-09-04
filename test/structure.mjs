@@ -1688,6 +1688,29 @@ export function run(test) {
     assert.match(refine, /compare-progress/, 'the wait says nothing while it happens')
   })
 
+  test('both ways in are offered, and the local one says what it costs', () => {
+    /*
+     * "Currently can a user login if they're just on the same network without
+     * signing in to the online account? If not, there should be two options —
+     * one just to sign in and control the device and use local browser
+     * storage… and then there should be a cloud login where they can save all
+     * their stuff between devices."
+     *
+     * They could, and it worked: a phone on the page the Mac serves needs no
+     * account at all. Every word about it lived behind servedLocally(), which
+     * is to say it was only ever shown to someone already there. The hosted
+     * screen offered exactly one route.
+     */
+    const connect = readFileSync(new URL('../src/components/ConnectScreen.jsx', import.meta.url), 'utf8')
+    assert.match(connect, /className="connect-local"/, 'the hosted screen offers only the account route')
+    assert.match(connect, /no account/i, 'the local route does not say the thing that makes it a choice')
+    assert.match(connect, /stays\s+on this phone/i, 'nothing says where the settings live on the local route')
+    assert.match(connect, /follow you\s+to any device/i, 'nothing says what signing in buys')
+    // And it goes somewhere: an address typed in lands on the Mac's own page.
+    assert.match(connect, /window\.location\.href = `http:\/\//, 'the address typed in goes nowhere')
+    assert.match(connect, /:5056/, 'a bare hostname is not given the port the Mac serves on')
+  })
+
   test('the tour teaches what a scene actually is', () => {
     const tour = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
     const card = tour.slice(tour.indexOf('Scenes are one rig'), tour.indexOf('Scenes are one rig') + 1200)
