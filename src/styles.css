@@ -229,7 +229,8 @@ button.fx-tile:active:not(:disabled),
 button.fx-power:active:not(:disabled),
 button.gig-block:active:not(:disabled),
 button.gig-scene:active:not(:disabled),
-button.cell-btn:active:not(:disabled),
+button.chain-block:active:not(:disabled),
+button.chain-gap:active:not(:disabled),
 button.preset-row:active:not(:disabled),
 button.chan-btn:active:not(:disabled),
 button.strip-btn:active:not(:disabled),
@@ -244,7 +245,8 @@ button.scene-line:active:not(:disabled) {
   button.fx-power:active:not(:disabled),
   button.gig-block:active:not(:disabled),
   button.gig-scene:active:not(:disabled),
-  button.cell-btn:active:not(:disabled),
+  button.chain-block:active:not(:disabled),
+  button.chain-gap:active:not(:disabled),
   button.preset-row:active:not(:disabled),
   button.chan-btn:active:not(:disabled),
   button.strip-btn:active:not(:disabled),
@@ -2383,73 +2385,157 @@ table.matrix th:first-child,
   margin-top: 30px;
 }
 
-.grid.editable {
-  grid-auto-rows: 48px;
+/*
+ * The chain, down the page rather than across it.
+ *
+ * The editor was a 940px canvas of forty-eight cells that scrolled sideways on
+ * every screen. This is a lane per row of the grid, each a list of what is
+ * actually in it — so it fits a 390px phone at full width, every target is a
+ * full-width row, and the thing you tapped is the thing that answers.
+ */
+.chain-lanes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+.chain-lane {
+  display: flex;
+  flex-direction: column;
   gap: var(--s-1);
 }
 
-button.cell-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--s-1) var(--s-1);
-  background: transparent;
-  border: 1px dashed var(--rule);
-  border-radius: var(--r-1);
-  overflow: hidden;
+.chain-lane-head {
+  margin: 0 0 var(--s-1);
 }
 
-button.cell-btn.filled {
+.chain-slot {
+  display: flex;
+  flex-direction: column;
+}
+
+button.chain-block,
+button.chain-gap {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  min-height: 48px;
+  padding: var(--s-2) var(--s-3);
+  text-align: left;
   background: var(--panel-hi);
   border: 1px solid var(--rule);
   border-left: 2px solid var(--signal);
+  border-radius: var(--r-1);
 }
 
-button.cell-btn.selected {
+button.chain-gap {
+  background: transparent;
+  border: 1px dashed var(--rule);
+}
+
+button.chain-block.open,
+button.chain-gap.open {
   border-color: var(--live);
   border-style: solid;
 }
 
-button.cell-btn.probed {
+/* Where a block being moved can land. */
+button.chain-gap.target {
+  border-color: var(--live);
+  border-style: solid;
+  color: var(--live);
+}
+
+button.chain-block.lifting {
+  opacity: 0.6;
+}
+
+button.chain-block.probed {
   box-shadow: inset 0 0 0 1px var(--live);
 }
 
-.cell-name {
-  font-family: var(--display);
-  font-weight: 600;
-  font-size: var(--f-1);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.cell-coord {
+.chain-col {
+  flex: 0 0 auto;
+  min-width: 2ch;
   font-size: var(--f-1);
   color: var(--silk-faint);
 }
 
-.cell-actions {
+.chain-block-name {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: var(--f-2);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chain-gap-word {
+  font-size: var(--f-1);
+  color: var(--silk-faint);
+}
+
+/*
+ * What you can do, directly under what you tapped. The old panel put this at
+ * the foot of the grid and its errors at the top of the page, so a failed tap
+ * looked like a tap that did nothing.
+ */
+.chain-actions {
   display: flex;
   align-items: center;
   gap: var(--s-2);
   flex-wrap: wrap;
-  margin-top: 12px;
-  padding: var(--s-3) var(--s-3);
+  padding: var(--s-3);
+  margin: var(--s-1) 0 var(--s-2);
   background: var(--panel);
   border: 1px solid var(--rule);
   border-radius: var(--r-1);
 }
 
-.cell-actions select {
+.chain-actions select {
   font-family: var(--body);
   font-size: var(--f-2);
   color: var(--silk);
   background: var(--chassis);
   border: 1px solid var(--rule);
   border-radius: var(--r-1);
-  padding: var(--s-2) var(--s-2);
+  padding: var(--s-2);
+  max-width: 100%;
+}
+
+.chain-actions .hint,
+.chain-note .hint {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.chain-note {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+/* Beside the control, in the colour of a thing that went wrong. */
+.chain-issue {
+  flex-basis: 100%;
+  margin: var(--s-1) 0 0;
+  font-size: var(--f-1);
+  color: var(--warn, var(--live));
+}
+
+.chain-technical {
+  margin-top: var(--s-4);
+}
+
+.chain-coords {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
 }
 
 /* ---------- unsaved state ---------- */
@@ -2542,25 +2628,6 @@ button.save-now:disabled {
   color: var(--silk-dim);
   padding-left: var(--s-3);
   margin-top: 2px;
-}
-
-/* ---------- grid drag and drop ---------- */
-
-button.cell-btn[draggable='true'] {
-  cursor: grab;
-}
-
-button.cell-btn.lifting {
-  opacity: 0.4;
-  cursor: grabbing;
-}
-
-/* The drop target is the empty cell, so it has to read as a destination
-   rather than as another block. */
-button.cell-btn.over {
-  border-style: solid;
-  border-color: var(--signal);
-  background: var(--signal-wash);
 }
 
 /* ==================================================================
@@ -3713,7 +3780,8 @@ ol.action-list li.destructive::marker {
     padding: var(--s-3);
   }
 
-  button.cell-btn {
+  button.chain-block,
+  button.chain-gap {
     min-height: 54px;
   }
 }
