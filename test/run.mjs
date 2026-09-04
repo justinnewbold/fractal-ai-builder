@@ -818,6 +818,23 @@ test('a block spec carries the channel its values belong to', () => {
   assert.match(bad.problems[0] || '', /no channel "Z"/)
 })
 
+test('a scene written without a name says so rather than keeping a stranger\u2019s', () => {
+  /*
+   * A blank name is not a blank scene: applyScenes skips setSceneName, so the
+   * scene keeps whatever it was called. On a preset somebody laid out that
+   * leaves a scene called "Lead" which is no longer the lead — the exact
+   * confusion this whole round is about.
+   */
+  const r = scened([
+    { index: 0, name: 'Rhythm', engaged: [58, 106] },
+    { index: 1, name: '   ', engaged: [58, 106, 118] }
+  ])
+  assert.equal(r.scenes.length, 2, 'the unnamed scene was dropped instead of reported')
+  assert.equal(r.scenes[1].name, '')
+  assert.match(r.problems.join(' | '), /Scene 2 came back with no name/)
+  assert.ok(!/Scene 1 came back with no name/.test(r.problems.join(' | ')), 'a named scene was reported too')
+})
+
 test('the cost of a scene plan is a switch plus a bypass each', () => {
   // Shown on the button before anything is written, because this is the half
   // that walks the unit through every scene.

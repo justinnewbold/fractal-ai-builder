@@ -5566,6 +5566,72 @@ button.topbar-preset.open .topbar-caret {
   accent-color: var(--signal);
 }
 
+/*
+ * Naming the preset, as its own tick box rather than a side effect of Send.
+ * Built like the scene-plan head, because it is the same kind of choice: a
+ * checkbox, a sentence, and the consequence under it.
+ */
+.rename-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  margin: var(--s-4) 0 0;
+  cursor: pointer;
+}
+
+.rename-choice > span {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+
+.rename-choice input[type='checkbox'] {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  accent-color: var(--signal);
+}
+
+/*
+ * The one question asked before a build on a preset with nothing in it. Two
+ * full-width answers, each carrying what it means underneath — a phone should
+ * not need a second screen to explain a two-way choice.
+ */
+.scene-ask {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.scene-ask button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-1);
+  width: 100%;
+  text-align: left;
+  padding: var(--s-3) var(--s-4);
+}
+
+.scene-ask button .hint {
+  font-weight: 400;
+}
+
+.scene-ask .primary .hint {
+  color: inherit;
+  opacity: 0.75;
+}
+
+/*
+ * What the write does to the scenes already there, in their own names. Sits
+ * between the checkbox and the list, because it is the sentence that decides
+ * whether the checkbox gets ticked.
+ */
+.scene-plan-scope {
+  margin: var(--s-3) 0 0;
+}
+
 .scene-plan-list {
   display: flex;
   flex-direction: column;
@@ -5581,6 +5647,7 @@ button.topbar-preset.open .topbar-caret {
   gap: var(--s-3);
   padding-top: var(--s-2);
   border-top: 1px solid var(--rule);
+  flex-wrap: wrap;
 }
 
 .scene-plan-list li.muted {

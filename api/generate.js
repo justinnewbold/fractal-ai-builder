@@ -168,6 +168,9 @@ switched by footswitch without a gap.
     specific sound, return an empty array rather than padding it out.
 11. Three or four well-judged scenes beat eight. Do not fill every slot for the
     sake of it.
+12. Name every scene you return. The name is written to the unit and is what
+    the player reads on the front panel and on their footswitch — an unnamed
+    scene keeps whatever name was there before, which is somebody else's.
 
 TONE JUDGEMENT
 
@@ -208,7 +211,8 @@ export default async function handler(req, res) {
     return
   }
 
-  const { description, device, blocks, previous, mode, sceneNames, taste } = req.body || {}
+  const { description, device, blocks, previous, mode, sceneNames, taste, wantScenes } =
+    req.body || {}
 
   if (!description || typeof description !== 'string') {
     res.status(400).json({ error: 'Describe the tone you want.' })
@@ -273,6 +277,24 @@ export default async function handler(req, res) {
       : `Tone wanted: ${description}`
 
   /*
+   * Whether the player was asked, and what they said.
+   *
+   * A preset with no scene named yet has nothing to lose, so the app asks
+   * before it builds: one sound, or a set of them. An answer is a decision and
+   * overrides rule 10's judgement in both directions - "just the one sound"
+   * must not come back with four scenes the player then has to switch off, and
+   * "a set" must not come back with none.
+   */
+  const asked =
+    wantScenes === true
+      ? '\n\nThe player has asked for a SET OF SCENES across this preset. Return three or four ' +
+        'scenes, each named, covering the sounds this description implies. Do not return an ' +
+        'empty scenes array.'
+      : wantScenes === false
+        ? '\n\nThe player has asked for ONE SOUND, not a set. Return an empty scenes array.'
+        : ''
+
+  /*
    * What this player has tended to keep, when the browser has enough history
    * to say. It settles the questions a short request leaves open — which of
    * four fitting amps, what "a lot of gain" means to this person — so the
@@ -323,7 +345,7 @@ export default async function handler(req, res) {
           {
             type: 'text',
             text:
-              `Current state of the loaded preset:\n${JSON.stringify(state)}\n\n${task}` +
+              `Current state of the loaded preset:\n${JSON.stringify(state)}\n\n${task}${asked}` +
               (context ? `\n\n${context}` : '')
           }
         ]

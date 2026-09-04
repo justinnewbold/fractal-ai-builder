@@ -1483,6 +1483,72 @@ export function run(test) {
     )
   })
 
+  /*
+   * "Is the generation just generating one scene? … And what happens to the
+   * other three scenes if it's a new empty preset?"
+   *
+   * The answer was: one scene, into whichever was live, and the others were
+   * left — but nothing on the screen said any of that, and nothing asked. A
+   * preset where no scene is named has nothing to lose, so that is the moment
+   * to ask; a preset that is laid out needs to be told which of its scenes is
+   * about to be written over, by name.
+   */
+  test('a build says which scenes it writes and which it writes over', () => {
+    const gen = readFileSync(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
+    assert.match(gen, /const overwritten =/, 'nothing works out which scenes already have names')
+    assert.match(gen, /Overwrites \$\{list\(overwritten/, 'the preview never says what is being written over')
+    assert.match(
+      gen,
+      /left exactly as/,
+      'the preview never says what happens to the scenes the plan does not touch'
+    )
+    assert.match(gen, /replaces \$\{nameOf\(scene\.index\)\}/, 'a scene row does not say what it replaces')
+  })
+
+  test('a preset with nothing laid out is asked before it is built', () => {
+    assert.match(
+      src,
+      /const nothingLaidOut = \(\) => !sceneNames\.some/,
+      'nothing decides whether this preset has anything to lose'
+    )
+    assert.match(
+      src,
+      /if \(opts\.wantScenes === undefined && sceneCount > 1 && nothingLaidOut\(\)\) \{\s*\n\s*setSceneAsk/,
+      'the build no longer stops to ask on a preset with no scenes named'
+    )
+    // Asked before the model runs, so the answer costs one generation, not two.
+    assert.match(
+      src,
+      /requestSpec\(schema, description, null, \{ wantScenes: opts\.wantScenes \}\)/,
+      'the answer never reaches the model, so asking changed nothing'
+    )
+    const api = readFileSync(new URL('../api/generate.js', import.meta.url), 'utf8')
+    assert.match(api, /wantScenes/, 'the designer route ignores the answer')
+    assert.match(api, /SET OF SCENES/, 'a request for a set is not made plain to the model')
+    assert.match(api, /ONE SOUND/, 'a request for one sound is not made plain to the model')
+    assert.match(api, /Name every scene you return/, 'the model is not told to name the scenes it makes')
+  })
+
+  test('naming the preset is its own decision', () => {
+    /*
+     * Applying a generation renamed the slot as a side effect, so laying a set
+     * of scenes into a preset you had already named renamed it underneath you.
+     * The scene names still go on — they are what the footswitch shows.
+     */
+    assert.match(
+      src,
+      /if \(renamePreset && generatedName/,
+      'the preset is renamed whatever the player chose'
+    )
+    const gen = readFileSync(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
+    assert.match(gen, /className="rename-choice"/, 'there is no way to decline the rename')
+    assert.match(
+      gen,
+      /scene names are written either way/i,
+      'declining the rename does not say what still happens'
+    )
+  })
+
   test('the tour teaches what a scene actually is', () => {
     const tour = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
     const card = tour.slice(tour.indexOf('Scenes are one rig'), tour.indexOf('Scenes are one rig') + 1200)

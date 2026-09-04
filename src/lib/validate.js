@@ -239,9 +239,21 @@ function validateScenes(scenes, schema, problems, sceneCount = 8, channelNames =
       channelFor.set(block.eid, wanted)
     }
 
+    /*
+     * A scene written without a name keeps the name it had, which on a preset
+     * somebody else laid out is a scene called "Lead" that is no longer the
+     * lead. Say so rather than leaving it to be discovered on stage.
+     */
+    const name = sanitizeSceneName(scene.name)
+    if (!name) {
+      problems.push(
+        `Scene ${index + 1} came back with no name, so it keeps the one it has.`
+      )
+    }
+
     out.push({
       index,
-      name: sanitizeSceneName(scene.name),
+      name,
       blocks: placed.map((eid) => ({
         eid,
         name: byEid.get(eid)?.name || byEid.get(eid)?.slug || `#${eid}`,

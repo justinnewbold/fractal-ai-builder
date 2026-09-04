@@ -10,7 +10,10 @@ export function Preview({
   scene,
   sceneNames,
   sceneCount,
-  onScene
+  onScene,
+  renamePreset,
+  onRenamePreset,
+  presetNow
 }) {
   if (!result) return null
 
@@ -27,6 +30,25 @@ export function Preview({
    */
   const touchesBypass = changes.some((c) => c.bypassed !== undefined)
   const sceneLabel = (i) => sceneNames?.[i]?.trim() || `Scene ${i + 1}`
+
+  /*
+   * What this write does to the scenes that already exist.
+   *
+   * The question the player asked: "what happens to the other three scenes if
+   * it's a new empty preset?" Nothing happens to them — a scene not in the
+   * plan is not touched — but until now nothing on this screen said so, and
+   * nothing said which of the named scenes were about to be written over
+   * either. Both halves are answered here, before the button rather than
+   * after it.
+   */
+  const nameOf = (i) => (sceneNames?.[i] || '').trim()
+  const written = scenes.map((s) => s.index)
+  const overwritten = written.filter((i) => nameOf(i))
+  const untouched = Array.from({ length: sceneCount || 0 }, (_, i) => i).filter(
+    (i) => !written.includes(i)
+  )
+  const namedUntouched = untouched.filter((i) => nameOf(i))
+  const list = (items, fn) => items.map(fn).join(', ')
 
   /*
    * No block changes is only "nothing to apply" if there are also no scenes.
@@ -93,6 +115,34 @@ export function Preview({
           Nothing to change in the blocks themselves — this is a scene plan over the preset as it
           already stands.
         </p>
+      ) : null}
+
+      {/*
+        Naming the preset is a separate decision from naming the scenes.
+        Every generation used to rename the slot as a side effect of applying
+        it, so laying a set of scenes into a preset you had already named
+        renamed it underneath you. Only worth asking when there is a name
+        there to lose.
+      */}
+      {presetName && onRenamePreset ? (
+        <label className="rename-choice">
+          <input
+            type="checkbox"
+            checked={!!renamePreset}
+            onChange={(e) => onRenamePreset(e.target.checked)}
+            disabled={busy}
+          />
+          <span>
+            {(presetNow || '').trim()
+              ? `Rename the preset from “${presetNow.trim()}” to “${presetName}”`
+              : `Name the preset “${presetName}”`}
+            <span className="hint">
+              {(presetNow || '').trim()
+                ? 'Off leaves the preset called what it is called. The scene names are written either way.'
+                : 'The scene names are written either way.'}
+            </span>
+          </span>
+        </label>
       ) : null}
 
       <div className="diff">
@@ -197,6 +247,25 @@ export function Preview({
             </span>
           </label>
 
+          {/*
+            Said before the button, in scene names rather than counts.
+            "Overwriting" is the word that matters: a player who laid out
+            Rhythm / Lead / Clean by hand needs to know which of those three
+            this is about to write over, and that the rest are left alone.
+          */}
+          <p className="scene-plan-scope hint">
+            {overwritten.length
+              ? `Overwrites ${list(overwritten, (i) => `scene ${i + 1} · ${nameOf(i)}`)}. `
+              : 'Nothing here is named yet, so nothing is being written over. '}
+            {namedUntouched.length
+              ? `${list(namedUntouched, (i) => `Scene ${i + 1} · ${nameOf(i)}`)} ${
+                  namedUntouched.length === 1 ? 'is' : 'are'
+                } left exactly as ${namedUntouched.length === 1 ? 'it is' : 'they are'}.`
+              : untouched.length
+                ? `The other ${untouched.length} scene${untouched.length === 1 ? '' : 's'} are left alone.`
+                : ''}
+          </p>
+
           <ol className="scene-plan-list">
             {scenes.map((scene) => {
               const on = scene.blocks.filter((b) => !b.bypassed)
@@ -211,6 +280,12 @@ export function Preview({
                 <li key={scene.index} className={withScenes ? '' : 'muted'}>
                   <span className="scene-plan-tag mono">S{scene.index + 1}</span>
                   <span className="scene-plan-name">{scene.name || `Scene ${scene.index + 1}`}</span>
+                  {/* What this row does to the scene that is already there. A
+                      scene with a name is somebody's work; a scene without one
+                      is a blank slot. They are not the same write. */}
+                  <span className={`tag ${nameOf(scene.index) ? 'off' : 'on'}`}>
+                    {nameOf(scene.index) ? `replaces ${nameOf(scene.index)}` : 'empty slot'}
+                  </span>
                   <span className="scene-plan-blocks">
                     {on.map((b) => b.name).join(' · ')}
                     {moved.length ? (

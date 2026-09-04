@@ -253,6 +253,22 @@ export default function App() {
    * asked for a sound has not asked for their scene layout to be rearranged.
    */
   const [withScenes, setWithScenes] = useState(false)
+  /*
+   * Whether to put the generated name on the preset itself.
+   *
+   * Naming the scenes and naming the preset are two different decisions, and
+   * the app used to make them together: every generation renamed the slot,
+   * whatever it was already called. Someone laying a set of scenes into a
+   * preset they have already named does not want it renamed underneath them.
+   */
+  const [renamePreset, setRenamePreset] = useState(true)
+  /*
+   * A build waiting on one question. A preset where no scene has a name has
+   * nothing to lose, so this is the moment to ask whether they want one sound
+   * or a set of them — before the model runs, rather than after, when the
+   * answer would cost a second generation.
+   */
+  const [sceneAsk, setSceneAsk] = useState(null)
   const [progress, setProgress] = useState(null)
   const [applied, setApplied] = useState(null)
   const [slot, setSlot] = useState('')
@@ -983,7 +999,7 @@ export default function App() {
   }, [status])
 
   /** One path to the model, so generate, refine and compare can't drift apart. */
-  const requestSpec = async (schema, description, previous) => {
+  const requestSpec = async (schema, description, previous, extra = {}) => {
     setPartial(null)
     setThinking(true)
     /*
@@ -1008,7 +1024,8 @@ export default function App() {
            * player has just heard, so their habits are exactly the thing that
            * settles what "warmer" means to them in numbers.
            */
-          taste: describeProfile(taste)
+          taste: describeProfile(taste),
+          ...extra
         },
         {
           onPartial: setPartial,
@@ -1058,11 +1075,30 @@ export default function App() {
     }
   }
 
-  const generate = async (description, against = null) => {
+  /**
+   * Nothing here is named yet, so nothing here can be overwritten.
+   *
+   * The signal is the scene names as the unit reports them. A preset somebody
+   * has laid out has Rhythm and Lead on it; a blank slot has eight empty
+   * strings. That is the difference between "build this over what is there"
+   * and "there is nothing here yet — what do you want?"
+   */
+  const nothingLaidOut = () => !sceneNames.some((n) => (n || '').trim())
+
+  const generate = async (description, against = null, opts = {}) => {
+    /*
+     * Ask once, before the model runs. Asking afterwards would mean paying for
+     * a second generation to act on the answer.
+     */
+    if (opts.wantScenes === undefined && sceneCount > 1 && nothingLaidOut()) {
+      setSceneAsk({ description, against })
+      return
+    }
     setBusy(true)
     setError(null)
     setResult(null)
     setWithScenes(false)
+    setRenamePreset(true)
     setApplied(null)
     try {
       setProgress('Reading what the unit has loaded...')
@@ -1081,7 +1117,7 @@ export default function App() {
       }
 
       setProgress(null)
-      const spec = await requestSpec(schema, description)
+      const spec = await requestSpec(schema, description, null, { wantScenes: opts.wantScenes })
 
       const validated = validateSpec(spec, schema, sceneCount, channelNames)
       validated.spec = spec
@@ -1092,7 +1128,9 @@ export default function App() {
        * changes no block and only lays out scenes would otherwise arrive with
        * its one useful half switched off and a button offering zero writes.
        */
-      setWithScenes(validated.changes.length === 0 && validated.scenes.length > 0)
+      setWithScenes(
+        validated.scenes.length > 0 && (opts.wantScenes === true || validated.changes.length === 0)
+      )
       setLastPrompt(description)
       revealResult()
 
@@ -1166,7 +1204,10 @@ export default function App() {
       // edit buffer, so writing it here means the unit's screen shows what was
       // just built — which is also the quickest confirmation the write landed.
       const generatedName = (saveName || result.presetName || '').trim()
-      if (generatedName && generatedName !== preset?.name?.trim()) {
+      // Renaming the preset is its own decision, made on the preview. Scene
+      // names are written either way — they are part of the plan that was
+      // agreed to, and they are what the footswitch shows.
+      if (renamePreset && generatedName && generatedName !== preset?.name?.trim()) {
         try {
           const res = await setPresetName(generatedName)
           // The AM4 answers {ok:false} rather than erroring when it can't
@@ -2235,6 +2276,9 @@ export default function App() {
         scene={scene}
         sceneNames={sceneNames}
         sceneCount={sceneCount}
+        renamePreset={renamePreset}
+        onRenamePreset={setRenamePreset}
+        presetNow={preset?.name}
         /* Choosing a scene switches to it rather than remembering it for
            later. Bypass is written into whatever scene is live, so making
            the choice real immediately is both simpler and honest — and you
@@ -2883,6 +2927,53 @@ export default function App() {
             onChanged={(summary) => record('backup', summary)}
           />
         </Section>
+      </Sheet>
+
+      {/*
+        One question, asked once, on a preset with nothing laid out in it.
+
+        The player's own question was what happens to the other scenes on a new
+        empty preset. The honest answer depends on what they wanted, and the
+        app never asked — it built one sound into whichever scene was live and
+        left seven blank. Asking here costs one tap and saves a second
+        generation, because the answer goes into the request rather than being
+        applied to a reply that already exists.
+      */}
+      <Sheet
+        open={!!sceneAsk}
+        onClose={() => setSceneAsk(null)}
+        title="One sound, or a set?"
+        note="Nothing in this preset is named yet"
+      >
+        <div className="scene-ask">
+          <p className="hint">
+            This preset has no scenes set up, so there is nothing here to write over. What are you
+            building?
+          </p>
+          <button
+            className="primary"
+            onClick={() => {
+              const ask = sceneAsk
+              setSceneAsk(null)
+              generate(ask.description, ask.against, { wantScenes: false })
+            }}
+          >
+            One sound
+            <span className="hint">Goes into the scene you are in. The rest stay empty.</span>
+          </button>
+          <button
+            onClick={() => {
+              const ask = sceneAsk
+              setSceneAsk(null)
+              generate(ask.description, ask.against, { wantScenes: true })
+            }}
+          >
+            A set of scenes
+            <span className="hint">
+              Three or four named sounds off one rig, switched by footswitch.
+            </span>
+          </button>
+        </div>
       </Sheet>
 
       <Sheet
