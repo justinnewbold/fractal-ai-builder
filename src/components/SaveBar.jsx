@@ -20,7 +20,7 @@ import { remoteActive } from '../lib/remote'
  * the write is still two taps from anywhere, but the second tap is on a button
  * that names the slot, next to the list of what is in it.
  */
-export default function SaveBar({ preset, dirty, busy, saving, compact, onOpenSave, queued }) {
+export default function SaveBar({ preset, dirty, busy, saving, compact, onOpenSave, queued, savedHere }) {
   /*
    * A slot write is on ForgeFX's never-remote list, and it should be — a phone
    * at the far side of a room shouldn't be able to overwrite a slot on a mis-tap.
@@ -42,6 +42,13 @@ export default function SaveBar({ preset, dirty, busy, saving, compact, onOpenSa
    * everyone looks at said nothing, and the word that did was the smallest
    * thing in the bar (and hidden on phones). Now: quiet "Saved" when there
    * is nothing to save, amber "Save" when there is.
+   *
+   * "Saved" only once something actually was. `dirty` answers "is there
+   * anything unsaved", which is not the same question — on a preset freshly
+   * loaded, or one just generated and written to the unit but never put in a
+   * slot, there is nothing pending and nothing saved either, and the button
+   * claimed the second. "This says 'Saved' when there is nothing saved yet. It
+   * should say SAVE if it hasn't been saved yet."
    */
   return (
     <div className="save-cluster" data-dirty={dirty ? 'yes' : 'no'}>
@@ -61,7 +68,7 @@ export default function SaveBar({ preset, dirty, busy, saving, compact, onOpenSa
               : 'Waiting for the Mac…'
             : saving
               ? 'Saving…'
-              : !dirty
+              : !dirty && savedHere
                 ? 'Saved'
                 : remote && !compact
                   ? 'Save at the Mac'

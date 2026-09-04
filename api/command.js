@@ -238,7 +238,22 @@ export default async function handler(req, res) {
     res.status(400).json({ error: 'Say what you want changed.' })
     return
   }
-  if (!Array.isArray(blocks) || blocks.length === 0) {
+  /*
+   * An empty preset is a thing to answer, not a thing to refuse.
+   *
+   * This used to require at least one block, and that single line defeated a
+   * feature that was already finished: buildChain exists precisely to lay a
+   * chain into an empty preset, the instructions below already explain it, and
+   * they already tell the model that a tone description on an empty preset is
+   * still designTone because the chain gets put there first. None of it could
+   * ever run, because the request was refused before the model was asked.
+   *
+   * "Still need to fix the issue when generating on an empty preset."
+   *
+   * So only the shape is checked. A preset with no blocks reaches the model
+   * with an empty list, which is exactly what the instructions describe.
+   */
+  if (!Array.isArray(blocks)) {
     res.status(400).json({ error: 'No blocks were read from the device.' })
     return
   }

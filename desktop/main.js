@@ -178,7 +178,36 @@ async function start() {
   return waitForServer({ port })
 }
 
+/*
+ * Whether this app appears in the dock, the app switcher, and Force Quit.
+ *
+ * Hiding the dock icon is what makes this a menu-bar service rather than a
+ * document app, and that part is right. What it also does — and this is not
+ * obvious — is take the app out of Force Quit Applications entirely, because
+ * macOS leaves accessory apps out of that list. "The Fractal AI Builder isn't
+ * showing up in the active programs running, so no option to force close if
+ * it's having issues."
+ *
+ * Which is worst exactly when it matters: a window that has stopped
+ * responding, and no way to reach for the one tool everybody knows.
+ *
+ * So the icon follows the window. Open a window and the app becomes an
+ * ordinary one — in the dock, in cmd-tab, in Force Quit. Close it and it goes
+ * back to being a menu-bar service. The state that can hang is the state you
+ * can force quit, and the quiet state stays quiet.
+ */
+function showInDock(yes) {
+  if (!app.dock) return
+  try {
+    if (yes) app.dock.show()
+    else app.dock.hide()
+  } catch {
+    // Not fatal: the app still runs, it is only listed differently.
+  }
+}
+
 function openWindow() {
+  showInDock(true)
   if (win) {
     win.show()
     win.focus()
@@ -206,6 +235,7 @@ function openWindow() {
   })
   win.on('closed', () => {
     win = null
+    showInDock(false)
   })
 }
 
@@ -350,7 +380,7 @@ async function beginUpdates() {
 
 app.whenReady().then(async () => {
   // A service, not a document: no dock icon, no window until asked.
-  if (app.dock) app.dock.hide()
+  showInDock(false)
   const answering = await start()
   if (!where) return
   buildTray()

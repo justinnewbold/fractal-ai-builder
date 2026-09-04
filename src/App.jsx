@@ -395,6 +395,19 @@ export default function App() {
   // is what lets the app say "this is not saved yet" instead of leaving someone
   // to wonder whether they just overwrote a preset.
   const [dirty, setDirty] = useState(false)
+  /*
+   * Whether this preset has actually been saved from here.
+   *
+   * "This says 'Saved' when there is nothing saved yet. It should say SAVE if
+   * it hasn't been saved yet."
+   *
+   * The button said "Saved" whenever nothing was unsaved — which is a claim
+   * about pending changes, not about having saved anything, and on a preset
+   * freshly loaded or just generated it reads as a lie. Kept separate from
+   * `dirty` because they answer different questions, and cleared whenever a
+   * different preset arrives: saving slot 93 says nothing about slot 2.
+   */
+  const [savedHere, setSavedHere] = useState(false)
   const [safety, setSafety] = useState(null)
 
   // Fifteen stacked sections was a long scroll with the important things buried.
@@ -737,6 +750,7 @@ export default function App() {
         // "done" over there and the only honest thing it could say is nothing.
         await reportSave({ id: req.id, ok: true, slot: req.slot })
         setDirty(false)
+        setSavedHere(true)
         record('save', `Saved "${name || preset?.name}" to slot ${req.slot}, asked for from the phone`)
         await read()
       } catch (err) {
@@ -788,6 +802,7 @@ export default function App() {
       setQueuedSave(null)
       if (res.ok) {
         setDirty(false)
+        setSavedHere(true)
         record('save', `The Mac saved it to slot ${res.slot}`)
         read()
       } else {
@@ -1373,6 +1388,7 @@ export default function App() {
       setApplied((prev) => ({ ...prev, savedTo: number }))
       record('save', `Saved "${name || preset?.name}" to slot ${number}`)
       setDirty(false)
+      setSavedHere(true)
       await read()
     } catch (err) {
       // Shown on the save bar itself as well as the banner. A refusal that
@@ -1395,6 +1411,7 @@ export default function App() {
       await selectPreset(number)
       record('select', `Loaded slot ${number}`)
       setDirty(false)
+      setSavedHere(false)
       setSafety(null)
       setResult(null)
       setApplied(null)
@@ -1569,6 +1586,7 @@ export default function App() {
       await revertPreset(preset.number)
       record('revert', `Reverted slot ${preset.number} to its saved version`)
       setDirty(false)
+      setSavedHere(false)
       setResult(null)
       setApplied(null)
       await read()
@@ -2359,6 +2377,7 @@ export default function App() {
       >
         {status === 'live' && view !== 'gig' ? (
           <SaveBar
+            savedHere={savedHere}
             preset={preset}
             dirty={dirty}
             busy={busy}
