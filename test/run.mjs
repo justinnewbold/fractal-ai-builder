@@ -703,6 +703,100 @@ test('publishing without mDNS available still gives a usable stop', async () => 
   await ad.stop()
 })
 
+console.log('\nkeeping the Mac app up to date')
+
+const updates = await import('../desktop/lib/updates.mjs')
+
+/** An updater that records what it was told and lets a test fire its events. */
+function fakeUpdater() {
+  const handlers = new Map()
+  return {
+    handlers,
+    checked: 0,
+    on(event, fn) {
+      handlers.set(event, fn)
+    },
+    emit(event, payload) {
+      handlers.get(event)?.(payload)
+    },
+    async checkForUpdates() {
+      this.checked += 1
+    }
+  }
+}
+
+test('the update installs when you quit, and never before', () => {
+  /*
+   * The rule the whole feature is shaped around. This runs on a machine with a
+   * guitar plugged into it, and the moment a restart is worst is exactly the
+   * moment someone is using it — so it downloads quietly and swaps itself in
+   * when the person quits, which they do when they are finished by definition.
+   */
+  const u = fakeUpdater()
+  updates.wireUpdates({ updater: u, onState: () => {} })
+  assert.equal(u.autoInstallOnAppQuit, true, 'the download would sit there forever')
+  assert.equal(u.autoDownload, true, 'the update waits on a decision nobody was offered')
+})
+
+test('the menu follows the download', async () => {
+  const seen = []
+  const u = fakeUpdater()
+  const { check } = updates.wireUpdates({ updater: u, onState: (s) => seen.push(s) })
+
+  await check()
+  assert.equal(u.checked, 1)
+
+  u.emit('checking-for-update')
+  u.emit('update-available', { version: '7.29.0' })
+  u.emit('download-progress', { percent: 41.6 })
+  u.emit('update-downloaded', { version: '7.29.0' })
+
+  assert.deepEqual(
+    seen.map((s) => s.kind),
+    ['checking', 'found', 'downloading', 'ready']
+  )
+  assert.equal(seen[2].percent, 42, 'a percentage nobody asked for is at least a whole number')
+  assert.match(updates.updateLine(seen[3]), /installs when you quit/i)
+  assert.match(updates.updateLine(seen[3]), /7\.29\.0/)
+})
+
+test('a failed check is a line, not a problem', () => {
+  /*
+   * The network was down, or GitHub was slow. The app still serves the unit,
+   * which is the whole job — so this is never a dialog and never throws.
+   */
+  const seen = []
+  const u = fakeUpdater()
+  updates.wireUpdates({ updater: u, onState: (s) => seen.push(s) })
+  u.emit('error', new Error('getaddrinfo ENOTFOUND'))
+  assert.deepEqual(seen, [{ kind: 'trouble' }])
+  assert.match(updates.updateLine({ kind: 'trouble' }), /couldn.t check/i)
+})
+
+test('a check that throws does not leave the menu stuck', async () => {
+  const seen = []
+  const u = fakeUpdater()
+  u.checkForUpdates = async () => {
+    throw new Error('no network')
+  }
+  const { check } = updates.wireUpdates({ updater: u, onState: (s) => seen.push(s) })
+  await check()
+  assert.deepEqual(seen, [{ kind: 'trouble' }], 'the menu would say "Checking…" for ever')
+})
+
+test('nothing is said until there is something to say', () => {
+  // A menu line of null means the item is not drawn at all.
+  assert.equal(updates.updateLine(), null)
+  assert.equal(updates.updateLine({ kind: 'idle' }), null)
+  assert.equal(updates.updateLine({ kind: 'current' }), 'Up to date')
+})
+
+test('no updater at all is survivable', async () => {
+  // A checkout has nothing to update from; the app must still run.
+  const { check } = updates.wireUpdates({ updater: null, onState: () => {} })
+  await check()
+})
+
 console.log('\nwhere this copy of the app is running')
 
 const platform = await import('../src/lib/platform.js')
