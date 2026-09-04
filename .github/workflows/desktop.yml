@@ -40,6 +40,18 @@ on:
 jobs:
   mac:
     runs-on: macos-latest
+    # Creating a release needs contents: write, and a workflow that says
+    # nothing gets whatever the repository defaults to — which here is read
+    # only. GitHub named the missing permission itself when it refused:
+    #
+    #   403 Resource not accessible by integration
+    #   x-accepted-github-permissions: contents=write
+    #
+    # Asked for by name rather than left to a default, so this cannot quietly
+    # change underneath the release again. Nothing else is granted: the job
+    # reads the repository, builds it, and publishes what it built.
+    permissions:
+      contents: write
     env:
       # Whether a certificate exists at all. The `secrets` context cannot be
       # read from a step's `if`, but `env` can, so the question is answered once
