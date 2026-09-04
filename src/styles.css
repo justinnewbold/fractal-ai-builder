@@ -4941,113 +4941,6 @@ button.gig-mode.on {
   }
 }
 
-/* ---------- the XY pad ---------- */
-
-.xy {
-  margin-top: 10px;
-}
-
-.xy-pickers {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--s-2);
-}
-
-.xy-pickers label {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-1);
-  min-width: 0;
-}
-
-.xy-pickers select {
-  width: 100%;
-  padding: var(--s-2);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-1);
-  background: var(--panel);
-  color: var(--silk);
-  font-size: var(--f-input);
-}
-
-/* Square, and it owns every touch that starts on it — without touch-action
-   the browser treats a vertical drag as a scroll. A control, not a screen:
-   capped so it never takes the scene you are in off a phone, and never
-   becomes the whole page on a desktop. */
-.xy-pad {
-  position: relative;
-  margin: 10px auto 0;
-  width: min(100%, 320px, 44vh);
-  aspect-ratio: 1;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-1);
-  background:
-    linear-gradient(var(--rule) 1px, transparent 1px) 0 0 / 100% 25%,
-    linear-gradient(90deg, var(--rule) 1px, transparent 1px) 0 0 / 25% 100%,
-    var(--chassis);
-  touch-action: none;
-  overflow: hidden;
-  /* Holding a finger still on the pad is playing, not long-pressing. */
-  -webkit-touch-callout: none;
-  -webkit-tap-highlight-color: transparent;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-.xy-line-h,
-.xy-line-v {
-  position: absolute;
-  background: color-mix(in srgb, var(--signal) 45%, transparent);
-  pointer-events: none;
-}
-
-.xy-line-h {
-  left: 0;
-  right: 0;
-  height: 1px;
-}
-
-.xy-line-v {
-  top: 0;
-  bottom: 0;
-  width: 1px;
-}
-
-.xy-dot {
-  position: absolute;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;;
-  transform: translate(-50%, -50%);
-  background: var(--signal);
-  box-shadow: 0 0 14px color-mix(in srgb, var(--signal) 60%, transparent);
-  pointer-events: none;
-}
-
-.xy-readout {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--s-3);
-  margin-top: 8px;
-  font-size: var(--f-2);
-  color: var(--silk-dim);
-}
-
-/* Anything that scrolls the pad into view lands it under the bar, not behind it. */
-.gig-pad {
-  scroll-margin-top: calc(var(--bar-h) + var(--s-3));
-}
-
-/* Which scene the pad is playing into, said above it, because on a phone the
-   scene grid may have scrolled out of reach by the time a thumb is on the pad. */
-.gig-pad-scene {
-  margin: var(--s-3) 0 0;
-  font-size: var(--f-1);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--silk-dim);
-}
-
 /* ---------- the preset file inspector ---------- */
 
 .inspect {
@@ -5434,12 +5327,6 @@ button.sheet-close:active {
   .fx-panel {
     margin-top: var(--s-2);
   }
-}
-
-/* The way back to the pickers, once the pad has folded them away. */
-button.xy-change {
-  margin-left: auto;
-  align-self: center;
 }
 
 /* ---------- the bar's popovers, on a phone ----------

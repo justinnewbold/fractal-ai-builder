@@ -22,7 +22,7 @@ export const ORDER = ['play', 'ask', 'shape']
 
 /** Where a sideways drag already means something else. */
 export const YIELDS =
-  '.chain-strip, .grid-scroll, .views, .diag-table, .knob, .xy, .xy-pad, input, textarea, select, [data-no-swipe]'
+  '.chain-strip, .grid-scroll, .views, .diag-table, .knob, input, textarea, select, [data-no-swipe]'
 
 const INTENT = 24 // px sideways before a drag is a swipe at all
 const SLACK = 1.5 // and this many times more sideways than down

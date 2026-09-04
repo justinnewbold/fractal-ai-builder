@@ -33,7 +33,7 @@ export function run(test) {
       .filter((f) => f.endsWith('.jsx'))
       .filter((f) => /addEventListener\('touchstart'/.test(read(f)))
       .sort()
-    assert.deepEqual(binds, ['Knob.jsx', 'Screens.jsx', 'Sheet.jsx', 'XYPad.jsx'])
+    assert.deepEqual(binds, ['Knob.jsx', 'Screens.jsx', 'Sheet.jsx'])
   })
 
   test('the screens take nothing on the press and yield to anything sideways', () => {
@@ -56,7 +56,7 @@ export function run(test) {
     assert.ok(/closest\?\.\(YIELDS\)/.test(body), 'the screens no longer yield to surfaces that own a sideways drag')
 
     const yields = screens.match(/YIELDS =\s*'([^']+)'/)?.[1] || ''
-    for (const owner of ['.chain-strip', '.grid-scroll', '.knob', '.xy', 'input', '[data-no-swipe]']) {
+    for (const owner of ['.chain-strip', '.grid-scroll', '.knob', 'input', '[data-no-swipe]']) {
       assert.ok(yields.split(',').map((s) => s.trim()).includes(owner), `${owner} is no longer left its own gesture`)
     }
 
@@ -83,7 +83,7 @@ export function run(test) {
     /*
      * The sheet's header is the handle *and* the home of the close button, so
      * it is the one surface that has to make the distinction. Knob's element
-     * and XYPad's `.xy-pad` hold only decoration, which is why they can take
+     * hold only decoration, which is why they can take
      * every touch that reaches them.
      */
     // Comments out first: this very handler explains itself by naming
