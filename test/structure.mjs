@@ -1243,10 +1243,21 @@ export function run(test) {
      * moment it reads from a different set of presets than Create lists, the
      * profile becomes something the player cannot check against anything.
      */
+    /*
+     * Every store, merged at the point of use. Three now: this browser, the
+     * account, and a chosen folder — which was the one that could swallow a
+     * design whole, since picking a folder skips browser storage and nothing
+     * ever listed what went in there.
+     */
     assert.match(
       src,
-      /const library = useMemo\(\s*\n\s*\(\) => newestFirst\(listPresets\(\), cloudSaves\)/,
-      'the library is no longer both stores merged at the point of use'
+      /const library = useMemo\(\s*\n\s*\(\) => newestFirst\(listPresets\(\), cloudSaves, folderSaves\)/,
+      'the library is no longer every store merged at the point of use'
+    )
+    assert.match(
+      src,
+      /files\s*\n?\s*\.filter\(\(f\) => f\.kind === 'design'\)/,
+      'the folder is never read, so designs kept there stay invisible'
     )
     assert.match(
       src,

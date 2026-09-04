@@ -284,6 +284,17 @@ export default function App() {
   const [lastPrompt, setLastPrompt] = useState('')
   const [historyKey, setHistoryKey] = useState(0)
   /*
+   * Designs kept in a chosen folder.
+   *
+   * When a folder is picked it becomes the home for designs, and browser
+   * storage is skipped rather than written to as well — which is right, and
+   * left them invisible: the list only ever read browser storage, so on a Mac
+   * with a folder chosen every tone was saved somewhere the app could never
+   * show. "I generated a new papa roach tone and it didn't save it to
+   * history." It did. Nothing could list it.
+   */
+  const [folderSaves, setFolderSaves] = useState([])
+  /*
    * The account's presets, held so the taste profile can see them.
    *
    * Read once when signed in rather than before every generation: this is
@@ -315,9 +326,46 @@ export default function App() {
    * and the dedupe matters to both for the same reason.
    */
   const library = useMemo(
-    () => newestFirst(listPresets(), cloudSaves),
-    [historyKey, cloudSaves]
+    () => newestFirst(listPresets(), cloudSaves, folderSaves),
+    [historyKey, cloudSaves, folderSaves]
   )
+
+  /*
+   * Read the folder's designs whenever the history moves.
+   *
+   * Names and times only: listing is cheap, and opening forty files to show a
+   * list nobody has clicked yet is not. The full entry is read on demand when
+   * one is opened, the same way a preset in a slot is.
+   *
+   * Silent on failure by design — a folder the browser has forgotten
+   * permission for, or one that has been moved, must leave the rest of the
+   * history working rather than emptying the screen.
+   */
+  useEffect(() => {
+    let stop = false
+    ;(async () => {
+      try {
+        const { savedFolder, listPresetFiles } = await import('./lib/localFolder')
+        const folder = await savedFolder().catch(() => null)
+        if (!folder || folder.needsPermission) {
+          if (!stop) setFolderSaves([])
+          return
+        }
+        const files = await listPresetFiles(folder.handle || folder)
+        if (stop) return
+        setFolderSaves(
+          files
+            .filter((f) => f.kind === 'design')
+            .map((f) => ({ id: f.file, name: f.name, at: f.at, where: 'folder', file: f.file }))
+        )
+      } catch {
+        if (!stop) setFolderSaves([])
+      }
+    })()
+    return () => {
+      stop = true
+    }
+  }, [historyKey])
 
   const taste = useMemo(
     () => (tasteOn ? profileFrom(library) : null),
