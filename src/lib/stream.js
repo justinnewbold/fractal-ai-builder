@@ -259,8 +259,8 @@ async function attemptOnce(body, { onPartial, onEvent, signal, host, timing } = 
        */
       throw fail(
         partials
-          ? 'The preset was still being written when the connection closed — the server hit its time limit, or the link dropped. Nothing was written to your unit. Ask again; a shorter, more specific request finishes sooner.'
-          : 'The connection closed before the model sent anything. Nothing was written — ask again.',
+          ? 'The connection dropped while your tone was being built. Nothing was written to your unit — ask again, and a shorter description finishes sooner.'
+          : 'The connection dropped before anything came back. Nothing was written to your unit — ask again.',
         'truncated'
       )
     }
@@ -272,13 +272,13 @@ async function attemptOnce(body, { onPartial, onEvent, signal, host, timing } = 
     if (control.signal.aborted) {
       if (reason === 'stalled') {
         throw fail(
-          `The model went quiet for ${Math.round(stallMs / 1000)} seconds mid-answer, so the request was dropped. Nothing was written to your unit. Ask again — if it keeps happening, the model service is the place to look.`,
+          'The answer stopped partway through and nothing more came. Nothing was written to your unit — ask again.',
           'stalled'
         )
       }
       if (reason === 'quiet-start') {
         throw fail(
-          `The model had the request for ${Math.round(firstMs / 1000)} seconds without starting to answer, so it was dropped. Nothing was written to your unit — asking again is safe, and a shorter, more specific request starts sooner.`,
+          'The AI took the request but never started answering, so we stopped waiting. Nothing was written to your unit — ask again, and a shorter description starts sooner.',
           // Deliberately the same kind as a stall: nothing arrived and nothing
           // was written, so the one automatic retry above applies.
           'stalled'
@@ -286,19 +286,19 @@ async function attemptOnce(body, { onPartial, onEvent, signal, host, timing } = 
       }
       if (reason === 'capped' && !firstByte) {
         throw fail(
-          `Nothing reached the browser at all in ${Math.round(capMs / 1000)} seconds — the server never answered, so this is the connection or the deployment rather than the model. Nothing was written to your unit. Try again.`,
+          'Couldn’t get through at all — check your internet connection, then try again. Nothing was written to your unit.',
           'capped'
         )
       }
       if (reason === 'capped' && !answering) {
         throw fail(
-          `The server took the request but the model hadn't started answering after ${Math.round(capMs / 1000)} seconds, so it was dropped. Nothing was written to your unit. Try again.`,
+          'The AI never started answering, so we stopped waiting. Nothing was written to your unit — try again.',
           'capped'
         )
       }
       if (reason === 'capped') {
         throw fail(
-          `The generation ran past ${Math.round(capMs / 1000)} seconds and was dropped — that is the server's own limit, so it would have been cut off a moment later anyway. Nothing was written to your unit. Ask again with a shorter, more specific request.`,
+          'Designing this took too long, so we stopped. Nothing was written to your unit — ask again, describing the tone in fewer words.',
           'capped'
         )
       }

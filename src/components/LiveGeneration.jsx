@@ -116,8 +116,12 @@ export function Thinking({ message, active, startedAt }) {
   let clock = null
   if (seconds !== null) {
     clock = seconds >= 60 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${seconds}s`
-    // Past a minute the clock alone reads as patience. Say what it means.
-    if (seconds >= 60) clock += ' · longer than usual, Stop is safe'
+    /*
+     * Past a minute the clock alone reads as patience. Say what it means — and
+     * answer the question someone actually has by then, which is not "how long"
+     * but "is my rig safe".
+     */
+    if (seconds >= 60) clock += ' · longer than usual — nothing has been sent to your unit yet'
   }
 
   return (
