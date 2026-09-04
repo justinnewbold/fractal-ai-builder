@@ -1612,6 +1612,44 @@ export function run(test) {
     assert.ok(technical.length > 0, 'the cursor probe is back in the main flow')
   })
 
+  /*
+   * "On the comparing scenes, A and B… channel and channel B is confusing.
+   * Also saying that it cost twice as much isn't super user-friendly. The
+   * generation also isn't working — it says building for about two minutes and
+   * then just stops."
+   *
+   * The panel promised it "points scenes 1 and 2 at them" and never touched a
+   * scene. Since choosing a channel is one of the two things a scene
+   * remembers, both takes' choices landed in whichever scene was live and the
+   * second overwrote the first — so only one take was ever audible. It also
+   * threw away every write failure and every rejected setting, and rendered
+   * its progress on a screen the person was not looking at.
+   */
+  test('two takes really are two scenes, and say what did not land', () => {
+    const from = src.indexOf('const buildComparison')
+    const compare = src.slice(from, src.indexOf('const revert = async', from))
+    assert.ok(compare, 'buildComparison is gone')
+    assert.match(
+      compare,
+      /await writeScene\(index\)\s*\n\s*for \(const block of withChannels\) await setChannel/,
+      'the takes still choose a channel without standing in the scene that plays it'
+    )
+    assert.match(compare, /failures\.push\(\.\.\.failed/, 'write failures are discarded again')
+    assert.match(compare, /rejected\.push\(\.\.\.validated\.problems/, 'rejected settings are discarded again')
+    assert.match(compare, /revealCompare\(\)/, 'the panel is never scrolled to, so its progress and errors are off screen')
+    assert.match(compare, /Nothing in this preset has channels/, 'a preset with no channels pays for two generations before failing')
+    assert.match(compare, /one scene, so there is nothing to footswitch/, 'a one-scene unit is offered a comparison it cannot play')
+
+    const refine = readFileSync(new URL('../src/components/Refine.jsx', import.meta.url), 'utf8')
+    assert.ok(!/twice the cost/.test(refine), 'the panel still prices itself in money')
+    assert.ok(
+      !/points scenes 1 and 2 at\s*\n?\s*them/.test(refine),
+      'the panel still claims to point scenes at the takes in the words it never honoured'
+    )
+    assert.match(refine, /state\.failures/, 'the result never shows what the unit refused')
+    assert.match(refine, /compare-progress/, 'the wait says nothing while it happens')
+  })
+
   test('the tour teaches what a scene actually is', () => {
     const tour = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
     const card = tour.slice(tour.indexOf('Scenes are one rig'), tour.indexOf('Scenes are one rig') + 1200)
