@@ -6476,3 +6476,41 @@ button.view-tab {
 .turn-queued {
   opacity: 0.6;
 }
+
+/* What the AI was given. A reading surface, not a control panel: long text,
+   monospaced where it is data, and every part shut until asked for. */
+.devtrace {
+  display: grid;
+  gap: var(--s-2);
+  margin-top: var(--s-4);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--hairline);
+}
+
+.devtrace-part summary {
+  cursor: pointer;
+  padding: var(--s-2) 0;
+  color: var(--silk);
+}
+
+.devtrace-body {
+  max-height: 40vh;
+  overflow: auto;
+  overscroll-behavior: contain;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: var(--f-1);
+  line-height: 1.5;
+  color: var(--silk-dim);
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-2);
+  padding: var(--s-3);
+}
+
+.devtrace-switch label {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  color: var(--silk);
+}
