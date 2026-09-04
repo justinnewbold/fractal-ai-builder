@@ -6470,3 +6470,9 @@ button.view-tab {
 .feedback-sent p {
   color: var(--silk);
 }
+
+/* Said while the model was working, and waiting its turn. Dimmer than a turn
+   that has been asked, because it has not been asked yet. */
+.turn-queued {
+  opacity: 0.6;
+}
