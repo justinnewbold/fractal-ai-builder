@@ -113,7 +113,44 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npm run dist
 
-      # What the step above claims, checked against what macOS will actually do
+      # electron-builder notarises the app and stops there. Its
+      # `notarizeIfProvided` takes the app path, and it runs during signing —
+      # before a disk image exists at all. So the .dmg a person actually
+      # downloads carried no ticket of its own, which is exactly what the step
+      # below caught the first time it got far enough to ask:
+      # "does not have a ticket stapled to it".
+      #
+      # That matters because the image is the first thing macOS assesses. It
+      # quarantines the download and checks the container before anything
+      # inside it is reachable, and a stapled ticket is what lets that succeed
+      # with no network.
+      #
+      # Deliberately not signed. electron-builder offers `dmg.sign` and
+      # documents it as "Signing is not required and will lead to unwanted
+      # errors in combination with notarization requirements" — the notary
+      # service reads what is inside the image, and the ticket attaches either
+      # way. Taking the tool's own word over a guess.
+      - name: Notarise the disk image too
+        if: ${{ github.event_name != 'pull_request' && env.SIGNABLE == 'true' }}
+        working-directory: desktop
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for dmg in release/*.dmg; do
+            echo "── $dmg"
+            xcrun notarytool submit "$dmg" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" \
+              --wait
+            xcrun stapler staple "$dmg"
+          done
+
+      # What the steps above claim, checked against what macOS will actually do
       # with the file. Three different questions, and a build can pass one while
       # failing another:
       #
