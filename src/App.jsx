@@ -1435,6 +1435,21 @@ export default function App() {
    * all through a generation. Wanting to be shown the thing you just asked for
    * is not the same as being dragged there ten times a minute.
    */
+  /**
+   * Bring the comparison panel into view.
+   *
+   * revealResult is for the preview inside the assistant's own scrollbox and
+   * does nothing for this: Compare lives in a fold on the Edit screen, so its
+   * progress and its failures were rendered somewhere the person was not
+   * looking — a two-minute wait with nothing on screen, and an error at the top
+   * of a long page.
+   */
+  const revealCompare = () => {
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => bringIntoView(document.querySelector('.compare'), { block: 'start' }))
+    )
+  }
+
   const revealResult = () => {
     /*
      * Two scrolls, because the preview sits inside the assistant's own
@@ -1562,7 +1577,26 @@ export default function App() {
     setBusy(true)
     setError(null)
     setCompare(null)
+    revealCompare()
     try {
+      const withChannels = blocks.filter((b) => b.channel)
+      /*
+       * Two things this needs, and it used to check neither.
+       *
+       * A block with no channels has nowhere to put a second take, and a unit
+       * with one scene has nothing to switch between. Said before two
+       * generations are paid for rather than after.
+       */
+      if (!withChannels.length) {
+        throw new Error(
+          'Nothing in this preset has channels, so there is nowhere to put a second take. ' +
+            'Add an amp or a drive and try again.'
+        )
+      }
+      if (sceneCount < 2) {
+        throw new Error('This unit has one scene, so there is nothing to footswitch between.')
+      }
+
       setProgress('Reading what the unit has loaded...')
       const schema = await readSchema(
         blocks,
@@ -1572,21 +1606,40 @@ export default function App() {
         { force: true }
       )
 
-      const withChannels = blocks.filter((b) => b.channel)
       const takes = []
+      const failures = []
+      const rejected = []
 
       for (const [index, channel] of ['A', 'B'].entries()) {
         setProgress(`Take ${index + 1} of 2 — designing...`)
         const spec = await requestSpec(schema, description)
         const validated = validateSpec(spec, schema, sceneCount, channelNames)
+        rejected.push(...validated.problems.map((p) => `Take ${index + 1} · ${p}`))
 
-        setProgress(`Take ${index + 1} of 2 — switching to channel ${channel}...`)
+        /*
+         * Stand in the scene that will play this take before choosing the
+         * channel, because choosing a channel IS a scene's business: it is one
+         * of the two things a scene remembers. This is what the panel has
+         * always promised — "points scenes 1 and 2 at them" — and what it never
+         * did: both takes' channel choices landed in whichever scene happened
+         * to be live, so the second overwrote the first and only one of the two
+         * was ever audible.
+         */
+        setProgress(`Take ${index + 1} of 2 — setting up scene ${index + 1}...`)
+        await writeScene(index)
         for (const block of withChannels) await setChannel(block.effectId, channel)
 
         setProgress(`Take ${index + 1} of 2 — writing to channel ${channel}...`)
-        await applyChanges(validated.changes, (done, total, label) =>
+        /*
+         * The channel is this flow's to choose, so a channel the model happened
+         * to name is dropped rather than allowed to move the block out from
+         * under the scene that was just pointed at it.
+         */
+        const changes = validated.changes.map(({ channel: _ignored, ...rest }) => rest)
+        const failed = await applyChanges(changes, (done, total, label) =>
           setProgress(`Take ${index + 1} · ${done} of ${total} - ${label}`)
         )
+        failures.push(...failed.map((f) => `Take ${index + 1} · ${f}`))
 
         takes.push(validated.summary || validated.presetName || `Take ${index + 1}`)
 
@@ -1597,11 +1650,22 @@ export default function App() {
       // Through the store, so every surface follows the return to scene 1
       // rather than showing whichever scene the comparison left behind.
       await writeScene(0)
-      setCompare({ done: true, a: takes[0], b: takes[1] })
-      record('compare', `Built two takes of "${description}" on channels A and B`, takes)
+      /*
+       * What failed travels with the result. Every write failure and every
+       * rejected setting used to be discarded, so a run where the unit refused
+       * the lot still announced two takes to listen to.
+       */
+      setCompare({ done: true, a: takes[0], b: takes[1], failures, rejected })
+      record('compare', `Built two takes of "${description}" on channels A and B`, [
+        ...takes,
+        ...failures
+      ])
       await read()
+      revealCompare()
     } catch (err) {
       setError(err.message)
+      setCompare({ error: err.message })
+      revealCompare()
     } finally {
       setProgress(null)
       setBusy(false)
@@ -2686,6 +2750,8 @@ export default function App() {
               state={compare}
               onClear={() => setCompare(null)}
               busy={busy}
+              progress={progress}
+              sceneNames={sceneNames}
               disabled={status !== 'live'}
             />
           </Section>

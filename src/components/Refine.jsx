@@ -19,26 +19,66 @@ const QUICK = [
  * heard, which is the opposite of how anyone actually works. The previous spec
  * goes back as the subject and the instruction is an adjustment to it.
  */
-export function Compare({ onCompare, state, onClear, busy, disabled }) {
+export function Compare({ onCompare, state, onClear, busy, progress, sceneNames, disabled }) {
   const [description, setDescription] = useState('')
+  // The scenes by the names the player gave them, because "scene 2" is not what
+  // they call it once they have named it Lead.
+  const label = (i) => (sceneNames?.[i]?.trim() ? `scene ${i + 1} · ${sceneNames[i].trim()}` : `scene ${i + 1}`)
 
   return (
     <section className="compare">
       <p className="silk-label">Compare two takes</p>
 
-      {state?.done ? (
+      {state?.error ? (
+        <div className="notice" data-kind="fault">
+          <h2>That didn&rsquo;t work</h2>
+          <p className="mono problem">{state.error}</p>
+          <button className="chip" onClick={onClear}>
+            Close
+          </button>
+        </div>
+      ) : state?.done ? (
         <div className="notice">
           <h2>Two versions on the unit</h2>
           <p>
-            <strong>Channel A</strong> — {state.a}
+            <strong>{label(0)}</strong> — {state.a}
           </p>
           <p>
-            <strong>Channel B</strong> — {state.b}
+            <strong>{label(1)}</strong> — {state.b}
           </p>
           <p>
-            Scene 1 uses channel A, scene 2 uses channel B. Footswitch between them and pick by
-            ear. Whichever wins, save it from above.
+            Footswitch between those two scenes and pick by ear. Each one plays its own channel of
+            the amp, so they are two real sounds rather than one with something switched on.
+            Whichever wins, save it from above.
           </p>
+
+          {/*
+            What did not land. Both of these used to be thrown away, so a run
+            where the unit refused every write still announced two takes to
+            listen to — and the person went looking for a difference that was
+            never written.
+          */}
+          {state.failures?.length ? (
+            <div className="problems">
+              <p className="silk-label">The unit refused</p>
+              {state.failures.map((f, i) => (
+                <p key={i} className="mono problem">
+                  {f}
+                </p>
+              ))}
+            </div>
+          ) : null}
+          {state.rejected?.length ? (
+            <div className="problems">
+              <p className="silk-label">Dropped during checking</p>
+              {state.rejected.map((p, i) => (
+                <p key={i} className="mono problem">
+                  {p}
+                </p>
+              ))}
+            </div>
+          ) : null}
+
           <button className="chip" onClick={onClear}>
             Done comparing
           </button>
@@ -63,9 +103,17 @@ export function Compare({ onCompare, state, onClear, busy, disabled }) {
               {busy ? 'Building…' : 'Build both'}
             </button>
           </div>
+          {/*
+            Said while it happens, where it is happening. This wait is two
+            generations plus two rounds of writes — minutes — and the line
+            describing it rendered on a different screen, so the panel sat
+            saying "Building…" and nothing else until it finished or didn't.
+          */}
+          {busy && progress ? <p className="hint mono compare-progress">{progress}</p> : null}
           <p className="hint">
-            Writes one take to channel A and another to channel B, then points scenes 1 and 2 at
-            them. Two generations, so twice the cost of a single run.
+            Dials the same description twice, once on each block&rsquo;s channel A and once on
+            channel B, and sets up {label(0)} and {label(1)} to play them. Two goes at designing it,
+            so it takes about twice as long as building one.
           </p>
         </>
       )}
