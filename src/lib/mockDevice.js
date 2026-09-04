@@ -22,7 +22,7 @@ import driveTypes from '../data/drive-types.json'
 import cabTypes from '../data/cab-types.json'
 import ampParams from '../data/amp-params.json'
 import { fromNormalized } from './scale.js'
-import { createSceneBypass } from './sceneBypass.js'
+import { createSceneState } from './sceneState.js'
 import { storedSceneNames, keepSceneNames, DEFAULT_SCENE_NAMES } from './demoMemory.js'
 import { createTunerStream } from './tunerStream.js'
 
@@ -56,6 +56,18 @@ const SCENE_SEEDS = {
   default: LAYOUT.filter((l) => l.bypassed).map((l) => l.effectId),
   1: [eid('wah')],
   2: [eid('wah'), eid('drive'), eid('delay')]
+}
+
+/*
+ * The other half of a scene: which channel each block plays there.
+ *
+ * Lead runs the amp on channel D and Clean on A, so the demo shows what the
+ * hardware actually does — three sounds out of one amp block, not one amp with
+ * pedals switched in front of it.
+ */
+const SCENE_CHANNELS = {
+  1: { [eid('amp')]: 'D' },
+  2: { [eid('amp')]: 'A' }
 }
 
 /*
@@ -140,8 +152,8 @@ export function createMockDevice() {
     presetName: 'DEMO',
     scene: 0,
     sceneNames: storedSceneNames() || DEFAULT_SCENE_NAMES.slice(),
-    // Bypass lives per scene, not on the block — see sceneBypass.js.
-    scenes: createSceneBypass({ count: 8, seeds: SCENE_SEEDS }),
+    // Bypass and channel both live per scene, not on the block — see sceneState.js.
+    scenes: createSceneState({ count: 8, seeds: SCENE_SEEDS, channels: SCENE_CHANNELS }),
     blocks: LAYOUT.map((b, i) => ({
       slug: b.slug,
       name: b.name,
@@ -149,10 +161,11 @@ export function createMockDevice() {
       col: b.col,
       row: 1,
       fromRows: i === 0 ? [] : [1],
-      channel: b.channel || 'A',
-      type: 0
+      channel: b.channel || 'A'
     })),
+    // Both keyed "effectId:channel", because that is where a value lives.
     params: new Map(),
+    models: new Map(),
     stored: new Map([
       [0, 'Justin'],
       [1, 'Mia'],
@@ -161,11 +174,46 @@ export function createMockDevice() {
   }
 
   for (const block of state.blocks) {
-    state.params.set(block.effectId, paramsFor(block.slug))
+    state.params.set(`${block.effectId}:${block.channel}`, paramsFor(block.slug))
   }
 
   /** Whether a block is off in the scene the unit is in. */
   const off = (effectId) => state.scenes.isOff(state.scene, effectId)
+
+  /**
+   * Which channel a block is playing right now — the scene's choice if it has
+   * one, otherwise the channel it was placed on.
+   */
+  const chan = (effectId) =>
+    state.scenes.channelOf(state.scene, effectId) ||
+    state.blocks.find((b) => b.effectId === effectId)?.channel ||
+    'A'
+
+  /*
+   * Values and models belong to a block's channel, not to the block. A channel
+   * nobody has visited starts as a copy of the one the block was placed on,
+   * which is close enough to how a unit behaves and is what makes "the lead
+   * scene has a hotter amp" something a person can actually try in the demo.
+   */
+  const paramsOf = (eid) => {
+    const key = `${eid}:${chan(eid)}`
+    if (!state.params.has(key)) {
+      const block = state.blocks.find((b) => b.effectId === eid)
+      const from = state.params.get(`${eid}:${block?.channel || 'A'}`)
+      state.params.set(key, from ? clone(from) : paramsFor(block?.slug))
+    }
+    return state.params.get(key)
+  }
+
+  /** The model this block is on, in this channel. */
+  const typeOf = (eid) => {
+    const key = `${eid}:${chan(eid)}`
+    if (!state.models.has(key)) {
+      const block = state.blocks.find((b) => b.effectId === eid)
+      state.models.set(key, state.models.get(`${eid}:${block?.channel || 'A'}`) ?? 0)
+    }
+    return state.models.get(key)
+  }
 
   function paramsFor(slug) {
     if (slug === 'amp') {
@@ -189,7 +237,7 @@ export function createMockDevice() {
         p.value = p.min
       }
     }
-    state.params.set(eid, fresh)
+    state.params.set(`${eid}:${chan(eid)}`, fresh)
   }
 
   return {
@@ -231,7 +279,7 @@ export function createMockDevice() {
         col: b.col,
         fromRows: b.fromRows,
         bypassed: off(b.effectId),
-        channel: b.channel
+        channel: chan(b.effectId)
       })),
 
     blockParams: (eid) => {
@@ -241,12 +289,12 @@ export function createMockDevice() {
       // only place that answers it — /preset/blocks does not carry a typeName,
       // which is why the model picker showed "331 models…" and never a model.
       const roster = ROSTERS[block.slug] || []
-      const chosen = roster.find((m) => m.value === block.type) || roster[0] || null
+      const chosen = roster.find((m) => m.value === typeOf(eid)) || roster[0] || null
       return {
         block: block.name,
         slug: block.slug,
         page: eid,
-        named: clone(state.params.get(eid) || []),
+        named: clone(paramsOf(eid)),
         enums: [],
         type: chosen ? { value: chosen.value, name: chosen.name } : null
       }
@@ -256,7 +304,7 @@ export function createMockDevice() {
 
     /** Normalised in, clamped silently, stored as real units. */
     setParam: (eid, paramId, norm) => {
-      const list = state.params.get(eid)
+      const list = paramsOf(eid)
       const param = list?.find((p) => p.id === paramId)
       if (!param) return { ok: true } // the device doesn't complain either
       const clamped = Math.max(0, Math.min(1, norm))
@@ -268,7 +316,9 @@ export function createMockDevice() {
     setType: (eid, value) => {
       const block = state.blocks.find((b) => b.effectId === eid)
       if (block) {
-        block.type = value
+        // The model belongs to the channel this scene is playing, so switching
+        // the lead scene's amp to a different model leaves the rhythm one be.
+        state.models.set(`${eid}:${chan(eid)}`, value)
         applyModelSwap(eid, block.slug, value)
       }
       return { ok: true }
@@ -280,9 +330,10 @@ export function createMockDevice() {
       return { ok: true }
     },
 
+    /* Per scene too: the channel a scene plays is part of what the scene is. */
     setChannel: (eid, channel) => {
-      const block = state.blocks.find((b) => b.effectId === eid)
-      if (block) block.channel = channel
+      if (state.blocks.some((b) => b.effectId === eid))
+        state.scenes.setChannel(state.scene, eid, channel)
       return { ok: true }
     },
 
@@ -314,7 +365,7 @@ export function createMockDevice() {
     },
 
     setEnum: (eid, paramId, ordinal) => {
-      const list = state.params.get(eid)
+      const list = paramsOf(eid)
       const param = list?.find((p) => p.id === paramId)
       if (param) param.value = ordinal
       return { ok: true }
@@ -448,7 +499,8 @@ export function createMockDevice() {
       else state.blocks.push(block)
       // A block just placed is on in every scene.
       state.scenes.forget(blockId)
-      if (!state.params.has(blockId)) state.params.set(blockId, paramsFor(block.slug))
+      if (!state.params.has(`${blockId}:A`))
+        state.params.set(`${blockId}:A`, paramsFor(block.slug))
       return { ok: true }
     },
 
@@ -503,7 +555,7 @@ export function createMockDevice() {
         .map((b) => ({
           effectId: b.effectId,
           bypassed: off(b.effectId),
-          channel: b.channel
+          channel: chan(b.effectId)
         })),
 
     tempo: () => ({ bpm: state.bpm ?? 120 }),

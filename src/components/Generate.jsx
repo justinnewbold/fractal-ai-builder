@@ -200,11 +200,25 @@ export function Preview({
           <ol className="scene-plan-list">
             {scenes.map((scene) => {
               const on = scene.blocks.filter((b) => !b.bypassed)
+              /*
+               * The other half of what a scene is. A scene that puts the amp on
+               * a channel of its own is a scene with its own sound, and that is
+               * the interesting line in this list — "Lead: amp on D" says more
+               * than the block names, which are the same in every row.
+               */
+              const moved = scene.blocks.filter((b) => b.channel)
               return (
                 <li key={scene.index} className={withScenes ? '' : 'muted'}>
                   <span className="scene-plan-tag mono">S{scene.index + 1}</span>
                   <span className="scene-plan-name">{scene.name || `Scene ${scene.index + 1}`}</span>
-                  <span className="scene-plan-blocks">{on.map((b) => b.name).join(' · ')}</span>
+                  <span className="scene-plan-blocks">
+                    {on.map((b) => b.name).join(' · ')}
+                    {moved.length ? (
+                      <span className="scene-plan-channels">
+                        {moved.map((b) => `${b.name} on channel ${b.channel}`).join(', ')}
+                      </span>
+                    ) : null}
+                  </span>
                 </li>
               )
             })}

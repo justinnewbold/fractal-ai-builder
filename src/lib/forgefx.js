@@ -714,55 +714,81 @@ export async function readSchema(blocks, onProgress, { force = false } = {}) {
  * Sequential is a requirement, not a style choice: these all travel down one
  * serial port.
  *
- * Model swaps go first, because changing a block's model resets its parameters
- * and would otherwise undo the values just written. But a swap can also change
- * the parameter *ranges* — different amp models have different low-cut spans —
- * and values were normalised against the ranges read before the swap. So after
- * a model change that block's parameters are re-read and the conversion redone
- * against what the new model actually reports. Without this, a frequency asked
- * for in the middle of the old range can land pinned at the floor of the new
- * one.
+ * Each block is finished before the next is started, because everything here
+ * is relative to two things the write itself moves: the channel the block is
+ * on, and the model that channel is playing.
+ *
+ * A channel selection goes first. Values belong to a channel, not to a block,
+ * so a change carrying one is a change to *that* channel and has to be sitting
+ * on it before anything is set — otherwise the lead settings land on top of
+ * the rhythm ones. A model swap goes next, because changing a model resets
+ * that block's parameters and would otherwise undo the values just written.
+ *
+ * Both also change the parameter *ranges* — different amp models have
+ * different low-cut spans, and a channel is free to be on a different model
+ * entirely — and values were normalised against the ranges read beforehand. So
+ * after either, that block's parameters are re-read and the conversion redone
+ * against what the unit now reports. Without this, a frequency asked for in
+ * the middle of the old range can land pinned at the floor of the new one.
  */
 export async function applyChanges(changes, onProgress) {
   const failures = []
-  const swapped = changes.filter((c) => c.type !== undefined)
   let step = 0
-  const total =
-    changes.reduce(
-      (n, c) => n + c.params.length + (c.type !== undefined ? 1 : 0) + (c.bypassed !== undefined ? 1 : 0),
-      0
-    ) + swapped.length
+  const total = changes.reduce((n, c) => {
+    // A channel or a model move costs its own write plus the re-read after it.
+    const moved = c.channel !== undefined || c.type !== undefined
+    return (
+      n +
+      c.params.length +
+      (c.channel !== undefined ? 1 : 0) +
+      (c.type !== undefined ? 1 : 0) +
+      (moved ? 1 : 0) +
+      (c.bypassed !== undefined ? 1 : 0)
+    )
+  }, 0)
 
   const advance = (label) => onProgress?.(++step, total, label)
 
-  // 1. models
-  for (const change of swapped) {
-    advance(`${change.name} → ${change.typeName}`)
-    try {
-      await setType(change.eid, change.type)
-    } catch (err) {
-      failures.push(`${change.name} model — ${err.message}`)
-    }
-  }
-
-  // 2. re-read ranges for anything whose model moved
-  const freshRanges = new Map()
-  for (const change of swapped) {
-    advance(`Re-reading ${change.name} after model change`)
-    try {
-      const res = await blockParams(change.eid)
-      freshRanges.set(
-        change.eid,
-        new Map((res?.named || []).map((p) => [p.id, { min: p.min, max: p.max, log: !!p.log }]))
-      )
-    } catch {
-      // Fall back to the pre-swap ranges rather than skipping the writes.
-    }
-  }
-
-  // 3. parameters, then bypass
   for (const change of changes) {
-    const fresh = freshRanges.get(change.eid)
+    // 1. the channel these values belong to
+    let moved = false
+    if (change.channel !== undefined) {
+      advance(`${change.name} → channel ${change.channel}`)
+      try {
+        await setChannel(change.eid, change.channel)
+        moved = true
+      } catch (err) {
+        failures.push(`${change.name} channel — ${err.message}`)
+      }
+    }
+
+    // 2. the model on it
+    if (change.type !== undefined) {
+      advance(`${change.name} → ${change.typeName}`)
+      try {
+        await setType(change.eid, change.type)
+        moved = true
+      } catch (err) {
+        failures.push(`${change.name} model — ${err.message}`)
+      }
+    }
+
+    // 3. re-read ranges if either moved
+    let fresh = null
+    if (moved) {
+      advance(`Re-reading ${change.name}`)
+      try {
+        const res = await blockParams(change.eid)
+        fresh = new Map(
+          (res?.named || []).map((p) => [p.id, { min: p.min, max: p.max, log: !!p.log }])
+        )
+      } catch {
+        // Fall back to the ranges read before the move rather than skipping
+        // the writes entirely.
+      }
+    }
+
+    // 4. parameters, then bypass
     for (const param of change.params) {
       const range = fresh?.get(param.id) ?? param.range
       advance(`${change.name} · ${param.name} → ${param.to}${param.unit}`)
@@ -796,11 +822,12 @@ export async function applyChanges(changes, onProgress) {
 /**
  * Write a scene plan: one rig, several states of it.
  *
- * Scenes carry which blocks are on, not what they sound like — parameters live
- * on the block (and per channel), so every scene shares the models and values
- * written by applyChanges. That is the whole reason this is a separate pass
- * rather than part of one: the rig has to exist before the states over it mean
- * anything.
+ * A scene carries two things per block — whether it is on, and which channel it
+ * plays — and both are written here. What a channel *sounds* like is not: those
+ * values belong to the channel and are written once by applyChanges. That is
+ * the whole reason this is a separate pass rather than part of one: the rig,
+ * and every channel of it that this preset uses, has to exist before the states
+ * over it mean anything.
  *
  * The player's own scene is put back at the end. Writing scenes moves the unit
  * through all of them, and finishing on scene 6 because that was the last one
@@ -822,7 +849,10 @@ export async function applyScenes(scenes, onProgress) {
   }
 
   let step = 0
-  const total = scenes.reduce((n, s) => n + 1 + s.blocks.length, 0)
+  const total = scenes.reduce(
+    (n, s) => n + 1 + s.blocks.length + s.blocks.filter((b) => b.channel).length,
+    0
+  )
   const advance = (label) => onProgress?.(++step, total, label)
 
   for (const scene of scenes) {
@@ -849,6 +879,16 @@ export async function applyScenes(scenes, onProgress) {
         await setBypass(block.eid, block.bypassed)
       } catch (err) {
         failures.push(`${label} · ${block.name} — ${err.message}`)
+      }
+      // The channel this scene plays. Written while standing in the scene, for
+      // the same reason the bypass is: it is the scene that remembers it.
+      if (block.channel) {
+        advance(`${label} · ${block.name} → channel ${block.channel}`)
+        try {
+          await setChannel(block.eid, block.channel)
+        } catch (err) {
+          failures.push(`${label} · ${block.name} channel — ${err.message}`)
+        }
       }
     }
   }

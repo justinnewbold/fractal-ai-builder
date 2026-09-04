@@ -8,7 +8,7 @@
 
 import { isSilencingParam, matchParam } from './guardrails.js'
 
-export function validateSpec(spec, schema, sceneCount = 8) {
+export function validateSpec(spec, schema, sceneCount = 8, channelNames = ['A', 'B', 'C', 'D']) {
   const problems = []
   // Not rejections: changes that were kept after being matched to the control
   // the model named rather than the id it gave. Shown separately, because a
@@ -58,6 +58,26 @@ export function validateSpec(spec, schema, sceneCount = 8) {
       slug: known.slug,
       wasBypassed: known.bypassed,
       params: []
+    }
+
+    /*
+     * Which channel these values belong to.
+     *
+     * A block's values live on its channel, not on the block, so "the lead
+     * amp" is the amp block written on a second channel — and the write has to
+     * select that channel before it sets anything, or the lead settings land
+     * on top of the rhythm ones. A block the unit reports no channel for has
+     * none, and a letter it does not offer is dropped rather than sent.
+     */
+    if (block.channel !== undefined && block.channel !== null && block.channel !== '') {
+      const wanted = String(block.channel).trim().toUpperCase()
+      if (!known.channel) {
+        problems.push(`${known.name}: this block has no channels — the channel was ignored.`)
+      } else if (!channelNames.includes(wanted)) {
+        problems.push(`${known.name}: no channel "${block.channel}" on this unit — ignored.`)
+      } else {
+        change.channel = wanted
+      }
     }
 
     // model swap
@@ -122,7 +142,10 @@ export function validateSpec(spec, schema, sceneCount = 8) {
     }
 
     const touchesSomething =
-      change.type !== undefined || change.bypassed !== undefined || change.params.length > 0
+      change.type !== undefined ||
+      change.bypassed !== undefined ||
+      change.channel !== undefined ||
+      change.params.length > 0
 
     if (touchesSomething) changes.push(change)
   }
@@ -133,7 +156,7 @@ export function validateSpec(spec, schema, sceneCount = 8) {
     summary: typeof spec.summary === 'string' ? spec.summary : '',
     notes: typeof spec.notes === 'string' ? spec.notes : '',
     changes,
-    scenes: validateScenes(spec.scenes, schema, problems, sceneCount),
+    scenes: validateScenes(spec.scenes, schema, problems, sceneCount, channelNames),
     problems,
     repairs
   }
@@ -151,7 +174,7 @@ export function validateSpec(spec, schema, sceneCount = 8) {
  * of what is on and the hardware is told what is off — the inversion is the
  * part worth doing once, here, rather than at every call site.
  */
-function validateScenes(scenes, schema, problems, sceneCount = 8) {
+function validateScenes(scenes, schema, problems, sceneCount = 8, channelNames = ['A', 'B', 'C', 'D']) {
   if (!Array.isArray(scenes) || !scenes.length) return []
   const placed = schema.map((b) => b.eid)
   const known = new Set(placed)
@@ -194,13 +217,36 @@ function validateScenes(scenes, schema, problems, sceneCount = 8) {
       )
     }
 
+    /*
+     * The other half of a scene. A channel named for a block that has none, or
+     * a letter the unit does not offer, is dropped here — the alternative is a
+     * write the device ignores and a scene that quietly isn't what was
+     * described.
+     */
+    const channelFor = new Map()
+    for (const entry of Array.isArray(scene.channels) ? scene.channels : []) {
+      const block = byEid.get(Number(entry?.eid))
+      const wanted = String(entry?.channel || '').trim().toUpperCase()
+      if (!block || !wanted) continue
+      if (!block.channel) {
+        problems.push(`Scene ${index + 1}: ${block.name || block.slug} has no channels — ignored.`)
+        continue
+      }
+      if (!channelNames.includes(wanted)) {
+        problems.push(`Scene ${index + 1}: no channel "${entry.channel}" on this unit — ignored.`)
+        continue
+      }
+      channelFor.set(block.eid, wanted)
+    }
+
     out.push({
       index,
       name: sanitizeSceneName(scene.name),
       blocks: placed.map((eid) => ({
         eid,
         name: byEid.get(eid)?.name || byEid.get(eid)?.slug || `#${eid}`,
-        bypassed: !engaged.has(eid)
+        bypassed: !engaged.has(eid),
+        ...(channelFor.has(eid) ? { channel: channelFor.get(eid) } : {})
       }))
     })
   }
@@ -214,9 +260,15 @@ function sanitizeSceneName(name) {
   return name.replace(/[^\w \-'&.]/g, '').replace(/\s+/g, ' ').trim().slice(0, 16)
 }
 
-/** How many hardware writes a scene plan costs: a switch, then a bypass each. */
+/**
+ * How many hardware writes a scene plan costs: a switch into the scene, then a
+ * bypass for every block, and a channel for each block the scene moves.
+ */
 export function countSceneWrites(scenes) {
-  return (scenes || []).reduce((n, s) => n + 1 + s.blocks.length, 0)
+  return (scenes || []).reduce(
+    (n, s) => n + 1 + s.blocks.length + s.blocks.filter((b) => b.channel).length,
+    0
+  )
 }
 
 /**
@@ -236,7 +288,12 @@ function sanitizeName(name) {
 /** How many individual hardware writes a validated spec will cost. */
 export function countWrites(changes) {
   return changes.reduce(
-    (n, c) => n + c.params.length + (c.type !== undefined ? 1 : 0) + (c.bypassed !== undefined ? 1 : 0),
+    (n, c) =>
+      n +
+      c.params.length +
+      (c.channel !== undefined ? 1 : 0) +
+      (c.type !== undefined ? 1 : 0) +
+      (c.bypassed !== undefined ? 1 : 0),
     0
   )
 }

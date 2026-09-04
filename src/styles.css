@@ -5604,6 +5604,16 @@ button.topbar-preset.open .topbar-caret {
   color: var(--silk-dim);
 }
 
+/*
+ * The channel a scene plays, under the blocks it switches on. Its own line,
+ * because it is the half that changes the sound and the block names above it
+ * repeat from row to row.
+ */
+.scene-plan-channels {
+  display: block;
+  color: var(--signal);
+}
+
 @media (max-width: 560px) {
   .scene-plan-list li {
     flex-wrap: wrap;

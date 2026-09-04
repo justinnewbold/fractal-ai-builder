@@ -81,9 +81,9 @@ const Action = z.object({
     .int()
     .nullable()
     .describe(
-      'Scene index, 0-based, for setSceneBlock — and for setBypass when the player named a ' +
-        'scene other than the one the unit is in. Null means the scene the unit is in. ' +
-        'Zero-based: 0 is the scene the player calls scene 1, so "scene 2" is index 1.'
+      'Scene index, 0-based, for setSceneBlock — and for setBypass and setChannel when the ' +
+        'player named a scene other than the one the unit is in. Null means the scene the unit ' +
+        'is in. Zero-based: 0 is the scene the player calls scene 1, so "scene 2" is index 1.'
     ),
   why: z.string().describe('One short line the player will read, in plain language.')
 })
@@ -172,21 +172,29 @@ Slots are addressed by the numbers the unit uses. "Save this to 67" is
 savePreset with value 67. "Save it" with no number means the slot that is
 already loaded, which you are given.
 
-SCENES
+SCENES AND CHANNELS
 
-A scene is a saved pattern of which blocks are on. You are given the scene the
-unit is in (activeScene, 0-based) and the scene names (sceneNames, by index), so
-"the lead scene" means the scene whose name is Lead. The player counts from 1
-and these are indexed from 0: their "scene 2" is index 1, the second entry in
-sceneNames — the "scenes" list spells this out per scene. Every scene number
-you return is an index. Bypass is per scene: to
-switch a block on or off in a scene the unit is not in, give setBypass that
-scene's index in "scene". Parameter values are shared by every scene on this
-unit — there is no such thing as brighter treble in scene 2 alone. Asked for a
-scene-specific tone change, do one of two things: switch blocks on or off in
-that scene, or say in "refused" that values are shared by every scene and ask
-whether to change it for the whole preset. Never present a preset-wide value
-change as a change to one scene.
+A scene remembers two things about every block: whether it is on, and which of
+its channels it is playing. Channels are A to D and each one holds its own
+model and its own values. You are given the scene the unit is in (activeScene,
+0-based) and the scene names (sceneNames, by index), so "the lead scene" means
+the scene whose name is Lead. The player counts from 1 and these are indexed
+from 0: their "scene 2" is index 1, the second entry in sceneNames — the
+"scenes" list spells this out per scene. Every scene number you return is an
+index.
+
+Both halves are per scene: to switch a block on or off, or to put it on a
+different channel, in a scene the unit is not in, give setBypass or setChannel
+that scene's index in "scene".
+
+A value is not per scene — it belongs to the channel the block is on, so
+setting it changes every scene playing that channel. Asked for a tone change in
+one scene, that is what channels are for: if the block is on the same channel
+everywhere, put that scene on a free channel with setChannel and say in
+"understood" that you have done so, then set the values, which now belong to
+that scene alone. If the player would rather not spend a channel, say so in
+"refused" and offer the preset-wide change instead. Never present a change that
+lands on a shared channel as a change to one scene.
 
 READING INTENT
 

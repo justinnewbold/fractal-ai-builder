@@ -1399,4 +1399,101 @@ export function run(test) {
       "the working line ignores the server's hello, so it claims to be reaching the server long after it has"
     )
   })
+
+  /*
+   * What the app tells the AI about the hardware.
+   *
+   * For a long time it told it something false: that a scene changes only what
+   * is switched on, and that every scene shares one set of values. Both routes
+   * said it, the tour taught it, and the chat refused legitimate asks because
+   * of it — while this app's own device layer had the truth written down the
+   * whole time ("bypass and channel are per-scene on this hardware — that IS
+   * what a scene is"). A scene remembers a channel per block, and a channel
+   * holds its own model and its own values, which is the mechanism scenes
+   * exist for. This is the guard that keeps the instructions honest.
+   */
+  test('the AI is not told that scenes share one set of values', () => {
+    const generate = readFileSync(new URL('../api/generate.js', import.meta.url), 'utf8')
+    const command = readFileSync(new URL('../api/command.js', import.meta.url), 'utf8')
+
+    for (const [name, text] of [['generate', generate], ['command', command]]) {
+      assert.ok(
+        !/shared by every scene|Every scene shares|values are shared/i.test(text),
+        `${name} still tells the model every scene shares one set of values`
+      )
+      assert.ok(
+        !/cannot give a scene its own|not a hotter amp/i.test(text),
+        `${name} still tells the model a scene cannot have its own amp`
+      )
+      assert.match(text, /channel/i, `${name} says nothing about channels at all`)
+    }
+
+    // And the designer can actually say it: a channel per block, and a channel
+    // per block per scene.
+    assert.match(
+      generate,
+      /channel: z\s*\n?\s*\.string\(\)/,
+      'the block spec has no channel, so values can only ever be written to the one the block is on'
+    )
+    assert.match(
+      generate,
+      /channels: z\s*\n?\s*\.array\(/,
+      'a scene cannot name the channels it plays'
+    )
+  })
+
+  test('a channel is written where the scene that plays it can keep it', () => {
+    const forgefx = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+
+    // The scene pass: standing in the scene, because that is what remembers it.
+    const scenes = forgefx.slice(
+      forgefx.indexOf('export async function applyScenes'),
+      forgefx.indexOf('export const selectPreset')
+    )
+    assert.match(
+      scenes,
+      /await setChannel\(block\.eid, block\.channel\)/,
+      'the scene pass writes the bypass and drops the channel, so half of every scene is thrown away'
+    )
+
+    /*
+     * The block pass: the channel first. A value belongs to a channel, so
+     * writing values before selecting one puts the lead settings on top of the
+     * rhythm ones — and a channel is free to be on a different model, so the
+     * ranges have to be re-read after the move exactly as they are after a
+     * model swap.
+     */
+    const changes = forgefx.slice(
+      forgefx.indexOf('export async function applyChanges'),
+      forgefx.indexOf('export async function applyScenes')
+    )
+    const at = (re) => changes.search(re)
+    assert.ok(at(/await setChannel\(change\.eid/) !== -1, 'a change carrying a channel never selects it')
+    assert.ok(
+      at(/await setChannel\(change\.eid/) < at(/await setType\(change\.eid/),
+      'the model is written before the channel it belongs to'
+    )
+    assert.ok(
+      at(/await setType\(change\.eid/) < at(/await blockParams\(change\.eid/),
+      'the ranges are re-read before the writes that move them'
+    )
+    assert.ok(
+      at(/await blockParams\(change\.eid/) < at(/setParamConfirmed/),
+      'values are written against ranges read before the channel and model moved'
+    )
+  })
+
+  test('the tour teaches what a scene actually is', () => {
+    const tour = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
+    const card = tour.slice(tour.indexOf('Scenes are one rig'), tour.indexOf('Scenes are one rig') + 1200)
+    assert.match(card, /channel/i, 'the scenes card never mentions channels, which is what a scene remembers')
+    assert.ok(
+      !/every scene shares/i.test(card),
+      'the scenes card still teaches that every scene shares one set of values'
+    )
+    assert.ok(
+      !/rather than a\s*\n?\s*hotter amp|not a hotter amp/i.test(card),
+      'the scenes card still says a lead scene cannot have a hotter amp'
+    )
+  })
 }

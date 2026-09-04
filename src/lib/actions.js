@@ -85,8 +85,11 @@ const ORDER = {
   clearCell: 0,
   moveBlock: 1,
   placeBlock: 2,
+  // The channel comes before the model, not after it: a channel holds its own
+  // model and its own values, so choosing one after setting a model would put
+  // the model on whichever channel was live and then walk away from it.
+  setChannel: 2.5,
   setModel: 3,
-  setChannel: 4,
   setParam: 5,
   setBypass: 6,
   setSceneBlock: 7,
@@ -112,8 +115,9 @@ export function validatePlan(plan, blocks, capabilities) {
    * Which scene the unit is in, and what the scenes are called — so a plan
    * aimed at another scene is written there or refused, never quietly landed
    * in the live one. "Brighten scene 2" with scene 3 live used to nudge the
-   * amp on scene 3: parameter values are shared by every scene on this
-   * hardware, and only bypass and channel are per scene.
+   * amp on scene 3: what a scene remembers per block is its bypass and its
+   * channel, and a value belongs to the channel, so a value written "for
+   * scene 2" reaches every scene playing that same channel.
    */
   const activeScene = typeof capabilities?.activeScene === 'number' ? capabilities.activeScene : null
   const sceneNames = Array.isArray(capabilities?.sceneNames) ? capabilities.sceneNames : []
@@ -139,9 +143,11 @@ export function validatePlan(plan, blocks, capabilities) {
         if (
           !need(
             !aimedElsewhere(raw),
-            `${block.name} / ${param.name}: parameter values are shared by every scene on this unit, so this can't be changed for ${sceneLabel(
+            `${block.name} / ${param.name}: a value belongs to the channel this block is on, not to ${sceneLabel(
               raw.scene
-            )} alone. Switch a block on or off in that scene, or change it for the whole preset.`
+            )}, so writing it there would change every scene playing that channel. Give that scene its own channel for ${
+              block.name
+            } first, then set the value on it — or change it for the whole preset.`
           )
         )
           break
@@ -229,15 +235,40 @@ export function validatePlan(plan, blocks, capabilities) {
         if (!need(block, `No block with effect id ${raw.eid}.`)) break
         const channels = capabilities?.channelNames || ['A', 'B', 'C', 'D']
         if (!need(channels.includes(raw.text), `${block.name}: no channel "${raw.text}".`)) break
+        const chanScene = typeof raw.scene === 'number' ? raw.scene : null
+        if (
+          chanScene !== null &&
+          !need(chanScene >= 0 && chanScene < sceneCount, `There's no scene ${chanScene + 1}.`)
+        )
+          break
+        const eid = block.eid ?? block.effectId
+        /*
+         * A channel belongs to a scene, exactly as a bypass does — that pair is
+         * what a scene is. So "put the lead scene on channel B" is written by
+         * standing in that scene, not in whichever one the unit is in.
+         */
+        if (chanScene !== null && chanScene !== activeScene) {
+          actions.push({
+            ...raw,
+            label: `${block.name} → channel ${raw.text} in ${sceneLabel(chanScene)}`,
+            run: async () => {
+              const d = await device()
+              const res = await d.setSceneBlock(chanScene, eid, { channel: raw.text })
+              // Each channel carries its own values — the cached ones belong to
+              // the channel we just left.
+              d.invalidateSchema(eid)
+              return res
+            }
+          })
+          break
+        }
+        const inScene = activeScene !== null ? ` in ${sceneLabel(activeScene)}` : ''
         actions.push({
           ...raw,
-          label: `${block.name} → channel ${raw.text}`,
+          label: `${block.name} → channel ${raw.text}${inScene}`,
           run: async () => {
             const d = await device()
-            const eid = block.eid ?? block.effectId
             const res = await d.setChannel(eid, raw.text)
-            // Each channel carries its own values — the cached ones belong to
-            // the channel we just left.
             d.invalidateSchema(eid)
             return res
           }
