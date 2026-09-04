@@ -1733,6 +1733,15 @@ export function run(test) {
         `${tool} still asks before it runs`
       )
     }
+    /*
+     * And the rest of the same class. Reading a pull request, its checks and
+     * its comments is the bulk of what gets asked about here, and none of it
+     * changes anything — so the whole of both servers is allowed, rather than
+     * naming tools one at a time as each new one interrupts someone.
+     */
+    for (const server of ['mcp__github', 'mcp__Claude_Code_Remote']) {
+      assert.ok(allowed.includes(server), `${server} still asks tool by tool`)
+    }
   })
 
   test('the tour teaches what a scene actually is', () => {
