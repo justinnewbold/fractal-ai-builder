@@ -445,11 +445,32 @@ export default function Assistant({
         {/* While the model has the request, the useful button is the one that
             takes it back. "Working…" disabled is a dead end when the thing has
             hung, which is exactly when someone reaches for a button. */}
+        {/*
+          One round button at the end of the box, the shape every chat uses.
+
+          "Instead of a send button below the chat box, put a send arrow on the
+          right side of it." It was already beside the box rather than under it
+          — a word in a rectangle, taking a fifth of the row from the thing you
+          type into. An arrow says the same thing in a circle and gives the
+          width back.
+
+          The same button becomes Stop while the model has the request, because
+          that is the one place it belongs: the thing you reach for when a
+          generation hangs is where the thing you pressed to start it was.
+          Labelled for a screen reader either way — a glyph is not a name.
+        */}
         {onStop ? (
-          <button onClick={onStop}>Stop</button>
+          <button className="send-btn stopping" onClick={onStop} aria-label="Stop">
+            <span aria-hidden="true">■</span>
+          </button>
         ) : (
-          <button onClick={() => submit()} disabled={!text.trim()}>
-            {busy ? 'Working…' : 'Send'}
+          <button
+            className="send-btn"
+            onClick={() => submit()}
+            disabled={!text.trim()}
+            aria-label={busy ? 'Send when the current tone finishes' : 'Send'}
+          >
+            <span aria-hidden="true">↑</span>
           </button>
         )}
       </div>

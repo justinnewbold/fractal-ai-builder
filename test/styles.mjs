@@ -547,4 +547,28 @@ export function run(test) {
     assert.match(code, /\.chain-lane\[data-linear\] \.chain-slot\.open \{[^}]*flex-basis: 100%/,
       'the open slot keeps its quarter of the row, so its controls are unreachable')
   })
+
+  /*
+   * An arrow at the end of the box, and a box you would type a sentence into.
+   *
+   * "Instead of a send button below the chat box, put a send arrow on the right
+   * side of it. Also, let's make the chat box text entry a little more rounded
+   * instead of square."
+   */
+  test('the composer ends in a round arrow and the box is not a rectangle', () => {
+    const btn = code.slice(code.indexOf('button.send-btn {'), code.indexOf('}', code.indexOf('button.send-btn {')))
+    assert.ok(btn.length > 40, 'the send arrow has no style of its own')
+    assert.match(btn, /border-radius: 50%/, 'the arrow is square again')
+    /* Round is not an excuse to be small: this is pressed with a thumb. */
+    assert.match(btn, /width: 44px/, 'the arrow is under a thumb-sized target')
+    assert.match(btn, /height: 44px/, 'the arrow is under a thumb-sized target')
+    /* It must not stretch as the box grows — flex-end keeps it at the bottom,
+       and a fixed basis keeps it a circle. */
+    assert.match(btn, /flex: 0 0 auto/, 'the arrow stretches with the box')
+
+    const box = code.slice(code.indexOf('textarea.refine-input {'), code.indexOf('}', code.indexOf('textarea.refine-input {')))
+    const radius = box.match(/border-radius: var\(--r-(\d)\)/)
+    assert.ok(radius, 'the box takes whatever radius it inherits')
+    assert.ok(Number(radius[1]) >= 3, `the box is back to a ${radius[0]} corner, which is the panel edge`)
+  })
 }
