@@ -1577,6 +1577,26 @@ export function run(test) {
     )
   })
 
+  /*
+   * A button does not offer to fix what is not broken.
+   *
+   * "Says connected to Mac. But has a reconnect button. That shouldn't say
+   * reconnect if already connected." The label was unconditional, so a live,
+   * connected unit was offered a Reconnect — which reads as though the app
+   * knows something the player does not.
+   */
+  test('Reconnect is only offered when something is disconnected', () => {
+    const detail = readFileSync(
+      new URL('../src/components/DeviceDetail.jsx', import.meta.url),
+      'utf8'
+    )
+    assert.match(
+      detail,
+      /status === 'live' \? 'Read the unit again' : 'Reconnect'/,
+      'the button says Reconnect at a unit that is connected'
+    )
+  })
+
   test('a channel is written where the scene that plays it can keep it', () => {
     const forgefx = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
 
