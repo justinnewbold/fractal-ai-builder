@@ -2512,8 +2512,6 @@ export default function App() {
         onToggle={() => setLiveOpen(!liveOpen)}
       />
 
-      <Cost usage={result?.usage} sessionTotal={spend.total} runs={spend.runs} />
-
       <Preview
         result={result}
         writeCount={writeCount}
@@ -2540,16 +2538,19 @@ export default function App() {
         busy={busy}
         onApply={apply}
         onDiscard={() => setResult(null)}
-      />
+      >
+        {/*
+          What it cost, and why it came out the way it did.
+          Both belong with the tone rather than beside it — and both belong
+          behind the same fold as the rest of the detail, because a chat that
+          answers a request with four stacked panels is the thing being fixed.
+        */}
+        <Cost usage={result?.usage} sessionTotal={spend.total} runs={spend.runs} />
 
-      {/*
-        Why a tone came out the way it did, when someone has asked to see.
-        Under the design rather than in Setup, because that is where a tone
-        that missed is being looked at.
-      */}
-      {result?._trace || result?.spec ? (
-        <DevTrace trace={result._trace} spec={result.spec} problems={result.problems} />
-      ) : null}
+        {result?._trace || result?.spec ? (
+          <DevTrace trace={result._trace} spec={result.spec} problems={result.problems} />
+        ) : null}
+      </Preview>
 
       {/*
         What applying actually did, including anything that read back
