@@ -189,6 +189,22 @@ export const SETTLE_TRIES = 3
 export const SETTLE_MS = 700
 
 /**
+ * How many times a phone asks before believing "no unit".
+ *
+ * "Says it's connected but says no unit. The unit is connected — if I hit Try
+ * again like five or six times it will actually connect."
+ *
+ * Every ask from a phone becomes a real handshake down the Mac's serial port
+ * with a 1.5-second window, on a port the Mac's own page is polling for meters
+ * every half second and an AM4 answers with 500ms structure reads. A handshake
+ * that lands in the middle of one of those misses, and a miss reads as "no
+ * unit". Five or six taps is what it took by hand; this is those taps, taken
+ * automatically, with a gap between them so each lands at a different phase
+ * of whatever the port is doing.
+ */
+export const RELAY_TRIES = 5
+
+/**
  * Ask whether the unit is there, and do not take the first no for an answer.
  *
  * "I'm on the FM3. As soon as I hit next or select a scene, it goes to the
@@ -206,6 +222,12 @@ export const SETTLE_MS = 700
  * confirm. Nothing was ever live, and the first answer stands, so a genuinely
  * empty rig still says so as fast as it always did.
  *
+ * Except from a phone. There the question travels a relay to a Mac whose port
+ * is already busy with its own page, and a first no is the least trustworthy
+ * answer in the app — see RELAY_TRIES. A rig that really is empty costs a few
+ * extra seconds on the phone to say so; a rig that is not costs six taps of
+ * Try again without this.
+ *
  * Takes its detect and its wait, so the whole policy is tested in node against
  * a fake that never touches a port.
  */
@@ -213,10 +235,12 @@ export async function confirmedDetect({
   detect,
   wait,
   wasLive,
+  remote = false,
   tries = SETTLE_TRIES,
+  relayTries = RELAY_TRIES,
   gap = SETTLE_MS
 }) {
-  const attempts = wasLive ? Math.max(1, tries) : 1
+  const attempts = wasLive ? Math.max(1, tries) : remote ? Math.max(1, relayTries) : 1
   let info = null
   let failure = null
 
