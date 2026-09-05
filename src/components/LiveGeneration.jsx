@@ -1,23 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
 
 /**
- * Messages shown while the model is working.
+ * What the line says when there is nothing true to say yet.
  *
- * The model call is the one step whose duration nothing can predict — it
- * depends on how much of the preset is being changed. A static "designing…"
- * for fifteen seconds reads as a hang, so these describe what's actually
- * happening rather than counting.
+ * "Instead of saying working out what that means just say 'Thinking' whenever
+ * it's not saying exactly what it's doing."
+ *
+ * This replaces a list of eight stages on a three-second timer — "Choosing an
+ * amp", "Shaping the EQ" — that read as progress and were not. Nothing
+ * consulted the model; the script simply advanced with the clock, so the line
+ * claiming to choose a cabinet appeared whether or not a cabinet was ever
+ * touched. It was the same woolliness as the message this change was asked
+ * about, only more confident, and confident is worse.
+ *
+ * The real messages are still specific and still win over this the moment they
+ * arrive: what was sent, how many blocks have been built, which parameter is
+ * being verified. This fills the second or two before the first of them lands,
+ * and says only what is actually known then.
  */
-const STAGES = [
-  'Reading what your unit can do',
-  'Matching the description to real gear',
-  'Choosing an amp',
-  'Setting the gain structure',
-  'Shaping the EQ',
-  'Balancing the drive against the amp',
-  'Choosing a cabinet',
-  'Setting time and space'
-]
+export const THINKING = 'Thinking'
 
 /**
  * What the model is producing, as it produces it.
@@ -110,8 +111,7 @@ export function Thinking({ message, active, startedAt }) {
   if (!running) return null
 
   const seconds = startedAt ? Math.max(0, Math.round((now - startedAt) / 1000)) : null
-  const scripted = STAGES[Math.min(Math.floor((seconds ?? 0) / 3), STAGES.length - 1)]
-  const text = message || `${scripted}…`
+  const text = message || `${THINKING}…`
 
   let clock = null
   if (seconds !== null) {

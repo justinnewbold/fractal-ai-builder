@@ -331,13 +331,29 @@ export function run(test) {
     assert.ok(!/padding: 0 var\(--s-4\)/.test(tour), 'the tour card still pads itself on top of the sheet body')
   })
 
-  test('the floating Ask and the Ask tab swap at the phone breakpoint', () => {
-    const at = code.indexOf('button.ask-tab {')
-    assert.notEqual(at, -1, 'the phone/desktop swap for Ask is gone')
-    const block = code.slice(at, at + 600)
-    assert.match(block, /^button\.ask-tab \{\s*display: none/, 'the Ask tab shows on wide screens too')
-    assert.match(block, /@media \(max-width: 700px\) \{[^@]*\.ask-anywhere \{\s*display: none/, 'the floating Ask still floats over a phone’s controls')
-    assert.match(block, /@media \(max-width: 700px\) \{[^@]*button\.ask-tab \{\s*display: inline-flex/, 'the Ask tab is missing on a phone')
+  test('the floating Ask never floats over a phone’s controls', () => {
+    /*
+     * This used to check a swap: a floating button on wide screens, a fourth
+     * `button.ask-tab` on phones. That tab is gone — it opened the same
+     * conversation the Ask screen already is — so what is left to hold is the
+     * half that was always about the hardware in someone's hands.
+     *
+     * Fixed to the bottom-right corner, the floating button sat on scene tile
+     * 6, the pad's Change and Edit's Modifiers, because that corner is where
+     * the last control in every grid lands. On a phone the tab row is the way
+     * to the conversation and this must stay hidden.
+     */
+    assert.ok(
+      !/button\.ask-tab \{/.test(code),
+      'the removed Ask tab still has styling, which will dress up whatever gets that class next'
+    )
+    const at = code.indexOf('.ask-anywhere {')
+    assert.notEqual(at, -1, 'the floating Ask button is gone entirely — wide screens lost the sheet')
+    assert.match(
+      code,
+      /@media \(max-width: 700px\) \{\s*\.ask-anywhere \{\s*display: none/,
+      'the floating Ask is back over a phone’s controls'
+    )
   })
 
   test('a docked sheet is clipped to its rail and arrives without overshoot', () => {

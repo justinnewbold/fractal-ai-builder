@@ -6318,22 +6318,23 @@ button.topbar-preset.open .topbar-caret {
   }
 }
 
-/* Ask: a tab on a phone, a floating button on a wide screen. */
-button.ask-tab {
-  display: none;
-  margin-left: auto;
-  gap: var(--s-1);
-  color: var(--silk-dim);
-}
-
+/*
+ * Ask on a phone is the screen; on a wide one it is also a button.
+ *
+ * `button.ask-tab` used to live here — a fourth tab that opened the same
+ * conversation the Create tab already was. Both are gone: the screen is called
+ * ✦ Ask now, so on a phone the tab row is the way in and there is nothing to
+ * duplicate.
+ *
+ * The floating button stays hidden on a phone for the reason it always was:
+ * fixed to the bottom-right corner, it sat on scene tile 6, the pad's Change
+ * and Edit's Modifiers, because that corner is where the last control in every
+ * grid lands. On a wide screen nothing is under it, and reaching the
+ * conversation without leaving Play is worth having there.
+ */
 @media (max-width: 700px) {
   .ask-anywhere {
     display: none;
-  }
-
-  button.ask-tab {
-    display: inline-flex;
-    align-items: center;
   }
 }
 

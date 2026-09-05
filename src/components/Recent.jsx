@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { formatWhen } from '../lib/history'
 
 /**
@@ -20,7 +21,11 @@ import { formatWhen } from '../lib/history'
  */
 const SHOWN = 6
 
-export default function Recent({ entries, onRestore, onSeeAll, busy }) {
+export default function Recent({ entries, onRestore, onDelete, onSeeAll, busy }) {
+  // Which row is asking. One at a time, cleared when the button loses focus, so
+  // a half-pressed delete never sits armed on a screen nobody is looking at.
+  const [confirmDelete, setConfirmDelete] = useState(null)
+
   // No empty state. A player with no history has nothing to recover, and a box
   // explaining that would be a permanent fixture on the screen of everyone who
   // has just started.
@@ -46,6 +51,30 @@ export default function Recent({ entries, onRestore, onSeeAll, busy }) {
               <span className="recent-name">{entry.name || 'Untitled'}</span>
               <span className="recent-when mono">{formatWhen(entry.at)}</span>
             </button>
+            {/*
+              Throwing one away, from the list it is actually in.
+              Deleting used to live only in the presets sheet, two taps behind
+              the bar — and now that every generation is kept rather than only
+              the ones that were sent, this list is where the clutter arrives
+              and so it is where it has to be clearable.
+
+              Confirmed before it happens: a row is one tap from Restore, the
+              designs are not recoverable, and asking costs a second.
+            */}
+            {onDelete ? (
+              <button
+                className="recent-del icon-btn"
+                disabled={busy}
+                aria-label={`Delete ${entry.name || 'Untitled'}`}
+                onClick={() => {
+                  if (confirmDelete === entry.id) onDelete(entry)
+                  else setConfirmDelete(entry.id)
+                }}
+                onBlur={() => setConfirmDelete((id) => (id === entry.id ? null : id))}
+              >
+                {confirmDelete === entry.id ? 'Sure?' : '×'}
+              </button>
+            ) : null}
           </li>
         ))}
       </ul>

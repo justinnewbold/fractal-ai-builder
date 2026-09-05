@@ -917,18 +917,43 @@ export function run(test) {
     )
   })
 
-  test('on a phone, Ask lives in the tab row, not over the controls', () => {
+  test('there is one conversation and one name for it', () => {
     /*
-     * The floating Ask button sat over scene tile 6 on Play, the pad's
-     * Change button and Edit's Modifiers on a phone — the bottom-right corner
-     * is where the last control in every grid lands. On a phone it is a
-     * fourth tab now; the floating button stays for wide screens, where
-     * nothing sits under it.
+     * "It says Create, and then Ask on the same page, which kind of defeats the
+     * purpose of having multiple chat bots."
+     *
+     * There is one bot. It was listed twice: the Create tab rendered `chat` and
+     * `tones`, and a fourth ✦ Ask tab opened those same two elements in a
+     * sheet — greying itself out on Create, because there was nothing left to
+     * open. The screen carries the name and the ✦ now, and the duplicate is
+     * gone.
+     *
+     * On a phone the tab row is the way in (the floating button is hidden there
+     * because it sat over the controls). On a wide screen the floating button
+     * still opens the sheet from Play and Edit, where nothing is under it.
      */
     const nav = src.slice(src.indexOf('<nav className="views"'), src.indexOf('</nav>'))
-    assert.match(nav, /className="view-tab ask-tab"/, 'the tab row has no Ask')
-    assert.match(nav, /onClick=\{\(\) => setSheet\('chat'\)\}/, 'the Ask tab does not open the conversation')
-    assert.match(nav, /disabled=\{view === 'ask'\}/, 'the Ask tab offers to open what is already open on Create')
+    assert.ok(
+      !/ask-tab/.test(nav),
+      'the duplicate Ask tab is back — it opens the conversation the Ask screen already is'
+    )
+    assert.match(nav, /\['ask', '✦ Ask'\]/, 'the conversation screen is not called Ask in the tab row')
+    assert.equal(
+      (nav.match(/\['(play|ask|shape)',/g) || []).length,
+      3,
+      'the tab row is no longer three screens'
+    )
+    // And the sheet route survives for the screens that are not the conversation.
+    assert.match(
+      src,
+      /view !== 'ask' \? \(\s*\n?\s*<button\s*\n?\s*className="ask-anywhere"/,
+      'the floating Ask button no longer opens the conversation from Play and Edit'
+    )
+    const styles = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    assert.ok(
+      !/button\.ask-tab \{/.test(styles),
+      'the removed tab still has styling, which will dress up the next thing given that class by accident'
+    )
   })
 
   test('polish: sheets close with the screen, hand edits are the only "You:", and the rest', () => {
@@ -944,7 +969,10 @@ export function run(test) {
     assert.match(assistant, /<p className="turn-text">\{turn\.text\}<\/p>/, 'the turn text is decorated')
     // Two narration sites were filed as hand edits: the app's own words about itself must pass fromAssistant.
     assert.match(src, /record\('grid', 'Built a chain into the empty slot', \[\], true\)/, 'the design’s own chain build is recorded as a hand edit')
-    assert.match(src, /record\('library', `Kept locally, but not to your account — \$\{err\.message\}`, \[\], true\)/, 'a cloud-save failure is recorded as a hand edit')
+    // The wording moved when keeping became a thing that happens at generation
+    // rather than after a write. What the guard is actually for is the trailing
+    // `true` — this is the app talking about itself, not a hand on the unit.
+    assert.match(src, /record\('library', `[^`]*\$\{err\.message\}`, \[\], true\)/, 'a cloud-save failure is recorded as a hand edit')
     // The typed placeholder follows the reduced-motion setting live, through the one shared hook.
     assert.match(assistant, /import \{ useAsks \} from '\.\.\/lib\/asks'/, 'Assistant reads reduced motion once at mount again')
     assert.match(assistant, /useAsks\('\(prefers-reduced-motion: reduce\)'\)/)
@@ -1465,11 +1493,52 @@ export function run(test) {
      * overwrote it — so two ninety-second waits read as one that never ended:
      * "said working on tone for over 3 minutes then just disappeared".
      */
+    // Not the literal sentence — the wording moved to "Thinking… (second try)"
+    // when the vague lines were cut. What has to hold is that `e.attempt` still
+    // picks a different message, and that the difference names the retry.
     assert.match(
       src,
-      /e\.attempt \? 'Second try/,
+      /e\.attempt \? [^\n]*second try/i,
       'the second attempt looks exactly like the first, so a three-minute wait looks like a hang'
     )
+  })
+
+  test('a line that cannot say what it is doing says only that', () => {
+    /*
+     * "Instead of saying working out what that means just say Thinking whenever
+     * it's not saying exactly what it's doing."
+     *
+     * Two kinds of woolliness went. `setProgress('Working out what that
+     * means...')` is the one that was reported. The other was quieter and
+     * worse: LiveGeneration carried eight STAGES on a three-second timer —
+     * "Choosing an amp", "Shaping the EQ" — that nothing consulted the model
+     * about. They read as progress and were a script, so the line claiming to
+     * choose a cabinet appeared whether or not one was ever touched.
+     *
+     * The specific lines are not covered by this and must not be: "Reading X of
+     * Y", "Building your chain — 3 blocks so far" and "Verifying …" are counts
+     * of things that really happened.
+     */
+    const live = readFileSync(
+      new URL('../src/components/LiveGeneration.jsx', import.meta.url),
+      'utf8'
+    )
+    assert.match(live, /export const THINKING = 'Thinking'/, 'the one honest holding line is gone')
+    assert.ok(
+      !/const STAGES = \[/.test(live),
+      'the scripted stage list is back — it advances on a timer and reports work nobody checked'
+    )
+    assert.ok(
+      !/Working out what that means/.test(src),
+      'the reported line is still there'
+    )
+    assert.ok(
+      !/working on your tone/i.test(src),
+      'a second woolly line is still there, saying nothing the lines around it do not'
+    )
+    // The specific ones survive, or this went too far.
+    assert.match(src, /Building your chain/, 'the real block count stopped being reported')
+    assert.match(src, /Verifying \$\{name\}/, 'the real verify count stopped being reported')
   })
 
   /*

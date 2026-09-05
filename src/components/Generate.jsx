@@ -3,6 +3,8 @@ export function Preview({
   onApply,
   onDiscard,
   busy,
+  /* Whether this plan, with these tick boxes, is already on the unit. */
+  sent = false,
   writeCount,
   withScenes,
   onWithScenes,
@@ -167,13 +169,24 @@ export function Preview({
               e.currentTarget.blur()
               onApply()
             }}
-            disabled={busy || total === 0}
+            disabled={busy || sent || total === 0}
           >
             {busy
               ? 'Writing…'
-              : total === 0
-                ? 'Nothing to send'
-                : `Send ${total} change${total === 1 ? '' : 's'}`}
+              : /*
+                 * "After sending changes, it still says send changes."
+                 *
+                 * Sent outranks the count, because the count was the thing
+                 * saying the wrong thing: sixty-four writes offered again after
+                 * all sixty-four had landed. Turning on scenes or the rename
+                 * makes this false again and the offer comes back, which is
+                 * right — there is something unsent again by then.
+                 */
+                sent
+                ? 'Changes sent'
+                : total === 0
+                  ? 'Nothing to send'
+                  : `Send ${total} change${total === 1 ? '' : 's'}`}
           </button>
         </div>
         )}

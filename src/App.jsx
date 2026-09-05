@@ -11,7 +11,7 @@ import Gig from './components/Gig'
 import SaveBar from './components/SaveBar'
 import SaveSheet from './components/SaveSheet'
 import CloudPresets from './components/CloudPresets'
-import { LiveGeneration, Thinking } from './components/LiveGeneration'
+import { LiveGeneration, Thinking, THINKING } from './components/LiveGeneration'
 import { streamSpec } from './lib/stream'
 import { Modifiers, SceneMatrix } from './components/Modifiers'
 import Feedback from './components/Feedback'
@@ -93,7 +93,7 @@ import {
   forgetPresetName,
   readSceneNames
 } from './lib/forgefx'
-import { savePreset, buildEntry } from './lib/history'
+import { savePreset, buildEntry, deletePreset } from './lib/history'
 import { costOf } from './lib/cost'
 import { isDemo, setDemo } from './lib/forgefx'
 import {
@@ -120,7 +120,7 @@ import {
   servedLocally
 } from './lib/forgefx'
 import { aiUrl } from './lib/ai'
-import { saveCloudPreset, cloudReady, listCloudPresets } from './lib/cloudPresets'
+import { saveCloudPreset, cloudReady, listCloudPresets, deleteCloudPreset } from './lib/cloudPresets'
 import Tour, { tourSeen, markTourSeen } from './components/Tour'
 import Recent from './components/Recent'
 import ConnectScreen from './components/ConnectScreen'
@@ -293,6 +293,28 @@ export default function App() {
    */
   const [renamePreset, setRenamePreset] = useState(true)
   /*
+   * Whether this tone, exactly as it now stands, has already been written.
+   *
+   * "After sending changes, it still says send changes." It did: the button
+   * counted the writes in the plan and went on offering them for ever, so the
+   * one question it answered — have I sent this? — it answered wrongly from
+   * the moment you pressed it, and pressing it again wrote all sixty-four a
+   * second time.
+   *
+   * "Exactly as it now stands" is the whole of it. Scenes and the rename are
+   * tick boxes on the card, and turning one on after sending genuinely does
+   * leave something unsent, so the offer has to come back.
+   *
+   * Held as the plan that was sent rather than a flag, and compared, so no
+   * setter has to remember to clear it — there are eight places that replace
+   * the result and three that change a tick box, and a flag would have to be
+   * cleared correctly in all eleven for ever. Identity on `result` is exact:
+   * every generation, refine and restore builds a new object. Turning a tick
+   * box back to where it was makes this true again, which is right — that plan
+   * really was sent.
+   */
+  const [sentPlan, setSentPlan] = useState(null)
+  /*
    * A build waiting on one question. A preset where no scene has a name has
    * nothing to lose, so this is the moment to ask whether they want one sound
    * or a set of them — before the model runs, rather than after, when the
@@ -366,6 +388,7 @@ export default function App() {
     () => newestFirst(listPresets(), cloudSaves, folderSaves),
     [historyKey, cloudSaves, folderSaves]
   )
+
 
   /*
    * Read the folder's designs whenever the history moves.
@@ -1349,8 +1372,16 @@ export default function App() {
              * later, so two long waits read as one that never ended: "said
              * working on tone for over 3 minutes then just disappeared".
              */
+            /*
+             * The model has been asked and has not answered yet, which is
+             * genuinely all that is known at this point. The line that used to
+             * sit here filled the space without adding to it; the lines above
+             * and below say what was sent and what is coming back, and those
+             * are the ones worth reading. The attempt still shows, because two
+             * ninety-second waits otherwise read as one that never ended.
+             */
             else if (e.kind === 'open')
-              setProgress(e.attempt ? 'Second try — working on your tone…' : 'Working on your tone…')
+              setProgress(e.attempt ? `${THINKING}… (second try)` : `${THINKING}…`)
             else if (e.kind === 'partial') {
               setProgress(
                 e.blocks
@@ -1416,6 +1447,122 @@ export default function App() {
     if (entry) setPast((list) => [...list, entry])
   }
 
+  /**
+   * Has this exact plan already been written?
+   *
+   * Every part of what a send would do: the tone itself, and the three choices
+   * on the card that change what goes with it. Change any of them and this goes
+   * false and the button offers again, which is the whole point.
+   *
+   * Down here rather than beside the state it reads, because `scene` is a
+   * `useDevice` subscription declared much further down the component and a
+   * `const` cannot be read above its own declaration. Written up there first,
+   * this threw "Cannot access 'scene' before initialization" — but only on the
+   * render after a write, which is the one render no unit test performs. The
+   * error boundary caught it and replaced the whole app with "The app couldn't
+   * draw"; every test still passed.
+   */
+  const sent =
+    !!result &&
+    sentPlan?.result === result &&
+    sentPlan.withScenes === withScenes &&
+    sentPlan.renamePreset === renamePreset &&
+    sentPlan.scene === scene
+
+  /**
+   * Throw a design away, from whichever store it is actually in.
+   *
+   * "Add a way for them to delete generations that have been generated
+   * previously." Three stores feed one list, and an entry knows which one it
+   * came from — `where` is set by whoever read it, and absent means this
+   * browser's own storage. Deleting from the wrong one leaves the row on screen
+   * and looks like the button not working.
+   *
+   * A failure is reported rather than swallowed: a delete that silently did
+   * nothing is worse than one that says it could not.
+   */
+  const forget = async (entry) => {
+    if (!entry) return
+    try {
+      if (entry.where === 'cloud') await deleteCloudPreset(entry.id)
+      else if (entry.where === 'folder') {
+        const { savedFolder, deletePresetFile } = await import('./lib/localFolder')
+        const folder = await savedFolder()
+        if (folder && !folder.needsPermission) await deletePresetFile(folder, entry.file)
+      } else deletePreset(entry.id)
+      setHistoryKey((k) => k + 1)
+    } catch (err) {
+      setError(`Couldn't delete “${entry.name || 'Untitled'}” — ${err.message}`)
+    }
+  }
+
+  /**
+   * Keep a tone the moment it is designed, wherever this player's presets live.
+   *
+   * "I'm logged in to the account so it should be saving all of my presets that
+   * I've ever generated instead of just a local browser."
+   *
+   * Half of that was a misreading and half was a real fault, and the real half
+   * is the timing. This ran off the back of a successful write, on the argument
+   * that "a spec that was never sent isn't a preset, it's a draft". That
+   * argument is wrong about how the app is actually used: tones get designed,
+   * compared, and half of them never sent — and every one of those was gone the
+   * moment the next one arrived, from the account as much as from the browser.
+   * Three rows in the table after weeks of use is what that policy looks like
+   * from the outside, and it looks like cloud saving being broken.
+   *
+   * So it happens at generation now. Sending is a separate decision and no
+   * longer the price of keeping anything.
+   *
+   * The two stores are not alternatives. Local (or the chosen folder) is what
+   * makes this work with no account at all; the account copy is what makes a
+   * new phone not a fresh start. A failure to reach the account must not lose
+   * the tone, so it is caught and reported to the log rather than thrown.
+   */
+  const keepGeneration = async (designed) => {
+    if (!designed?.spec) return
+    const fields = {
+      name: designed.presetName || preset?.name || 'Untitled',
+      description: designed.description || lastPrompt,
+      summary: designed.summary,
+      spec: designed.spec,
+      usage: designed.usage,
+      device: device?.name,
+      blockNames: (designed.changes || []).map((c) => c.name)
+    }
+    /*
+     * The folder is the home when one is chosen; this browser's storage is the
+     * fallback, not a second copy. Writing both would show every design twice
+     * on the Mac and leave the question "which one is real" — files on disk are
+     * the answer, because backups reach them and browsers get reinstalled.
+     */
+    try {
+      const { savedFolder, writeDesignFile } = await import('./lib/localFolder')
+      const folder = await savedFolder().catch(() => null)
+      if (folder && !folder.needsPermission) {
+        try {
+          await writeDesignFile(folder, buildEntry(fields))
+        } catch {
+          savePreset(fields)
+        }
+      } else {
+        savePreset(fields)
+      }
+    } catch {
+      savePreset(fields)
+    }
+
+    if (cloudReady()) {
+      try {
+        await saveCloudPreset(buildEntry(fields))
+      } catch (err) {
+        // The app talking about itself, not a hand on the unit.
+        record('library', `Kept on this device, but not to your account — ${err.message}`, [], true)
+      }
+    }
+    setHistoryKey((k) => k + 1)
+  }
+
   const generate = async (description, against = null, opts = {}) => {
     /*
      * Ask once, before the model runs. Asking afterwards would mean paying for
@@ -1464,6 +1611,9 @@ export default function App() {
        */
       if (spec?._trace) validated._trace = spec._trace
       setResult(validated)
+      // Kept here, not on the way out of a write: a tone you never send is
+      // still a tone you asked for, and it used to vanish with the next one.
+      keepGeneration(validated)
       /*
        * Scenes are opt-in — unless they are the whole proposal. A plan that
        * changes no block and only lays out scenes would otherwise arrive with
@@ -1588,55 +1738,16 @@ export default function App() {
 
       const count = countWrites(result.changes)
       setApplied({ failures, count, mismatches })
+      // The plan as it stands is now on the unit, so the button stops offering
+      // to write it again until one of the tick boxes changes what "it" means.
+      setSentPlan({ result, withScenes, renamePreset, scene })
       setDirty(true)
 
-      // Saved after writing rather than on generation: a spec that was never
-      // sent isn't a preset, it's a draft.
-      if (result.spec) {
-        const fields = {
-          name: result.presetName || preset?.name || 'Untitled',
-          description: result.description || lastPrompt,
-          summary: result.summary,
-          spec: result.spec,
-          usage: result.usage,
-          device: device?.name,
-          blockNames: result.changes.map((c) => c.name)
-        }
-        /*
-         * The folder is the home when one is chosen; this browser's storage is
-         * the fallback, not a second copy. Writing both would show every design
-         * twice on the Mac and leave the question "which one is real" — files
-         * on disk are the answer, because backups reach them and browsers get
-         * reinstalled.
-         */
-        const { savedFolder, writeDesignFile } = await import('./lib/localFolder')
-        const folder = await savedFolder().catch(() => null)
-        if (folder && !folder.needsPermission) {
-          try {
-            await writeDesignFile(folder, buildEntry(fields))
-          } catch {
-            savePreset(fields)
-          }
-        } else {
-          savePreset(fields)
-        }
-        /*
-         * And to the account, when signed in. Additive rather than instead:
-         * the local copy is what makes this work with no account at all, and
-         * the cloud copy is what makes a new machine not a fresh start. A
-         * failure here must not lose the tone, so it is caught and reported
-         * through the log rather than thrown into the middle of a write.
-         */
-        if (cloudReady()) {
-          try {
-            await saveCloudPreset(buildEntry(fields))
-          } catch (err) {
-            // The app talking about itself, not a hand on the unit.
-            record('library', `Kept locally, but not to your account — ${err.message}`, [], true)
-          }
-        }
-        setHistoryKey((k) => k + 1)
-      }
+      /*
+       * Keeping it is `keepGeneration`'s job now, and it happened the moment
+       * this tone was designed — see there for why it moved off the back of a
+       * successful write.
+       */
       record(
         'write',
         `Wrote ${count} changes to ${preset?.name || 'the working preset'}`,
@@ -1909,6 +2020,11 @@ export default function App() {
       validated.description = instruction
       keep(replacing)
       setResult(validated)
+      // A refinement is its own tone — a different spec, asked for separately —
+      // so it is kept like one. Restoring from the library is NOT: that entry
+      // is already saved, and keeping it again would grow a duplicate each time
+      // someone opened an old design to look at it.
+      keepGeneration(validated)
       setApplied(null)
       setSaveName(validated.presetName || preset?.name?.trim() || '')
       revealResult()
@@ -2001,7 +2117,7 @@ export default function App() {
         return { ...entry, row: placed?.row, col: placed?.col }
       })
 
-      setProgress('Working out what that means...')
+      setProgress(`${THINKING}…`)
       // The placeable palette rides along so "add a reverb" is sayable: the
       // model can only speak in names it has been shown, and type codes differ
       // per unit. Cached per device inside blockCatalog's own layer.
@@ -2632,6 +2748,7 @@ export default function App() {
             }
           }}
           busy={busy}
+          sent={sent}
           onApply={apply}
           /* Discard clears the panel; it has never undone anything on the unit.
              So the tone still goes into the log — turning one down is part of
@@ -3006,11 +3123,27 @@ export default function App() {
               and revealResult anchor to them. Only the words a player reads
               change: "Shape" and "Ask" described what the screen was to the
               person building it, not what you go there to do. */}
-          {/* Create before Edit: you make a tone, then you adjust it, and the
-              tabs now run in that order. */}
+          {/*
+            One conversation, one name.
+            There used to be four tabs here: Create, and then a separate ✦ Ask
+            that opened `chat` and `tones` — the same two elements Create
+            renders — in a sheet. Not two assistants; one, listed twice, and the
+            second entry greyed itself out whenever you were on the first
+            because there was nothing left for it to open. "It says Create, and
+            then Ask on the same page, which kind of defeats the purpose of
+            having multiple chat bots."
+
+            So the screen carries the ✦ and the name the floating button
+            already used, and the fourth tab is gone. The sheet stays: on Play
+            and Edit the same conversation is still one tap away, without
+            leaving the screen you are working on.
+
+            The id is still 'ask' — it always was. Only the word a player reads
+            has changed, and it has changed to the one used everywhere else.
+          */}
           {[
             ['play', 'Play'],
-            ['ask', 'Create'],
+            ['ask', '✦ Ask'],
             ['shape', 'Edit']
           ].map(([id, label]) => (
             <button
@@ -3022,21 +3155,6 @@ export default function App() {
               {label}
             </button>
           ))}
-          {/*
-            Ask, as a tab, on a phone. The floating button below sat over the
-            bottom-right corner — scene tile 6, the pad's Change, Edit's
-            Modifiers — because that corner is where the last control in every
-            grid lands. Up here nothing is under it. On Create the
-            conversation is the screen, so the tab has nothing to open.
-          */}
-          <button
-            className="view-tab ask-tab"
-            onClick={() => setSheet('chat')}
-            disabled={view === 'ask'}
-            aria-label="Ask for a change"
-          >
-            <span aria-hidden="true">✦</span> Ask
-          </button>
         </nav>
       ) : null}
 
@@ -3199,6 +3317,7 @@ export default function App() {
           entries={library}
           busy={busy}
           onRestore={reload}
+          onDelete={forget}
           onSeeAll={() => setSheet('presets')}
         />
       ) : null}
