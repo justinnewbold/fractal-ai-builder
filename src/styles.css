@@ -4004,10 +4004,85 @@ ol.action-list li.destructive::marker {
   border-radius: var(--r-1);
 }
 
+/*
+ * The transcript's own scroll, and how tall it is allowed to be.
+ *
+ * 340px was a letterbox: a conversation happening in a small window with the
+ * page scrolling behind it, which is the shape no chat anybody has used has.
+ * Off the Create screen — in the sheet, where the sheet owns the height — it
+ * is still capped, because there the panel is a guest.
+ */
 .assistant-log {
   max-height: 340px;
   overflow-y: auto;
   margin-bottom: 12px;
+}
+
+/*
+ * On Create, the conversation gets what is left of the screen.
+ *
+ * dvh rather than vh: on iOS the address bar grows and shrinks the viewport,
+ * and vh is the tall one, so a vh-sized column spends half its life taller
+ * than the screen it is in. The shell stops scrolling on this view so the
+ * transcript is the one thing that does — one scroll surface, which is the
+ * other half of what "like most chat bots" means.
+ *
+ * The composer is not pinned to the window, only to the bottom of this column.
+ * A fixed bar carrying a text field is what iOS Safari handles worst, this app
+ * removed one once already, and nothing here brings it back.
+ */
+.shell.shell-chat {
+  display: flex;
+  flex-direction: column;
+  /*
+   * A height, not a minimum. With a minimum the column grows past the screen
+   * as the conversation gets longer, and a growing column has no reason to
+   * scroll anything — the transcript pushed the composer off the bottom
+   * instead, which is worse than the letterbox it replaced.
+   */
+  height: 100dvh;
+  padding-bottom: var(--s-4);
+}
+
+/*
+ * The chain, all the way down.
+ *
+ * The conversation does not sit in the shell directly — it is inside the
+ * screens wrapper and the screen that swaps with the tabs, both of them plain
+ * blocks. A flex column only hands height to children that are flex items, so
+ * without these two the transcript stayed at its content height and the page
+ * grew instead, which is what the first attempt at this did.
+ */
+.shell-chat .screens,
+.shell-chat .screens > .screen {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.chat-screen {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  /* Without this a flex child refuses to shrink past its content, and the
+     transcript pushes the composer off the bottom instead of scrolling. */
+  min-height: 0;
+  margin-top: 18px;
+}
+
+.chat-screen .assistant {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 0;
+}
+
+.chat-screen .assistant-log {
+  max-height: none;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .assistant-empty {

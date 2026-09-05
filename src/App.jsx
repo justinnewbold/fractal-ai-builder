@@ -2634,7 +2634,7 @@ export default function App() {
   )
 
   return (
-    <div className="shell">
+    <div className={`shell ${status === 'live' && view === 'ask' ? 'shell-chat' : ''}`}>
       {/* Above everything, because a stale tab makes every other thing on this
           screen a possible lie about what the code does. */}
       <UpdateNotice />
@@ -2994,7 +2994,14 @@ export default function App() {
         </>
       ) : null}
 
-      {view === 'ask' ? chat : null}
+      {/*
+        Create is the conversation's home and, as the comment above says, gives
+        it the whole screen. It did not: the log was capped at 340 pixels (260
+        on a phone), so a chat with the run of a 900-pixel window happened in a
+        letterbox with the page scrolling behind it. "Right now it feels
+        clunky" — this is the other half of that.
+      */}
+      {view === 'ask' ? <div className="chat-screen">{chat}</div> : null}
 
       {/*
         What you have made, under the box you make it in — and only there.

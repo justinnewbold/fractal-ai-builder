@@ -381,4 +381,28 @@ export function run(test) {
     assert.ok(!/;;/.test(rule), 'a stray double semicolon is back')
   })
 
+  /*
+   * The conversation gets the screen it is on.
+   *
+   * "Right now it feels clunky." Half of that was the tone taking pages. The
+   * other half was this: the transcript was a 340px window (260 on a phone) with
+   * the page scrolling behind it, on the screen whose own comment says Create
+   * "gives it the whole screen". Measured before the change: 19px of 900.
+   */
+  test('the transcript fills the Create screen rather than a letterbox', () => {
+    const chat = css.slice(css.indexOf('.shell.shell-chat'))
+
+    // A height, not a minimum: a column that grows has no reason to scroll, and
+    // the transcript pushed the composer off the bottom instead.
+    assert.match(chat.slice(0, 900), /height: 100dvh/, 'the chat column has no fixed height')
+    assert.ok(!/min-height: 100vh|height: 100vh\b/.test(chat.slice(0, 900)),
+      'vh rather than dvh — on iOS that is the tall viewport, so the column outgrows the screen')
+
+    // The chain has to reach: the conversation is inside .screens > .screen,
+    // both plain blocks, and a flex column only hands height to flex items.
+    assert.match(css, /\.shell-chat \.screens,\s*\n\s*\.shell-chat \.screens > \.screen \{/,
+      'the flex chain stops before the conversation, so it stays at content height')
+    assert.match(css, /\.chat-screen \.assistant-log \{[^}]*max-height: none/,
+      'the log keeps its letterbox cap on the screen that is meant to be its home')
+  })
 }
