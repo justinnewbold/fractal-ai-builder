@@ -1079,12 +1079,33 @@ button.chip {
   border-radius: var(--r-1);
 }
 
+/*
+ * A tone from earlier in the conversation.
+ *
+ * The live one keeps the signal stripe down its left edge; a card that has
+ * already been answered gives it up, so the one thing on the screen wearing
+ * that colour is the one still asking a question. Everything else about it is
+ * unchanged — this is the same tone, still readable in full, not a summary of
+ * one.
+ */
+.preview-past {
+  border-left-color: var(--rule);
+}
+
 .preview-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--s-4);
   flex-wrap: wrap;
+}
+
+/* Where the buttons were, on a card that no longer has any. */
+.preview-outcome {
+  margin: 0;
+  color: var(--silk-dim);
+  font-size: var(--f-2);
+  white-space: nowrap;
 }
 
 .preview-actions {

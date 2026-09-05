@@ -436,9 +436,17 @@ export function run(test) {
       }
     }
     walk(dir)
+    /*
+     * Three shapes, because a class written the fourth way is invisible here
+     * and reports a live anchor as dead. `className={cond ? 'a' : 'b'}` used to
+     * be that fourth way: a real rule, really rendered, and this scan could not
+     * see either name in it.
+     */
     const rendered = files
-      .flatMap((body) => [...body.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)])
-      .flatMap((m) => (m[1] || m[2] || '').split(/[\s${}?:'"]+/))
+      .flatMap((body) => [
+        ...body.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\}|\{([^}]*)\})/g)
+      ])
+      .flatMap((m) => (m[1] || m[2] || m[3] || '').split(/[\s${}?:'"`]+/))
       .filter(Boolean)
 
     const anchors = [
@@ -1754,11 +1762,70 @@ export function run(test) {
     const folded = gen.slice(gen.indexOf('<details className="preview-detail">'))
     assert.match(folded, /className="diff"/, 'the diff is not what is folded')
 
-    // And the cost and the trace ride inside it rather than stacking beside it.
+    /*
+     * And the cost and the trace ride inside it rather than stacking beside it.
+     * Every card, not the first one found: there is more than one <Preview> in
+     * App now — the live tone and each one kept in the conversation — and a
+     * card that stacks its cost beside itself is the same regression whichever
+     * of them does it.
+     */
     const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
-    const preview = app.slice(app.indexOf('<Preview'), app.indexOf('</Preview>'))
-    assert.match(preview, /<Cost /, 'the cost is a panel of its own beside the tone again')
-    assert.match(preview, /<DevTrace /, 'the trace is a panel of its own beside the tone again')
+    const cards = app.split('<Preview').slice(1).map((part) => part.slice(0, part.indexOf('</Preview>')))
+    assert.ok(cards.length >= 2, 'the tones kept in the conversation are not drawn as cards')
+    for (const card of cards) {
+      assert.match(card, /<Cost\b/, 'the cost is a panel of its own beside the tone again')
+      assert.match(card, /<DevTrace\b/, 'the trace is a panel of its own beside the tone again')
+    }
+  })
+
+  test('a tone asked for earlier is still in the conversation, and cannot write', () => {
+    /*
+     * "Like most chat bots" — what was said stays said.
+     *
+     * There was one slot for a design, so a second tone destroyed the first.
+     * Ask for something darker and the tone you were comparing it against was
+     * gone from the screen with nothing anywhere that remembered it: history
+     * keeps only what was saved, so a tone generated and turned down left no
+     * trace at all.
+     */
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    const gen = readFileSync(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
+
+    /*
+     * Every path that takes the tone off the screen puts it in the log first.
+     * Four of them: a new generation, a refinement, loading a saved design over
+     * it, and Discard.
+     */
+    const kept = (app.match(/\bkeep\((?:shelved\(\)|replacing)\)/g) || []).length
+    assert.ok(kept >= 4, `only ${kept} of the four paths keep the tone they replace`)
+
+    /*
+     * The one that matters most.
+     *
+     * A card from three requests ago describes a preset that has since moved,
+     * so a Send button on it is an offer to overwrite whatever came after. The
+     * kept cards are handed no handler that can reach the unit — not the write,
+     * not the scene switch, not the two choices.
+     */
+    const past = app.slice(app.indexOf('const pastDesigns ='), app.indexOf('</Preview>', app.indexOf('const pastDesigns =')))
+    assert.ok(past.length > 100, 'the kept tones are no longer built here')
+    for (const handler of ['onApply', 'onDiscard', 'onScene', 'onWithScenes', 'onRenamePreset']) {
+      assert.ok(!past.includes(handler), `a tone from earlier can still ${handler} — it would write the wrong preset`)
+    }
+
+    /*
+     * And the card itself offers nothing to press once it has an outcome. The
+     * buttons live in the other half of that branch; strip the comments first,
+     * which describe them.
+     */
+    const bare = gen.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+    const head = bare.slice(bare.indexOf('{outcome ? ('), bare.indexOf(') : ('))
+    assert.match(head, /preview-outcome/, 'a tone that has been answered does not say what happened to it')
+    assert.ok(!head.includes('<button'), 'a tone that has been answered still offers a button')
+
+    /* The scene names are the ones it was asked against, not whatever they
+       have since been renamed to — the card is a record of a moment. */
+    assert.match(app, /sceneNames=\{entry\.sceneNames\}/, 'a kept tone reads the live scene names')
   })
 
   /*
@@ -2135,11 +2202,43 @@ export function run(test) {
      * the newest thing on screen was an old design. It is placed where it
      * happened instead: after the turns that existed when it started, and above
      * everything said since.
+     *
+     * There are several of them now — every tone asked for in this
+     * conversation is kept — so the split became a merge. The property under
+     * test is the same one: each tone sits at its own `at`, and the turns run
+     * around them in order rather than all of them landing first.
      */
     const a = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
-    assert.match(a, /const before = turns\.slice\(0, cut\)/, 'the log does not split around the design')
-    assert.match(a, /const since = turns\.slice\(cut\)/, 'nothing renders below the design')
-    assert.match(a, /since\.map/, 'turns said after the design are dropped')
+    assert.match(a, /\.sort\(\(a, b\) => a\.at - b\.at\)/, 'the tones are not put in the order they were asked for')
+    assert.match(
+      a,
+      /for \(; cursor < mark\.at; cursor\+\+\) log\.push\(renderTurn/,
+      'the log does not run the turns up to each tone'
+    )
+    assert.match(
+      a,
+      /for \(; cursor < turns\.length; cursor\+\+\) trailing\.push\(renderTurn/,
+      'turns said after the last tone are dropped'
+    )
+    /*
+     * And the live tone is one of them, not a special case rendered after the
+     * loop — that is what put it permanently last before.
+     */
+    assert.match(a, /\{ key: 'live', at: cut, node: children \}/, 'the live tone is placed outside the merge')
+
+    /*
+     * And the position it is given is the conversation as it stands, not as it
+     * stood when the function was made.
+     *
+     * A generation runs from inside an async chain — something typed, a turn
+     * recorded, a round trip to the model, then the design request — so `turns`
+     * in that closure is several turns stale. Every tone was landing one
+     * exchange too high, above the sentence that asked for it.
+     */
+    const app2 = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    assert.match(app2, /turnsNow\.current = turns\.length/, 'nothing tracks how long the conversation is now')
+    assert.match(app2, /setGenAt\(turnsNow\.current\)/, 'the tone reads its position from a stale closure')
+    assert.ok(!app2.includes('setGenAt(turns.length)'), 'the tone reads its position from a stale closure')
 
     // One renderer, so a turn below the design keeps its confirm buttons.
     assert.match(a, /const renderTurn = /, 'the turn markup is duplicated and will drift')
@@ -2149,9 +2248,9 @@ export function run(test) {
       'a pending turn is drawn twice, or only on one side of the design'
     )
 
-    // And App has to say when the design started, or the split is always a no-op.
+    // And App has to say when the design started, or the merge is a no-op.
     const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
-    assert.match(app, /setGenAt\(turns\.length\)/, 'nothing records where the design belongs')
+    assert.match(app, /setGenAt\(/, 'nothing records where the design belongs')
     assert.match(app, /at=\{genAt\}/, 'the chat is never told where the design belongs')
   })
 
