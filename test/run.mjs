@@ -2533,9 +2533,55 @@ test('quiet after the hello is the AI, and it says so without naming machines', 
   globalThis.fetch = f.fetch
   await assert.rejects(
     streamSpec({}, { timing }),
-    (err) => err.generationFailure === 'stalled' && /took the request but never started/.test(err.message)
+    (err) => err.generationFailure === 'stalled' && /sent nothing back/.test(err.message)
   )
   assert.equal(f.calls(), 2, 'a quiet start was not retried — nothing had been written, so it was free to ask again')
+})
+
+test('a wait of our own making is not blamed on what the player typed', async () => {
+  /*
+   * "Said working on tone for over 3 minutes then just disappeared and nothing
+   * was generated." What it then said was "ask again, and a shorter
+   * description starts sooner" — to someone whose description was five words.
+   *
+   * The wait before the model's first word is this app's own payload and the
+   * model's own speed. Pointing a person at the one part they cannot usefully
+   * change wastes their next attempt and blames them for our delay.
+   */
+  const f = scheduledFetch([
+    { steps: [{ at: 5, chunk: OPEN }], end: false },
+    { steps: [{ at: 5, chunk: OPEN }], end: false }
+  ])
+  globalThis.fetch = f.fetch
+  await assert.rejects(streamSpec({}, { timing }), (err) => {
+    assert.ok(
+      !/shorter description|fewer words/i.test(err.message),
+      `it still blames the description — ${err.message}`
+    )
+    assert.match(err.message, /twice/, 'three minutes of waiting is reported as one attempt')
+    assert.match(err.message, /Nothing was written to your unit/)
+    return true
+  })
+})
+
+test('the second attempt announces itself and is not overwritten', async () => {
+  /*
+   * The retry said "asking again" and the new attempt's hello overwrote it a
+   * second later, so two ninety-second waits looked like one that never
+   * ended. The attempt number rides on the hello so the screen can keep
+   * saying which try this is.
+   */
+  const f = scheduledFetch([
+    { steps: [{ at: 5, chunk: OPEN }], end: false },
+    { steps: [{ at: 5, chunk: OPEN }], end: false }
+  ])
+  globalThis.fetch = f.fetch
+  const opens = []
+  await assert.rejects(
+    streamSpec({}, { timing, onEvent: (e) => e.kind === 'open' && opens.push(e.attempt) }),
+    () => true
+  )
+  assert.deepEqual(opens, [0, 1], 'the hello does not say which attempt it belongs to')
 })
 
 test('the wait speaks to a guitarist, not to whoever wrote it', () => {

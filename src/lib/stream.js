@@ -99,7 +99,7 @@ export async function streamSpec(body, opts = {}) {
   const started = Date.now()
   for (let attempt = 0; ; attempt++) {
     try {
-      return await attemptOnce(body, opts, started)
+      return await attemptOnce(body, opts, started, attempt)
     } catch (err) {
       const canRetry = err?.generationFailure === 'stalled' && !err.partials && attempt === 0 && !opts.signal?.aborted
       if (!canRetry) throw err
@@ -109,7 +109,12 @@ export async function streamSpec(body, opts = {}) {
   }
 }
 
-async function attemptOnce(body, { onPartial, onEvent, signal, host, timing } = {}, started = Date.now()) {
+async function attemptOnce(
+  body,
+  { onPartial, onEvent, signal, host, timing } = {},
+  started = Date.now(),
+  attempt = 0
+) {
   const stallMs = timing?.stallMs ?? STALL_MS
   const firstMs = timing?.firstMs ?? FIRST_MS
   const capMs = timing?.capMs ?? HARD_CAP_MS
@@ -226,7 +231,13 @@ async function attemptOnce(body, { onPartial, onEvent, signal, host, timing } = 
         // and starts nothing.
         if (frame.type === 'open') {
           note('open', { ms: since() })
-          onEvent?.({ kind: 'open', ms: since() })
+          /*
+           * The attempt travels with it. The retry announced itself and then
+           * this frame overwrote the announcement a second later, so three
+           * minutes of waiting looked like one attempt that never ended:
+           * "said working on tone for over 3 minutes then just disappeared".
+           */
+          onEvent?.({ kind: 'open', ms: since(), attempt })
           continue
         }
         answering = true
@@ -277,8 +288,20 @@ async function attemptOnce(body, { onPartial, onEvent, signal, host, timing } = 
         )
       }
       if (reason === 'quiet-start') {
+        /*
+         * What this used to say: "ask again, and a shorter description starts
+         * sooner." It was told to someone whose description was five words.
+         *
+         * The wait before the first word is not their prose. It is this app's
+         * own payload — every model roster the unit carries, its parameter
+         * ranges and its current state — plus however busy the model is. Aiming
+         * a person at the one part they cannot usefully change wastes their
+         * next attempt and blames them for a delay that is ours.
+         */
         throw fail(
-          'The AI took the request but never started answering, so we stopped waiting. Nothing was written to your unit — ask again, and a shorter description starts sooner.',
+          `The AI accepted the request and then sent nothing back for ${Math.round(
+            firstMs / 1000
+          )} seconds${attempt ? ', twice' : ''}, so we stopped waiting. Nothing was written to your unit. That wait is the AI being slow rather than anything about what you asked for — trying again in a moment usually works.`,
           // Deliberately the same kind as a stall: nothing arrived and nothing
           // was written, so the one automatic retry above applies.
           'stalled'

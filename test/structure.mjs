@@ -1433,8 +1433,19 @@ export function run(test) {
      */
     assert.match(
       src,
-      /e\.kind === 'open'\) setProgress\(/,
+      /e\.kind === 'open'\)\s*\n?\s*setProgress\(/,
       "the working line ignores the server's hello, so it claims to be reaching the server long after it has"
+    )
+    /*
+     * And it says which attempt is running. A quiet start is retried once, and
+     * the retry used to announce itself only for the second before this hello
+     * overwrote it — so two ninety-second waits read as one that never ended:
+     * "said working on tone for over 3 minutes then just disappeared".
+     */
+    assert.match(
+      src,
+      /e\.attempt \? 'Second try/,
+      'the second attempt looks exactly like the first, so a three-minute wait looks like a hang'
     )
   })
 

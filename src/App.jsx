@@ -292,6 +292,16 @@ export default function App() {
   const [log, setLog] = useState([])
   const [spend, setSpend] = useState({ total: 0, runs: 0 })
   const [lastPrompt, setLastPrompt] = useState('')
+  /*
+   * A failed generation, kept so it can be asked again with one tap.
+   *
+   * "Said working on tone for over 3 minutes then just disappeared and nothing
+   * was generated." At the end of that the only thing on offer was Dismiss, so
+   * the cost of the failure was the wait plus typing it all again. Every one of
+   * these failures ends with nothing written to the unit, which is exactly the
+   * condition that makes asking again safe to offer.
+   */
+  const [retryAsk, setRetryAsk] = useState(null)
   const [historyKey, setHistoryKey] = useState(0)
   /*
    * Designs kept in a chosen folder.
@@ -1190,6 +1200,8 @@ export default function App() {
   /** One path to the model, so generate and refine can't drift apart. */
   const requestSpec = async (schema, description, previous, extra = {}) => {
     setPartial(null)
+    // A new run replaces whatever the last failure was offering to repeat.
+    setRetryAsk(null)
     setThinking(true)
     /*
      * A handle on the request while it runs, so Stop can actually stop it.
@@ -1256,7 +1268,15 @@ export default function App() {
             // line changing at all means the round trip works — which is most
             // of what someone staring at a long wait wants to know, even if
             // they would never put it that way.
-            else if (e.kind === 'open') setProgress('Working on your tone…')
+            /*
+             * Which attempt this is, kept on screen.
+             *
+             * The retry announced itself and this line overwrote it a second
+             * later, so two long waits read as one that never ended: "said
+             * working on tone for over 3 minutes then just disappeared".
+             */
+            else if (e.kind === 'open')
+              setProgress(e.attempt ? 'Second try — working on your tone…' : 'Working on your tone…')
             else if (e.kind === 'partial') {
               setProgress(
                 e.blocks
@@ -1355,6 +1375,8 @@ export default function App() {
       // A run that failed leaves no half chain on screen beside its error.
       setPartial(null)
       setError(err.message)
+      // Nothing reached the unit, so asking again is safe to offer.
+      setRetryAsk({ description, against, opts })
     } finally {
       setProgress(null)
       setBusy(false)
@@ -2704,7 +2726,35 @@ export default function App() {
           <h2>Didn&rsquo;t work</h2>
           <p>{error}</p>
           <div className="history-actions">
-            <button className="chip" onClick={() => setError(null)}>
+            {/*
+              Asking again, without typing it again.
+
+              Offered only where the app knows nothing was written — a design
+              run that failed — because that is the one case where repeating
+              the request cannot do any harm. Three minutes of waiting used to
+              end at a Dismiss button and a blank chat box.
+            */}
+            {retryAsk ? (
+              <button
+                className="chip"
+                disabled={busy}
+                onClick={() => {
+                  const again = retryAsk
+                  setRetryAsk(null)
+                  setError(null)
+                  generate(again.description, again.against, again.opts)
+                }}
+              >
+                Try again
+              </button>
+            ) : null}
+            <button
+              className="chip"
+              onClick={() => {
+                setError(null)
+                setRetryAsk(null)
+              }}
+            >
               Dismiss
             </button>
           </div>
