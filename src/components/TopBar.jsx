@@ -1,6 +1,7 @@
 import { isDemo } from '../lib/forgefx'
 import { describeUnit } from '../lib/link'
 import { presetLabel } from '../lib/presetName'
+import { FULL, VERSION } from '../lib/version'
 import LinkChip from './LinkChip'
 
 /**
@@ -120,6 +121,22 @@ export default function TopBar({
         {/* The Save button says whether there is anything to save; there is
             no separate word for it any more. */}
         {children}
+
+        {/*
+          The version, where it can be read without opening anything.
+
+          "The app version number is listed only in settings. I like to always
+          know easily what version we are working on." Fair: it is the first
+          thing either of us needs when something looks wrong, and it lived one
+          sheet and one fold away from the screen it describes.
+
+          Small, dim and last before the gear, so it sits with the other things
+          about the app rather than the things about the tone. It carries the
+          same title as Setup's line so a hover still gives the commit.
+        */}
+        <span className="topbar-version mono" title={FULL}>
+          v{VERSION}
+        </span>
 
         <LinkChip compact link={link} onAction={onLinkAction} />
 

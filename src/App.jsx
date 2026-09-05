@@ -412,6 +412,27 @@ export default function App() {
   const [queuedSave, setQueuedSave] = useState(null)
   const [askedSave, setAskedSave] = useState(null)
   /*
+   * Requests already dealt with, by id.
+   *
+   * "This notification doesn't disappear after clicking one of the options."
+   *
+   * Both buttons cleared the state and then cleared the parked request on the
+   * host — in that order, with awaits in between. Clearing the state re-runs
+   * the effect below, which looks again immediately, finds the request still
+   * parked, and raises it a second time. The same happens whenever the clear
+   * fails at all: the notice returns six seconds later, for ever.
+   *
+   * So the decision is remembered here the moment it is made, before anything
+   * is awaited. A ref rather than state because it must be true instantly, in
+   * the same tick, for the look() that is about to run.
+   */
+  const handledSaves = useRef([])
+  const markHandled = useCallback((id) => {
+    if (!id || handledSaves.current.includes(id)) return
+    // Bounded: this only has to outlive the request that is on screen.
+    handledSaves.current = [...handledSaves.current.slice(-19), id]
+  }, [])
+  /*
    * Whether this is the machine with the cable in it.
    *
    * Asked of localhost rather than guessed from the user agent, and asked
@@ -864,6 +885,15 @@ export default function App() {
   /** Do at the Mac what the phone asked for, and say so at both ends. */
   const carryOutSave = useCallback(
     async (req) => {
+      /*
+       * First, before anything is awaited and before the notice comes down.
+       *
+       * Clearing askedSave re-runs the effect that watches for parked saves,
+       * which looks again immediately — while this is still part-way through
+       * and the request is still parked on the host. Without this it finds it
+       * and carries it out a second time.
+       */
+      markHandled(req?.id)
       setBusy(true)
       setAskedSave(null)
       try {
@@ -938,7 +968,7 @@ export default function App() {
         setBusy(false)
       }
     },
-    [preset?.name, read, record, device?.capabilities]
+    [preset?.name, read, record, device?.capabilities, markHandled]
   )
 
   /*
@@ -955,11 +985,21 @@ export default function App() {
     let stop = false
     const look = async () => {
       const req = await takeParkedSave()
-      if (stop || !req?.id || !Number.isInteger(req.slot) || askedSave?.id === req.id) return
+      if (stop || !req?.id || !Number.isInteger(req.slot)) return
+      // Already on screen, or already answered — either way, not news.
+      if (askedSave?.id === req.id || handledSaves.current.includes(req.id)) return
       const fresh = Date.now() - (req.at || 0) < 15 * 60 * 1000
       const sameBuffer = req.fromSlot == null || req.fromSlot === preset?.number
       if (fresh && sameBuffer) await carryOutSave(req)
-      else setAskedSave(req)
+      /*
+       * Which of the two it is, decided here and carried with the request.
+       *
+       * The notice used to say "the unit has moved since it asked" whatever
+       * the reason was, so a request held up purely by age announced itself
+       * as "it was on 99 and is on 99 now" — a sentence that disproves itself
+       * in front of the person reading it.
+       */
+      else setAskedSave({ ...req, why: sameBuffer ? 'stale' : 'moved' })
     }
     look()
     const timer = setInterval(look, 6000)
@@ -2694,17 +2734,33 @@ export default function App() {
           <h2>The phone asked to save</h2>
           <p>
             &ldquo;{askedSave.name || askedSave.fromName || 'Untitled'}&rdquo; to slot{' '}
-            {askedSave.slot}. The unit has moved since it asked &mdash; it was on{' '}
-            {askedSave.fromSlot ?? '--'} and is on {preset?.number ?? '--'} now &mdash; so saving
-            would store what is loaded here, under that name.
+            {askedSave.slot}.{' '}
+            {askedSave.why === 'moved' ? (
+              <>
+                The unit has moved since it asked &mdash; it was on {askedSave.fromSlot ?? '--'} and
+                is on {preset?.number ?? '--'} now &mdash; so saving would store what is loaded
+                here, under that name.
+              </>
+            ) : (
+              <>
+                That was asked a while ago, and what is loaded here may not be what they meant any
+                more &mdash; saving would store whatever is on the unit now, under that name.
+              </>
+            )}
           </p>
           <div className="history-actions">
-            <button className="chip" onClick={() => carryOutSave(askedSave)} disabled={busy}>
+            <button
+              className="chip"
+              onClick={() => carryOutSave(askedSave)}
+              disabled={busy}
+            >
               Save it anyway
             </button>
             <button
               className="chip"
               onClick={async () => {
+                markHandled(askedSave.id)
+                setAskedSave(null)
                 await clearParkedSave().catch(() => {})
                 await reportSave({
                   id: askedSave.id,
@@ -2712,7 +2768,6 @@ export default function App() {
                   slot: askedSave.slot,
                   error: 'Left alone at the Mac — the unit had moved on.'
                 }).catch(() => {})
-                setAskedSave(null)
               }}
             >
               Leave it

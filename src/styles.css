@@ -407,6 +407,22 @@ button.topbar-preset:active:not(:disabled) {
  * had. It is now a square big enough to hit, and the glyph inside it is a size
  * you can see at arm's length rather than one that hides in the corner.
  */
+/* The version: present, and never competing with the preset name for room. */
+.topbar-version {
+  flex: 0 0 auto;
+  font-size: var(--f-1);
+  color: var(--silk-faint);
+  letter-spacing: 0;
+}
+
+/* On a phone the bar is already tight — the name lost to it once before, so
+   the patch number goes rather than the name. */
+@media (max-width: 620px) {
+  .topbar-version {
+    display: none;
+  }
+}
+
 button.topbar-gear {
   flex: 0 0 auto;
   display: inline-flex;

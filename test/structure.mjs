@@ -1644,6 +1644,71 @@ export function run(test) {
     )
   })
 
+  /*
+   * Answering a question makes it go away.
+   *
+   * "This notification doesn't disappear after clicking one of the options."
+   * Both buttons cleared the notice and then cleared the parked request, in
+   * that order, with awaits between — and clearing the notice re-runs the
+   * effect that watches for parked saves, which looks again immediately, finds
+   * the request still there, and raises it a second time.
+   *
+   * And the copy said "the unit has moved since it asked" whatever the reason
+   * was, so a request held up purely by its age announced itself as "it was on
+   * 99 and is on 99 now" — a sentence that disproves itself as you read it.
+   */
+  test('a save request that has been answered cannot ask again', () => {
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+
+    // The decision is recorded before anything is awaited, and consulted.
+    assert.match(app, /markHandled\(req\?\.id\)/, 'nothing records that a request was dealt with')
+    assert.match(
+      app,
+      /handledSaves\.current\.includes\(req\.id\)/,
+      'the watcher can raise a request that has already been answered'
+    )
+    /*
+     * It is the FIRST thing carryOutSave does — after an await it is too late.
+     * Measured with the comments stripped: the comment explaining this says
+     * "before anything is awaited", and a guard that finds the word there
+     * reads its own explanation as the defect.
+     */
+    const carry = app
+      .slice(app.indexOf('const carryOutSave'), app.indexOf('const carryOutSave') + 2500)
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+    const marked = carry.indexOf('markHandled')
+    const firstAwait = carry.indexOf('await ')
+    assert.ok(
+      marked >= 0 && (firstAwait === -1 || marked < firstAwait),
+      'the request is marked after the first await, which is the race this fixes'
+    )
+
+    // And the notice says which of the two reasons it is.
+    assert.match(app, /why: sameBuffer \? 'stale' : 'moved'/, 'the reason is not carried with the request')
+    assert.match(app, /askedSave\.why === 'moved' \?/, 'the copy claims a movement whatever the reason')
+  })
+
+  /*
+   * "The app version number is listed only in settings. I like to always know
+   * easily what version we are working on."
+   *
+   * On the bar, where it can be read without opening anything — and not on a
+   * phone, where the bar has no room to give: a long preset name is already
+   * clipped at 390px, and this measured as costing it nothing only because
+   * there is slack at desktop widths.
+   */
+  test('the version is on the main screen, and not where the bar is full', () => {
+    const bar = readFileSync(new URL('../src/components/TopBar.jsx', import.meta.url), 'utf8')
+    assert.match(bar, /className="topbar-version mono"/, 'the version is only in Setup again')
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    const rule = css.slice(css.indexOf('.topbar-version'))
+    assert.match(
+      rule.slice(0, 400),
+      /max-width: 620px[\s\S]{0,120}\.topbar-version[\s\S]{0,60}display: none/,
+      'the version takes room from the preset name on a phone'
+    )
+  })
+
   test('a channel is written where the scene that plays it can keep it', () => {
     const forgefx = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
 
