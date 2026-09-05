@@ -1608,6 +1608,42 @@ export function run(test) {
     )
   })
 
+  /*
+   * One fold per thing, and the empty case in a player's words.
+   *
+   * Opening FOOTSWITCHES in Setup showed a lone "Hide footswitches" button —
+   * a second fold inside the section that is already a fold, offering to hide
+   * something that was not being shown — and under it "This unit reported a
+   * footswitch model but no per-switch detail", which is a sentence about a
+   * wire protocol. On an FM3 that empty case is the normal one, so it is what
+   * most people will ever see here.
+   */
+  test('the footswitch panel does not fold inside its own fold', () => {
+    const fc = readFileSync(new URL('../src/components/Footswitches.jsx', import.meta.url), 'utf8')
+    /*
+     * Matched against the code, not the prose: the comment above the component
+     * quotes the old label to explain why it went, and a guard that reads its
+     * own explanation as the defect is a guard that can never pass.
+     */
+    const code = fc
+      .slice(fc.indexOf('export default function'))
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+    assert.ok(!/setOpen|Hide footswitches/.test(code), 'the inner toggle is back inside the Setup section')
+    assert.ok(!/per-switch detail/.test(code), 'the empty case is written for whoever wrote it')
+    assert.match(
+      fc,
+      /doesn&rsquo;t tell this app what each one is set to/,
+      'a unit that will not report its switches says nothing a player can use'
+    )
+    // And the section still only appears where the unit has switches at all.
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    assert.match(
+      app,
+      /capabilities\?\.fc\?\.model !== false \? \(/,
+      'the panel is offered on units that have no footswitches to report'
+    )
+  })
+
   test('a channel is written where the scene that plays it can keep it', () => {
     const forgefx = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
 
