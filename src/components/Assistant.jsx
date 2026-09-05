@@ -102,9 +102,17 @@ function useTypedSuggestion(active, own = []) {
     return () => clearTimeout(t)
   }, [text, index, phase, active, reduced])
 
-  if (reduced) return lines[index % lines.length]
-  if (!active) return lines[index % lines.length]
-  return text
+  /*
+   * Both the part being shown and the whole of it.
+   *
+   * The box has to be tall enough for the finished suggestion, not for however
+   * much of it has been typed so far — otherwise it grows a line mid-animation
+   * and the page jumps under a thumb. `full` is what the box is measured
+   * against; `shown` is what anyone reads.
+   */
+  const full = lines[index % lines.length]
+  if (reduced || !active) return { shown: full, full }
+  return { shown: text, full }
 }
 
 export default function Assistant({
@@ -161,7 +169,7 @@ export default function Assistant({
    * Still stops for the things it should: something typed, the box focused, or
    * a reduced-motion setting.
    */
-  const typed = useTypedSuggestion(!text && !focused, suggestions)
+  const { shown: typed, full: typedFull } = useTypedSuggestion(!text && !focused, suggestions)
 
   useEffect(() => {
     /*
@@ -186,13 +194,33 @@ export default function Assistant({
    * whatever width the row happens to be, so it stays right when the window is
    * resized or a phone is turned. The ceiling is CSS's, and past it the box
    * scrolls instead of swallowing the conversation.
+   *
+   * An empty box is measured against the SUGGESTION, not against nothing.
+   * `scrollHeight` answers for a textarea's value, and a placeholder is not a
+   * value — so "Warm clean with a bit of shimmer", which wraps to two lines on
+   * a phone, was drawn into a box one line tall and lost its second line. The
+   * invitation to type was the one thing you could not read.
+   *
+   * Measured against the whole suggestion rather than the part typed so far, so
+   * the height is settled before the animation starts and the box does not gain
+   * a line halfway through. The cursor block goes on the end because it is on
+   * the end of the real placeholder, and at the exact width where it tips onto
+   * the next line, it tips.
    */
   useEffect(() => {
     const el = box.current
     if (!el) return
+    /*
+     * Borrowing the value to measure it. React holds this as a controlled
+     * field at '', and it is put back before anything can paint or read it —
+     * setting `value` from script fires no input event, so React never sees it.
+     */
+    const borrow = text ? null : `${typedFull}▏`
+    if (borrow !== null) el.value = borrow
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
-  }, [text])
+    if (borrow !== null) el.value = ''
+  }, [text, typedFull])
 
   const submit = (value) => {
     const instruction = (value ?? text).trim()
