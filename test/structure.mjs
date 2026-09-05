@@ -1314,9 +1314,15 @@ export function run(test) {
       `${tags.length} <Assistant> tags in App.jsx — the conversation must be built once and rendered by reference`
     )
     assert.match(src, /const chat = /, 'the hoisted conversation is gone')
+    /*
+     * Rendered by reference on Create, wrapper or no wrapper. What this is
+     * really holding is that there is one conversation and both places show
+     * the same element — a second copy behaves subtly differently depending on
+     * how it was opened, which nobody would think to check.
+     */
     assert.match(
       src,
-      /\{view === 'ask' \? chat : null\}/,
+      /view === 'ask' \? (<div className="chat-screen">\{chat\}<\/div>|chat) : null/,
       'Create no longer renders the hoisted conversation'
     )
     assert.match(
