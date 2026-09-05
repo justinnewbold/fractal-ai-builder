@@ -508,7 +508,10 @@ export function run(test) {
   test('every panel and every sheet is closed', () => {
     // SectionStack is gone with the drag-to-reorder it existed for; what is
     // left is the pairing, which a bad splice still breaks.
-    assert.equal((src.match(/<Section /g) || []).length, (src.match(/<\/Section>/g) || []).length)
+    /* Any whitespace after the name, not just a space: a Section whose props
+       run onto their own lines was invisible to this, which is exactly the
+       shape a bad splice leaves behind. */
+    assert.equal((src.match(/<Section\s/g) || []).length, (src.match(/<\/Section>/g) || []).length)
     assert.equal((src.match(/<Sheet\b/g) || []).length, (src.match(/<\/Sheet>/g) || []).length)
   })
 
@@ -1333,9 +1336,15 @@ export function run(test) {
       /view === 'ask' \? (<div className="chat-screen">\{chat\}<\/div>|chat) : null/,
       'Create no longer renders the hoisted conversation'
     )
+    /*
+     * Still by reference, still only while open. The sheet now shows the
+     * conversation and the tones under it — the same pair, in the same order,
+     * as Create — so a tone asked for from the sheet is not invisible until you
+     * walk to another screen.
+     */
     assert.match(
       src,
-      /\{sheet === 'chat' \? chat : null\}/,
+      /\{sheet === 'chat' \? \(\s*<>\s*\{chat\}\s*\{tones\}\s*<\/>\s*\) : null\}/,
       'the chat sheet no longer renders the hoisted conversation — and mounting it unconditionally would leave a second live turn list behind Create'
     )
 
@@ -1778,46 +1787,54 @@ export function run(test) {
     }
   })
 
-  test('a tone asked for earlier is still in the conversation, and cannot write', () => {
+  test('every tone is kept, listed under the conversation, and cannot write', () => {
     /*
-     * "Like most chat bots" — what was said stays said.
+     * "Don't show the preset generation inside of the chat box — show it below
+     * it separately, just like the LP Meteora. Have it in a collapsible
+     * drop-down, but expanded by default after the tone is generated, and have
+     * buttons to send it in there. The chat box should pretty much be just the
+     * chats going back and forth."
      *
-     * There was one slot for a design, so a second tone destroyed the first.
-     * Ask for something darker and the tone you were comparing it against was
-     * gone from the screen with nothing anywhere that remembered it: history
-     * keeps only what was saved, so a tone generated and turned down left no
-     * trace at all.
+     * Two properties, and they are separable. Where the tones live is this
+     * report. That none of them is destroyed by asking for another was the
+     * one before it, and moving them must not quietly undo it.
      */
     const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
     const gen = readFileSync(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
 
-    /*
-     * Every path that takes the tone off the screen puts it in the log first.
-     * Four of them: a new generation, a refinement, loading a saved design over
-     * it, and Discard.
-     */
+    /* Nothing is destroyed: four paths used to drop the live tone and all four
+       keep it — a new generation, a refinement, loading a saved design over it,
+       and Discard. */
     const kept = (app.match(/\bkeep\((?:shelved\(\)|replacing)\)/g) || []).length
     assert.ok(kept >= 4, `only ${kept} of the four paths keep the tone they replace`)
 
+    /* And they are under the conversation rather than between its turns. */
+    const tones = app.slice(app.indexOf('const tones ='), app.indexOf('const chat = status'))
+    assert.ok(tones.length > 200, 'the tones are no longer built as a panel of their own')
+    assert.match(tones, /<Section/, 'a tone is not something you can fold away')
+    assert.match(tones, /defaultOpen/, 'a tone arrives folded shut, so it looks like nothing happened')
+    /* Re-keyed per run: <details open> is a starting state, so a second tone
+       would arrive inside a panel somebody had folded and be invisible. */
+    assert.match(tones, /key=\{`tone-\$\{genAt\}-\$\{past\.length\}`\}/,
+      'the panel is not re-keyed, so only the first tone opens itself')
+
+    /* The conversation carries speech and the working line, and no tone. */
+    const a = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
+    assert.ok(!/designs/.test(a), 'the conversation is drawing tones between its turns again')
+    assert.ok(!a.includes('turn-result'), 'a tone is still dressed as a reply inside the log')
+
     /*
-     * The one that matters most.
-     *
-     * A card from three requests ago describes a preset that has since moved,
-     * so a Send button on it is an offer to overwrite whatever came after. The
-     * kept cards are handed no handler that can reach the unit — not the write,
-     * not the scene switch, not the two choices.
+     * The one that matters most, unchanged by the move: a card from three
+     * requests ago describes a preset the app has since moved past, so a Send
+     * button on it is an offer to overwrite whatever came after.
      */
-    const past = app.slice(app.indexOf('const pastDesigns ='), app.indexOf('</Preview>', app.indexOf('const pastDesigns =')))
-    assert.ok(past.length > 100, 'the kept tones are no longer built here')
+    const past = tones.slice(tones.indexOf('past].reverse()'))
+    assert.ok(past.length > 100, 'the kept tones are no longer listed')
     for (const handler of ['onApply', 'onDiscard', 'onScene', 'onWithScenes', 'onRenamePreset']) {
       assert.ok(!past.includes(handler), `a tone from earlier can still ${handler} — it would write the wrong preset`)
     }
 
-    /*
-     * And the card itself offers nothing to press once it has an outcome. The
-     * buttons live in the other half of that branch; strip the comments first,
-     * which describe them.
-     */
+    /* And the card itself offers nothing to press once it has an outcome. */
     const bare = gen.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
     const head = bare.slice(bare.indexOf('{outcome ? ('), bare.indexOf(') : ('))
     assert.match(head, /preview-outcome/, 'a tone that has been answered does not say what happened to it')
@@ -2402,67 +2419,50 @@ export function run(test) {
     )
   })
 
-  test('the newest thing in the chat is at the bottom', () => {
+  test('the conversation is speech and what is happening, in that order', () => {
     /*
-     * "It puts recent messages above the generated tones, which is weird. Most
-     * recent generations should be at the bottom of the chat. Shouldn't have to
-     * scroll to find what was just talked about."
+     * "The chat box should pretty much be just the chats going back and forth,
+     * saying creating tone, what the AI is doing and things like that."
      *
-     * The design was rendered after every turn, which pinned it to the bottom
-     * of the log for good — so anything said afterwards appeared above it, and
-     * the newest thing on screen was an old design. It is placed where it
-     * happened instead: after the turns that existed when it started, and above
-     * everything said since.
-     *
-     * There are several of them now — every tone asked for in this
-     * conversation is kept — so the split became a merge. The property under
-     * test is the same one: each tone sits at its own `at`, and the turns run
-     * around them in order rather than all of them landing first.
+     * It used to hold the tone as well, spliced in at the turn it was asked
+     * for — which is where the older report about ordering came from: the
+     * design was rendered after every turn, pinning it to the bottom for good,
+     * so anything said afterwards appeared above it. That is answered by the
+     * tone not being in the log at all. What is left has one order: everything
+     * said, then whatever is happening right now.
      */
     const a = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
-    assert.match(a, /\.sort\(\(a, b\) => a\.at - b\.at\)/, 'the tones are not put in the order they were asked for')
-    assert.match(
-      a,
-      /for \(; cursor < mark\.at; cursor\+\+\) log\.push\(renderTurn/,
-      'the log does not run the turns up to each tone'
+    const bare = a.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+    const log = bare.slice(bare.indexOf('className="assistant-log"'), bare.indexOf('ref={tail}'))
+    assert.ok(
+      log.indexOf('turns.map(renderTurn)') < log.indexOf('{children}'),
+      'what is happening now is drawn above what was said'
     )
-    assert.match(
-      a,
-      /for \(; cursor < turns\.length; cursor\+\+\) trailing\.push\(renderTurn/,
-      'turns said after the last tone are dropped'
+    /* The queue sits between them: what is about to be asked has been said,
+       and has not happened yet. */
+    assert.ok(
+      log.indexOf('queue.map') > log.indexOf('turns.map(renderTurn)') &&
+        log.indexOf('queue.map') < log.indexOf('{children}'),
+      'what is waiting its turn is out of order'
     )
-    /*
-     * And the live tone is one of them, not a special case rendered after the
-     * loop — that is what put it permanently last before.
-     */
-    assert.match(a, /\{ key: 'live', at: cut, node: children \}/, 'the live tone is placed outside the merge')
 
-    /*
-     * And the position it is given is the conversation as it stands, not as it
-     * stood when the function was made.
-     *
-     * A generation runs from inside an async chain — something typed, a turn
-     * recorded, a round trip to the model, then the design request — so `turns`
-     * in that closure is several turns stale. Every tone was landing one
-     * exchange too high, above the sentence that asked for it.
-     */
-    const app2 = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
-    assert.match(app2, /turnsNow\.current = turns\.length/, 'nothing tracks how long the conversation is now')
-    assert.match(app2, /setGenAt\(turnsNow\.current\)/, 'the tone reads its position from a stale closure')
-    assert.ok(!app2.includes('setGenAt(turns.length)'), 'the tone reads its position from a stale closure')
-
-    // One renderer, so a turn below the design keeps its confirm buttons.
+    // One renderer, so every turn keeps its confirm buttons.
     assert.match(a, /const renderTurn = /, 'the turn markup is duplicated and will drift')
     assert.equal(
       (a.match(/className="turn-confirm"/g) || []).length,
       1,
-      'a pending turn is drawn twice, or only on one side of the design'
+      'a pending turn is drawn twice'
     )
 
-    // And App has to say when the design started, or the merge is a no-op.
+    /*
+     * And the position a run was asked at is still recorded, read from a ref
+     * rather than a closure — it is what re-keys the tone panel, so a second
+     * tone opens itself instead of arriving folded away.
+     */
     const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
-    assert.match(app, /setGenAt\(/, 'nothing records where the design belongs')
-    assert.match(app, /at=\{genAt\}/, 'the chat is never told where the design belongs')
+    assert.match(app, /turnsNow\.current = turns\.length/, 'nothing tracks how long the conversation is now')
+    assert.match(app, /setGenAt\(turnsNow\.current\)/, 'the run reads its position from a stale closure')
+    assert.ok(!app.includes('setGenAt(turns.length)'), 'the run reads its position from a stale closure')
   })
 
   test('the two-take comparison is gone, not half removed', () => {

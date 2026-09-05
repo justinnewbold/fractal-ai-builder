@@ -1390,7 +1390,6 @@ export default function App() {
     if (!result) return null
     return {
       id: (pastId.current += 1),
-      at: genAt,
       result,
       withScenes,
       renamePreset,
@@ -1802,12 +1801,15 @@ export default function App() {
      * and gets overwritten, leaving the box showing the END of a long preview.
      */
     const run = () => {
-      const preview = document.querySelector('.preview')
-      const log = document.querySelector('.assistant-log')
-      if (log && preview) {
-        log.scrollTop = Math.max(0, preview.offsetTop - log.offsetTop - 8)
-      }
-      bringIntoView(document.querySelector('.assistant'), { block: 'start' })
+      /*
+       * One scroll now, not two. The preview used to sit inside the
+       * conversation's own scrollbox, so being shown it meant moving the box
+       * and the page. It is its own panel below the conversation, and a tone
+       * on a screen whose conversation is a full viewport tall is otherwise
+       * entirely below the fold — which is exactly the "button that does
+       * nothing" this exists to prevent.
+       */
+      bringIntoView(document.querySelector('.tones'), { block: 'start' })
     }
     requestAnimationFrame(() => requestAnimationFrame(run))
   }
@@ -2543,44 +2545,6 @@ export default function App() {
   // an id with no block behind it must not open an empty sheet.
   const openBlock = selectedBlock ? blocks.find((b) => b.effectId === selectedBlock) : null
 
-  /*
-   * The earlier tones, drawn as the cards they were.
-   *
-   * The same component as the live one, given no handlers — so the diff, the
-   * scene plan, the rejections and the cost all read exactly as they did, and
-   * every control on it is inert. Nothing here can write to the unit: a card
-   * from three requests ago describes a preset that has since moved, and a
-   * Send button on it would be an offer to overwrite work that came after.
-   *
-   * The counts are recomputed from the tone itself rather than the live ones,
-   * which belong to whatever is on screen now.
-   */
-  const pastDesigns = past.map((entry) => ({
-    key: entry.id,
-    at: entry.at,
-    node: (
-      <Preview
-        result={entry.result}
-        writeCount={countWrites(entry.result.changes)}
-        sceneWriteCount={countSceneWrites(entry.result.scenes)}
-        withScenes={entry.withScenes}
-        renamePreset={entry.renamePreset}
-        sceneNames={entry.sceneNames}
-        sceneCount={entry.sceneCount}
-        scene={entry.scene}
-        outcome={entry.outcome}
-      >
-        <Cost usage={entry.result.usage} />
-        {entry.result._trace || entry.result.spec ? (
-          <DevTrace
-            trace={entry.result._trace}
-            spec={entry.result.spec}
-            problems={entry.result.problems}
-          />
-        ) : null}
-      </Preview>
-    )
-  }))
 
   /*
    * The conversation, built once and shown in two places.
@@ -2600,6 +2564,128 @@ export default function App() {
    * 30 lines of hard-won keyboard scroll-holding, and this app removed a
    * pinned bottom bar once already.
    */
+  /*
+   * The tone, under the conversation rather than inside it.
+   *
+   * "Don't show the preset generation inside of the chat box — show it below it
+   * separately, just like the LP Meteora. Have it in a collapsible drop-down,
+   * but expanded by default after the tone is generated, and have buttons to
+   * send it in there. The chat box should pretty much be just the chats going
+   * back and forth."
+   *
+   * Which is what the first report asked for — "maybe we can just list those
+   * under it after they generate" — and I answered by making the card smaller
+   * and leaving it between the turns. Smaller was worth doing. It was not the
+   * thing asked for.
+   *
+   * So the conversation carries what was said and what is happening, and every
+   * tone is an entry below it: the newest open with its buttons, the ones
+   * before it folded down to a name and what became of them. Nothing is
+   * destroyed by asking for another one, which is the part of this that has to
+   * keep being true.
+   */
+  const tones =
+    status === 'live' && (result || past.length) ? (
+      <div className="tones">
+        {result ? (
+          /*
+           * Re-keyed per generation so it opens for each one.
+           *
+           * <details open> is a starting state, not a binding — a second tone
+           * would otherwise arrive inside a panel somebody had folded away and
+           * be invisible. The key moves when a tone is shelved (past grows) or
+           * a new run starts (genAt moves), which is every case that produces
+           * one.
+           */
+          <Section
+            key={`tone-${genAt}-${past.length}`}
+            title={result.presetName || 'The tone'}
+            note={`${writeCount} change${writeCount === 1 ? '' : 's'}${
+              withScenes && sceneWriteCount ? ` · ${sceneWriteCount} scene writes` : ''
+            }`}
+            defaultOpen
+          >
+        <Preview
+          result={result}
+          writeCount={writeCount}
+          sceneWriteCount={sceneWriteCount}
+          withScenes={withScenes}
+          onWithScenes={setWithScenes}
+          scene={scene}
+          sceneNames={sceneNames}
+          sceneCount={sceneCount}
+          renamePreset={renamePreset}
+          onRenamePreset={setRenamePreset}
+          presetNow={preset?.name}
+          /* Choosing a scene switches to it rather than remembering it for
+             later. Bypass is written into whatever scene is live, so making
+             the choice real immediately is both simpler and honest — and you
+             hear it, which is the confirmation that it took. */
+          onScene={async (index) => {
+            try {
+              await writeScene(index)
+            } catch (err) {
+              setError(err.message)
+            }
+          }}
+          busy={busy}
+          onApply={apply}
+          /* Discard clears the panel; it has never undone anything on the unit.
+             So the tone still goes into the log — turning one down is part of
+             what happened, and "the first one was better" needs the first one to
+             still be readable. */
+          onDiscard={() => {
+            keep(shelved())
+            setResult(null)
+          }}
+        >
+          {/*
+            What it cost, and why it came out the way it did.
+            Both belong with the tone rather than beside it — and both belong
+            behind the same fold as the rest of the detail, because a chat that
+            answers a request with four stacked panels is the thing being fixed.
+          */}
+          <Cost usage={result?.usage} sessionTotal={spend.total} runs={spend.runs} />
+
+          {result?._trace || result?.spec ? (
+            <DevTrace trace={result._trace} spec={result.spec} problems={result.problems} />
+          ) : null}
+        </Preview>
+          </Section>
+        ) : null}
+
+        {/* Newest first: the one before this is the one worth reaching for. */}
+        {[...past].reverse().map((entry) => (
+          <Section
+            key={entry.id}
+            title={entry.result.presetName || 'Untitled'}
+            note={entry.outcome}
+          >
+            <Preview
+              result={entry.result}
+              writeCount={countWrites(entry.result.changes)}
+              sceneWriteCount={countSceneWrites(entry.result.scenes)}
+              withScenes={entry.withScenes}
+              renamePreset={entry.renamePreset}
+              sceneNames={entry.sceneNames}
+              sceneCount={entry.sceneCount}
+              scene={entry.scene}
+              outcome={entry.outcome}
+            >
+              <Cost usage={entry.result.usage} />
+              {entry.result._trace || entry.result.spec ? (
+                <DevTrace
+                  trace={entry.result._trace}
+                  spec={entry.result.spec}
+                  problems={entry.result.problems}
+                />
+              ) : null}
+            </Preview>
+          </Section>
+        ))}
+      </div>
+    ) : null
+
   const chat = status === 'live' ? (
     <Assistant
       turns={turns}
@@ -2610,8 +2696,6 @@ export default function App() {
       /* Not drawn there — Thinking below draws it. Passed so the transcript
          scrolls with each tick, which is the one thing Assistant needs it for. */
       progress={progress}
-      at={genAt}
-      designs={pastDesigns}
       suggestions={suggestionsFrom(taste)}
       onStop={
         genStarted
@@ -2625,7 +2709,14 @@ export default function App() {
           : null
       }
     >
-      {/* A design shows up in the conversation that asked for it. */}
+      {/*
+        What the conversation carries: what was said, and what is happening now.
+
+        "The chat box should pretty much be just the chats going back and
+        forth, saying creating tone, what the AI is doing and things like
+        that." The tone itself moved out from between the turns — see
+        `tones` below.
+      */}
       <Thinking message={progress} active={thinking} startedAt={genStarted} />
 
       <LiveGeneration
@@ -2634,52 +2725,6 @@ export default function App() {
         onToggle={() => setLiveOpen(!liveOpen)}
       />
 
-      <Preview
-        result={result}
-        writeCount={writeCount}
-        sceneWriteCount={sceneWriteCount}
-        withScenes={withScenes}
-        onWithScenes={setWithScenes}
-        scene={scene}
-        sceneNames={sceneNames}
-        sceneCount={sceneCount}
-        renamePreset={renamePreset}
-        onRenamePreset={setRenamePreset}
-        presetNow={preset?.name}
-        /* Choosing a scene switches to it rather than remembering it for
-           later. Bypass is written into whatever scene is live, so making
-           the choice real immediately is both simpler and honest — and you
-           hear it, which is the confirmation that it took. */
-        onScene={async (index) => {
-          try {
-            await writeScene(index)
-          } catch (err) {
-            setError(err.message)
-          }
-        }}
-        busy={busy}
-        onApply={apply}
-        /* Discard clears the panel; it has never undone anything on the unit.
-           So the tone still goes into the log — turning one down is part of
-           what happened, and "the first one was better" needs the first one to
-           still be readable. */
-        onDiscard={() => {
-          keep(shelved())
-          setResult(null)
-        }}
-      >
-        {/*
-          What it cost, and why it came out the way it did.
-          Both belong with the tone rather than beside it — and both belong
-          behind the same fold as the rest of the detail, because a chat that
-          answers a request with four stacked panels is the thing being fixed.
-        */}
-        <Cost usage={result?.usage} sessionTotal={spend.total} runs={spend.runs} />
-
-        {result?._trace || result?.spec ? (
-          <DevTrace trace={result._trace} spec={result.spec} problems={result.problems} />
-        ) : null}
-      </Preview>
 
       {/*
         What applying actually did, including anything that read back
@@ -3131,6 +3176,15 @@ export default function App() {
       {view === 'ask' ? <div className="chat-screen">{chat}</div> : null}
 
       {/*
+        And the tone under it, outside that column deliberately.
+        The conversation was given the height of the screen and keeps it; a
+        card folded into the same column would take that back from the thing it
+        was given to. Below it the page scrolls, which is where Earlier
+        generations has always been.
+      */}
+      {view === 'ask' ? tones : null}
+
+      {/*
         What you have made, under the box you make it in — and only there.
         `chat` is one element rendered in two places, so this sits outside it:
         in the Ask sheet, which is for a quick change to the tone playing now,
@@ -3256,7 +3310,12 @@ export default function App() {
         title="Ask"
         note={preset?.name?.trim() || null}
       >
-        {sheet === 'chat' ? chat : null}
+        {sheet === 'chat' ? (
+          <>
+            {chat}
+            {tones}
+          </>
+        ) : null}
       </Sheet>
 
       <Sheet
