@@ -1136,7 +1136,7 @@ export function run(test) {
     const read = (f) => readFileSync(new URL('../src/components/' + f, import.meta.url), 'utf8')
     const console_ = read('Console.jsx')
     assert.ok(!/\{m\.basedOn \? ` — \$\{m\.basedOn\}` : ''\}/.test(console_), 'the model option carries the whole "based on" sentence again')
-    assert.match(console_, /className="hint pad based-on">Based on \{basedOn\}/, 'what a model is based on is not shown under the picker')
+    assert.match(console_, /className="hint pad based-on">\{gear\}/, 'what a model is based on is not shown under the picker')
     const mods = read('Modifiers.jsx')
     assert.match(mods, /id="mod-why" role="status"/, 'the disabled Attach button gives no reason')
     assert.match(mods, /aria-describedby=\{why \? 'mod-why' : undefined\}/)

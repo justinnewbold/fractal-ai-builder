@@ -400,7 +400,25 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
     type && models.some((m) => m.value === type.value)
       ? type.value
       : (models.find((m) => m.name === type?.name)?.value ?? '')
-  const basedOn = models.find((m) => m.value === chosenValue)?.basedOn
+  const chosen = models.find((m) => m.value === chosenValue)
+  /*
+   * The lineage when it is known, and the maker on its own when it is not.
+   *
+   * Which amp a Mark IV is voiced from is not recorded for every model, but who
+   * built it is recorded for nearly all of them — and "Mesa" answers most of
+   * what somebody wanted from "USA MK IV Lead" while staying true, which naming
+   * a specific amp would not.
+   *
+   * Two verbs, because one sentence will not carry both. "Based on Mesa" is not
+   * English: "based on" wants a thing, and an article does not save it — "a
+   * Custom Audio Amplifiers" is worse. "Modelled on Mesa" reads correctly for
+   * every one of the forty-seven makers in the catalog, single word or not.
+   */
+  const gear = chosen?.basedOn
+    ? `Based on ${chosen.basedOn}`
+    : chosen?.manufacturer
+      ? `Modelled on ${chosen.manufacturer}`
+      : null
 
   const valueOf = (p) => (local[p.id] !== undefined ? local[p.id] : p.value)
 
@@ -575,7 +593,7 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
           ))}
         </select>
       ) : null}
-      {models.length && basedOn ? <p className="hint pad based-on">Based on {basedOn}</p> : null}
+      {models.length && gear ? <p className="hint pad based-on">{gear}</p> : null}
 
       {rest.length ? (
         <div className="block-tabs">

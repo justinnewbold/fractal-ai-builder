@@ -13,6 +13,7 @@ import { EXCLUDED_BLOCKS, safeParams } from './guardrails.js'
 import { cleanPresetName, isEmptySlotName } from './presetName.js'
 import { zeroBasedChain, wrongSlot } from './slots.js'
 import { toNormalized } from './scale.js'
+import { withLineage } from './lineage.js'
 import { remoteActive, remoteRequest, subscribeRemoteEvents } from './remote.js'
 import {
   rosterCache,
@@ -383,9 +384,18 @@ export const blockParams = async (eid) =>
 export const blockHelp = (slug) =>
   mock ? tick().then(() => null) : request(`/help/blocks/${slug}`)
 
-/** Model roster for a block family, e.g. 'amp' -> 331 amp models. */
+/**
+ * Model roster for a block family, e.g. 'amp' -> 331 amp models.
+ *
+ * With what each model is in real life put back on, because the unit does not
+ * carry it. ForgeFX's AM4 driver returns `manufacturer: null, basedOn: null` for
+ * every model — the catalog fields are gen-3-only — so the "Based on…" line has
+ * been blank on every real unit since it was written, and the generator has
+ * been choosing between 331 amps knowing none of them by the name a person
+ * would use. See lib/lineage.js.
+ */
 export const blockTypes = async (slug) =>
-  mock ? (await tick(), mock.blockTypes(slug)) : request(`/blocks/${slug}/types`)
+  withLineage(slug, mock ? (await tick(), mock.blockTypes(slug)) : await request(`/blocks/${slug}/types`))
 
 /**
  * Set one parameter.
