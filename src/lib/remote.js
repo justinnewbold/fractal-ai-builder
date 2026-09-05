@@ -214,6 +214,10 @@ const seers = new Set()
  * Normally one, and everything below is a no-op. See censusHosts.
  */
 let hosts = []
+/** Which of them requests are addressed to. Null while there is only one. */
+let chosen = null
+/** Whether addressing one Mac has been PROVED to leave the others out. */
+let targeted = false
 /** Roll calls in progress: an id, and every answer that has come back to it. */
 const censuses = new Map()
 
@@ -256,27 +260,108 @@ export async function censusHosts({
   sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 } = {}) {
   if (!channel || !isJoined(channel)) return hosts
+  // A read every host allows and every host answers differently: its own name,
+  // written into its store by the launcher on that Mac.
+  const answers = await collectAnswers({ path: '/store/config/host.name', windowMs, sleep })
+  hosts = await hostNamesFrom(answers)
+
+  // A choice made before is honoured if that Mac is still one of the answers.
+  if (!hosts.includes(chosen)) chosen = null
+  if (hosts.length > 1 && !chosen) {
+    const remembered = recallHost()
+    if (hosts.includes(remembered)) chosen = remembered
+  }
+  targeted = false
+  if (hosts.length > 1 && chosen) await confirmTargeting({ windowMs, sleep })
+  return hosts
+}
+
+/**
+ * Shout one read and keep every answer, rather than the first.
+ *
+ * The whole of counting hosts is here: replies are indistinguishable, so the
+ * only question that can be asked of them is how many. Waits out the window
+ * even when the first answer is instant, because "no second answer yet" and "no
+ * second answer at all" are the same thing until the clock runs out.
+ */
+async function collectAnswers({ path, host = null, windowMs, sleep }) {
   const id = `census-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
   const answers = []
   censuses.set(id, answers)
   try {
-    await channel.send({
-      type: 'broadcast',
-      event: 'req',
-      // A read every host allows and every host answers differently: its own
-      // name, written into its store by the launcher on this Mac.
-      payload: { id, method: 'GET', path: '/store/config/host.name', body: null }
-    })
+    const payload = { id, method: 'GET', path, body: null }
+    if (host) payload.host = host
+    await channel.send({ type: 'broadcast', event: 'req', payload })
     await sleep(windowMs)
   } catch {
-    // A roll call that could not be sent tells us nothing, which is what the
+    // A question that could not be asked tells us nothing, which is what the
     // empty answer list already says.
   } finally {
     censuses.delete(id)
   }
+  return answers
+}
 
-  hosts = await hostNamesFrom(answers)
-  return hosts
+/**
+ * Prove that addressing a request to one Mac actually leaves the others out.
+ *
+ * The host end of this only exists in a new enough ForgeFX: an older one has
+ * never heard of an addressed request and answers it like any other. So the app
+ * does not take the feature on trust — it asks the chosen Mac one addressed
+ * question and counts the answers. Exactly one means every other Mac stayed
+ * out of it, which is the only evidence that a write will land in one place.
+ * Anything else means at least one Mac on this account is too old, and writes
+ * stay refused.
+ *
+ * Which makes a mixed pair fail safe rather than fail quietly: the dangerous
+ * case and the un-upgraded case produce the same answer, and it is the careful
+ * one.
+ */
+async function confirmTargeting({ windowMs, sleep }) {
+  if (!chosen) return false
+  const answers = await collectAnswers({
+    path: '/store/config/host.name',
+    host: chosen,
+    windowMs,
+    sleep
+  })
+  targeted = answers.length === 1
+  return targeted
+}
+
+/**
+ * Drive this Mac and no other.
+ *
+ * Remembered, because the answer does not change between one visit and the
+ * next: the phone in your pocket belongs to the rig you play, not to whichever
+ * Mac happened to answer first.
+ */
+export async function pickHost(name, { windowMs = 1500, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+  if (!hosts.includes(name)) return false
+  chosen = name
+  rememberHost(name)
+  targeted = false
+  if (hosts.length > 1) await confirmTargeting({ windowMs, sleep })
+  return targeted
+}
+
+/** Which Mac requests are addressed to, or null when there is only one to ask. */
+export const remoteChosenHost = () => chosen
+
+const HOST_KEY = 'fab.remote.host'
+const recallHost = () => {
+  try {
+    return localStorage.getItem(HOST_KEY)
+  } catch {
+    return null
+  }
+}
+const rememberHost = (name) => {
+  try {
+    localStorage.setItem(HOST_KEY, name)
+  } catch {
+    // A choice we cannot write down still holds for this visit.
+  }
 }
 
 /**
@@ -309,12 +394,41 @@ export async function hostNamesFrom(answers, read = decode) {
  * fixes it. Turning the phone remote off is a switch that already exists on
  * each Mac, and armHost already respects it across restarts.
  */
-export function hostConflict(list = hosts) {
+export function hostConflict(list = hosts, pick = chosen, proved = targeted) {
   if (list.length < 2) return null
+
+  const both = list.join(' and ')
+
+  /*
+   * Two Macs with the same name cannot be told apart by the only thing that
+   * distinguishes them on the wire, so there is nothing to pick between and the
+   * fix is not in this app. Checked before anything else, because no choice can
+   * settle it: addressing that name reaches both, which is the whole problem.
+   */
+  if (new Set(list).size < list.length) {
+    return (
+      `Two of your Macs are both called ${list[0]}, so this app cannot tell them apart — ` +
+      `and a change made here would be made on both units. Rename one of them in ` +
+      `System Settings › General › About, reopen the app there, then check again.`
+    )
+  }
+
+  // Addressed, and proved to be addressed: this is settled and there is nothing
+  // to say. The picker still shows which Mac is being driven.
+  if (pick && proved) return null
+
+  if (!pick) {
+    return (
+      `${list.length} Macs are answering for this account — ${both}. ` +
+      `They share one line, so a change made here would be made on both units. ` +
+      `Choose the one you want to drive.`
+    )
+  }
+
   return (
-    `${list.length} Macs are answering for this account — ${list.join(' and ')}. ` +
-    `They share one line, so a change made here would be made on both units. ` +
-    `Turn the phone remote off on the Mac you are not using, then try again.`
+    `${both} both answered a request meant only for ${pick}, so one of them is running ` +
+    `a version that cannot tell requests apart. Nothing will be changed from here until ` +
+    `both Macs are up to date. Update the app on each of them, then check again.`
   )
 }
 
@@ -757,6 +871,8 @@ export async function remoteDisconnect() {
   // Who answered belongs to the channel that is going away. Carrying it over
   // would keep writes refused on a link where the second Mac is long gone.
   hosts = []
+  chosen = null
+  targeted = false
   censuses.clear()
   failWaiting('Disconnected.')
   announce()
@@ -860,11 +976,17 @@ export async function remoteRequest(path, options = {}) {
     })
   })
 
-  await channel.send({
-    type: 'broadcast',
-    event: 'req',
-    payload: { id, method, path, body: options.body ?? null }
-  })
+  /*
+   * Addressed once there is more than one Mac to address, and never before.
+   *
+   * A single-host session sends exactly what it always sent, so nothing here
+   * depends on the host being new until the moment two of them are listening —
+   * and by then confirmTargeting has proved the hosts understand it.
+   */
+  const ask = { id, method, path, body: options.body ?? null }
+  if (hosts.length > 1 && chosen && targeted) ask.host = chosen
+
+  await channel.send({ type: 'broadcast', event: 'req', payload: ask })
 
   const payload = await reply
   // An answer is proof the Mac is on the channel — better proof than any probe,

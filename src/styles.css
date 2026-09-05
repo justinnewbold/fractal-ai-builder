@@ -1871,6 +1871,22 @@ button.scene.current .scene-num {
   margin-top: 8px;
 }
 
+/*
+ * Choosing which Mac to drive.
+ *
+ * A row of chips inside a notice, and it has to wrap: a Mac is called whatever
+ * its owner called it, and "Drive Justin's MacBook Pro" beside "Drive Studio
+ * Mac" does not fit a phone on one line. Without the wrap the second button
+ * leaves the screen — and it is the one that is not currently selected, which
+ * is precisely the one somebody opened this notice to press.
+ */
+.host-pick {
+  display: flex;
+  gap: var(--s-1);
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
 .history-list {
   margin-top: 10px;
   border: 1px solid var(--rule);

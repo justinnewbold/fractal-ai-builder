@@ -30,14 +30,23 @@
     "to a slot is still refused, so it cannot overwrite anything on the unit.",
     "",
     "Kept on a branch so the mirror's main stays a clean copy of upstream: the next",
-    "upstream release is a rebase of one commit rather than a merge conflict."
+    "upstream release is a rebase of one commit rather than a merge conflict.",
+    "",
+    "The branch now also carries host addressing. The remote channel is per",
+    "ACCOUNT, so a request is not sent to a host -- it is shouted, and every host",
+    "signed into that account answers it. With two Macs that meant a read was",
+    "answered twice and a WRITE WAS CARRIED OUT TWICE, on two different units. The",
+    "host now honours an optional `host` field naming the Mac a request is meant",
+    "for, and stays silent on anything addressed elsewhere. Absent on every request",
+    "from a client that has only ever seen one host, so it is inert until there are",
+    "two."
   ],
   "forgefx": {
     "repo": "justinnewbold/forgefx",
     "upstream": "sKuhLight/forgefx",
-    "tag": "v0.7.1-beta+rename",
-    "commit": "70c3e76046279ba4a048a618e7f576c480f1ef2b",
-    "branch": "claude/allow-renaming-remotely"
+    "tag": "v0.7.1-beta+rename+host",
+    "commit": "7aa677252cc5b53f42a0a7bab46e41c50ecfe881",
+    "branch": "claude/address-one-host"
   },
   "forgefx-midi": {
     "repo": "justinnewbold/forgefx-midi",

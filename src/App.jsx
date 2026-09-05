@@ -140,6 +140,7 @@ import {
   setMacRemote,
   signOutHere,
   recheckHosts,
+  chooseHost,
   faultCopy
 } from './lib/link'
 import { pushEntry, replaceEntry } from './lib/nav'
@@ -3065,9 +3066,32 @@ export default function App() {
         <div className="notice" data-kind="fault" role="alert">
           <h2>Two Macs are answering</h2>
           <p>{link.clash}</p>
-          <p>
-            {/* The fix is at the other Mac, and turning it off does not drop
-                this connection — so nothing here would ever notice. */}
+          <p className="host-pick">
+            {/*
+              The choice itself, where the problem is explained rather than a
+              screen away. Naming the Macs is the whole of the fix: they are
+              told apart by the name each one calls itself, so the button says
+              exactly what will be driven.
+
+              Only offered when there is something to choose between. Two Macs
+              with one name between them cannot be addressed separately, and a
+              picker there would promise something it cannot do.
+            */}
+            {new Set(link.hosts).size === link.hosts.length
+              ? link.hosts.map((name) => (
+                  <button
+                    key={name}
+                    className={`chip ${link.chosenHost === name ? 'current' : ''}`}
+                    onClick={() => chooseHost(name)}
+                    disabled={busy}
+                  >
+                    Drive {name}
+                  </button>
+                ))
+              : null}
+            {/* The fix may also be at the other Mac — turning its phone remote
+                off, or updating it — and neither drops this connection, so
+                nothing here would ever notice on its own. */}
             <button className="chip" onClick={() => recheckHosts()} disabled={busy}>
               Check again
             </button>

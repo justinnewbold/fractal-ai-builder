@@ -547,10 +547,51 @@ test('two Macs on one account cannot quietly write to two units', async () => {
   assert.equal(hostConflict(['Justins MacBook Pro']), null)
   assert.equal(hostConflict([]), null)
 
-  const clash = hostConflict(['Justins MacBook Pro', 'Studio Mac'])
+  const clash = hostConflict(['Justins MacBook Pro', 'Studio Mac'], null, false)
   assert.match(clash, /Justins MacBook Pro and Studio Mac/, 'the person is not told which two')
   assert.match(clash, /both units/, 'nothing says what would actually happen')
-  assert.match(clash, /[Tt]urn the phone remote off/, 'nothing says what to do about it')
+  assert.match(clash, /[Cc]hoose the one/, 'nothing says what to do about it')
+})
+
+test('one Mac chosen, and proved to be the only one listening', () => {
+  /*
+   * The fix rather than the guard rail: a request can name the host it is meant
+   * for, and the others stay out of it.
+   *
+   * The catch is that only a new enough ForgeFX knows what that means. An older
+   * one has never heard of an addressed request and answers it like any other —
+   * so the app does not take the feature on trust. It asks the chosen Mac one
+   * addressed question and counts the answers, and only exactly one is evidence
+   * that a write will land in one place.
+   *
+   * Which makes a half-updated pair fail the same way as an un-updated one, and
+   * that way is the careful one.
+   */
+  const two = ['Justins MacBook Pro', 'Studio Mac']
+
+  // Chosen and proved: settled, nothing to say.
+  assert.equal(hostConflict(two, 'Studio Mac', true), null)
+
+  // Chosen but not proved — the other Mac answered a question meant for this
+  // one, so something out there is too old to be trusted with a write.
+  const stale = hostConflict(two, 'Studio Mac', false)
+  assert.match(stale, /meant only for Studio Mac/, 'the person is not told what was actually tried')
+  assert.match(stale, /[Uu]pdate the app/, 'nothing says what to do about an out-of-date Mac')
+
+  // Nothing chosen yet: an offer, not a complaint.
+  assert.match(hostConflict(two, null, false), /[Cc]hoose the one/)
+
+  // Two Macs with the same name cannot be told apart by the one thing that
+  // distinguishes them on the wire, so the fix is not in this app.
+  const same = hostConflict(['MacBook Pro', 'MacBook Pro'], null, false)
+  assert.match(same, /both called MacBook Pro/, 'a name clash is reported as an ordinary choice')
+  assert.match(same, /[Rr]ename one/, 'nothing says how to make them tellable apart')
+  // And a name clash is never talked out of by a choice, because a choice
+  // cannot be honoured: both Macs answer to it.
+  assert.match(hostConflict(['MacBook Pro', 'MacBook Pro'], 'MacBook Pro', true), /both called/)
+
+  // One Mac stays the ordinary case whatever else is set.
+  assert.equal(hostConflict(['Studio Mac'], null, false), null)
 })
 
 test('nothing is written while two Macs are listening', () => {
@@ -577,12 +618,30 @@ test('nothing is written while two Macs are listening', () => {
     /const census = payload\?\.id && censuses\.get\(payload\.id\)[\s\S]{0,120}const pending = payload\?\.id && waiting\.get/,
     'the second answer is dropped before anything counts it'
   )
-  // The count belongs to the channel it was taken on.
-  assert.match(src, /hosts = \[\]\s*\n\s*censuses\.clear\(\)/, 'a stale count outlives its connection')
+  // Requests name the Mac they are meant for, but only once there is more than
+  // one to name and only once that has been proved to work.
+  assert.match(
+    src,
+    /if \(hosts\.length > 1 && chosen && targeted\) ask\.host = chosen/,
+    'a request is sent to every Mac again, or to one that cannot understand being addressed'
+  )
+  assert.match(
+    src,
+    /targeted = answers\.length === 1/,
+    'addressing a Mac is taken on trust instead of proved'
+  )
+  // The count, the choice and the proof all belong to the channel they were
+  // taken on.
+  assert.match(
+    src,
+    /hosts = \[\]\s*\n\s*chosen = null\s*\n\s*targeted = false\s*\n\s*censuses\.clear\(\)/,
+    'a stale count outlives its connection'
+  )
 
   const link = readSrc(new URL('../src/lib/link.js', import.meta.url), 'utf8')
   assert.match(link, /countHosts\(\)/, 'the roll call is never taken')
-  assert.match(link, /set\(\{ clash: hostConflict\(\) \}\)/, 'the app is never told')
+  assert.match(link, /clash: hostConflict\(\)/, 'the app is never told')
+  assert.match(link, /export async function chooseHost/, 'there is no way to choose between them')
 })
 
 test('each Mac advertises itself under its own name', async () => {
