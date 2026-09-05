@@ -331,6 +331,31 @@ export function run(test) {
     assert.ok(!/padding: 0 var\(--s-4\)/.test(tour), 'the tour card still pads itself on top of the sheet body')
   })
 
+  test('a row and its delete button share one line', () => {
+    /*
+     * The delete button shipped with no styling at all. `button.recent-row` is
+     * a flex item at full width and a list item is not a flex container, so the
+     * × wrapped underneath every row: 89px tall instead of 44, an orphaned ×
+     * at the left edge, and the restore target no longer where it looked.
+     *
+     * Two rules make it a row, and both have to hold: the item has to lay out
+     * as flex, and the button beside the × must not claim the whole width.
+     */
+    const item = code.slice(code.indexOf('.recent-list li {'), code.indexOf('}', code.indexOf('.recent-list li {')))
+    assert.match(item, /display: flex/, 'the row and its delete button stack instead of sitting side by side')
+
+    const row = code.slice(code.indexOf('button.recent-row {'), code.indexOf('}', code.indexOf('button.recent-row {')))
+    assert.ok(
+      !/width: 100%/.test(row),
+      'the row claims the whole line again, which pushes the delete button onto its own'
+    )
+    assert.match(row, /flex: 1 1 auto/, 'the row no longer takes the room the delete button leaves')
+
+    const del = code.slice(code.indexOf('button.recent-del {'), code.indexOf('}', code.indexOf('button.recent-del {')))
+    assert.ok(del, 'the delete button has no styling at all')
+    assert.match(del, /min-height: 44px/, 'the delete button is under the touch floor')
+  })
+
   test('the floating Ask never floats over a phone’s controls', () => {
     /*
      * This used to check a swap: a floating button on wide screens, a fourth
