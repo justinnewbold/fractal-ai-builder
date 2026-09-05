@@ -14,6 +14,7 @@ import { forbiddenRemotely, explainAuth, timeoutFor } from '../src/lib/remote.js
 import * as taste from '../src/lib/taste.js'
 import * as link from '../src/lib/link.js'
 import * as corrections from '../src/lib/corrections.js'
+import * as slots from '../src/lib/slots.js'
 import { readFileSync as readSrc } from 'node:fs'
 import {
   patchSchemaValue,
@@ -3414,6 +3415,63 @@ test('a correction that changes nothing is not a correction', () => {
    channel had been joined, which is true with the Mac off and nothing
    answering. Nothing here may say connected unless the Mac answered.
    ------------------------------------------------------------------ */
+
+/*
+ * Slots the unit does not have.
+ *
+ * "Tries switching scenes to slot 500 and it didn't work — Preset location
+ * index must be integer 0..103, got 500."
+ *
+ * Not the scenes: a save parked from one machine and carried out on another,
+ * aimed at a slot the attached unit has never had. It came from `?? 512` — the
+ * gen-3 count, used as a default for every unit including the ones whose
+ * driver reports no count at all — and it reappeared every six seconds,
+ * because a parked save that fails is retried.
+ */
+console.log('\nslot ranges')
+
+test('a unit that has not said how many it holds is not given a number', () => {
+  assert.equal(slots.slotCount({}), null)
+  assert.equal(slots.slotCount({ presets: {} }), null)
+  assert.equal(slots.slotCount({ presets: { count: 0 } }), null)
+  assert.equal(slots.slotCount({ presets: { count: 104 } }), 104)
+})
+
+test('a slot past the end is refused once the unit has said where the end is', () => {
+  const am4 = { presets: { count: 104 } }
+  assert.equal(slots.slotOutside(500, am4), true)
+  assert.equal(slots.slotOutside(103, am4), false)
+  assert.equal(slots.slotOutside(104, am4), true)
+  assert.equal(slots.slotOutside(-1, am4), true)
+})
+
+test('a unit that has said nothing still gets the benefit of the doubt', () => {
+  /*
+   * The negative that keeps this from being worse than the bug. Refusing every
+   * slot on a unit whose driver never reports a count would turn one wrong
+   * save into a Save button that never works.
+   */
+  assert.equal(slots.slotOutside(500, {}), false)
+  assert.equal(slots.slotOutside(5, undefined), false)
+})
+
+test('a unit that states its size while refusing is listened to', () => {
+  assert.equal(
+    slots.countFromRefusal('Preset location index must be integer 0..103, got 500.'),
+    104,
+    'the one place some units ever say how big they are'
+  )
+  assert.equal(slots.countFromRefusal('location (0..511) required'), 512)
+})
+
+test('a refusal that states no range teaches nothing', () => {
+  // Narrow on purpose: a number in an unrelated message must not become the
+  // unit's size, which would be a worse wrong answer than having none.
+  assert.equal(slots.countFromRefusal('the port is busy, try again'), null)
+  assert.equal(slots.countFromRefusal('slot 500 is empty'), null)
+  assert.equal(slots.countFromRefusal(''), null)
+  assert.equal(slots.countFromRefusal(null), null)
+})
 
 /*
  * A unit that is busy is not a unit that is gone.

@@ -65,7 +65,7 @@ import {
   rememberNote,
   summariseCorrections
 } from './lib/corrections'
-import { timeLeft } from './lib/slots'
+import { countFromRefusal, slotCount, slotOutside, timeLeft } from './lib/slots'
 import { createNameScan } from './lib/nameScan'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
 import Screens from './components/Screens'
@@ -857,6 +857,22 @@ export default function App() {
       setBusy(true)
       setAskedSave(null)
       try {
+        /*
+         * A slot this unit does not have is refused here, not by the unit.
+         *
+         * A save is parked on one machine and carried out on another, and the
+         * two need not be looking at the same hardware — a phone in the demo
+         * offers 512 slots, and the unit with the cable in it may hold 104.
+         * Sent on, that becomes "Preset location index must be integer 0..103,
+         * got 500" in front of a guitarist, once every six seconds, because the
+         * parked request keeps being retried.
+         */
+        if (slotOutside(req.slot, device?.capabilities)) {
+          const has = slotCount(device?.capabilities)
+          throw new Error(
+            `Slot ${req.slot} isn't on this unit — it holds ${has}, numbered 0 to ${has - 1}. Nothing was saved.`
+          )
+        }
         const name = (req.name || '').trim()
         if (name && name !== preset?.name?.trim()) await setPresetName(name)
         await storePreset(req.slot)
@@ -871,14 +887,39 @@ export default function App() {
         record('save', `Saved "${name || preset?.name}" to slot ${req.slot}, asked for from the phone`)
         await read()
       } catch (err) {
+        /*
+         * The unit's own complaint often states its size — "must be integer
+         * 0..103" — and that sentence is the only place some units ever say it.
+         * So it is read rather than shown: the count is corrected here, which
+         * stops the picker offering slots that do not exist and stops this
+         * happening again.
+         */
+        const learned = countFromRefusal(err.message)
+        if (learned && learned !== device?.capabilities?.presets?.count) {
+          setDevice((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  capabilities: {
+                    ...prev.capabilities,
+                    presets: { ...prev.capabilities?.presets, count: learned }
+                  }
+                }
+              : prev
+          )
+        }
         await clearParkedSave().catch(() => {})
         await reportSave({ id: req.id, ok: false, slot: req.slot, error: err.message }).catch(() => {})
-        setError(err.message)
+        setError(
+          learned
+            ? `Slot ${req.slot} isn't on this unit — it holds ${learned}, numbered 0 to ${learned - 1}. Nothing was saved.`
+            : err.message
+        )
       } finally {
         setBusy(false)
       }
     },
-    [preset?.name, read, record]
+    [preset?.name, read, record, device?.capabilities]
   )
 
   /*
@@ -1478,6 +1519,17 @@ export default function App() {
     const number = slot === '' ? preset?.number : Number(slot)
     if (!Number.isInteger(number) || number < 0) {
       setSaveError('Enter a preset slot number.')
+      return
+    }
+    /*
+     * Caught here rather than by the unit, and caught before it is parked: a
+     * save asked for from the phone is carried out later, on the Mac, and a
+     * slot that does not exist becomes a driver message in front of a
+     * guitarist minutes after they typed it.
+     */
+    if (slotOutside(number, device?.capabilities)) {
+      const has = slotCount(device?.capabilities)
+      setSaveError(`This unit holds ${has} presets, numbered 0 to ${has - 1}.`)
       return
     }
     setBusy(true)
@@ -2211,7 +2263,17 @@ export default function App() {
    * the relay carries nothing nobody is looking at. The demo has no port to
    * protect and reads eagerly from the start.
    */
-  const namesTotal = device?.capabilities?.presets?.count ?? 512
+  /*
+   * How many slots to read, and nothing invented.
+   *
+   * This was `?? 512`, which is the gen-3 count and a guess about hardware the
+   * app may not be attached to. On a unit whose driver reports no count, the
+   * guess became a fact: the scan walked toward slot 512 on a unit that holds
+   * 104, and the picker offered every one of them to be saved into. Zero means
+   * there is nothing to scan, which is the right amount of a unit's attention
+   * to spend on slots nobody has said exist.
+   */
+  const namesTotal = slotCount(device?.capabilities) ?? 0
 
   useEffect(() => {
     unitInUse.current.busy = busy
