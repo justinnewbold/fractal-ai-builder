@@ -1170,18 +1170,6 @@ export const fcModel = () => (mock ? tick().then(() => null) : request('/fc/mode
 const toWireCell = (row, col) => ({ row, col: col + 1 })
 
 /**
- * Move the device's edit cursor to a cell. Writes nothing.
- *
- * The safe way to confirm the app and the hardware agree about which cell is
- * which: point at one and watch the FM3's screen. Worth doing once before
- * trusting placement, given the two indexing conventions in play.
- */
-export const pointAtCell = (row, col) =>
-  mock
-    ? tick().then(() => ({ ok: true }))
-    : request('/preset/grid/select', { method: 'POST', body: JSON.stringify(toWireCell(row, col)) })
-
-/**
  * Put a block in a cell, or clear it with blockId 0.
  *
  * ForgeFX sends a cell-select before the insert — the FM3 drops the block at a
