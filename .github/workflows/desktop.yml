@@ -39,7 +39,21 @@ on:
 
 jobs:
   mac:
-    runs-on: macos-latest
+    # Pinned, and this is a stopgap rather than a fix.
+    #
+    # GitHub rolled macos-latest from image 20260728.0273.1 to 20260831.0337.3
+    # between two builds three hours apart. The first signed and published
+    # 7.31.0; the next two failed identically inside electron-builder's
+    # keychain step:
+    #
+    #   security: SecKeychainUnlock: The user name or passphrase you entered
+    #   is not correct.
+    #
+    # No secret changed and no code in the signing path changed — the machine
+    # underneath did. Pinning puts releases back on a machine known to work
+    # while electron-builder is brought up to a version that handles the new
+    # image; the real fix is that upgrade, and this line goes when it lands.
+    runs-on: macos-15
     # Creating a release needs contents: write, and a workflow that says
     # nothing gets whatever the repository defaults to — which here is read
     # only. GitHub named the missing permission itself when it refused:
