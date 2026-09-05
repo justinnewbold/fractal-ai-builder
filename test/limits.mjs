@@ -223,6 +223,62 @@ export function run(test) {
     )
   })
 
+  test('everything the app loads at runtime is actually in the app', () => {
+    /*
+     * `files` is an allowlist. Anything main.js reaches for that is not named
+     * there is simply absent from the packaged app, and the failures are quiet
+     * by nature: Electron treats a missing preload as no preload, with no error
+     * and nothing in the window.
+     *
+     * preload.js was missing from it for every release it existed in. So
+     * `window.fractalDesktop` was never defined in a packaged build,
+     * `desktopBridge()` answered null exactly as designed for a phone or the
+     * hosted site, and the whole Updates section — version line, "Check for
+     * updates", the ready notice — drew nothing. The feature looked unwritten.
+     * It worked in development, where the file sits on disk beside main.js.
+     *
+     * So this reads what main.js actually asks for rather than checking one
+     * name: every `join(__dirname, '<file>')` has to be covered by `files`, or
+     * by `extraResources` for the two that are copied in beside the asar.
+     */
+    const main = read('desktop/main.js')
+    const yml = read('desktop/electron-builder.yml')
+
+    const listed = (block) => {
+      const at = yml.indexOf(`${block}:`)
+      if (at === -1) return []
+      const rest = yml.slice(at + block.length + 1)
+      const end = rest.search(/\n[a-zA-Z]/)
+      return (end === -1 ? rest : rest.slice(0, end))
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l.startsWith('- ') || l.startsWith('to: '))
+        .map((l) => l.replace(/^-\s*/, '').replace(/^to:\s*/, '').trim())
+    }
+    const packaged = [...listed('files'), ...listed('extraResources')]
+    assert.ok(packaged.includes('main.js'), 'the files list is no longer being read correctly')
+
+    const wanted = [...main.matchAll(/join\(__dirname,\s*'([^']+)'/g)]
+      .map((m) => m[1])
+      // `..` climbs out of the app to the checkout, which only exists in
+      // development — those paths sit behind an `app.isPackaged` ternary whose
+      // other half reads process.resourcesPath.
+      .filter((name) => name !== '..')
+    assert.ok(wanted.length >= 2, 'nothing looks like a runtime path any more — has main.js changed shape?')
+
+    for (const name of wanted) {
+      const covered = packaged.some(
+        (p) => p === name || p === `${name}/**` || p.startsWith(`${name}/`) ||
+               (p.includes('*') && new RegExp(`^${p.replace(/\*+/g, '.*')}$`).test(name))
+      )
+      assert.ok(
+        covered,
+        `main.js loads ${name} at runtime and nothing packages it — in a built app it will not be there, ` +
+          'and a missing preload or icon fails silently'
+      )
+    }
+  })
+
   test('the menu offers the way in that works, and names the usual reason one does not', () => {
     /*
      * Two ways to a phone, and the menu only ever mentioned one — the wifi

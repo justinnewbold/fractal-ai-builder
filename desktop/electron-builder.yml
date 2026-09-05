@@ -7,8 +7,24 @@ appId: cloud.newbold.fractal
 productName: Fractal AI Builder
 directories:
   output: release
+# An allowlist, not a filter. Anything main.js reaches for at runtime has to be
+# named here or it simply is not in the app.
+#
+# preload.js was missing from this list for every release it existed in. It is
+# loaded by absolute path (main.js: join(__dirname, 'preload.js')), and Electron
+# treats a preload that is not there as no preload at all — no error, no warning
+# in the window, nothing. So `window.fractalDesktop` was never defined in a
+# packaged build, `desktopBridge()` answered null exactly as it is designed to
+# on a phone or the hosted site, and the whole Updates section — the version
+# line, "Check for updates", the "an update is ready" notice — rendered nothing
+# and looked like a feature that had never been written.
+#
+# It worked perfectly in development, where the file is on disk beside main.js.
+# That is the shape of this bug: only the packaged app is missing it, and the
+# packaged app is the only one anybody runs.
 files:
   - main.js
+  - preload.js
   - lib/**
   - trayTemplate*.png
   - package.json
