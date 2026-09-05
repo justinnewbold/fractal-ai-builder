@@ -382,9 +382,20 @@ export const PORT_TAKEN = (port = DEFAULT_PORT) =>
  * — the tests run in a container with no network worth advertising on, and the
  * two callers install it in different places.
  */
-export function publish(Bonjour, { port = DEFAULT_PORT, name = DEFAULT_NAME } = {}) {
+export function publish(
+  Bonjour,
+  { port = DEFAULT_PORT, name = DEFAULT_NAME, onError = () => {} } = {}
+) {
   if (!Bonjour) return { stop: async () => {} }
-  const bonjour = new Bonjour()
+  /*
+   * The second argument is what bonjour-service does with a socket error, and
+   * its default is `function (err) { throw err }` — thrown from inside a UDP
+   * event handler, where nothing is waiting to catch it, so a network that goes
+   * away underneath the advert takes the whole app down with it. Advertising a
+   * name is the least important thing this app does; it may not be the thing
+   * that decides whether it keeps running.
+   */
+  const bonjour = new Bonjour({}, onError)
   const ad = bonjour.publish({ name, type: 'http', port })
   return {
     ad,
@@ -437,6 +448,18 @@ export const MISSING_FORGEFX =
  * until the stray process is killed. So: SIGINT, wait, and SIGKILL what is
  * still there.
  *
+ * And the third, which is the one that came back: stopping the advert was
+ * awaited with no deadline. Underneath `advert.stop()` is bonjour-service
+ * sending a goodbye packet over multicast UDP and calling back when it has gone
+ * out — so the app's ability to close depended on a network write completing.
+ * On a Mac whose wifi has changed, or slept, or whose socket errored, that
+ * callback simply never arrives, the promise never settles, `app.quit()` is
+ * never reached, and there is no way out but Force Quit. Reported exactly that
+ * way: "closing the app doesn't close it all the way."
+ *
+ * So nothing here waits on anything indefinitely. Every step has a deadline and
+ * every deadline ends in the app closing.
+ *
  * Every side effect is injected, which is the only reason this can be tested
  * from a machine with no Electron and no serial port.
  */
@@ -447,14 +470,17 @@ export async function shutdown({
   alive = (proc) => proc.exitCode === null && proc.signalCode === null,
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
   grace = 2000,
-  step = 100
+  step = 100,
+  adGrace = 1500
 } = {}) {
   const report = { advert: 'none', server: 'none' }
 
   if (advert?.stop) {
     try {
-      await advert.stop()
-      report.advert = 'stopped'
+      report.advert = await Promise.race([
+        Promise.resolve(advert.stop()).then(() => 'stopped'),
+        sleep(adGrace).then(() => 'gave up')
+      ])
     } catch {
       // Never a reason to stay open. The advert dies with the process anyway.
       report.advert = 'failed'

@@ -34,6 +34,13 @@ let firewall = { known: false }
 let update = null
 /** `check` from wireUpdates, so the menu item can ask again by hand. */
 let updates = null
+/**
+ * Whether the app is on its way out. See the quit handler at the foot of this
+ * file — it lives up here because three other things have to know: the dock
+ * must not be touched, a dying server is not news, and a second quit must not
+ * be cancelled by the handler that asked for it.
+ */
+let quitting = false
 
 /** The shared logic is ESM; this shell is CommonJS, so it is imported lazily. */
 const host = () => import('./lib/host.mjs')
@@ -136,14 +143,28 @@ async function start() {
   } catch {
     // Without mDNS the IP still works; only the .local name is lost.
   }
-  advert = publish(Bonjour, { port, name })
+  advert = publish(Bonjour, {
+    port,
+    name,
+    onError: (err) => console.error('[mdns]', err?.message || err)
+  })
 
   server = spawn(process.execPath, [join(forgefx, 'server', 'dist', 'index.js')], {
     env: serverEnv({ port, dist: distPath(), asNode: true }),
     stdio: 'inherit'
   })
   server.on('exit', (code) => {
-    if (code) dialog.showErrorBox('The device server stopped', `ForgeFX exited with code ${code}.`)
+    /*
+     * Not while quitting. Stopping the server is the first thing the quit does,
+     * and a ForgeFX that exits non-zero on SIGINT would then put a modal box on
+     * screen mid-quit — one belonging to an app whose window has gone and whose
+     * dock icon is on its way out, so it can land behind everything with no
+     * obvious way to reach it. The app looks like it is refusing to close, and
+     * the only way out is the one nobody should need.
+     */
+    if (code && !quitting) {
+      dialog.showErrorBox('The device server stopped', `ForgeFX exited with code ${code}.`)
+    }
   })
 
   /*
@@ -197,7 +218,8 @@ async function start() {
  * can force quit, and the quiet state stays quiet.
  */
 function showInDock(yes) {
-  if (!app.dock) return
+  // On the way out, the dock icon is the operating system's business.
+  if (quitting || !app.dock) return
   try {
     if (yes) app.dock.show()
     else app.dock.hide()
@@ -451,15 +473,42 @@ app.on('window-all-closed', () => {})
  * finds a ForgeFX it did not start, says so, and quits. Between them that is
  * "it won't let you reopen it, you have to force close then restart".
  *
- * The work itself lives in host.mjs, where it can be tested. Here there is only
- * the flag that stops this handler from cancelling its own second quit.
+ * The work itself lives in host.mjs, where it can be tested, and it now has a
+ * deadline on every step of it. What is left here is the promise that outranks
+ * all of them: however that goes, this app closes.
+ *
+ * Because the cost of it not closing is no longer just an annoyance. An update
+ * is installed when the app quits — that is the whole design, so that nothing
+ * ever restarts itself mid-set — and an app that can only be force quit is an
+ * app that can never finish an update. Force Quit is SIGKILL: no quit event, no
+ * install, and the same "an update is ready" line waiting the next time.
  */
-let quitting = false
+const QUIT_DEADLINE_MS = 6000
 
 app.on('before-quit', (e) => {
   if (quitting) return
   quitting = true
   e.preventDefault()
+
+  /*
+   * Say so on screen straight away. Tearing down can take a couple of seconds
+   * in the worst case, and a window still sitting there after ⌘Q reads as an
+   * app that ignored you — which is exactly when a person reaches for Force
+   * Quit and loses the update that was about to install.
+   */
+  if (win && !win.isDestroyed()) win.hide()
+
+  /*
+   * The backstop, and it is deliberately never cleared.
+   *
+   * Everything below has a deadline of its own, so in the ordinary case this
+   * timer is still counting when the process is already gone and it simply
+   * never runs. It exists for the case nobody predicted — the next thing that
+   * turns out to wait forever — because the one outcome that must not be
+   * possible is an app a person cannot close.
+   */
+  setTimeout(() => app.exit(0), QUIT_DEADLINE_MS)
+
   const done = () => {
     server = null
     advert = null
