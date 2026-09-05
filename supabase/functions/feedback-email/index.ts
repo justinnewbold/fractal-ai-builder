@@ -17,12 +17,17 @@
  *
  * WHAT HAS TO BE SET, in Supabase → Edge Functions → Secrets:
  *
- *   RESEND_API_KEY        from resend.com — the only one without a default
- *   FEEDBACK_TO           where reports land (default: the address below)
- *   FEEDBACK_FROM         who they come from; must be a domain verified with
- *                         Resend, or their onboarding@resend.dev while testing
- *   FEEDBACK_HOOK_SECRET  any random string, matching the one in the database
- *                         (the migration reads it from Vault)
+ *   RESEND_API_KEY   from resend.com. The only one that is required.
+ *   FEEDBACK_TO      where reports land (default: the address below)
+ *   FEEDBACK_FROM    who they come from; must be a domain verified with Resend,
+ *                    or their onboarding@resend.dev while testing
+ *
+ * There is deliberately no secret to keep in step by hand. An earlier version
+ * had one — FEEDBACK_HOOK_SECRET here, the same string in Vault — and that is
+ * the step that breaks: two halves typed twice, and when they disagree the
+ * failure is a 401 nobody is looking at. The database generates the secret
+ * instead and this reads it back through an RPC that only `service_role` may
+ * call, using the key Supabase injects here on its own.
  *
  * With no RESEND_API_KEY this answers 200 and does nothing. Deliberate: the
  * trigger fires on every insert from the moment it exists, and a function that
@@ -41,6 +46,40 @@ const DEFAULT_TO = 'justinnewbold@gmail.com'
  * the day this is set up rather than after a DNS change has propagated.
  */
 const DEFAULT_FROM = 'Fractal AI Builder <onboarding@resend.dev>'
+
+/**
+ * The secret the trigger sends, read from where the database keeps it.
+ *
+ * Held across invocations on purpose: a warm function answers without the extra
+ * round trip, and a cold one pays it once. Only a successful read is cached, so
+ * a blip while the secret is being rotated does not lock this out until the
+ * next deploy.
+ */
+let cachedSecret: string | null = null
+
+async function hookSecret(): Promise<string | null> {
+  if (cachedSecret) return cachedSecret
+  const url = Deno.env.get('SUPABASE_URL')
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!url || !key) return null
+  try {
+    const res = await fetch(`${url}/rest/v1/rpc/feedback_hook_secret`, {
+      method: 'POST',
+      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: '{}'
+    })
+    if (!res.ok) {
+      console.error('feedback-email: could not read the hook secret', res.status, await res.text())
+      return null
+    }
+    const value = await res.json()
+    if (typeof value === 'string' && value) cachedSecret = value
+    return cachedSecret
+  } catch (err) {
+    console.error('feedback-email: could not read the hook secret', err)
+    return null
+  }
+}
 
 /** Nothing from a stranger's keyboard reaches an inbox as markup. */
 const esc = (s: unknown) =>
@@ -62,8 +101,14 @@ Deno.serve(async (req: Request) => {
    * Compared in full rather than with a prefix so a partial guess proves
    * nothing.
    */
-  const expected = Deno.env.get('FEEDBACK_HOOK_SECRET')
-  if (!expected || req.headers.get('x-hook-secret') !== expected) {
+  const expected = await hookSecret()
+  const given = req.headers.get('x-hook-secret')
+  /*
+   * Both halves must exist. Without the first test an unreadable secret would
+   * make `null !== null` false and wave everything through — the failure that
+   * turns a closed door into an open one.
+   */
+  if (!expected || !given || given !== expected) {
     return new Response('No', { status: 401 })
   }
 
