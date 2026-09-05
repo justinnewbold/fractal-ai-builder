@@ -182,6 +182,39 @@ export function describeLink(state) {
 }
 
 /**
+ * What the bar says on the left, and what colour the lamp is.
+ *
+ * Pulled out of TopBar so it can be tested, because it got this wrong in a way
+ * a screenshot showed instantly and no test could: a phone read
+ * "NOT CONNECTED" beside a chip reading "connected", over a notice explaining
+ * that the Mac was connected and no unit was plugged into it. Three labels,
+ * one moment, all disagreeing.
+ *
+ * Each was true about a different thing. The chip is about the link to the
+ * Mac; the bar is about the unit. The bar was the wrong one — it treated every
+ * remote state that was not live as "not connected", which is exactly right
+ * until the link connects and only the unit is missing.
+ *
+ * The rule now: the bar names the thing that is absent. No link, no Mac —
+ * "Not connected", quietly, because a phone that has not connected yet is not
+ * broken and the screen behind it is already asking it to connect. Link up and
+ * no unit — "No unit", in red, because there is a red notice under it saying
+ * the same and a cable the player can go and check.
+ */
+export function describeUnit({ demo, role, status, device, link }) {
+  const remote = role === 'remote'
+  const linkUp = link === 'connected'
+  const named = device?.short || device?.name || 'Connected'
+
+  if (remote && status !== 'live') {
+    const unit = linkUp ? (status === 'fault' ? 'No unit' : 'Looking…') : 'Not connected'
+    return { unit, lamp: demo ? 'demo' : linkUp ? status : 'idle' }
+  }
+  const unit = status === 'live' ? named : status === 'fault' ? 'No device' : 'Looking…'
+  return { unit, lamp: demo ? 'demo' : status }
+}
+
+/**
  * The one sentence about Safari, only where it is true.
  *
  * A page served over https cannot talk to the plain-http Fractal app on the

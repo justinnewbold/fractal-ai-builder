@@ -12,6 +12,7 @@ import {
 import { remoteActive } from '../lib/remote'
 import { EXCLUDED_BLOCKS } from '../lib/guardrails'
 import { blockColor } from '../lib/blockColors'
+import { presetLabel } from '../lib/presetName'
 import { tick as haptic } from '../lib/feedback'
 import { Tuner } from './Console'
 
@@ -286,9 +287,9 @@ export default function Gig({ preset, device, capabilities, onError, onChanged, 
           className="gig-name"
           onClick={onPickPreset}
           disabled={!onPickPreset}
-          aria-label={`${preset?.name?.trim() || 'Untitled'} — choose another preset`}
+          aria-label={`${presetLabel(preset)} — choose another preset`}
         >
-          <span>{preset?.name?.trim() || 'Untitled'}</span>
+          <span>{presetLabel(preset)}</span>
           <span className="gig-name-caret" aria-hidden="true">
             ⌄
           </span>

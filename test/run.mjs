@@ -14,6 +14,8 @@ import { forbiddenRemotely, explainAuth, timeoutFor } from '../src/lib/remote.js
 import * as taste from '../src/lib/taste.js'
 import * as link from '../src/lib/link.js'
 import * as corrections from '../src/lib/corrections.js'
+import * as slots from '../src/lib/slots.js'
+import * as names from '../src/lib/presetName.js'
 import { readFileSync as readSrc } from 'node:fs'
 import {
   patchSchemaValue,
@@ -2532,9 +2534,55 @@ test('quiet after the hello is the AI, and it says so without naming machines', 
   globalThis.fetch = f.fetch
   await assert.rejects(
     streamSpec({}, { timing }),
-    (err) => err.generationFailure === 'stalled' && /took the request but never started/.test(err.message)
+    (err) => err.generationFailure === 'stalled' && /sent nothing back/.test(err.message)
   )
   assert.equal(f.calls(), 2, 'a quiet start was not retried — nothing had been written, so it was free to ask again')
+})
+
+test('a wait of our own making is not blamed on what the player typed', async () => {
+  /*
+   * "Said working on tone for over 3 minutes then just disappeared and nothing
+   * was generated." What it then said was "ask again, and a shorter
+   * description starts sooner" — to someone whose description was five words.
+   *
+   * The wait before the model's first word is this app's own payload and the
+   * model's own speed. Pointing a person at the one part they cannot usefully
+   * change wastes their next attempt and blames them for our delay.
+   */
+  const f = scheduledFetch([
+    { steps: [{ at: 5, chunk: OPEN }], end: false },
+    { steps: [{ at: 5, chunk: OPEN }], end: false }
+  ])
+  globalThis.fetch = f.fetch
+  await assert.rejects(streamSpec({}, { timing }), (err) => {
+    assert.ok(
+      !/shorter description|fewer words/i.test(err.message),
+      `it still blames the description — ${err.message}`
+    )
+    assert.match(err.message, /twice/, 'three minutes of waiting is reported as one attempt')
+    assert.match(err.message, /Nothing was written to your unit/)
+    return true
+  })
+})
+
+test('the second attempt announces itself and is not overwritten', async () => {
+  /*
+   * The retry said "asking again" and the new attempt's hello overwrote it a
+   * second later, so two ninety-second waits looked like one that never
+   * ended. The attempt number rides on the hello so the screen can keep
+   * saying which try this is.
+   */
+  const f = scheduledFetch([
+    { steps: [{ at: 5, chunk: OPEN }], end: false },
+    { steps: [{ at: 5, chunk: OPEN }], end: false }
+  ])
+  globalThis.fetch = f.fetch
+  const opens = []
+  await assert.rejects(
+    streamSpec({}, { timing, onEvent: (e) => e.kind === 'open' && opens.push(e.attempt) }),
+    () => true
+  )
+  assert.deepEqual(opens, [0, 1], 'the hello does not say which attempt it belongs to')
 })
 
 test('the wait speaks to a guitarist, not to whoever wrote it', () => {
@@ -3414,6 +3462,260 @@ test('a correction that changes nothing is not a correction', () => {
    channel had been joined, which is true with the Mac off and nothing
    answering. Nothing here may say connected unless the Mac answered.
    ------------------------------------------------------------------ */
+
+/*
+ * A marker is not a name.
+ *
+ * "Empty scene is still showing previous preset name" — slot 495, shown as
+ * `<EMPTY>k Album Chug`. An empty gen-3 slot reports `<EMPTY>` written over the
+ * front of a fixed run of characters rather than clearing it, so a short marker
+ * on top of a longer old name leaves the old name's tail hanging off the end.
+ * The app cannot fix that buffer; it can stop repeating it.
+ */
+console.log('\npreset names')
+
+test('a marker with somebody else preset stuck to it is not a name', () => {
+  assert.equal(names.isEmptySlotName('<EMPTY>k Album Chug'), true)
+  assert.equal(names.cleanPresetName('<EMPTY>k Album Chug'), '', 'the rubble is kept')
+  assert.equal(names.presetLabel({ name: '<EMPTY>k Album Chug' }), 'Empty')
+})
+
+test('the marker is recognised however the unit spaces it', () => {
+  for (const raw of ['<EMPTY>', ' <EMPTY> ', '<empty>', '< Empty >'])
+    assert.equal(names.isEmptySlotName(raw), true, raw)
+})
+
+test('a preset somebody named is left alone', () => {
+  /*
+   * The negative that matters. Matching anywhere in the string would rename
+   * somebody's own preset, which is a worse failure than the one being fixed —
+   * it is their work, and they chose the word.
+   */
+  for (const raw of ['Empty Room Verb', 'Nearly <EMPTY> Chug', 'JN Metal Zone'])
+    assert.equal(names.isEmptySlotName(raw), false, raw)
+  assert.equal(names.cleanPresetName('  JN Metal Zone  '), 'JN Metal Zone')
+  assert.equal(names.presetLabel({ name: 'Empty Room Verb' }), 'Empty Room Verb')
+})
+
+test('an empty slot and an unnamed preset do not read the same', () => {
+  // Untitled is something somebody made and did not name. Empty is nothing.
+  assert.equal(names.presetLabel({ name: '' }), 'Untitled')
+  assert.equal(names.presetLabel({ name: '   ' }), 'Untitled')
+  assert.equal(names.presetLabel({ name: '', empty: true }), 'Empty')
+  assert.equal(names.presetLabel(null), 'Untitled')
+})
+
+/*
+ * Slots the unit does not have.
+ *
+ * "Tries switching scenes to slot 500 and it didn't work — Preset location
+ * index must be integer 0..103, got 500."
+ *
+ * Not the scenes: a save parked from one machine and carried out on another,
+ * aimed at a slot the attached unit has never had. It came from `?? 512` — the
+ * gen-3 count, used as a default for every unit including the ones whose
+ * driver reports no count at all — and it reappeared every six seconds,
+ * because a parked save that fails is retried.
+ */
+console.log('\nslot ranges')
+
+test('a unit that has not said how many it holds is not given a number', () => {
+  assert.equal(slots.slotCount({}), null)
+  assert.equal(slots.slotCount({ presets: {} }), null)
+  assert.equal(slots.slotCount({ presets: { count: 0 } }), null)
+  assert.equal(slots.slotCount({ presets: { count: 104 } }), 104)
+})
+
+test('a slot past the end is refused once the unit has said where the end is', () => {
+  const am4 = { presets: { count: 104 } }
+  assert.equal(slots.slotOutside(500, am4), true)
+  assert.equal(slots.slotOutside(103, am4), false)
+  assert.equal(slots.slotOutside(104, am4), true)
+  assert.equal(slots.slotOutside(-1, am4), true)
+})
+
+test('a unit that has said nothing still gets the benefit of the doubt', () => {
+  /*
+   * The negative that keeps this from being worse than the bug. Refusing every
+   * slot on a unit whose driver never reports a count would turn one wrong
+   * save into a Save button that never works.
+   */
+  assert.equal(slots.slotOutside(500, {}), false)
+  assert.equal(slots.slotOutside(5, undefined), false)
+})
+
+test('a unit that states its size while refusing is listened to', () => {
+  assert.equal(
+    slots.countFromRefusal('Preset location index must be integer 0..103, got 500.'),
+    104,
+    'the one place some units ever say how big they are'
+  )
+  assert.equal(slots.countFromRefusal('location (0..511) required'), 512)
+})
+
+test('a refusal that states no range teaches nothing', () => {
+  // Narrow on purpose: a number in an unrelated message must not become the
+  // unit's size, which would be a worse wrong answer than having none.
+  assert.equal(slots.countFromRefusal('the port is busy, try again'), null)
+  assert.equal(slots.countFromRefusal('slot 500 is empty'), null)
+  assert.equal(slots.countFromRefusal(''), null)
+  assert.equal(slots.countFromRefusal(null), null)
+})
+
+/*
+ * A unit that is busy is not a unit that is gone.
+ *
+ * "I'm on the FM3. As soon as I hit next or select a scene, it goes to the
+ * screen where it says not connected again."
+ *
+ * Next tells the unit to load a preset and then reads back what is loaded.
+ * On hardware that read lands while the unit is still working, the answer is
+ * "no unit", and the app believed it — a working rig replaced by a No unit
+ * found screen with the guitar still plugged in.
+ */
+console.log('\nsettling')
+
+const never = async () => {
+  throw new Error('this should not have been asked')
+}
+
+test('a unit that answers on the second ask is not declared gone', async () => {
+  const answers = [{ connected: false }, { connected: true, short: 'FM3' }]
+  let waited = 0
+  const info = await ds.confirmedDetect({
+    detect: async () => answers.shift(),
+    wait: async (ms) => {
+      waited += ms
+    },
+    wasLive: true
+  })
+  assert.equal(info.short, 'FM3')
+  assert.ok(waited > 0, 'it asked again with no pause at all, which asks the same busy port')
+})
+
+test('a unit that throws once is not declared gone either', async () => {
+  // The likelier shape on a relay: the call does not answer false, it fails.
+  let n = 0
+  const info = await ds.confirmedDetect({
+    detect: async () => {
+      if (++n === 1) throw new Error('timed out')
+      return { connected: true }
+    },
+    wait: async () => {},
+    wasLive: true
+  })
+  assert.equal(info.connected, true)
+  assert.equal(n, 2)
+})
+
+test('a unit that really is gone is still reported', async () => {
+  let n = 0
+  const info = await ds.confirmedDetect({
+    detect: async () => {
+      n++
+      return { connected: false }
+    },
+    wait: async () => {},
+    wasLive: true
+  })
+  assert.equal(info.connected, false, 'a missing unit was reported as present')
+  assert.equal(n, ds.SETTLE_TRIES, 'it gave up early or kept asking for ever')
+})
+
+test('a failure every time is the caller own to report, not a quiet null', async () => {
+  await assert.rejects(
+    ds.confirmedDetect({
+      detect: async () => {
+        throw new Error('the Mac stopped answering')
+      },
+      wait: async () => {},
+      wasLive: true
+    }),
+    /stopped answering/
+  )
+})
+
+test('nothing was live, so the first answer stands', async () => {
+  /*
+   * The other half of the rule, and the reason this is not just a retry: an
+   * empty rig at startup must still say so at once. Asking three times would
+   * put a second and a half in front of every person who opens the app with
+   * nothing plugged in.
+   */
+  let n = 0
+  const info = await ds.confirmedDetect({
+    detect: async () => {
+      n++
+      return { connected: false }
+    },
+    wait: never,
+    wasLive: false
+  })
+  assert.equal(info.connected, false)
+  assert.equal(n, 1, 'a rig that was never live was asked more than once')
+})
+
+/*
+ * The bar, the chip and the notice have to tell one story.
+ *
+ * A real phone showed all three at once: "NOT CONNECTED" on the left, a chip
+ * reading "connected", and a red notice explaining that the Mac was connected
+ * and no unit was plugged into it. Every one of them was true about a
+ * different thing, and together they were nonsense.
+ */
+test('a Mac that answered with no unit on it does not read as not connected', () => {
+  const said = link.describeUnit({
+    role: 'remote',
+    link: 'connected',
+    status: 'fault',
+    device: { connected: false }
+  })
+  assert.equal(said.unit, 'No unit', 'the bar contradicts the chip beside it')
+  assert.equal(said.lamp, 'fault', 'a cable the player can go and check is not a quiet state')
+})
+
+test('a phone that has not reached the Mac stays quiet about it', () => {
+  // The reason the bar went quiet in the first place: red over a screen that
+  // is calmly asking you to connect is the loud wrong answer.
+  for (const state of ['off', 'joining', 'no-answer']) {
+    const said = link.describeUnit({ role: 'remote', link: state, status: 'fault' })
+    assert.equal(said.unit, 'Not connected', state)
+    assert.equal(said.lamp, 'idle', state)
+  }
+})
+
+test('a connected phone still reading the unit says so', () => {
+  const said = link.describeUnit({ role: 'remote', link: 'connected', status: 'idle' })
+  assert.equal(said.unit, 'Looking…')
+})
+
+test('a live unit is named, wherever the app is running', () => {
+  assert.equal(
+    link.describeUnit({ role: 'remote', link: 'connected', status: 'live', device: { short: 'AM4' } })
+      .unit,
+    'AM4'
+  )
+  assert.equal(
+    link.describeUnit({ role: 'mac', link: 'connected', status: 'live', device: { short: 'FM3' } })
+      .unit,
+    'FM3'
+  )
+})
+
+test('at the Mac, a missing unit is still a missing device', () => {
+  // Nothing above changes the end with the cable in it.
+  const said = link.describeUnit({ role: 'mac', link: 'connected', status: 'fault' })
+  assert.equal(said.unit, 'No device')
+  assert.equal(said.lamp, 'fault')
+})
+
+test('the demo lamp outranks whatever the unit is doing', () => {
+  assert.equal(link.describeUnit({ demo: true, role: 'mac', status: 'live' }).lamp, 'demo')
+  assert.equal(
+    link.describeUnit({ demo: true, role: 'remote', link: 'connected', status: 'fault' }).lamp,
+    'demo'
+  )
+})
 
 test('connected means the Mac answered, never merely that a channel was joined', () => {
   const base = { role: 'remote', hasSession: true, joining: false, channelUp: true }

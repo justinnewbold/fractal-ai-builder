@@ -1,4 +1,6 @@
 import { isDemo } from '../lib/forgefx'
+import { describeUnit } from '../lib/link'
+import { presetLabel } from '../lib/presetName'
 import LinkChip from './LinkChip'
 
 /**
@@ -45,22 +47,20 @@ export default function TopBar({
   const remote = link?.role === 'remote'
 
   /*
-   * The short name is the point: "FM3", not a sentence.
-   *
-   * A phone that is not connected is not a fault. "No device" in red over a
-   * screen that calmly says "Connect to your Mac" is two answers to one
-   * question, and the loud one is wrong — so on a phone the bar says the
-   * quiet thing and leaves the state to the chip.
+   * The short name is the point: "FM3", not a sentence. A phone that has not
+   * connected yet is not a fault, and one that has connected to a Mac with no
+   * unit on it is — describeUnit holds both, in link.js where it can be tested,
+   * because it got this wrong in a way a screenshot showed instantly and no
+   * test could: "NOT CONNECTED" beside a chip reading "connected", over a
+   * notice saying the Mac was connected and no unit was plugged in.
    */
-  const settled = remote && status !== 'live'
-  const unit = settled
-    ? 'Not connected'
-    : status === 'live'
-      ? device?.short || device?.name || 'Connected'
-      : status === 'fault'
-        ? 'No device'
-        : 'Looking…'
-  const lampState = demo ? 'demo' : settled ? 'idle' : status
+  const { unit, lamp: lampState } = describeUnit({
+    demo,
+    role: link?.role,
+    status,
+    device,
+    link: link?.link
+  })
 
   /*
    * The word beside the lamp. On a phone the chip on the right already says
@@ -109,7 +109,7 @@ export default function TopBar({
                 <span className="sr-only">Preset </span>
                 {preset?.number ?? '--'}
               </span>
-              <span className="topbar-name">{preset?.name?.trim() || 'Untitled'}</span>
+              <span className="topbar-name">{presetLabel(preset)}</span>
               <span className="topbar-caret" aria-hidden="true" />
             </span>
           </button>

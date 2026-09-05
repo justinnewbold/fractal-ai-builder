@@ -39,6 +39,7 @@ import {
   tapBeat,
   writeScene,
   writeTempo,
+  confirmedDetect,
   writeBypass,
   writeTuner
 } from './lib/deviceState'
@@ -64,7 +65,7 @@ import {
   rememberNote,
   summariseCorrections
 } from './lib/corrections'
-import { timeLeft } from './lib/slots'
+import { countFromRefusal, slotCount, slotOutside, timeLeft } from './lib/slots'
 import { createNameScan } from './lib/nameScan'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
 import Screens from './components/Screens'
@@ -291,6 +292,16 @@ export default function App() {
   const [log, setLog] = useState([])
   const [spend, setSpend] = useState({ total: 0, runs: 0 })
   const [lastPrompt, setLastPrompt] = useState('')
+  /*
+   * A failed generation, kept so it can be asked again with one tap.
+   *
+   * "Said working on tone for over 3 minutes then just disappeared and nothing
+   * was generated." At the end of that the only thing on offer was Dismiss, so
+   * the cost of the failure was the wait plus typing it all again. Every one of
+   * these failures ends with nothing written to the unit, which is exactly the
+   * condition that makes asking again safe to offer.
+   */
+  const [retryAsk, setRetryAsk] = useState(null)
   const [historyKey, setHistoryKey] = useState(0)
   /*
    * Designs kept in a chosen folder.
@@ -622,10 +633,25 @@ export default function App() {
     }
   }
 
+  /*
+   * Whether the unit was answering before this read started.
+   *
+   * A ref because read() is built once and would otherwise close over the
+   * status as it stood at mount — which is 'idle', i.e. exactly the value that
+   * turns the confirmation off.
+   */
+  const liveRef = useRef(false)
+  useEffect(() => {
+    liveRef.current = status === 'live'
+  }, [status])
+
   const read = useCallback(async () => {
     setBusy(true)
     setError(null)
     let fresh = null
+    // Whether the unit answered this pass, which decides what a later failure
+    // means: a read that lost a race, or a unit that has gone.
+    let answered = false
     try {
       /*
        * A channel with nothing answering on it is the worst case: every call
@@ -637,13 +663,29 @@ export default function App() {
         setStatus('fault')
         return null
       }
-      const info = await detect()
+      /*
+       * A no from a unit that was answering a moment ago is confirmed before
+       * it is believed. Next tells the unit to load a preset and reads back
+       * immediately; on real hardware that read lands while the unit is still
+       * busy, and the answer is "no unit". See confirmedDetect.
+       */
+      const info = await confirmedDetect({
+        detect,
+        wait: (ms) => new Promise((go) => setTimeout(go, ms)),
+        wasLive: liveRef.current
+      })
       setDevice(info)
       if (!info?.connected) {
         setStatus('fault')
         setError('Your Mac is connected, but no Fractal is plugged into it.')
         return
       }
+      /*
+       * Past here the unit has answered. Anything that fails now is one read
+       * that lost a race for the port, not a unit that has gone — so it is
+       * reported without tearing down a working screen. See the catch.
+       */
+      answered = true
       const [p, b] = await Promise.all([currentPreset(), presetBlocks()])
       setPreset(p)
       const list = Array.isArray(b) ? b : []
@@ -701,8 +743,20 @@ export default function App() {
       refreshTempo()
 
     } catch (err) {
-      setStatus('fault')
-      setError(err.message)
+      /*
+       * Losing one read is not losing the unit.
+       *
+       * This used to answer every failure with a fault, which on a stage means
+       * the whole app replaced by a "no unit" screen because one call lost the
+       * port to a preset that was still loading. If the unit answered at the
+       * top of this pass and was live before it, the chain on screen is still
+       * the truth: say what failed and leave it up.
+       */
+      if (answered && liveRef.current) setError(err.message)
+      else {
+        setStatus('fault')
+        setError(err.message)
+      }
     } finally {
       setBusy(false)
     }
@@ -813,6 +867,22 @@ export default function App() {
       setBusy(true)
       setAskedSave(null)
       try {
+        /*
+         * A slot this unit does not have is refused here, not by the unit.
+         *
+         * A save is parked on one machine and carried out on another, and the
+         * two need not be looking at the same hardware — a phone in the demo
+         * offers 512 slots, and the unit with the cable in it may hold 104.
+         * Sent on, that becomes "Preset location index must be integer 0..103,
+         * got 500" in front of a guitarist, once every six seconds, because the
+         * parked request keeps being retried.
+         */
+        if (slotOutside(req.slot, device?.capabilities)) {
+          const has = slotCount(device?.capabilities)
+          throw new Error(
+            `Slot ${req.slot} isn't on this unit — it holds ${has}, numbered 0 to ${has - 1}. Nothing was saved.`
+          )
+        }
         const name = (req.name || '').trim()
         if (name && name !== preset?.name?.trim()) await setPresetName(name)
         await storePreset(req.slot)
@@ -827,14 +897,48 @@ export default function App() {
         record('save', `Saved "${name || preset?.name}" to slot ${req.slot}, asked for from the phone`)
         await read()
       } catch (err) {
+        /*
+         * The unit's own complaint often states its size — "must be integer
+         * 0..103" — and that sentence is the only place some units ever say it.
+         * So it is read rather than shown: the count is corrected here, which
+         * stops the picker offering slots that do not exist and stops this
+         * happening again.
+         */
+        /*
+         * Only where the unit has said nothing itself.
+         *
+         * A refusal is weaker evidence than a stated count, and taking it as
+         * stronger is how this fix could become a worse bug than the one it
+         * fixes: a unit that reports 512 slots, refused once by something that
+         * quotes an AM4's range, would have four hundred real slots hidden
+         * from its owner. What the unit says about itself wins.
+         */
+        const learned = slotCount(device?.capabilities) ? null : countFromRefusal(err.message)
+        if (learned) {
+          setDevice((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  capabilities: {
+                    ...prev.capabilities,
+                    presets: { ...prev.capabilities?.presets, count: learned }
+                  }
+                }
+              : prev
+          )
+        }
         await clearParkedSave().catch(() => {})
         await reportSave({ id: req.id, ok: false, slot: req.slot, error: err.message }).catch(() => {})
-        setError(err.message)
+        setError(
+          learned
+            ? `Slot ${req.slot} isn't on this unit — it holds ${learned}, numbered 0 to ${learned - 1}. Nothing was saved.`
+            : err.message
+        )
       } finally {
         setBusy(false)
       }
     },
-    [preset?.name, read, record]
+    [preset?.name, read, record, device?.capabilities]
   )
 
   /*
@@ -1096,6 +1200,8 @@ export default function App() {
   /** One path to the model, so generate and refine can't drift apart. */
   const requestSpec = async (schema, description, previous, extra = {}) => {
     setPartial(null)
+    // A new run replaces whatever the last failure was offering to repeat.
+    setRetryAsk(null)
     setThinking(true)
     /*
      * A handle on the request while it runs, so Stop can actually stop it.
@@ -1162,7 +1268,15 @@ export default function App() {
             // line changing at all means the round trip works — which is most
             // of what someone staring at a long wait wants to know, even if
             // they would never put it that way.
-            else if (e.kind === 'open') setProgress('Working on your tone…')
+            /*
+             * Which attempt this is, kept on screen.
+             *
+             * The retry announced itself and this line overwrote it a second
+             * later, so two long waits read as one that never ended: "said
+             * working on tone for over 3 minutes then just disappeared".
+             */
+            else if (e.kind === 'open')
+              setProgress(e.attempt ? 'Second try — working on your tone…' : 'Working on your tone…')
             else if (e.kind === 'partial') {
               setProgress(
                 e.blocks
@@ -1261,6 +1375,8 @@ export default function App() {
       // A run that failed leaves no half chain on screen beside its error.
       setPartial(null)
       setError(err.message)
+      // Nothing reached the unit, so asking again is safe to offer.
+      setRetryAsk({ description, against, opts })
     } finally {
       setProgress(null)
       setBusy(false)
@@ -1434,6 +1550,17 @@ export default function App() {
     const number = slot === '' ? preset?.number : Number(slot)
     if (!Number.isInteger(number) || number < 0) {
       setSaveError('Enter a preset slot number.')
+      return
+    }
+    /*
+     * Caught here rather than by the unit, and caught before it is parked: a
+     * save asked for from the phone is carried out later, on the Mac, and a
+     * slot that does not exist becomes a driver message in front of a
+     * guitarist minutes after they typed it.
+     */
+    if (slotOutside(number, device?.capabilities)) {
+      const has = slotCount(device?.capabilities)
+      setSaveError(`This unit holds ${has} presets, numbered 0 to ${has - 1}.`)
       return
     }
     setBusy(true)
@@ -2167,7 +2294,17 @@ export default function App() {
    * the relay carries nothing nobody is looking at. The demo has no port to
    * protect and reads eagerly from the start.
    */
-  const namesTotal = device?.capabilities?.presets?.count ?? 512
+  /*
+   * How many slots to read, and nothing invented.
+   *
+   * This was `?? 512`, which is the gen-3 count and a guess about hardware the
+   * app may not be attached to. On a unit whose driver reports no count, the
+   * guess became a fact: the scan walked toward slot 512 on a unit that holds
+   * 104, and the picker offered every one of them to be saved into. Zero means
+   * there is nothing to scan, which is the right amount of a unit's attention
+   * to spend on slots nobody has said exist.
+   */
+  const namesTotal = slotCount(device?.capabilities) ?? 0
 
   useEffect(() => {
     unitInUse.current.busy = busy
@@ -2589,7 +2726,35 @@ export default function App() {
           <h2>Didn&rsquo;t work</h2>
           <p>{error}</p>
           <div className="history-actions">
-            <button className="chip" onClick={() => setError(null)}>
+            {/*
+              Asking again, without typing it again.
+
+              Offered only where the app knows nothing was written — a design
+              run that failed — because that is the one case where repeating
+              the request cannot do any harm. Three minutes of waiting used to
+              end at a Dismiss button and a blank chat box.
+            */}
+            {retryAsk ? (
+              <button
+                className="chip"
+                disabled={busy}
+                onClick={() => {
+                  const again = retryAsk
+                  setRetryAsk(null)
+                  setError(null)
+                  generate(again.description, again.against, again.opts)
+                }}
+              >
+                Try again
+              </button>
+            ) : null}
+            <button
+              className="chip"
+              onClick={() => {
+                setError(null)
+                setRetryAsk(null)
+              }}
+            >
               Dismiss
             </button>
           </div>

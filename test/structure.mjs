@@ -1433,8 +1433,19 @@ export function run(test) {
      */
     assert.match(
       src,
-      /e\.kind === 'open'\) setProgress\(/,
+      /e\.kind === 'open'\)\s*\n?\s*setProgress\(/,
       "the working line ignores the server's hello, so it claims to be reaching the server long after it has"
+    )
+    /*
+     * And it says which attempt is running. A quiet start is retried once, and
+     * the retry used to announce itself only for the second before this hello
+     * overwrote it — so two ninety-second waits read as one that never ended:
+     * "said working on tone for over 3 minutes then just disappeared".
+     */
+    assert.match(
+      src,
+      /e\.attempt \? 'Second try/,
+      'the second attempt looks exactly like the first, so a three-minute wait looks like a hang'
     )
   })
 
@@ -1551,6 +1562,86 @@ export function run(test) {
     // Switched off with the rest of it, and visible where the rest of it is.
     assert.match(app, /summariseCorrections\(corrections\)/, 'the player cannot see what is being sent about them')
     assert.match(app, /Forget what I keep fixing/, 'there is no way to erase it')
+  })
+
+  /*
+   * A stated count outranks a refusal.
+   *
+   * Learning a unit's size from its own complaint is how the app stops
+   * offering slots that do not exist. Applied to a unit that HAS stated its
+   * size, it becomes the more expensive mistake: one refusal quoting a
+   * smaller unit's range would hide four hundred real slots from the person
+   * who owns them. The unit's own answer wins, and this is the guard that
+   * keeps it that way.
+   */
+  test('what the unit says about its own size beats what a refusal implies', () => {
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    assert.match(
+      app,
+      /slotCount\(device\?\.capabilities\) \? null : countFromRefusal\(err\.message\)/,
+      'a refusal can now shrink a unit that already said how many presets it holds'
+    )
+    // And nothing anywhere invents the gen-3 count for a unit that never said.
+    assert.ok(
+      !/presets\?\.count \?\? 512|presets\.count \?\? 512/.test(app),
+      'the invented 512 is back'
+    )
+  })
+
+  /*
+   * A button does not offer to fix what is not broken.
+   *
+   * "Says connected to Mac. But has a reconnect button. That shouldn't say
+   * reconnect if already connected." The label was unconditional, so a live,
+   * connected unit was offered a Reconnect — which reads as though the app
+   * knows something the player does not.
+   */
+  test('Reconnect is only offered when something is disconnected', () => {
+    const detail = readFileSync(
+      new URL('../src/components/DeviceDetail.jsx', import.meta.url),
+      'utf8'
+    )
+    assert.match(
+      detail,
+      /status === 'live' \? 'Read the unit again' : 'Reconnect'/,
+      'the button says Reconnect at a unit that is connected'
+    )
+  })
+
+  /*
+   * One fold per thing, and the empty case in a player's words.
+   *
+   * Opening FOOTSWITCHES in Setup showed a lone "Hide footswitches" button —
+   * a second fold inside the section that is already a fold, offering to hide
+   * something that was not being shown — and under it "This unit reported a
+   * footswitch model but no per-switch detail", which is a sentence about a
+   * wire protocol. On an FM3 that empty case is the normal one, so it is what
+   * most people will ever see here.
+   */
+  test('the footswitch panel does not fold inside its own fold', () => {
+    const fc = readFileSync(new URL('../src/components/Footswitches.jsx', import.meta.url), 'utf8')
+    /*
+     * Matched against the code, not the prose: the comment above the component
+     * quotes the old label to explain why it went, and a guard that reads its
+     * own explanation as the defect is a guard that can never pass.
+     */
+    const code = fc
+      .slice(fc.indexOf('export default function'))
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+    assert.ok(!/setOpen|Hide footswitches/.test(code), 'the inner toggle is back inside the Setup section')
+    assert.ok(!/per-switch detail/.test(code), 'the empty case is written for whoever wrote it')
+    assert.match(
+      fc,
+      /doesn&rsquo;t tell this app what each one is set to/,
+      'a unit that will not report its switches says nothing a player can use'
+    )
+    // And the section still only appears where the unit has switches at all.
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    assert.match(
+      app,
+      /capabilities\?\.fc\?\.model !== false \? \(/,
+      'the panel is offered on units that have no footswitches to report'
+    )
   })
 
   test('a channel is written where the scene that plays it can keep it', () => {

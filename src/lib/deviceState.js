@@ -177,6 +177,66 @@ export const isListening = () => !!stopEvents
  * is not worth a message — but the gig screen shows "couldn't read the chain"
  * rather than an empty row, because an empty row reads as an empty preset.
  */
+/**
+ * How many times a unit that was answering gets asked again before it is
+ * declared gone, and how long between asks.
+ *
+ * A real unplug is still reported inside a second and a half. A preset change
+ * on an FM3 takes a fraction of that, which is the whole problem this exists
+ * for.
+ */
+export const SETTLE_TRIES = 3
+export const SETTLE_MS = 700
+
+/**
+ * Ask whether the unit is there, and do not take the first no for an answer.
+ *
+ * "I'm on the FM3. As soon as I hit next or select a scene, it goes to the
+ * screen where it says not connected again."
+ *
+ * Next tells the unit to load a preset and then immediately reads back what is
+ * loaded. On real hardware that read lands while the unit is still working —
+ * a preset load takes the port for a moment — and the answer that comes back
+ * is "no unit". The app believed it: one negative answer, and a working rig
+ * became a No unit found screen with the guitar still plugged in.
+ *
+ * A unit that answered a second ago has almost certainly not been unplugged in
+ * the meantime; it is busy doing the thing it was just told to do. So a no is
+ * confirmed before it is acted on — but only when there was something to
+ * confirm. Nothing was ever live, and the first answer stands, so a genuinely
+ * empty rig still says so as fast as it always did.
+ *
+ * Takes its detect and its wait, so the whole policy is tested in node against
+ * a fake that never touches a port.
+ */
+export async function confirmedDetect({
+  detect,
+  wait,
+  wasLive,
+  tries = SETTLE_TRIES,
+  gap = SETTLE_MS
+}) {
+  const attempts = wasLive ? Math.max(1, tries) : 1
+  let info = null
+  let failure = null
+
+  for (let i = 0; i < attempts; i++) {
+    if (i) await wait(gap)
+    try {
+      info = await detect()
+      failure = null
+      if (info?.connected) return info
+    } catch (err) {
+      failure = err
+      info = null
+    }
+  }
+
+  // Every attempt threw: that is the caller's to report, not a quiet null.
+  if (failure) throw failure
+  return info
+}
+
 export async function refreshBlocks() {
   if (!driver?.presetBlocks) return null
   try {

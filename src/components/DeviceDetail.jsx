@@ -85,8 +85,19 @@ export default function DeviceDetail({ status, device, onRetry, busy }) {
             {!demo && !remote ? (
               <button onClick={() => setEditing(true)}>Change address</button>
             ) : null}
+            {/*
+              The word depends on whether anything is disconnected.
+
+              "Says connected to Mac. But has a reconnect button. That shouldn't
+              say reconnect if already connected." Quite right: the button did
+              the same two things either way — poke the link, then read the unit
+              — and only one of those is worth a name when the link is up. On a
+              live connection this is a re-read, which is the thing you want
+              after somebody has turned a knob on the front panel, and saying so
+              is more use than offering to fix a connection that is not broken.
+            */}
             <button onClick={onRetry} disabled={busy}>
-              {busy ? 'Reading…' : 'Reconnect'}
+              {busy ? 'Reading…' : status === 'live' ? 'Read the unit again' : 'Reconnect'}
             </button>
             {/* Light or dark is set about as often as the host address. */}
             <Theme />
