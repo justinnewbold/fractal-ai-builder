@@ -339,16 +339,49 @@ export default function Gig({ preset, device, capabilities, onError, onChanged, 
         </div>
       ) : null}
 
-      {/* The tuner is running — POST /tuner said ok — but nothing has arrived.
-          Over a remote session that is ForgeFX's relay by design: it bridges
-          discrete changes and filters the high-frequency tuner stream, so the
-          unit is being polled at the Mac and every reading stays there. Saying
-          so beats a needle that never moves. */}
+      {/*
+        Your unit's screen not changing is not a fault.
+
+        "On the AM4, hitting the tuner doesn't turn the tuner on the device."
+        Correct, and deliberate — in the device server, not here. A gen-3 unit
+        is sent a tuner-page open, which is why an FM3 lights up; the AM4's
+        tuner block is always live, so it is simply polled and the unit is
+        never switched into tuner mode. Same readings, no page. Said here
+        because from the outside it looks exactly like a button that missed.
+      */}
+      {tunerOn && device?.gen ? (
+        device.gen !== 3 ? (
+          <p className="gig-note">
+            Your {device.short || device.name || 'unit'} stays on the screen it&rsquo;s on &mdash; the
+            app reads its tuner without switching the unit into tuner mode. Nothing is wrong.
+          </p>
+        ) : null
+      ) : null}
+
+      {/* The tuner is running — POST /tuner said ok — but nothing has arrived. */}
       {tunerOn && tunerStalled ? (
         <p className="gig-note">
-          {remoteActive()
-            ? 'The tuner is running on the unit, but its readings don’t reach a phone yet — only the app at the Mac. Tune there.'
-            : 'No tuner readings are arriving. If the unit is making sound, the Fractal app on the Mac may need updating.'}
+          {remoteActive() ? (
+            <>
+              {/*
+                What this used to say was wrong in the way that costs somebody
+                an evening: "only the app at the Mac. Tune there." The phone
+                remote is the route that cannot carry a tuner — the host bridges
+                param, changed, scene, tempo and config, and drops everything at
+                the meter/tuner cadence rather than flooding the relay with
+                eight readings a second. A phone on the same wifi is not on that
+                route at all: it opens the event stream on the Mac directly and
+                gets every reading. So the answer is a different route, not a
+                different machine, and now it says so.
+              */}
+              Tuner readings don&rsquo;t cross the phone-remote link &mdash; it carries changes, not
+              the eight readings a second a tuner sends. They do reach a phone on the same wifi as
+              the Mac: at the Mac, open <strong>Setup &rsaquo; Phone remote</strong> and scan the
+              code with this phone.
+            </>
+          ) : (
+            'No tuner readings are arriving. If the unit is making sound, the Fractal app on the Mac may need updating.'
+          )}
         </p>
       ) : null}
 

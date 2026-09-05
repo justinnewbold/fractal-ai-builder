@@ -1857,6 +1857,46 @@ export function run(test) {
     assert.match(bare, /el\.style\.height = `\$\{el\.scrollHeight\}px`/, 'the box does not grow with what is in it')
   })
 
+  test('the tuner says the true reason it is not moving, and names a route that works', () => {
+    /*
+     * "On the AM4, hitting the tuner doesn't turn the tuner on the device...
+     * but previously it was still reading the tuning back to the phone. On the
+     * FM3 it works fine."
+     *
+     * Two different things, and only one of them is a fault.
+     *
+     * The unit's screen not changing is correct: the device server sends a
+     * gen-3 unit a tuner-page open, which is why an FM3 lights up, and the
+     * AM4's tuner block is always live so it is polled without ever switching
+     * the unit into tuner mode. Nothing was there to say so, and from the
+     * outside it looks like a button that missed.
+     *
+     * The readings are the fault, and the old sentence misdiagnosed it: "only
+     * the app at the Mac. Tune there." The phone remote is the route that
+     * cannot carry a tuner — the host bridges discrete changes and drops the
+     * meter/tuner cadence rather than flooding the relay. A phone on the same
+     * wifi is not on that route: it opens the event stream on the Mac directly
+     * and gets every reading. Telling somebody with a working route that they
+     * have none is the expensive kind of wrong.
+     */
+    const gig = readFileSync(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8')
+    const bare = gig.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+
+    /* The unit's own screen, explained only where it is true. */
+    assert.match(bare, /device\.gen !== 3/, 'every unit is told its screen will not change, including the ones where it does')
+    assert.match(bare, /switching the unit into tuner mode/, 'nothing explains a unit whose screen stays put')
+
+    /* And the route that works is named, rather than a machine. */
+    const stall = bare.slice(bare.indexOf('remoteActive() ? ('), bare.indexOf('No tuner readings are arriving'))
+    assert.ok(stall.length > 40, 'the remote explanation is gone')
+    assert.match(stall, /same wifi/, 'the one route that does carry tuner readings is not mentioned')
+    assert.match(stall, /Phone remote/, 'nothing says where to find it')
+    assert.ok(
+      !/Tune there|only the app at the Mac/.test(bare),
+      'the tuner still says a phone cannot do this, which is only true of one of its two routes'
+    )
+  })
+
   test('a switch says where the thing it switches on will appear', () => {
     /*
      * "Where do I view the generation from the AI from the Developer tab?"
