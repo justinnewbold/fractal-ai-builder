@@ -194,6 +194,77 @@ export function run(test) {
     }
   })
 
+  test('no field sets its own font-size and escapes the zoom floor', () => {
+    /*
+     * "As soon as I click the chat box, it zooms in on it and then you can't
+     * see the send button anymore."
+     *
+     * The floor above is written on bare element selectors, and a media query
+     * adds no specificity — so `textarea.refine-input { font-size: var(--f-3) }`
+     * at (0,1,1) beat it and the composer stayed at 13px. The test above passed
+     * throughout, because `textarea` IS in the floor rule; it was the override
+     * that won.
+     *
+     * So this is the general form: any field named with a class of its own that
+     * sets a font-size must also be named in a rule applying the floor. It
+     * catches the next one, which is the point — this is the third time a
+     * class-qualified field has quietly outranked a blanket rule in this file.
+     */
+    /*
+     * Position matters as much as presence, and getting that wrong is how the
+     * first attempt at this fix shipped green and still zoomed: the floor was
+     * added to the touch block near the top of the file, and
+     * `textarea.refine-input` sets its size several hundred lines below at the
+     * same specificity, so source order handed it back. A guard that only asked
+     * "is the class named somewhere" passed throughout. So each field is
+     * checked against where its floor sits, not merely whether one exists.
+     */
+    const rules = [...code.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    const floorAt = new Map()
+    for (const m of rules) {
+      if (!/font-size: var\(--f-input\)/.test(m[2])) continue
+      for (const s of m[1].matchAll(/\.([\w-]+)/g)) {
+        floorAt.set(s[1], Math.max(floorAt.get(s[1]) ?? -1, m.index))
+      }
+    }
+
+    /*
+     * Every rule that gives a class-named field a size that is NOT the floor.
+     *
+     * Deliberately not "rules outside the touch block": an earlier version of
+     * this guard tried to express that as "before the first @media (pointer:
+     * coarse)", and the composer's own rule lives several hundred lines AFTER
+     * that block — so the one field the whole test exists for was skipped, and
+     * the broken fix passed. Whether a rule sits inside a media query does not
+     * matter here. What matters is that something sets a non-floor size and the
+     * floor does not come after it.
+     */
+    const owned = new Map()
+    for (const m of rules) {
+      if (!/font-size:/.test(m[2])) continue
+      if (/font-size: var\(--f-input\)/.test(m[2])) continue
+      if (!/\b(?:input|textarea)\.[\w-]+/.test(m[1])) continue
+      for (const s of m[1].matchAll(/\b(?:input|textarea)\.([\w-]+)/g)) {
+        owned.set(s[1], Math.max(owned.get(s[1]) ?? -1, m.index))
+      }
+    }
+    assert.ok(owned.size, 'no class-named field sets its own font-size — has the scan stopped matching?')
+
+    for (const [cls, own] of owned) {
+      const floor = floorAt.get(cls)
+      assert.ok(
+        floor !== undefined,
+        `.${cls} sets its own font-size and is never named in the 16px floor — ` +
+          'a bare element selector cannot reach it, so iOS zooms the page on focus'
+      )
+      assert.ok(
+        floor > own,
+        `.${cls} gets the 16px floor at character ${floor} but sets its own size at ${own} — ` +
+          'same specificity, later wins, so the floor never applies and iOS zooms the page on focus'
+      )
+    }
+  })
+
   test('the page reserves the room the floating Ask button takes up', () => {
     /*
      * `.ask-anywhere` is fixed over the bottom-right corner on Play and Edit.
