@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { selectPreset, liveMeters } from '../lib/forgefx'
+import { selectPreset, liveMeters, setChannel } from '../lib/forgefx'
 import {
   useDevice,
   refreshBlocks as reReadChain,
@@ -14,6 +14,8 @@ import { EXCLUDED_BLOCKS } from '../lib/guardrails'
 import { blockColor } from '../lib/blockColors'
 import { presetLabel } from '../lib/presetName'
 import { tick as haptic } from '../lib/feedback'
+import { useLongPress } from '../lib/longPress'
+import { useDismiss } from '../lib/dismiss'
 import { Tuner } from './Console'
 
 /**
@@ -124,6 +126,9 @@ export default function Gig({ preset, device, capabilities, onError, onChanged, 
 
   const sceneCount = capabilities?.sceneCount || 8
   const hasScenes = capabilities?.hasScenes !== false
+  /* What a block can be switched between, straight off the unit's own report —
+     the same list the block sheet on Edit has always used. */
+  const channels = capabilities?.channelNames
 
   useEffect(() => {
     let stop = false
@@ -469,34 +474,114 @@ export default function Gig({ preset, device, capabilities, onError, onChanged, 
       {blocks.length ? (
         <div className="gig-blocks">
           {blocks.map((block) => (
-            <button
+            <BlockTile
               key={block.effectId}
-              className={`gig-block ${block.bypassed ? 'off' : 'on'}`}
-              style={{
-                '--block-fill': blockColor(block.slug).fill,
-                '--block-ink': blockColor(block.slug).ink
-              }}
-              onClick={() => toggle(block)}
-              disabled={toggling === block.effectId}
-              aria-pressed={!block.bypassed}
+              block={block}
+              channels={channels}
+              busy={toggling === block.effectId}
+              onToggle={() => toggle(block)}
+              onError={onError}
+              onChanged={onChanged}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * One block on the stage screen: tap to switch it, hold to change its channel.
+ *
+ * "If you can hold one of the effects for a few seconds, it would be cool to
+ * have a pop-up where you can quickly switch channels from ABCD... On the Mac
+ * version, maybe we can do a right click."
+ *
+ * Both, and on the web — a hold is a pointer that stays put and a right-click
+ * is an event browsers have always sent, so none of this waits on the phone
+ * apps that do not exist yet.
+ *
+ * The channels were reachable already, on the Edit screen, three taps into a
+ * sheet. That is the right place to study a block and the wrong one to change
+ * it between two bars of a song, which is the whole reason this screen exists.
+ */
+function BlockTile({ block, channels, busy, onToggle, onError, onChanged }) {
+  const [open, setOpen] = useState(false)
+  const [writing, setWriting] = useState(null)
+  const cell = useRef(null)
+
+  /* Only where there is something to choose. Not every block is channelled,
+     and a menu with one entry in it is a menu that wasted a gesture. */
+  const has = (channels?.length || 0) > 1
+  const hold = useLongPress(
+    () => {
+      haptic()
+      setOpen(true)
+    },
+    { enabled: has && !busy }
+  )
+
+  useDismiss(cell, () => setOpen(false), { open })
+
+  const pick = async (ch) => {
+    setWriting(ch)
+    try {
+      await setChannel(block.effectId, ch)
+      /* Closed on the way out rather than on the way back: the write goes down
+         a serial port and a menu that sits there through it reads as a tap
+         that missed. */
+      setOpen(false)
+      onChanged?.(`${block.name || block.slug} → channel ${ch}`)
+    } catch (err) {
+      onError?.(err.message)
+    } finally {
+      setWriting(null)
+    }
+  }
+
+  return (
+    <div className="gig-block-cell" ref={cell}>
+      <button
+        className={`gig-block ${block.bypassed ? 'off' : 'on'}`}
+        style={{
+          '--block-fill': blockColor(block.slug).fill,
+          '--block-ink': blockColor(block.slug).ink
+        }}
+        onClick={onToggle}
+        disabled={busy}
+        aria-pressed={!block.bypassed}
+        {...hold}
+      >
+        <span className="gig-block-name">{block.name || block.slug}</span>
+        <span className="gig-block-state">
+          {block.bypassed ? 'Off' : 'On'}
+          {/*
+            The channel, beside the on/off.
+
+            A scene remembers a channel per block, and each channel holds its
+            own models and values — so which one a block is on is half of what
+            the scene is, and the tile said nothing about it. "On this screen,
+            also list the channels (A/B/C/D) on each block."
+
+            Only when the block has one: not every block is channelled, and a
+            bare letter on something without channels would be a lie about the
+            hardware.
+          */}
+          {block.channel ? <span className="gig-block-channel">{block.channel}</span> : null}
+        </span>
+      </button>
+
+      {open ? (
+        <div className="gig-chan" role="group" aria-label={`Channel for ${block.name || block.slug}`}>
+          {channels.map((ch) => (
+            <button
+              key={ch}
+              className={`gig-chan-btn ${block.channel === ch ? 'current' : ''}`}
+              onClick={() => pick(ch)}
+              disabled={writing !== null}
+              aria-pressed={block.channel === ch}
             >
-              <span className="gig-block-name">{block.name || block.slug}</span>
-              <span className="gig-block-state">
-                {block.bypassed ? 'Off' : 'On'}
-                {/*
-                  The channel, beside the on/off.
-
-                  A scene remembers a channel per block, and each channel holds
-                  its own models and values — so which one a block is on is half
-                  of what the scene is, and the tile said nothing about it. "On
-                  this screen, also list the channels (A/B/C/D) on each block."
-
-                  Only when the block has one: not every block is channelled,
-                  and a bare letter on something without channels would be a
-                  lie about the hardware.
-                */}
-                {block.channel ? <span className="gig-block-channel">{block.channel}</span> : null}
-              </span>
+              {ch}
             </button>
           ))}
         </div>

@@ -1857,6 +1857,63 @@ export function run(test) {
     assert.match(bare, /el\.style\.height = `\$\{el\.scrollHeight\}px`/, 'the box does not grow with what is in it')
   })
 
+  test('a block is held for its channels, and the hold does not also switch it off', () => {
+    /*
+     * "If you can hold one of the effects for a few seconds, it would be cool
+     * to have a pop-up where you can quickly switch channels from ABCD... On
+     * the Mac version, maybe we can do a right click."
+     *
+     * The channels were reachable already — on Edit, three taps into a sheet.
+     * That is the right place to study a block and the wrong one to change it
+     * between two bars, which is what the stage screen is for.
+     */
+    const gig = readFileSync(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8')
+    const bare = gig.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+    assert.match(bare, /useLongPress\(/, 'the stage tiles cannot be held')
+    assert.match(bare, /gig-chan-btn/, 'there is nothing to pick once one is held')
+
+    /*
+     * The failure that matters, and it is not a cosmetic one.
+     *
+     * A press produces a click afterwards. Without swallowing it, the tile
+     * somebody held to change a channel also toggles the block — silence, mid
+     * song, from a gesture meant to be safe. It is held in the hook so that
+     * every future caller gets it rather than remembering to.
+     */
+    const press = readFileSync(new URL('../src/lib/longPress.js', import.meta.url), 'utf8')
+    const bareP = press.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+    assert.match(bareP, /onClickCapture/, 'the click after a hold still reaches the button under it')
+    const click = bareP.slice(bareP.indexOf('onClickCapture'))
+    assert.match(click, /preventDefault\(\)/, 'a held block is also switched off')
+    assert.match(click, /stopPropagation\(\)/, 'a held block is also switched off')
+
+    /*
+     * And the menu only opens where there is a choice. A block with one channel
+     * — or none — opens an empty menu, which is worse than a gesture that does
+     * nothing at all.
+     */
+    assert.match(bare, /channels\?\.length \|\| 0\) > 1/, 'a block with no channels opens an empty menu')
+
+    /*
+     * iOS answers a long press with its own callout over the top of the page,
+     * and sends no contextmenu event, so CSS is the only place it can be
+     * stopped. Android's own menu is cancelled in the handler, where the event
+     * exists.
+     */
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    const tile = css.slice(css.indexOf('button.gig-block {'), css.indexOf('}', css.indexOf('button.gig-block {')))
+    assert.match(tile, /-webkit-touch-callout: none/, 'iOS puts its own menu over the channels')
+    assert.match(bareP, /onContextMenu/, 'right-click does nothing, and Android shows its own menu instead')
+
+    /*
+     * Pointer events, not a fourth touchstart. The three surfaces that bind one
+     * each carry a paragraph explaining why, and touch.mjs makes a fourth a
+     * decision rather than a paste — a hold never needs to cancel the gesture,
+     * so it has no business in that list.
+     */
+    assert.ok(!/addEventListener\('touchstart'/.test(press), 'the hold went around React and into the passive-listener trap')
+  })
+
   test('the tuner says the true reason it is not moving, and names a route that works', () => {
     /*
      * "On the AM4, hitting the tuner doesn't turn the tuner on the device...
