@@ -281,7 +281,7 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
   const laneList = (editable) => (
     <div className="chain-lanes">
       {shown.map((lane) => (
-        <div className="chain-lane" key={lane.row}>
+        <div className="chain-lane" data-linear={linear ? 'yes' : undefined} key={lane.row}>
           {rows > 1 ? (
             <p className="silk-label chain-lane-head">
               {lane.blocks.length ? `Row ${lane.row}` : `Row ${lane.row} — empty`}
@@ -295,7 +295,7 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
             if (item.kind === 'gap') {
               const target = moving && moving.at !== at
               return (
-                <div className="chain-slot" key={at}>
+                <div className={`chain-slot ${isOpen ? 'open' : ''}`} key={at}>
                   <button
                     className={`chain-gap ${isOpen ? 'open' : ''} ${target ? 'target' : ''}`}
                     onClick={() => {
@@ -327,7 +327,7 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
 
             const b = item.block
             return (
-              <div className="chain-slot" key={at}>
+              <div className={`chain-slot ${isOpen ? 'open' : ''}`} key={at}>
                 <button
                   className={`chain-block ${isOpen ? 'open' : ''} ${
                     moving?.at === at ? 'lifting' : ''
@@ -355,13 +355,32 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
                       </>
                     ) : (
                       <>
-                        <button
-                          className="chip"
-                          onClick={() => setMoving({ at, row: lane.row, col: item.col, block: b })}
-                          disabled={busy || !!working || !lanes.some((l) => l.gaps.length)}
-                        >
-                          Move
-                        </button>
+                        {/*
+                          Move, only where moving keeps the block.
+
+                          "The move function doesn't work... if it's not
+                          possible or too hard, let's just remove the move
+                          button either way."
+
+                          On a grid unit a block carries its own settings, so
+                          putting it in another cell is a move. On the AM4 the
+                          settings live in the slot: the write available is
+                          "set this slot's block type", so a move is clear one
+                          slot, create a fresh block in another — same name,
+                          every knob back at its default. That is not a move,
+                          and dressing it as one loses somebody's tone silently.
+                          Cleared and re-added is what it always was, and Remove
+                          and Replace already say so honestly.
+                        */}
+                        {linear ? null : (
+                          <button
+                            className="chip"
+                            onClick={() => setMoving({ at, row: lane.row, col: item.col, block: b })}
+                            disabled={busy || !!working || !lanes.some((l) => l.gaps.length)}
+                          >
+                            Move
+                          </button>
+                        )}
                         {picker(() => add(lane.row, item.col), 'Replace', `add:${at}`)}
                         <button
                           className="chip"
