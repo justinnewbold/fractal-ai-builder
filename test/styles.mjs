@@ -356,6 +356,25 @@ export function run(test) {
     assert.match(del, /min-height: 44px/, 'the delete button is under the touch floor')
   })
 
+  test('the Macs to choose between both fit on the screen', () => {
+    /*
+     * A Mac is called whatever its owner called it, so the buttons here read
+     * "Drive Justin's MacBook Pro" and "Drive Studio Mac" — two long labels that
+     * do not share a line on a phone. Without the wrap the second one leaves the
+     * screen, and the second one is the one not currently selected: precisely
+     * what somebody opened this notice to press.
+     *
+     * Written after a delete button shipped with no styling at all and broke a
+     * whole list. A class named in JSX and absent from here is not a small
+     * mistake in this app.
+     */
+    const at = code.indexOf('.host-pick {')
+    assert.ok(at !== -1, 'the row of Macs to choose between has no styling at all')
+    const rule = code.slice(at, code.indexOf('}', at))
+    assert.match(rule, /display: flex/, 'the buttons do not lay out as a row')
+    assert.match(rule, /flex-wrap: wrap/, 'a long Mac name pushes the other choice off the screen')
+  })
+
   test('the floating Ask never floats over a phone’s controls', () => {
     /*
      * This used to check a swap: a floating button on wide screens, a fourth

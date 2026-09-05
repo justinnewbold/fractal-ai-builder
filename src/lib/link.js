@@ -44,6 +44,9 @@ import {
   remoteSignIn,
   censusHosts,
   hostConflict,
+  remoteHosts,
+  remoteChosenHost,
+  pickHost,
   signOut
 } from './remote.js'
 
@@ -317,7 +320,11 @@ let state = {
    * so a change made from here would be made on every unit on it. See
    * censusHosts in remote.js.
    */
-  clash: null
+  clash: null,
+  /** remote role: every Mac that answered the roll call, by name. */
+  hosts: [],
+  /** remote role: which of them requests are addressed to, or null. */
+  chosenHost: null
 }
 let joining = false
 /*
@@ -410,10 +417,23 @@ async function join() {
 async function countHosts() {
   try {
     await censusHosts()
-    set({ clash: hostConflict() })
+    set({ hosts: remoteHosts(), chosenHost: remoteChosenHost(), clash: hostConflict() })
   } catch {
     // A roll call that fails is not a reason to distrust the link.
   }
+}
+
+/**
+ * Drive one of them, and leave the other alone.
+ *
+ * Proving that the choice is honoured is the slow part and it happens inside
+ * pickHost, so by the time this returns the notice is either gone or has been
+ * replaced by the reason it could not be.
+ */
+export async function chooseHost(name) {
+  await pickHost(name)
+  set({ hosts: remoteHosts(), chosenHost: remoteChosenHost(), clash: hostConflict() })
+  return state.clash
 }
 
 /**
@@ -729,6 +749,6 @@ export function _resetLink() {
   joining = false
   restoring = false
   booted = false
-  state = { role: 'unknown', link: 'off', account: null, hostOn: false, macName: null, since: Date.now(), cloud: null, clash: null }
+  state = { role: 'unknown', link: 'off', account: null, hostOn: false, macName: null, since: Date.now(), cloud: null, clash: null, hosts: [], chosenHost: null }
   watchers.clear()
 }
