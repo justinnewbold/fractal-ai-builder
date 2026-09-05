@@ -4,7 +4,7 @@
 # rather than being part of this package — main.js finds it at
 # `process.resourcesPath/dist`, which is what makes ForgeFX able to serve it.
 appId: cloud.newbold.fractal
-productName: Fractal AI Builder
+productName: Fractal Remote
 directories:
   output: release
 # An allowlist, not a filter. Anything main.js reaches for at runtime has to be

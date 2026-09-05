@@ -1,4 +1,4 @@
-# Build prompt: Fractal AI Builder
+# Build prompt: Fractal Remote
 
 Paste everything below into the tool of your choice.
 
