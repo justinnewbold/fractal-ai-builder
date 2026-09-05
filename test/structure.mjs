@@ -1755,6 +1755,57 @@ export function run(test) {
     assert.match(preview, /<DevTrace /, 'the trace is a panel of its own beside the tone again')
   })
 
+  /*
+   * An update you can see, and ask for.
+   *
+   * "I quit the app and restarted, I'm on 7.50.0, no update notification. In
+   * addition to a notification that pops up can we add a check for update
+   * button in settings?"
+   *
+   * There was nothing to see and no way to ask. The window loads the web app
+   * over http with context isolation on and no preload at all, so the page and
+   * the updater had never had a channel between them — everything the updater
+   * knew went to the menu-bar menu and nowhere else.
+   */
+  test('the page can be told about an update, and ask for one', () => {
+    const main = readFileSync(new URL('../desktop/main.js', import.meta.url), 'utf8')
+    const preload = readFileSync(new URL('../desktop/preload.js', import.meta.url), 'utf8')
+
+    assert.match(main, /preload: join\(__dirname, 'preload\.js'\)/, 'the window has no bridge again')
+    // Context isolation stays on and node stays out: the bridge is the whole
+    // surface, and it carries one subject.
+    assert.match(main, /contextIsolation: true/, 'context isolation was turned off to do this')
+    assert.match(main, /nodeIntegration: false/, 'node was let into the page to do this')
+    assert.match(main, /ipcMain\.handle\('updates:check'/, 'nothing can ask for a check')
+    assert.match(main, /win\.webContents\.send\('updates:state'/, 'the window is never told anything')
+
+    /*
+     * The wording is built once, in the main process. Two copies of it drift,
+     * and a menu and a window disagreeing about the same download is worse
+     * than either one alone.
+     */
+    assert.match(main, /line: updateLine\(state\)/, 'the window builds its own wording')
+    assert.ok(
+      !/updateLine|Downloading an update/.test(
+        readFileSync(new URL('../src/lib/desktop.js', import.meta.url), 'utf8')
+      ),
+      'the page has its own copy of the update wording'
+    )
+
+    /*
+     * And the bridge exposes updates and nothing else — read with the prose
+     * stripped, because the comment above it says "the Mac app." and a guard
+     * that finds its own explanation is a guard that can never pass. Third
+     * time that has caught me in this file.
+     */
+    const bridge = preload.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+    assert.ok(
+      !/require\('node:|shell\.|dialog\.|\bapp\.(quit|relaunch|exit)/.test(bridge),
+      'the preload reaches past updates into the rest of the app'
+    )
+    assert.match(bridge, /exposeInMainWorld\('fractalDesktop'/, 'the bridge is not exposed')
+  })
+
   test('a channel is written where the scene that plays it can keep it', () => {
     const forgefx = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
 

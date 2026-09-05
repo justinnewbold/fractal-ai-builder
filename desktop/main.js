@@ -16,7 +16,7 @@
  * app with it. A child can die and be reported. Worth revisiting once this has
  * run on real hardware for a while; not worth guessing at from a container.
  */
-const { app, BrowserWindow, Tray, Menu, shell, nativeImage, dialog } = require('electron')
+const { app, BrowserWindow, Tray, Menu, shell, nativeImage, dialog, ipcMain } = require('electron')
 const { spawn, execFileSync } = require('node:child_process')
 const { join } = require('node:path')
 const net = require('node:net')
@@ -219,7 +219,16 @@ function openWindow() {
     minWidth: 380,
     backgroundColor: '#0d0f12',
     title: 'Fractal AI Builder',
-    webPreferences: { contextIsolation: true, nodeIntegration: false }
+    /*
+     * The preload is the page's only channel to the app, and it carries one
+     * subject: updates. Context isolation stays on and node stays out — the
+     * bridge exposes three functions and nothing else. See preload.js.
+     */
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: join(__dirname, 'preload.js')
+    }
   })
   win.loadURL(where?.local || 'about:blank')
   /*
@@ -357,6 +366,24 @@ function buildTray() {
  * Failure here is not fatal and not reported: an app that cannot reach GitHub
  * still serves the unit, which is the whole job.
  */
+/*
+ * What the page may ask, and the only two things it may ask for.
+ *
+ * Registered once, whether or not the updater ever loads — a page asking in a
+ * development build should get "nothing to say" rather than an error nobody
+ * can act on.
+ */
+function wireUpdateChannel() {
+  ipcMain.handle('updates:state', () =>
+    update ? { ...update, line: updateLine(update) } : { kind: 'idle', line: null }
+  )
+  ipcMain.handle('updates:check', async () => {
+    if (!updates) return { ok: false, reason: 'no-updater' }
+    await updates.check()
+    return { ok: true }
+  })
+}
+
 async function beginUpdates() {
   if (!app.isPackaged) return
   try {
@@ -369,6 +396,14 @@ async function beginUpdates() {
       onState: (state) => {
         update = state
         if (tray) buildTray()
+        /*
+         * And the window, which until now was never told anything. The line is
+         * built here rather than in the page so the menu and the window cannot
+         * drift into saying different things about the same download.
+         */
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('updates:state', { ...state, line: updateLine(state) })
+        }
       },
       log: (err) => console.error('[updates]', err?.message || err)
     })
@@ -384,6 +419,7 @@ app.whenReady().then(async () => {
   const answering = await start()
   if (!where) return
   buildTray()
+  wireUpdateChannel()
   await beginUpdates()
   if (!answering) {
     /*
