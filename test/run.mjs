@@ -3415,6 +3415,68 @@ test('a correction that changes nothing is not a correction', () => {
    answering. Nothing here may say connected unless the Mac answered.
    ------------------------------------------------------------------ */
 
+/*
+ * The bar, the chip and the notice have to tell one story.
+ *
+ * A real phone showed all three at once: "NOT CONNECTED" on the left, a chip
+ * reading "connected", and a red notice explaining that the Mac was connected
+ * and no unit was plugged into it. Every one of them was true about a
+ * different thing, and together they were nonsense.
+ */
+test('a Mac that answered with no unit on it does not read as not connected', () => {
+  const said = link.describeUnit({
+    role: 'remote',
+    link: 'connected',
+    status: 'fault',
+    device: { connected: false }
+  })
+  assert.equal(said.unit, 'No unit', 'the bar contradicts the chip beside it')
+  assert.equal(said.lamp, 'fault', 'a cable the player can go and check is not a quiet state')
+})
+
+test('a phone that has not reached the Mac stays quiet about it', () => {
+  // The reason the bar went quiet in the first place: red over a screen that
+  // is calmly asking you to connect is the loud wrong answer.
+  for (const state of ['off', 'joining', 'no-answer']) {
+    const said = link.describeUnit({ role: 'remote', link: state, status: 'fault' })
+    assert.equal(said.unit, 'Not connected', state)
+    assert.equal(said.lamp, 'idle', state)
+  }
+})
+
+test('a connected phone still reading the unit says so', () => {
+  const said = link.describeUnit({ role: 'remote', link: 'connected', status: 'idle' })
+  assert.equal(said.unit, 'Looking…')
+})
+
+test('a live unit is named, wherever the app is running', () => {
+  assert.equal(
+    link.describeUnit({ role: 'remote', link: 'connected', status: 'live', device: { short: 'AM4' } })
+      .unit,
+    'AM4'
+  )
+  assert.equal(
+    link.describeUnit({ role: 'mac', link: 'connected', status: 'live', device: { short: 'FM3' } })
+      .unit,
+    'FM3'
+  )
+})
+
+test('at the Mac, a missing unit is still a missing device', () => {
+  // Nothing above changes the end with the cable in it.
+  const said = link.describeUnit({ role: 'mac', link: 'connected', status: 'fault' })
+  assert.equal(said.unit, 'No device')
+  assert.equal(said.lamp, 'fault')
+})
+
+test('the demo lamp outranks whatever the unit is doing', () => {
+  assert.equal(link.describeUnit({ demo: true, role: 'mac', status: 'live' }).lamp, 'demo')
+  assert.equal(
+    link.describeUnit({ demo: true, role: 'remote', link: 'connected', status: 'fault' }).lamp,
+    'demo'
+  )
+})
+
 test('connected means the Mac answered, never merely that a channel was joined', () => {
   const base = { role: 'remote', hasSession: true, joining: false, channelUp: true }
   assert.equal(
