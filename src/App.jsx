@@ -46,6 +46,7 @@ import {
 import ParamSearch from './components/ParamSearch'
 import Assistant from './components/Assistant'
 import UpdateNotice from './components/UpdateNotice'
+import Updates, { UpdateReadyNotice } from './components/Updates'
 import { validatePlan, runPlan } from './lib/actions'
 import { listPresets, newestFirst } from './lib/history'
 import {
@@ -66,6 +67,7 @@ import {
   summariseCorrections
 } from './lib/corrections'
 import { countFromRefusal, slotCount, slotOutside, timeLeft } from './lib/slots'
+import { inDesktopApp } from './lib/desktop'
 import { createNameScan } from './lib/nameScan'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
 import Screens from './components/Screens'
@@ -2638,6 +2640,12 @@ export default function App() {
       <UpdateNotice />
 
       {/*
+        The Mac app's update, when one is downloaded and waiting. Renders
+        nothing anywhere else — a phone has no updater to talk to.
+      */}
+      <UpdateReadyNotice />
+
+      {/*
         Saving rides in the bar, and stays off the gig screen: that screen
         exists to switch sounds with a thumb in the dark, and a slot overwrite
         is not something to put within reach of a mis-tap mid-song. The bar
@@ -3362,6 +3370,17 @@ export default function App() {
             }}
           />
         </Section>
+
+        {/*
+          Only in the Mac app: Updates renders nothing without a bridge to the
+          updater, and a section that is always empty everywhere else is worse
+          than no section.
+        */}
+        {inDesktopApp() ? (
+          <Section key="updates" title="Updates" note="This app, not your unit">
+            <Updates />
+          </Section>
+        ) : null}
 
         {device?.capabilities?.fc?.model !== false ? (
           <Section key="footswitches" title="Footswitches">

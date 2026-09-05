@@ -2158,10 +2158,21 @@ test('a gen-3 slot is a number, not a bank letter', async () => {
 })
 
 test('the AM4 keeps its lettered banks of four', async () => {
+  /*
+   * Both, and the number first.
+   *
+   * "Can we also add the slot number in front of the A to Z bank numbers."
+   * Everything else in this app talks in numbers — save to slot 5, the bar
+   * says SLOT 99 — while the unit's front panel and this list talked in
+   * letters. Reading one and typing the other meant doing the arithmetic, and
+   * the arithmetic is only obvious once you know a bank holds four.
+   */
   const { slotLabel } = await import('../src/lib/slots.js')
-  assert.equal(slotLabel(0, 'bankLetter'), 'A01')
-  assert.equal(slotLabel(7, 'bankLetter'), 'B04')
-  assert.equal(slotLabel(103, 'bankLetter'), 'Z04')
+  assert.equal(slotLabel(0, 'bankLetter'), '000 A01')
+  assert.equal(slotLabel(7, 'bankLetter'), '007 B04')
+  assert.equal(slotLabel(103, 'bankLetter'), '103 Z04')
+  // The number is the one you type, so it leads.
+  assert.match(slotLabel(4, 'bankLetter'), /^004 /)
 })
 
 test('past Z there is no letter, so it falls back to the number', async () => {

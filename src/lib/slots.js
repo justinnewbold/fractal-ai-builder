@@ -68,14 +68,29 @@ export function countFromRefusal(message) {
   return Number.isInteger(top) && top >= 0 ? top + 1 : null
 }
 
-/** What to print in front of a name. Numeric slots are padded so the column lines up. */
+/**
+ * What to print in front of a name.
+ *
+ * Numeric slots are padded so the column lines up. A banked unit gets both:
+ * the number the app uses and the address the unit shows on its own display.
+ *
+ * "Can we also add the slot number in front of the A to Z bank numbers in this
+ * preset menu." Right, and it matters more than it looks: everything else in
+ * this app talks in numbers — save to slot 5, the bar says SLOT 99 — while the
+ * unit's front panel and this list talked in letters. Anyone reading one and
+ * typing the other had to do the arithmetic themselves, and the arithmetic is
+ * only obvious once you know a bank holds four.
+ *
+ * The number first, because it is the one you type.
+ */
 export function slotLabel(number, addressing) {
   if (!Number.isFinite(number) || number < 0) return '—'
-  if (!isBanked(addressing)) return String(number).padStart(3, '0')
+  const padded = String(number).padStart(3, '0')
+  if (!isBanked(addressing)) return padded
   const bank = Math.floor(number / PER_BANK)
   // Past Z there is no letter left, and inventing one is worse than a number.
-  if (bank > LAST_BANK) return String(number).padStart(3, '0')
-  return `${String.fromCharCode(65 + bank)}${String((number % PER_BANK) + 1).padStart(2, '0')}`
+  if (bank > LAST_BANK) return padded
+  return `${padded} ${String.fromCharCode(65 + bank)}${String((number % PER_BANK) + 1).padStart(2, '0')}`
 }
 
 /** Whether this slot opens a bank — the only place the list draws a rule. */
