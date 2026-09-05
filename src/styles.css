@@ -4158,9 +4158,20 @@ ol.action-list li.destructive::marker {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
-  /* Without this a flex child refuses to shrink past its content, and the
-     transcript pushes the composer off the bottom instead of scrolling. */
-  min-height: 0;
+  /*
+   * A floor, because it now shares this column.
+   *
+   * The conversation had the screen to itself and could take whatever was
+   * left of it. With a tone listed underneath, "whatever is left" went to 31
+   * pixels — the transcript at zero and the composer sitting on top of the
+   * panel below it. A flex child with `min-height: 0` will shrink to nothing
+   * without complaint, which is the right answer for the log inside this box
+   * and the wrong one for the box itself.
+   *
+   * Past this the column overflows and the page scrolls, which is what a page
+   * with something below the fold is supposed to do.
+   */
+  min-height: min(60dvh, 380px);
   margin-top: 18px;
 }
 
@@ -4173,9 +4184,27 @@ ol.action-list li.destructive::marker {
 }
 
 .chat-screen .assistant-log {
+  /*
+   * Short conversations sit at the bottom, against the box you type in.
+   *
+   * With the tone moved out from between the turns, two lines of talk in a
+   * 300px transcript left most of it blank — and the page lands scrolled to
+   * the tone, so the blank is what you see. `margin-top: auto` on the first
+   * child is the idiom that survives overflow: it pushes a short list down and
+   * resolves to nothing once the list is taller than the box, where
+   * `justify-content: flex-end` would make the top of it unreachable.
+   */
+  display: flex;
+  flex-direction: column;
   max-height: none;
   flex: 1 1 auto;
   min-height: 0;
+}
+
+/* The push itself. On the first child so it disappears the moment the list is
+   taller than the box — a rule on the container would fight the scroll. */
+.chat-screen .assistant-log > :first-child {
+  margin-top: auto;
 }
 
 .assistant-empty {
@@ -5127,17 +5156,32 @@ button.phone-chip.off {
   }
 }
 
-/* The assistant's working area: previews, progress and results render as part
-   of the conversation, and this seam is what makes them read as a reply rather
-   than a floating panel that happens to be nearby. */
-.turn.turn-result {
-  border-left: 2px solid var(--rule);
-  padding-left: var(--s-3);
-  margin-top: 10px;
+/*
+ * The tones, under the conversation.
+ *
+ * "Show it below it separately, just like the LP Meteora — in a collapsible
+ * drop-down, expanded by default after the tone is generated." So they are
+ * entries rather than replies: the newest open with its buttons, the ones
+ * before it folded to a name and what became of them.
+ *
+ * The seam that used to mark a design inside the log went with them. Nothing
+ * in the conversation needs one now — what is left there is speech and a
+ * working line.
+ */
+.tones {
+  margin-top: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
 }
 
-.turn.turn-result:empty {
-  display: none;
+/* The card is already the panel here, so it does not need a second border and
+   a second top margin inside the section that holds it. */
+.tones .section-body .preview {
+  margin-top: 0;
+  padding: 0;
+  background: none;
+  border: 0;
 }
 
 /* ---------- gig blocks in the unit's own colours ---------- */

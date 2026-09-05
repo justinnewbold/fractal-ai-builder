@@ -128,17 +128,12 @@ export default function Assistant({
    * the general examples have to stand on their own without them.
    */
   suggestions = [],
-  children,
-  at = null,
   /*
-   * Tones from earlier in this conversation.
-   *
-   * `{ key, at, node }` each — the card as it was, and how many turns had been
-   * said when it was generated. They used to be destroyed: one slot held the
-   * design, so asking for a second tone erased the first, and a chat where the
-   * previous answer vanishes when you ask a follow-up is not a chat.
+   * What is happening now: the working line, the chain arriving, and what a
+   * write did. Rendered after everything said, because that is when it is
+   * happening — the tone itself is no longer among them.
    */
-  designs = []
+  children
 }) {
   const [text, setText] = useState('')
   /*
@@ -179,9 +174,7 @@ export default function Assistant({
      */
     const log = tail.current?.parentElement
     if (log) log.scrollTop = log.scrollHeight
-    /* A tone arriving is a new thing to read, the same as a turn: the count of
-       them moves when one is shelved and the live one replaces it. */
-  }, [turns, progress, designs.length])
+  }, [turns, progress])
 
   /*
    * The box is as tall as what is in it.
@@ -267,36 +260,6 @@ export default function Assistant({
     ask.current(next)
   }, [busy, queue])
 
-  /*
-   * Where the design sits in the conversation.
-   *
-   * It used to be rendered after every turn, which pinned it to the bottom of
-   * the log for good — so anything said afterwards appeared *above* it, and
-   * the newest thing on screen was an old design. "Most recent generations
-   * should be at the bottom of the chat. Shouldn't have to scroll to find what
-   * was just talked about."
-   *
-   * `at` is how many turns had been said when a design started, so the log
-   * splits around it. Null — no design yet, or one from before this was
-   * tracked — puts every turn first, which is exactly the old shape.
-   *
-   * There is more than one of them now, so this is a merge rather than a
-   * single split: every tone sits where it was asked for, and the turns run
-   * around all of them in order.
-   */
-  const place = (n) => (typeof n === 'number' ? Math.min(Math.max(n, 0), turns.length) : turns.length)
-  const cut = place(at)
-  /*
-   * Sorted, and stable: two tones generated without a word between them share
-   * an `at`, and the order they arrived in is the order they belong in. The
-   * live one is last because its `at` is the largest — every shelved tone was
-   * asked for before it.
-   */
-  const marks = [...designs, { key: 'live', at: cut, node: children }]
-    .filter((m) => m.node)
-    .map((m) => ({ ...m, at: place(m.at) }))
-    .sort((a, b) => a.at - b.at)
-
   /** One turn, drawn the same wherever it falls relative to the design. */
   const renderTurn = (turn, i) => (
           <div key={i} className={`turn turn-${turn.role}`}>
@@ -350,27 +313,6 @@ export default function Assistant({
           </div>
   )
 
-  /*
-   * The log, in order.
-   *
-   * The turns, with every tone spliced in at the point it was asked for. Built
-   * as a list rather than three slices because there is no longer one place to
-   * split at — a conversation with four tones in it has four.
-   */
-  const log = []
-  let cursor = 0
-  for (const mark of marks) {
-    for (; cursor < mark.at; cursor++) log.push(renderTurn(turns[cursor], cursor))
-    log.push(
-      <div key={`design-${mark.key}`} className={`turn turn-result${mark.key === 'live' ? '' : ' turn-past'}`}>
-        {mark.node}
-      </div>
-    )
-  }
-  /* Whatever was said after the last tone. */
-  const trailing = []
-  for (; cursor < turns.length; cursor++) trailing.push(renderTurn(turns[cursor], cursor))
-
   return (
     <section className="assistant">
       <div className="assistant-log" role="log" aria-live="polite">
@@ -381,7 +323,7 @@ export default function Assistant({
           </p>
         ) : null}
 
-        {log}
+        {turns.map(renderTurn)}
 
         {/*
           What is waiting its turn.
@@ -396,7 +338,12 @@ export default function Assistant({
           </div>
         ))}
 
-        {trailing}
+        {/*
+          What is happening now, after everything said. The tone a run produces
+          is not here any more — it is its own panel under the conversation, so
+          this is the working line, the chain arriving, and what a write did.
+        */}
+        {children}
 
         <div ref={tail} />
       </div>
