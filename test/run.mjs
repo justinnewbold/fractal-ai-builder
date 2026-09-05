@@ -574,6 +574,41 @@ test('quitting always finishes, and never leaves the server holding the port', a
   assert.deepEqual(await host.shutdown(), { advert: 'none', server: 'none' })
 })
 
+test('an advert that never answers cannot hold the app open', async () => {
+  /*
+   * The one that came back, on a real Mac, months later: "closing the app
+   * doesn't close it all the way — the only way is to force close."
+   *
+   * Underneath advert.stop() is bonjour-service putting a goodbye packet on the
+   * network and calling back when it has gone out. That callback is not
+   * guaranteed to arrive: a wifi network that changed, a socket that errored, a
+   * machine that slept. It was awaited with no deadline, so when it did not
+   * come the promise never settled, app.quit() was never reached, and there was
+   * no way out but Force Quit.
+   *
+   * Which by then cost more than a nuisance. An update installs when the app
+   * quits; Force Quit is SIGKILL, so it never installs, and the same "an update
+   * is ready" line is waiting the next time.
+   *
+   * Raced against a clock here rather than simply awaited, so that the old
+   * behaviour fails this test instead of hanging the whole suite on it.
+   */
+  const answer = await Promise.race([
+    host.shutdown({
+      advert: { stop: () => new Promise(() => {}) },
+      sleep: async () => {}
+    }),
+    new Promise((r) => setTimeout(() => r('never finished'), 500))
+  ])
+
+  assert.notEqual(answer, 'never finished', 'a teardown that never answers stops the app quitting')
+  assert.equal(answer.advert, 'gave up')
+
+  // And an advert that answers normally is still waited for, not abandoned.
+  const polite = await host.shutdown({ advert: { stop: async () => {} }, sleep: async () => {} })
+  assert.equal(polite.advert, 'stopped')
+})
+
 test('closing the window is not the end of the app', () => {
   /*
    * A menu-bar app has no dock icon, so closing its window leaves nothing on
@@ -588,6 +623,31 @@ test('closing the window is not the end of the app', () => {
   assert.match(main, /let quitting = false/, 'the quit handler can cancel its own second quit again')
   assert.match(main, /shutdown\(\{ server, advert \}\)/, 'quitting does not go through the tested shutdown')
   assert.ok(!/await advert\.stop\(\)/.test(main), 'the un-caught teardown that could block a quit is back')
+})
+
+test('nothing can stop the app closing', () => {
+  /*
+   * Three separate ways the quit could stall, each of which read to the person
+   * holding the Mac as "it will not close". The deadline inside shutdown is
+   * tested above; these are the two in the shell, plus the backstop that covers
+   * whatever turns out to be next.
+   */
+  const main = readSrc(new URL('../desktop/main.js', import.meta.url), 'utf8')
+
+  // A server dying because we just killed it is not news, and a modal box
+  // during a quit is a box with no window and no dock icon to belong to.
+  assert.match(
+    main,
+    /if \(code && !quitting\)/,
+    'a server stopped by the quit still opens a dialog in the middle of it'
+  )
+
+  // The dock is not ours to touch on the way out.
+  assert.match(main, /if \(quitting \|\| !app\.dock\) return/, 'the dock is still changed while quitting')
+
+  // And the promise that outranks all of it.
+  assert.match(main, /setTimeout\(\(\) => app\.exit\(0\), QUIT_DEADLINE_MS\)/, 'there is no backstop on the quit')
+  assert.match(main, /const QUIT_DEADLINE_MS = \d+/, 'the quit deadline is not a named number')
 })
 
 test('an installed app uses the server it shipped with', () => {
