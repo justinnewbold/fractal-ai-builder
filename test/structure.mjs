@@ -1553,6 +1553,30 @@ export function run(test) {
     assert.match(app, /Forget what I keep fixing/, 'there is no way to erase it')
   })
 
+  /*
+   * A stated count outranks a refusal.
+   *
+   * Learning a unit's size from its own complaint is how the app stops
+   * offering slots that do not exist. Applied to a unit that HAS stated its
+   * size, it becomes the more expensive mistake: one refusal quoting a
+   * smaller unit's range would hide four hundred real slots from the person
+   * who owns them. The unit's own answer wins, and this is the guard that
+   * keeps it that way.
+   */
+  test('what the unit says about its own size beats what a refusal implies', () => {
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    assert.match(
+      app,
+      /slotCount\(device\?\.capabilities\) \? null : countFromRefusal\(err\.message\)/,
+      'a refusal can now shrink a unit that already said how many presets it holds'
+    )
+    // And nothing anywhere invents the gen-3 count for a unit that never said.
+    assert.ok(
+      !/presets\?\.count \?\? 512|presets\.count \?\? 512/.test(app),
+      'the invented 512 is back'
+    )
+  })
+
   test('a channel is written where the scene that plays it can keep it', () => {
     const forgefx = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
 

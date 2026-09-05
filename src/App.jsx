@@ -894,8 +894,17 @@ export default function App() {
          * stops the picker offering slots that do not exist and stops this
          * happening again.
          */
-        const learned = countFromRefusal(err.message)
-        if (learned && learned !== device?.capabilities?.presets?.count) {
+        /*
+         * Only where the unit has said nothing itself.
+         *
+         * A refusal is weaker evidence than a stated count, and taking it as
+         * stronger is how this fix could become a worse bug than the one it
+         * fixes: a unit that reports 512 slots, refused once by something that
+         * quotes an AM4's range, would have four hundred real slots hidden
+         * from its owner. What the unit says about itself wins.
+         */
+        const learned = slotCount(device?.capabilities) ? null : countFromRefusal(err.message)
+        if (learned) {
           setDevice((prev) =>
             prev
               ? {
