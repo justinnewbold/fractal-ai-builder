@@ -6873,3 +6873,30 @@ button.view-tab {
   gap: var(--s-2);
   color: var(--silk);
 }
+
+/* ---------- the iOS zoom floor, last word ---------- */
+
+/*
+ * "As soon as I click the chat box, it zooms in on it and then you can't see
+ * the send button anymore."
+ *
+ * iOS zooms a focused field whose computed size is under 16px, and the floor
+ * that prevents it is set near the top of the touch block on bare element
+ * selectors. Two fields name themselves — `textarea.refine-input` and
+ * `input.preset-filter` — and both beat it twice over: (0,1,1) against (0,0,1),
+ * and several hundred lines further down the file. A media query adds no
+ * specificity and changes no source order, so the floor never reached either.
+ *
+ * Which is why this block is at the very end and not beside the others. It has
+ * to outrank every rule that sets a size on these fields, and the only way to
+ * be sure of that is to come after all of them. Anything else added here
+ * belongs here too, for the same reason — a field that sets its own font-size
+ * and is not named in this block is a field iOS will zoom.
+ */
+@media (pointer: coarse) {
+  textarea.refine-input,
+  input.refine-input,
+  input.preset-filter {
+    font-size: var(--f-input);
+  }
+}
