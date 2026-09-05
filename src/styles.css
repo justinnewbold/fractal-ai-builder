@@ -4544,8 +4544,26 @@ button.view-tab.gig-tab::after {
   margin-top: 18px;
 }
 
+/* The tile and the menu it can open share a box, so the menu can be placed
+   against the tile rather than the page. */
+.gig-block-cell {
+  position: relative;
+  display: grid;
+}
+
 /* Sized for a thumb on a dark stage, not a mouse. */
 button.gig-block {
+  /*
+   * A held tile is ours, not the browser's.
+   *
+   * iOS answers a long press with its own callout and a text selection, over
+   * the top of whatever the page was doing — and it sends no contextmenu event,
+   * so this is the only place it can be stopped. Android's menu is cancelled in
+   * the handler instead, where the event exists.
+   */
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -4588,6 +4606,53 @@ button.gig-block {
   font-size: var(--f-1);
   letter-spacing: 0.1em;
   color: var(--silk-dim);
+}
+
+/*
+ * Hold a block, or right-click it: its channels, over the tile.
+ *
+ * "If you can hold one of the effects for a few seconds, it would be cool to
+ * have a pop-up where you can quickly switch channels from ABCD."
+ *
+ * Over rather than beside. A tile at the right edge of a two-column grid has
+ * nowhere to open sideways, and a menu that opens off-screen on half the tiles
+ * is worse than one that covers the thing it belongs to — which is anchored,
+ * obvious, and exactly where the finger already is.
+ */
+.gig-chan {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--s-1);
+  padding: var(--s-1);
+  background: var(--panel);
+  border: 1px solid var(--live);
+  border-radius: var(--r-1);
+  box-shadow: var(--e-2);
+}
+
+button.gig-chan-btn {
+  /* Four of these across a 130px tile is 30px each, and this is the screen
+     whose whole premise is a target you can hit in the dark. So they take the
+     tile's full height instead — a tall, thin target is still a target, and
+     the height is the dimension going spare. */
+  min-height: 100%;
+  padding: 0;
+  font-family: var(--display);
+  font-size: var(--f-4);
+  font-weight: 700;
+  background: var(--chassis);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2);
+  color: var(--silk-dim);
+}
+
+button.gig-chan-btn.current {
+  background: var(--live-halo);
+  border-color: var(--live);
+  color: var(--live);
 }
 
 /* On carries the signal colour and a lit edge, so which blocks are live reads

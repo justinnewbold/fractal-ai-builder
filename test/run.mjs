@@ -16,6 +16,7 @@ import * as link from '../src/lib/link.js'
 import * as corrections from '../src/lib/corrections.js'
 import * as slots from '../src/lib/slots.js'
 import * as names from '../src/lib/presetName.js'
+import * as hold from '../src/lib/longPress.js'
 import { readFileSync as readSrc } from 'node:fs'
 import {
   patchSchemaValue,
@@ -3177,6 +3178,32 @@ test('a reading with the tuner off is not a reading', () => {
   ds.set({ tunerOn: true })
   ds.handleEvent({ type: 'tuner', note: 'E', cents: 3 })
   assert.equal(ds.getSnapshot().tuning?.note, 'E')
+})
+
+test('a hold is a press that stays put, and a right-click is not a middle-click', () => {
+  /*
+   * "If you can hold one of the effects for a few seconds... on the Mac
+   * version, maybe we can do a right click."
+   *
+   * The two decisions a hold makes, held here because both are the kind that
+   * fail quietly: a menu that opens while somebody is scrolling the stage
+   * screen, and one that opens on a scroll-wheel click.
+   */
+  assert.equal(hold.holdStarts({ pointerType: 'touch' }), true)
+  assert.equal(hold.holdStarts({ pointerType: 'pen' }), true)
+  assert.equal(hold.holdStarts({ pointerType: 'mouse', button: 0 }), true)
+  assert.equal(hold.holdStarts({ pointerType: 'mouse', button: 1 }), false, 'a middle-click opens a menu')
+  assert.equal(hold.holdStarts({ pointerType: 'mouse', button: 2 }), false, 'a right-click would fire twice')
+
+  const from = { x: 100, y: 100 }
+  assert.equal(hold.movedOut(from, 100, 100), false)
+  /* A thumb resting against a guitar moves a few pixels without anybody
+     meaning it to; past the slop it is a scroll. */
+  assert.equal(hold.movedOut(from, 106, 100), false, 'a resting thumb cancels the hold')
+  assert.equal(hold.movedOut(from, 100, 118), true, 'a scroll still opens the menu')
+  // Diagonal, so the distance is the hypotenuse rather than the larger axis.
+  assert.equal(hold.movedOut(from, 108, 108), true, 'a diagonal drag is measured one axis at a time')
+  assert.equal(hold.movedOut(null, 999, 999), false, 'a move with no press behind it counts as one')
 })
 
 test('a tuner the unit cannot run turns itself back off', async () => {
