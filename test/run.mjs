@@ -3180,6 +3180,52 @@ test('a reading with the tuner off is not a reading', () => {
   assert.equal(ds.getSnapshot().tuning?.note, 'E')
 })
 
+test('a unit that counts its chain from one is brought back to zero', () => {
+  /*
+   * "It shows five blocks when there's only four and it says add empty one —
+   * if you add one, it actually saves it to the first block, but overwrites
+   * the one that is listed as number two."
+   *
+   * The AM4 reports its four slots as 1..4 while the app counts from zero and
+   * adds the wire's one back at the boundary. So every column arrived one too
+   * high: four blocks drew five slots, the phantom one labelled 1, and filling
+   * it wrote to wire slot 1 — on top of the block the screen was calling 2.
+   */
+  const linear = { slotModel: 'linear', slotCount: 4 }
+  const am4 = [
+    { name: 'Chorus', col: 1 },
+    { name: 'Amp', col: 2 },
+    { name: 'Delay', col: 3 },
+    { name: 'Reverb', col: 4 }
+  ]
+  assert.deepEqual(
+    slots.zeroBasedChain(am4, linear).map((b) => b.col),
+    [0, 1, 2, 3],
+    'the chain still starts at one, so the screen draws a slot that is not there'
+  )
+
+  // A grid unit already counts from zero and must be left exactly as it is.
+  const grid = [{ name: 'Amp', col: 0 }, { name: 'Cab', col: 3 }]
+  assert.deepEqual(slots.zeroBasedChain(grid, { slotModel: 'grid' }).map((b) => b.col), [0, 3])
+  assert.equal(slots.zeroBasedChain(grid, { slotModel: 'grid' }), grid, 'a grid chain was needlessly rebuilt')
+
+  /*
+   * And the correction is not applied twice. A driver fixed upstream, or an
+   * app that runs this on its own output, would otherwise shift a chain into
+   * slot -1 — which the unit refuses outright.
+   */
+  const once = slots.zeroBasedChain(am4, linear)
+  assert.deepEqual(slots.zeroBasedChain(once, linear).map((b) => b.col), [0, 1, 2, 3],
+    'a chain already counting from zero was shifted below it')
+
+  // Nothing to shift is not something to break on.
+  assert.deepEqual(slots.zeroBasedChain([], linear), [])
+  assert.equal(slots.zeroBasedChain(null, linear), null)
+  assert.equal(slots.isLinearChain(linear), true)
+  assert.equal(slots.isLinearChain({ slotModel: 'grid' }), false)
+  assert.equal(slots.isLinearChain(undefined), false)
+})
+
 test('a hold is a press that stays put, and a right-click is not a middle-click', () => {
   /*
    * "If you can hold one of the effects for a few seconds... on the Mac

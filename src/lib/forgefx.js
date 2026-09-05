@@ -11,6 +11,7 @@
 
 import { EXCLUDED_BLOCKS, safeParams } from './guardrails.js'
 import { cleanPresetName, isEmptySlotName } from './presetName.js'
+import { zeroBasedChain } from './slots.js'
 import { toNormalized } from './scale.js'
 import { remoteActive, remoteRequest, subscribeRemoteEvents } from './remote.js'
 import {
@@ -226,11 +227,22 @@ let deviceSlug = 'device'
 
 export const currentDeviceSlug = () => deviceSlug
 
+/*
+ * What the last detect said about how this unit numbers its chain.
+ *
+ * Cached beside the slug, and for the same reason: it is a fact about the
+ * attached unit that a dozen callers need and none of them are holding. See
+ * zeroBasedChain — the AM4 reports its four slots from one while the app counts
+ * from zero, and the correction has to happen where the list arrives.
+ */
+let lastCaps = null
+
 /** Full capability report: grid size, scene count, preset count, what writes are allowed. */
 export const detect = async () => {
   const res = mock ? (await tick(), mock.detect()) : await request('/device/detect')
   const label = res?.short || res?.name
   if (label) deviceSlug = String(label).toLowerCase().replace(/[^a-z0-9]/g, '') || 'device'
+  lastCaps = res?.capabilities ?? null
   return res
 }
 
@@ -357,7 +369,11 @@ export const currentPreset = async () => {
 }
 
 /** Every block placed in the current preset, with grid position, bypass state and channel. */
-export const presetBlocks = async () => (mock ? (await tick(), mock.presetBlocks()) : request('/preset/blocks'))
+export const presetBlocks = async () => {
+  const list = mock ? (await tick(), mock.presetBlocks()) : await request('/preset/blocks')
+  /* One convention inside the app, whatever the driver answered. */
+  return zeroBasedChain(list, lastCaps)
+}
 
 /** Named parameters for one placed block. `eid` is the effect id from presetBlocks(). */
 export const blockParams = async (eid) =>

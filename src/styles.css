@@ -2459,6 +2459,74 @@ table.matrix th:first-child,
   flex-direction: column;
 }
 
+/*
+ * A four-slot chain reads the way the unit is laid out: left to right.
+ *
+ * "Instead of showing the blocks vertically, show them horizontally like it
+ * does on the device itself." The AM4 is four switches in a row, and signal
+ * runs along them — a stacked list is a different shape from the thing in front
+ * of you.
+ *
+ * Only for a linear unit. A gen-3 grid is twelve columns wide, which is what
+ * made this a stacked list in the first place: the old horizontal grid was
+ * 940px on a 390px phone. Four fits; twelve never will.
+ */
+.chain-lane[data-linear] {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.chain-lane[data-linear] .chain-slot {
+  /* Equal shares of the row, and able to shrink below their content — four
+     names of different lengths must not give four different widths. */
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/*
+ * The one you tapped takes the whole row.
+ *
+ * Its actions — a model picker, Replace, Remove — live inside the slot, and a
+ * quarter of a phone is 85px. Given its own line it has the width it had when
+ * the list was stacked, and the other three reflow underneath.
+ *
+ * A class rather than :has(), because being able to reach the Add button is not
+ * the place to spend a newer selector.
+ */
+.chain-lane[data-linear] .chain-slot.open {
+  flex-basis: 100%;
+}
+
+/* Standing up rather than lying down: the number above the name, centred, so a
+   slot reads as a switch rather than a row that has been squashed. */
+.chain-lane[data-linear] .chain-slot:not(.open) button.chain-block,
+.chain-lane[data-linear] .chain-slot:not(.open) button.chain-gap {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-1);
+  min-height: 72px;
+  padding: var(--s-2) var(--s-1);
+  text-align: center;
+  border-left-width: 1px;
+  border-top: 2px solid var(--signal);
+}
+
+.chain-lane[data-linear] .chain-slot:not(.open) button.chain-gap {
+  border-top-style: dashed;
+}
+
+/* Wrapped, not clipped. "COMPRESSOR" in a quarter of a phone is two lines, and
+   two readable lines beat one that ends in an ellipsis. */
+.chain-lane[data-linear] .chain-slot:not(.open) .chain-block-name,
+.chain-lane[data-linear] .chain-slot:not(.open) .chain-gap-word {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: var(--f-1);
+  line-height: 1.2;
+}
+
 button.chain-block,
 button.chain-gap {
   display: flex;

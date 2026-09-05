@@ -113,3 +113,42 @@ export function timeLeft(remaining, msPerSlot) {
   const minutes = Math.round(seconds / 60)
   return `about ${minutes} minute${minutes === 1 ? '' : 's'} left`
 }
+
+/* --------------------------------------------------- the chain, not the bank -- */
+
+/**
+ * Whether this unit's chain is four slots in a line rather than a grid.
+ *
+ * A separate question from how it addresses its *presets*, which is what the
+ * rest of this file is about — but the same word, so it lives here rather than
+ * being asked with a raw string comparison in four places.
+ */
+export const isLinearChain = (capabilities) => capabilities?.slotModel === 'linear'
+
+/**
+ * Put a unit's reported chain into the one convention the app uses: from zero.
+ *
+ * The app's rule is stated in GridEditor: columns are zero-based inside, and
+ * the wire's one-based numbering is added once, at the boundary. Gen-3 obeys
+ * it. The AM4 does not, and reports its four slots as 1..4 — the driver's own
+ * two methods disagree with each other, `grid()` answering `slot - 1` and
+ * `placedBlocks()` answering `slot`.
+ *
+ * So every column arrived one too high, and everything downstream was wrong in
+ * the same direction: a chain of four drew five slots, the phantom one labelled
+ * 1, and putting a block in it wrote to wire slot 1 — on top of the block the
+ * screen was calling 2. "It shows five blocks when there's only four... if you
+ * add one, it actually saves it to the first block, but overwrites the one that
+ * is listed as number two."
+ *
+ * Corrected on the way in rather than at each use, because there were four uses
+ * and the next one would have been wrong too.
+ */
+export function zeroBasedChain(list, capabilities) {
+  if (!Array.isArray(list) || !isLinearChain(capabilities)) return list
+  /* Only when it really is one-based. A driver that is fixed upstream, or one
+     that reports an empty chain, must not be shifted into negative slots. */
+  const cols = list.map((b) => b?.col).filter((c) => Number.isInteger(c))
+  if (!cols.length || Math.min(...cols) < 1) return list
+  return list.map((b) => (Number.isInteger(b?.col) ? { ...b, col: b.col - 1 } : b))
+}

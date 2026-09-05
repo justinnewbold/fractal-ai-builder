@@ -1857,6 +1857,47 @@ export function run(test) {
     assert.match(bare, /el\.style\.height = `\$\{el\.scrollHeight\}px`/, 'the box does not grow with what is in it')
   })
 
+  test('the chain is corrected where it arrives, and Move is gone where it would lose the block', () => {
+    /*
+     * "It shows five blocks when there's only four... if you add one, it
+     * actually saves it to the first block, but overwrites the one that is
+     * listed as number two." And: "the move function doesn't work... let's just
+     * remove the move button."
+     */
+    const fx = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+
+    /*
+     * One place, not four. The columns were used by the editor's slot list, its
+     * gap list, its labels and its writes, and correcting them at each use
+     * leaves the next use wrong. This is the boundary the file already says it
+     * converts at.
+     */
+    const blocks = fx.slice(fx.indexOf('export const presetBlocks'), fx.indexOf('export const blockParams'))
+    assert.match(blocks, /zeroBasedChain\(/, 'a one-based chain reaches the app uncorrected')
+    assert.match(fx, /lastCaps = res\?\.capabilities/, 'nothing remembers whether this unit counts from one')
+
+    /*
+     * And the correction happens on the way in rather than on the way out — the
+     * write side already adds the wire's one, and doing it in both places is
+     * how the chain ended up off by one to begin with.
+     */
+    assert.match(fx, /const toWireCell = \(row, col\) => \(\{ row, col: col \+ 1 \}\)/,
+      'the wire boundary changed; the chain may now be corrected twice or not at all')
+
+    /*
+     * Move, only where a move keeps the block. On a grid unit a block carries
+     * its own settings; on the AM4 they live in the slot, so "move" is clear
+     * one and create a fresh one — same name, every knob at its default.
+     */
+    const grid = readFileSync(new URL('../src/components/GridEditor.jsx', import.meta.url), 'utf8')
+    const bare = grid.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+    const move = bare.slice(bare.indexOf('{linear ? null : ('), bare.indexOf('Replace', bare.indexOf('{linear ? null : (')))
+    assert.ok(move.length > 20, 'Move is offered on every unit again')
+    assert.match(move, /Move/, 'the guarded control is no longer Move')
+    /* Remove and Replace stay — they are honest about creating a new block. */
+    assert.match(bare, /'Replace'/, 'Replace went with it')
+  })
+
   test('a block is held for its channels, and the hold does not also switch it off', () => {
     /*
      * "If you can hold one of the effects for a few seconds, it would be cool

@@ -519,4 +519,32 @@ export function run(test) {
     assert.match(code, /\.save-cluster button\.save-now \{[^}]*min-height: 46px/,
       'the Save button lost its floor')
   })
+
+  /*
+   * A four-slot chain runs across; a twelve-column grid never can.
+   *
+   * "Show them horizontally like it does on the device itself." The AM4 is four
+   * switches in a row and signal runs along them. The reason this was a stacked
+   * list to begin with is the other unit: the old horizontal grid was 940px
+   * wide on a 390px phone, which is the bug that rebuild fixed.
+   */
+  test('the chain runs across only on the unit whose chain fits across', () => {
+    const across = code.slice(code.indexOf('.chain-lane[data-linear] {'))
+    assert.ok(across.length > 100, 'the linear chain no longer has a layout of its own')
+    assert.match(across.slice(0, 200), /flex-direction: row/, 'the four slots are stacked again')
+
+    /*
+     * The plain lane stays a column. A bare `.chain-lane` going horizontal puts
+     * twelve columns on a phone, which is the 940px grid back.
+     */
+    const plain = code.slice(code.indexOf('.chain-lane {'), code.indexOf('}', code.indexOf('.chain-lane {')))
+    assert.match(plain, /flex-direction: column/, 'a grid unit lays its twelve columns across a phone again')
+
+    /*
+     * And the slot you tap gets the whole row back for its controls — a quarter
+     * of a phone is 85px, and a model picker does not fit in it.
+     */
+    assert.match(code, /\.chain-lane\[data-linear\] \.chain-slot\.open \{[^}]*flex-basis: 100%/,
+      'the open slot keeps its quarter of the row, so its controls are unreachable')
+  })
 }
