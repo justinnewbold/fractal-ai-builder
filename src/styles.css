@@ -4266,8 +4266,16 @@ textarea.refine-input {
   font-family: var(--mono);
   font-size: var(--f-3);
   background: var(--chassis);
-  padding: var(--s-2) var(--s-2);
+  padding: var(--s-2) var(--s-3);
   margin-top: 0;
+  /*
+   * "Let's make the chat box text entry a little more rounded instead of
+   * square." A 3px radius is the app's edge for panels and rows — right for
+   * something rectangular, wrong for the one field you type a sentence into.
+   * The wider side padding goes with it: text starting inside a curve needs
+   * the room, or the first letter sits on the bend.
+   */
+  border-radius: var(--r-3);
   /* The height is computed from the content; a drag handle fights that, and a
      browser default of two or three rows is a hole in an empty conversation. */
   resize: none;
@@ -4280,6 +4288,47 @@ textarea.refine-input {
 
 textarea.refine-input:focus-visible {
   outline-color: var(--live);
+}
+
+/*
+ * The arrow at the end of the box.
+ *
+ * Round, so it reads as an action rather than another field, and exactly as
+ * tall as the box is when empty — it sits level with a one-line composer and
+ * stays at the bottom as the box grows, which is where a thumb already is.
+ */
+button.send-btn {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  font-size: var(--f-4);
+  line-height: 1;
+  background: var(--signal);
+  border: 1px solid var(--signal);
+  border-radius: 50%;
+  color: var(--on-signal);
+}
+
+/* Nothing typed is nothing to send: quiet rather than shouting an action that
+   would do nothing. Not hidden — a control that vanishes is one you have to
+   rediscover. */
+button.send-btn:disabled {
+  background: var(--panel);
+  border-color: var(--rule);
+  color: var(--silk-faint);
+  opacity: 1;
+}
+
+/* Stop wears the fault colour, because stopping is undoing something that is
+   already happening rather than starting something new. */
+button.send-btn.stopping {
+  background: var(--fault);
+  border-color: var(--fault);
+  color: var(--on-signal);
 }
 
 .assistant-row {

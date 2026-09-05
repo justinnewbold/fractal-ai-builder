@@ -1853,6 +1853,16 @@ export function run(test) {
        lines means the first disappears upwards — no better than the field this
        replaced. Measured from the content rather than counted from the text, so
        it stays right at any width. */
+    /*
+     * The arrow says what it does to eyes; the label says it to everything
+     * else. A button whose whole face is a glyph is unnamed without one, and
+     * both of its states need naming — Send and Stop share the button.
+     */
+    assert.match(bare, /aria-label="Stop"/, 'the stop arrow has no name')
+    assert.match(bare, /aria-label=\{busy \? 'Send when the current tone finishes' : 'Send'\}/,
+      'the send arrow has no name')
+    assert.ok(!/>\s*Send\s*</.test(bare), 'the word Send is back on the button beside the arrow')
+
     assert.match(bare, /el\.style\.height = 'auto'/, 'the box never shrinks back down')
     assert.match(bare, /el\.style\.height = `\$\{el\.scrollHeight\}px`/, 'the box does not grow with what is in it')
   })
