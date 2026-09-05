@@ -140,6 +140,13 @@ HARD RULES
 5. Bypass blocks that don't belong in the tone rather than leaving them engaged
    and neutral.
 6. Do not move blocks, add blocks, or change routing. Work with what is placed.
+7. Balance, Pan and Output are the player's gain staging, not yours — never set
+   them. A block's own Level you may move, but only a little: within about 15%
+   of the control's full range from where it sits now, and never into the
+   bottom fifth of that range. It is there for real asks — a lead sound that
+   has to be louder than the rhythm one — not for balancing the mix, and a
+   Level walked to its floor hands back a preset that looks right and makes no
+   sound, which the app refuses however it is worded.
 
 SCENES AND CHANNELS
 

@@ -10,7 +10,7 @@
  * parameters — a plan that sets gain then swaps the amp silently discards the
  * gain.
  */
-import { isSilencingParam } from './guardrails.js'
+import { isForbiddenParam, levelLimits } from './guardrails.js'
 
 /**
  * The device functions are loaded when an action runs, not when this module
@@ -154,8 +154,8 @@ export function validatePlan(plan, blocks, capabilities) {
           break
         if (
           !need(
-            !isSilencingParam(param.name),
-            `${block.name} / ${param.name}: output levels are yours to set.`
+            !isForbiddenParam(param.name),
+            `${block.name} / ${param.name}: balance and output routing are yours to set.`
           )
         )
           break
@@ -164,6 +164,23 @@ export function validatePlan(plan, blocks, capabilities) {
           !need(
             raw.value >= param.min && raw.value <= param.max,
             `${block.name} / ${param.name}: ${raw.value} is outside ${param.min}–${param.max}.`
+          )
+        )
+          break
+        /*
+         * A block's own level may move, but only by a nudge. "The amp should be
+         * louder when it's on than when it's off" is a real ask and the one
+         * control that answers it; walking that same control to its floor hands
+         * back a preset that looks right and makes no sound.
+         */
+        const window = levelLimits(param)
+        if (
+          window &&
+          !need(
+            raw.value >= window.floor && raw.value <= window.ceiling,
+            `${block.name} / ${param.name}: levels can be nudged, not reset — ${
+              raw.value
+            } is outside ${round(window.floor)} to ${round(window.ceiling)}.`
           )
         )
           break

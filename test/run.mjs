@@ -7,7 +7,7 @@
  */
 import assert from 'node:assert/strict'
 import { toNormalized, fromNormalized } from '../src/lib/scale.js'
-import { isSilencingParam } from '../src/lib/guardrails.js'
+import { isForbiddenParam, isLevelParam, isSilencingParam, levelLimits } from '../src/lib/guardrails.js'
 import { validateSpec, countWrites, countSceneWrites } from '../src/lib/validate.js'
 import { preferredEncoding, rememberEncoding, disambiguate } from '../src/lib/encoding.js'
 import { forbiddenRemotely, explainAuth, timeoutFor } from '../src/lib/remote.js'
@@ -113,7 +113,7 @@ test('round trips', () => {
 
 console.log('\nguardrails')
 
-test('blocks output levels', () => {
+test('keeps the controls that can silence a preset out of the quick knob list', () => {
   for (const n of ['Amp1 Level', 'Level', 'Out Level', 'Balance', 'Pan L'])
     assert.ok(isSilencingParam(n), n)
 })
@@ -121,6 +121,42 @@ test('blocks output levels', () => {
 test('allows real tone controls', () => {
   for (const n of ['Gain 1', 'Bass 1', 'Master Volume', 'Boost Level', 'Input Level', 'Mix'])
     assert.ok(!isSilencingParam(n), n)
+})
+
+test('balance and routing are never the AI to set; a level is', () => {
+  for (const n of ['Balance', 'Pan L', 'Output Mode', 'Bypass Mode'])
+    assert.ok(isForbiddenParam(n), n)
+  for (const n of ['Amp1 Level', 'Level', 'Out Level']) {
+    assert.ok(!isForbiddenParam(n), `${n} is refused outright`)
+    assert.ok(isLevelParam(n), n)
+  }
+  // Named a level, but not one: these move a tone, not the output.
+  for (const n of ['Boost Level', 'Input Level']) assert.ok(!isLevelParam(n), n)
+})
+
+test('a level window is a nudge from where it sits, never near the floor', () => {
+  /*
+   * The two ends have different jobs. The ceiling keeps a change to a nudge —
+   * a lead scene louder than the rhythm one, not a new gain structure. The
+   * floor is the one that matters: a preset can be musically perfect and
+   * silent, and that failure looks identical to a good one until you play it.
+   */
+  const amp = levelLimits({ name: 'Amp 1 Level', value: 0, min: -80, max: 20 })
+  assert.deepEqual(amp, { floor: -15, ceiling: 15 })
+
+  const drive = levelLimits({ name: 'Drive Level', value: 5, min: 0, max: 10 })
+  assert.deepEqual(drive, { floor: 3.5, ceiling: 6.5 })
+
+  /*
+   * Sitting below the floor already — the player's own doing. The window is
+   * still the bottom fifth upward, so the only move offered is a raise. The
+   * app never drags a level back up on its own; it just will not go down.
+   */
+  const low = levelLimits({ name: 'Amp 1 Level', value: -70, min: -80, max: 20 })
+  assert.deepEqual(low, { floor: -60, ceiling: -55 })
+
+  assert.equal(levelLimits({ name: 'Bass', value: 5, min: 0, max: 10 }), null)
+  assert.equal(levelLimits({ name: 'Amp 1 Level', value: 0 }), null, 'no range, no window')
 })
 
 console.log('\nvalidate')
@@ -1159,14 +1195,44 @@ test('accepts a parameter change in range', () => {
   assert.match(r.actions[0].label, /Gain 1/)
 })
 
-test('refuses to touch output levels', () => {
-  const r = validatePlan(
+test('the chat can nudge a level but not walk it down', () => {
+  // The same window the design route holds, on the route a player talks to.
+  const down = validatePlan(
     { actions: [{ kind: 'setParam', eid: 58, paramId: 1, value: -40, why: '' }] },
     cmdBlocks,
     caps
   )
+  assert.equal(down.actions.length, 0)
+  assert.match(down.problems[0], /nudged, not reset/)
+
+  const up = validatePlan(
+    { actions: [{ kind: 'setParam', eid: 58, paramId: 1, value: -2, why: '' }] },
+    cmdBlocks,
+    caps
+  )
+  assert.equal(up.actions.length, 1, 'a few dB of make-up gain is still refused')
+  assert.match(up.actions[0].label, /Amp1 Level/)
+})
+
+test('the chat never touches balance or routing', () => {
+  const blocks = [
+    {
+      eid: 58,
+      name: 'Amp 1',
+      slug: 'amp',
+      row: 1,
+      col: 4,
+      models: [],
+      params: [{ id: 2, name: 'Balance', value: 0, min: -100, max: 100 }]
+    }
+  ]
+  const r = validatePlan(
+    { actions: [{ kind: 'setParam', eid: 58, paramId: 2, value: 40, why: '' }] },
+    blocks,
+    caps
+  )
   assert.equal(r.actions.length, 0)
-  assert.match(r.problems[0], /gain staging|yours to set/i)
+  assert.match(r.problems[0], /yours to set/i)
 })
 
 test('refuses an out-of-range value', () => {
@@ -2028,13 +2094,37 @@ test('a name that matches nothing is still a rejection', () => {
   assert.match(res.problems[0], /no parameter 99/)
 })
 
-test('matching by name never resurrects an output level', () => {
-  const res = validateSpec(
+test('an output level can be nudged but never reset to silence', () => {
+  /*
+   * Levels used to be withheld from the model entirely, and the reason was
+   * sound: a Level sits in the same list as Bass and Treble, so a generation
+   * that is otherwise musically right will set it to -60 dB and hand back a
+   * preset that looks perfect and makes no sound.
+   *
+   * What that cost was worse. "I told the AI that the amp should be louder
+   * when it's on compared to when it's off and it told me I was wrong." The
+   * one control that does that was invisible, so the model argued rather than
+   * refused. It is reachable now, within a window: a nudge, not a reset.
+   */
+  const silence = validateSpec(
     { blocks: [{ eid: 58, params: [{ id: 3, name: 'Amp 1 Level', value: -60 }] }] },
     ampSchema
   )
-  assert.equal(res.changes.length, 0)
-  assert.match(res.problems[0], /yours to set/)
+  assert.equal(silence.changes.length, 0, 'a level was walked to silence in one write')
+  assert.match(silence.problems[0], /nudged, not reset/)
+
+  /*
+   * And the thing the player actually asked for goes through. Addressed by the
+   * Level's own id here, where the case above deliberately arrives with the
+   * wrong one so the name-matching path is covered too — both routes reach the
+   * same control, and the window has to hold on either.
+   */
+  const louder = validateSpec(
+    { blocks: [{ eid: 58, params: [{ id: 4, name: 'Amp 1 Level', value: 3 }] }] },
+    ampSchema
+  )
+  assert.equal(louder.changes.length, 1, 'a few dB of make-up gain is still refused')
+  assert.equal(louder.changes[0].params[0].to, 3)
 })
 
 test('a name matched to the right id is not reported as a correction', () => {
