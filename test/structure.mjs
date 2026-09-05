@@ -1503,6 +1503,48 @@ export function run(test) {
     )
   })
 
+  test('the chat box is tall enough for the suggestion in it', () => {
+    /*
+     * "Chat box cuts off second line text."
+     *
+     * The box sizes itself from `scrollHeight`, which answers for a textarea's
+     * VALUE — and a placeholder is not a value. So a suggestion long enough to
+     * wrap ("Warm clean with a bit of shimmer" does, on a phone) was drawn into
+     * a box one line tall and lost its second line: the invitation to type was
+     * the one thing you could not read.
+     *
+     * Two halves, and both are needed. The measurement has to borrow the
+     * suggestion as a value to have anything to measure, and it has to depend
+     * on it so it runs again when the suggestion changes — the old effect
+     * watched `text` alone, which never changes while the placeholder rotates.
+     */
+    const a = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
+    assert.match(
+      a,
+      /const borrow = text \? null : `\$\{typedFull\}/,
+      'the empty box is measured against nothing again, so a wrapping suggestion is clipped'
+    )
+    assert.match(
+      a,
+      /\}, \[text, typedFull\]\)/,
+      'the height is not recomputed when the suggestion changes, so it fits only the first one'
+    )
+    // And the full line is what it measures, not the part typed so far —
+    // otherwise the box gains a line mid-animation and the page jumps.
+    assert.match(
+      a,
+      /return \{ shown: text, full \}/,
+      'the hook no longer reports the whole suggestion, so the box can only chase the animation'
+    )
+    // The borrowed value must go back, or React's controlled field is left
+    // holding a suggestion the player never typed.
+    assert.match(
+      a,
+      /if \(borrow !== null\) el\.value = ''/,
+      'the borrowed value is never given back, so the box fills with its own placeholder'
+    )
+  })
+
   test('a line that cannot say what it is doing says only that', () => {
     /*
      * "Instead of saying working out what that means just say Thinking whenever
