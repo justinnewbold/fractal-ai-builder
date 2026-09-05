@@ -218,7 +218,18 @@ export default async function handler(req, res) {
     return
   }
 
-  const { description, device, blocks, previous, mode, sceneNames, taste, wantScenes, trace } =
+  const {
+    description,
+    device,
+    blocks,
+    previous,
+    mode,
+    sceneNames,
+    taste,
+    corrections,
+    wantScenes,
+    trace
+  } =
     req.body || {}
 
   if (!description || typeof description !== 'string') {
@@ -319,6 +330,24 @@ export default async function handler(req, res) {
   const context = typeof taste === 'string' && taste.trim() ? taste.trim().slice(0, 4000) : null
 
   /*
+   * What this player has already had to fix by hand.
+   *
+   * The other half of the same idea, and the sharper one. Taste says what they
+   * choose; this says what we keep getting wrong for them — a control they
+   * always end up turning down, a word they always end up saying. It is only
+   * ever assembled once the same correction has happened enough times to be a
+   * habit rather than a mood (src/lib/corrections.js), so an empty string here
+   * is the normal case and costs nothing.
+   *
+   * Capped like the taste block, and for the same reason: it arrives in a
+   * request body this endpoint cannot verify.
+   */
+  const fixes =
+    typeof corrections === 'string' && corrections.trim()
+      ? corrections.trim().slice(0, 2000)
+      : null
+
+  /*
    * The output ceiling is set here rather than left to the provider default.
    *
    * The AI SDK's Anthropic provider has to send `max_tokens` on every request,
@@ -357,6 +386,7 @@ export default async function handler(req, res) {
         system: SYSTEM,
         task: task + asked,
         taste: context,
+        corrections: fixes,
         // What it was told is on the unit right now.
         state,
         // What it was allowed to choose from, by family.
@@ -395,7 +425,8 @@ export default async function handler(req, res) {
             type: 'text',
             text:
               `Current state of the loaded preset:\n${JSON.stringify(state)}\n\n${task}${asked}` +
-              (context ? `\n\n${context}` : '')
+              (context ? `\n\n${context}` : '') +
+              (fixes ? `\n\n${fixes}` : '')
           }
         ]
       }

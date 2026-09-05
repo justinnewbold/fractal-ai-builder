@@ -13,6 +13,7 @@ import { preferredEncoding, rememberEncoding, disambiguate } from '../src/lib/en
 import { forbiddenRemotely, explainAuth, timeoutFor } from '../src/lib/remote.js'
 import * as taste from '../src/lib/taste.js'
 import * as link from '../src/lib/link.js'
+import * as corrections from '../src/lib/corrections.js'
 import { readFileSync as readSrc } from 'node:fs'
 import {
   patchSchemaValue,
@@ -3281,6 +3282,129 @@ test('a low-gain library is offered the other direction', () => {
   const entries = [1, 2, 3, 4].map((n) => keptPreset(`Clean ${n}`, 'warm clean', [amp('Deluxe Verb', 2)]))
   const lines = taste.suggestionsFrom(taste.profileFrom(entries))
   assert.ok(lines.some((l) => /dirtier/.test(l)), lines.join(' | '))
+})
+
+/* ------------------------------------------------------------------
+   Corrections — what the player fixes by hand, and what that is allowed
+   to teach.
+
+   Same quiet failure mode as taste, and a worse one: taste steers a
+   generation, this one tells the model it has been getting something wrong.
+   A pattern claimed from too little evidence is the app inventing a habit
+   and then acting on it for good.
+   ------------------------------------------------------------------ */
+
+const fix = (param, from, to, extra = {}) => ({
+  at: Date.now(),
+  block: 'Amp 1',
+  slug: 'amp',
+  param,
+  from,
+  to,
+  min: 0,
+  max: 10,
+  ...extra
+})
+
+console.log('\ncorrections')
+
+test('one correction is an accident, not a habit', () => {
+  assert.equal(corrections.patternsFrom([fix('Presence', 6, 4)]), null)
+  assert.equal(corrections.patternsFrom([fix('Presence', 6, 4), fix('Presence', 7, 5)]), null)
+})
+
+test('the same fix, enough times, becomes something worth saying', () => {
+  const p = corrections.patternsFrom([
+    fix('Presence', 6, 4),
+    fix('Presence', 7, 5),
+    fix('Presence', 6, 4)
+  ])
+  assert.equal(p.controls.length, 1)
+  assert.equal(p.controls[0].name, 'Presence')
+  assert.equal(p.controls[0].way, 'down')
+  assert.equal(p.controls[0].count, 3)
+  assert.equal(p.controls[0].by, 2)
+  assert.equal(p.controls[0].range, '0-10', 'the figure is quoted without the range it belongs to')
+})
+
+test('a control pushed both ways is being fiddled with, not corrected', () => {
+  /*
+   * The important negative. Someone who raises Presence as often as they lower
+   * it has no habit here, and "this player usually turns Presence up" built
+   * from a coin flip would steer every future generation on nothing.
+   */
+  const p = corrections.patternsFrom([
+    fix('Presence', 5, 7),
+    fix('Presence', 5, 3),
+    fix('Presence', 5, 7),
+    fix('Presence', 5, 3)
+  ])
+  assert.equal(p, null)
+})
+
+test('controls are grouped by name, because that is where the habit lives', () => {
+  // Same control on three different amps is one habit, not three near-misses.
+  const p = corrections.patternsFrom([
+    fix('Presence', 6, 4, { block: 'Amp 1' }),
+    fix('Presence', 6, 4, { block: 'Amp 2' }),
+    fix('presence', 6, 4, { block: 'Amp 1' })
+  ])
+  assert.equal(p.controls.length, 1)
+  assert.equal(p.controls[0].count, 3)
+})
+
+test('a figure is not quoted across ranges it does not belong to', () => {
+  // 2 on a 0-10 control and 2 on a -80-20 one are not the same 2.
+  const p = corrections.patternsFrom([
+    fix('Presence', 6, 4),
+    fix('Presence', 6, 4, { min: -80, max: 20 }),
+    fix('Presence', 6, 4)
+  ])
+  assert.equal(p.controls[0].range, null)
+})
+
+test('what they say when it is wrong is counted, once it repeats', () => {
+  const p = corrections.patternsFrom([
+    { at: 1, note: 'darker' },
+    { at: 2, note: 'Darker' },
+    { at: 3, note: 'more gain' }
+  ])
+  assert.equal(p.words.length, 1, 'a phrase said once was treated as a habit')
+  assert.equal(p.words[0].text, 'darker')
+  assert.equal(p.words[0].count, 2)
+})
+
+test('the prose tells the model to start there, and not to repeat it back', () => {
+  const prose = corrections.describeCorrections(
+    corrections.patternsFrom([fix('Presence', 6, 4), fix('Presence', 7, 5), fix('Presence', 6, 4)])
+  )
+  assert.match(prose, /turn Presence down/)
+  assert.match(prose, /first attempt/i, 'it reads as trivia rather than as an instruction')
+  /*
+   * The two guards that keep this from being worse than nothing: a player's
+   * request now beats a habit, and the habit is never quoted back at them. A
+   * model that opens with "I know you usually lower Presence" has turned a
+   * quiet improvement into a boast about surveillance.
+   */
+  assert.match(prose, /do not mention them/i)
+  assert.match(prose, /never let one override/i)
+})
+
+test('nothing to say is an empty string, not a paragraph saying so', () => {
+  assert.equal(corrections.describeCorrections(null), '')
+  assert.equal(corrections.describeCorrections({ controls: [], words: [], total: 0 }), '')
+})
+
+test('a correction that changes nothing is not a correction', () => {
+  /*
+   * Three of them, so this is decided by the rule rather than by the count
+   * being too low to look at — which is how the first version of this test
+   * passed while the code underneath built a habit out of "by NaN".
+   */
+  assert.equal(
+    corrections.patternsFrom([fix('Presence', 5, 5), fix('Presence', 5, 5), fix('Presence', 5, 5)]),
+    null
+  )
 })
 
 /* ------------------------------------------------------------------
