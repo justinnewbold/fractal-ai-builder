@@ -19,6 +19,35 @@ export const DEFAULT_PORT = 5056
 export const DEFAULT_NAME = 'fractal'
 
 /**
+ * The name this Mac advertises itself under on the network.
+ *
+ * A constant would be wrong the moment there are two Macs, and it was a
+ * constant. Both would ask for `fractal.local`; bonjour-service probes first
+ * and, finding the name taken, quietly stops advertising and writes a line to a
+ * console nobody is reading. So the second Mac has no name at all — while its
+ * own menu goes on offering `http://fractal.local:5056`, built from the name it
+ * asked for rather than the one it got. Tap it and you land on the other Mac.
+ * Every other address in that menu is per-machine and correct; this is the only
+ * one that can lie.
+ *
+ * So the machine's own name goes in it — the same name armHost already writes
+ * into the store for the phone to show, so the two agree. `fractal` stays the
+ * prefix, because the point of the name is to say what it is, and stays the
+ * whole name on a Mac whose hostname tells us nothing.
+ */
+export function mdnsName(machine = osHostname()) {
+  const slug = String(machine || '')
+    .replace(/\.local$/i, '')
+    .toLowerCase()
+    // Anything a DNS label may not carry becomes the one separator it may.
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+    .replace(/-+$/, '')
+  return slug ? `${DEFAULT_NAME}-${slug}` : DEFAULT_NAME
+}
+
+/**
  * Where ForgeFX is.
  *
  * It is a separate project — we do not own it and cannot vendor it — so its

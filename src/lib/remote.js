@@ -208,6 +208,116 @@ const listeners = new Set()
 const watchers = new Set()
 const seers = new Set()
 
+/*
+ * Every Mac that answered the last roll call, by the name it calls itself.
+ *
+ * Normally one, and everything below is a no-op. See censusHosts.
+ */
+let hosts = []
+/** Roll calls in progress: an id, and every answer that has come back to it. */
+const censuses = new Map()
+
+/**
+ * Which Macs are answering for this account.
+ *
+ * Empty until a roll call has been taken, one entry in the ordinary case, and
+ * more than one only in the situation this exists for.
+ */
+export const remoteHosts = () => hosts
+
+/**
+ * Count the Macs on the channel, and learn what each is called.
+ *
+ * A request is a broadcast on one channel per ACCOUNT — `remote:<uid>` — and it
+ * carries an id but no address. It is not sent to a Mac; it is shouted, and
+ * every Mac signed into that account hears it and answers. With one Mac that is
+ * a perfectly good design and nobody would build it differently.
+ *
+ * With two it is a fault, and the two halves fail differently. A read gets two
+ * answers, and remoteRequest resolves on the first and silently drops the
+ * second — so which unit you are looking at is decided by whichever Mac was
+ * quicker, and can change between one request and the next. A write is worse,
+ * because it is not a race: both Macs carry it out. "Turn the drive on" is
+ * executed on the AM4 and on the FM3.
+ *
+ * Nothing detected that, because the app had no way to ask "how many of you are
+ * there?" — the one thing every reply looks identical for. This is that
+ * question. It sends one ordinary read and, instead of taking the first answer,
+ * keeps listening for the rest of a short window and counts what arrives. The
+ * read is the Mac's own name, so the same round trip that counts them also says
+ * which they are, which is what a person needs in order to do anything about it.
+ *
+ * Slow on purpose: it has to wait out the window even when the first answer
+ * comes back instantly, because "no second answer yet" and "no second answer at
+ * all" are the same thing until the clock runs out. Taken once per connect.
+ */
+export async function censusHosts({
+  windowMs = 1500,
+  sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+} = {}) {
+  if (!channel || !isJoined(channel)) return hosts
+  const id = `census-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+  const answers = []
+  censuses.set(id, answers)
+  try {
+    await channel.send({
+      type: 'broadcast',
+      event: 'req',
+      // A read every host allows and every host answers differently: its own
+      // name, written into its store by the launcher on this Mac.
+      payload: { id, method: 'GET', path: '/store/config/host.name', body: null }
+    })
+    await sleep(windowMs)
+  } catch {
+    // A roll call that could not be sent tells us nothing, which is what the
+    // empty answer list already says.
+  } finally {
+    censuses.delete(id)
+  }
+
+  hosts = await hostNamesFrom(answers)
+  return hosts
+}
+
+/**
+ * Turn the answers to a roll call into names, one per Mac that replied.
+ *
+ * An answer that cannot be read still counts. The count is the part that
+ * matters — it is what decides whether anything may be written — and a Mac that
+ * answered in a shape we did not expect is still a Mac that would carry out the
+ * next write. Losing it from the list would turn a fault back into silence.
+ */
+export async function hostNamesFrom(answers, read = decode) {
+  const named = []
+  for (const answer of answers) {
+    let name = null
+    try {
+      const body = JSON.parse(await read(answer))
+      name = body?.data?.name || body?.name || null
+    } catch {
+      // Unreadable, but present. See above.
+    }
+    named.push(typeof name === 'string' && name.trim() ? name.trim() : 'a Mac')
+  }
+  return named
+}
+
+/**
+ * Why this account's requests cannot be trusted right now, or null.
+ *
+ * One sentence, in a player's words, naming the Macs and the one action that
+ * fixes it. Turning the phone remote off is a switch that already exists on
+ * each Mac, and armHost already respects it across restarts.
+ */
+export function hostConflict(list = hosts) {
+  if (list.length < 2) return null
+  return (
+    `${list.length} Macs are answering for this account — ${list.join(' and ')}. ` +
+    `They share one line, so a change made here would be made on both units. ` +
+    `Turn the phone remote off on the Mac you are not using, then try again.`
+  )
+}
+
 /**
  * The one way `hostSeen` changes, so anyone who cares hears about it.
  *
@@ -544,6 +654,17 @@ export async function remoteConnect() {
   })
 
   chan.on('broadcast', { event: 'res' }, ({ payload }) => {
+    /*
+     * A roll call keeps every answer; an ordinary request keeps the first.
+     *
+     * This is the only place a second answer to the same id is visible at all.
+     * Below, `waiting.delete` runs before the resolve, so a duplicate finds
+     * nothing pending and is dropped without trace — which is exactly how two
+     * Macs went unnoticed.
+     */
+    const census = payload?.id && censuses.get(payload.id)
+    if (census) census.push(payload)
+
     const pending = payload?.id && waiting.get(payload.id)
     if (pending) {
       waiting.delete(payload.id)
@@ -633,6 +754,10 @@ export async function remoteDisconnect() {
   session = null
   channel = null
   seen(false)
+  // Who answered belongs to the channel that is going away. Carrying it over
+  // would keep writes refused on a link where the second Mac is long gone.
+  hosts = []
+  censuses.clear()
   failWaiting('Disconnected.')
   announce()
 
@@ -687,6 +812,24 @@ export async function remoteRequest(path, options = {}) {
     throw new Error('The connection to your Mac dropped.')
   }
   const method = (options.method || 'GET').toUpperCase()
+
+  /*
+   * Nothing is changed while two Macs are listening.
+   *
+   * A request is shouted on one channel per account, so with two Macs on it a
+   * write is not sent to the wrong unit — it is carried out on both. Reads are
+   * left alone deliberately: they are a coin flip rather than a hazard, and the
+   * screen that has to explain this is built out of reads.
+   */
+  if (method !== 'GET') {
+    const clash = hostConflict()
+    if (clash) {
+      const err = new Error(clash)
+      err.status = 409
+      err.hostConflict = true
+      throw err
+    }
+  }
 
   const why = forbiddenRemotely(method, path)
   if (why) {
