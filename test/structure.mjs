@@ -1857,6 +1857,40 @@ export function run(test) {
     assert.match(bare, /el\.style\.height = `\$\{el\.scrollHeight\}px`/, 'the box does not grow with what is in it')
   })
 
+  test('a switch says where the thing it switches on will appear', () => {
+    /*
+     * "Where do I view the generation from the AI from the Developer tab?"
+     *
+     * The trace stood on its own under the tone, and the switch said so: "adds
+     * a panel under each new tone". Then the tone became a card and everything
+     * explanatory moved behind its fold — the trace with it — and the switch
+     * went on saying the old thing. So it was turned on, looked for under the
+     * tone, and not found: a setting that worked, reported as broken, by its
+     * own description.
+     *
+     * The fix is a sentence, and this is what keeps the sentence true: the
+     * words on the fold and the words that send you to it are the same words.
+     */
+    const gen = readFileSync(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
+    const trace = readFileSync(new URL('../src/components/DevTrace.jsx', import.meta.url), 'utf8')
+
+    const summary = gen.slice(gen.indexOf('<details className="preview-detail">'))
+    const label = summary.slice(summary.indexOf('<summary>') + 9, summary.indexOf('<span')).trim()
+    assert.ok(label.length > 6, `the fold has no words on it to point at: ${JSON.stringify(label)}`)
+
+    const hint = trace.slice(trace.indexOf('<p className="hint">'), trace.indexOf('</p>', trace.indexOf('<p className="hint">')))
+    assert.ok(
+      hint.includes(label),
+      `the switch sends people to "${label.length ? '…' : ''}" but the fold now says "${label}"`
+    )
+    /* And it is genuinely inside that fold rather than beside it — the other
+       half of the same claim, held by the tone-card test above. */
+    assert.ok(
+      gen.indexOf('{children}') > gen.indexOf('<details className="preview-detail">'),
+      'the trace is outside the fold the switch points at'
+    )
+  })
+
   /*
    * An update you can see, and ask for.
    *

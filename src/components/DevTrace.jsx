@@ -26,10 +26,20 @@ export function TraceSwitch() {
         />{' '}
         Record what the AI was given
       </label>
+      {/*
+        Where it actually is, which is not where this used to say.
+        The panel stood on its own under the tone until the tone became a card
+        and everything explanatory moved behind its fold. The switch went on
+        promising "a panel under each new tone", so somebody turned it on,
+        looked under the tone, and found nothing. "Where do I view the
+        generation from the AI?" — a fair question about a setting that had
+        already worked.
+      */}
       <p className="hint">
-        Adds a panel under each new tone showing everything the model received and everything it
-        sent back. Off by default because it makes each generation a little bigger &mdash; turn it
-        on when a tone comes out wrong and you want to know why.
+        Records everything the model received and everything it sent back. On the next tone you
+        ask for, tap <strong>Show every change</strong> and it is at the bottom, under the cost.
+        Off by default because it makes each generation a little bigger &mdash; turn it on when a
+        tone comes out wrong and you want to know why.
       </p>
     </div>
   )
