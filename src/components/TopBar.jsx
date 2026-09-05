@@ -1,5 +1,6 @@
 import { isDemo } from '../lib/forgefx'
 import { describeUnit } from '../lib/link'
+import { presetLabel } from '../lib/presetName'
 import LinkChip from './LinkChip'
 
 /**
@@ -108,7 +109,7 @@ export default function TopBar({
                 <span className="sr-only">Preset </span>
                 {preset?.number ?? '--'}
               </span>
-              <span className="topbar-name">{preset?.name?.trim() || 'Untitled'}</span>
+              <span className="topbar-name">{presetLabel(preset)}</span>
               <span className="topbar-caret" aria-hidden="true" />
             </span>
           </button>

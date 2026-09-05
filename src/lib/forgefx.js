@@ -10,6 +10,7 @@
 //   - /preset/store commits to a slot even when capabilities report supportsSave:false
 
 import { EXCLUDED_BLOCKS, safeParams } from './guardrails.js'
+import { cleanPresetName, isEmptySlotName } from './presetName.js'
 import { toNormalized } from './scale.js'
 import { remoteActive, remoteRequest, subscribeRemoteEvents } from './remote.js'
 import {
@@ -334,7 +335,26 @@ export const reportSave = (result) => writeHostDoc(saveResultKey(), { ...result,
 export const readSaveResult = () => readHostDoc(saveResultKey())
 
 /** The preset currently loaded on the unit. */
-export const currentPreset = async () => (mock ? (await tick(), mock.preset()) : request('/preset'))
+/**
+ * The preset loaded on the unit.
+ *
+ * The name is cleaned on the way in rather than at each place it is shown.
+ * An empty gen-3 slot reports `<EMPTY>` written over the front of whatever name
+ * was in the buffer before, so the tail of the old one comes back attached —
+ * "<EMPTY>k Album Chug" on slot 495. Every consumer of this, from the top bar
+ * to the model's context to the name a save is offered under, would otherwise
+ * repeat it. See lib/presetName.js.
+ */
+export const currentPreset = async () => {
+  const res = mock ? (await tick(), mock.preset()) : await request('/preset')
+  if (res && typeof res.name === 'string') {
+    // The fact travels with the cleaning: past here nobody can tell an empty
+    // slot from a preset somebody made and never named, and those read
+    // differently on a screen you look at from arm's length.
+    return { ...res, name: cleanPresetName(res.name), empty: isEmptySlotName(res.name) }
+  }
+  return res
+}
 
 /** Every block placed in the current preset, with grid position, bypass state and channel. */
 export const presetBlocks = async () => (mock ? (await tick(), mock.presetBlocks()) : request('/preset/blocks'))
@@ -1304,7 +1324,7 @@ export async function storedName(number) {
   if (!nameRouteStubbed) {
     try {
       const res = await presetName(number)
-      quick = (res?.name || '').trim()
+      quick = cleanPresetName(res?.name)
     } catch {
       quick = null
     }
@@ -1316,7 +1336,7 @@ export async function storedName(number) {
   let decoded = null
   try {
     const res = await presetSummary(number)
-    decoded = (res?.name || '').trim()
+    decoded = cleanPresetName(res?.name)
   } catch (err) {
     // 501 is ForgeFX saying this unit has no dump to decode, which is final.
     // Anything else is one slot going wrong, and the next slot deserves a try.

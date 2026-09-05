@@ -15,6 +15,7 @@ import * as taste from '../src/lib/taste.js'
 import * as link from '../src/lib/link.js'
 import * as corrections from '../src/lib/corrections.js'
 import * as slots from '../src/lib/slots.js'
+import * as names from '../src/lib/presetName.js'
 import { readFileSync as readSrc } from 'node:fs'
 import {
   patchSchemaValue,
@@ -3461,6 +3462,48 @@ test('a correction that changes nothing is not a correction', () => {
    channel had been joined, which is true with the Mac off and nothing
    answering. Nothing here may say connected unless the Mac answered.
    ------------------------------------------------------------------ */
+
+/*
+ * A marker is not a name.
+ *
+ * "Empty scene is still showing previous preset name" — slot 495, shown as
+ * `<EMPTY>k Album Chug`. An empty gen-3 slot reports `<EMPTY>` written over the
+ * front of a fixed run of characters rather than clearing it, so a short marker
+ * on top of a longer old name leaves the old name's tail hanging off the end.
+ * The app cannot fix that buffer; it can stop repeating it.
+ */
+console.log('\npreset names')
+
+test('a marker with somebody else preset stuck to it is not a name', () => {
+  assert.equal(names.isEmptySlotName('<EMPTY>k Album Chug'), true)
+  assert.equal(names.cleanPresetName('<EMPTY>k Album Chug'), '', 'the rubble is kept')
+  assert.equal(names.presetLabel({ name: '<EMPTY>k Album Chug' }), 'Empty')
+})
+
+test('the marker is recognised however the unit spaces it', () => {
+  for (const raw of ['<EMPTY>', ' <EMPTY> ', '<empty>', '< Empty >'])
+    assert.equal(names.isEmptySlotName(raw), true, raw)
+})
+
+test('a preset somebody named is left alone', () => {
+  /*
+   * The negative that matters. Matching anywhere in the string would rename
+   * somebody's own preset, which is a worse failure than the one being fixed —
+   * it is their work, and they chose the word.
+   */
+  for (const raw of ['Empty Room Verb', 'Nearly <EMPTY> Chug', 'JN Metal Zone'])
+    assert.equal(names.isEmptySlotName(raw), false, raw)
+  assert.equal(names.cleanPresetName('  JN Metal Zone  '), 'JN Metal Zone')
+  assert.equal(names.presetLabel({ name: 'Empty Room Verb' }), 'Empty Room Verb')
+})
+
+test('an empty slot and an unnamed preset do not read the same', () => {
+  // Untitled is something somebody made and did not name. Empty is nothing.
+  assert.equal(names.presetLabel({ name: '' }), 'Untitled')
+  assert.equal(names.presetLabel({ name: '   ' }), 'Untitled')
+  assert.equal(names.presetLabel({ name: '', empty: true }), 'Empty')
+  assert.equal(names.presetLabel(null), 'Untitled')
+})
 
 /*
  * Slots the unit does not have.
