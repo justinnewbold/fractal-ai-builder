@@ -1941,6 +1941,27 @@ export function run(test) {
     assert.ok(!/\.xy/.test(screens), 'the swipe guard still exempts a surface that no longer exists')
   })
 
+  test('the release runs on a machine that can sign', () => {
+    /*
+     * GitHub rolled macos-latest from image 20260728.0273.1 to 20260831.0337.3
+     * between two builds three hours apart. The first signed and published
+     * 7.31.0; the next two failed identically inside electron-builder's
+     * keychain step — "SecKeychainUnlock: the user name or passphrase you
+     * entered is not correct" — with no secret changed and nothing in the
+     * signing path touched.
+     *
+     * So the runner is pinned rather than floating. This guard exists to make
+     * the pin deliberate and to make its removal deliberate too: it goes when
+     * electron-builder can sign on the newer image, not before.
+     */
+    const flow = readFileSync(new URL('../.github/workflows/desktop.yml', import.meta.url), 'utf8')
+    assert.ok(
+      !/runs-on: macos-latest/.test(flow),
+      'the release build floats onto whatever image GitHub ships next'
+    )
+    assert.match(flow, /runs-on: macos-\d+/, 'the runner is not pinned to a numbered image')
+  })
+
   test('the tour teaches what a scene actually is', () => {
     const tour = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
     const card = tour.slice(tour.indexOf('Scenes are one rig'), tour.indexOf('Scenes are one rig') + 1200)
