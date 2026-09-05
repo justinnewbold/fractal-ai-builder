@@ -139,6 +139,7 @@ import {
   setUpMac,
   setMacRemote,
   signOutHere,
+  recheckHosts,
   faultCopy
 } from './lib/link'
 import { pushEntry, replaceEntry } from './lib/nav'
@@ -3053,6 +3054,26 @@ export default function App() {
         failure anywhere else — a rejected sign-in, a refused write — set the
         message and rendered nothing. Silence read as "the button does nothing".
       */}
+
+      {/*
+        Two Macs on one account share one line, and a change made here would be
+        made on every unit on it — so this is said before anybody tries, not
+        after. The refusal in remoteRequest is the guarantee; this is the part
+        that explains it while there is still time to do something about it.
+      */}
+      {link.clash ? (
+        <div className="notice" data-kind="fault" role="alert">
+          <h2>Two Macs are answering</h2>
+          <p>{link.clash}</p>
+          <p>
+            {/* The fix is at the other Mac, and turning it off does not drop
+                this connection — so nothing here would ever notice. */}
+            <button className="chip" onClick={() => recheckHosts()} disabled={busy}>
+              Check again
+            </button>
+          </p>
+        </div>
+      ) : null}
 
       {status === 'live' && error ? (
         <div className="notice" data-kind="fault" role="alert">

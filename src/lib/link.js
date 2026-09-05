@@ -42,6 +42,8 @@ import {
   wantsAutoConnect,
   hasSavedSession,
   remoteSignIn,
+  censusHosts,
+  hostConflict,
   signOut
 } from './remote.js'
 
@@ -307,7 +309,15 @@ let state = {
    */
   canHost: true,
   /** mac role: whether this ForgeFX can host at all, and who it is signed in as. */
-  cloud: null
+  cloud: null,
+  /**
+   * remote role: why this link cannot be trusted, or null.
+   *
+   * Set when more than one Mac answers for the account — they share one line,
+   * so a change made from here would be made on every unit on it. See
+   * censusHosts in remote.js.
+   */
+  clash: null
 }
 let joining = false
 /*
@@ -382,7 +392,42 @@ async function join() {
     joining = false
   }
   refresh()
-  if (remoteHostSeen()) readMacName()
+  if (remoteHostSeen()) {
+    readMacName()
+    countHosts()
+  }
+}
+
+/**
+ * How many Macs are answering for this account.
+ *
+ * Taken once per join, not awaited: it costs a second and a half of listening
+ * and the ordinary case has nothing to report, so it must not stand between
+ * someone and their unit. Writes are refused inside remoteRequest from the
+ * moment the count lands, which is well before anyone has finished reading a
+ * screen — and until then the app behaves exactly as it did before.
+ */
+async function countHosts() {
+  try {
+    await censusHosts()
+    set({ clash: hostConflict() })
+  } catch {
+    // A roll call that fails is not a reason to distrust the link.
+  }
+}
+
+/**
+ * Ask again, after doing something about it.
+ *
+ * The fix is at the other Mac, and nothing here can see it happen: the roll
+ * call is taken on joining, and turning the phone remote off across the room
+ * does not drop this connection. Without a way to ask again the notice would
+ * stand until the page was reloaded, telling somebody who had already fixed it
+ * that they had not — which is how a warning stops being believed.
+ */
+export async function recheckHosts() {
+  await countHosts()
+  return state.clash
 }
 
 /** The name the launcher wrote on the Mac, read over the link once it answers. */
@@ -684,6 +729,6 @@ export function _resetLink() {
   joining = false
   restoring = false
   booted = false
-  state = { role: 'unknown', link: 'off', account: null, hostOn: false, macName: null, since: Date.now(), cloud: null }
+  state = { role: 'unknown', link: 'off', account: null, hostOn: false, macName: null, since: Date.now(), cloud: null, clash: null }
   watchers.clear()
 }

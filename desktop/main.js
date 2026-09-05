@@ -72,7 +72,7 @@ const vendored = () =>
 
 async function start() {
   const {
-    DEFAULT_NAME,
+    mdnsName,
     DEFAULT_PORT,
     MISSING_FORGEFX,
     addresses,
@@ -88,7 +88,10 @@ async function start() {
   } = await host()
 
   const port = Number(process.env.PORT || DEFAULT_PORT)
-  const name = process.env.FRACTAL_MDNS_NAME || DEFAULT_NAME
+  // Per machine, not a constant: two Macs both asking for `fractal.local`
+  // means one of them silently has no name while still offering it. See
+  // mdnsName in lib/host.mjs.
+  const name = process.env.FRACTAL_MDNS_NAME || mdnsName()
 
   /*
    * Nothing else may already be on the port. ForgeFX moves itself when the port

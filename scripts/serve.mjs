@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url'
 import { Bonjour } from 'bonjour-service'
 import QRCode from 'qrcode'
 import {
-  DEFAULT_NAME,
+  mdnsName,
   DEFAULT_PORT,
   MISSING_FORGEFX,
   addresses,
@@ -35,7 +35,7 @@ import {
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const port = Number(process.env.PORT || DEFAULT_PORT)
-const name = process.env.FRACTAL_MDNS_NAME || DEFAULT_NAME
+const name = process.env.FRACTAL_MDNS_NAME || mdnsName()
 
 const run = (cmd, args, opts) =>
   new Promise((ok, fail) => {

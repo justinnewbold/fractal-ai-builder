@@ -10,7 +10,7 @@ import { toNormalized, fromNormalized } from '../src/lib/scale.js'
 import { isForbiddenParam, isLevelParam, isSilencingParam, levelLimits } from '../src/lib/guardrails.js'
 import { validateSpec, countWrites, countSceneWrites } from '../src/lib/validate.js'
 import { preferredEncoding, rememberEncoding, disambiguate } from '../src/lib/encoding.js'
-import { forbiddenRemotely, explainAuth, timeoutFor } from '../src/lib/remote.js'
+import { forbiddenRemotely, explainAuth, timeoutFor, hostNamesFrom, hostConflict } from '../src/lib/remote.js'
 import * as taste from '../src/lib/taste.js'
 import * as link from '../src/lib/link.js'
 import * as corrections from '../src/lib/corrections.js'
@@ -506,6 +506,105 @@ test('the app refuses to serve from a port something else already holds', async 
 
   assert.match(host.PORT_TAKEN(5056), /already running on this Mac, on port 5056/)
   assert.match(host.PORT_TAKEN(), /serial port/, 'the reason two cannot share is not explained')
+})
+
+test('two Macs on one account cannot quietly write to two units', async () => {
+  /*
+   * "If I have one Mac connected to an AM4 and one Mac connected to an FM3 and
+   * I try to do a remote connection on my phone, how does the app differentiate
+   * which device is connected?"
+   *
+   * It did not. A request is a broadcast on one channel per ACCOUNT —
+   * `remote:<uid>` — carrying an id and no address, so every Mac signed into
+   * that account hears it and answers. ForgeFX's host agent handles every req
+   * it sees without checking whether it was meant for it.
+   *
+   * A read was therefore a coin flip: two answers, the first resolves and the
+   * second is dropped by a `waiting.delete` that runs before it. A write was
+   * worse, because it is not a race — BOTH Macs carry it out. One tap, two
+   * units.
+   *
+   * Nothing could detect it either, because every reply looks the same. So the
+   * roll call keeps every answer instead of the first, and the read it sends is
+   * each Mac's own name — the same round trip counts them and says which.
+   */
+  const answer = (name) => ({ id: 'x', status: 200, body: JSON.stringify({ data: { name } }) })
+  const read = async (p) => p.body
+
+  const two = await hostNamesFrom(
+    [answer('Justins MacBook Pro'), answer('Studio Mac')],
+    read
+  )
+  assert.deepEqual(two, ['Justins MacBook Pro', 'Studio Mac'])
+
+  // A Mac that answered in a shape we did not expect is still a Mac that would
+  // carry out the next write, so it counts. Dropping it turns the fault back
+  // into the silence this whole thing exists to end.
+  const odd = await hostNamesFrom([answer('Studio Mac'), { id: 'x', body: 'not json' }], read)
+  assert.deepEqual(odd, ['Studio Mac', 'a Mac'], 'a Mac that answered was not counted')
+
+  // One Mac is the ordinary case and says nothing at all.
+  assert.equal(hostConflict(['Justins MacBook Pro']), null)
+  assert.equal(hostConflict([]), null)
+
+  const clash = hostConflict(['Justins MacBook Pro', 'Studio Mac'])
+  assert.match(clash, /Justins MacBook Pro and Studio Mac/, 'the person is not told which two')
+  assert.match(clash, /both units/, 'nothing says what would actually happen')
+  assert.match(clash, /[Tt]urn the phone remote off/, 'nothing says what to do about it')
+})
+
+test('nothing is written while two Macs are listening', () => {
+  /*
+   * The sentence above is the explanation; this is the guarantee. A write is
+   * refused at the one place every write goes through, so it holds for the
+   * chat, the knobs, the generator and anything added later — none of which
+   * knows this problem exists.
+   *
+   * Reads are deliberately still allowed. They are a coin flip rather than a
+   * hazard, and the screen that has to explain the fault is built out of them.
+   */
+  const src = readSrc(new URL('../src/lib/remote.js', import.meta.url), 'utf8')
+
+  assert.match(
+    src,
+    /if \(method !== 'GET'\) \{\s*\n\s*const clash = hostConflict\(\)/,
+    'a write can travel again while two Macs are answering'
+  )
+  // The collector has to run before the resolve, because `waiting.delete` is
+  // what makes the second answer invisible.
+  assert.match(
+    src,
+    /const census = payload\?\.id && censuses\.get\(payload\.id\)[\s\S]{0,120}const pending = payload\?\.id && waiting\.get/,
+    'the second answer is dropped before anything counts it'
+  )
+  // The count belongs to the channel it was taken on.
+  assert.match(src, /hosts = \[\]\s*\n\s*censuses\.clear\(\)/, 'a stale count outlives its connection')
+
+  const link = readSrc(new URL('../src/lib/link.js', import.meta.url), 'utf8')
+  assert.match(link, /countHosts\(\)/, 'the roll call is never taken')
+  assert.match(link, /set\(\{ clash: hostConflict\(\) \}\)/, 'the app is never told')
+})
+
+test('each Mac advertises itself under its own name', async () => {
+  /*
+   * The other half, and it bites even when the two Macs are on different
+   * accounts. Every Mac asked to be `fractal.local`. bonjour-service probes
+   * first, finds the name taken, quietly stops advertising and logs a line to a
+   * console nobody reads — so the second Mac has no name, while its own menu
+   * goes on offering `http://fractal.local:5056`, built from the name it asked
+   * for rather than the one it got. Tapping it opens the other Mac.
+   */
+  assert.equal(host.mdnsName('Justins-MacBook-Pro.local'), 'fractal-justins-macbook-pro')
+  assert.equal(host.mdnsName('Studio Mac'), 'fractal-studio-mac')
+  // A DNS label carries letters, digits and hyphens, and nothing else.
+  assert.equal(host.mdnsName('MacBook Air (2)'), 'fractal-macbook-air-2')
+  assert.ok(!/[^a-z0-9-]/.test(host.mdnsName('Åsa’s Mac!!')), 'an illegal character reached a DNS label')
+  assert.ok(!/-$/.test(host.mdnsName('x'.repeat(60))), 'a truncated name can end in a hyphen')
+  // Nothing to go on is the one case where the old constant is still right.
+  assert.equal(host.mdnsName(''), 'fractal')
+
+  const main = readSrc(new URL('../desktop/main.js', import.meta.url), 'utf8')
+  assert.match(main, /FRACTAL_MDNS_NAME \|\| mdnsName\(\)/, 'the Mac app still advertises a constant')
 })
 
 test('a model roster with no lineage on it gets one', () => {
