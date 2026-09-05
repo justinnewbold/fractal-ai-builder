@@ -6318,22 +6318,23 @@ button.topbar-preset.open .topbar-caret {
   }
 }
 
-/* Ask: a tab on a phone, a floating button on a wide screen. */
-button.ask-tab {
-  display: none;
-  margin-left: auto;
-  gap: var(--s-1);
-  color: var(--silk-dim);
-}
-
+/*
+ * Ask on a phone is the screen; on a wide one it is also a button.
+ *
+ * `button.ask-tab` used to live here — a fourth tab that opened the same
+ * conversation the Create tab already was. Both are gone: the screen is called
+ * ✦ Ask now, so on a phone the tab row is the way in and there is nothing to
+ * duplicate.
+ *
+ * The floating button stays hidden on a phone for the reason it always was:
+ * fixed to the bottom-right corner, it sat on scene tile 6, the pad's Change
+ * and Edit's Modifiers, because that corner is where the last control in every
+ * grid lands. On a wide screen nothing is under it, and reaching the
+ * conversation without leaving Play is worth having there.
+ */
 @media (max-width: 700px) {
   .ask-anywhere {
     display: none;
-  }
-
-  button.ask-tab {
-    display: inline-flex;
-    align-items: center;
   }
 }
 
@@ -6436,7 +6437,19 @@ button.tour-dot {
   border-top: 1px solid var(--rule);
 }
 
+/*
+ * The row and the way to throw it away, side by side.
+ *
+ * The delete button was added without this and `button.recent-row` is
+ * `width: 100%`, so the × wrapped onto its own line under every row: 89px tall
+ * instead of 44, an orphaned × at the left edge, and a restore target you could
+ * miss by aiming at the obvious place. A list item is not a flex container by
+ * default and nothing else here needed it to be.
+ */
 .recent-list li {
+  display: flex;
+  align-items: stretch;
+  gap: var(--s-2);
   border-bottom: 1px solid var(--rule);
 }
 
@@ -6445,7 +6458,9 @@ button.recent-row {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--s-3);
-  width: 100%;
+  /* Takes the room the × does not. `width: 100%` here is what pushed it out. */
+  flex: 1 1 auto;
+  min-width: 0;
   min-height: 44px;
   padding: var(--s-2) 0;
   background: none;
@@ -6453,6 +6468,37 @@ button.recent-row {
   border-radius: 0;
   text-align: left;
   color: var(--silk);
+}
+
+/*
+ * Quiet until you go looking for it.
+ *
+ * Restoring is the reason anyone reads this list; deleting is the rare one and
+ * sits one tap away from it, so it stays dim until hovered or focused and asks
+ * "Sure?" before it does anything. Fixed width so a row's name is not measured
+ * against a button that changes size when it arms itself.
+ */
+button.recent-del {
+  flex: 0 0 auto;
+  min-width: 56px;
+  min-height: 44px;
+  padding: 0 var(--s-2);
+  background: none;
+  border: 0;
+  border-radius: var(--r-2);
+  color: var(--silk-faint);
+  font-size: var(--f-2);
+  line-height: 1;
+}
+
+@media (hover: hover) {
+  button.recent-del:hover:not(:disabled) {
+    color: var(--fault);
+  }
+}
+
+button.recent-del:focus-visible {
+  color: var(--fault);
 }
 
 @media (hover: hover) {
