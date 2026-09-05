@@ -1817,9 +1817,48 @@ export function run(test) {
       'the request is marked after the first await, which is the race this fixes'
     )
 
-    // And the notice says which of the two reasons it is.
-    assert.match(app, /why: sameBuffer \? 'stale' : 'moved'/, 'the reason is not carried with the request')
-    assert.match(app, /askedSave\.why === 'moved' \?/, 'the copy claims a movement whatever the reason')
+    /*
+     * And the Mac is never the one asked.
+     *
+     * "Every time I open the Mac app it shows me 'the phone asked to save'. I
+     * have dismissed this notification multiple times and it shows up every
+     * time." Dismissing recorded the id in a ref, which a restart empties, so
+     * the only durable record was a DELETE whose failure `deleteHostDoc`
+     * swallows — one failed delete and the question returned at every launch
+     * for ever.
+     *
+     * It was also the wrong question. Once the unit has moved on, the buffer
+     * the phone edited is gone: there is nothing correct left to save, so the
+     * only sound answer is no, and a notice whose only answer is no is a notice
+     * that should not exist. The phone is told instead, where the person who
+     * asked is standing.
+     */
+    assert.ok(
+      !/The phone asked to save/.test(app),
+      'the Mac is being asked again — a question whose only right answer is no'
+    )
+    assert.ok(
+      !/setAskedSave/.test(app),
+      'the state behind that notice is back'
+    )
+    // Both dead ends report to the phone, and say which one it was.
+    const watcher = app.slice(app.indexOf('const req = await takeParkedSave()'))
+    assert.match(watcher, /reportSave\(\{/, 'a request the Mac cannot carry out leaves the phone waiting for ever')
+    assert.match(
+      watcher,
+      /error: sameBuffer\s*\n?\s*\?/,
+      'both dead ends give the phone the same reason, and one of them is a lie'
+    )
+    /*
+     * Marked before the delete rather than after: the delete is the part that
+     * can fail silently, and a decision recorded only by a failed delete is no
+     * decision at all.
+     */
+    const drop = watcher.slice(0, watcher.indexOf('reportSave'))
+    assert.ok(
+      drop.indexOf('handledSaves.current = [') < drop.indexOf('await clearParkedSave()'),
+      'the request is recorded as handled only after the delete, so a failed delete raises it again'
+    )
   })
 
   /*

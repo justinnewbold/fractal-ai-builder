@@ -450,7 +450,6 @@ export default function App() {
   // A slot write asked for from the phone: what it's waiting on there, and
   // what has arrived here.
   const [queuedSave, setQueuedSave] = useState(null)
-  const [askedSave, setAskedSave] = useState(null)
   /*
    * Requests already dealt with, by id.
    *
@@ -942,16 +941,14 @@ export default function App() {
   const carryOutSave = useCallback(
     async (req) => {
       /*
-       * First, before anything is awaited and before the notice comes down.
+       * First, before anything is awaited.
        *
-       * Clearing askedSave re-runs the effect that watches for parked saves,
-       * which looks again immediately — while this is still part-way through
-       * and the request is still parked on the host. Without this it finds it
-       * and carries it out a second time.
+       * The watcher looks again every six seconds, and it looks while this is
+       * still part-way through with the request still parked on the host.
+       * Without marking it first it finds it and carries it out a second time.
        */
       markHandled(req?.id)
       setBusy(true)
-      setAskedSave(null)
       try {
         /*
          * A slot this unit does not have is refused here, not by the unit.
@@ -1032,9 +1029,28 @@ export default function App() {
    *
    * Applied without ceremony when it is plainly the thing that is loaded — that
    * is someone saving the tone they have been editing, and a confirmation step
-   * at a machine they are not standing at helps nobody. When the unit has moved
-   * on since the request, it asks: storing the wrong buffer under someone's
-   * name is not a mistake to make on their behalf.
+   * at a machine they are not standing at helps nobody.
+   *
+   * And when it is NOT: the answer goes to the phone, not to the Mac.
+   *
+   * "Every time I open the Mac app it shows me 'the phone asked to save'. I
+   * have dismissed this notification multiple times and it shows up every
+   * time." It did, and it would have for ever: dismissing recorded the id in a
+   * ref, which a restart empties, so the only durable record was the delete —
+   * and `deleteHostDoc` swallows its own failure and returns false, which the
+   * caller then dropped on the floor. One failed DELETE and the question came
+   * back at every launch until the end of time.
+   *
+   * The deeper problem is that it was the wrong question to ask. Once the unit
+   * has moved on, the edited buffer the phone was working on is gone — there is
+   * nothing correct left to save, and "Save it anyway" would store whatever is
+   * loaded now under somebody's name. The only sound answer is no, so asking a
+   * person at a machine they walked away from to give it is a notice that can
+   * only ever be dismissed. The phone is told instead, where the person who
+   * asked actually is.
+   *
+   * So there are two outcomes now and neither one interrupts the Mac: it is
+   * saved, or it is dropped and reported.
    */
   useEffect(() => {
     if (status !== 'live' || remote || isDemo()) return
@@ -1042,20 +1058,27 @@ export default function App() {
     const look = async () => {
       const req = await takeParkedSave()
       if (stop || !req?.id || !Number.isInteger(req.slot)) return
-      // Already on screen, or already answered — either way, not news.
-      if (askedSave?.id === req.id || handledSaves.current.includes(req.id)) return
+      if (handledSaves.current.includes(req.id)) return
       const fresh = Date.now() - (req.at || 0) < 15 * 60 * 1000
       const sameBuffer = req.fromSlot == null || req.fromSlot === preset?.number
-      if (fresh && sameBuffer) await carryOutSave(req)
+      if (fresh && sameBuffer) {
+        await carryOutSave(req)
+        return
+      }
       /*
-       * Which of the two it is, decided here and carried with the request.
-       *
-       * The notice used to say "the unit has moved since it asked" whatever
-       * the reason was, so a request held up purely by age announced itself
-       * as "it was on 99 and is on 99 now" — a sentence that disproves itself
-       * in front of the person reading it.
+       * Dropped, and said so — in that order, so a failed delete cannot leave
+       * the phone waiting on an answer that has already been decided.
        */
-      else setAskedSave({ ...req, why: sameBuffer ? 'stale' : 'moved' })
+      handledSaves.current = [...handledSaves.current.slice(-19), req.id]
+      await clearParkedSave()
+      await reportSave({
+        id: req.id,
+        ok: false,
+        slot: req.slot,
+        error: sameBuffer
+          ? 'The Mac did not pick this up within fifteen minutes, so it was dropped rather than written to a preset that has moved on. Nothing was saved — ask again with the Mac awake.'
+          : `The Mac had moved to slot ${preset?.number ?? 'another preset'} by the time it saw this, so the sound you edited was no longer loaded. Nothing was saved.`
+      }).catch(() => {})
     }
     look()
     const timer = setInterval(look, 6000)
@@ -1063,7 +1086,7 @@ export default function App() {
       stop = true
       clearInterval(timer)
     }
-  }, [status, remote, preset?.number, carryOutSave, askedSave?.id])
+  }, [status, remote, preset?.number, carryOutSave])
 
   /* On the phone: what became of it. */
   useEffect(() => {
@@ -3030,52 +3053,6 @@ export default function App() {
         failure anywhere else — a rejected sign-in, a refused write — set the
         message and rendered nothing. Silence read as "the button does nothing".
       */}
-      {askedSave ? (
-        <div className="notice" data-kind="fault">
-          <h2>The phone asked to save</h2>
-          <p>
-            &ldquo;{askedSave.name || askedSave.fromName || 'Untitled'}&rdquo; to slot{' '}
-            {askedSave.slot}.{' '}
-            {askedSave.why === 'moved' ? (
-              <>
-                The unit has moved since it asked &mdash; it was on {askedSave.fromSlot ?? '--'} and
-                is on {preset?.number ?? '--'} now &mdash; so saving would store what is loaded
-                here, under that name.
-              </>
-            ) : (
-              <>
-                That was asked a while ago, and what is loaded here may not be what they meant any
-                more &mdash; saving would store whatever is on the unit now, under that name.
-              </>
-            )}
-          </p>
-          <div className="history-actions">
-            <button
-              className="chip"
-              onClick={() => carryOutSave(askedSave)}
-              disabled={busy}
-            >
-              Save it anyway
-            </button>
-            <button
-              className="chip"
-              onClick={async () => {
-                markHandled(askedSave.id)
-                setAskedSave(null)
-                await clearParkedSave().catch(() => {})
-                await reportSave({
-                  id: askedSave.id,
-                  ok: false,
-                  slot: askedSave.slot,
-                  error: 'Left alone at the Mac — the unit had moved on.'
-                }).catch(() => {})
-              }}
-            >
-              Leave it
-            </button>
-          </div>
-        </div>
-      ) : null}
 
       {status === 'live' && error ? (
         <div className="notice" data-kind="fault" role="alert">
