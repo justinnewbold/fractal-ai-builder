@@ -206,6 +206,42 @@ test('drops an unknown block', () => {
   assert.match(r.problems[0], /no such block/)
 })
 
+/*
+ * A block the tone wanted and the preset does not have.
+ *
+ * "Skipped effect 70 — no such block in this preset." The AM4 run that reported
+ * that was asking for three blocks its four slots never held, and every change
+ * riding on them died at the check above. The ids are constrained at the schema
+ * now; this is where the intent behind them is supposed to land instead.
+ */
+test('carries what the tone wanted but could not reach', () => {
+  const r = validateSpec({ blocks: [], wanted: ['delay', 'Wah'] }, schema)
+  assert.deepEqual(r.wanted, ['delay', 'wah'])
+  assert.equal(r.problems.length, 0, 'a gap in the chain is not a rejection')
+})
+
+test('a wanted list is names only, capped and deduplicated', () => {
+  const r = validateSpec(
+    {
+      blocks: [],
+      wanted: ['delay', 'DELAY', '  pitch  ', 7, null, 'a'.repeat(80), 'b', 'c', 'd', 'e', 'f', 'g']
+    },
+    schema
+  )
+  assert.ok(r.wanted.length <= 6, `capped, got ${r.wanted.length}`)
+  assert.equal(new Set(r.wanted).size, r.wanted.length, 'deduplicated')
+  assert.ok(r.wanted.includes('pitch'), 'trimmed')
+  assert.ok(
+    r.wanted.every((w) => typeof w === 'string' && w.length <= 24),
+    'every entry is a short string'
+  )
+})
+
+test('no wanted list at all is an empty one, never undefined', () => {
+  assert.deepEqual(validateSpec({ blocks: [] }, schema).wanted, [])
+  assert.deepEqual(validateSpec(null, schema).wanted, [])
+})
+
 test('keeps preset names within the 31-char hardware limit', () => {
   const long = validateSpec(
     { presetName: 'a preset name far longer than any Fractal unit will store', blocks: [] },

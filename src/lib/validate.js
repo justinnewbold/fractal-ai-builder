@@ -22,6 +22,7 @@ export function validateSpec(spec, schema, sceneCount = 8, channelNames = ['A', 
       scenes: [],
       problems: ['The generator returned nothing usable.'],
       repairs,
+      wanted: [],
       presetName: '',
       summary: ''
     }
@@ -171,10 +172,38 @@ export function validateSpec(spec, schema, sceneCount = 8, channelNames = ['A', 
     summary: typeof spec.summary === 'string' ? spec.summary : '',
     notes: typeof spec.notes === 'string' ? spec.notes : '',
     changes,
+    /*
+     * Blocks the tone wanted and this preset does not have.
+     *
+     * Not a rejection — nothing was dropped for it, and it must not be shown
+     * among the losses. It is the model saying what it could not reach, which
+     * on a four-slot unit is the difference between "the tone missed" and "the
+     * tone missed because this preset has no delay in it".
+     */
+    wanted: wantedBlocks(spec.wanted),
     scenes: validateScenes(spec.scenes, schema, problems, sceneCount, channelNames),
     problems,
     repairs
   }
+}
+
+/**
+ * Names only, tidied, and deduplicated.
+ *
+ * Free text from a generator, rendered on a screen: capped in count and in
+ * length so a runaway answer cannot turn into a wall of prose, and stripped of
+ * anything that isn't a block name.
+ */
+function wantedBlocks(list) {
+  if (!Array.isArray(list)) return []
+  const seen = new Set()
+  for (const item of list) {
+    if (typeof item !== 'string') continue
+    const clean = item.replace(/[^\w \-/]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24)
+    if (clean) seen.add(clean.toLowerCase())
+    if (seen.size >= 6) break
+  }
+  return [...seen]
 }
 
 /**

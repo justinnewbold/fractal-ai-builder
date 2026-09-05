@@ -1207,6 +1207,20 @@ button.chip {
   max-width: 62ch;
 }
 
+/*
+ * A block the tone wanted and the chain does not carry.
+ *
+ * Deliberately not red and deliberately not in .problems: nothing was lost, and
+ * the one thing on the card the player can act on should not read as a failure.
+ * The rule down its left is the same shape the app uses elsewhere for "here is
+ * something to do", set in the ordinary text colour rather than the fault one.
+ */
+.wanted {
+  padding-left: var(--s-3);
+  border-left: 2px solid var(--rule);
+  color: var(--silk);
+}
+
 .problems {
   margin-top: 16px;
   padding-top: var(--s-3);
