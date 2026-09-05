@@ -11,7 +11,7 @@
 
 import { EXCLUDED_BLOCKS, safeParams } from './guardrails.js'
 import { cleanPresetName, isEmptySlotName } from './presetName.js'
-import { zeroBasedChain } from './slots.js'
+import { zeroBasedChain, wrongSlot } from './slots.js'
 import { toNormalized } from './scale.js'
 import { remoteActive, remoteRequest, subscribeRemoteEvents } from './remote.js'
 import {
@@ -1602,13 +1602,16 @@ export async function readSceneNames(number) {
     try {
       const summary = await presetSummary(number)
       const names = summary?.scenes
-      if (Array.isArray(names) && names.some((n) => (n || '').trim())) {
+      if (wrongSlot(number, summary?.number)) {
+        traceStep(`summary: answered for ${summary?.number}, not ${number} — ignored`)
+      } else if (Array.isArray(names) && names.some((n) => (n || '').trim())) {
         const clean = names.map((n) => (n || '').trim())
         rememberSceneNames(number, clean)
         traceStep('summary: found names')
         return clean
+      } else {
+        traceStep('summary: no names (normal on an AM4)')
       }
-      traceStep('summary: no names (normal on an AM4)')
     } catch (err) {
       traceStep(`summary: failed — ${err.message}`)
     }
@@ -1617,7 +1620,22 @@ export async function readSceneNames(number) {
   try {
     const dump = await backupPreset(number)
     const names = dump?.sceneNames
-    if (Array.isArray(names) && names.some((n) => (n || '').trim())) {
+    /*
+     * A dump that is not the slot we asked for names somebody else's scenes.
+     *
+     * "On the Cowboys From Hell rig it's still showing the Distortion Rigs
+     * scenes." Slot 97 was showing 96's names, and kept showing them: the
+     * answer was believed, cached under 97, and on a phone the cache is the
+     * only source there is — the AM4 cannot be dumped over the relay — so the
+     * wrong names outlived the read that produced them.
+     *
+     * A stored dump carries the location it came from, and an active-buffer
+     * dump reports null. Either can arrive when the port is mid-preset-change,
+     * which is exactly when this is asked. Checked rather than assumed.
+     */
+    if (wrongSlot(number, dump?.location)) {
+      traceStep(`dump: came back as ${dump?.location ?? 'the active buffer'}, not ${number} — ignored`)
+    } else if (Array.isArray(names) && names.some((n) => (n || '').trim())) {
       const clean = names.map((n) => (n || '').trim())
       rememberSceneNames(number, clean)
       traceStep('dump: found names')

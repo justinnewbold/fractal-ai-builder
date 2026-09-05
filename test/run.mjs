@@ -3734,6 +3734,37 @@ test('a failure every time is the caller own to report, not a quiet null', async
   )
 })
 
+test('names that came back for another preset are not believed, or kept', () => {
+  /*
+   * "On the Cowboys From Hell rig it's still showing the Distortion Rigs
+   * scenes."
+   *
+   * Slot 97 showed 96's scene names and kept showing them. The app asked for
+   * 97, was answered about 96, believed it, and cached it under 97 — and on a
+   * phone the cache is the only source there is, because an AM4 cannot be
+   * dumped over the relay. So one bad answer outlived the read that made it.
+   *
+   * The rule is one-sided on purpose. Only a stated, disagreeing identity
+   * counts; a driver that does not say which slot it read says nothing either
+   * way, and treating silence as a mismatch would throw away every name on
+   * every unit that does not report it.
+   */
+  assert.equal(slots.wrongSlot(97, 96), true, 'an answer about another preset was believed')
+  assert.equal(slots.wrongSlot(97, 97), false)
+
+  /* An AM4 stored dump reports its location; null means it dumped the active
+     buffer instead, which is not the slot that was asked for either. */
+  assert.equal(slots.wrongSlot(97, null), true, 'an active-buffer dump passed as slot 97')
+
+  /* Silence is not disagreement. */
+  assert.equal(slots.wrongSlot(97, undefined), false, 'a driver that reports no location lost its names')
+
+  /* And nothing to compare against cannot disagree: asking for the loaded
+     preset with no number is the active-buffer read, which is correct. */
+  assert.equal(slots.wrongSlot(undefined, null), false)
+  assert.equal(slots.wrongSlot(undefined, 96), false)
+})
+
 test('a phone does not take the first no from a busy port', async () => {
   /*
    * "Says it's connected but says no unit. The unit is connected — if I hit

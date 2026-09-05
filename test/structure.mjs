@@ -1884,6 +1884,33 @@ export function run(test) {
     assert.match(bare, /el\.style\.height = `\$\{el\.scrollHeight\}px`/, 'the box does not grow with what is in it')
   })
 
+  test('scene names are checked against the preset they were asked for', () => {
+    /*
+     * "On the Cowboys From Hell rig it's still showing the Distortion Rigs
+     * scenes. Weirdly it's only happening on these two."
+     *
+     * Only these two because it sticks: the wrong answer was cached under the
+     * slot it was not about, and on a phone the cache is the only source —
+     * an AM4 cannot be dumped over the relay. So the check has to happen
+     * before the write to the cache, on both routes that can answer.
+     */
+    const fx = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+    const read = fx.slice(fx.indexOf('export async function readSceneNames'))
+    const body = read.slice(0, read.indexOf('\nexport '))
+
+    const summary = body.indexOf('wrongSlot(number, summary?.number)')
+    const dump = body.indexOf('wrongSlot(number, dump?.location)')
+    assert.ok(summary > 0, 'the summary route believes an answer about another preset')
+    assert.ok(dump > 0, 'the dump route believes an answer about another preset — the one that bit')
+
+    /* Before the cache, not after: a wrong answer that is rejected but kept is
+       the same bug with an extra step. */
+    for (const [what, at] of [['summary', summary], ['dump', dump]]) {
+      const remembered = body.indexOf('rememberSceneNames', at)
+      assert.ok(remembered > at, `the ${what} route caches before it checks`)
+    }
+  })
+
   test('the chain is corrected where it arrives, and Move is gone where it would lose the block', () => {
     /*
      * "It shows five blocks when there's only four... if you add one, it
