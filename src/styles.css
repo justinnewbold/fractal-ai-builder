@@ -5555,6 +5555,43 @@ button.sheet-close:active {
   .topbar-name {
     min-width: 8ch;
   }
+
+  /*
+   * And the chips beside it stop taking the room they don't need.
+   *
+   * "Make the save and connect button a little bit smaller, it's overlapping
+   * slightly into the preset name." Measured on a 390px screen with the name
+   * from that report: the name wanted 108px and had 98, so it was cut to
+   * "Puppet…" — and the chip on that phone says "connected", three characters
+   * longer than the case measured here, so it was worse than the numbers say.
+   *
+   * None of this is the button getting shorter. Every one of them stays a
+   * 44px target: what comes off is horizontal padding and the tracking on a
+   * word that does not need it, which is space nobody was aiming at.
+   */
+  .topbar-row {
+    gap: var(--s-1);
+  }
+
+  .save-cluster button.save-now {
+    padding: var(--s-2) var(--s-2);
+  }
+
+  button.phone-chip,
+  button.phone-chip.compact {
+    padding: var(--s-1) var(--s-1);
+    letter-spacing: normal;
+  }
+
+  /* The name's own row was spending 32px on padding and two gaps to hold three
+     things that read as one phrase: slot, name, caret. */
+  button.topbar-preset {
+    padding: var(--s-1);
+  }
+
+  .topbar-preset-line {
+    gap: var(--s-1);
+  }
 }
 
 /* What the app is actually talking to, at the top of the connection panel and

@@ -22,6 +22,24 @@ const declarations = (prop) => [
   ...code.matchAll(new RegExp(`(?:^|[;{\\s])${prop}: ([^;{}]+);`, 'g'))
 ].map((m) => m[1].trim())
 
+/**
+ * One whole block from `at`, braces matched.
+ *
+ * A media query holds rules that hold rules, so "up to the next `}`" reads a
+ * fraction of one and quietly passes or fails on whichever rules happened to
+ * land first.
+ */
+function balanced(text, at) {
+  const open = text.indexOf('{', at)
+  if (open < 0) return ''
+  let depth = 0
+  for (let i = open; i < text.length; i++) {
+    if (text[i] === '{') depth++
+    else if (text[i] === '}' && --depth === 0) return text.slice(at, i + 1)
+  }
+  return text.slice(at)
+}
+
 export function run(test) {
   test('every font size comes off the scale', () => {
     /*
@@ -450,5 +468,55 @@ export function run(test) {
      * moment it became a textarea.
      */
     assert.match(code, /textarea\.refine-input,/, 'the box you type in is under 44px on a phone again')
+  })
+
+  /*
+   * The preset name gets the room; the chips beside it stop taking it.
+   *
+   * "Make the save and connect button a little bit smaller, it's overlapping
+   * slightly into the preset name." On a 390px screen the name wanted 108px and
+   * had 98, so it read "Puppet…" — and the chip on that phone says "connected",
+   * which is three characters longer than the short case anyone measuring
+   * casually would land on.
+   *
+   * What came off is horizontal padding and the tracking on a word that does
+   * not need it. What did not come off is height: these are the controls
+   * somebody presses standing up, mid-song.
+   */
+  test('the bar spends its width on the name, and its chips are still targets', () => {
+    /* The phone block that carries all of it — found by the promise made in it
+       rather than by counting media queries. */
+    /* Anchored on the promise itself — `.topbar-name` appears twice, and the
+       base rule is not the one that matters here. */
+    const at = code.indexOf('min-width: 8ch')
+    assert.ok(at > 0, 'the promise of eight characters of preset name is gone')
+    const block = balanced(code, code.lastIndexOf('@media (max-width: 620px)', at))
+    assert.ok(block.includes('min-width: 8ch'), 'the phone rules for the bar are not one block')
+
+    for (const [what, rule] of [
+      ['the row', /\.topbar-row \{[^}]*gap: var\(--s-1\)/],
+      ['Save', /\.save-cluster button\.save-now \{[^}]*padding: var\(--s-2\) var\(--s-2\)/],
+      ['the link chip', /button\.phone-chip\.compact \{[^}]*padding: var\(--s-1\) var\(--s-1\)/],
+      ['the preset button', /button\.topbar-preset \{[^}]*padding: var\(--s-1\)/],
+      ['the slot and the name', /\.topbar-preset-line \{[^}]*gap: var\(--s-1\)/]
+    ]) {
+      assert.match(block, rule, `${what} takes back the width it gave the preset name`)
+    }
+
+    /* The tracking on a nine-letter word cost five pixels of the name. */
+    assert.match(block, /letter-spacing: normal/, 'the chip is tracked again, at the name’s expense')
+
+    /*
+     * And none of it came out of the height. Every height here is set outside
+     * the phone block, so a padding change cannot quietly shrink a target —
+     * this fails if somebody ever answers "a little bit smaller" with the one
+     * dimension that must not move.
+     */
+    assert.ok(
+      !/min-height|height:/.test(block.slice(block.indexOf('.topbar-row {'))),
+      'something in the bar got shorter rather than narrower'
+    )
+    assert.match(code, /\.save-cluster button\.save-now \{[^}]*min-height: 46px/,
+      'the Save button lost its floor')
   })
 }
