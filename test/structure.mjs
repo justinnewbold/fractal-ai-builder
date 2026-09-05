@@ -1709,6 +1709,52 @@ export function run(test) {
     )
   })
 
+  /*
+   * A generated tone is a card, not pages.
+   *
+   * "The generated tones take up pages of the chat box, maybe we can just list
+   * those under it after they generate?" They did: a six-block preset is a
+   * couple of thousand pixels of parameter rows, scene plan, cost and trace,
+   * rendered inside a chat log 340 pixels tall. Measured after this change it
+   * is 200px on a desktop and 296px on a phone — 12-15% of what it hid.
+   */
+  test('a tone answers as a card with its detail folded', () => {
+    const gen = readFileSync(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
+    assert.match(gen, /<details className="preview-detail">/, 'the whole tone is on the page again')
+    assert.match(gen, /className="preview-count mono"/, 'the card does not say how much it changes')
+    // A rejection is never folded away without a word on the card.
+    assert.match(gen, /className="preview-refused"/, 'settings can be rejected and never mentioned')
+
+    /*
+     * What may never be folded: a decision, or a consequence.
+     *
+     * The bulk is the diff — thirty-odd rows nobody reads unless a tone
+     * surprised them. Everything with a consequence stays on the card: what it
+     * will rename, which scene the bypasses land in, which scenes get written
+     * over. Those were put in front of people deliberately by earlier work,
+     * and a decision behind a fold is a decision made for you.
+     */
+    const card = gen.slice(
+      gen.indexOf('<div className="preview-head">'),
+      gen.indexOf('<details className="preview-detail">')
+    )
+    assert.match(card, /preset-name/, 'the name is behind the fold')
+    assert.match(card, /preview-actions/, 'the buttons are behind the fold')
+    assert.match(card, /rename-choice/, 'the rename decision is behind the fold')
+    assert.match(card, /write-target/, 'which scene the bypasses land in is behind the fold')
+    assert.match(card, /scene-plan/, 'what gets written over is behind the fold')
+
+    // And what is folded is the bulk, not the decisions.
+    const folded = gen.slice(gen.indexOf('<details className="preview-detail">'))
+    assert.match(folded, /className="diff"/, 'the diff is not what is folded')
+
+    // And the cost and the trace ride inside it rather than stacking beside it.
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    const preview = app.slice(app.indexOf('<Preview'), app.indexOf('</Preview>'))
+    assert.match(preview, /<Cost /, 'the cost is a panel of its own beside the tone again')
+    assert.match(preview, /<DevTrace /, 'the trace is a panel of its own beside the tone again')
+  })
+
   test('a channel is written where the scene that plays it can keep it', () => {
     const forgefx = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
 

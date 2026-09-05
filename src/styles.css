@@ -407,6 +407,36 @@ button.topbar-preset:active:not(:disabled) {
  * had. It is now a square big enough to hit, and the glyph inside it is a size
  * you can see at arm's length rather than one that hides in the corner.
  */
+/* A generated tone, as a card rather than a page. */
+.preview-count {
+  margin: 4px 0 0;
+  font-size: var(--f-1);
+  color: var(--silk-faint);
+}
+
+.preview-refused {
+  margin: 4px 0 0;
+  font-size: var(--f-1);
+  color: var(--warn, var(--live));
+}
+
+.preview-detail {
+  margin-top: var(--s-3);
+  border-top: 1px solid var(--rule);
+  padding-top: var(--s-3);
+}
+
+.preview-detail > summary {
+  cursor: pointer;
+  font-size: var(--f-2);
+  color: var(--silk-dim);
+  /* The touch floor: this is the one control on the card most likely to be
+     tapped by someone holding a guitar. */
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
 /* The version: present, and never competing with the preset name for room. */
 .topbar-version {
   flex: 0 0 auto;
@@ -3822,6 +3852,17 @@ ol.action-list li.destructive::marker {
   .history-head {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  /* Side by side, not stacked. Two 44px buttons in a column cost a phone card
+     a quarter of its height for no information — and both labels are short
+     enough to sit in one row once the long one was shortened. */
+  .preview-actions {
+    width: 100%;
+  }
+
+  .preview-actions button {
+    flex: 1 1 auto;
   }
 
   .diff {

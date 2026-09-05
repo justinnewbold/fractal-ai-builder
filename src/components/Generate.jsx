@@ -13,7 +13,8 @@ export function Preview({
   onScene,
   renamePreset,
   onRenamePreset,
-  presetNow
+  presetNow,
+  children
 }) {
   if (!result) return null
 
@@ -77,13 +78,49 @@ export function Preview({
     )
   }
 
+  /*
+   * A tone is a message in a conversation, not a page.
+   *
+   * "The generated tones take up pages of the chat box, maybe we can just list
+   * those under it after they generate?"
+   *
+   * They did take pages. A ten-block preset is eighty-odd parameter rows, and
+   * every one of them rendered inside a chat log 340 pixels tall — plus the
+   * scene plan, the write target, the cost and the trace. Scrolling past all of
+   * that to reach the next thing you said is not a conversation.
+   *
+   * So the card is what a reply looks like: what it is called, what it sounds
+   * like, how much it changes, and the two buttons. Everything else is true and
+   * occasionally vital and belongs one tap away — which is where anybody who
+   * has ever used a chat expects to find it.
+   */
+  const blocks = changes.length
+  const detail = `${writeCount} change${writeCount === 1 ? '' : 's'}${
+    blocks ? ` across ${blocks} block${blocks === 1 ? '' : 's'}` : ''
+  }${scenes.length ? `, ${scenes.length} scene${scenes.length === 1 ? '' : 's'}` : ''}`
+
   return (
     <section className="preview">
       <div className="preview-head">
         <div>
-          <p className="silk-label">Proposed</p>
+          {/* "Proposed" said what Discard and Send already say, and on a phone
+              it cost a line of a card that has to fit on one screen. */}
           <h2 className="preset-name">{presetName || 'UNTITLED'}</h2>
           {summary ? <p className="summary">{summary}</p> : null}
+          <p className="preview-count mono">{detail}</p>
+          {/*
+            A rejection is never folded away silently.
+            The list of them is long and belongs with the rest of the detail,
+            but the fact that some of what was designed did not survive
+            checking changes how you read the tone — so the count stays on the
+            card and points at where the reasons are.
+          */}
+          {problems.length ? (
+            <p className="preview-refused">
+              {problems.length} setting{problems.length === 1 ? '' : 's'} rejected while checking
+              &mdash; in the changes below
+            </p>
+          ) : null}
         </div>
         <div className="preview-actions">
           <button onClick={onDiscard} disabled={busy}>
@@ -105,7 +142,11 @@ export function Preview({
             }}
             disabled={busy || total === 0}
           >
-            {busy ? 'Writing…' : total === 0 ? 'Nothing selected to send' : `Send ${total} changes to the unit`}
+            {busy
+              ? 'Writing…'
+              : total === 0
+                ? 'Nothing to send'
+                : `Send ${total} change${total === 1 ? '' : 's'}`}
           </button>
         </div>
       </div>
@@ -123,8 +164,14 @@ export function Preview({
         it, so laying a set of scenes into a preset you had already named
         renamed it underneath you. Only worth asking when there is a name
         there to lose.
+
+        On the card rather than inside the fold, and only in that case: this is
+        the one decision here that costs something if it is missed, and a
+        decision folded away is a decision made for you. Naming a preset that
+        has no name loses nothing, so that one rides with the rest of the
+        detail and keeps the card short.
       */}
-      {presetName && onRenamePreset ? (
+      {presetName && onRenamePreset && (presetNow || '').trim() ? (
         <label className="rename-choice">
           <input
             type="checkbox"
@@ -133,54 +180,29 @@ export function Preview({
             disabled={busy}
           />
           <span>
-            {(presetNow || '').trim()
-              ? `Rename the preset from “${presetNow.trim()}” to “${presetName}”`
-              : `Name the preset “${presetName}”`}
+            {`Rename “${(presetNow || '').trim()}” to “${presetName}”`}
             <span className="hint">
-              {(presetNow || '').trim()
-                ? 'Off leaves the preset called what it is called. The scene names are written either way.'
-                : 'The scene names are written either way.'}
+              Off keeps the current name. The scene names are written either way.
             </span>
           </span>
         </label>
       ) : null}
 
-      <div className="diff">
-        {changes.map((change) => (
-          <div className="diff-block" key={change.eid}>
-            <div className="diff-block-head">
-              <span className="block-name">{change.name}</span>
-              {change.bypassed !== undefined ? (
-                <span className={`tag ${change.bypassed ? 'off' : 'on'}`}>
-                  {change.bypassed ? 'bypass' : 'engage'}
-                </span>
-              ) : null}
-            </div>
+      {presetName && onRenamePreset && !(presetNow || '').trim() ? (
+        <label className="rename-choice">
+          <input
+            type="checkbox"
+            checked={!!renamePreset}
+            onChange={(e) => onRenamePreset(e.target.checked)}
+            disabled={busy}
+          />
+          <span>
+            Name the preset &ldquo;{presetName}&rdquo;
+            <span className="hint">The scene names are written either way.</span>
+          </span>
+        </label>
+      ) : null}
 
-            {change.typeName ? (
-              <div className="diff-row">
-                <span className="diff-label">Model</span>
-                <span className="diff-value mono">{change.typeName}</span>
-                {change.typeBasedOn ? <span className="based-on">{change.typeBasedOn}</span> : null}
-              </div>
-            ) : null}
-
-            {change.params.map((param) => (
-              <div className="diff-row" key={param.id}>
-                <span className="diff-label">{param.name}</span>
-                <span className="diff-value mono">
-                  <span className="from">{round(param.from)}</span>
-                  <span className="arrow">→</span>
-                  <span className="to">
-                    {round(param.to)}
-                    {param.unit}
-                  </span>
-                </span>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
 
       {/*
         The scene plan, and the choice of whether to write it.
@@ -301,6 +323,58 @@ export function Preview({
         </div>
       ) : null}
 
+      {/*
+        What is folded, and what is not.
+        
+        The bulk is the diff — thirty-odd rows of "Bass 5 → 6" that nobody
+        reads unless a tone surprised them. That folds. What does not fold is
+        anything with a consequence: what the tone is called, what it will
+        overwrite, which scenes it touches and which it leaves alone. Those
+        were put in front of people deliberately, and a decision behind a fold
+        is a decision made for you.
+      */}
+      <details className="preview-detail">
+        <summary>
+          Show every change<span className="hint"> · {detail}</span>
+        </summary>
+
+      <div className="diff">
+        {changes.map((change) => (
+          <div className="diff-block" key={change.eid}>
+            <div className="diff-block-head">
+              <span className="block-name">{change.name}</span>
+              {change.bypassed !== undefined ? (
+                <span className={`tag ${change.bypassed ? 'off' : 'on'}`}>
+                  {change.bypassed ? 'bypass' : 'engage'}
+                </span>
+              ) : null}
+            </div>
+
+            {change.typeName ? (
+              <div className="diff-row">
+                <span className="diff-label">Model</span>
+                <span className="diff-value mono">{change.typeName}</span>
+                {change.typeBasedOn ? <span className="based-on">{change.typeBasedOn}</span> : null}
+              </div>
+            ) : null}
+
+            {change.params.map((param) => (
+              <div className="diff-row" key={param.id}>
+                <span className="diff-label">{param.name}</span>
+                <span className="diff-value mono">
+                  <span className="from">{round(param.from)}</span>
+                  <span className="arrow">→</span>
+                  <span className="to">
+                    {round(param.to)}
+                    {param.unit}
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
       {notes ? <p className="notes">{notes}</p> : null}
 
       {problems.length > 0 ? (
@@ -326,6 +400,10 @@ export function Preview({
           ))}
         </div>
       ) : null}
+
+        {/* What it cost and what it was working from, for the same reader. */}
+        {children}
+      </details>
     </section>
   )
 }
