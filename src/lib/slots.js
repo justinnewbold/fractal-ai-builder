@@ -152,3 +152,24 @@ export function zeroBasedChain(list, capabilities) {
   if (!cols.length || Math.min(...cols) < 1) return list
   return list.map((b) => (Number.isInteger(b?.col) ? { ...b, col: b.col - 1 } : b))
 }
+
+/**
+ * Whether an answer is about a different preset than the one that was asked for.
+ *
+ * "On the Cowboys From Hell rig it's still showing the Distortion Rigs scenes."
+ * Slot 97 showed 96's scene names and kept showing them: the app asked for 97,
+ * was answered about 96, believed it, and cached it under 97 — and on a phone
+ * that cache is the only source there is, because an AM4 cannot be dumped over
+ * the relay. One bad answer outlived the read that produced it.
+ *
+ * Deliberately one-sided: only a stated, disagreeing identity counts. A driver
+ * that does not echo which slot it read says nothing either way, and treating
+ * silence as a mismatch would throw away every name on every unit that does not
+ * report one. `null` is not silence — an AM4 says null when it dumped the
+ * active buffer rather than the stored slot, which is a real disagreement.
+ */
+export function wrongSlot(asked, got) {
+  if (typeof asked !== 'number') return false
+  if (got === undefined) return false
+  return got !== asked
+}
