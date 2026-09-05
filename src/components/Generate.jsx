@@ -27,7 +27,16 @@ export function Preview({
 }) {
   if (!result) return null
 
-  const { changes, problems, repairs = [], summary, notes, presetName, scenes = [] } = result
+  const {
+    changes,
+    problems,
+    repairs = [],
+    wanted = [],
+    summary,
+    notes,
+    presetName,
+    scenes = []
+  } = result
   const total = writeCount + (withScenes ? sceneWriteCount : 0)
   /*
    * Which half of a write is scene-bound.
@@ -396,6 +405,17 @@ export function Preview({
 
       {notes ? <p className="notes">{notes}</p> : null}
 
+      {/* Said plainly and above the rejections, because it is not one: the tone
+          was dialled with what is placed, and this is what the chain would have
+          needed to go further. */}
+      {wanted.length > 0 ? (
+        <p className="notes wanted">
+          This tone would also use {readable(wanted)} — this preset doesn&rsquo;t have{' '}
+          {wanted.length === 1 ? 'one' : 'them'}. Ask for &ldquo;add a {wanted[0]}&rdquo; and it
+          goes in a free slot first.
+        </p>
+      ) : null}
+
       {problems.length > 0 ? (
         <div className="problems">
           <p className="silk-label">Rejected during checking</p>
@@ -430,4 +450,11 @@ export function Preview({
 function round(n) {
   if (typeof n !== 'number') return '—'
   return Math.abs(n) >= 100 ? Math.round(n) : Math.round(n * 100) / 100
+}
+
+/** "a delay", "a delay and a wah", "a delay, a wah and a phaser". */
+function readable(names) {
+  const each = names.map((n) => `${/^[aeiou]/i.test(n) ? 'an' : 'a'} ${n}`)
+  if (each.length <= 1) return each[0] || ''
+  return `${each.slice(0, -1).join(', ')} and ${each[each.length - 1]}`
 }

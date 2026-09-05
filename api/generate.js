@@ -41,7 +41,31 @@ function resolveModel() {
   return null
 }
 
-const PresetSpec = z.object({
+/**
+ * The id field, narrowed to the ids this preset actually holds.
+ *
+ * Rule 1 has always said "only use effect ids that appear in the supplied block
+ * list", and a model that reads it still invented three. On a four-slot AM4
+ * holding compressor, drive, amp and reverb, one run asked for 70, 82 and 94 —
+ * blocks the unit has never heard of in this preset — and every change riding
+ * on them was dropped at the validator, so the player got a partial tone and a
+ * wall of red.
+ *
+ * A rule is a request. An enum is not: a structured-output schema that lists
+ * the four legal numbers cannot express a fifth, so the failure stops being
+ * possible rather than being caught after the fact. The validator keeps its own
+ * check regardless — a schema is the model's constraint, not a guarantee about
+ * what arrives over a network.
+ *
+ * `z.literal([...])` rather than a union of literals on purpose: it emits
+ * `{type: 'number', enum: [...]}`, which is the shape a tool schema constrains
+ * against, where a union emits `anyOf` and is honoured more loosely.
+ */
+const eidField = (eids, what) =>
+  eids.length ? z.literal(eids).describe(what) : z.number().int().describe(what)
+
+const buildPresetSpec = (eids = []) =>
+  z.object({
   presetName: z
     .string()
     .describe(
@@ -49,10 +73,27 @@ const PresetSpec = z.object({
         'the sound rather than generic — a player scrolling a list of 512 should know what this is.'
     ),
   summary: z.string().describe('One sentence on the approach taken.'),
+  /*
+   * Somewhere to put a block the tone needs and the preset does not have.
+   *
+   * The other half of narrowing the id. A model that wants a delay and cannot
+   * name one has to do something with the intent, and the something it would
+   * otherwise do is hang delay settings on whichever block it can name — which
+   * is worse than the invented id it replaced, because nothing rejects it. This
+   * field is that intent's proper home: the tone is dialled with what is
+   * placed, and what was missing is said out loud instead of faked.
+   */
+  wanted: z
+    .array(z.string())
+    .describe(
+      'Block families this tone wants that the preset does not have — "delay", "wah". Names ' +
+        'only, no ids and no settings: dial the tone with the blocks that ARE placed and list ' +
+        'the gaps here. Empty array when the placed chain covers it.'
+    ),
   blocks: z
     .array(
       z.object({
-        eid: z.number().int().describe('Effect id, copied from the supplied block list.'),
+        eid: eidField(eids, 'Effect id, copied from the supplied block list.'),
         bypassed: z.boolean().describe('Whether this block should be bypassed.'),
         channel: z
           .string()
@@ -96,7 +137,7 @@ const PresetSpec = z.object({
           .string()
           .describe('Short name for this scene — "Clean", "Rhythm", "Lead". Eight characters or fewer reads best on the unit.'),
         engaged: z
-          .array(z.number().int())
+          .array(eidField(eids, 'An effect id that is ON in this scene.'))
           .describe(
             'Effect ids that are ON in this scene. Every other block placed in the preset is off. ' +
               'Copy ids from the supplied block list.'
@@ -104,7 +145,7 @@ const PresetSpec = z.object({
         channels: z
           .array(
             z.object({
-              eid: z.number().int().describe('Effect id from the supplied block list.'),
+              eid: eidField(eids, 'Effect id from the supplied block list.'),
               channel: z.string().describe('Channel letter A, B, C or D this scene plays.')
             })
           )
@@ -120,7 +161,7 @@ const PresetSpec = z.object({
         'a single sound.'
     ),
   notes: z.string().describe('Anything the player should know. Empty string if nothing.')
-})
+  })
 
 const SYSTEM = `You are a Fractal Audio preset designer. You translate a guitarist's
 description of a tone into concrete settings for the blocks in their currently
@@ -128,7 +169,10 @@ loaded preset.
 
 HARD RULES
 
-1. Only use effect ids that appear in the supplied block list.
+1. Only use effect ids that appear in the supplied block list. If the tone needs
+   a block this preset does not have, name its family in "wanted" and dial the
+   tone with what is placed. Never hang that block's settings on a different
+   block to stand in for it.
 2. For a model change, use only the numeric "value" of an entry in that block's
    supplied model list. Never invent a number.
 3. Only set parameter ids that appear in that block's supplied parameter list,
@@ -405,7 +449,10 @@ export default async function handler(req, res) {
   const args = {
     model,
     maxOutputTokens: 16000,
-    schema: PresetSpec,
+    // Narrowed to this preset's own ids, so an id it does not hold cannot be
+    // returned at all. Built per request because every preset holds a different
+    // four (or twelve) of them.
+    schema: buildPresetSpec(blocks.map((b) => b.eid).filter((e) => Number.isInteger(e))),
     schemaName: 'preset_spec',
     system: SYSTEM,
     messages: [

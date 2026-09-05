@@ -2221,6 +2221,50 @@ export function run(test) {
     assert.match(api, /Name every scene you return/, 'the model is not told to name the scenes it makes')
   })
 
+  test('the model cannot name a block this preset does not have', () => {
+    /*
+     * Rule 1 has always forbidden it and a run still asked for effects 70, 82
+     * and 94 on a four-slot AM4 holding 46, 118, 58 and 66 — every change on
+     * them dropped at the validator, the tone half-applied. A rule is a
+     * request; an enum built from the preset's own ids is not one.
+     */
+    const api = readFileSync(new URL('../api/generate.js', import.meta.url), 'utf8')
+    assert.match(
+      api,
+      /const buildPresetSpec = \(eids/,
+      'the spec schema is fixed, so it cannot be narrowed to a preset'
+    )
+    assert.match(
+      api,
+      /eids\.length \? z\.literal\(eids\)/,
+      'the id field is not constrained to the ids the preset holds'
+    )
+    assert.match(
+      api,
+      /schema: buildPresetSpec\(blocks\.map\(\(b\) => b\.eid\)/,
+      'the request builds its schema from something other than the blocks it sent'
+    )
+    // And somewhere for the intent to go, so a constrained model does not hang
+    // a delay's settings on the reverb it is allowed to name.
+    assert.match(api, /wanted: z\n?\s*\.array\(z\.string\(\)\)/, 'there is no way to say a block is missing')
+    assert.match(
+      api,
+      /name its family in "wanted"/,
+      'the model is never told what to do with a block it cannot name'
+    )
+
+    const val = readFileSync(new URL('../src/lib/validate.js', import.meta.url), 'utf8')
+    assert.match(val, /wanted: wantedBlocks\(spec\.wanted\)/, 'the gap never leaves the validator')
+
+    const gen = readFileSync(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
+    assert.match(gen, /wanted\.length > 0/, 'nothing on the card says what the chain was missing')
+    assert.doesNotMatch(
+      gen,
+      /className="problems">[\s\S]{0,80}wanted/,
+      'a missing block is reported among the rejections, which it is not'
+    )
+  })
+
   test('naming the preset is its own decision', () => {
     /*
      * Applying a generation renamed the slot as a side effect, so laying a set
