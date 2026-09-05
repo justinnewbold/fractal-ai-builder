@@ -2598,6 +2598,32 @@ export function run(test) {
     )
 
     /*
+     * One name, in all four places that show it.
+     *
+     * The app is named separately for the Mac bundle, the packager, the browser
+     * tab and the home-screen icon, and nothing made them agree — so a rename
+     * lands in three of the four and the fourth goes on saying the old thing
+     * for months, on whichever surface nobody happened to open. That is not
+     * hypothetical for a rename done by hand across a repository: it is the
+     * ordinary outcome.
+     *
+     * The bundle name is the one with consequences. It decides what the .app in
+     * Applications is called and what electron-builder names every release
+     * asset, so productName in the two files that carry it must never drift.
+     */
+    const NAME = 'Fractal Remote'
+    assert.equal(pkg.productName, NAME, 'the Mac app is named something else')
+    assert.match(yml, new RegExp(`productName: ${NAME}\\s*$`, 'm'), 'the packager builds a differently named app')
+
+    const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
+    assert.match(html, new RegExp(`<title>${NAME}</title>`), 'the browser tab says something else')
+
+    const manifest = JSON.parse(
+      readFileSync(new URL('../public/manifest.webmanifest', import.meta.url), 'utf8')
+    )
+    assert.equal(manifest.name, NAME, 'an icon added to a home screen is named something else')
+
+    /*
      * And published rather than drafted. electron-builder's default is a
      * draft, which is invisible to the updater — so the app would check, find
      * nothing, and be right, while the release sat waiting for a click.

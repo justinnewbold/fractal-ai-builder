@@ -408,21 +408,21 @@ test('a phone that cannot reach the Mac is told the likely reason', async () => 
 
   // On, and this app explicitly allowed through: nothing to report.
   const allowed = host.readFirewall({
-    appPath: '/Applications/Fractal AI Builder.app',
+    appPath: '/Applications/Fractal Remote.app',
     run: (_cmd, args) =>
       args[0] === '--getglobalstate'
         ? 'Firewall is enabled. (State = 1)'
-        : 'ALF: Fractal AI Builder is set to allow incoming connections'
+        : 'ALF: Fractal Remote is set to allow incoming connections'
   })
   assert.deepEqual(allowed, { known: true, on: true, blocked: false })
 
   // On and blocking: the case worth a line in the menu.
   const blocked = host.readFirewall({
-    appPath: '/Applications/Fractal AI Builder.app',
+    appPath: '/Applications/Fractal Remote.app',
     run: (_cmd, args) =>
       args[0] === '--getglobalstate'
         ? 'Firewall is enabled. (State = 1)'
-        : 'ALF: Fractal AI Builder is set to block all incoming connections'
+        : 'ALF: Fractal Remote is set to block all incoming connections'
   })
   assert.equal(blocked.blocked, true)
 
@@ -853,7 +853,7 @@ test('an installed app uses the server it shipped with', () => {
    * FORGEFX_PATH still wins over both: it is somebody deliberately saying where.
    */
   const exists = () => true
-  const vendored = '/Applications/Fractal AI Builder.app/Contents/Resources/vendor/forgefx'
+  const vendored = '/Applications/Fractal Remote.app/Contents/Resources/vendor/forgefx'
   assert.equal(host.findForgeFX({ env: { HOME: '/Users/x' }, exists, extra: [vendored] }), vendored)
   assert.equal(
     host.findForgeFX({ env: { HOME: '/Users/x', FORGEFX_PATH: '/opt/ff' }, exists, extra: [vendored] }),

@@ -1,4 +1,4 @@
-# Fractal AI Builder
+# Fractal Remote
 
 Describe a tone in plain language and get a working preset written to your Fractal
 device.

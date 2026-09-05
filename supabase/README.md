@@ -44,7 +44,7 @@ filtered and it is obviously not yours.
 
 To send as `feedback@newbold.cloud`: Resend → **Domains** → **Add Domain** →
 `newbold.cloud`, add the DNS records it gives you, wait for it to verify, then
-change `FEEDBACK_FROM` to `Fractal AI Builder <feedback@newbold.cloud>`. Nothing
+change `FEEDBACK_FROM` to `Fractal Remote <feedback@newbold.cloud>`. Nothing
 else changes.
 
 ## How it is put together, and why

@@ -45,7 +45,7 @@ const DEFAULT_TO = 'justinnewbold@gmail.com'
  * theirs and works immediately, which is what makes the first email arrive on
  * the day this is set up rather than after a DNS change has propagated.
  */
-const DEFAULT_FROM = 'Fractal AI Builder <onboarding@resend.dev>'
+const DEFAULT_FROM = 'Fractal Remote <onboarding@resend.dev>'
 
 /**
  * The secret the trigger sends, read from where the database keeps it.

@@ -243,7 +243,7 @@ function openWindow() {
     height: 800,
     minWidth: 380,
     backgroundColor: '#0d0f12',
-    title: 'Fractal AI Builder',
+    title: 'Fractal Remote',
     /*
      * The preload is the page's only channel to the app, and it carries one
      * subject: updates. Context isolation stays on and node stays out — the
@@ -300,7 +300,7 @@ function buildTray() {
     const icon = nativeImage.createFromPath(join(__dirname, 'trayTemplate.png'))
     icon.setTemplateImage(true)
     tray = new Tray(icon)
-    tray.setToolTip('Fractal AI Builder')
+    tray.setToolTip('Fractal Remote')
     // The menu is where everything is, but the obvious thing to do with an
     // icon is click it, and the obvious thing to want is the window.
     tray.on('click', openWindow)
@@ -456,7 +456,7 @@ app.whenReady().then(async () => {
       'The device server did not start',
       'It was started but never answered, so there is nothing to show yet.\n\n' +
         'Quit and open the app again. If it keeps happening, the log is in\n' +
-        'Console.app under "Fractal AI Builder".'
+        'Console.app under "Fractal Remote".'
     )
     return
   }
