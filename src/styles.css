@@ -2429,10 +2429,6 @@ button.chain-block.lifting {
   opacity: 0.6;
 }
 
-button.chain-block.probed {
-  box-shadow: inset 0 0 0 1px var(--live);
-}
-
 .chain-col {
   flex: 0 0 auto;
   min-width: 2ch;
@@ -2503,17 +2499,6 @@ button.chain-block.probed {
   margin: var(--s-1) 0 0;
   font-size: var(--f-1);
   color: var(--warn, var(--live));
-}
-
-.chain-technical {
-  margin-top: var(--s-4);
-}
-
-.chain-coords {
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-  margin-top: var(--s-2);
 }
 
 /* ---------- unsaved state ---------- */

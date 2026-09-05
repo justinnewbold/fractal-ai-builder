@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { pointAtCell, placeBlock, clearCell, readGrid, blockCatalog } from '../lib/forgefx'
+import { placeBlock, clearCell, readGrid, blockCatalog } from '../lib/forgefx'
 
 /**
  * A workable starting chain, by block family rather than by number.
@@ -49,8 +49,6 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
   const [issue, setIssue] = useState(null)
   const [palette, setPalette] = useState([])
   const [paletteFailed, setPaletteFailed] = useState(false)
-  const [coords, setCoords] = useState(false)
-  const [probe, setProbe] = useState(null)
 
   const linear = capabilities?.slotModel === 'linear'
   const rows = linear ? 1 : capabilities?.grid?.rows ?? 4
@@ -234,18 +232,6 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
     }
   }
 
-  const point = async (row, col) => {
-    setProbe(`${row}:${col}`)
-    setIssue(null)
-    try {
-      await pointAtCell(row, col)
-      onChanged(`Pointed the cursor at row ${row}, column ${label(col)} — nothing written`)
-    } catch (err) {
-      setIssue(err.message)
-      onError(err.message)
-    }
-  }
-
   const buildStarter = async () => {
     setWorking('starter')
     setIssue(null)
@@ -344,8 +330,8 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
               <div className="chain-slot" key={at}>
                 <button
                   className={`chain-block ${isOpen ? 'open' : ''} ${
-                    probe === at ? 'probed' : ''
-                  } ${moving?.at === at ? 'lifting' : ''}`}
+                    moving?.at === at ? 'lifting' : ''
+                  }`}
                   onClick={() => {
                     if (!editable) return
                     setIssue(null)
@@ -389,15 +375,6 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
                         </button>
                       </>
                     )}
-                    {coords ? (
-                      <button
-                        className="chip"
-                        onClick={() => point(lane.row, item.col)}
-                        disabled={busy}
-                      >
-                        Point at it
-                      </button>
-                    ) : null}
                     {issue ? <p className="chain-issue">{issue}</p> : null}
                   </div>
                 ) : null}
@@ -465,28 +442,6 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
 
       {laneList(true)}
 
-      {/*
-        The cursor probe, out of the way.
-
-        It writes nothing — it moves the unit's own edit cursor so you can check
-        the app and the hardware agree about which cell is which. Worth having,
-        and worth doing once ever, which is not a reason to put it in the middle
-        of the thing people do every time.
-      */}
-      <details className="chain-technical">
-        <summary onClick={() => setCoords(true)}>Technical details</summary>
-        <p className="hint">
-          Two indexing conventions are in play, so <strong>Point at it</strong> appears on every
-          block while this is open: it moves the unit&rsquo;s cursor without writing anything, and
-          the unit&rsquo;s own screen tells you whether it landed where you meant.
-        </p>
-        {coords ? (
-          <label className="chain-coords">
-            <input type="checkbox" checked={coords} onChange={(e) => setCoords(e.target.checked)} />
-            <span>Show “Point at it” on each block</span>
-          </label>
-        ) : null}
-      </details>
     </section>
   )
 }

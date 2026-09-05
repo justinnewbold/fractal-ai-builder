@@ -1670,9 +1670,21 @@ export function run(test) {
     // disabled with nothing to explain it.
     assert.match(grid, /paletteFailed/, 'a failed block list is silent again')
     assert.match(grid, /Couldn&rsquo;t read the block list/, 'a failed block list does not say so')
-    assert.match(grid, /Point at it/, 'the cursor probe is gone entirely')
-    const technical = grid.slice(grid.indexOf('chain-technical'))
-    assert.ok(technical.length > 0, 'the cursor probe is back in the main flow')
+    /*
+     * The cursor probe is gone, and stays gone.
+     *
+     * It moved the unit's edit cursor without writing anything, so you could
+     * check that the app and the hardware agreed about which cell was which —
+     * a thing worth doing once, while a numbering bug was being chased, by the
+     * person chasing it. It shipped, folded behind "Technical details" and a
+     * sentence about indexing conventions: "why is this here. makes no sense."
+     * Correct. A diagnostic left in a player's chain editor is not a feature,
+     * and the fold it hid in was broken anyway — opening it switched the probe
+     * on, and the switch to turn it off vanished with it.
+     */
+    assert.ok(!/Point at it|chain-technical|pointAtCell/.test(grid), 'the cursor probe is back')
+    const forgefx = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+    assert.ok(!/pointAtCell/.test(forgefx), 'the device call behind it is dead code again')
   })
 
   /*
