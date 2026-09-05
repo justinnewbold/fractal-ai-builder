@@ -1512,6 +1512,47 @@ export function run(test) {
     }
   })
 
+  /*
+   * The learning loop is wired end to end, or it is theatre.
+   *
+   * Every piece of this can be present and the feature still do nothing: a
+   * knob editor that reports a sentence and not the numbers, a recorder nobody
+   * calls, a summary the request body never carries. Each of those failures
+   * looks exactly like success from the outside — the panel fills up, the
+   * generations do not change — which is why this checks the whole chain
+   * rather than the ends of it.
+   */
+  test('what the player fixes by hand reaches the next generation', () => {
+    const console_ = readFileSync(new URL('../src/components/Console.jsx', import.meta.url), 'utf8')
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    const api = readFileSync(new URL('../api/generate.js', import.meta.url), 'utf8')
+
+    // The knob editor hands over the numbers, not just the sentence.
+    assert.match(
+      console_,
+      /onChanged\(`\$\{block\.name\} · \$\{p\.name\} → \$\{next\}`, \{/,
+      'a hand change reports a sentence and drops the before-and-after that makes it useful'
+    )
+
+    // The app records one, and only against a generation it just wrote.
+    assert.match(app, /rememberCorrection\(change\)/, 'nothing records a correction')
+    assert.match(
+      app,
+      /if \(applied && change && tasteOn\)/,
+      'a knob turned on the player own preset is counted as correcting the model'
+    )
+    assert.match(app, /rememberNote\(instruction\)/, 'the words used to correct a tone are thrown away')
+
+    // And it travels.
+    assert.match(app, /corrections: tasteOn \? describeCorrections\(corrections\) : ''/, 'the summary never leaves the app')
+    assert.match(api, /corrections,/, 'the endpoint does not read it')
+    assert.match(api, /\(fixes \? `\\n\\n\$\{fixes\}` : ''\)/, 'the endpoint reads it and never puts it in the prompt')
+
+    // Switched off with the rest of it, and visible where the rest of it is.
+    assert.match(app, /summariseCorrections\(corrections\)/, 'the player cannot see what is being sent about them')
+    assert.match(app, /Forget what I keep fixing/, 'there is no way to erase it')
+  })
+
   test('a channel is written where the scene that plays it can keep it', () => {
     const forgefx = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
 

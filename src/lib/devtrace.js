@@ -14,12 +14,13 @@
  *   - what each control does, in the device's own words, where it says
  *   - the tone asked for, in the player's words
  *   - a few lines about what this player has tended to keep (lib/taste.js)
+ *   - what they keep fixing by hand afterwards (lib/corrections.js)
  *
  * Everything else — that a Rectifier is scooped, that a Tube Screamer in front
  * tightens a high-gain amp, what a Papa Roach rhythm tone is — comes from what
  * the model already knows. So when a tone misses, it missed either because the
- * knowledge was wrong, or because one of those five inputs pointed it the
- * wrong way. This makes all five visible so the difference can be told.
+ * knowledge was wrong, or because one of those inputs pointed it the wrong
+ * way. This makes all of them visible so the difference can be told.
  *
  * Off by default: the rosters alone are around 11k tokens, and there is no
  * sense paying to send that back to everyone who will never look at it.
@@ -100,6 +101,13 @@ export function sections(trace) {
       title: 'What it was told about your taste',
       body: trace.taste,
       note: 'Built from presets you kept. It settles what a short request leaves open — which of four fitting amps, what "a lot of gain" means to you.'
+    })
+  if (trace.corrections)
+    out.push({
+      key: 'corrections',
+      title: 'What it was told it keeps getting wrong',
+      body: trace.corrections,
+      note: 'Built from the values you change by hand after a tone is written, and the words you use when you ask for it again. Only appears once the same correction has happened enough times to be a habit.'
     })
   return out
 }

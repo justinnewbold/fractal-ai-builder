@@ -9,9 +9,8 @@
  * whole tone was good enough, without saying which part was wrong. The strong
  * signal was being thrown away. Every time a tone comes back and the player
  * reaches for the Presence knob, that is a labelled before-and-after: the model
- * said 6, the player wanted 4, and the words that asked for it are right there
- * in the request. Nothing recorded it, so the same correction happened again on
- * the next generation, and the one after.
+ * said 6, the player wanted 4. Nothing recorded it, so the same correction
+ * happened again on the next generation, and the one after.
  *
  * This records them, and only claims a pattern once one exists. Three
  * corrections to the same control, mostly the same way, is a habit worth
@@ -92,8 +91,14 @@ export function clearCorrections() {
  * preset the player built themselves is not a correction of anything, and
  * counting it would teach the model about the player's rig rather than about
  * its own mistakes.
+ *
+ * What is kept is a control name and two numbers. The request that produced
+ * the tone is deliberately not stored with it: nothing here reads it, and a
+ * local record of what somebody typed, held for a purpose that does not exist
+ * yet, is a liability rather than a feature. rememberNote keeps the words that
+ * are actually used, and only those.
  */
-export function rememberCorrection({ block, slug, param, from, to, min, max, asked }) {
+export function rememberCorrection({ block, slug, param, from, to, min, max }) {
   const a = Number(from)
   const b = Number(to)
   if (!param || !Number.isFinite(a) || !Number.isFinite(b) || a === b) return false
@@ -107,8 +112,7 @@ export function rememberCorrection({ block, slug, param, from, to, min, max, ask
       from: a,
       to: b,
       min: Number.isFinite(Number(min)) ? Number(min) : null,
-      max: Number.isFinite(Number(max)) ? Number(max) : null,
-      asked: (asked || '').slice(0, 200)
+      max: Number.isFinite(Number(max)) ? Number(max) : null
     }
   ])
 }
@@ -154,7 +158,13 @@ export function patternsFrom(entries) {
       notes.set(key, (notes.get(key) || 0) + 1)
       continue
     }
-    if (!e?.param) continue
+    /*
+     * A value that did not move is not a correction, whatever wrote it here.
+     * rememberCorrection refuses them, but this reads a store that has been on
+     * disk across many versions of this app, and a group of them would divide
+     * by nothing and report a habit of turning something "up by NaN".
+     */
+    if (!e?.param || !(Number(e.to) !== Number(e.from))) continue
     const key = e.param.toLowerCase()
     if (!byParam.has(key)) byParam.set(key, [])
     byParam.get(key).push(e)

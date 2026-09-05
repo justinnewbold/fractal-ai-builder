@@ -55,6 +55,15 @@ import {
   tasteEnabled,
   setTasteEnabled
 } from './lib/taste'
+import {
+  clearCorrections,
+  describeCorrections,
+  listCorrections,
+  patternsFrom,
+  rememberCorrection,
+  rememberNote,
+  summariseCorrections
+} from './lib/corrections'
 import { timeLeft } from './lib/slots'
 import { createNameScan } from './lib/nameScan'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
@@ -370,6 +379,20 @@ export default function App() {
   const taste = useMemo(
     () => (tasteOn ? profileFrom(library) : null),
     [library, tasteOn]
+  )
+  /*
+   * The habits behind the values this player fixes by hand.
+   *
+   * Re-read on a counter rather than on every render, because it comes out of
+   * localStorage and the only things that change it are a correction being
+   * recorded and the player forgetting them all — both of which bump the
+   * counter. Same shape as taste: computed from the record, never stored, so
+   * forgetting the record genuinely un-learns it.
+   */
+  const [correctionKey, setCorrectionKey] = useState(0)
+  const corrections = useMemo(
+    () => (tasteOn ? patternsFrom(listCorrections()) : null),
+    [tasteOn, correctionKey]
   )
   const [turns, setTurns] = useState([])
   const [remote, setRemote] = useState(false)
@@ -1100,6 +1123,15 @@ export default function App() {
            * settles what "warmer" means to them in numbers.
            */
           taste: describeProfile(taste),
+          /*
+           * What this player fixes by hand after a generation.
+           *
+           * Kept apart from taste because it answers a different question.
+           * Taste is what they choose; this is what the model keeps getting
+           * wrong for them, which is the more useful of the two and was being
+           * thrown away entirely.
+           */
+          corrections: tasteOn ? describeCorrections(corrections) : '',
           ...extra
         },
         {
@@ -1584,6 +1616,16 @@ export default function App() {
   const refine = async (instruction, against = null) => {
     const previous = result?.spec
     if (!previous) return
+
+    /*
+     * What they say when a first attempt is wrong.
+     *
+     * Every refinement is the model being told, in the player's own words,
+     * what it should have done in the first place. Said three times, "darker"
+     * stops being a correction and becomes an instruction for the next first
+     * attempt — which is the whole point of collecting it.
+     */
+    if (tasteOn && rememberNote(instruction)) setCorrectionKey((n) => n + 1)
 
     setBusy(true)
     setError(null)
@@ -2768,8 +2810,22 @@ export default function App() {
           busy={busy}
           focus={editorFocus}
           onError={setError}
-          onChanged={(summary) => {
+          onChanged={(summary, change) => {
             record('edit', summary)
+            /*
+             * A knob turned after a generation was written is a correction of
+             * it: the model chose one value and the player wanted another.
+             * That is the strongest signal this app can collect, and until now
+             * it fixed one tone and was forgotten.
+             *
+             * Only while a generation is on the unit. A knob turned on a
+             * preset someone built themselves corrects nobody, and counting it
+             * would teach the model about their rig rather than about its own
+             * misses.
+             */
+            if (applied && change && tasteOn) {
+              if (rememberCorrection(change)) setCorrectionKey((n) => n + 1)
+            }
             setDirty(true)
             read()
           }}
@@ -3160,6 +3216,32 @@ export default function App() {
               ) : null}
             </ul>
           ) : null}
+          {/*
+            The other half, and the more useful one.
+
+            What someone keeps says the whole tone was good enough. What they
+            reach over and change says which part was wrong — and it comes with
+            the number they actually wanted. That was being thrown away, so the
+            same correction was needed again on the next generation and the one
+            after. Shown separately from taste because it reads differently: it
+            is a list of the app's own repeated misses, in this player's hands.
+          */}
+          <p className="silk-label">What you keep fixing afterwards</p>
+          <p className="hint">{summariseCorrections(corrections)}</p>
+          {corrections ? (
+            <ul className="cloud-list taste-list">
+              {corrections.controls.map((c) => (
+                <li className="hint" key={c.name}>
+                  {c.name}: you usually turn it {c.way} ({c.count} of {c.of} times, by about {c.by})
+                </li>
+              ))}
+              {corrections.words.length ? (
+                <li className="hint">
+                  You often ask for: {corrections.words.map((w) => w.text).join(', ')}
+                </li>
+              ) : null}
+            </ul>
+          ) : null}
           <div className="history-actions">
             <button
               className="chip"
@@ -3168,6 +3250,17 @@ export default function App() {
             >
               {tasteOn ? 'Stop using my history' : 'Use my history again'}
             </button>
+            {corrections ? (
+              <button
+                className="chip"
+                onClick={() => {
+                  clearCorrections()
+                  setCorrectionKey((n) => n + 1)
+                }}
+              >
+                Forget what I keep fixing
+              </button>
+            ) : null}
           </div>
         </Section>
 

@@ -417,7 +417,24 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
         delete copy[p.id]
         return copy
       })
-      onChanged(`${block.name} · ${p.name} → ${next}`)
+      /*
+       * The numbers as well as the sentence.
+       *
+       * A hand change made just after a generation is the app's only labelled
+       * before-and-after: the model chose p.value, the player wanted `next`.
+       * lib/corrections.js turns a habit's worth of those into something the
+       * next generation is told, so the same correction stops being needed.
+       * The summary line stays exactly as it was, for the log a person reads.
+       */
+      onChanged(`${block.name} · ${p.name} → ${next}`, {
+        block: block.name,
+        slug: block.slug,
+        param: p.name,
+        from: p.value,
+        to: next,
+        min: p.min,
+        max: p.max
+      })
     } catch (err) {
       onError(err.message)
     }
