@@ -7,27 +7,77 @@
  * that looks right and makes no sound. Nothing downstream can catch that,
  * because -60 dB is inside the parameter's legal range.
  *
- * So these are never offered to the generator and never written. Gain staging
- * is the player's, not the model's.
+ * The first answer was to withhold every one of them. That cost more than it
+ * saved: "I told the AI the amp should be louder when it's on than when it's
+ * off and it told me I was wrong." The one control that does that was invisible
+ * to it, so instead of saying it could not, it disputed the premise.
+ *
+ * So the rule is split. Balance, Pan, Output and the rest are routing and stay
+ * the player's alone. A block's own Level moves, but only within a window
+ * around where it already sits, and never into the bottom of its range — a
+ * nudge, not a reset. That makes "louder for the lead" reachable while the
+ * silent preset stays impossible.
  */
 
-/** Block output level and routing. Not tone. */
-const SILENCING = [
-  /^.*\bLevel$/i, // "Amp1 Level", "Level", "Out Level"
-  /^Balance$/i,
-  /^Pan\b/i,
-  /^Output\s/i,
-  /^Bypass\b/i,
-  /^Mute\b/i
-]
+/** Routing and balance. Never the model's, at any value. */
+const FORBIDDEN = [/^Balance$/i, /^Pan\b/i, /^Output\s/i, /^Bypass\b/i, /^Mute\b/i]
+
+/** A block's own output level: allowed, but only a nudge. See levelLimits. */
+const LEVEL = /^.*\bLevel$/i // "Amp1 Level", "Level", "Out Level"
 
 /** Exceptions: these carry "Level" in the name but drive gain, not output. */
 const ALLOWED = [/Boost Level/i, /Input Level/i]
 
-export function isSilencingParam(name) {
+export function isForbiddenParam(name) {
+  if (typeof name !== 'string') return false
+  return FORBIDDEN.some((re) => re.test(name))
+}
+
+export function isLevelParam(name) {
   if (typeof name !== 'string') return false
   if (ALLOWED.some((re) => re.test(name))) return false
-  return SILENCING.some((re) => re.test(name))
+  return LEVEL.test(name)
+}
+
+/** How far a level may move in one write, as a fraction of its full range. */
+export const LEVEL_MOVE = 0.15
+
+/** The bottom of the range no write may reach, as a fraction of it. */
+export const LEVEL_FLOOR = 0.2
+
+/**
+ * The window a level may be written into, or null if this is not a level.
+ *
+ * Two ends, two jobs. The ceiling keeps a change to a nudge, so a generation
+ * cannot quietly restructure the gain. The floor is the one that matters: it is
+ * what makes the silent preset unreachable however the request is worded.
+ *
+ * Measured from where the control sits now rather than from the middle of its
+ * range, because "a bit louder" means a bit louder than this, and a level that
+ * has been set low on purpose should not be dragged back to the centre.
+ */
+export function levelLimits(param) {
+  if (!param || !isLevelParam(param.name)) return null
+  const min = Number(param.min)
+  const max = Number(param.max)
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return null
+  const span = max - min
+  const now = Number.isFinite(Number(param.value)) ? Number(param.value) : min + span / 2
+  return {
+    floor: Math.max(min + span * LEVEL_FLOOR, now - span * LEVEL_MOVE),
+    ceiling: Math.min(max, now + span * LEVEL_MOVE)
+  }
+}
+
+/**
+ * Controls kept out of the quick knob list.
+ *
+ * Both kinds, because neither belongs under a thumb mid-set: routing is not a
+ * tone control, and a level dragged by a finger on a phone is the same silent
+ * preset by another route.
+ */
+export function isSilencingParam(name) {
+  return isForbiddenParam(name) || isLevelParam(name)
 }
 
 /**
@@ -41,9 +91,14 @@ export function isSilencingParam(name) {
  */
 export const EXCLUDED_BLOCKS = ['input', 'output', 'looper', 'gate']
 
-/** Strip silencing parameters from a block schema before it's sent out. */
+/**
+ * Strip the parameters the model may never set from a block schema.
+ *
+ * Levels stay in: it cannot answer "louder for the lead" with a control it
+ * cannot see, and what it may do with one is bounded where the write happens.
+ */
 export function safeParams(params) {
-  return (params || []).filter((p) => !isSilencingParam(p.name))
+  return (params || []).filter((p) => !isForbiddenParam(p.name))
 }
 
 /**

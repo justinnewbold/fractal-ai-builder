@@ -1480,6 +1480,38 @@ export function run(test) {
     )
   })
 
+  /*
+   * What the app tells the AI about levels.
+   *
+   * Levels were withheld outright, and the model was never told — so asked for
+   * a lead sound louder than the rhythm one it argued rather than declining:
+   * "I told the AI the amp should be louder when it's on than when it's off and
+   * it told me I was wrong." A rule it cannot see is a rule it will talk its
+   * way around. Both routes must now name the window, so a refusal it does hit
+   * is one it can explain.
+   */
+  test('the AI is told what it may do with a level, not left to guess', () => {
+    const generate = readFileSync(new URL('../api/generate.js', import.meta.url), 'utf8')
+    const command = readFileSync(new URL('../api/command.js', import.meta.url), 'utf8')
+
+    for (const [name, text] of [['generate', generate], ['command', command]]) {
+      assert.ok(
+        !/Do not set anything named Level|never set .*\bLevel\b/i.test(text),
+        `${name} still tells the model levels are off limits, which is no longer true`
+      )
+      assert.match(
+        text,
+        /Level you may move, but only a little/,
+        `${name} does not tell the model a level may be nudged`
+      )
+      assert.match(
+        text,
+        /bottom fifth/,
+        `${name} names no floor, so the model cannot say why a request was refused`
+      )
+    }
+  })
+
   test('a channel is written where the scene that plays it can keep it', () => {
     const forgefx = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
 

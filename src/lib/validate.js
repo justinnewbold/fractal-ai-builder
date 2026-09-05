@@ -6,7 +6,7 @@
  * parameter's own range. Anything that fails is dropped and reported, not sent.
  */
 
-import { isSilencingParam, matchParam } from './guardrails.js'
+import { isForbiddenParam, levelLimits, matchParam } from './guardrails.js'
 
 export function validateSpec(spec, schema, sceneCount = 8, channelNames = ['A', 'B', 'C', 'D']) {
   const problems = []
@@ -109,14 +109,29 @@ export function validateSpec(spec, schema, sceneCount = 8, channelNames = ['A', 
         )
         continue
       }
-      // Backstop. These are stripped before the generator ever sees them, but a
-      // silent preset is bad enough to be worth checking twice.
-      if (isSilencingParam(known_param.name)) {
-        problems.push(`${known.name} / ${known_param.name}: output level is yours to set — skipped.`)
+      // Backstop. Routing and muting are stripped before the generator sees
+      // them; a preset that arrives hard-panned or muted is worth checking
+      // twice for.
+      if (isForbiddenParam(known_param.name)) {
+        problems.push(`${known.name} / ${known_param.name}: that one is yours to set — skipped.`)
         continue
       }
       if (typeof param.value !== 'number' || Number.isNaN(param.value)) {
         problems.push(`${known.name} / ${known_param.name}: value wasn't a number — skipped.`)
+        continue
+      }
+      /*
+       * A level may be nudged, not reset. The cap is what keeps a generation
+       * that is otherwise musically right from setting a block to -60 dB and
+       * handing back a preset that looks perfect and makes no sound.
+       */
+      const window = levelLimits(known_param)
+      if (window && (param.value < window.floor || param.value > window.ceiling)) {
+        problems.push(
+          `${known.name} / ${known_param.name}: levels can be nudged, not reset — ` +
+            `${param.value} is outside ${Math.round(window.floor * 10) / 10} to ` +
+            `${Math.round(window.ceiling * 10) / 10}, so it was skipped.`
+        )
         continue
       }
 

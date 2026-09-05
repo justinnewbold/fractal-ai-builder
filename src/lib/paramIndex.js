@@ -1,5 +1,5 @@
 import { blockParams, disambiguate } from './forgefx'
-import { EXCLUDED_BLOCKS, safeParams } from './guardrails'
+import { EXCLUDED_BLOCKS, isSilencingParam } from './guardrails'
 
 /**
  * Every editable control in the preset, one flat list.
@@ -14,7 +14,13 @@ export async function buildParamIndex(blocks) {
   for (const block of editable) {
     try {
       const res = await blockParams(block.effectId)
-      for (const param of safeParams(disambiguate(res?.named || []))) {
+      /*
+       * The player's own list, so it holds the player's rule rather than the
+       * model's: levels reach the model now, bounded, but a level found in a
+       * search box and dragged by a finger is the silent preset by another
+       * route. They stay where the knob list keeps them, off the quick surfaces.
+       */
+      for (const param of disambiguate(res?.named || []).filter((p) => !isSilencingParam(p.name))) {
         out.push({ block, param })
       }
     } catch {
