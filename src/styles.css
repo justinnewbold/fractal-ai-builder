@@ -1079,12 +1079,33 @@ button.chip {
   border-radius: var(--r-1);
 }
 
+/*
+ * A tone from earlier in the conversation.
+ *
+ * The live one keeps the signal stripe down its left edge; a card that has
+ * already been answered gives it up, so the one thing on the screen wearing
+ * that colour is the one still asking a question. Everything else about it is
+ * unchanged — this is the same tone, still readable in full, not a summary of
+ * one.
+ */
+.preview-past {
+  border-left-color: var(--rule);
+}
+
 .preview-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--s-4);
   flex-wrap: wrap;
+}
+
+/* Where the buttons were, on a card that no longer has any. */
+.preview-outcome {
+  margin: 0;
+  color: var(--silk-dim);
+  font-size: var(--f-2);
+  white-space: nowrap;
 }
 
 .preview-actions {
@@ -3741,6 +3762,10 @@ ol.action-list li.destructive::marker {
    */
   input.preset-filter,
   input.refine-input,
+  /* The conversation's box is a textarea now, and an element selector does not
+     follow a class across element types — it would have quietly gone back to
+     33px under a thumb. */
+  textarea.refine-input,
   input.knob-readout,
   input[type='email'],
   input[type='password'],
@@ -4134,6 +4159,59 @@ ol.action-list li.destructive::marker {
   gap: var(--s-2);
   flex-wrap: wrap;
   margin-top: 9px;
+}
+
+/*
+ * The box you type in, and the button beside it.
+ *
+ * This class was referenced in two components and styled in none, so the row
+ * was a plain block and the field kept a browser default: 230 pixels wide, on
+ * a 1280-pixel window and on a 390-pixel phone alike. A chat box the width of
+ * a search field is most of what "it feels clunky" was pointing at.
+ */
+.refine-row {
+  display: flex;
+  /* At the bottom, so the button stays put as the box grows upward rather
+     than drifting down the screen line by line. */
+  align-items: flex-end;
+  gap: var(--s-2);
+}
+
+.refine-row .refine-input {
+  /* A field carries an intrinsic width, and a flex item will not shrink below
+     it without this — which is how one 230px box survived every screen. */
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+}
+
+/*
+ * It changed element, so it has to be told how to keep looking the same.
+ *
+ * The blanket `textarea` rule is written for the big description box — body
+ * face, larger type, panel ground, a wider pad and a margin above it — and
+ * every one of those differs from `input[type='text']`, which is what this box
+ * has always been. Nothing about the request was "make it look different", so
+ * these restate the field it replaced.
+ */
+textarea.refine-input {
+  font-family: var(--mono);
+  font-size: var(--f-3);
+  background: var(--chassis);
+  padding: var(--s-2) var(--s-2);
+  margin-top: 0;
+  /* The height is computed from the content; a drag handle fights that, and a
+     browser default of two or three rows is a hole in an empty conversation. */
+  resize: none;
+  overflow-y: auto;
+  line-height: 1.45;
+  /* Long enough for a paragraph, short enough that pasting a page of text
+     leaves the conversation on screen. Past it, the box scrolls. */
+  max-height: min(40vh, 220px);
+}
+
+textarea.refine-input:focus-visible {
+  outline-color: var(--live);
 }
 
 .assistant-row {

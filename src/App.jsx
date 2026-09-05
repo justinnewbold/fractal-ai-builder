@@ -263,6 +263,21 @@ export default function App() {
 
   const [result, setResult] = useState(null)
   /*
+   * The tones asked for earlier in this conversation.
+   *
+   * There was one slot for a design, so a second tone destroyed the first —
+   * ask for "something darker" and the thing you were comparing it against was
+   * gone from the screen, with nothing anywhere that remembered it. History
+   * only keeps what was saved, so a tone that was generated and turned down
+   * left no trace at all.
+   *
+   * "Like most chat bots" is the whole specification: what was said stays
+   * said. Each entry keeps the tone exactly as it was, where it was asked for,
+   * the two choices that were on it, and what became of it.
+   */
+  const [past, setPast] = useState([])
+  const pastId = useRef(0)
+  /*
    * Whether to write the scene plan too. Off by default: it is the one part of
    * a generation that walks the unit through every scene, and someone who
    * asked for a sound has not asked for their scene layout to be rearranged.
@@ -497,6 +512,19 @@ export default function App() {
    * put the design there rather than always last. See Assistant.jsx.
    */
   const [genAt, setGenAt] = useState(null)
+  /*
+   * How long the conversation is right now, as opposed to when this function
+   * was made.
+   *
+   * A generation is started from inside an async chain — something typed, a
+   * turn recorded, a round trip to the model, then the design request. By the
+   * time that last step runs, `turns` in its closure is several turns out of
+   * date, so a design read its position from the conversation as it stood
+   * before the request that asked for it. Every tone landed one exchange too
+   * high: above the sentence that produced it.
+   */
+  const turnsNow = useRef(0)
+  turnsNow.current = turns.length
 
   // Anything written but not stored lives only in the edit buffer. Tracking it
   // is what lets the app say "this is not saved yet" instead of leaving someone
@@ -1253,7 +1281,8 @@ export default function App() {
     const control = new AbortController()
     generationAbort.current = control
     setGenStarted(Date.now())
-    setGenAt(turns.length)
+    /* Read through the ref, not the closure — see turnsNow. */
+    setGenAt(turnsNow.current)
     try {
       return await streamSpec(
         {
@@ -1348,6 +1377,43 @@ export default function App() {
    */
   const nothingLaidOut = () => !sceneNames.some((n) => (n || '').trim())
 
+  /**
+   * The tone on screen, as it will be kept in the conversation.
+   *
+   * Read from this render, so it is the design the person is actually looking
+   * at, with the two choices as they left them. The outcome is the plain fact
+   * of what happened to it — sent or not — rather than anything about what
+   * came next: a line saying "replaced" would be a lie if the generation that
+   * was supposed to replace it then failed.
+   */
+  const shelved = () => {
+    if (!result) return null
+    return {
+      id: (pastId.current += 1),
+      at: genAt,
+      result,
+      withScenes,
+      renamePreset,
+      /* The scene names as they were when this was asked for. A card saying
+         "replaces Rhythm" is describing the unit at that moment; reading it
+         off the live names would rewrite the record every time a scene is
+         renamed afterwards. */
+      sceneNames,
+      sceneCount,
+      scene,
+      outcome: applied
+        ? `Sent — ${applied.count} change${applied.count === 1 ? '' : 's'} written${
+            applied.savedTo !== undefined ? `, saved to slot ${applied.savedTo}` : ''
+          }.`
+        : 'Not sent.'
+    }
+  }
+
+  /** Put a tone into the conversation for good. */
+  const keep = (entry) => {
+    if (entry) setPast((list) => [...list, entry])
+  }
+
   const generate = async (description, against = null, opts = {}) => {
     /*
      * Ask once, before the model runs. Asking afterwards would mean paying for
@@ -1359,6 +1425,10 @@ export default function App() {
     }
     setBusy(true)
     setError(null)
+    /* The tone being cleared off the screen goes into the log rather than
+       nowhere. Shelved here, before the clear, because after it there is
+       nothing left to read it from. */
+    keep(shelved())
     setResult(null)
     setWithScenes(false)
     setRenamePreset(true)
@@ -1746,6 +1816,10 @@ export default function App() {
     setBusy(true)
     setError(null)
     setApplied(null)
+    /* Taken now and kept only if the load succeeds: a failed read leaves the
+       tone that was on screen still on screen, and it would be in the log
+       twice. */
+    const replacing = shelved()
     try {
       setProgress('Reading what the unit has loaded...')
       const schema = await readSchema(
@@ -1761,6 +1835,7 @@ export default function App() {
       validated.description = entry.description
       if (!validated.presetName) validated.presetName = entry.name
 
+      keep(replacing)
       setResult(validated)
       setSaveName(validated.presetName || entry.name)
       revealResult()
@@ -1785,6 +1860,10 @@ export default function App() {
   const refine = async (instruction, against = null) => {
     const previous = result?.spec
     if (!previous) return
+    /* The version being adjusted, taken before the run and kept only if a new
+       one arrives. A refinement that fails leaves the old tone live — and a
+       tone that is both live and in the log is the same tone drawn twice. */
+    const replacing = shelved()
 
     /*
      * What they say when a first attempt is wrong.
@@ -1823,6 +1902,7 @@ export default function App() {
       const validated = validateSpec(spec, schema, sceneCount, channelNames)
       validated.spec = spec
       validated.description = instruction
+      keep(replacing)
       setResult(validated)
       setApplied(null)
       setSaveName(validated.presetName || preset?.name?.trim() || '')
@@ -2464,6 +2544,45 @@ export default function App() {
   const openBlock = selectedBlock ? blocks.find((b) => b.effectId === selectedBlock) : null
 
   /*
+   * The earlier tones, drawn as the cards they were.
+   *
+   * The same component as the live one, given no handlers — so the diff, the
+   * scene plan, the rejections and the cost all read exactly as they did, and
+   * every control on it is inert. Nothing here can write to the unit: a card
+   * from three requests ago describes a preset that has since moved, and a
+   * Send button on it would be an offer to overwrite work that came after.
+   *
+   * The counts are recomputed from the tone itself rather than the live ones,
+   * which belong to whatever is on screen now.
+   */
+  const pastDesigns = past.map((entry) => ({
+    key: entry.id,
+    at: entry.at,
+    node: (
+      <Preview
+        result={entry.result}
+        writeCount={countWrites(entry.result.changes)}
+        sceneWriteCount={countSceneWrites(entry.result.scenes)}
+        withScenes={entry.withScenes}
+        renamePreset={entry.renamePreset}
+        sceneNames={entry.sceneNames}
+        sceneCount={entry.sceneCount}
+        scene={entry.scene}
+        outcome={entry.outcome}
+      >
+        <Cost usage={entry.result.usage} />
+        {entry.result._trace || entry.result.spec ? (
+          <DevTrace
+            trace={entry.result._trace}
+            spec={entry.result.spec}
+            problems={entry.result.problems}
+          />
+        ) : null}
+      </Preview>
+    )
+  }))
+
+  /*
    * The conversation, built once and shown in two places.
    *
    * Create is its home and gives it the whole screen. Everywhere else it
@@ -2492,6 +2611,7 @@ export default function App() {
          scrolls with each tick, which is the one thing Assistant needs it for. */
       progress={progress}
       at={genAt}
+      designs={pastDesigns}
       suggestions={suggestionsFrom(taste)}
       onStop={
         genStarted
@@ -2539,7 +2659,14 @@ export default function App() {
         }}
         busy={busy}
         onApply={apply}
-        onDiscard={() => setResult(null)}
+        /* Discard clears the panel; it has never undone anything on the unit.
+           So the tone still goes into the log — turning one down is part of
+           what happened, and "the first one was better" needs the first one to
+           still be readable. */
+        onDiscard={() => {
+          keep(shelved())
+          setResult(null)
+        }}
       >
         {/*
           What it cost, and why it came out the way it did.

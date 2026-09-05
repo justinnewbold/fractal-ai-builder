@@ -14,6 +14,15 @@ export function Preview({
   renamePreset,
   onRenamePreset,
   presetNow,
+  /*
+   * What became of this tone, when it is no longer the live one.
+   *
+   * A card with an outcome is a record: it is still the whole tone, still
+   * opens onto every change it proposed, but nothing on it can be pressed.
+   * The decision it was asking for has already been made, and offering the
+   * buttons again on a tone two generations old would write the wrong thing.
+   */
+  outcome = null,
   children
 }) {
   if (!result) return null
@@ -100,7 +109,7 @@ export function Preview({
   }${scenes.length ? `, ${scenes.length} scene${scenes.length === 1 ? '' : 's'}` : ''}`
 
   return (
-    <section className="preview">
+    <section className={`preview${outcome ? ' preview-past' : ''}`}>
       <div className="preview-head">
         <div>
           {/* "Proposed" said what Discard and Send already say, and on a phone
@@ -122,6 +131,15 @@ export function Preview({
             </p>
           ) : null}
         </div>
+        {/*
+          A tone that has been answered says what happened to it instead of
+          asking again. The words are the plain fact — sent, or not sent —
+          because "superseded" depends on what came afterwards and this line
+          has to stay true whatever that was.
+        */}
+        {outcome ? (
+          <p className="preview-outcome">{outcome}</p>
+        ) : (
         <div className="preview-actions">
           <button onClick={onDiscard} disabled={busy}>
             Discard
@@ -149,6 +167,7 @@ export function Preview({
                 : `Send ${total} change${total === 1 ? '' : 's'}`}
           </button>
         </div>
+        )}
       </div>
 
       {changes.length === 0 ? (
@@ -177,7 +196,7 @@ export function Preview({
             type="checkbox"
             checked={!!renamePreset}
             onChange={(e) => onRenamePreset(e.target.checked)}
-            disabled={busy}
+            disabled={busy || !!outcome}
           />
           <span>
             {`Rename “${(presetNow || '').trim()}” to “${presetName}”`}
@@ -194,7 +213,7 @@ export function Preview({
             type="checkbox"
             checked={!!renamePreset}
             onChange={(e) => onRenamePreset(e.target.checked)}
-            disabled={busy}
+            disabled={busy || !!outcome}
           />
           <span>
             Name the preset &ldquo;{presetName}&rdquo;
@@ -254,7 +273,7 @@ export function Preview({
               type="checkbox"
               checked={!!withScenes}
               onChange={(e) => onWithScenes?.(e.target.checked)}
-              disabled={busy}
+              disabled={busy || !!outcome}
             />
             <span>
               <strong>
