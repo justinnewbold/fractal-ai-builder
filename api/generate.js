@@ -463,7 +463,12 @@ export default async function handler(req, res) {
             type: 'text',
             text:
               `Models available on this unit, by block family. The numeric "value" is what ` +
-              `you must use when changing a model:\n${JSON.stringify(rosters)}\n\n` +
+              `you must use when changing a model. "basedOn" and "manufacturer" name the real ` +
+              `amp or pedal each one is modelled on — the unit cannot print those names, so ` +
+              `"Brit 800 2204 High" is a Marshall JCM 800 and "Rat Distortion" is a Pro Co RAT. ` +
+              `Use them to answer a request that names real gear, and say the model's own name ` +
+              `back rather than the real one, because that is what is written on the unit:\n` +
+              `${JSON.stringify(rosters)}\n\n` +
               `What each block and control actually does, from the device's own reference:\n` +
               `${JSON.stringify(reference)}`,
             providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } }

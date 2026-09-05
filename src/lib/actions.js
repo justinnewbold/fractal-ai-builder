@@ -207,9 +207,18 @@ export function validatePlan(plan, blocks, capabilities) {
         if (!need(block, `No block with effect id ${raw.eid}.`)) break
         const model = (block.models || []).find((m) => m.value === raw.value)
         if (!need(model, `${block.name}: model ${raw.value} isn't on this unit.`)) break
+        /*
+         * With what it is in real life, where that is known.
+         *
+         * "Amp 1 → Brit 800 2204 High" is the unit's own word for it and means
+         * nothing to somebody who has not memorised the roster. This row is
+         * where a person decides whether to accept the change, so it is the one
+         * place the translation is worth the width.
+         */
+        const gear = model.basedOn || model.manufacturer || null
         actions.push({
           ...raw,
-          label: `${block.name} → ${model.name}`,
+          label: `${block.name} → ${model.name}${gear ? ` (${gear})` : ''}`,
           run: async () => {
             const d = await device()
             const eid = block.eid ?? block.effectId

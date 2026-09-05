@@ -17,6 +17,7 @@ import * as corrections from '../src/lib/corrections.js'
 import * as slots from '../src/lib/slots.js'
 import * as names from '../src/lib/presetName.js'
 import * as hold from '../src/lib/longPress.js'
+import * as lineage from '../src/lib/lineage.js'
 import { readFileSync as readSrc } from 'node:fs'
 import {
   patchSchemaValue,
@@ -505,6 +506,99 @@ test('the app refuses to serve from a port something else already holds', async 
 
   assert.match(host.PORT_TAKEN(5056), /already running on this Mac, on port 5056/)
   assert.match(host.PORT_TAKEN(), /serial port/, 'the reason two cannot share is not explained')
+})
+
+test('a model roster with no lineage on it gets one', () => {
+  /*
+   * The unit does not know what its own models are in real life. ForgeFX's AM4
+   * driver returns `manufacturer: null, basedOn: null` for every one of them —
+   * the catalog fields are gen-3-only — and even an FM3's ordinary read path
+   * returns nulls. So the app has carried a lineage for 149 amps and 80 pedals
+   * since the beginning and shown it to nobody: the demo read the data files,
+   * every real unit got a blank line.
+   *
+   * This is that roster: names, and nothing else.
+   */
+  const fromTheUnit = [
+    { value: 14, name: 'Brit 800 2204 High', manufacturer: null, basedOn: null },
+    { value: 324, name: 'USA MK V Red XT', manufacturer: null, basedOn: null },
+    { value: 22, name: 'USA MK IIC+ Bright', manufacturer: null, basedOn: null }
+  ]
+  const [brit, markV, iic] = lineage.withLineage('amp', fromTheUnit)
+
+  assert.equal(brit.basedOn, '50W Marshall JCM 800 2204', 'the roster came back as bare as it went in')
+  // No lineage recorded for this one, but the maker is — and "Mesa" is most of
+  // what somebody wanted to know, where naming a specific amp would be a guess.
+  assert.equal(markV.basedOn, null)
+  assert.equal(markV.manufacturer, 'Mesa')
+  // A voicing of a model we know is that model.
+  assert.equal(iic.basedOn, 'MESA/Boogie Mark IIC+')
+
+  assert.equal(lineage.gearLine('drive', 'Rat Distortion'), 'Pro Co RAT', 'the pedals say nothing')
+  assert.equal(lineage.gearLine('amp', 'USA MK V Red XT'), 'Mesa')
+
+  // The unit is the better authority on its own models: a roster that already
+  // carries lineage keeps it.
+  const [kept] = lineage.withLineage('amp', [
+    { value: 14, name: 'Brit 800 2204 High', manufacturer: 'Marshall', basedOn: 'what the unit said' }
+  ])
+  assert.equal(kept.basedOn, 'what the unit said')
+
+  // A family with no catalog says nothing rather than something plausible.
+  assert.equal(lineage.gearLine('cab', '4x12 CITRUS'), null)
+  assert.equal(lineage.gearLine('delay', 'Digital Mono'), null)
+})
+
+test('a model we cannot name is left unnamed', () => {
+  /*
+   * The guard that matters most here, because the failure it prevents is worse
+   * than the gap it leaves. A wrong attribution in a guitar app is read by
+   * somebody who knows the gear better than the app does.
+   *
+   * The tempting rule is to take the longest name prefix some sibling shares.
+   * It resolves three times as many models and it is confidently wrong: "USA MK
+   * IV Lead" becomes a Mark IIC+ because they share "USA MK", and "Mr Z Highway
+   * 66" becomes a Dr. Z Maz 38 because they share "Mr Z". Neither is true.
+   *
+   * So the rule only crosses words that describe a voicing of the same amp —
+   * the bright input, the deep switch, the jumpered jacks — and the rest of the
+   * name has to match a model in the data exactly.
+   */
+  assert.equal(lineage.gearLine('amp', 'USA MK IV Lead'), null, 'a Mark IV is being called something else')
+  assert.equal(lineage.gearLine('amp', 'Mr Z Highway 66'), null, 'an amp is being attributed by a shared word')
+  assert.equal(lineage.gearLine('drive', "Box o' Crunch"), null, 'a pedal with no recorded lineage was given one')
+  assert.equal(lineage.gearLine('amp', 'A Model That Does Not Exist'), null)
+  assert.equal(lineage.gearLine('amp', ''), null)
+  assert.equal(lineage.gearLine('amp', undefined), null)
+})
+
+test('what a model really is reaches the screen and the generator', () => {
+  /*
+   * Three places, because the catalog is worth nothing sitting in a file. The
+   * roster read off the unit is where all three get it — the picker, the row
+   * that asks you to accept a model change, and the roster the generator
+   * chooses from, which until now listed 331 amps and knew none of them by a
+   * name a person would use.
+   */
+  const src = (p) => readSrc(new URL(p, import.meta.url), 'utf8')
+
+  assert.match(
+    src('../src/lib/forgefx.js'),
+    /withLineage\(\s*slug,/,
+    'the roster is read straight off the unit again, so it carries no lineage'
+  )
+  // Two verbs on purpose: "Based on Mesa" is not English, and no article fixes
+  // it for a maker called Custom Audio Amplifiers.
+  assert.match(
+    src('../src/components/Console.jsx'),
+    /Modelled on \$\{chosen\.manufacturer\}/,
+    'the picker says nothing for a model whose maker is all we know'
+  )
+  assert.match(
+    src('../src/lib/actions.js'),
+    /model\.basedOn \|\| model\.manufacturer/,
+    'a model change is proposed in the unit’s words only'
+  )
 })
 
 test('quitting always finishes, and never leaves the server holding the port', async () => {
