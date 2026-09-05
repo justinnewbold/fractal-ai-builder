@@ -723,7 +723,10 @@ export default function App() {
       const info = await confirmedDetect({
         detect,
         wait: (ms) => new Promise((go) => setTimeout(go, ms)),
-        wasLive: liveRef.current
+        wasLive: liveRef.current,
+        /* A phone's first no is the least trustworthy answer in the app —
+           the handshake races the Mac's own polling. See RELAY_TRIES. */
+        remote: remoteActive()
       })
       setDevice(info)
       if (!info?.connected) {

@@ -2246,9 +2246,24 @@ test('the fault notice speaks to the end it is on', () => {
   const phone = link.faultCopy({ role: 'remote', secure: true, userAgent: ios })
   assert.ok(phone && !/this Mac|Safari/.test(phone.body), 'a phone was told to open an app on "this Mac"')
   assert.match(link.faultCopy({ role: 'wifi' }).title, /Lost the Mac/)
-  for (const role of ['mac', 'wifi', 'remote']) {
+  /*
+   * A unit that answered "not connected" wins over the role copy — but not
+   * with the same words at every end. At the Mac the cable is an arm's length
+   * away and worth checking. On a phone it is in another room, and by the time
+   * this shows the unit has already been asked five times: "says it's
+   * connected but says no unit... if I hit Try again like five or six times it
+   * will actually connect."
+   */
+  for (const role of ['mac', 'wifi']) {
     assert.equal(link.faultCopy({ role, device: { connected: false } }).title, 'No unit found')
   }
+  const noUnit = link.faultCopy({ role: 'remote', device: { connected: false } })
+  assert.match(noUnit.title, /can’t see your unit/, 'a phone is still told to check a cable it cannot reach')
+  assert.match(noUnit.body, /five times/, 'a phone is not told the asking already happened')
+  assert.ok(
+    !/tap Try again/.test(noUnit.body),
+    'Try again is offered as the fix for the thing that just failed five times'
+  )
 })
 
 test('a phone restoring its sign-in reads as connecting, never as signed out', () => {
@@ -3717,6 +3732,63 @@ test('a failure every time is the caller own to report, not a quiet null', async
     }),
     /stopped answering/
   )
+})
+
+test('a phone does not take the first no from a busy port', async () => {
+  /*
+   * "Says it's connected but says no unit. The unit is connected — if I hit
+   * Try again like five or six times it will actually connect."
+   *
+   * Nothing was live, so the wasLive rule does not apply and one no would have
+   * stood. But a phone's ask is a handshake down a port the Mac's own page is
+   * already polling, and a handshake that lands mid-poll misses. Five or six
+   * taps by hand is the evidence; this is those taps.
+   */
+  let n = 0
+  const info = await ds.confirmedDetect({
+    detect: async () => ({ connected: ++n >= 4 }),
+    wait: async () => {},
+    wasLive: false,
+    remote: true
+  })
+  assert.equal(info.connected, true, 'the phone believed the first no and showed "no unit"')
+  assert.equal(n, 4, 'it kept asking after it had its answer')
+})
+
+test('a phone gives up eventually rather than asking for ever', async () => {
+  let n = 0
+  let waited = 0
+  const info = await ds.confirmedDetect({
+    detect: async () => ({ connected: false }),
+    wait: async (ms) => {
+      n++
+      waited += ms
+    },
+    wasLive: false,
+    remote: true
+  })
+  assert.equal(info.connected, false, 'an empty rig was reported as present')
+  assert.equal(n, ds.RELAY_TRIES - 1, `it asked ${n + 1} times, not ${ds.RELAY_TRIES}`)
+  assert.ok(waited > 0, 'it asked again with no pause, which asks the same busy port')
+})
+
+test('at the Mac the first no still stands', async () => {
+  /*
+   * The other half. There is no relay and no second client on the port, so a
+   * no is a no — and putting several seconds in front of everybody who opens
+   * the app with nothing plugged in is the cost this avoids.
+   */
+  let n = 0
+  await ds.confirmedDetect({
+    detect: async () => {
+      n++
+      return { connected: false }
+    },
+    wait: never,
+    wasLive: false,
+    remote: false
+  })
+  assert.equal(n, 1, 'the Mac now waits out a retry loop for an empty rig')
 })
 
 test('nothing was live, so the first answer stands', async () => {

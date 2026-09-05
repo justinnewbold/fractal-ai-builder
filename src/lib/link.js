@@ -242,6 +242,26 @@ export function whySafari({ secure, userAgent }) {
  */
 export function faultCopy({ role, device, secure = false, userAgent = '' }) {
   if (device && device.connected === false) {
+    /*
+     * The one a phone actually sees, and the one that was lying.
+     *
+     * "Says it's connected but says no unit. The unit is connected — if I hit
+     * Try again like five or six times it will actually connect." This branch
+     * wins over the role-specific ones below, so a phone was reading "check
+     * the cable" about a cable at the other end of the room that was fine.
+     *
+     * The asking is automatic now, so by the time this is on screen the unit
+     * has been asked five times over several seconds. Which makes Try again
+     * the wrong first instinct — a sixth ask is what just failed — and makes
+     * "something else is using the port" the likely answer rather than the
+     * cable.
+     */
+    if (role === 'remote') {
+      return {
+        title: 'The Mac can’t see your unit',
+        body: 'It asked five times over a few seconds and got no answer. At the Mac: check the unit is on and plugged in, and that nothing else is talking to it — another editor, or a second copy of the Fractal app.'
+      }
+    }
     return {
       title: 'No unit found',
       body: 'Your Mac is connected, but no Fractal is plugged into it. Check the cable, and that nothing else is using it, then tap Try again.'
