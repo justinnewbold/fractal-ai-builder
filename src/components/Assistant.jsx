@@ -183,6 +183,24 @@ export default function Assistant({
        them moves when one is shelved and the live one replaces it. */
   }, [turns, progress, designs.length])
 
+  /*
+   * The box is as tall as what is in it.
+   *
+   * A textarea has one fixed height and scrolls inside it, which for two lines
+   * of typing means the first line disappears upwards — no better than the
+   * single-line field this replaced. Measured rather than counted: `scrollHeight`
+   * after collapsing to `auto` is the height the content actually wants, at
+   * whatever width the row happens to be, so it stays right when the window is
+   * resized or a phone is turned. The ceiling is CSS's, and past it the box
+   * scrolls instead of swallowing the conversation.
+   */
+  useEffect(() => {
+    const el = box.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [text])
+
   const submit = (value) => {
     const instruction = (value ?? text).trim()
     if (!instruction) return
@@ -384,16 +402,42 @@ export default function Assistant({
       </div>
 
       <div className="refine-row assistant-row">
-        <input
+        {/*
+          A box you can write a paragraph in.
+
+          It was a single-line text field, so a request longer than about forty
+          characters scrolled away to the left as you typed it \u2014 and describing
+          a tone is exactly the kind of thing people write two sentences of.
+          It grows with what is in it and stops at a height the CSS sets, past
+          which it scrolls rather than eating the conversation above it.
+        */}
+        <textarea
           ref={box}
-          type="text"
+          rows={1}
           className="refine-input"
           value={text}
           placeholder={typed ? `${typed}\u258f` : ''}
           onChange={(e) => setText(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          onKeyDown={(e) => e.key === 'Enter' && submit()}
+          /*
+           * Enter sends, Shift+Enter starts a line \u2014 which is what every chat
+           * does, and what a person who has used one will try first.
+           */
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter' || e.shiftKey) return
+            /*
+             * Except mid-word. Enter is also how an IME commits the character
+             * being composed, and sending there would post half a sentence and
+             * swallow the word someone was in the middle of.
+             */
+            if (e.nativeEvent?.isComposing) return
+            e.preventDefault()
+            submit()
+          }}
+          // So a phone keyboard offers Send rather than a return arrow, which
+          // in a box this shape reads as "this will start a new line".
+          enterKeyHint="send"
           // The placeholder moves, so it can't be what a screen reader is told
           // this box is for.
           aria-label="What you want done"

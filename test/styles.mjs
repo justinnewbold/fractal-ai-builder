@@ -405,4 +405,50 @@ export function run(test) {
     assert.match(css, /\.chat-screen \.assistant-log \{[^}]*max-height: none/,
       'the log keeps its letterbox cap on the screen that is meant to be its home')
   })
+
+  /*
+   * And the box you type into gets the width of the row it is in.
+   *
+   * `.refine-row` was referenced in two components and styled in none, so the
+   * row was a plain block and the field kept a browser default: 230 pixels, on
+   * a 1280-pixel window and on a 390-pixel phone alike. Measured after: 1046 of
+   * 1113 on the desktop.
+   */
+  test('the box you type in is as wide as the row and as tall as what is in it', () => {
+    const row = code.slice(code.indexOf('.refine-row {'), code.indexOf('}', code.indexOf('.refine-row {')))
+    assert.match(row, /display: flex/, 'the composer row is a plain block again, so the box keeps its default width')
+    /* At the bottom, so the button stays put as the box grows upward. */
+    assert.match(row, /align-items: flex-end/, 'the button drifts down the screen as the box grows')
+
+    const field = code.slice(
+      code.indexOf('.refine-row .refine-input {'),
+      code.indexOf('}', code.indexOf('.refine-row .refine-input {'))
+    )
+    /* A field carries an intrinsic width; without this a flex item will not go
+       below it, which is how one 230px box survived every screen. */
+    assert.match(field, /min-width: 0/, 'the box cannot shrink below its intrinsic width')
+    assert.match(field, /flex: 1 1 auto/, 'the box does not take the space in the row')
+
+    const area = code.slice(
+      code.indexOf('textarea.refine-input {'),
+      code.indexOf('}', code.indexOf('textarea.refine-input {'))
+    )
+    /* The height is computed from the content, so a ceiling is what stops a
+       pasted page from eating the conversation above it. */
+    assert.match(area, /max-height:/, 'a long request grows the box without limit')
+    assert.match(area, /overflow-y: auto/, 'past the ceiling the box clips rather than scrolls')
+    assert.match(area, /resize: none/, 'a drag handle fights the height being computed')
+    /* It changed element, and the blanket textarea rule is written for the big
+       description box — a different face, size, ground and pad. */
+    assert.match(area, /font-family: var\(--mono\)/, 'the box quietly changed typeface')
+
+    /*
+     * And it is still a target under a thumb. The 44px floor names elements
+     * individually because that is the only thing that beats the rules setting
+     * their heights — and an element selector does not follow a class across
+     * element types, so `input.refine-input` stopped covering this box the
+     * moment it became a textarea.
+     */
+    assert.match(code, /textarea\.refine-input,/, 'the box you type in is under 44px on a phone again')
+  })
 }

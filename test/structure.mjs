@@ -1828,6 +1828,35 @@ export function run(test) {
     assert.match(app, /sceneNames=\{entry\.sceneNames\}/, 'a kept tone reads the live scene names')
   })
 
+  test('the box you type in holds more than one line, and Enter still sends', () => {
+    /*
+     * It was a single-line field, so a request longer than about forty
+     * characters scrolled away to the left as it was typed — and describing a
+     * tone is exactly the kind of thing people write two sentences of.
+     */
+    const a = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
+    const bare = a.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+    assert.match(bare, /<textarea\b/, 'the conversation is typed into one line again')
+    assert.ok(!/type='text'|type="text"/.test(bare), 'the single-line field is back')
+
+    /* Enter sends, Shift+Enter starts a line — what every chat does, and what
+       someone who has used one will try first. */
+    const keys = bare.slice(bare.indexOf('onKeyDown={(e) => {'), bare.indexOf('enterKeyHint'))
+    assert.match(keys, /e\.key !== 'Enter' \|\| e\.shiftKey/, 'shift+enter no longer starts a line')
+    assert.match(keys, /e\.preventDefault\(\)/, 'Enter sends and inserts a newline as well')
+    assert.match(keys, /submit\(\)/, 'Enter does not send')
+    /* Enter also commits an IME's character; sending there swallows the word
+       somebody is in the middle of. */
+    assert.match(keys, /isComposing/, 'a request typed with an IME sends half a word')
+
+    /* A textarea has one fixed height and scrolls inside it, which for two
+       lines means the first disappears upwards — no better than the field this
+       replaced. Measured from the content rather than counted from the text, so
+       it stays right at any width. */
+    assert.match(bare, /el\.style\.height = 'auto'/, 'the box never shrinks back down')
+    assert.match(bare, /el\.style\.height = `\$\{el\.scrollHeight\}px`/, 'the box does not grow with what is in it')
+  })
+
   /*
    * An update you can see, and ask for.
    *
