@@ -3416,6 +3416,99 @@ test('a correction that changes nothing is not a correction', () => {
    ------------------------------------------------------------------ */
 
 /*
+ * A unit that is busy is not a unit that is gone.
+ *
+ * "I'm on the FM3. As soon as I hit next or select a scene, it goes to the
+ * screen where it says not connected again."
+ *
+ * Next tells the unit to load a preset and then reads back what is loaded.
+ * On hardware that read lands while the unit is still working, the answer is
+ * "no unit", and the app believed it — a working rig replaced by a No unit
+ * found screen with the guitar still plugged in.
+ */
+console.log('\nsettling')
+
+const never = async () => {
+  throw new Error('this should not have been asked')
+}
+
+test('a unit that answers on the second ask is not declared gone', async () => {
+  const answers = [{ connected: false }, { connected: true, short: 'FM3' }]
+  let waited = 0
+  const info = await ds.confirmedDetect({
+    detect: async () => answers.shift(),
+    wait: async (ms) => {
+      waited += ms
+    },
+    wasLive: true
+  })
+  assert.equal(info.short, 'FM3')
+  assert.ok(waited > 0, 'it asked again with no pause at all, which asks the same busy port')
+})
+
+test('a unit that throws once is not declared gone either', async () => {
+  // The likelier shape on a relay: the call does not answer false, it fails.
+  let n = 0
+  const info = await ds.confirmedDetect({
+    detect: async () => {
+      if (++n === 1) throw new Error('timed out')
+      return { connected: true }
+    },
+    wait: async () => {},
+    wasLive: true
+  })
+  assert.equal(info.connected, true)
+  assert.equal(n, 2)
+})
+
+test('a unit that really is gone is still reported', async () => {
+  let n = 0
+  const info = await ds.confirmedDetect({
+    detect: async () => {
+      n++
+      return { connected: false }
+    },
+    wait: async () => {},
+    wasLive: true
+  })
+  assert.equal(info.connected, false, 'a missing unit was reported as present')
+  assert.equal(n, ds.SETTLE_TRIES, 'it gave up early or kept asking for ever')
+})
+
+test('a failure every time is the caller own to report, not a quiet null', async () => {
+  await assert.rejects(
+    ds.confirmedDetect({
+      detect: async () => {
+        throw new Error('the Mac stopped answering')
+      },
+      wait: async () => {},
+      wasLive: true
+    }),
+    /stopped answering/
+  )
+})
+
+test('nothing was live, so the first answer stands', async () => {
+  /*
+   * The other half of the rule, and the reason this is not just a retry: an
+   * empty rig at startup must still say so at once. Asking three times would
+   * put a second and a half in front of every person who opens the app with
+   * nothing plugged in.
+   */
+  let n = 0
+  const info = await ds.confirmedDetect({
+    detect: async () => {
+      n++
+      return { connected: false }
+    },
+    wait: never,
+    wasLive: false
+  })
+  assert.equal(info.connected, false)
+  assert.equal(n, 1, 'a rig that was never live was asked more than once')
+})
+
+/*
  * The bar, the chip and the notice have to tell one story.
  *
  * A real phone showed all three at once: "NOT CONNECTED" on the left, a chip

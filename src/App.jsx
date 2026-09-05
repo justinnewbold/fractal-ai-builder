@@ -39,6 +39,7 @@ import {
   tapBeat,
   writeScene,
   writeTempo,
+  confirmedDetect,
   writeBypass,
   writeTuner
 } from './lib/deviceState'
@@ -622,10 +623,25 @@ export default function App() {
     }
   }
 
+  /*
+   * Whether the unit was answering before this read started.
+   *
+   * A ref because read() is built once and would otherwise close over the
+   * status as it stood at mount — which is 'idle', i.e. exactly the value that
+   * turns the confirmation off.
+   */
+  const liveRef = useRef(false)
+  useEffect(() => {
+    liveRef.current = status === 'live'
+  }, [status])
+
   const read = useCallback(async () => {
     setBusy(true)
     setError(null)
     let fresh = null
+    // Whether the unit answered this pass, which decides what a later failure
+    // means: a read that lost a race, or a unit that has gone.
+    let answered = false
     try {
       /*
        * A channel with nothing answering on it is the worst case: every call
@@ -637,13 +653,29 @@ export default function App() {
         setStatus('fault')
         return null
       }
-      const info = await detect()
+      /*
+       * A no from a unit that was answering a moment ago is confirmed before
+       * it is believed. Next tells the unit to load a preset and reads back
+       * immediately; on real hardware that read lands while the unit is still
+       * busy, and the answer is "no unit". See confirmedDetect.
+       */
+      const info = await confirmedDetect({
+        detect,
+        wait: (ms) => new Promise((go) => setTimeout(go, ms)),
+        wasLive: liveRef.current
+      })
       setDevice(info)
       if (!info?.connected) {
         setStatus('fault')
         setError('Your Mac is connected, but no Fractal is plugged into it.')
         return
       }
+      /*
+       * Past here the unit has answered. Anything that fails now is one read
+       * that lost a race for the port, not a unit that has gone — so it is
+       * reported without tearing down a working screen. See the catch.
+       */
+      answered = true
       const [p, b] = await Promise.all([currentPreset(), presetBlocks()])
       setPreset(p)
       const list = Array.isArray(b) ? b : []
@@ -701,8 +733,20 @@ export default function App() {
       refreshTempo()
 
     } catch (err) {
-      setStatus('fault')
-      setError(err.message)
+      /*
+       * Losing one read is not losing the unit.
+       *
+       * This used to answer every failure with a fault, which on a stage means
+       * the whole app replaced by a "no unit" screen because one call lost the
+       * port to a preset that was still loading. If the unit answered at the
+       * top of this pass and was live before it, the chain on screen is still
+       * the truth: say what failed and leave it up.
+       */
+      if (answered && liveRef.current) setError(err.message)
+      else {
+        setStatus('fault')
+        setError(err.message)
+      }
     } finally {
       setBusy(false)
     }
