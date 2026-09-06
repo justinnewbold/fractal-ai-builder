@@ -2965,24 +2965,48 @@ export function run(test) {
     )
   })
 
-  test('the chat keeps moving while a tone is being built', () => {
+  test('the composer goes blank while a tone is being built', () => {
     /*
-     * "When generating a new tone the suggestion typewriter stops and freezes.
-     * Can we keep the live suggestions going? Maybe queue messages sent while
-     * generating?"
+     * This has been both ways, and which way it is now depends on something
+     * that changed underneath it.
      *
-     * The suggestions stopped on `busy`, which is the whole of a generation —
-     * so the one moment nothing else is happening on screen is the moment the
-     * screen went still, and a thirty-second wait looked like a hang. And
-     * sending returned early while busy with the box disabled, so a thought
-     * had mid-run was simply dropped.
+     * It first stopped on `busy`, and that was wrong for the reason the player
+     * gave: "when generating a new tone the suggestion typewriter stops and
+     * freezes. Can we keep the live suggestions going?" The one moment nothing
+     * else moved on screen was the moment the screen went still, and a
+     * thirty-second wait read as a hang. So the typing was kept running.
+     *
+     * The working line counts the wait out loud now — "Designing… 40s", ticking
+     * off the server's own heartbeat — so a generation is visibly alive without
+     * borrowing the composer to prove it. That leaves the motion with nothing to
+     * buy: a box typing an example under a tone being built invites an answer it
+     * will not take, since sending is disabled until the run finishes.
+     *
+     * "While the AI is thinking and building stop the typewriter text from
+     * displaying. And just have the type box blank."
      */
     const a = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
     assert.match(
       a,
-      /useTypedSuggestion\(!text && !focused, suggestions\)/,
-      'the suggestions still freeze for the whole of a generation'
+      /useTypedSuggestion\(\s*\n[\s\S]{0,200}!busy && !text && !focused,\s*\n\s*suggestions,\s*\n[\s\S]{0,120}busy\s*\n\s*\)/,
+      'the suggestions still type themselves through a generation'
     )
+    // Blank, not frozen mid-word, and not the whole suggestion standing still —
+    // `silent` is a different state from `!active`, which still shows the full
+    // line for someone typing or with reduced motion on.
+    assert.match(a, /if \(silent\) return \{ shown: '', full \}/, 'the box is not actually blanked')
+    assert.match(a, /if \(reduced \|\| !active\) return \{ shown: full, full \}/, 'reduced motion lost its static suggestion')
+    /*
+     * `full` is still returned while silent, because it is what the box is
+     * measured against. Returning '' with it would shrink the box to one line
+     * the moment a generation started and grow it back at the end — a jump
+     * under the thumb, to save space nothing else was using.
+     */
+    assert.ok(
+      !/if \(silent\) return \{ shown: '', full: '' \}/.test(a),
+      'the composer collapses a line when a generation starts'
+    )
+    assert.match(a, /const borrow = text \? null : `\$\{typedFull\}/, 'the box is no longer measured against the whole suggestion')
 
     // What is typed mid-run is kept, and goes one at a time afterwards.
     assert.match(a, /if \(busy\) \{\s*\n\s*setQueue/, 'anything sent mid-generation is still dropped')
