@@ -64,7 +64,7 @@ export function newestFirst(...groups) {
   return out
 }
 
-export function buildEntry({ name, description, summary, spec, usage, device, blockNames }) {
+export function buildEntry({ name, description, summary, spec, usage, device, blockNames, ms }) {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     at: Date.now(),
@@ -74,8 +74,44 @@ export function buildEntry({ name, description, summary, spec, usage, device, bl
     spec,
     usage: usage || null,
     device: device || null,
-    blockNames: blockNames || []
+    blockNames: blockNames || [],
+    /**
+     * How long this one took, start to finish.
+     *
+     * Recorded because the app kept telling people a generation was "longer
+     * than usual" without ever having measured one. See typicalMs below.
+     */
+    ms: Number.isFinite(ms) && ms > 0 ? Math.round(ms) : null
   }
+}
+
+/**
+ * How long a generation usually takes HERE, from the ones that already have.
+ *
+ * "Every tone generator says it takes longer than usual. How long is usual? If
+ * it takes longer than usual, why does it always say that?"
+ *
+ * Because "usual" was a literal 60 seconds that nobody measured. It came from
+ * an old server ceiling that has since been raised — this app's own timing now
+ * calls ninety seconds before the first token "slow, not broken" — so the
+ * warning fired on runs the rest of the code considers perfectly normal.
+ *
+ * A number the app made up cannot be corrected by the app. One it measures can:
+ * a median over the last dozen runs on this device, on this person's presets,
+ * with their model. Null until there are enough of them to mean anything, and
+ * everything that reads it must be prepared to say nothing at all.
+ */
+export function typicalMs(entries = read(), { least = 3, over = 12 } = {}) {
+  const times = entries
+    .map((e) => e?.ms)
+    .filter((ms) => Number.isFinite(ms) && ms > 0)
+    .slice(0, over)
+    .sort((a, b) => a - b)
+  if (times.length < least) return null
+  // A median, not a mean: one run that timed out at two and a half minutes
+  // should not move what "usual" means.
+  const mid = Math.floor(times.length / 2)
+  return times.length % 2 ? times[mid] : Math.round((times[mid - 1] + times[mid]) / 2)
 }
 
 export function savePreset(fields) {

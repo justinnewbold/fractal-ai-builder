@@ -93,7 +93,7 @@ import {
   forgetPresetName,
   readSceneNames
 } from './lib/forgefx'
-import { savePreset, buildEntry, deletePreset } from './lib/history'
+import { savePreset, buildEntry, deletePreset, typicalMs } from './lib/history'
 import { costOf } from './lib/cost'
 import { isDemo, setDemo } from './lib/forgefx'
 import {
@@ -1558,7 +1558,13 @@ export default function App() {
       spec: designed.spec,
       usage: designed.usage,
       device: device?.name,
-      blockNames: (designed.changes || []).map((c) => c.name)
+      blockNames: (designed.changes || []).map((c) => c.name),
+      /*
+       * How long this one took. Measured so that "longer than usual" can be a
+       * comparison against something rather than a literal sixty seconds
+       * inherited from a server ceiling that has since moved. See typicalMs.
+       */
+      ms: genStarted ? Date.now() - genStarted : null
     }
     /*
      * The folder is the home when one is chosen; this browser's storage is the
@@ -2867,7 +2873,15 @@ export default function App() {
         that." The tone itself moved out from between the turns — see
         `tones` below.
       */}
-      <Thinking message={progress} active={thinking} startedAt={genStarted} />
+      {/* What a run usually costs in seconds HERE, from the runs already kept.
+          Null until there are a few, and Thinking says nothing about "usual"
+          until there are — the honest answer with no data is silence. */}
+      <Thinking
+        message={progress}
+        active={thinking}
+        startedAt={genStarted}
+        typicalMs={typicalMs(past)}
+      />
 
       <LiveGeneration
         partial={partial}

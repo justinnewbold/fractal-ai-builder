@@ -98,7 +98,45 @@ export function LiveGeneration({ partial, open, onToggle }) {
  * A real message always wins over it here, and past a minute the line says
  * plainly that this is no longer normal.
  */
-export function Thinking({ message, active, startedAt }) {
+/**
+ * When to stop showing only a clock, and what to say instead.
+ *
+ * This said "longer than usual" at sixty seconds, every time, for a reason that
+ * had nothing to do with what usual is: sixty was an old server ceiling, and
+ * when that ceiling moved this line did not. The app's own timing now calls
+ * ninety seconds before the first token "slow, not broken" — so the warning was
+ * firing on runs the rest of the code considers ordinary, and a warning that
+ * always fires is one nobody reads.
+ *
+ * "Every tone generator says it takes longer than usual. How long is usual? If
+ * it takes longer than usual, why does it always say that?"
+ *
+ * So there are two questions and they are answered separately.
+ *
+ * IS MY RIG SAFE is the one somebody actually has while waiting, and it does
+ * not depend on knowing a norm — the answer is the same at forty seconds and at
+ * two minutes, and it is worth saying once the wait is long enough to worry
+ * anybody. That is REASSURE_AT, and it is a fact rather than a comparison.
+ *
+ * IS THIS ONE SLOW needs a norm, and is only said where there is a measured one
+ * — this person's own median, from history.js. Half again as long as usual is a
+ * real outlier and worth naming; with no measurements yet it says nothing,
+ * because the honest answer to "is this longer than usual" with three runs of
+ * data is that we do not know.
+ */
+const REASSURE_AT = 40
+const SLOW_MULTIPLE = 1.5
+
+function aside(seconds, typicalMs) {
+  const usual = Number.isFinite(typicalMs) && typicalMs > 0 ? Math.round(typicalMs / 1000) : null
+  const slow = usual !== null && seconds > Math.max(usual * SLOW_MULTIPLE, usual + 15)
+
+  if (slow) return ` · longer than your usual ${usual}s — nothing has been sent to your unit yet`
+  if (seconds >= REASSURE_AT) return ' · nothing has been sent to your unit yet'
+  return ''
+}
+
+export function Thinking({ message, active, startedAt, typicalMs = null }) {
   const [now, setNow] = useState(Date.now())
   const running = !!(active || message)
 
@@ -116,12 +154,7 @@ export function Thinking({ message, active, startedAt }) {
   let clock = null
   if (seconds !== null) {
     clock = seconds >= 60 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${seconds}s`
-    /*
-     * Past a minute the clock alone reads as patience. Say what it means — and
-     * answer the question someone actually has by then, which is not "how long"
-     * but "is my rig safe".
-     */
-    if (seconds >= 60) clock += ' · longer than usual — nothing has been sent to your unit yet'
+    clock += aside(seconds, typicalMs)
   }
 
   return (
