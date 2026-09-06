@@ -882,8 +882,18 @@ export function run(test) {
     assert.match(body, /\n\s*scene,\s*\n\s*sceneNames,\s*\n\s*sceneCount/, 'the chat request no longer carries the scene names')
     assert.match(
       src,
-      /validatePlan\(body, withPositions, \{ \.\.\.\(device\?\.capabilities \|\| \{\}\), activeScene: scene, sceneNames \}\)/,
+      /validatePlan\(body, withPositions, \{[\s\S]{0,200}?activeScene: scene,[\s\S]{0,80}?sceneNames,/,
       'the plan is checked without knowing which scene is live'
+    )
+    /*
+     * And without knowing whether it is being checked over the relay, it would
+     * go on proposing a slot write the host refuses from a distance — which
+     * applies a whole tone and then fails on the one step that keeps it.
+     */
+    assert.match(
+      src,
+      /validatePlan\(body, withPositions, \{[\s\S]{0,600}?remote: remoteActive\(\)/,
+      'the plan is checked without knowing it is being driven over the relay'
     )
   })
 

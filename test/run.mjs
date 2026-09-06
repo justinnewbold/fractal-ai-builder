@@ -2418,6 +2418,70 @@ test('backing up a preset needs no confirmation', () => {
   assert.ok(!r.actions[0].destructive)
 })
 
+test('a plan over the relay does not propose what the Mac alone can do', () => {
+  /*
+   * The host refuses a slot write and a backup from a distance — deliberately,
+   * and REMOTE_FORBIDDEN in shared/relay-rules.mjs says so in words. The plan
+   * used to propose them anyway: every other action applied, the unit made the
+   * sound asked for, and the one step that would have kept it failed at the
+   * end as a single line among the successes. A tone you can hear and did not
+   * keep reads as "it worked" until the next preset change takes it away.
+   *
+   * So the refusal moves to where a plan is still a proposal. Said before
+   * anything is written, not reported after everything else was.
+   */
+  const away = { ...caps, remote: true }
+
+  const save = validatePlan(
+    { actions: [{ kind: 'savePreset', value: 67, text: 'Dimebag', why: '' }] },
+    cmdBlocks,
+    away
+  )
+  assert.deepEqual(save.actions, [], 'a slot write was proposed over the relay')
+  assert.match(save.problems[0] || '', /only works at the Mac/, save.problems.join(' | '))
+  assert.match(save.problems[0] || '', /67/, 'the refusal does not say which slot was left alone')
+
+  const backup = validatePlan(
+    { actions: [{ kind: 'backupPreset', value: 3, why: '' }] },
+    cmdBlocks,
+    away
+  )
+  assert.deepEqual(backup.actions, [], 'a backup was proposed over the relay')
+  assert.match(backup.problems[0] || '', /only works at the Mac/, backup.problems.join(' | '))
+
+  // Everything else still travels: the tone is applied over the relay exactly
+  // as it was, and only the two steps the host refuses are held back.
+  const mixed = validatePlan(
+    {
+      actions: [
+        { kind: 'setParam', eid: 58, paramId: 7, value: 6, why: '' },
+        { kind: 'savePreset', value: 67, why: '' }
+      ]
+    },
+    cmdBlocks,
+    away
+  )
+  assert.deepEqual(
+    mixed.actions.map((a) => a.kind),
+    ['setParam'],
+    'the relay plan lost an action it could have carried out'
+  )
+
+  // And at the Mac both are proposed as they always were.
+  const home = validatePlan(
+    {
+      actions: [
+        { kind: 'savePreset', value: 67, why: '' },
+        { kind: 'backupPreset', value: 3, why: '' }
+      ]
+    },
+    cmdBlocks,
+    caps
+  )
+  assert.deepEqual(home.actions.map((a) => a.kind), ['backupPreset', 'savePreset'])
+  assert.deepEqual(home.problems, [], home.problems.join(' | '))
+})
+
 test('a confirmed write updates the cached value in place', () => {
   resetSchemaCache()
   const params = [{ id: 7, name: 'Gain', value: 5, min: 0, max: 10 }]

@@ -2570,7 +2570,7 @@ export default function App() {
           const built = validatePlan(
             { actions: [{ kind: 'buildChain', text: null, why: 'empty preset' }] },
             [],
-            device?.capabilities
+            { ...(device?.capabilities || {}), remote: remoteActive() }
           )
           const failures = await runPlan(built.actions, (done, total, label) =>
             setProgress(`${done} of ${total} - ${label}`)
@@ -2639,7 +2639,14 @@ export default function App() {
         return
       }
 
-      const checked = validatePlan(body, withPositions, { ...(device?.capabilities || {}), activeScene: scene, sceneNames })
+      const checked = validatePlan(body, withPositions, {
+        ...(device?.capabilities || {}),
+        activeScene: scene,
+        sceneNames,
+        // Over the relay the host refuses a slot write and a backup, so the
+        // plan must not propose either. See validatePlan's `remote`.
+        remote: remoteActive()
+      })
       record(
         'ask',
         `Asked: ${instruction}`,

@@ -120,6 +120,23 @@ export function validatePlan(plan, blocks, capabilities) {
    * channel, and a value belongs to the channel, so a value written "for
    * scene 2" reaches every scene playing that same channel.
    */
+  /*
+   * Whether the unit is being driven over the relay rather than from the Mac
+   * it is plugged into.
+   *
+   * Two of the actions below reach routes the host refuses from a distance —
+   * see REMOTE_FORBIDDEN in shared/relay-rules.mjs. Proposing one anyway meant
+   * a plan that applied a whole tone and then failed on the step that would
+   * have kept it, reported afterwards as one line among the successes. A tone
+   * you can hear and did not keep reads as "it worked", right up until the
+   * next preset change takes it away.
+   *
+   * So they are refused while the plan is still a proposal, in words, before
+   * anything is written. The save the manual button does over the relay is a
+   * different mechanism (parkSave — the Mac carries it out) and is untouched.
+   */
+  const remote = capabilities?.remote === true
+
   const activeScene = typeof capabilities?.activeScene === 'number' ? capabilities.activeScene : null
   const sceneNames = Array.isArray(capabilities?.sceneNames) ? capabilities.sceneNames : []
   const sceneCount = capabilities?.sceneCount ?? 8
@@ -473,6 +490,13 @@ export function validatePlan(plan, blocks, capabilities) {
       case 'savePreset': {
         const number = raw.value
         if (!need(Number.isInteger(number) && number >= 0, `${number} isn't a slot number.`)) break
+        if (
+          !need(
+            !remote,
+            `Saving to a slot only works at the Mac, so slot ${number} was left alone.`
+          )
+        )
+          break
         const name = (raw.text || '').trim().slice(0, 31)
         actions.push({
           ...raw,
@@ -510,6 +534,7 @@ export function validatePlan(plan, blocks, capabilities) {
       }
 
       case 'backupPreset': {
+        if (!need(!remote, 'Backing up to a file only works at the Mac.')) break
         actions.push({
           ...raw,
           label: 'Back up this preset to a file',
