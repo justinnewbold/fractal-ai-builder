@@ -1109,12 +1109,38 @@ export function run(test) {
      * preset freshly loaded, or generated and written to the unit but never
      * put in a slot, there is nothing pending and nothing saved either, and
      * the button used to claim the second. Both halves are required: without
-     * savedHere it lies, without !dirty it hides pending changes.
+     * the save itself it lies, without !dirty it hides pending changes.
      */
     assert.match(
       save,
-      /: !dirty && savedHere\s*\n?\s*\? 'Saved'/,
+      /: !dirty && justSaved\s*\n?\s*\? 'Saved'/,
       'the button says "Saved" about a preset that has never been saved'
+    )
+    /*
+     * And then it said "Save" instead, on a preset nobody had touched — the
+     * same fault wearing the other word, a button offering to do a thing there
+     * is no thing to do. So it is a presence now, not a label.
+     */
+    assert.match(
+      save,
+      /if \(!queued && !saving && !dirty && !justSaved\) return null/,
+      'the Save button is back on a bar with nothing to save'
+    )
+    /*
+     * "Saved" is the one state with no work behind it, so it is the one that
+     * has to expire — and from a clock rather than a flag, or a component that
+     * mounts an hour later starts its own timer and says it again.
+     */
+    assert.match(save, /Date\.now\(\) - savedAt < SAVED_FOR_MS/, '"Saved" never stops being said')
+    /*
+     * Hiding it took away the only door to the save sheet, which is also how a
+     * preset is put in a DIFFERENT slot with nothing edited. That door moved
+     * rather than closing.
+     */
+    assert.match(
+      read('../App.jsx'),
+      /setSheet\('save'\)[\s\S]{0,120}Save to a slot/,
+      'a preset with no edits can no longer be saved to another slot at all'
     )
     assert.ok(!/className="lamp"/.test(save), 'the cyan dot is back beside Save')
     assert.ok(!/topbar-dirty/.test(read('TopBar.jsx')), 'the separate UNSAVED word is back in the bar')

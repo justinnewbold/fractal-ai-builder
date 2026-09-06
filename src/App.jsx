@@ -565,8 +565,13 @@ export default function App() {
    * freshly loaded or just generated it reads as a lie. Kept separate from
    * `dirty` because they answer different questions, and cleared whenever a
    * different preset arrives: saving slot 93 says nothing about slot 2.
+   *
+   * A time rather than a flag, because the button now goes away when there is
+   * nothing to do and "Saved" has to stop being said at some point. A flag has
+   * no way to expire, and a remounted component would start its own timer and
+   * say it again for an old save.
    */
-  const [savedHere, setSavedHere] = useState(false)
+  const [savedAt, setSavedAt] = useState(null)
   const [safety, setSafety] = useState(null)
 
   // Fifteen stacked sections was a long scroll with the important things buried.
@@ -978,7 +983,7 @@ export default function App() {
         // "done" over there and the only honest thing it could say is nothing.
         await reportSave({ id: req.id, ok: true, slot: req.slot })
         setDirty(false)
-        setSavedHere(true)
+        setSavedAt(Date.now())
         record('save', `Saved "${name || preset?.name}" to slot ${req.slot}, asked for from the phone`)
         await read()
       } catch (err) {
@@ -1100,7 +1105,7 @@ export default function App() {
       setQueuedSave(null)
       if (res.ok) {
         setDirty(false)
-        setSavedHere(true)
+        setSavedAt(Date.now())
         record('save', `The Mac saved it to slot ${res.slot}`)
         read()
       } else {
@@ -1855,7 +1860,7 @@ export default function App() {
       setApplied((prev) => ({ ...prev, savedTo: number }))
       record('save', `Saved "${name || preset?.name}" to slot ${number}`)
       setDirty(false)
-      setSavedHere(true)
+      setSavedAt(Date.now())
       await read()
     } catch (err) {
       // Shown on the save bar itself as well as the banner. A refusal that
@@ -1878,7 +1883,7 @@ export default function App() {
       await selectPreset(number)
       record('select', `Loaded slot ${number}`)
       setDirty(false)
-      setSavedHere(false)
+      setSavedAt(null)
       setSafety(null)
       setResult(null)
       setApplied(null)
@@ -2081,7 +2086,7 @@ export default function App() {
       await revertPreset(preset.number)
       record('revert', `Reverted slot ${preset.number} to its saved version`)
       setDirty(false)
-      setSavedHere(false)
+      setSavedAt(null)
       setResult(null)
       setApplied(null)
       await read()
@@ -2938,6 +2943,25 @@ export default function App() {
           setPresetMenu(false)
         }}
       />
+      {/*
+        The way to the save sheet when nothing has been edited.
+
+        Save is gone from the bar unless there is something to save, which is
+        what was asked for and is right — a button that does nothing is worse
+        than no button. But it was also the only door to that sheet, and the
+        sheet is how you put a preset in a DIFFERENT slot: load 45, change
+        nothing, keep it as 46. Losing that quietly would have been a feature
+        removed under cover of a tidy-up.
+      */}
+      <button
+        className="chip preset-menu-more"
+        onClick={() => {
+          setPresetMenu(false)
+          setSheet('save')
+        }}
+      >
+        Save to a slot…
+      </button>
       <button
         className="chip preset-menu-more"
         onClick={() => {
@@ -2989,7 +3013,7 @@ export default function App() {
       >
         {status === 'live' && view !== 'gig' ? (
           <SaveBar
-            savedHere={savedHere}
+            savedAt={savedAt}
             preset={preset}
             dirty={dirty}
             busy={busy}
