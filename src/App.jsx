@@ -144,6 +144,8 @@ import {
   faultCopy
 } from './lib/link'
 import { keepAwake } from './lib/awake'
+import { loadSession, saveSession, interrupted } from './lib/session'
+import { loadCloudChat, saveCloudChat, pickChat, chatCloudReady } from './lib/cloudChat'
 import { sceneChoices } from '../api/_scenes.js'
 import { pushEntry, replaceEntry } from './lib/nav'
 import { useAsks } from './lib/asks'
@@ -265,7 +267,15 @@ export default function App() {
    */
   const [saving, setSaving] = useState(false)
 
-  const [result, setResult] = useState(null)
+  /*
+   * What was on screen when this page last existed.
+   *
+   * Read once, synchronously, before the first render — a phone coming back
+   * from the background must not flash an empty conversation on its way to the
+   * real one. See lib/session.js for why this state has to leave memory at all.
+   */
+  const restored = useRef(loadSession()).current
+  const [result, setResult] = useState(restored?.result ?? null)
   /*
    * The tones asked for earlier in this conversation.
    *
@@ -286,7 +296,7 @@ export default function App() {
    * a generation that walks the unit through every scene, and someone who
    * asked for a sound has not asked for their scene layout to be rearranged.
    */
-  const [withScenes, setWithScenes] = useState(false)
+  const [withScenes, setWithScenes] = useState(!!restored?.withScenes)
   /*
    * Whether to put the generated name on the preset itself.
    *
@@ -295,7 +305,7 @@ export default function App() {
    * whatever it was already called. Someone laying a set of scenes into a
    * preset they have already named does not want it renamed underneath them.
    */
-  const [renamePreset, setRenamePreset] = useState(true)
+  const [renamePreset, setRenamePreset] = useState(restored?.renamePreset !== false)
   /*
    * Whether this tone, exactly as it now stands, has already been written.
    *
@@ -342,13 +352,13 @@ export default function App() {
    */
   const [justDid, setJustDid] = useState(null)
   const [slot, setSlot] = useState('')
-  const [saveName, setSaveName] = useState('')
+  const [saveName, setSaveName] = useState(restored?.saveName || '')
   // A failed save is shown on the save bar as well as in the banner — the bar is
   // where the tap happened, and on a phone the banner is off-screen above it.
   const [saveError, setSaveError] = useState(null)
   const [log, setLog] = useState([])
   const [spend, setSpend] = useState({ total: 0, runs: 0 })
-  const [lastPrompt, setLastPrompt] = useState('')
+  const [lastPrompt, setLastPrompt] = useState(restored?.lastPrompt || '')
   /*
    * A failed generation, kept so it can be asked again with one tap.
    *
@@ -359,6 +369,15 @@ export default function App() {
    * condition that makes asking again safe to offer.
    */
   const [retryAsk, setRetryAsk] = useState(null)
+  /*
+   * The ask currently in flight, or null.
+   *
+   * Not state: nothing renders from it, and it has to be readable by the save
+   * below without adding a render to every generation. Its whole job is to be
+   * on disk when the page dies, so the next load can say the answer is not
+   * coming rather than waiting for it forever.
+   */
+  const pending = useRef(restored?.pending || null)
   const [historyKey, setHistoryKey] = useState(0)
   /*
    * Designs kept in a chosen folder.
@@ -504,7 +523,14 @@ export default function App() {
     () => (tasteOn ? patternsFrom(listCorrections()) : null),
     [tasteOn, correctionKey]
   )
-  const [turns, setTurns] = useState([])
+  const [turns, setTurns] = useState(() => {
+    const back = restored?.turns || []
+    // A generation that was in flight died with the page. Say so where the
+    // question was asked, rather than coming back looking as if nothing had
+    // been happening.
+    const cut = interrupted(restored?.pending)
+    return cut ? [...back, cut] : back
+  })
   const [remote, setRemote] = useState(false)
   // A slot write asked for from the phone: what it's waiting on there, and
   // what has arrived here.
@@ -946,6 +972,74 @@ export default function App() {
    * and the failure of three copies is a Disconnect that behaves differently
    * depending on which surface it was tapped on.
    */
+  /*
+   * Written down on every change, so the phone can be put in a pocket.
+   *
+   * Cheap enough to do on each render that matters: a transcript is text and a
+   * spec is a few kilobytes, and the alternative — a timer — loses whatever
+   * happened in the last tick, which on iOS is exactly the moment the page is
+   * taken away. See lib/session.js.
+   */
+  useEffect(() => {
+    saveSession({
+      turns,
+      result,
+      withScenes,
+      renamePreset,
+      saveName,
+      lastPrompt,
+      pending: pending.current
+    })
+  }, [turns, result, withScenes, renamePreset, saveName, lastPrompt, thinking])
+
+  /*
+   * And up to the account, so the conversation is the same on the next device.
+   *
+   * Debounced rather than written per turn: a reply arrives as several state
+   * changes in a row — the turn, then the tone, then what landed — and each one
+   * would otherwise be its own round trip. Two seconds after the last of them
+   * is still well inside the time it takes to pick up another device.
+   *
+   * Skipped entirely until a transcript exists, so opening the app signed in
+   * does not immediately push an empty chat over the one on the Mac.
+   */
+  useEffect(() => {
+    if (!chatCloudReady() || !turns.length) return undefined
+    const timer = setTimeout(() => {
+      saveCloudChat(turns).catch(() => {
+        // Offline. The local copy is whole and the next change tries again.
+      })
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [turns])
+
+  /*
+   * What the account was holding, once there is an account to ask.
+   *
+   * After the link has signed in, not on mount: `supabaseClient()` is null
+   * until restoreSession has run, so asking earlier would always answer "signed
+   * out" and this would never happen at all.
+   */
+  const pulledChat = useRef(false)
+  useEffect(() => {
+    if (pulledChat.current || !link.account || !chatCloudReady()) return
+    pulledChat.current = true
+    let live = true
+    loadCloudChat().then((cloud) => {
+      if (!live || !cloud) return
+      const here = { turns, at: restored?.at || 0 }
+      const winner = pickChat(here, cloud)
+      // Only when it is actually the other copy. Setting the same turns again
+      // would push them back up and restart this on the other device.
+      if (winner.from !== 'cloud') return
+      setTurns(winner.turns)
+      record('chat', `Picked up the conversation from ${cloud.device || 'your other device'}`)
+    })
+    return () => {
+      live = false
+    }
+  }, [link.account, turns, restored, record])
+
   const linkAction = useCallback(
     async (kind) => {
       setError(null)
@@ -1693,6 +1787,14 @@ export default function App() {
      * whatever half of the preset made it back.
      */
     const release = keepAwake()
+    /*
+     * On disk before the first round trip, so a page that dies during the
+     * minutes this takes comes back knowing an answer was owed. Cleared in
+     * `finally`, so a generation that finished — or failed in a way the app
+     * already reported — leaves nothing behind to apologise for.
+     */
+    pending.current = { description, at: Date.now() }
+    saveSession({ turns, result, withScenes, renamePreset, saveName, lastPrompt, pending: pending.current })
     try {
       setProgress('Reading what the unit has loaded...')
       const schema = await readSchema(
@@ -1756,6 +1858,7 @@ export default function App() {
       // Nothing reached the unit, so asking again is safe to offer.
       setRetryAsk({ description, against, opts })
     } finally {
+      pending.current = null
       release()
       setProgress(null)
       setBusy(false)

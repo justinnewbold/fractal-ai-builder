@@ -164,6 +164,32 @@ const censuses = new Map()
  */
 export const remoteHosts = () => hosts
 
+/*
+ * Who is answering, as it changes.
+ *
+ * The roll call used to be taken in one place — on joining — and read in
+ * another, so anything that re-took it had to remember to push the result back
+ * into the screen state by hand. The write gate below re-takes it, and the
+ * notice it clears is drawn from link.js, which has no way to know. Announced,
+ * every re-take reaches the screen for free.
+ */
+const hostWatchers = new Set()
+
+export function subscribeHosts(fn) {
+  hostWatchers.add(fn)
+  return () => hostWatchers.delete(fn)
+}
+
+function hostsChanged() {
+  for (const fn of hostWatchers) {
+    try {
+      fn(hosts, chosen, targeted)
+    } catch {
+      // One bad watcher shouldn't stop the others.
+    }
+  }
+}
+
 /**
  * Count the Macs on the channel, and learn what each is called.
  *
@@ -208,8 +234,17 @@ export async function censusHosts({
   }
   targeted = false
   if (hosts.length > 1 && chosen) await confirmTargeting({ windowMs, sleep })
+  countedAt = Date.now()
+  hostsChanged()
   return hosts
 }
+
+/**
+ * When the roll call was last taken, so a stale one can be told from a fresh one.
+ *
+ * Zero means never. See `conflictNow` for the whole of why this matters.
+ */
+let countedAt = 0
 
 /**
  * Shout one read and keep every answer, rather than the first.
@@ -310,6 +345,40 @@ export const hostNamesFrom = (answers, read = decode) => namesFrom(answers, read
 
 export const hostConflict = (list = hosts, pick = chosen, proved = targeted) =>
   conflictBetween(list, pick, proved)
+
+/**
+ * The clash as it is NOW, not as it was when this phone connected.
+ *
+ * "Only one Mac connected to anything, but I got this notification."
+ *
+ * The roll call was taken once, inside join, and never again. Everything after
+ * it — the notice on screen, and the refusal of every write — was answered from
+ * that one moment. So a second Mac that was awake when the phone connected and
+ * has since slept, quit, or been signed out went on blocking writes for the
+ * rest of the session, describing a room that had emptied. The only way out was
+ * to notice the "Check again" button, or to reconnect.
+ *
+ * A refusal is the one moment where being right actually matters, so that is
+ * where the question gets asked again. It costs the roll call's window — a
+ * second and a half — and only when a clash is currently believed, which in the
+ * ordinary case is never. A write that was going to be refused can afford to
+ * find out it doesn't have to be.
+ */
+export async function conflictNow(maxAgeMs = 4000) {
+  const clash = hostConflict()
+  if (!clash) return null
+  // Just taken, by a gate a moment ago or by the screen: asking again would
+  // add three seconds to a burst of writes and learn nothing.
+  if (Date.now() - countedAt < maxAgeMs) return clash
+  try {
+    await censusHosts()
+  } catch {
+    // A roll call that could not be taken leaves the last one standing, which
+    // is the careful direction: it keeps writes refused rather than letting
+    // them through on a link we just failed to question.
+  }
+  return hostConflict()
+}
 
 /**
  * The one way `hostSeen` changes, so anyone who cares hears about it.
@@ -867,7 +936,8 @@ export async function remoteRequest(path, options = {}) {
    * screen that has to explain this is built out of reads.
    */
   if (method !== 'GET') {
-    const clash = hostConflict()
+    // Asked again rather than remembered — see conflictNow.
+    const clash = await conflictNow()
     if (clash) {
       const err = new Error(clash)
       err.status = 409

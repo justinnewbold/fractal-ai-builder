@@ -43,6 +43,7 @@ import {
   hasSavedSession,
   remoteSignIn,
   censusHosts,
+  subscribeHosts,
   hostConflict,
   remoteHosts,
   remoteChosenHost,
@@ -633,6 +634,12 @@ export async function bootLink() {
     if (!up && state.role === 'remote' && state.account && wantsAutoConnect() !== false) pokeLink()
   })
   subscribeHostSeen(() => refresh())
+  /*
+   * The roll call is re-taken by the write gate now, not only here, so its
+   * answer has to reach the screen from wherever it was taken. Without this the
+   * notice would still be up over a link the gate had just cleared.
+   */
+  subscribeHosts(() => set({ hosts: remoteHosts(), chosenHost: remoteChosenHost(), clash: hostConflict() }))
 
   if (role === 'mac') {
     await readMac()
@@ -651,7 +658,12 @@ export async function bootLink() {
 
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && state.role === 'remote') pokeLink()
+      if (document.hidden || state.role !== 'remote') return
+      pokeLink()
+      // A phone comes out of a pocket into a room that may have changed. The
+      // second Mac is the thing most likely to have left, and the notice about
+      // it is the thing most in the way if it has.
+      if (state.clash) countHosts()
     })
   }
   if (typeof window !== 'undefined') {
