@@ -17,7 +17,7 @@ import { tick as haptic } from '../lib/feedback'
 import { useLongPress } from '../lib/longPress'
 import { useDismiss } from '../lib/dismiss'
 import { Tuner } from './Console'
-import { SIZES, loadSize, saveSize, sizeVars, clampSize } from '../lib/gigSize'
+import { sizeVars } from '../lib/gigSize'
 
 /**
  * The stand, not the bench.
@@ -37,22 +37,13 @@ const ofBlocks = (s) => s.blocks
 const ofTunerOn = (s) => s.tunerOn
 const ofTuning = (s) => s.tuning
 
-export default function Gig({ preset, device, capabilities, onError, onChanged, onPickPreset }) {
+export default function Gig({ preset, device, capabilities, size, onError, onChanged, onPickPreset }) {
   /*
-   * How big the buttons are, chosen by whoever is holding it.
-   *
-   * Read synchronously for the first render rather than in an effect: a stage
-   * screen that paints at one size and jumps to another is worse than either
-   * size, and the jump lands exactly when someone is reaching for it.
+   * How big the buttons are is decided in the tab bar, a row this screen does
+   * not own, so the step arrives as a prop. Only the CSS variables are applied
+   * here — on the element the two grids actually read them from. See App's
+   * `size` state and lib/gigSize.
    */
-  const [size, setSize] = useState(loadSize)
-  const resize = (by) => {
-    const next = clampSize(size + by)
-    if (next === size) return
-    haptic()
-    setSize(next)
-    saveSize(next)
-  }
   /*
    * A view over the one device state, not a second client to the unit.
    *
@@ -415,35 +406,6 @@ export default function Gig({ preset, device, capabilities, onError, onChanged, 
           )}
         </p>
       ) : null}
-
-      {/*
-        Two buttons, above the things they resize.
-        Deliberately not stage furniture: small, quiet, and set off to the
-        right, because a control that changes the screen must not be reachable
-        by the thumb that was going for scene 3. It is still a real target -
-        44px - because it is pressed while setting up, in the light.
-      */}
-      <div className="gig-size" role="group" aria-label="Button size">
-        <span className="gig-size-label">{SIZES[size].name}</span>
-        <button
-          type="button"
-          className="gig-size-step"
-          onClick={() => resize(-1)}
-          disabled={size <= 0}
-          aria-label="Smaller buttons, fit more on screen"
-        >
-          &minus;
-        </button>
-        <button
-          type="button"
-          className="gig-size-step"
-          onClick={() => resize(1)}
-          disabled={size >= SIZES.length - 1}
-          aria-label="Bigger buttons, fit less on screen"
-        >
-          +
-        </button>
-      </div>
 
       {/* Scenes lead. A scene is the bigger move and it sets every block state
           below it, so cause sits above effect rather than under it. */}

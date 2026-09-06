@@ -71,6 +71,7 @@ import { inDesktopApp } from './lib/desktop'
 import { createNameScan } from './lib/nameScan'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
 import Screens, { viewsFor } from './components/Screens'
+import { SIZES, loadSize, saveSize, clampSize } from './lib/gigSize'
 import {
   getTempo,
   setTempo,
@@ -715,6 +716,39 @@ export default function App() {
    * exactly where both belong.
    */
   const views = useMemo(() => viewsFor(narrow), [narrow])
+
+  /*
+   * How big the buttons on Play are.
+   *
+   * It lives up here rather than in Gig because it is drawn in the tab row,
+   * which Gig does not own — and the tab row is where it belongs on a phone:
+   * that row carries one word now that Ask and Edit are gone, and the control
+   * had been costing a whole line of its own directly above the scenes.
+   *
+   * Read synchronously for the first paint rather than in an effect: a stage
+   * screen that paints at one size and jumps to another is worse than either,
+   * and the jump lands exactly when someone is reaching for it.
+   */
+  const [size, setSize] = useState(loadSize)
+  /*
+   * Named rather than written inline in the tab row.
+   *
+   * test/structure.mjs locates the Play screen by searching the source for the
+   * literal conditional that opens it, and takes the first hit. A second one
+   * written above, in the tab row, hands that test the tab row instead — so
+   * the condition is given a name here and the row asks for the name.
+   *
+   * Which is also why this comment describes that string rather than quoting
+   * it: quoting it put a third hit above both of them, and the test then
+   * measured the chrome from a comment.
+   */
+  const onPlay = view === 'play'
+  const resize = (by) => {
+    const next = clampSize(size + by)
+    if (next === size) return
+    setSize(next)
+    saveSize(next)
+  }
 
   /*
    * A window narrowed while Ask was open leaves `view` naming a screen that no
@@ -3575,6 +3609,38 @@ export default function App() {
               {label}
             </button>
           ))}
+          {/*
+            The size of the buttons on Play, in the row that already exists.
+
+            It had a line of its own above the scenes, which is a whole row of
+            a stage screen spent on something pressed while setting up. The tab
+            row carries one word on a phone now, so the space was already there
+            — and being off to the right of it keeps it away from the thumb
+            going for a scene, which is why it was never put beside them.
+          */}
+          {onPlay ? (
+            <div className="gig-size" role="group" aria-label="Button size">
+              <span className="gig-size-label">{SIZES[size].name}</span>
+              <button
+                type="button"
+                className="gig-size-step"
+                onClick={() => resize(-1)}
+                disabled={size <= 0}
+                aria-label="Smaller buttons, fit more on screen"
+              >
+                &minus;
+              </button>
+              <button
+                type="button"
+                className="gig-size-step"
+                onClick={() => resize(1)}
+                disabled={size >= SIZES.length - 1}
+                aria-label="Bigger buttons, fit less on screen"
+              >
+                +
+              </button>
+            </div>
+          ) : null}
         </nav>
       ) : null}
 
@@ -3642,6 +3708,7 @@ export default function App() {
           preset={preset}
           device={device}
           capabilities={device?.capabilities}
+          size={size}
           onError={setError}
           onChanged={read}
           onPickPreset={() => setPresetMenu(true)}
