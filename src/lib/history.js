@@ -40,6 +40,46 @@ export function listPresets() {
 }
 
 /**
+ * What identifies one tone across the stores it might be in.
+ *
+ * Not the id: a preset copied to an account gets a fresh one, and its times
+ * differ by however long the copy took. Name plus description is what survives
+ * the move — and keeps two takes on the same prompt apart, which two rows with
+ * the same name would not.
+ *
+ * Exported because the copy-up has to ask the same question this list asks. A
+ * migration that deduplicates differently from the list showing the result is a
+ * migration that appears to have done nothing, or to have done it twice.
+ */
+export function signatureOf(entry) {
+  return `${entry?.name || ''} ${entry?.description || ''}`
+}
+
+/**
+ * How many tones on this device are not on the account.
+ *
+ * Beside the other two on purpose: this asks the same question the list and the
+ * copy-up ask, and three places asking it three ways is how a panel comes to
+ * say "12 to copy" over a button that copies nothing.
+ *
+ * A folder entry can only be matched on its name — its description is inside
+ * the file, and this runs on every render. So the number is exact for what is
+ * in browser storage and a good-faith estimate for what is in a folder; the
+ * copy itself opens each file and matches properly, which is why it can report
+ * having sent fewer than this said. Overstating what is stranded is the safe
+ * direction: the correction arrives as "3 were already there", not as a library
+ * quietly left behind.
+ */
+export function notOnAccount(local = [], cloud = []) {
+  if (!cloud.length) return local.length
+  const signatures = new Set(cloud.map(signatureOf))
+  const names = new Set(cloud.map((e) => e?.name || ''))
+  return local.filter((e) =>
+    e?.spec ? !signatures.has(signatureOf(e)) : !names.has(e?.name || '')
+  ).length
+}
+
+/**
  * Several stores, one list, newest first and each preset once.
  *
  * A preset is very often in two places: copying this browser's presets to an
@@ -47,18 +87,26 @@ export function listPresets() {
  * holds every one of them twice. Shown twice it is a list that looks broken;
  * counted twice it makes a habit look twice as settled as it is.
  *
- * The signature is name plus description, because the two copies carry
- * different ids and their timestamps differ by however long the copy took.
  * Sorted before deduplicating, so the surviving copy is the newest one.
  */
 export function newestFirst(...groups) {
   const seen = new Set()
+  const names = new Set()
   const out = []
   for (const entry of groups.flat().sort((a, b) => (b?.at || 0) - (a?.at || 0))) {
     if (!entry) continue
-    const signature = `${entry.name || ''} ${entry.description || ''}`
-    if (seen.has(signature)) continue
-    seen.add(signature)
+    /*
+     * A folder listing carries a name and a time, not the tone — opening forty
+     * files to draw a list nobody has clicked is not worth it. So a folder
+     * entry can only be matched on its name, which is all it has, and without
+     * that it survives every dedupe: the same tone appears once as a file and
+     * again as an account row, which is exactly what copying to the account
+     * produces on a Mac with a folder set.
+     */
+    const duplicate = entry.spec ? seen.has(signatureOf(entry)) : names.has(entry.name || '')
+    if (duplicate) continue
+    seen.add(signatureOf(entry))
+    names.add(entry.name || '')
     out.push(entry)
   }
   return out

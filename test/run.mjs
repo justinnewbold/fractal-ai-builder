@@ -346,6 +346,152 @@ test('anything else is passed through rather than swallowed', () => {
   assert.match(cloud.explain(null), /failed/i)
 })
 
+/*
+ * Copying up, twice, and from the store the Mac actually uses.
+ *
+ * Both sides of the network are injected here, so what is under test is the
+ * rule about what gets sent — which is the part that was wrong — rather than
+ * Supabase.
+ */
+const tone = (name, description, spec = { blocks: [] }) => ({ name, description, spec })
+const {
+  signatureOf,
+  newestFirst: newestFirstEntries,
+  notOnAccount: notOnAccountCount
+} = await import('../src/lib/history.js')
+
+test('a preset already on the account is not sent again', async () => {
+  /*
+   * Every insert was unconditional. So the button was safe to press exactly
+   * once, and doubled the account every time after — and nothing about a
+   * button reading "copy your presets up" says it may only ever be pressed
+   * once. Someone who pressed it twice had two of everything, for ever.
+   */
+  const sent = []
+  const result = await cloud.pushLocalPresets(
+    [tone('Black Album', 'tight and scooped'), tone('Bulls & Boxcars', 'open and ringing')],
+    null,
+    {
+      existing: async () => [tone('Black Album', 'tight and scooped')],
+      save: async (e) => sent.push(e.name)
+    }
+  )
+  assert.deepEqual(sent, ['Bulls & Boxcars'])
+  assert.equal(result.saved, 1)
+  assert.equal(result.skipped, 1)
+})
+
+test('two takes on one prompt are two presets, not one', () => {
+  // The signature is name plus description for exactly this reason: a
+  // refinement carries the instruction that made it, so it is its own tone.
+  assert.notEqual(
+    signatureOf(tone('Lead', 'more gain')),
+    signatureOf(tone('Lead', 'more gain, less fizz'))
+  )
+})
+
+test("a design in the folder is copied up, not just the browser's", async () => {
+  /*
+   * The one that made this useless where it mattered. On a Mac with a folder
+   * chosen, a design is written to disk INSTEAD of browser storage — so the
+   * machine holding the whole stranded library had, by the old reckoning,
+   * nothing to copy. A folder listing is a name and a time, so an item may be
+   * a way to fetch a tone rather than the tone.
+   */
+  const sent = []
+  const result = await cloud.pushLocalPresets(
+    [{ name: 'From the folder', at: 1, load: async () => tone('From the folder', 'a file on disk') }],
+    null,
+    { existing: async () => [], save: async (e) => sent.push(e.description) }
+  )
+  assert.deepEqual(sent, ['a file on disk'])
+  assert.equal(result.saved, 1)
+})
+
+test('a folder design already on the account is matched on what is inside it', async () => {
+  // Its description lives in the file, so the signature before loading is not
+  // the signature it will have. Resolved first, then checked — the other way
+  // round skips the wrong things.
+  const sent = []
+  const result = await cloud.pushLocalPresets(
+    [{ name: 'Bulls & Boxcars', load: async () => tone('Bulls & Boxcars', 'open and ringing') }],
+    null,
+    {
+      existing: async () => [tone('Bulls & Boxcars', 'open and ringing')],
+      save: async (e) => sent.push(e.name)
+    }
+  )
+  assert.deepEqual(sent, [])
+  assert.equal(result.skipped, 1)
+})
+
+test('the same tone in both stores is sent once', async () => {
+  // Browser storage and the folder can both hold it — the set grows as the
+  // batch runs so the second copy is skipped like any other duplicate.
+  const sent = []
+  await cloud.pushLocalPresets(
+    [tone('Twice', 'here and there'), { name: 'Twice', load: async () => tone('Twice', 'here and there') }],
+    null,
+    { existing: async () => [], save: async (e) => sent.push(e.name) }
+  )
+  assert.deepEqual(sent, ['Twice'])
+})
+
+test('a file that cannot be read is reported, and the rest still go', async () => {
+  const sent = []
+  const result = await cloud.pushLocalPresets(
+    [
+      { name: 'Gone', load: async () => { throw new Error('The folder is not open.') } },
+      tone('Fine', 'still here')
+    ],
+    null,
+    { existing: async () => [], save: async (e) => sent.push(e.name) }
+  )
+  assert.deepEqual(sent, ['Fine'])
+  assert.equal(result.failed.length, 1)
+  assert.match(result.failed[0], /Gone — The folder is not open\./)
+})
+
+test('a folder listing shown beside its own account copy is one row, not two', () => {
+  /*
+   * Copying to the account is what creates this: the same tone is then a file
+   * on disk AND a row on the account. A listing has no description, so it
+   * matched nothing and survived every dedupe — which would have made the fix
+   * above show every rescued preset twice.
+   */
+  const shown = newestFirstEntries(
+    [{ name: 'Bulls & Boxcars', description: 'open and ringing', spec: {}, at: 2 }],
+    [{ name: 'Bulls & Boxcars', at: 1, where: 'folder' }]
+  )
+  assert.equal(shown.length, 1)
+  assert.equal(shown[0].where, undefined, 'the one that can be opened anywhere is the one kept')
+})
+
+test('the heading counts what is stranded, not what is kept', () => {
+  /*
+   * The number goes in a panel heading that is folded shut, which is the only
+   * place someone learns there is anything to do without opening it first. So
+   * it has to count what is missing, not what exists: "copy your 40 presets up"
+   * over an account already holding 39 describes work nobody needs.
+   */
+  const local = [tone('One', 'a'), tone('Two', 'b'), tone('Three', 'c')]
+  assert.equal(notOnAccountCount(local, []), 3, 'nothing on the account means all of it is stranded')
+  assert.equal(notOnAccountCount(local, [tone('Two', 'b')]), 2)
+  assert.equal(notOnAccountCount(local, local), 0)
+})
+
+test('a folder entry is counted on its name, because that is all a listing has', () => {
+  /*
+   * Its description is inside the file and this runs on every render. Exact for
+   * browser storage, a good-faith estimate for a folder — and overstating is
+   * the safe direction: the correction arrives as "3 were already there", not
+   * as a library quietly left behind.
+   */
+  const stub = { name: 'Bulls & Boxcars', at: 1 }
+  assert.equal(notOnAccountCount([stub], [tone('Bulls & Boxcars', 'open and ringing')]), 0)
+  assert.equal(notOnAccountCount([stub], [tone('Something else', 'open and ringing')]), 1)
+})
+
 test('the client never sends user_id', async () => {
   /*
    * It is the column default, which is auth.uid(). A client-supplied value is

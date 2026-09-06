@@ -93,7 +93,7 @@ import {
   forgetPresetName,
   readSceneNames
 } from './lib/forgefx'
-import { savePreset, buildEntry, deletePreset, typicalMs } from './lib/history'
+import { savePreset, buildEntry, deletePreset, typicalMs, notOnAccount } from './lib/history'
 import { costOf } from './lib/cost'
 import { isDemo, setDemo } from './lib/forgefx'
 import {
@@ -428,6 +428,47 @@ export default function App() {
       stop = true
     }
   }, [historyKey])
+
+  /*
+   * Everything kept on THIS device, and how to fetch each one whole.
+   *
+   * The copy-to-account button read browser storage and nothing else, which is
+   * the wrong half on the machine it exists for: when a folder is chosen a
+   * design is written to disk INSTEAD of browser storage, so a Mac with a
+   * folder set had, by that button's reckoning, nothing to copy — while
+   * holding the entire library the button was written to rescue.
+   *
+   * A folder listing is a name and a time, so what is handed over is a way to
+   * read the file rather than the tone itself. Nothing opens forty files to
+   * draw a list; the copy opens only what it is about to send.
+   */
+  const onThisDevice = useMemo(
+    () => [
+      ...listPresets(),
+      ...folderSaves.map((f) => ({
+        name: f.name,
+        at: f.at,
+        load: async () => {
+          const { savedFolder, readDesignFile } = await import('./lib/localFolder')
+          const folder = await savedFolder()
+          if (!folder || folder.needsPermission) throw new Error('The folder is not open.')
+          return readDesignFile(folder.handle || folder, f.file)
+        }
+      }))
+    ],
+    [historyKey, folderSaves]
+  )
+
+  /*
+   * How many of those are not on the account.
+   *
+   * A count, not a list: it goes in a panel heading that is folded shut, which
+   * is the only place someone learns there is anything to do without having to
+   * open it first. The rule itself lives beside the list's dedupe and the
+   * copy-up's, because three places asking this question three ways is how a
+   * panel comes to say "12 to copy" over a button that copies nothing.
+   */
+  const stranded = useMemo(() => notOnAccount(onThisDevice, cloudSaves), [cloudSaves, onThisDevice])
 
   const taste = useMemo(
     () => (tasteOn ? profileFrom(library) : null),
@@ -3563,8 +3604,25 @@ export default function App() {
             being reinstalled, and browser storage is the fallback that needs
             neither. Listed in that order because that is the order of how
             much they survive. */}
-        <Section key="account-presets" title="Kept with your account" note="On any machine you sign in from">
-          <CloudPresets onLoad={reload} onError={setError} busy={busy} />
+        {/* The note carries the number on purpose. This panel is folded shut,
+            so without it the only way to find out that a library is stranded on
+            one machine is to open a panel you had no reason to open. */}
+        <Section
+          key="account-presets"
+          title="Kept with your account"
+          note={
+            cloudReady() && stranded
+              ? `${stranded} here ${stranded === 1 ? 'is' : 'are'} not on your account yet`
+              : 'On any machine you sign in from'
+          }
+        >
+          <CloudPresets
+            onLoad={reload}
+            onError={setError}
+            busy={busy}
+            local={onThisDevice}
+            missing={stranded}
+          />
         </Section>
 
         <Section key="saved-presets" title="Saved presets" note="Captures and designs, as files in a folder you choose">

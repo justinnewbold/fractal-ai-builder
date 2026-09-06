@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import { listCloudPresets, deleteCloudPreset, pushLocalPresets, cloudReady } from '../lib/cloudPresets'
-import { listPresets } from '../lib/history'
 
 /**
  * Presets kept with the account, so a new machine is not a fresh start.
@@ -15,8 +14,15 @@ import { listPresets } from '../lib/history'
  * A copy, never a move. The local entries stay where they are: the two stores
  * are different things, and a partial failure must not have eaten the
  * originals.
+ *
+ * What there is to copy is handed in rather than read here, because this file
+ * used to read browser storage and nothing else — and on a Mac with a folder
+ * chosen, a design is written to disk INSTEAD of browser storage. So the
+ * machine whose entire library was stranded on it had, by this panel's
+ * reckoning, nothing to copy. The caller knows about both stores; this one only
+ * ever knew about the smaller.
  */
-export default function CloudPresets({ onLoad, onError, busy }) {
+export default function CloudPresets({ onLoad, onError, busy, local = [], missing = 0 }) {
   const [entries, setEntries] = useState(null)
   const [working, setWorking] = useState(null)
   const [note, setNote] = useState(null)
@@ -43,8 +49,6 @@ export default function CloudPresets({ onLoad, onError, busy }) {
       </p>
     )
   }
-
-  const local = listPresets()
 
   return (
     <div className="cloud-presets">
@@ -90,24 +94,29 @@ export default function CloudPresets({ onLoad, onError, busy }) {
       )}
 
       {/* Only offered when there is something to copy. An empty migration
-          button is a question nobody asked. */}
+          button is a question nobody asked.
+
+          It says how many are not on the account rather than how many exist,
+          because "copy your 40 presets up" over an account that already holds
+          39 of them describes work nobody needs and reads like a warning. */}
       {local.length ? (
         <div className="history-actions">
           <button
             className="chip"
-            disabled={busy || working === 'push'}
+            disabled={busy || working === 'push' || missing === 0}
             onClick={async () => {
               setWorking('push')
               setNote(null)
               try {
-                const { saved, failed } = await pushLocalPresets(local, (done, total, name) =>
+                const { saved, skipped, failed } = await pushLocalPresets(local, (done, total, name) =>
                   setNote(`Copying ${done} of ${total} — ${name || 'untitled'}`)
                 )
                 await refresh()
+                const also = skipped ? ` ${skipped} ${skipped === 1 ? 'was' : 'were'} already there.` : ''
                 setNote(
                   failed.length
-                    ? `Copied ${saved}. ${failed.length} did not go: ${failed[0]}`
-                    : `Copied ${saved} preset${saved === 1 ? '' : 's'} to your account. The browser copies are still here.`
+                    ? `Copied ${saved}.${also} ${failed.length} did not go: ${failed[0]}`
+                    : `Copied ${saved} preset${saved === 1 ? '' : 's'} to your account.${also} The copies on this device are still here.`
                 )
               } catch (err) {
                 onError?.(err.message)
@@ -118,7 +127,9 @@ export default function CloudPresets({ onLoad, onError, busy }) {
           >
             {working === 'push'
               ? 'Copying…'
-              : `Copy this browser's ${local.length} preset${local.length === 1 ? '' : 's'} up`}
+              : missing === 0
+                ? 'Everything on this device is on your account'
+                : `Copy ${missing} preset${missing === 1 ? '' : 's'} from this device up`}
           </button>
         </div>
       ) : null}
