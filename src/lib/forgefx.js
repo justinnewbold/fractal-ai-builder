@@ -1698,10 +1698,26 @@ export async function readSceneNames(number) {
 export function forgetSceneNames(number) {
   if (typeof number !== 'number') return
   try {
-    const all = JSON.parse(localStorage.getItem(SCENE_NAME_CACHE) || '{}')
+    const raw = localStorage.getItem(SCENE_NAME_CACHE)
+    /*
+     * Nothing cached, nothing to forget — and nothing to write.
+     *
+     * This read `|| '{}'`, deleted from the empty object and wrote it back, so
+     * renaming a scene where no name had ever been cached CREATED the key as
+     * `{}`. In the demo that is every rename, because the demo keeps its names
+     * in its own store: reported as `fractal.demo.sceneNames` populated beside
+     * a `fractal.sceneNames` that is permanently an empty object, which reads
+     * like two stores disagreeing when it is one store and a stray.
+     *
+     * Removing the empty one on the way past clears it for anyone already
+     * carrying it, without a migration that would have to be kept for ever.
+     */
+    if (!raw) return
+    const all = JSON.parse(raw)
     delete all[sceneNameKey(number)]
     delete all[number] // entries from before the cache was keyed by device
-    localStorage.setItem(SCENE_NAME_CACHE, JSON.stringify(all))
+    if (Object.keys(all).length) localStorage.setItem(SCENE_NAME_CACHE, JSON.stringify(all))
+    else localStorage.removeItem(SCENE_NAME_CACHE)
   } catch {
     // Nothing to clean up if it was never written.
   }

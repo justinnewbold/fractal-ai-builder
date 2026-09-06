@@ -1865,8 +1865,11 @@ button.scene.current .scene-num {
   gap: var(--s-1);
 }
 
+/* A, B, C, D — a primary control, and the only one here that had a width floor
+   and no height to go with it. 44px is the whole guideline, not half of it. */
 .channel-buttons .chip {
   min-width: 44px;
+  min-height: 44px;
   text-align: center;
 }
 
@@ -4094,7 +4097,20 @@ ol.action-list li.destructive::marker {
   --silk-dim: #3f444c; /* 8.5:1 on the chassis */
   --silk-faint: #4d525a; /* 6.8:1 — #62676f (4.9:1) still read as "a little light" on a phone in daylight */
 
-  --signal: #b5711a;
+  /*
+   * Amber, dark enough to be read on and read against.
+   *
+   * #b5711a carried the near-white ink of the Save button at 3.78:1 — under the
+   * 4.5:1 floor, measured, on the button people press hardest and in a hurry.
+   * And it is used as text and as a rule in forty other places on this cream
+   * ground, where it came to 3.43:1: below the floor in both directions at
+   * once.
+   *
+   * This is 4.98:1 for the ink on it and 4.51:1 for it on paper, which is the
+   * pair that has to hold rather than either alone. Dark-theme amber was never
+   * the problem — 8.88:1 both ways — and is untouched.
+   */
+  --signal: #9c5f12;
   --live: #1f7f92;
   --fault: #b23b23;
   --ok: #1f7a45; /* darker on paper — the dark-theme green greys out on white */
