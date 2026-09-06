@@ -79,7 +79,13 @@ export function run(test) {
     // onChange is a named handler rather than setView itself: a tab pressed by
     // hand also clears the report of what the last request in words did, which
     // is otherwise left on a screen the person has moved on from.
-    assert.match(app, /<Screens view=\{view\} enabled=\{status === 'live'\} onChange=\{changeView\}>/)
+    // And `order` is what the surface may swipe between, which is not always
+    // all three: a phone reaches the stage screen alone, and a swipe that
+    // could still reach Ask would walk around that.
+    assert.match(
+      app,
+      /<Screens view=\{view\} enabled=\{status === 'live'\} order=\{views\} onChange=\{changeView\}>/
+    )
   })
 
   test('a grab surface holding a control lets the control have its tap', () => {

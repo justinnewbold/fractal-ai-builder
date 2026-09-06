@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 
 /**
- * The three screens, side by side under the thumb.
+ * The screens a viewport reaches, side by side under the thumb.
  *
- * On a phone the tabs are a row of small words at the top of the page, and the
- * page is long. Changing screens meant scrolling back up, finding the word and
- * hitting it. A swipe is where the hand already is.
+ * How many that is depends on the viewport — see `viewsFor`. A desktop has
+ * three; a phone has the stage screen alone, and none of what follows runs,
+ * because there is nowhere to swipe to.
+ *
+ * Where there is more than one: the tabs are a row of small words at the top
+ * of the page, and the page is long. Changing screens meant scrolling back up,
+ * finding the word and hitting it. A swipe is where the hand already is.
  *
  * The one rule is that this surface never wins an argument. It is every
  * control on the screen at once, so it takes nothing on touchstart — no
@@ -19,6 +23,30 @@ import { useEffect, useRef, useState } from 'react'
  * one is ignored and the page scrolls under the drag.
  */
 export const ORDER = ['play', 'ask', 'shape']
+
+/**
+ * The bench screens, as opposed to the stage one.
+ *
+ * Ask designs a sound and Edit rebuilds a chain. Both are sit-down work: a
+ * conversation to read and reply to, and a 4x12 grid to drag blocks around on.
+ * Play is the other kind — what preset, which scene, that block off, am I in
+ * tune — and it is the only one worth having under a thumb in the dark.
+ *
+ * The phone apps in `mobile/` have never carried either, and say why in
+ * Stage.js: "a generate button within reach of a stage tap is a hazard". The
+ * web app on a phone had both, one sideways swipe from the stage screen. This
+ * is that same rule, applied to the surface that was missing it.
+ */
+export const BENCH = ['ask', 'shape']
+
+/**
+ * Which screens a viewport reaches.
+ *
+ * A phone gets the stage screen alone. Everything else keeps all three: a
+ * desktop browser is where the bench work belongs, so this hides it rather
+ * than removing it.
+ */
+export const viewsFor = (narrow) => (narrow ? ORDER.filter((id) => !BENCH.includes(id)) : ORDER)
 
 /** Where a sideways drag already means something else. */
 export const YIELDS =
@@ -34,7 +62,7 @@ const EDGE = 3 // past the last screen the page follows at a third: there is not
 const stillness = () =>
   typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
-export default function Screens({ view, enabled, onChange, children }) {
+export default function Screens({ view, enabled, order = ORDER, onChange, children }) {
   const outer = useRef(null)
   const inner = useRef(null)
   const [entering, setEntering] = useState(null)
@@ -58,8 +86,11 @@ export default function Screens({ view, enabled, onChange, children }) {
   useEffect(() => {
     const node = outer.current
     const page = inner.current
-    if (!node || !page || !enabled) return undefined
-    const at = ORDER.indexOf(view)
+    // One screen is not a set of screens: with nowhere to swipe to, the
+    // listener is pure cost and every drag on the stage screen would be
+    // measured against a decision that cannot come out either way.
+    if (!node || !page || !enabled || order.length < 2) return undefined
+    const at = order.indexOf(view)
     let touch = null
 
     const release = () => {
@@ -98,7 +129,7 @@ export default function Screens({ view, enabled, onChange, children }) {
 
       if (e.cancelable) e.preventDefault()
       const now = performance.now()
-      const next = ORDER[at + (dx < 0 ? 1 : -1)]
+      const next = order[at + (dx < 0 ? 1 : -1)]
       const shown = next ? dx : dx / EDGE
       // Speed over the last stretch of the drag, not the last event: one
       // late event would read as a stop, and one early one as a flick.
@@ -117,7 +148,7 @@ export default function Screens({ view, enabled, onChange, children }) {
       const { axis, dx, v } = touch
       release()
       if (axis !== 'x') return
-      const next = ORDER[at + (dx < 0 ? 1 : -1)]
+      const next = order[at + (dx < 0 ? 1 : -1)]
       // A fast flick back the way you came is a change of mind, however far
       // the page had travelled.
       const undo = Math.abs(v) > FLICK && Math.sign(v) !== Math.sign(dx)
@@ -172,7 +203,7 @@ export default function Screens({ view, enabled, onChange, children }) {
       release()
       rest()
     }
-  }, [view, enabled, onChange])
+  }, [view, enabled, order, onChange])
 
   return (
     <div className="screens" ref={outer} data-enter={entering || undefined}>

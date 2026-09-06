@@ -70,7 +70,7 @@ import { countFromRefusal, slotCount, slotOutside, timeLeft } from './lib/slots'
 import { inDesktopApp } from './lib/desktop'
 import { createNameScan } from './lib/nameScan'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
-import Screens from './components/Screens'
+import Screens, { viewsFor } from './components/Screens'
 import {
   getTempo,
   setTempo,
@@ -702,6 +702,28 @@ export default function App() {
    * under the bar, where there is a page around it to tap.
    */
   const narrow = useAsks('(max-width: 620px)')
+
+  /*
+   * Which screens this viewport reaches.
+   *
+   * Ask and Edit are bench work and a phone is not a bench: designing a tone
+   * is a conversation to read, and rebuilding a chain is a drag around a 4x12
+   * grid. Both sat one sideways swipe from the stage screen, which put a
+   * generate button and a grid editor within reach of a thumb mid-song.
+   *
+   * Hidden on a phone rather than deleted, because a desktop browser is
+   * exactly where both belong.
+   */
+  const views = useMemo(() => viewsFor(narrow), [narrow])
+
+  /*
+   * A window narrowed while Ask was open leaves `view` naming a screen that no
+   * longer has a tab, a swipe or a rendered body — an app showing nothing, with
+   * no way back. Turning a phone sideways does the same thing in reverse.
+   */
+  useEffect(() => {
+    if (!views.includes(view)) setView('play')
+  }, [views, view])
 
   /* A tap outside and Escape are the two ways anyone expects to dismiss a
      menu; without them the only way out is finding the button again. The
@@ -1377,12 +1399,19 @@ export default function App() {
   const fromPop = useRef(false)
   const viewRef = useRef(view)
   viewRef.current = view
+  /* Read through a ref so the listener still subscribes once: the reachable
+     set changes when a window is resized, and this must not resubscribe. */
+  const viewsRef = useRef(views)
+  viewsRef.current = views
   useEffect(() => {
     replaceEntry({ view: viewRef.current })
     const onPop = (e) => {
       const st = e.state
       if (!st || st.sheet || typeof st.view !== 'string') return
       if (st.view === viewRef.current) return
+      /* Entries pushed while the window was wide outlive the width that made
+         them. Back should not restore a screen this viewport has no tab for. */
+      if (!viewsRef.current.includes(st.view)) return
       fromPop.current = true
       setView(st.view)
     }
@@ -2694,6 +2723,8 @@ export default function App() {
    * being the thing on screen.
    */
   const changeView = (next) => {
+    // A swipe cannot reach an unreachable screen, but a caller might.
+    if (!views.includes(next)) return
     setJustDid(null)
     setView(next)
   }
@@ -2791,6 +2822,9 @@ export default function App() {
             ? { view: 'shape', anchor: '.chain-strip' }
             : null
     if (!target) return
+    // The anchor lives on a screen a phone no longer reaches: there is nothing
+    // to move to and nothing to scroll to once there.
+    if (target.view && !views.includes(target.view)) return
     if (target.view) setView(target.view)
     if (target.sheet) setSheet(target.sheet)
     // After the surface exists, not before — two frames, because a sheet
@@ -3524,7 +3558,7 @@ export default function App() {
             ['play', 'Play'],
             ['ask', '✦ Ask'],
             ['shape', 'Edit']
-          ].map(([id, label]) => (
+          ].filter(([id]) => views.includes(id)).map(([id, label]) => (
             <button
               key={id}
               className={`view-tab ${view === id ? 'current' : ''}`}
@@ -3542,7 +3576,7 @@ export default function App() {
         already the screen. Create has it full height and does not need a way
         to open what is open.
       */}
-      {status === 'live' && view !== 'ask' ? (
+      {status === 'live' && view !== 'ask' && views.includes('ask') ? (
         <button
           className="ask-anywhere"
           onClick={() => setSheet('chat')}
@@ -3578,9 +3612,11 @@ export default function App() {
             ))}
           </ul>
           <div className="history-actions">
-            <button className="chip" onClick={() => setView('ask')}>
-              Back to the chat
-            </button>
+            {views.includes('ask') ? (
+              <button className="chip" onClick={() => setView('ask')}>
+                Back to the chat
+              </button>
+            ) : null}
             <button className="chip" onClick={() => setJustDid(null)}>
               Got it
             </button>
@@ -3593,7 +3629,7 @@ export default function App() {
         takes nothing on touchstart — every control on every screen is inside
         it — and only claims a drag that has plainly gone sideways.
       */}
-      <Screens view={view} enabled={status === 'live'} onChange={changeView}>
+      <Screens view={view} enabled={status === 'live'} order={views} onChange={changeView}>
       {status === 'live' && view === 'play' ? (
         <Gig
           preset={preset}
