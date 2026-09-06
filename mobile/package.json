@@ -1,0 +1,30 @@
+{
+  "name": "fractal-remote",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "doctor": "expo-doctor"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@supabase/supabase-js": "^2.115.0",
+    "base64-js": "^1.5.1",
+    "expo": "^57.0.20",
+    "expo-haptics": "~57.0.2",
+    "expo-keep-awake": "~57.0.1",
+    "expo-splash-screen": "~57.0.8",
+    "expo-status-bar": "~57.0.1",
+    "fflate": "^0.8.3",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-url-polyfill": "^4.0.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2"
+  }
+}

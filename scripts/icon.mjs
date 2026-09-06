@@ -25,7 +25,22 @@ import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const source = resolve(root, 'public/icon.svg')
-const out = resolve(root, 'desktop/build/icon.png')
+/*
+ * Every raster of the icon, from the one drawing of it.
+ *
+ * The Mac app needs a PNG because electron-builder makes the .icns from one.
+ * The phone apps need three, and Expo will not read an SVG: the launcher icon,
+ * Android's adaptive foreground (same artwork — the app's own rounded square
+ * sits inside Android's mask rather than fighting it), and the splash mark.
+ * They are the same 1024px render written to four places, which is the only
+ * arrangement in which they cannot disagree about what the app looks like.
+ */
+const outputs = [
+  'desktop/build/icon.png',
+  'mobile/assets/icon.png',
+  'mobile/assets/adaptive-icon.png',
+  'mobile/assets/splash-icon.png'
+].map((rel) => resolve(root, rel))
 const SIZE = 1024
 
 // createRequire rather than a bare import so an installation outside the
@@ -38,7 +53,7 @@ try {
   console.error(
     'This needs Playwright, which is deliberately not a dependency:\n' +
       '  npm i -D playwright && npx playwright install chromium\n' +
-      `The committed ${out.slice(root.length + 1)} is what the build uses, so this only has to run when the icon changes.`
+      'The committed PNGs are what the builds use, so this only has to run when the icon changes.'
   )
   process.exit(1)
 }
@@ -50,7 +65,9 @@ const page = await browser.newPage({ viewport: { width: SIZE, height: SIZE }, de
 await page.setContent(
   `<style>html,body{margin:0;padding:0;background:transparent}svg{display:block;width:${SIZE}px;height:${SIZE}px}</style>${svg}`
 )
-mkdirSync(dirname(out), { recursive: true })
-await page.locator('svg').screenshot({ path: out, omitBackground: true })
+for (const out of outputs) {
+  mkdirSync(dirname(out), { recursive: true })
+  await page.locator('svg').screenshot({ path: out, omitBackground: true })
+  console.log(`${out.slice(root.length + 1)} — ${SIZE}x${SIZE} from ${source.slice(root.length + 1)}`)
+}
 await browser.close()
-console.log(`${out.slice(root.length + 1)} — ${SIZE}x${SIZE} from ${source.slice(root.length + 1)}`)

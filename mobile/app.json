@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "Fractal Remote",
+    "slug": "fractal-remote",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "fractalremote",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0d0f12",
+    "primaryColor": "#f0a73c",
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "ios": {
+      "bundleIdentifier": "cloud.newbold.fractalremote",
+      "supportsTablet": true,
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "cloud.newbold.fractalremote",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0d0f12"
+      }
+    },
+    "plugins": [
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0d0f12",
+          "imageWidth": 200
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {}
+    }
+  }
+}

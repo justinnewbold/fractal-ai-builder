@@ -73,6 +73,7 @@ Quit FM3-Edit before starting. Only one program can hold the USB port.
 - [x] Phase 4a — scenes, channels, adaptive write encoding
 - [x] Phase 4b — cab/IR picker, live meters *(block placement deliberately deferred, see below)*
 - [x] Phase 5 — .syx backup and restore, saved preset library
+- [x] Phase 6 — native iOS and Android remote, in `mobile/`
 
 ### Block placement, and the probe that makes it safe
 
@@ -309,6 +310,30 @@ real failure, including the device's own reported norm values used as fixtures �
 71.999 Hz reads `norm 0.42866` on a 10–1000 log range, and the conversion has to
 agree.
 
+## The phone apps
+
+`mobile/` is a React Native app — one codebase, iOS and Android — that joins the
+same private channel this app does and drives the unit at your Mac. Its own
+README covers building it; what follows is why it exists and what it shares.
+
+Two of the three reasons are in the section below: Safari cannot call
+`http://localhost`, and no page loaded over the network can either. The third is
+that a web page cannot stop a phone from locking itself, and a remote that has
+gone dark by the time the count-in starts is not a remote.
+
+Nothing about the protocol changes. Same channel, same host, same refusals — and
+the rule that decides those refusals is now in `shared/relay-rules.mjs`, which
+`src/lib/remote.js` imports directly and the phone app carries as a generated
+copy (`npm run sync:rules`). A hand-written second copy of that allowlist is
+exactly what drifted before, in both directions at once: it blocked GETs the
+host happily serves and allowed writes the host refuses. `npm test` regenerates
+the copy in memory and fails on any difference, so the two ends cannot disagree
+about what a phone may do.
+
+What the app does *not* carry is the rest of this one. No generation, no grid
+editing, no library, no saves — a generate button within reach of a stage tap is
+a hazard, and the host refuses a slot write from a distance anyway.
+
 ## Browser support, and using it from a phone
 
 Chrome works. **Safari does not** — it blocks a secure page from calling
@@ -318,7 +343,8 @@ The same rule is why the hosted app can't be used from a phone. Browsers make an
 exception letting an HTTPS page call `http://localhost` — that exemption is the
 only reason the hosted app works at all — and it does not extend to a LAN
 address. So a phone loading the hosted URL cannot reach ForgeFX on your Mac, and
-no app-side work changes that.
+no app-side work changes that. What does change it is not being a web page: see
+`mobile/`.
 
 ForgeFX can serve the app itself, which makes everything same-origin and
 sidesteps the rule:

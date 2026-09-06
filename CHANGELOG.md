@@ -3,6 +3,43 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.90.0
+
+**The phone apps.** iOS and Android, in `mobile/`, joining the same private
+channel the web app does.
+
+- One React Native codebase, built in the cloud by the `mobile` workflow — no
+  Xcode and no Android Studio. Every pull request that touches it bundles both
+  platforms with Metro, which is the only thing that catches an import Metro
+  can't resolve; `npm test` never would, and an EAS build finds it minutes in on
+  a machine at the far end of a queue.
+- Three things a web page cannot do, all of which matter on a stage. Safari
+  blocks a secure page from calling `http://localhost`, so iOS has never been
+  able to run this at the Mac. No page loaded over the network can reach ForgeFX
+  either. And a page cannot stop a phone locking itself — a remote gone dark by
+  the count-in is not a remote. The stage screen holds the screen awake and
+  every control answers through the case.
+- The allowlist has one home now. `shared/relay-rules.mjs` holds what may travel
+  the relay, how long to wait for it, and the words for a refusal; the web app
+  imports it and the phone carries a generated copy. That list drifted once
+  before in both directions at once — blocking GETs the host serves, allowing
+  writes the host refuses, eight routes disagreeing by the time anyone compared
+  them — and `npm test` now regenerates the copy in memory and fails on any
+  difference. A hand-kept second copy was the bug.
+- What the phone deliberately cannot do: generate, edit the grid, or save. The
+  host refuses a slot write from a distance and is right to, and a generate
+  button within reach of a stage tap is a hazard. What it can do is the set a
+  player reaches for between songs — preset, scenes, what's engaged, channels,
+  tempo, tuner.
+- The tuner says why it is silent. `POST /tuner` travels and starts the poll,
+  but the host filters the eight-per-second telemetry streams out of the relay,
+  so every reading stays at the Mac. After five silent seconds the screen says
+  that, rather than showing a needle that will never move.
+- Two Macs on one account are still refused a write, and still proved rather
+  than trusted: the roll call counts every answer instead of taking the first,
+  and addressing one Mac is confirmed by asking it one addressed question and
+  counting the replies. A mixed pair of versions fails safe.
+
 ## 5.5.2
 
 **Saving.** The button was in the wrong place, and on a phone it was also

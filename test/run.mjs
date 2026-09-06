@@ -3915,6 +3915,10 @@ console.log('\nlimits')
 const { run: limits } = await import('./limits.mjs')
 limits(test)
 
+console.log('\nthe phone apps')
+const { run: mobile } = await import('./mobile.mjs')
+mobile(test)
+
 test('both file kinds are listed and told apart', async () => {
   // A .syx goes back to the unit verbatim; a design re-validates first. Load
   // treating one as the other would either corrupt or silently no-op.

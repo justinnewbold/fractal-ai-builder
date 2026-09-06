@@ -41,107 +41,34 @@ const STORE_KEY = 'fractal.remote.config'
 export { DEFAULT_PROJECT } from '../../desktop/lib/project.mjs'
 import { DEFAULT_PROJECT } from '../../desktop/lib/project.mjs'
 
-/**
- * What the host will and won't do from a distance.
- *
- * ForgeFX refuses these with a 403 and it is right to: a phone on a dark stage
- * should not be able to overwrite slot 67 or move firmware around. Naming them
- * here lets the app say so plainly instead of surfacing a bare status code
- * halfway through a song.
- */
-/**
- * A verbatim port of the host's own rule — ForgeFX server/src/remote.ts,
- * remoteAllowed(). Keep the two in lockstep, character for character where the
- * shapes allow.
- *
- * This used to be a hand-written list of notable blocks, and it drifted in both
- * directions. It blocked GETs the host happily serves (the backup list, the
- * port list — needlessly dead panels on the phone), and it allowed writes the
- * host refuses (renames, version restores, cache deletes — which then failed as
- * raw relay errors instead of the friendly refusal this list exists to give).
- * Eight routes disagreed with the server by the time anyone compared them. A
- * port of the real function cannot disagree about anything.
- */
-function hostAllows(method, p) {
-  if (method === 'GET') return !p.startsWith('/cloud') && !p.startsWith('/remote') && p !== '/debug/raw'
-  if (method === 'PUT')
-    return (
-      /^\/preset\/blocks\/\d+\/params(\/\d+)?$/.test(p) ||
-      /^\/preset\/grid\/cell$/.test(p) ||
-      /^\/am4\/param$/.test(p) ||
-      /^\/device\/param$/.test(p) ||
-      p === '/telemetry/config' ||
-      /^\/store\/config\/[^/]+$/.test(p)
-    )
-  if (method === 'POST')
-    return (
-      /^\/preset\/blocks\/\d+\/(bypass|channel|type|read|readrange)$/.test(p) ||
-      p === '/preset/meters' ||
-      p === '/preset/select' ||
-      p === '/preset/grid/cable' ||
-      p === '/preset/grid/select' ||
-      p === '/scene' ||
-      p === '/tempo' ||
-      p === '/tempo/tap' ||
-      p === '/tuner' ||
-      p === '/mod/bind' ||
-      p === '/preset/name' ||
-      p === '/scene/name' ||
-      /^\/am4\/(bypass|scene|preset)$/.test(p)
-    )
-  return false
-}
-
-/** Friendly phrasings for the refusals people will actually hit. */
-export const REMOTE_FORBIDDEN = [
-  { match: (m, p) => m === 'POST' && p === '/preset/store', why: 'save to a slot' },
-  { match: (m, p) => p.startsWith('/preset/backup'), why: 'back up a preset' },
-  { match: (m, p) => p.startsWith('/preset/restore'), why: 'restore a preset' },
-  { match: (m, p) => p.startsWith('/backup'), why: 'back up the device' },
-  { match: (m, p) => p.startsWith('/version'), why: 'load or restore a version' },
-  { match: (m, p) => p.startsWith('/local'), why: 'reach the library on your Mac' },
-  { match: (m, p) => m !== 'GET' && p.startsWith('/ports'), why: 'change which port is used' },
-  { match: (m, p) => p.startsWith('/firmware'), why: 'touch firmware' },
-  { match: (m, p) => p.startsWith('/debug/raw'), why: 'send raw SysEx' }
-]
 
 /**
- * How long to wait for the host, by what was asked of it.
+ * What the host will and won't do from a distance, how long to wait, and the
+ * words for a refusal.
  *
- * Fifteen seconds was fine for the requests that motivated it — a scene change,
- * a parameter write, a preset select. It is not fine for a read that makes the
- * unit dump its whole preset over serial before answering. On an AM4 the block
- * list is exactly that read, and the relay was giving up on it mid-answer, which
- * the gig screen then showed as a preset with no blocks in it.
- *
- * The cost of waiting longer is only ever waiting longer. The cost of giving up
- * early is being told something false about the unit.
+ * All of it lives in `shared/relay-rules.mjs` now, because the browser is no
+ * longer the only client of this protocol — the phone apps under `mobile/`
+ * speak it too, to the same host, and a second copy of an allowlist is a
+ * second copy that drifts. Re-exported here so every existing caller and every
+ * test keeps its import.
  */
-const SLOW_READS = [
-  /^\/preset\/blocks$/,
-  /^\/preset\/blocks\/\d+\/(params|raw|cab)$/,
-  /^\/preset\/grid$/,
-  /^\/presets\/\d+(\/|$)/,
-  /^\/preset\/locations$/,
-  /^\/device\/cache/
-]
-
-export function timeoutFor(method, path) {
-  const clean = (path.split('?')[0] || '').replace(/\/+$/, '') || '/'
-  return SLOW_READS.some((re) => re.test(clean)) ? 45000 : 20000
-}
-
-/** Why this request can't travel, or null if it can. */
-export function forbiddenRemotely(method, path) {
-  const clean = (path.split('?')[0] || '').replace(/\/+$/, '') || '/'
-  const m = method.toUpperCase()
-  if (hostAllows(m, clean)) return null
-  // The host will refuse it; say why in words if we have them.
-  return (
-    REMOTE_FORBIDDEN.find((r) => r.match(m, clean))?.why ||
-    'do that from a distance — it only works at the Mac'
-  )
-}
+export {
+  REMOTE_FORBIDDEN,
+  forbiddenRemotely,
+  timeoutFor,
+  repeatable,
+  RELAY_GRACE,
+  explainAuth
+} from '../../shared/relay-rules.mjs'
+import {
+  forbiddenRemotely,
+  timeoutFor,
+  repeatable,
+  RELAY_GRACE,
+  explainAuth,
+  hostConflict as conflictBetween,
+  hostNamesFrom as namesFrom
+} from '../../shared/relay-rules.mjs'
 
 export const loadRemoteConfig = () => {
   try {
@@ -373,72 +300,16 @@ const rememberHost = (name) => {
 }
 
 /**
- * Turn the answers to a roll call into names, one per Mac that replied.
- *
- * An answer that cannot be read still counts. The count is the part that
- * matters — it is what decides whether anything may be written — and a Mac that
- * answered in a shape we did not expect is still a Mac that would carry out the
- * next write. Losing it from the list would turn a fault back into silence.
+ * Turn the answers to a roll call into names, and read the conflict between
+ * them. Both are rules the phone needs word for word, so both live in
+ * `shared/relay-rules.mjs`; what stays here is this module's own state —
+ * `decode` knows the host's framing, and the three variables are what a roll
+ * call last found.
  */
-export async function hostNamesFrom(answers, read = decode) {
-  const named = []
-  for (const answer of answers) {
-    let name = null
-    try {
-      const body = JSON.parse(await read(answer))
-      name = body?.data?.name || body?.name || null
-    } catch {
-      // Unreadable, but present. See above.
-    }
-    named.push(typeof name === 'string' && name.trim() ? name.trim() : 'a Mac')
-  }
-  return named
-}
+export const hostNamesFrom = (answers, read = decode) => namesFrom(answers, read)
 
-/**
- * Why this account's requests cannot be trusted right now, or null.
- *
- * One sentence, in a player's words, naming the Macs and the one action that
- * fixes it. Turning the phone remote off is a switch that already exists on
- * each Mac, and armHost already respects it across restarts.
- */
-export function hostConflict(list = hosts, pick = chosen, proved = targeted) {
-  if (list.length < 2) return null
-
-  const both = list.join(' and ')
-
-  /*
-   * Two Macs with the same name cannot be told apart by the only thing that
-   * distinguishes them on the wire, so there is nothing to pick between and the
-   * fix is not in this app. Checked before anything else, because no choice can
-   * settle it: addressing that name reaches both, which is the whole problem.
-   */
-  if (new Set(list).size < list.length) {
-    return (
-      `Two of your Macs are both called ${list[0]}, so this app cannot tell them apart — ` +
-      `and a change made here would be made on both units. Rename one of them in ` +
-      `System Settings › General › About, reopen the app there, then check again.`
-    )
-  }
-
-  // Addressed, and proved to be addressed: this is settled and there is nothing
-  // to say. The picker still shows which Mac is being driven.
-  if (pick && proved) return null
-
-  if (!pick) {
-    return (
-      `${list.length} Macs are answering for this account — ${both}. ` +
-      `They share one line, so a change made here would be made on both units. ` +
-      `Choose the one you want to drive.`
-    )
-  }
-
-  return (
-    `${both} both answered a request meant only for ${pick}, so one of them is running ` +
-    `a version that cannot tell requests apart. Nothing will be changed from here until ` +
-    `both Macs are up to date. Update the app on each of them, then check again.`
-  )
-}
+export const hostConflict = (list = hosts, pick = chosen, proved = targeted) =>
+  conflictBetween(list, pick, proved)
 
 /**
  * The one way `hostSeen` changes, so anyone who cares hears about it.
@@ -625,31 +496,6 @@ export async function waitForRelay(ms = RELAY_GRACE, step = 150, sleep = (n) => 
   }
 }
 
-/**
- * How long a request waits for a dropped relay before giving up on it.
- *
- * Long enough for realtime-js's own rejoin, which is a couple of seconds on a
- * phone that just came back; short enough that a Mac genuinely gone still says
- * so while someone is still looking at the screen.
- */
-export const RELAY_GRACE = 8000
-
-/**
- * Requests that must not be sent twice.
- *
- * Everything else the app relays is a statement of where something should end
- * up — this parameter is 4.5, this block is on channel B, load preset 12 — and
- * arriving twice leaves the unit exactly where arriving once did. Tap tempo is
- * the one that is not: it is a beat, and a resend is a beat that never
- * happened. So the retry below covers the whole relay except this.
- */
-const NOT_REPEATABLE = [/^\/tempo\/tap$/]
-
-export const repeatable = (path) => {
-  const clean = (String(path).split('?')[0] || '').replace(/\/+$/, '') || '/'
-  return !NOT_REPEATABLE.some((re) => re.test(clean))
-}
-
 /** realtime-js keeps its own channel state; 'joined' is the only one that can carry a request. */
 const isJoined = (chan) => {
   try {
@@ -669,24 +515,6 @@ const isJoined = (chan) => {
  */
 export function canReuseChannel(channel, session, client) {
   return !!channel && !!client && session?.client === client && isJoined(channel)
-}
-
-/** Sign in to the player's own Supabase project. */
-/**
- * Supabase's auth errors are terse and one of them is actively misleading.
- *
- * An unconfirmed account fails with wording that sounds like a wrong password,
- * which sends you off changing credentials that were right all along.
- */
-export function explainAuth(message) {
-  const m = (message || '').toLowerCase()
-  if (m.includes('not confirmed') || m.includes('email not confirmed')) {
-    return 'That email hasn’t been confirmed yet. Look for the confirmation email, then try again.'
-  }
-  if (m.includes('invalid login')) {
-    return 'Email or password didn’t match.'
-  }
-  return message
 }
 
 /** Create the account, when there isn't one yet. Same project, same policies. */
