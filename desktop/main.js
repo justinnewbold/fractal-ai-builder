@@ -407,6 +407,39 @@ function wireUpdateChannel() {
     await updates.check()
     return { ok: true }
   })
+
+  /*
+   * Install it now, because somebody asked.
+   *
+   * Installing on quit is the right default and it stays the default — nothing
+   * restarts itself on a machine with a guitar plugged into it. But it is only
+   * a good default while quitting works, and when it did not it took the update
+   * down with it: the update installs on quit, the quit never finished, so the
+   * only way out was Force Quit, which is a hard kill and installs nothing. The
+   * same version was offered again at every launch, for ever, and the fix for
+   * it was inside the version that could not be installed.
+   *
+   * A loop like that cannot be allowed to depend on one path working. So there
+   * is a second one, and it is a button a person presses: not the app deciding
+   * to interrupt anybody, which is the thing the whole design is against.
+   *
+   * The teardown runs here rather than being left to the quit handler, so that
+   * by the time electron-updater asks the app to quit there is nothing left to
+   * wait for and the quit is a formality.
+   */
+  ipcMain.handle('updates:install', async () => {
+    if (!updates?.install) return { ok: false, reason: 'no-updater' }
+    if (update?.kind !== 'ready') return { ok: false, reason: 'nothing-ready' }
+    await stopServing()
+    /*
+     * If the install has not taken the process by now it is not going to, and
+     * an app with no window and no server is worse than a closed one. The
+     * download is staged either way, so reopening tries again.
+     */
+    setTimeout(() => app.exit(0), INSTALL_DEADLINE_MS)
+    updates.install()
+    return { ok: true }
+  })
 }
 
 async function beginUpdates() {
@@ -487,19 +520,15 @@ app.on('window-all-closed', () => {})
  * install, and the same "an update is ready" line waiting the next time.
  */
 const QUIT_DEADLINE_MS = 6000
+/*
+ * Longer than the quit's, because this one waits on Squirrel handing the app
+ * over to its installer rather than on anything in this file.
+ */
+const INSTALL_DEADLINE_MS = 20000
 
 app.on('before-quit', (e) => {
   if (quitting) return
-  quitting = true
   e.preventDefault()
-
-  /*
-   * Say so on screen straight away. Tearing down can take a couple of seconds
-   * in the worst case, and a window still sitting there after ⌘Q reads as an
-   * app that ignored you — which is exactly when a person reaches for Force
-   * Quit and loses the update that was about to install.
-   */
-  if (win && !win.isDestroyed()) win.hide()
 
   /*
    * The backstop, and it is deliberately never cleared.
@@ -512,12 +541,40 @@ app.on('before-quit', (e) => {
    */
   setTimeout(() => app.exit(0), QUIT_DEADLINE_MS)
 
-  const done = () => {
-    server = null
-    advert = null
-    app.quit()
-  }
-  host()
-    .then(({ shutdown }) => shutdown({ server, advert }))
-    .then(done, done)
+  const done = () => app.quit()
+  stopServing().then(done, done)
 })
+
+/**
+ * Stop being a server, and stop being one only once.
+ *
+ * Shared by the two ways this app stops: somebody quitting it, and somebody
+ * asking for an update to be installed now. Both have to put the device server
+ * down before the process goes, or a ForgeFX left holding port 5056 stops the
+ * next launch dead.
+ *
+ * `quitting` is set first and never cleared. It is what stops the quit handler
+ * cancelling the very quit it asked for, and it is why installing an update can
+ * simply call app.quit() afterwards and be let through.
+ */
+async function stopServing() {
+  if (quitting) return
+  quitting = true
+
+  /*
+   * Say so on screen straight away. Tearing down can take a couple of seconds
+   * in the worst case, and a window still sitting there after ⌘Q reads as an
+   * app that ignored you — which is exactly when a person reaches for Force
+   * Quit and loses the update that was about to install.
+   */
+  if (win && !win.isDestroyed()) win.hide()
+
+  try {
+    const { shutdown } = await host()
+    await shutdown({ server, advert })
+  } catch {
+    // Nothing here is a reason to stay open. See QUIT_DEADLINE_MS.
+  }
+  server = null
+  advert = null
+}
