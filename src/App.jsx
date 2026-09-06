@@ -143,6 +143,7 @@ import {
   chooseHost,
   faultCopy
 } from './lib/link'
+import { keepAwake } from './lib/awake'
 import { pushEntry, replaceEntry } from './lib/nav'
 import { useAsks } from './lib/asks'
 import { useDismiss } from './lib/dismiss'
@@ -918,10 +919,21 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      // A phone asks its Mac again; the loop in link.js does the rest.
-      if (linkState().role === 'remote') pokeLink()
+      /*
+       * The rejoin is AWAITED, which is the whole difference between this
+       * button working and this button appearing to do nothing.
+       *
+       * It used to call pokeLink and move straight on to the read. pokeLink
+       * schedules a timer; it does not connect. So the read ran first, over
+       * whatever the link was a moment ago — over a dead socket it failed
+       * instantly and put the same fault screen back up, and the rejoin it had
+       * asked for landed seconds later with nothing looking at it. "Hitting
+       * try again did nothing. Refreshing browser reconnect." A reload worked
+       * because a reload rebuilds the channel BEFORE reading.
+       */
+      if (linkState().role === 'remote') await reconnectPhone()
     } catch {
-      // Best-effort; the read is what decides the verdict.
+      // A rejoin that failed still leaves the read below to say so plainly.
     }
     await read()
   }, [read])
@@ -1673,6 +1685,13 @@ export default function App() {
     setWithScenes(false)
     setRenamePreset(true)
     setApplied(null)
+    /*
+     * Reading a whole preset over the relay is as long as writing one and just
+     * as untouched, so the same lock covers it. Without it a phone locks
+     * during the read, the relay drops, and the tone is designed against
+     * whatever half of the preset made it back.
+     */
+    const release = keepAwake()
     try {
       setProgress('Reading what the unit has loaded...')
       const schema = await readSchema(
@@ -1733,6 +1752,7 @@ export default function App() {
       // Nothing reached the unit, so asking again is safe to offer.
       setRetryAsk({ description, against, opts })
     } finally {
+      release()
       setProgress(null)
       setBusy(false)
     }
@@ -1741,6 +1761,14 @@ export default function App() {
   const apply = async () => {
     setBusy(true)
     setError(null)
+    /*
+     * A send is minutes of round trips with nobody touching the screen, which
+     * is exactly what auto-lock is for — and a locked phone suspends the page
+     * and closes the socket underneath the relay. Held for the whole write and
+     * released in `finally`, so a send that fails does not leave the screen on
+     * for the rest of the night.
+     */
+    const release = keepAwake()
     try {
       // A verbatim copy of the slot as it stands, taken before the first write.
       // Revert covers unsaved edits; this covers changing your mind after
@@ -1854,7 +1882,24 @@ export default function App() {
       await read()
     } catch (err) {
       setError(err.message)
+      if (err.linkDown) {
+        /*
+         * Half a preset is on the unit and the link is gone. Two things follow
+         * and both matter more than the message: the edit buffer really has
+         * been changed, so it is dirty whatever happens next; and the plan is
+         * NOT marked as sent, so the button still offers to write it — sending
+         * again after reconnecting rewrites the ones that landed to the same
+         * values and finishes the ones that never left.
+         */
+        setDirty(true)
+        record('write', `Send stopped early — ${err.done} of ${err.total} written`, [
+          'The link to the Mac dropped part-way through.',
+          'Reconnect and send again: the writes that landed are written to the same values, so nothing is doubled.',
+          ...(err.failures || [])
+        ])
+      }
     } finally {
+      release()
       setProgress(null)
       setBusy(false)
     }
@@ -3147,8 +3192,15 @@ export default function App() {
           <h2>{fault.title}</h2>
           <p>{fault.body}</p>
           <p>
+            {/*
+              The label moves, because this button takes several seconds and
+              said nothing while it worked: a rejoin, then the five reads it
+              takes to be sure a unit really is missing. "Hitting try again did
+              nothing" was partly that it did not work and partly that there
+              was no way to tell.
+            */}
             <button className="chip" onClick={reconnect} disabled={busy}>
-              Try again
+              {busy ? 'Trying…' : 'Try again'}
             </button>{' '}
             <button
               className="chip"
