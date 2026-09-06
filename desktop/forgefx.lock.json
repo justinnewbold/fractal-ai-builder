@@ -23,7 +23,7 @@
     "file and refuses to build a pair upstream never released together.",
     "",
     "The pin is a branch of the mirror rather than a plain upstream commit. Naming",
-    "the preset or a scene was refused by the host's own remoteAllowed() \u2014 absent",
+    "the preset or a scene was refused by the host's own remoteAllowed() — absent",
     "from the writes it permits and absent from the list of things it says are",
     "never remotely reachable, which reads as an oversight rather than a boundary.",
     "It is an edit-buffer write like every other one allowed there, and committing",
@@ -46,14 +46,16 @@
     "subscribed client -- and wrong for the tuner, whose poll exists only while",
     "somebody has it open. Dropping it broke the one place a remote tuner is worth",
     "anything: tuning from a phone away from the Mac. Throttled to one reading",
-    "every 80 ms so a future poll cadence cannot flood the relay."
+    "every 80 ms so a future poll cadence cannot flood the relay.",
+    "",
+    "The branch moved again, and for a fault a player hit twice: \"PRESET_DUMP_HEADER: expected func 0x77 at offset 0, got 0x78\" on switching presets. The server decided a preset dump had arrived by checking for chunks and a terminator and taking the header on trust, so a dump whose HEADER went missing was handed to the codec instead of being re-read by the retry that was already there. The fix sits on top of the three patches above rather than on upstream main, which does not carry them — re-pinning to main would have taken renaming, host addressing and the remote tuner away with it."
   ],
   "forgefx": {
     "repo": "justinnewbold/forgefx",
     "upstream": "sKuhLight/forgefx",
-    "tag": "v0.7.1-beta+rename+host+tuner",
-    "commit": "dfb747691572cf878148ccad61bda1a3ce876b46",
-    "branch": "claude/address-one-host"
+    "tag": "v0.7.2-beta+rename+host+tuner+dumphdr",
+    "commit": "21fdd946cb3c4f5a6dd897ff5f645e58f5bd4ca9",
+    "branch": "claude/dump-header-fix"
   },
   "forgefx-midi": {
     "repo": "justinnewbold/forgefx-midi",
