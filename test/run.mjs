@@ -795,55 +795,48 @@ test('two Macs on one account cannot quietly write to two units', async () => {
   const odd = await hostNamesFrom([answer('Studio Mac'), { id: 'x', body: 'not json' }], read)
   assert.deepEqual(odd, ['Studio Mac', 'a Mac'], 'a Mac that answered was not counted')
 
-  // One Mac is the ordinary case and says nothing at all.
+  // The census still counts them. What it no longer does is refuse — see the
+  // test below, and hostConflict in shared/relay-rules.mjs.
   assert.equal(hostConflict(['Justins MacBook Pro']), null)
   assert.equal(hostConflict([]), null)
-
-  const clash = hostConflict(['Justins MacBook Pro', 'Studio Mac'], null, false)
-  assert.match(clash, /Justins MacBook Pro and Studio Mac/, 'the person is not told which two')
-  assert.match(clash, /both units/, 'nothing says what would actually happen')
-  assert.match(clash, /[Cc]hoose the one/, 'nothing says what to do about it')
 })
 
-test('one Mac chosen, and proved to be the only one listening', () => {
+test('more than one Mac answering is not a reason to refuse', () => {
   /*
-   * The fix rather than the guard rail: a request can name the host it is meant
-   * for, and the others stay out of it.
+   * This used to be the guard rail: two Macs answering meant a write might
+   * land on two units, so the app refused until one was chosen and the choice
+   * was proved to be honoured.
    *
-   * The catch is that only a new enough ForgeFX knows what that means. An older
-   * one has never heard of an addressed request and answers it like any other —
-   * so the app does not take the feature on trust. It asks the chosen Mac one
-   * addressed question and counts the answers, and only exactly one is evidence
-   * that a write will land in one place.
+   * The detection was never wrong — a host is anything signed into the account
+   * that answers the census, so an old install or a stray tab answers exactly
+   * like the Mac doing the work. The consequence was. What it guarded against
+   * needs two hosts each with an amp plugged in; answering a broadcast is not
+   * that, and conflating the two left a one-amp rig being asked to choose
+   * between two Macs, over and over, with no choice that settled it.
    *
-   * Which makes a half-updated pair fail the same way as an un-updated one, and
-   * that way is the careful one.
+   * Removed by the owner's decision for a rig with one unit. The cost is real
+   * and is not hidden: with two hosts each holding an amp, a write reaches
+   * both and nothing here says so.
+   *
+   * Every shape that used to produce a sentence is checked, so restoring the
+   * guard is a deliberate act rather than something that comes back by
+   * accident on the next edit.
    */
   const two = ['Justins MacBook Pro', 'Studio Mac']
 
-  // Chosen and proved: settled, nothing to say.
+  assert.equal(hostConflict(two, null, false), null, 'two Macs still refuse a write')
+  assert.equal(hostConflict(two, 'Studio Mac', false), null, 'an unproved choice still refuses')
   assert.equal(hostConflict(two, 'Studio Mac', true), null)
-
-  // Chosen but not proved — the other Mac answered a question meant for this
-  // one, so something out there is too old to be trusted with a write.
-  const stale = hostConflict(two, 'Studio Mac', false)
-  assert.match(stale, /meant only for Studio Mac/, 'the person is not told what was actually tried')
-  assert.match(stale, /[Uu]pdate the app/, 'nothing says what to do about an out-of-date Mac')
-
-  // Nothing chosen yet: an offer, not a complaint.
-  assert.match(hostConflict(two, null, false), /[Cc]hoose the one/)
-
-  // Two Macs with the same name cannot be told apart by the one thing that
-  // distinguishes them on the wire, so the fix is not in this app.
-  const same = hostConflict(['MacBook Pro', 'MacBook Pro'], null, false)
-  assert.match(same, /both called MacBook Pro/, 'a name clash is reported as an ordinary choice')
-  assert.match(same, /[Rr]ename one/, 'nothing says how to make them tellable apart')
-  // And a name clash is never talked out of by a choice, because a choice
-  // cannot be honoured: both Macs answer to it.
-  assert.match(hostConflict(['MacBook Pro', 'MacBook Pro'], 'MacBook Pro', true), /both called/)
-
-  // One Mac stays the ordinary case whatever else is set.
+  assert.equal(hostConflict(['MacBook Pro', 'MacBook Pro'], null, false), null, 'a name clash still refuses')
+  assert.equal(hostConflict(['MacBook Pro', 'MacBook Pro'], 'MacBook Pro', true), null)
+  assert.equal(hostConflict(['a', 'b', 'c'], null, false), null, 'three Macs still refuse')
   assert.equal(hostConflict(['Studio Mac'], null, false), null)
+  assert.equal(hostConflict([]), null)
+
+  // The phone carries its own copy of this rule and the two must not drift:
+  // a banner gone on one surface and still up on the other is the same bug
+  // reported in half the places. test/mobile.mjs holds them to each other.
+  assert.equal(typeof hostConflict, 'function', 'the signature callers rely on is gone')
 })
 
 test('nothing is written while two Macs are listening', () => {

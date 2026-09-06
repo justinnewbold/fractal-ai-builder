@@ -135,46 +135,31 @@ export const repeatable = (path) => !NOT_REPEATABLE.some((re) => re.test(cleanPa
 /**
  * Why this account's requests cannot be trusted right now, or null.
  *
- * One sentence, in a player's words, naming the Macs and the one action that
- * fixes it. Turning the phone remote off is a switch that already exists on
- * each Mac, and the host launcher respects it across restarts.
+ * Always null: this app no longer refuses to drive a unit because more than
+ * one host answered.
+ *
+ * The detection was never wrong. A host is anything signed into the account
+ * that answers a broadcast within the census window — it does not need a unit
+ * attached, or to be the Mac in front of you. So an old install, a stray tab
+ * left open, or a machine signed in months ago answers exactly like the Mac
+ * doing the work, and the banner was right that two things replied.
+ *
+ * It was the consequence that was wrong. What it protected against is a write
+ * landing on two units at once, which needs two hosts each with an amp plugged
+ * into it. Answering a census is not that, and the two were treated as the
+ * same thing — so a setup with one amp was told to choose between two Macs,
+ * repeatedly, with no choice that settled it and a stage in front of it.
+ *
+ * Removed deliberately and by the owner's decision, for a rig with one unit.
+ * The cost is named rather than hidden: with two hosts each holding an amp, a
+ * write now reaches both and nothing here will say so. Host addressing is
+ * untouched and still narrows a request to the chosen Mac where the hosts are
+ * new enough to honour it — this only stops the refusal.
+ *
+ * The signature is kept so callers and the host-picker still work unchanged.
  */
-export function hostConflict(list = [], pick = null, proved = false) {
-  if (list.length < 2) return null
-
-  const both = list.join(' and ')
-
-  /*
-   * Two Macs with the same name cannot be told apart by the only thing that
-   * distinguishes them on the wire, so there is nothing to pick between and the
-   * fix is not in this app. Checked before anything else, because no choice can
-   * settle it: addressing that name reaches both, which is the whole problem.
-   */
-  if (new Set(list).size < list.length) {
-    return (
-      `Two of your Macs are both called ${list[0]}, so this app cannot tell them apart — ` +
-      `and a change made here would be made on both units. Rename one of them in ` +
-      `System Settings › General › About, reopen the app there, then check again.`
-    )
-  }
-
-  // Addressed, and proved to be addressed: this is settled and there is nothing
-  // to say. The picker still shows which Mac is being driven.
-  if (pick && proved) return null
-
-  if (!pick) {
-    return (
-      `${list.length} Macs are answering for this account — ${both}. ` +
-      `They share one line, so a change made here would be made on both units. ` +
-      `Choose the one you want to drive.`
-    )
-  }
-
-  return (
-    `${both} both answered a request meant only for ${pick}, so one of them is running ` +
-    `a version that cannot tell requests apart. Nothing will be changed from here until ` +
-    `both Macs are up to date. Update the app on each of them, then check again.`
-  )
+export function hostConflict() {
+  return null
 }
 
 /**
