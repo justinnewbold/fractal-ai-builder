@@ -2135,6 +2135,7 @@ button.chip.more {
 
 .views {
   display: flex;
+  align-items: center;
   gap: var(--s-1);
   margin-top: var(--s-3);
   border-bottom: 1px solid var(--rule);
@@ -2273,9 +2274,15 @@ button.gig-name:disabled .gig-name-caret {
 .gig-size {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: var(--s-2);
-  margin-top: 18px;
+  /* Pushed to the far end of the tab row: the tabs are what a thumb aims at
+     on this row, and this is not. It also puts it diagonally opposite the
+     scenes, which is the other thing it must not be mistaken for. */
+  margin-left: auto;
+  /* Sits ON the row's rule rather than above it, so the row stays one bar
+     deep — a test checks that the chrome above the first control does not
+     grow, and this is chrome. */
+  padding-bottom: var(--s-1);
 }
 
 .gig-size-label {
@@ -2293,7 +2300,7 @@ button.gig-name:disabled .gig-name-caret {
 
 button.gig-size-step {
   width: 44px;
-  height: 44px;
+  height: 36px;
   padding: 0;
   display: flex;
   align-items: center;
