@@ -3445,6 +3445,41 @@ test('a scan already running is not started twice', async () => {
     // And the mock reads them: pinned by the structure guard on mockDevice.js.
   })
 
+  test('the demo tuner never changes note while a string is still ringing', () => {
+    /*
+     * "The note hops randomly, E2 → D3 → E4; looks broken."
+     *
+     * The stream held a string and drifted toward pitch, which was most of the
+     * way there — but it could also swap strings at any poll, on a 4% roll,
+     * mid-note. Rare enough to look like a glitch rather than a design, which
+     * is worse than doing it constantly.
+     *
+     * A real tuner cannot do that: while a string is ringing there is one pitch
+     * to detect and the detector holds it. The note changes after the note
+     * STOPS. So between any two consecutive readings that both have a note, the
+     * note is the same one — not usually, always.
+     */
+    let seed = 11
+    const random = () => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff
+      return seed / 0x7fffffff
+    }
+    const tuner = createTunerStream(random)
+    const readings = Array.from({ length: 600 }, () => tuner.next())
+    let midNote = 0
+    for (let i = 1; i < readings.length; i++) {
+      const [a, b] = [readings[i - 1], readings[i]]
+      if (!a.note || !b.note) continue
+      if (a.note !== b.note || a.octave !== b.octave) midNote++
+    }
+    assert.equal(midNote, 0, `the note changed ${midNote} times with the string still sounding`)
+
+    // And it is not simply frozen on one string for ever: a new one is picked
+    // coming out of a quiet gap, which is what re-detection looks like.
+    const played = new Set(readings.filter((r) => r.note).map((r) => `${r.note}${r.octave}`))
+    assert.ok(played.size > 1, `only ${[...played]} was ever shown — the demo never re-detects`)
+  })
+
   test('the demo tuner holds a string, drifts a little and sometimes goes quiet', () => {
     // A seeded generator so the run is the same every time.
     let seed = 7

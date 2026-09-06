@@ -545,6 +545,49 @@ export function run(test) {
     }
   })
 
+  test('a channel button is 44px both ways, not just across', () => {
+    /*
+     * It had min-width: 44px and no min-height, so it met the guideline in the
+     * one direction a chip is naturally wide in and missed it in the direction
+     * that actually needed the floor. Picking a channel is a primary control —
+     * it is what a scene IS on this hardware.
+     */
+    const rule = code.slice(code.indexOf('.channel-buttons .chip {'), code.indexOf('}', code.indexOf('.channel-buttons .chip {')))
+    assert.match(rule, /min-width: 44px/)
+    assert.match(rule, /min-height: 44px/, 'a channel button is back to meeting the touch floor sideways only')
+  })
+
+  test('the amber reads too — on it and against it', () => {
+    /*
+     * The other half of the same fault, and the one on the control people press
+     * hardest and in a hurry. `--on-signal` on `--signal` in the cream theme
+     * measured 3.78:1 — that is the Save button's own text — and `--signal` as
+     * ink on the cream ground came to 3.43:1, which is every amber word, rule
+     * and border on that theme.
+     *
+     * Both directions, because amber is used both ways: as a ground with ink on
+     * it, and as ink on the page. Fixing one alone leaves the other under the
+     * floor and looking deliberate.
+     */
+    const lum = (hex) => {
+      const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+      return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+    }
+    const ratio = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05)
+    for (const [name, open] of [['dark', ':root {'], ['light', "[data-theme='light'] {"]]) {
+      const block = code.slice(code.indexOf(open), code.indexOf('}', code.indexOf(open)))
+      const token = (t) => block.match(new RegExp(`--${t}: (#[0-9a-f]{6})`))?.[1]
+      const signal = token('signal')
+      assert.ok(signal, `the ${name} theme has no --signal`)
+      const ink = ratio(token('on-signal'), signal)
+      assert.ok(ink >= 4.5, `--on-signal on --signal is ${ink.toFixed(2)}:1 in the ${name} theme — that is the Save button`)
+      for (const ground of ['chassis', 'panel']) {
+        const r = ratio(signal, token(ground))
+        assert.ok(r >= 4.5, `--signal as ink on --${ground} is ${r.toFixed(2)}:1 in the ${name} theme`)
+      }
+    }
+  })
+
   test('the preset sits in the middle of the bar, and the chip’s word is not the smallest type in it', () => {
     const rule = (sel) => code.slice(code.indexOf(sel + ' {'), code.indexOf('}', code.indexOf(sel + ' {')))
     assert.match(rule('button.topbar-preset'), /align-items: center/, 'the preset button packs its line to the top of a 44px box again')

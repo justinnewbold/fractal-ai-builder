@@ -2655,6 +2655,28 @@ export function run(test) {
     assert.ok(!/pointAtCell/.test(forgefx), 'the device call behind it is dead code again')
   })
 
+  test('forgetting names nobody cached does not create a key to hold nothing', () => {
+    /*
+     * `forgetSceneNames` read the cache as `|| '{}'`, deleted from the empty
+     * object and wrote it straight back — so renaming a scene where nothing had
+     * ever been cached CREATED the key as `{}`. In the demo that is every
+     * rename, because the demo keeps its names in its own store: reported as
+     * `fractal.demo.sceneNames` populated beside a `fractal.sceneNames` that is
+     * permanently an empty object, which reads like two stores disagreeing when
+     * it is one store and a stray.
+     */
+    const forgefx2 = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+    const at = forgefx2.indexOf('export function forgetSceneNames(')
+    assert.notEqual(at, -1, 'forgetSceneNames is gone')
+    const body = forgefx2.slice(at, forgefx2.indexOf('\n}', at))
+    assert.match(body, /if \(!raw\) return/, 'an empty cache is written back rather than left alone')
+    assert.match(
+      body,
+      /else localStorage\.removeItem\(SCENE_NAME_CACHE\)/,
+      'a cache emptied by the last delete is left behind as {}'
+    )
+  })
+
   /*
    * "On the comparing scenes, A and B… channel and channel B is confusing.
    * Also saying that it cost twice as much isn't super user-friendly. The
