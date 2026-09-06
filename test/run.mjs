@@ -858,10 +858,23 @@ test('nothing is written while two Macs are listening', () => {
    */
   const src = readSrc(new URL('../src/lib/remote.js', import.meta.url), 'utf8')
 
+  /*
+   * Asked again at the gate, not remembered from the join. The roll call used
+   * to be taken once and every refusal after it answered from that one moment,
+   * so a second Mac that had since slept or quit went on blocking writes for
+   * the rest of the session. See conflictNow.
+   */
   assert.match(
     src,
-    /if \(method !== 'GET'\) \{\s*\n\s*const clash = hostConflict\(\)/,
+    /if \(method !== 'GET'\) \{[\s\S]{0,80}const clash = await conflictNow\(\)/,
     'a write can travel again while two Macs are answering'
+  )
+  assert.match(src, /export async function conflictNow\(maxAgeMs = 4000\)/)
+  assert.match(src, /if \(!clash\) return null/, 'the ordinary case pays for a roll call it does not need')
+  assert.match(
+    src,
+    /if \(Date\.now\(\) - countedAt < maxAgeMs\) return clash/,
+    'a burst of writes re-counts the Macs on every one of them'
   )
   // The collector has to run before the resolve, because `waiting.delete` is
   // what makes the second answer invisible.
@@ -3089,7 +3102,7 @@ test('the screen is held awake for the send and for the read, and let go after b
     const slice = app.slice(app.indexOf(start), app.indexOf(end))
     assert.ok(slice.length > 200, `could not find ${name}`)
     assert.match(slice, /const release = keepAwake\(\)/, `${name} runs for minutes and lets the phone lock itself`)
-    assert.match(slice, /\} finally \{\n      release\(\)/, `${name} leaves the screen on after it finishes`)
+    assert.match(slice, /\} finally \{\n(?:      pending\.current = null\n)?      release\(\)/, `${name} leaves the screen on after it finishes`)
   }
 })
 
@@ -3112,6 +3125,181 @@ test('a browser with no wake lock is not a browser that cannot send', async () =
   const release = keepAwake({ nav: {}, doc: { addEventListener: () => {} } })
   assert.equal(typeof release, 'function')
   release()
+})
+
+console.log('\nthe conversation surviving the phone')
+
+const sessionMod = await import('../src/lib/session.js')
+const cloudChatMod = await import('../src/lib/cloudChat.js')
+
+const fakeStore = (seed = {}) => {
+  const items = { ...seed }
+  return {
+    items,
+    getItem: (k) => (k in items ? items[k] : null),
+    setItem: (k, v) => {
+      items[k] = String(v)
+    },
+    removeItem: (k) => {
+      delete items[k]
+    }
+  }
+}
+
+test('the chat and the tone come back after the phone drops the page', () => {
+  /*
+   * "I was also in the middle of generating a tone and the chat and tone
+   * disappeared." iOS evicts a backgrounded web page whenever it wants the
+   * memory, and what comes back is a fresh load. Ten seconds in another app
+   * was enough to lose a whole conversation.
+   */
+  const { saveSession, loadSession } = sessionMod
+  const store = fakeStore()
+  const turns = [
+    { role: 'user', text: 'warmer' },
+    { role: 'assistant', text: 'Dropped the presence.' }
+  ]
+  assert.equal(saveSession({ turns, result: { presetName: 'Lead' }, saveName: 'Lead', lastPrompt: 'warmer' }, store), true)
+
+  const back = loadSession(store)
+  assert.deepEqual(back.turns, turns, 'the conversation did not survive')
+  assert.equal(back.result.presetName, 'Lead', 'the tone on screen did not survive')
+  assert.equal(back.saveName, 'Lead')
+  assert.equal(back.lastPrompt, 'warmer')
+  // renamePreset defaults ON, so absent must not read as off.
+  assert.equal(loadSession(fakeStore({ 'fab.session.v1': JSON.stringify({ v: 1, turns: [] }) })).renamePreset, true)
+})
+
+test('a transcript that cannot be read is no transcript, not a crash', () => {
+  const { loadSession, saveSession } = sessionMod
+  assert.equal(loadSession(fakeStore()), null, 'nothing saved is not an error')
+  assert.equal(loadSession(fakeStore({ 'fab.session.v1': 'not json' })), null)
+  // A record from a future shape is ignored rather than half-read.
+  assert.equal(loadSession(fakeStore({ 'fab.session.v1': JSON.stringify({ v: 9, turns: [] }) })), null)
+  assert.equal(loadSession(fakeStore({ 'fab.session.v1': JSON.stringify({ v: 1, turns: 'nope' }) })), null)
+  // A private window throws on the accessor, not on use. Saving must not fail
+  // a render over it.
+  const hostile = {
+    getItem: () => {
+      throw new Error('blocked')
+    },
+    setItem: () => {
+      throw new Error('blocked')
+    },
+    removeItem: () => {}
+  }
+  assert.equal(saveSession({ turns: [] }, hostile), false)
+  assert.equal(loadSession(hostile), null)
+  assert.doesNotThrow(() => sessionMod.clearSession(hostile))
+})
+
+test('a long conversation is trimmed from the old end, not the new', () => {
+  const { saveSession, loadSession, MAX_TURNS } = sessionMod
+  const store = fakeStore()
+  const many = Array.from({ length: MAX_TURNS + 20 }, (_, i) => ({ role: 'user', text: `turn ${i}` }))
+  saveSession({ turns: many }, store)
+  const back = loadSession(store)
+  assert.equal(back.turns.length, MAX_TURNS)
+  // The newest survive: an old turn has already been acted on.
+  assert.equal(back.turns.at(-1).text, `turn ${MAX_TURNS + 19}`)
+  assert.equal(back.turns[0].text, 'turn 20')
+})
+
+test('a generation cut off by the phone says so instead of waiting for ever', () => {
+  /*
+   * The request died with the page and cannot be resumed — it was an HTTP
+   * request held open by a page that no longer exists. What can be saved is
+   * the knowledge that an answer was owed, so the app does not come back
+   * looking as though nothing had been happening.
+   */
+  const { interrupted } = sessionMod
+  assert.equal(interrupted(null), null, 'a session that ended between thoughts apologises for nothing')
+  assert.equal(interrupted({}), null)
+  assert.equal(interrupted({ description: '   ' }), null)
+  const turn = interrupted({ description: 'a doom tone' })
+  assert.equal(turn.role, 'system')
+  assert.match(turn.text, /background/)
+  assert.match(turn.text, /Nothing reached the unit/, 'somebody has to be told their unit was not half-written')
+})
+
+test('the later transcript wins, and an empty one never wins', () => {
+  const { pickChat } = cloudChatMod
+  const here = [{ role: 'user', text: 'local' }]
+  const there = [{ role: 'user', text: 'cloud' }]
+
+  // An account that has never synced must not wipe the conversation somebody
+  // is in the middle of.
+  assert.deepEqual(pickChat({ turns: here, at: 5 }, null), { turns: here, from: 'here' })
+  assert.deepEqual(pickChat({ turns: here, at: 5 }, { turns: [], at: 9 }), { turns: here, from: 'here' })
+  // A fresh browser picks up what the account holds.
+  assert.deepEqual(pickChat({ turns: [], at: 0 }, { turns: there, at: 9 }), { turns: there, from: 'cloud' })
+  // Both real: the newer write, which for an append-only transcript is the one
+  // that contains the other.
+  assert.equal(pickChat({ turns: here, at: 5 }, { turns: there, at: 9 }).from, 'cloud')
+  assert.equal(pickChat({ turns: here, at: 9 }, { turns: there, at: 5 }).from, 'here')
+  // A tie keeps what is on screen rather than replacing it with the same thing.
+  assert.equal(pickChat({ turns: here, at: 5 }, { turns: there, at: 5 }).from, 'here')
+  assert.deepEqual(pickChat(null, null), { turns: [], from: 'here' })
+})
+
+test('the other device is named in words, not in a user agent', () => {
+  const { deviceName } = cloudChatMod
+  assert.equal(deviceName('Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) Safari'), 'iPhone')
+  assert.equal(deviceName('Mozilla/5.0 (iPad; CPU OS 17_5) Safari'), 'iPad')
+  assert.equal(deviceName('Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) Safari'), 'Mac')
+  assert.equal(deviceName('Mozilla/5.0 (Linux; Android 14) Chrome'), 'Android')
+  assert.equal(deviceName(''), 'a browser')
+  assert.equal(deviceName(undefined), 'a browser')
+})
+
+test('the conversation is restored before the first frame, and written on every change', () => {
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+
+  // Read synchronously into a ref, so a phone coming back from the background
+  // never flashes an empty conversation on its way to the real one.
+  assert.match(app, /const restored = useRef\(loadSession\(\)\)\.current/)
+  assert.ok(
+    app.indexOf('const restored = useRef(loadSession())') < app.indexOf('const [result, setResult]'),
+    'the state it seeds is declared before the thing that seeds it'
+  )
+  assert.match(app, /useState\(restored\?\.result \?\? null\)/)
+  assert.match(app, /const cut = interrupted\(restored\?\.pending\)/)
+
+  // Written on change rather than on a timer: a timer loses whatever happened
+  // in the last tick, which on iOS is exactly when the page is taken away.
+  const save = app.slice(app.indexOf('    saveSession({\n      turns,'))
+  assert.match(save.slice(0, 400), /\}, \[turns, result, withScenes, renamePreset, saveName, lastPrompt, thinking\]\)/)
+
+  // The in-flight ask is on disk before the first round trip and cleared when
+  // it settles, so finding it set on load is the signal the page died.
+  assert.match(app, /pending\.current = \{ description, at: Date\.now\(\) \}/)
+  assert.match(app, /pending\.current = null/)
+})
+
+test('the account copy is pulled once and pushed on a debounce', () => {
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  // A reply lands as several state changes in a row; each would otherwise be
+  // its own round trip.
+  assert.match(app, /if \(!chatCloudReady\(\) \|\| !turns\.length\) return undefined/, 'an empty chat is pushed over the one on the Mac')
+  assert.match(app, /saveCloudChat\(turns\)[\s\S]{0,200}\}, 2000\)/)
+  // Pulled after the link has an account: supabaseClient() is null until
+  // restoreSession has run, so asking on mount would always answer signed out.
+  assert.match(app, /if \(pulledChat\.current \|\| !link\.account \|\| !chatCloudReady\(\)\) return/)
+  // Only when it really is the other copy — setting the same turns again would
+  // push them back up and restart this on the other device.
+  assert.match(app, /if \(winner\.from !== 'cloud'\) return/)
+})
+
+test('the account chat is readable only by the account that wrote it', () => {
+  const sql = readSrc(new URL('../supabase/migrations/20260906_chats.sql', import.meta.url), 'utf8')
+  assert.match(sql, /alter table public\.chats enable row level security/)
+  // Every policy keyed to auth.uid(), matching presets and scene_names.
+  assert.match(sql, /for select using \(user_id = auth\.uid\(\)\)/, 'reads are not keyed to the signed-in user')
+  assert.match(sql, /for insert with check \(user_id = auth\.uid\(\)\)/, 'writes are not keyed to the signed-in user')
+  assert.match(sql, /for update using \(user_id = auth\.uid\(\)\) with check \(user_id = auth\.uid\(\)\)/, 'updates are not keyed to the signed-in user')
+  // One row per person: the app has one running conversation, and a table
+  // shaped that way cannot drift into meaning a filing system.
+  assert.match(sql, /user_id uuid primary key/)
 })
 
 console.log('\nhow many scenes')
