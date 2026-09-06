@@ -144,6 +144,7 @@ import {
   faultCopy
 } from './lib/link'
 import { keepAwake } from './lib/awake'
+import { sceneChoices } from '../api/_scenes.js'
 import { pushEntry, replaceEntry } from './lib/nav'
 import { useAsks } from './lib/asks'
 import { useDismiss } from './lib/dismiss'
@@ -1709,7 +1710,10 @@ export default function App() {
       }
 
       setProgress(null)
-      const spec = await requestSpec(schema, description, null, { wantScenes: opts.wantScenes })
+      const spec = await requestSpec(schema, description, null, {
+        wantScenes: opts.wantScenes,
+        sceneBudget: opts.sceneBudget
+      })
 
       const validated = validateSpec(spec, schema, sceneCount, channelNames)
       validated.spec = spec
@@ -3813,7 +3817,7 @@ export default function App() {
       <Sheet
         open={!!sceneAsk}
         onClose={() => setSceneAsk(null)}
-        title="One sound, or a set?"
+        title="How many sounds?"
         note="Nothing in this preset is named yet"
       >
         <div className="scene-ask">
@@ -3821,29 +3825,32 @@ export default function App() {
             This preset has no scenes set up, so there is nothing here to write over. What are you
             building?
           </p>
-          <button
-            className="primary"
-            onClick={() => {
-              const ask = sceneAsk
-              setSceneAsk(null)
-              generate(ask.description, ask.against, { wantScenes: false })
-            }}
-          >
-            One sound
-            <span className="hint">Goes into the scene you are in. The rest stay empty.</span>
-          </button>
-          <button
-            onClick={() => {
-              const ask = sceneAsk
-              setSceneAsk(null)
-              generate(ask.description, ask.against, { wantScenes: true })
-            }}
-          >
-            A set of scenes
-            <span className="hint">
-              Three or four named sounds off one rig, switched by footswitch.
-            </span>
-          </button>
+          {/*
+            The options come from the unit, not from this file. A set used to
+            mean three or four whatever was plugged in, which is a fine default
+            and was also a ceiling: somebody laying out a whole set on an FM3
+            wanted all eight and had no way to ask. On a unit with four scenes
+            "a few" and "all four" are the same answer twice, so the third
+            button is not offered there. See api/_scenes.js.
+          */}
+          {sceneChoices(sceneCount).map((choice, i) => (
+            <button
+              key={choice.key}
+              className={i === 0 ? 'primary' : undefined}
+              onClick={() => {
+                const ask = sceneAsk
+                setSceneAsk(null)
+                generate(ask.description, ask.against, {
+                  wantScenes: choice.budget !== 0,
+                  // Absent for "a few": the model judges, as it always did.
+                  sceneBudget: choice.budget || undefined
+                })
+              }}
+            >
+              {choice.label}
+              <span className="hint">{choice.hint}</span>
+            </button>
+          ))}
         </div>
       </Sheet>
 

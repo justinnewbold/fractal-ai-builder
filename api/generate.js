@@ -16,6 +16,7 @@ import { generateObject, streamObject } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 import { cors } from './_cors.js'
+import { sceneInstruction } from './_scenes.js'
 
 /**
  * Two ways in, because they fail differently.
@@ -299,6 +300,11 @@ export default async function handler(req, res) {
     taste,
     corrections,
     wantScenes,
+    /*
+     * How many scenes the player asked for, when they said. Null or absent
+     * leaves it to the model's own judgement, which is rule 11's three or four.
+     */
+    sceneBudget,
     trace
   } =
     req.body || {}
@@ -390,19 +396,14 @@ export default async function handler(req, res) {
    * Whether the player was asked, and what they said.
    *
    * A preset with no scene named yet has nothing to lose, so the app asks
-   * before it builds: one sound, or a set of them. An answer is a decision and
-   * overrides rule 10's judgement in both directions - "just the one sound"
-   * must not come back with four scenes the player then has to switch off, and
-   * "a set" must not come back with none.
+   * before it builds: one sound, a few, or every scene the unit has. An answer
+   * is a decision and overrides rule 10's judgement in both directions - "just
+   * the one sound" must not come back with four scenes the player then has to
+   * switch off, and "a set" must not come back with none. A number overrides
+   * rule 11 too. See ./_scenes.js, which the app shares so that the question
+   * and the instruction cannot disagree about what "all of them" means.
    */
-  const asked =
-    wantScenes === true
-      ? '\n\nThe player has asked for a SET OF SCENES across this preset. Return three or four ' +
-        'scenes, each named, covering the sounds this description implies. Do not return an ' +
-        'empty scenes array.'
-      : wantScenes === false
-        ? '\n\nThe player has asked for ONE SOUND, not a set. Return an empty scenes array.'
-        : ''
+  const asked = sceneInstruction({ wantScenes, sceneBudget, sceneCount: state.sceneCount })
 
   /*
    * What this player has tended to keep, when the browser has enough history
