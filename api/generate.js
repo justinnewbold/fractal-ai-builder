@@ -323,10 +323,31 @@ export default async function handler(req, res) {
   // so the text is byte-identical between runs and actually hits. Cached reads
   // bill at a tenth of base. The first run of a session pays a small write
   // premium; every run after is much cheaper.
+  /*
+   * A model, with nothing on it that says nothing.
+   *
+   * A roster entry arrives as {value, name, manufacturer, basedOn}, and for
+   * most families both lineage fields are null on every single entry — the unit
+   * does not carry them. Sent as-is that is `"manufacturer":null,"basedOn":null`
+   * three hundred and thirty-one times in the amp roster alone: a fifth of the
+   * biggest part of the request, spent saying nothing, and read by a model that
+   * has to decide those fields are not worth attending to.
+   *
+   * Dropping them puts the rosters back to what they measured before any
+   * lineage was added, WITH the lineage on the entries that have it.
+   */
+  const trim = (models) =>
+    models.map((m) => ({
+      value: m.value,
+      name: m.name,
+      ...(m.manufacturer ? { manufacturer: m.manufacturer } : {}),
+      ...(m.basedOn ? { basedOn: m.basedOn } : {})
+    }))
+
   const rosters = {}
   const reference = {}
   for (const block of [...blocks].sort((a, b) => a.slug.localeCompare(b.slug))) {
-    if (block.models?.length && !rosters[block.slug]) rosters[block.slug] = block.models
+    if (block.models?.length && !rosters[block.slug]) rosters[block.slug] = trim(block.models)
     if (!reference[block.slug]) {
       const params = {}
       for (const p of block.params || []) if (p.does) params[p.name] = p.does
@@ -532,46 +553,65 @@ export default async function handler(req, res) {
      * It also settles, from the browser, whether anything in between is
      * buffering the stream — which is not a question a server log can answer.
      */
-    res.write(JSON.stringify({ type: 'open' }) + '\n')
-    if (typeof res.flush === 'function') res.flush()
+    /*
+     * Every frame is pushed, not just the first.
+     *
+     * This flushed the hello and nothing after it, and that is a difference
+     * that only shows up in production: whatever sits between this function and
+     * a phone can hold a few hundred bytes of ndjson waiting for more to
+     * accumulate, and a partial is a few hundred bytes. So the hello arrived
+     * instantly — proving the route was open — and then the model streamed into
+     * a buffer while the browser sat on a clock that gives up after ninety
+     * seconds with no partial.
+     *
+     * Reported as exactly that shape: "the AI accepted the request and then
+     * sent nothing back for 90 seconds, twice". The stream was almost certainly
+     * running the whole time.
+     *
+     * One helper, so a frame added later cannot be the unflushed one.
+     */
+    const send = (frame) => {
+      res.write(JSON.stringify(frame) + '\n')
+      if (typeof res.flush === 'function') res.flush()
+    }
+
+    send({ type: 'open' })
 
     try {
       const result = streamObject(args)
       for await (const partial of result.partialObjectStream) {
-        res.write(JSON.stringify({ type: 'partial', object: partial }) + '\n')
+        send({ type: 'partial', object: partial })
       }
 
       const object = await result.object
       const usage = await result.usage
       const meta = (await result.providerMetadata)?.anthropic || {}
 
-      res.write(
-        JSON.stringify({
-          type: 'done',
-          object: {
-            ...object,
-            // Same trace as the non-streaming path, so a person looking at why
-            // a tone missed sees the same thing whichever route it came by.
-            ...(traced ? { _trace: traced } : {}),
-            _usage: {
-              inputTokens: usage?.inputTokens ?? null,
-              outputTokens: usage?.outputTokens ?? null,
-              cachedInputTokens:
-                usage?.cachedInputTokens ??
-                usage?.inputTokenDetails?.cacheReadTokens ??
-                meta.cacheReadInputTokens ??
-                null,
-              cacheWriteTokens:
-                usage?.inputTokenDetails?.cacheWriteTokens ??
-                meta.cacheCreationInputTokens ??
-                null,
-              model: typeof model === 'string' ? model : model?.modelId || MODEL_NAME
-            }
+      send({
+        type: 'done',
+        object: {
+          ...object,
+          // Same trace as the non-streaming path, so a person looking at why
+          // a tone missed sees the same thing whichever route it came by.
+          ...(traced ? { _trace: traced } : {}),
+          _usage: {
+            inputTokens: usage?.inputTokens ?? null,
+            outputTokens: usage?.outputTokens ?? null,
+            cachedInputTokens:
+              usage?.cachedInputTokens ??
+              usage?.inputTokenDetails?.cacheReadTokens ??
+              meta.cacheReadInputTokens ??
+              null,
+            cacheWriteTokens:
+              usage?.inputTokenDetails?.cacheWriteTokens ??
+              meta.cacheCreationInputTokens ??
+              null,
+            model: typeof model === 'string' ? model : model?.modelId || MODEL_NAME
           }
-        }) + '\n'
-      )
+        }
+      })
     } catch (err) {
-      res.write(JSON.stringify({ type: 'error', error: err.message }) + '\n')
+      send({ type: 'error', error: err.message })
     }
     res.end()
     return

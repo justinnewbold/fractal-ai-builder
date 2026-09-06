@@ -1669,6 +1669,38 @@ export function run(test) {
     assert.match(generate, /eids\.length \? array : array\.max\(0\)/, 'an empty preset can be sent block changes again')
     assert.match(generate, /blocks: onlyWhenPlaced\(/, 'blocks are not capped on an empty preset')
     assert.match(generate, /engaged: onlyWhenPlaced\(/, 'a scene can still switch on a block that does not exist')
+
+    /*
+     * Every frame is pushed, not just the first.
+     *
+     * The hello was flushed and nothing after it was, which is a difference
+     * that only appears in production: whatever sits between the function and a
+     * phone can hold a few hundred bytes of ndjson waiting for more, and a
+     * partial is a few hundred bytes. So the hello arrived instantly — proving
+     * the route open — and the model then streamed into a buffer while the
+     * browser sat on a ninety-second clock. "The AI accepted the request and
+     * then sent nothing back for 90 seconds, twice."
+     *
+     * One helper, so a frame added later cannot be the unflushed one.
+     */
+    assert.match(generate, /const send = \(frame\) => \{/, 'frames are written one at a time again')
+    assert.match(
+      generate,
+      /res\.write\(JSON\.stringify\(frame\)[\s\S]{0,80}res\.flush\(\)/,
+      'a written frame is no longer flushed, so it can sit in a buffer'
+    )
+    assert.ok(
+      !/res\.write\(JSON\.stringify\(\{ type:/.test(generate),
+      'a frame is written straight to the response again, bypassing the flush'
+    )
+
+    /*
+     * And nothing in the roster that says nothing. Both lineage fields are null
+     * on every entry of most families, which was a fifth of the largest part of
+     * the request spent on `"manufacturer":null,"basedOn":null`.
+     */
+    assert.match(generate, /const trim = \(models\) =>/, 'the rosters carry their empty fields again')
+    assert.match(generate, /rosters\[block\.slug\] = trim\(block\.models\)/, 'the rosters are sent untrimmed')
   })
 
   /*
