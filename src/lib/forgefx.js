@@ -957,9 +957,18 @@ export async function applyChanges(changes, onProgress) {
  * through all of them, and finishing on scene 6 because that was the last one
  * in the list would be the app rearranging the stage while your back is turned.
  */
-export async function applyScenes(scenes, onProgress) {
+export async function applyScenes(scenes, onProgress, presetNumber = null) {
   const failures = []
   if (!scenes?.length) return failures
+
+  /*
+   * Every name this pass lands, so the phone can read them back.
+   *
+   * Same reason as noteSceneName, on the bigger path: a generated plan names
+   * all eight scenes at once, and none of them were being written down. The
+   * unit had them and the handset that asked for them could not see one.
+   */
+  const named = new Map()
 
   // Where the player was, so they can be put back. If this read fails the
   // scenes are still worth writing — we just cannot restore, so we do not
@@ -997,6 +1006,7 @@ export async function applyScenes(scenes, onProgress) {
     if (scene.name) {
       try {
         await setSceneName(scene.index, scene.name)
+        named.set(scene.index, scene.name)
       } catch (err) {
         /*
          * Said out loud rather than swallowed.
@@ -1059,6 +1069,10 @@ export async function applyScenes(scenes, onProgress) {
       failures.push(`Wrote the scenes but could not switch back to scene ${cameFrom + 1}.`)
     }
   }
+
+  // One merge rather than one per scene: the host write inside this is a round
+  // trip, and eight of them for one plan would be seven too many.
+  noteSceneNames(presetNumber, named)
 
   return failures
 }
@@ -1852,6 +1866,45 @@ export async function readSceneNames(number) {
   }
 
   return local
+}
+
+/**
+ * Write down a name we just set, rather than forgetting we ever knew it.
+ *
+ * "After writing a scene, saving a scene and the unit confirmed it was saved,
+ * when I go back on the phone and then forward again it's not there anymore."
+ *
+ * Renaming used to call forgetSceneNames, on the sound reasoning that a stale
+ * name outliving the thing it named is worse than no name. That is right when
+ * the name changed somewhere else. It is exactly wrong here, because here we
+ * are the ones who changed it and we know what to.
+ *
+ * And on a phone those caches are not a convenience, they are the only copy
+ * there is. Scene names live inside a preset dump; dumps are refused over the
+ * relay by design; the summary does not carry them on this unit. So clearing
+ * both on the way out of a rename left the name written to the hardware and
+ * unreadable from the handset that wrote it — for good, until somebody opened
+ * the preset at the Mac.
+ *
+ * Given the list as the panel currently has it, this is the same list with one
+ * entry replaced: better evidence than any read, since it is the write itself.
+ */
+export function noteSceneNames(number, entries, known = []) {
+  if (typeof number !== 'number' || !entries?.size) return
+  // Whatever is on screen, else whatever a previous session managed to read.
+  const base = known.some((n) => (n || '').trim()) ? known : recallSceneNames(number)
+  const next = [...base]
+  for (const [index, name] of entries) {
+    if (!Number.isInteger(index) || index < 0) continue
+    while (next.length <= index) next.push('')
+    next[index] = name
+  }
+  rememberSceneNames(number, next)
+}
+
+/** One of them, which is what a rename is. */
+export function noteSceneName(number, index, name, known = []) {
+  noteSceneNames(number, new Map([[index, name]]), known)
 }
 
 /**

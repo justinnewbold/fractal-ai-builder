@@ -91,6 +91,7 @@ import {
   reportSave,
   readSaveResult,
   forgetPresetName,
+  noteSceneNames,
   readSceneNames
 } from './lib/forgefx'
 import { savePreset, buildEntry, deletePreset, typicalMs, notOnAccount } from './lib/history'
@@ -1958,8 +1959,14 @@ export default function App() {
        */
       const sceneFailures =
         withScenes && result.scenes?.length
-          ? await applyScenes(result.scenes, (done, total, label) =>
-              setProgress(`Scenes — ${done} of ${total} · ${label}`)
+          ? await applyScenes(
+              result.scenes,
+              (done, total, label) => setProgress(`Scenes — ${done} of ${total} · ${label}`),
+              // Which slot these names belong to, so a phone can read them back.
+              // Scene names live in a preset dump and dumps do not travel the
+              // relay, so what is written down here is the only copy a handset
+              // will ever see. See noteSceneNames.
+              preset?.number ?? null
             )
           : []
       failures.push(...sceneFailures)
@@ -2124,6 +2131,22 @@ export default function App() {
       await storePreset(number)
       // The list is holding that slot's old name, and it just stopped being true.
       forgetPresetName(number)
+      /*
+       * And the slot now holds this buffer's scenes, so its names are these.
+       *
+       * "Saving a scene and the unit confirmed it was saved — when I go back on
+       * the phone and then forward again it's not there anymore." Navigating to
+       * a slot asks what its scenes are called, and on a phone the answer can
+       * only come from what somebody wrote down: dumps do not travel the relay.
+       * Nothing wrote anything down at the one moment the answer was certain —
+       * the moment the buffer became that slot.
+       *
+       * Every index, including the blank ones: the buffer is the truth for this
+       * slot now, so a scene left unnamed here really is unnamed there.
+       */
+      if (Array.isArray(sceneNames) && sceneNames.some((n) => (n || '').trim())) {
+        noteSceneNames(number, new Map(sceneNames.map((n, i) => [i, (n || '').trim()])))
+      }
       setSlots((prev) => prev.filter((s) => s.number !== number))
       setApplied((prev) => ({ ...prev, savedTo: number }))
       record('save', `Saved "${name || preset?.name}" to slot ${number}`)
