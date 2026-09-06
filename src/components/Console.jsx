@@ -420,6 +420,24 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
       ? `Modelled on ${chosen.manufacturer}`
       : null
 
+  /*
+   * What a model is, in the list where the choosing happens.
+   *
+   * "Search for the real life names that each AMP and all other effects are
+   * based off of and list them next to the name." The line under the control
+   * only ever described the model already chosen, which is the one model
+   * nobody is wondering about: scrolling two hundred names looking for a
+   * Rectifier, every one of them is a code word and the answer is a tap away
+   * on each.
+   *
+   * The maker alone is deliberately not used here. Under the control it earns
+   * its place — it is a fact about the amp in front of you — but as a suffix
+   * on every row it would put "— Mesa/Boogie" beside forty models and tell
+   * nobody which one is the Rectifier. A row says the specific amp or it says
+   * nothing and stays short.
+   */
+  const listedAs = (m) => (m.basedOn ? `${m.name} — ${m.basedOn}` : m.name)
+
   const valueOf = (p) => (local[p.id] !== undefined ? local[p.id] : p.value)
 
   const commit = async (p, override) => {
@@ -582,13 +600,20 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
           {/* Only reachable while the model is genuinely unknown — an older
               firmware that doesn't report one, or the read still in flight. */}
           <option value="">{type?.name || `${models.length} models…`}</option>
-          {/* The name alone: with "— 1959 narrow-panel Fender Tweed Bassman,
-              5F6-A" inside the option, the closed control clipped the model
-              mid-word on a phone. What it is based on goes under the control,
-              where it can be read. */}
+          {/*
+            The model name first, always, and the amp after it.
+            
+            This carried the name alone for a while, because "— 1959 narrow-panel
+            Fender Tweed Bassman, 5F6-A" inside the option overran the closed
+            control on a phone. That was the right problem and the wrong fix: it
+            took the answer off the only screen where the question is asked. The
+            order is what settles it — the name leads, so anything the closed
+            control has to cut is cut off the far end, and the full line is
+            still spelled out underneath it.
+          */}
           {models.map((m) => (
             <option key={m.value} value={m.value}>
-              {m.name}
+              {listedAs(m)}
             </option>
           ))}
         </select>
