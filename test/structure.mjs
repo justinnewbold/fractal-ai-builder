@@ -3193,6 +3193,45 @@ export function run(test) {
     assert.match(list, /if \(needle[^)]*\) return/, 'centring fights the filter being typed')
   })
 
+  test('the range jumps carry you there without loading anything', () => {
+    /*
+     * 512 rows is about forty screens, and opening at the one you are on does
+     * nothing for going somewhere else — which on a unit this size is most of
+     * what the list is for.
+     *
+     * The property worth guarding is not that they exist. It is that they
+     * SCROLL: tapping 300 mid-set must not change what is coming out of the
+     * amp. Loading stays where it was, on the row you choose deliberately.
+     */
+    const con = readFileSync(new URL('../src/components/Console.jsx', import.meta.url), 'utf8')
+    const from = con.indexOf('export function PresetList')
+    const next = con.indexOf('\nexport ', from + 1)
+    // Comments out, for the reason the test above this one records.
+    const list = con
+      .slice(from, next === -1 ? undefined : next)
+      .replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ' ')
+
+    const jump = list.slice(list.indexOf('const jumpTo'), list.indexOf('useEffect'))
+    assert.ok(jump.length > 0, 'the range jumps are gone')
+    assert.ok(
+      !/onSelect/.test(jump),
+      'a range jump loads a preset — tapping 300 must not change the sound mid-set'
+    )
+    assert.match(jump, /scrollTop/, 'the range jump no longer scrolls')
+
+    // Offered against the unit's own size, so a smaller Fractal is not given
+    // buttons for slots it does not have.
+    assert.match(
+      list,
+      /\[100, 200, 300, 400, 500\]\.filter\(\(n\) => n < total\)/,
+      'the jumps are a fixed list rather than what this unit actually holds'
+    )
+
+    // And the row knows its own number, so a jump never parses a label to
+    // work out where it is going.
+    assert.match(list, /data-slot=\{slot\.number\}/, 'rows no longer carry their slot number')
+  })
+
   test('the tour teaches what a scene actually is', () => {
     const tour = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
     const card = tour.slice(tour.indexOf('Scenes are one rig'), tour.indexOf('Scenes are one rig') + 1200)

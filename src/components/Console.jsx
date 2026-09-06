@@ -199,6 +199,43 @@ export function PresetList({
   const hidden = slots.length - named.length
 
   /*
+   * Getting to the 300s without a thumb marathon.
+   *
+   * 512 rows is about forty screens. The centring below solves opening at the
+   * one you are on; it does nothing for going somewhere else, which on a unit
+   * this size is most of what the list is for.
+   *
+   * These SCROLL, they do not load. Tapping 300 while a set is running must
+   * not change what is coming out of the amp — the row underneath is still
+   * chosen deliberately, this only carries you to it.
+   *
+   * Offered against the unit's own size, so a smaller Fractal gets fewer of
+   * them and nothing offers a slot that isn't there.
+   */
+  const total = deviceSlots || slots.length
+  const jumps = [100, 200, 300, 400, 500].filter((n) => n < total)
+
+  const jumpTo = (n) => {
+    const box = rows.current
+    if (!box) return
+    /*
+     * The first row AT or PAST the number. An unnamed slot is not in the list
+     * unless "show all" is on, so 300 itself is often not a row — landing on
+     * 304 is the answer somebody asking for 300 wanted anyway.
+     */
+    const row = [...box.querySelectorAll('.preset-row')].find(
+      (r) => Number(r.dataset.slot) >= n
+    )
+    const scroller = row && scrollerOf(row)
+    if (!scroller) return
+    // Top of the box rather than the middle: the point is the run of presets
+    // starting there, and half of them would be above the fold if centred.
+    scroller.scrollTop += row.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 8
+    /* Nothing is loaded, so the list must say where it went. */
+    centredOn.current = current
+  }
+
+  /*
    * Open where you already are.
    *
    * Opening at 000 with the loaded preset 165 rows below it is a list you have
@@ -249,6 +286,16 @@ export function PresetList({
         aria-label="Filter presets"
       />
 
+      {jumps.length && !needle ? (
+        <div className="preset-jumps" role="group" aria-label="Jump to a range">
+          {jumps.map((n) => (
+            <button key={n} className="preset-jump mono" onClick={() => jumpTo(n)} aria-label={`Jump to preset ${n}`}>
+              {n}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {scanning && progress ? (
         <div className="scan-bar">
           <div className="scan-fill" style={{ width: `${progress.pct}%` }} />
@@ -287,6 +334,7 @@ export function PresetList({
                   ? 'bank-start'
                   : ''
               }`}
+              data-slot={slot.number}
               onClick={() => onSelect(slot.number)}
             >
               <span className="preset-id mono">{slotLabel(slot.number, addressing)}:</span>

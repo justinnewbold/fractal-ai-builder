@@ -3008,6 +3008,36 @@ input.bpm-box:focus {
 
 /* ---------- preset list ---------- */
 
+/*
+ * The range jumps.
+ *
+ * A row of five, under the filter and above the list, because that is the
+ * order somebody uses them in: narrow it, or skip to where you are going.
+ * Mono, like every other number in this app that gets compared at a glance.
+ */
+.preset-jumps {
+  display: flex;
+  gap: var(--s-2);
+  padding: 0 var(--s-3) var(--s-2) var(--s-3);
+}
+
+button.preset-jump {
+  flex: 1 1 0;
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  background: var(--panel);
+  color: var(--silk-dim);
+  font-size: var(--f-2);
+  letter-spacing: 0.06em;
+}
+
+button.preset-jump:active {
+  background: var(--panel-hi);
+  color: var(--silk);
+}
+
 .preset-scroll {
   max-height: 420px;
   overflow-y: auto;
