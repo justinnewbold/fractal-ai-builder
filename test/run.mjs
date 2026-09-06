@@ -2704,6 +2704,236 @@ test('nothing to reuse is not something to reuse', async () => {
   assert.equal(canReuseChannel({ state: 'joined' }, null, client), false)
 })
 
+test('a request that could not travel is told apart from one the unit refused', async () => {
+  /*
+   * "Disconnected from phone remote when sending presets to FM3."
+   *
+   * A send is hundreds of writes down one serial port over minutes, and the
+   * phone locks part-way through. Every remaining write then failed instantly
+   * with a message about the link, and applyChanges recorded each as a
+   * refusal — ninety failure lines for writes that never left the handset.
+   * The flag is what lets the write loop stop instead.
+   */
+  const src = readSrc(new URL('../src/lib/remote.js', import.meta.url), 'utf8')
+  assert.match(src, /function linkDown\(message\)[\s\S]*err\.linkDown = true/, 'the relay has no way to say "this never left the phone"')
+  assert.match(src, /failWaiting\(message\) \{[\s\S]*pending\.reject\(linkDown\(message\)\)/, 'requests killed by a closing socket arrive as ordinary failures')
+
+  const forge = readSrc(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+  assert.match(forge, /if \(cause\?\.linkDown\) this\.linkDown = true/, 'the flag is flattened away crossing into ForgeError')
+  // The same crossing used to drop remoteBlocked, so the one branch that reads
+  // it — the rename a phone is not allowed to make — could never be true.
+  assert.match(forge, /if \(cause\?\.remoteBlocked\) this\.remoteBlocked = true/)
+})
+
+test('everything the relay carries may be sent twice, except a tap', async () => {
+  const { repeatable } = await import('../src/lib/remote.js')
+  /*
+   * Retrying is only safe because these say where something should END UP.
+   * Arriving twice leaves the unit exactly where arriving once did.
+   */
+  for (const path of [
+    '/preset/blocks/58/params',
+    '/preset/blocks/58/channel',
+    '/preset/blocks/58/type',
+    '/preset/blocks/58/bypass',
+    '/preset/select',
+    '/scene',
+    '/tempo',
+    '/healthz'
+  ]) {
+    assert.equal(repeatable(path), true, `${path} is a value, not an event`)
+  }
+  // A beat is not a destination: a resent tap is a beat that never happened.
+  assert.equal(repeatable('/tempo/tap'), false)
+  assert.equal(repeatable('/tempo/tap?x=1'), false, 'a query string is not a different route')
+  assert.equal(repeatable('/tempo/tap/'), false, 'nor is a trailing slash')
+})
+
+test('a request waits for the relay to come back rather than failing into the gap', async () => {
+  const { waitForRelay } = await import('../src/lib/remote.js')
+  /*
+   * realtime-js reopens the socket a second or two after it closes. For that
+   * second or two every request failed outright, which is survivable under a
+   * finger and fatal in the middle of a send.
+   */
+  let slept = 0
+  const sleep = async (ms) => {
+    slept += ms
+  }
+  // No session at all: nothing is coming back, and the wait ends rather than
+  // hanging on for ever.
+  assert.equal(await waitForRelay(600, 150, sleep), false)
+  assert.ok(slept >= 600, 'the grace period was not actually waited out')
+})
+
+test('the health probe asks for no grace, because it is what decides the grace', async () => {
+  const src = readSrc(new URL('../src/lib/remote.js', import.meta.url), 'utf8')
+  const probe = src.slice(src.indexOf('export async function hostResponds'))
+  assert.match(probe.slice(0, 900), /graceMs: 0/, 'the probe that tests the link would wait out the link’s own grace period')
+})
+
+test('a dropped link stops the send instead of failing every write after it', () => {
+  const forge = readSrc(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+  assert.match(forge, /function relayGone\(err, done, total, what\)/)
+  assert.match(forge, /if \(!err\?\.linkDown\) return null/, 'a unit that refused a write must not stop the send')
+  assert.match(forge, /dropped after \$\{done\} of \$\{total\}/, 'how far it got is the number that decides what to do next')
+
+  // Every loop that talks to the unit over the relay: the write pass, the
+  // scene pass, the read-back, and the schema read the generator designs from.
+  const uses = forge.match(/relayGone\(/g) || []
+  assert.ok(uses.length >= 10, `only ${uses.length} call sites — a loop was left grinding through a dead link`)
+
+  // The schema read is the subtle one: its catch was empty, so a relay that
+  // went away produced blocks with no parameters and the generator designed a
+  // tone against a preset nobody could read.
+  const schema = forge.slice(forge.indexOf('export async function readSchema'), forge.indexOf('export async function applyChanges'))
+  assert.match(schema, /const stop = relayGone\(err, i, editable\.length, 'blocks read'\)/)
+})
+
+test('Try again rejoins before it reads, which is all a reload ever did', () => {
+  /*
+   * "Hitting try again did nothing. Refreshing browser reconnect."
+   *
+   * pokeLink schedules a timer; it does not connect. So the read ran first,
+   * over a socket that had already closed, failed instantly, and put the same
+   * fault screen straight back up — while the rejoin it had asked for landed
+   * seconds later with nothing looking at it.
+   */
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  const fn = app.slice(app.indexOf('const reconnect = useCallback'), app.indexOf('const linkAction = useCallback'))
+  assert.match(fn, /await reconnectPhone\(\)/, 'the button asks for a rejoin it does not wait for')
+  assert.ok(fn.indexOf('await reconnectPhone()') < fn.indexOf('await read()'), 'the read still runs before the rejoin')
+  assert.ok(!/pokeLink\(\)/.test(fn), 'a scheduled poke is not a reconnection')
+})
+
+test('a poke asks now, not in three seconds', () => {
+  const src = readSrc(new URL('../src/lib/link.js', import.meta.url), 'utf8')
+  const poke = src.slice(src.indexOf('export function pokeLink'), src.indexOf('export function pokeLink') + 200)
+  assert.match(poke, /schedule\(0\)/, 'a screen just unlocked waits three seconds before anything happens')
+  // And a socket that closed is chased at once rather than at the next turn of
+  // the loop — up to thirty seconds while backed off, never while hidden.
+  assert.match(src, /if \(!up && state\.role === 'remote'[\s\S]{0,120}pokeLink\(\)/)
+})
+
+test('the screen is held awake for as long as the unit is being written to', async () => {
+  const { keepAwake } = await import('../src/lib/awake.js')
+
+  let taken = 0
+  let released = 0
+  const listeners = {}
+  let onRelease = null
+  const nav = {
+    wakeLock: {
+      request: async () => {
+        taken++
+        return {
+          addEventListener: (name, fn) => {
+            if (name === 'release') onRelease = fn
+          },
+          release: async () => {
+            released++
+          }
+        }
+      }
+    }
+  }
+  const doc = {
+    hidden: false,
+    addEventListener: (name, fn) => {
+      listeners[name] = fn
+    },
+    removeEventListener: (name) => {
+      delete listeners[name]
+    }
+  }
+
+  const release = keepAwake({ nav, doc })
+  await Promise.resolve()
+  assert.equal(taken, 1, 'a send runs for minutes with nobody touching the screen; auto-lock ends it')
+
+  /*
+   * The system drops the lock whenever the page is hidden and does NOT hand it
+   * back. One glance at a notification would otherwise end the protection for
+   * the rest of the send, silently — so it is re-taken on the way back.
+   */
+  doc.hidden = true
+  onRelease()
+  listeners.visibilitychange()
+  await Promise.resolve()
+  assert.equal(taken, 1, 'a hidden page asked for a lock it cannot hold')
+
+  doc.hidden = false
+  listeners.visibilitychange()
+  await Promise.resolve()
+  assert.equal(taken, 2, 'the lock the system took back was never asked for again')
+
+  // A lock we still hold is not asked for twice.
+  listeners.visibilitychange()
+  await Promise.resolve()
+  assert.equal(taken, 2)
+
+  release()
+  assert.equal(released, 1, 'a finished send leaves the screen on for the rest of the night')
+  assert.equal(listeners.visibilitychange, undefined, 'the listener outlives the send')
+})
+
+test('a request caught between one channel and the next waits for the next one', () => {
+  /*
+   * The rejoin the drop itself triggers tears the old session down before it
+   * registers the new one. A request landing in that window would have been
+   * told "not connected" and given up — over a link that was a second from
+   * coming back, and coming back because of the very drop it was reacting to.
+   */
+  const src = readSrc(new URL('../src/lib/remote.js', import.meta.url), 'utf8')
+  assert.match(src, /if \(!session && !connecting\) throw linkDown\('Not connected to your Mac\.'\)/)
+  assert.match(src, /connecting = true\n  try \{\n    return await joinChannel\(\)\n  \} finally \{\n    connecting = false\n  \}/)
+})
+
+test('the grace period is one budget for the request, not one per attempt', () => {
+  /*
+   * The screen that decides whether a unit is really gone asks five reads in a
+   * row. A retry that could double each one's wait would turn a flapping link
+   * into eighty seconds of nothing.
+   */
+  const src = readSrc(new URL('../src/lib/remote.js', import.meta.url), 'utf8')
+  assert.match(src, /const graceUntil = Date\.now\(\) \+ \(options\.graceMs \?\? RELAY_GRACE\)/)
+  assert.match(src, /await relayReady\(graceUntil - Date\.now\(\)\)/, 'each attempt starts its own grace period')
+})
+
+test('the screen is held awake for the send and for the read, and let go after both', () => {
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  for (const [name, start, end] of [
+    ['apply', 'const apply = async () => {', 'const revert'],
+    ['generate', 'const generate = async (description', 'const apply = async () => {']
+  ]) {
+    const slice = app.slice(app.indexOf(start), app.indexOf(end))
+    assert.ok(slice.length > 200, `could not find ${name}`)
+    assert.match(slice, /const release = keepAwake\(\)/, `${name} runs for minutes and lets the phone lock itself`)
+    assert.match(slice, /\} finally \{\n      release\(\)/, `${name} leaves the screen on after it finishes`)
+  }
+})
+
+test('a send cut off part-way is not recorded as a preset that was written', () => {
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  const apply = app.slice(app.indexOf('const apply = async () => {'), app.indexOf('const revert'))
+  assert.match(apply, /if \(err\.linkDown\)/)
+  // The plan must stay unsent, so the button still offers to write it: sending
+  // again after reconnecting rewrites what landed to the same values.
+  const sent = apply.indexOf('setSentPlan(')
+  const caught = apply.indexOf('} catch (err) {\n      setError(err.message)')
+  assert.ok(sent !== -1 && caught !== -1 && sent < caught, 'a half-written preset is marked as sent')
+  assert.match(apply, /setDirty\(true\)\n        record\('write', `Send stopped early/, 'the unit really was changed, and the app forgot')
+})
+
+test('a browser with no wake lock is not a browser that cannot send', async () => {
+  const { keepAwake } = await import('../src/lib/awake.js')
+  // Older Safari, and any context that refuses. The relay's own patience
+  // covers the lock that then happens anyway.
+  const release = keepAwake({ nav: {}, doc: { addEventListener: () => {} } })
+  assert.equal(typeof release, 'function')
+  release()
+})
+
 console.log('\nparameter matching')
 
 const ampSchema = [

@@ -103,6 +103,23 @@ class ForgeError extends Error {
     this.name = 'ForgeError'
     this.status = status
     this.cause = cause
+    /*
+     * What the relay knew about this failure, kept rather than flattened.
+     *
+     * Every remote error is re-thrown as one of these, and the re-throw used
+     * to carry the message and the status and nothing else — so `remoteBlocked`
+     * never survived the crossing, and the one branch in the app that reads it
+     * (the rename a phone is not allowed to make) could never be true. What a
+     * player saw was the generic "couldn't write the name" instead of the
+     * sentence explaining that renaming happens at the Mac and theirs is
+     * waiting there.
+     *
+     * `linkDown` is the same lesson learned once: the write loop has to be
+     * able to tell "the relay went away" from "the unit refused this".
+     */
+    if (cause?.remoteBlocked) this.remoteBlocked = true
+    if (cause?.hostConflict) this.hostConflict = true
+    if (cause?.linkDown) this.linkDown = true
   }
 }
 
@@ -666,6 +683,33 @@ export const storePreset = (number) =>
 export { ForgeError }
 
 /**
+ * The relay went away, so stop rather than pretending to carry on.
+ *
+ * Every long loop below is written to survive one bad read — a block whose
+ * parameters would not come back, a write the unit refused — because on a
+ * serial port those happen and abandoning three hundred writes over one of
+ * them would be worse. That tolerance is exactly wrong for a dropped link:
+ * there, EVERY remaining step will fail the same way, instantly, and the loop
+ * grinds to the end producing one bogus failure line per change it never
+ * attempted. Someone sending a preset from a phone got "Written to the unit"
+ * over ninety refusals for writes that never left the handset.
+ *
+ * remoteRequest already waits out a rejoin and goes again once, so by the time
+ * a linkDown error reaches here the relay has genuinely gone. Stop, and say
+ * how far it got — that is the number that decides what to do next.
+ */
+function relayGone(err, done, total, what) {
+  if (!err?.linkDown) return null
+  const stop = new Error(
+    `The link to your Mac dropped after ${done} of ${total} ${what}. Nothing after that was sent — reconnect and send again.`
+  )
+  stop.linkDown = true
+  stop.done = done
+  stop.total = total
+  return stop
+}
+
+/**
  * Build the generation context: for every placed block, its live parameters and
  * the model roster its family offers.
  *
@@ -705,8 +749,17 @@ export async function readSchema(blocks, onProgress, { force = false } = {}) {
       try {
         const res = await blockParams(block.effectId)
         params = safeParams(disambiguate(res?.named || []))
-      } catch {
-        // A block with no readable parameters is not a failure — skip it.
+      } catch (err) {
+        /*
+         * A block with no readable parameters is not a failure — skip it. A
+         * relay that has gone is a different thing entirely: every block after
+         * this one reads empty too, and what comes out the far end is a schema
+         * with no controls in it, which the generator then designs a tone
+         * against. Better to say the link dropped than to design against a
+         * preset nobody could read.
+         */
+        const stop = relayGone(err, i, editable.length, 'blocks read')
+        if (stop) throw stop
       }
       paramCache.set(block.effectId, params)
     }
@@ -804,6 +857,11 @@ export async function applyChanges(changes, onProgress) {
         await setChannel(change.eid, change.channel)
         moved = true
       } catch (err) {
+        const stop = relayGone(err, step - 1, total, 'writes')
+        if (stop) {
+          stop.failures = failures
+          throw stop
+        }
         failures.push(`${change.name} channel — ${err.message}`)
       }
     }
@@ -815,6 +873,11 @@ export async function applyChanges(changes, onProgress) {
         await setType(change.eid, change.type)
         moved = true
       } catch (err) {
+        const stop = relayGone(err, step - 1, total, 'writes')
+        if (stop) {
+          stop.failures = failures
+          throw stop
+        }
         failures.push(`${change.name} model — ${err.message}`)
       }
     }
@@ -828,9 +891,14 @@ export async function applyChanges(changes, onProgress) {
         fresh = new Map(
           (res?.named || []).map((p) => [p.id, { min: p.min, max: p.max, log: !!p.log }])
         )
-      } catch {
+      } catch (err) {
         // Fall back to the ranges read before the move rather than skipping
-        // the writes entirely.
+        // the writes entirely — unless there is no link left to write over.
+        const stop = relayGone(err, step - 1, total, 'writes')
+        if (stop) {
+          stop.failures = failures
+          throw stop
+        }
       }
     }
 
@@ -849,6 +917,11 @@ export async function applyChanges(changes, onProgress) {
           )
         }
       } catch (err) {
+        const stop = relayGone(err, step - 1, total, 'writes')
+        if (stop) {
+          stop.failures = failures
+          throw stop
+        }
         failures.push(`${change.name} · ${param.name} — ${err.message}`)
       }
     }
@@ -857,6 +930,11 @@ export async function applyChanges(changes, onProgress) {
       try {
         await setBypass(change.eid, change.bypassed)
       } catch (err) {
+        const stop = relayGone(err, step - 1, total, 'writes')
+        if (stop) {
+          stop.failures = failures
+          throw stop
+        }
         failures.push(`${change.name} bypass — ${err.message}`)
       }
     }
@@ -907,6 +985,11 @@ export async function applyScenes(scenes, onProgress) {
     try {
       await setScene(scene.index)
     } catch (err) {
+      const stop = relayGone(err, step - 1, total, 'scene writes')
+      if (stop) {
+        stop.failures = failures
+        throw stop
+      }
       failures.push(`Scene ${scene.index + 1} — ${err.message}`)
       continue
     }
@@ -930,6 +1013,11 @@ export async function applyScenes(scenes, onProgress) {
          * good. It goes in the same list the caller already shows, so the
          * person is told which names did not land and can see why.
          */
+        const stop = relayGone(err, step - 1, total, 'scene writes')
+        if (stop) {
+          stop.failures = failures
+          throw stop
+        }
         failures.push(`Scene ${scene.index + 1} — kept its old name: ${err.message}`)
       }
     }
@@ -939,6 +1027,11 @@ export async function applyScenes(scenes, onProgress) {
       try {
         await setBypass(block.eid, block.bypassed)
       } catch (err) {
+        const stop = relayGone(err, step - 1, total, 'scene writes')
+        if (stop) {
+          stop.failures = failures
+          throw stop
+        }
         failures.push(`${label} · ${block.name} — ${err.message}`)
       }
       // The channel this scene plays. Written while standing in the scene, for
@@ -948,6 +1041,11 @@ export async function applyScenes(scenes, onProgress) {
         try {
           await setChannel(block.eid, block.channel)
         } catch (err) {
+          const stop = relayGone(err, step - 1, total, 'scene writes')
+          if (stop) {
+            stop.failures = failures
+            throw stop
+          }
           failures.push(`${label} · ${block.name} channel — ${err.message}`)
         }
       }
@@ -1016,7 +1114,11 @@ export async function verifyChanges(changes, onProgress) {
     let live
     try {
       live = await blockParams(change.eid)
-    } catch {
+    } catch (err) {
+      // One block that would not read back is not worth stopping for; a relay
+      // that has gone means none of the rest will read back either.
+      const stop = relayGone(err, i, changes.length, 'blocks checked')
+      if (stop) throw stop
       continue
     }
     const byId = new Map((live?.named || []).map((p) => [p.id, p]))

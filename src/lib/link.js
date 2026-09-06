@@ -494,10 +494,18 @@ async function tick() {
   schedule(delay)
 }
 
-/** Ask again soon — the screen came back, the network came back, someone tapped. */
+/**
+ * Ask again NOW — the screen came back, the network came back, someone tapped.
+ *
+ * It used to be "ask again in three seconds", and three seconds is a long time
+ * to look at a screen you just unlocked, or at a Try again you just pressed,
+ * with nothing happening. The backoff still starts from three seconds for the
+ * attempt AFTER this one; what changes is that a poke is immediate, which is
+ * the whole meaning of a poke.
+ */
 export function pokeLink() {
   delay = 0
-  schedule(PROBE_FIRST)
+  schedule(0)
 }
 
 /* ------------------------------------------------------------------
@@ -611,7 +619,19 @@ export async function bootLink() {
   restoring = false
   set({ account })
 
-  subscribeRemoteState(() => refresh())
+  subscribeRemoteState((up) => {
+    refresh()
+    /*
+     * A socket that closed is chased at once rather than at the next turn of
+     * the loop. realtime-js reopens one on its own, but nothing here knew it
+     * had happened until the poll came round — up to thirty seconds later
+     * while backed off, and never at all while the tab was hidden. That gap
+     * is what a dropped link felt like: a phone that had reconnected
+     * underneath and an app still showing the disconnected screen until
+     * somebody reloaded the page.
+     */
+    if (!up && state.role === 'remote' && state.account && wantsAutoConnect() !== false) pokeLink()
+  })
   subscribeHostSeen(() => refresh())
 
   if (role === 'mac') {

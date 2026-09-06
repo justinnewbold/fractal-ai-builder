@@ -201,6 +201,14 @@ let client = null
 let channel = null // the joined channel, and null the moment it stops being joined
 let session = null // what we built: the channel object and the client it belongs to
 let userId = null
+/*
+ * A rejoin is under way. Between remoteDisconnect tearing the old session down
+ * and the new one being registered there is no session at all, and a request
+ * caught in that window would otherwise be told "not connected" and give up —
+ * over a link that was seconds from coming back, and coming back BECAUSE of
+ * the drop it is reacting to. See relayReady.
+ */
+let connecting = false
 let hostSeen = false
 let answeredAt = 0
 const waiting = new Map()
@@ -514,7 +522,13 @@ export async function hostResponds() {
     return false
   }
   try {
-    await remoteRequest('/healthz', { timeoutMs: 6000 })
+    /*
+     * No grace: this is the question that decides whether the relay is worth
+     * being patient about, so it must not itself wait out a grace period.
+     * The loop in link.js asks it every few seconds; a probe that took eight
+     * seconds to answer "no" would be the reason a red lamp was slow.
+     */
+    await remoteRequest('/healthz', { timeoutMs: 6000, graceMs: 0 })
     seen(true)
   } catch {
     seen(false)
@@ -555,10 +569,85 @@ function announce() {
   }
 }
 
+/**
+ * The socket went, as an error anything upstream can recognise without reading
+ * English.
+ *
+ * Four different sentences mean "the relay dropped" — thrown from four places
+ * here — and every one of them used to arrive at the write loop as an ordinary
+ * failure indistinguishable from "the unit refused this parameter". So a
+ * hundred-write send met a two-second blip and produced ninety failures, one
+ * per remaining change, none of which had been tried. The flag is what lets a
+ * caller tell "this never left the phone" from "the unit said no".
+ */
+function linkDown(message) {
+  const err = new Error(message)
+  err.linkDown = true
+  return err
+}
+
 /** Nothing can be answered on a channel that has gone. Fail them now, loudly. */
 function failWaiting(message) {
-  for (const [, pending] of waiting) pending.reject(new Error(message))
+  for (const [, pending] of waiting) pending.reject(linkDown(message))
   waiting.clear()
+}
+
+/**
+ * Wait for the relay to come back, for a little while.
+ *
+ * realtime-js rejoins on its own after a socket closes — a phone unlocked, a
+ * hand-off from wifi to cellular, a tunnel. It takes a second or two, and for
+ * that second or two every request in flight and every request after it failed
+ * outright. That is survivable when someone is tapping a control; it is not
+ * survivable in the middle of a send, where three hundred writes go down one
+ * serial port and the whole thing is abandoned at write forty.
+ *
+ * Polled rather than subscribed on purpose: `announce` only fires when the
+ * module's own `channel` changes, and the case this exists for is realtime-js
+ * flipping its channel back to joined underneath us.
+ */
+export async function waitForRelay(ms = RELAY_GRACE, step = 150, sleep = (n) => new Promise((r) => setTimeout(r, n))) {
+  const until = Date.now() + ms
+  for (;;) {
+    // The session's channel is the one realtime-js rejoins; `channel` is our
+    // own view of it, cleared the moment it stopped being joined. Either being
+    // back is the relay being back.
+    const chan = session?.chan || channel
+    if (chan && isJoined(chan)) {
+      if (channel !== chan) {
+        channel = chan
+        announce()
+      }
+      return true
+    }
+    if (Date.now() >= until) return false
+    await sleep(step)
+  }
+}
+
+/**
+ * How long a request waits for a dropped relay before giving up on it.
+ *
+ * Long enough for realtime-js's own rejoin, which is a couple of seconds on a
+ * phone that just came back; short enough that a Mac genuinely gone still says
+ * so while someone is still looking at the screen.
+ */
+export const RELAY_GRACE = 8000
+
+/**
+ * Requests that must not be sent twice.
+ *
+ * Everything else the app relays is a statement of where something should end
+ * up — this parameter is 4.5, this block is on channel B, load preset 12 — and
+ * arriving twice leaves the unit exactly where arriving once did. Tap tempo is
+ * the one that is not: it is a beat, and a resend is a beat that never
+ * happened. So the retry below covers the whole relay except this.
+ */
+const NOT_REPEATABLE = [/^\/tempo\/tap$/]
+
+export const repeatable = (path) => {
+  const clean = (String(path).split('?')[0] || '').replace(/\/+$/, '') || '/'
+  return !NOT_REPEATABLE.some((re) => re.test(clean))
 }
 
 /** realtime-js keeps its own channel state; 'joined' is the only one that can carry a request. */
@@ -734,6 +823,15 @@ export async function remoteConnect() {
    * there until it timed out. Anything else gets torn down and rebuilt.
    */
   if (canReuseChannel(channel, session, client)) return userId
+  connecting = true
+  try {
+    return await joinChannel()
+  } finally {
+    connecting = false
+  }
+}
+
+async function joinChannel() {
   await remoteDisconnect()
 
   /*
@@ -915,18 +1013,21 @@ async function decode(payload) {
  * Every message carries an id because replies arrive on a shared broadcast
  * channel with no ordering guarantee — matching on id is the only way to know
  * which answer belongs to which question.
+ *
+ * A dropped socket is not a failed request. Sending a preset is three hundred
+ * of these down one serial port over several minutes, and for all of that time
+ * the phone is a phone: it gets locked, it gets carried, it moves from wifi to
+ * cellular. Any one of those closes the socket, realtime-js opens another a
+ * second or two later, and in between every remaining write failed instantly
+ * without ever leaving the handset. One blip forty writes in used to end the
+ * send and leave the preset half-written, which is the worst place to leave it.
+ *
+ * So a request that could not travel waits for the relay to come back and goes
+ * again, once. Repeating is safe because everything the app relays says where
+ * something should END UP rather than what should happen next — see
+ * `repeatable`, and the one route that is the exception.
  */
 export async function remoteRequest(path, options = {}) {
-  if (!channel) throw new Error('Not connected to your Mac.')
-  // A channel can stop being joined between one request and the next, and
-  // sending into it waits out the whole timeout for an answer nobody heard the
-  // question. Catching it here costs nothing and says what actually happened.
-  if (!isJoined(channel)) {
-    channel = null
-    seen(false)
-    announce()
-    throw new Error('The connection to your Mac dropped.')
-  }
   const method = (options.method || 'GET').toUpperCase()
 
   /*
@@ -955,6 +1056,58 @@ export async function remoteRequest(path, options = {}) {
     throw err
   }
 
+  /*
+   * One budget for the whole request, not one per attempt.
+   *
+   * The retry must not be able to double the wait: a link that is flapping
+   * would otherwise cost sixteen seconds a request, and the screen that has to
+   * decide whether a unit is really gone asks five of them in a row. The
+   * health probe passes zero, because it is the question that decides whether
+   * there is anything to be patient about.
+   */
+  const graceUntil = Date.now() + (options.graceMs ?? RELAY_GRACE)
+  const attempts = repeatable(path) ? 2 : 1
+
+  let last = null
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      await relayReady(graceUntil - Date.now())
+      return await relaySend(method, path, options)
+    } catch (err) {
+      // Only a relay that went missing is worth repeating. A 403, a 409, a
+      // unit that answered "no" — those are answers, and asking again gets
+      // the same one a second slower.
+      if (!err?.linkDown) throw err
+      last = err
+    }
+  }
+  throw last
+}
+
+/**
+ * Don't send into a socket that isn't there — wait for the one coming back.
+ *
+ * `channel` is cleared the instant realtime-js reports the channel left the
+ * joined state, so this is also the place that picks it up again when the
+ * rejoin lands.
+ */
+async function relayReady(grace) {
+  if (channel && isJoined(channel)) return
+  if (channel) {
+    channel = null
+    seen(false)
+    announce()
+  }
+  // Nothing was ever set up, and nothing is coming: say so now rather than
+  // making someone watch a grace period elapse over an empty session. A
+  // rejoin in flight is something coming, so that waits like any other drop.
+  if (!session && !connecting) throw linkDown('Not connected to your Mac.')
+  if (grace > 0 && (await waitForRelay(grace))) return
+  throw linkDown('The connection to your Mac dropped.')
+}
+
+/** One trip: shout the question, match the answer by id, unwrap it. */
+async function relaySend(method, path, options) {
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
   const reply = new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -986,7 +1139,17 @@ export async function remoteRequest(path, options = {}) {
   const ask = { id, method, path, body: options.body ?? null }
   if (hosts.length > 1 && chosen && targeted) ask.host = chosen
 
-  await channel.send({ type: 'broadcast', event: 'req', payload: ask })
+  try {
+    await channel.send({ type: 'broadcast', event: 'req', payload: ask })
+  } catch (err) {
+    /*
+     * A send that throws never reached the wire, and the promise above is
+     * still parked in `waiting` holding a timer. Left there it would fire
+     * twenty seconds later against a request nobody made.
+     */
+    waiting.delete(id)
+    throw linkDown(err?.message ? `Couldn’t reach your Mac — ${err.message}` : 'Couldn’t reach your Mac.')
+  }
 
   const payload = await reply
   // An answer is proof the Mac is on the channel — better proof than any probe,
