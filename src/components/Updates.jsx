@@ -89,6 +89,8 @@ export function UpdateReadyNotice() {
   const bridge = desktopBridge()
   const [state, setState] = useState(null)
   const [hidden, setHidden] = useState(false)
+  // Pressed once. The app is about to close and reopen, so this never clears.
+  const [installing, setInstalling] = useState(false)
 
   useEffect(() => {
     if (!bridge) return undefined
@@ -113,8 +115,37 @@ export function UpdateReadyNotice() {
         when you quit the app &mdash; nothing is interrupted until then.
       </p>
       <div className="history-actions">
+        {/*
+          The other way in, and the reason it exists.
+
+          Installing on quit is still the default and still right: nothing
+          restarts itself on a machine with a guitar plugged into it. But it is
+          only a good default while quitting works, and when it did not it took
+          the update down with it — Force Quit is a hard kill, so nothing
+          installed, the same version was offered at every launch, and the fix
+          for the quit was inside the version that could not be installed.
+
+          A person pressing this is not the app deciding to interrupt anybody,
+          which is the thing the design is actually against.
+        */}
+        {bridge.updates.install ? (
+          <button
+            className="chip"
+            disabled={installing}
+            onClick={async () => {
+              setInstalling(true)
+              try {
+                await bridge.updates.install()
+              } catch {
+                // The app is on its way out; there is nobody left to tell.
+              }
+            }}
+          >
+            {installing ? 'Installing\u2026' : 'Install now'}
+          </button>
+        ) : null}
         <button className="chip" onClick={() => setHidden(true)}>
-          Got it
+          Later
         </button>
       </div>
     </div>

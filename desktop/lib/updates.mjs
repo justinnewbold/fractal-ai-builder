@@ -86,6 +86,26 @@ export function wireUpdates({ updater, onState, log = () => {} }) {
   })
 
   return {
+    /**
+     * Install it now and come back on the new version.
+     *
+     * Not the default and not automatic: installing on quit is what keeps a
+     * restart from ever landing mid-set. This is the other way out, for the
+     * case where quitting itself is what is broken — an update that installs on
+     * quit and a quit that never finishes is a loop with no exit, and the fix
+     * for the quit is inside the version that cannot be installed.
+     *
+     * Never called by anything but a person pressing a button.
+     */
+    install: () => {
+      try {
+        updater.quitAndInstall()
+      } catch {
+        // Nothing to fall back to: the caller has already stopped serving and
+        // the app is on its way out either way.
+      }
+    },
+
     check: async () => {
       try {
         await updater.checkForUpdates()

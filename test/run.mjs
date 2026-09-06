@@ -877,6 +877,50 @@ test('closing the window is not the end of the app', () => {
   assert.ok(!/await advert\.stop\(\)/.test(main), 'the un-caught teardown that could block a quit is back')
 })
 
+test('an update never depends on the quit working', () => {
+  /*
+   * The loop this breaks, seen on a real Mac and reported with a Force Quit
+   * window open next to the notice:
+   *
+   *   the update installs when you quit
+   *     -> quitting does not finish
+   *       -> Force Quit, which is a hard kill and installs nothing
+   *         -> the same version is offered at the next launch, for ever
+   *
+   * And the fix for the quit was inside the version that could not be
+   * installed, so nothing in that loop could ever break it from the inside. It
+   * had to be broken by hand, once, with a disk image.
+   *
+   * Installing on quit stays the default: nothing restarts itself on a machine
+   * with a guitar plugged into it. What is added is a second way out that a
+   * PERSON presses — which was never the thing the design was against.
+   */
+  const main = readSrc(new URL('../desktop/main.js', import.meta.url), 'utf8')
+  const preload = readSrc(new URL('../desktop/preload.js', import.meta.url), 'utf8')
+  const updates = readSrc(new URL('../desktop/lib/updates.mjs', import.meta.url), 'utf8')
+  const ui = readSrc(new URL('../src/components/Updates.jsx', import.meta.url), 'utf8')
+
+  // The channel exists end to end, or the button is a button that does nothing.
+  assert.match(updates, /install: \(\) => \{/, 'the updater cannot be told to install')
+  assert.match(updates, /updater\.quitAndInstall\(\)/, 'installing does not install')
+  assert.match(preload, /install: \(\) => ipcRenderer\.invoke\('updates:install'\)/, 'the page cannot ask')
+  assert.match(main, /ipcMain\.handle\('updates:install'/, 'nothing answers the page')
+  assert.match(ui, /bridge\.updates\.install\(\)/, 'the notice never offers it')
+
+  // And only for an update that is actually sitting there, so this cannot
+  // become a way to restart the app for any other reason.
+  assert.match(
+    main,
+    /if \(update\?\.kind !== 'ready'\) return \{ ok: false, reason: 'nothing-ready' \}/,
+    'the app can be restarted with no update to install'
+  )
+
+  // The server goes down first either way. A ForgeFX left holding port 5056
+  // stops the next launch dead, and the next launch is the whole point here.
+  assert.match(main, /await stopServing\(\)\s*\n/, 'installing leaves the device server running')
+  assert.match(main, /async function stopServing\(\)/, 'the teardown is not shared with the quit')
+})
+
 test('nothing can stop the app closing', () => {
   /*
    * Three separate ways the quit could stall, each of which read to the person
