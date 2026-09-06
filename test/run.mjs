@@ -3481,6 +3481,37 @@ test('a value checked on the wrong channel is not a value that did not stick', a
   }
 })
 
+test('the demo can be turned off where there is no browser to remember it', async () => {
+  /*
+   * setDemo wrote the demo flag to localStorage without checking there was
+   * one. In a browser there always is; in the tests there is not, except where
+   * a test installs a fake — and the tests drive the mock device through this
+   * very function to check the write and verify paths without hardware.
+   *
+   * So turning the demo ON worked (the caller had installed a fake by then)
+   * and turning it OFF threw, in a `finally`, after the real assertions had
+   * passed. It read as the code under test failing. It surfaced only on Node
+   * 20, which is what CI runs and which drains the test queue in a different
+   * order from Node 22, so it passed on the machine it was written on and was
+   * red on main from the commit that added it.
+   *
+   * Run with the global genuinely absent, which is the condition that broke
+   * it, and put back whatever was there for whoever runs next.
+   */
+  const had = Object.prototype.hasOwnProperty.call(globalThis, 'localStorage')
+  const saved = had ? globalThis.localStorage : undefined
+  delete globalThis.localStorage
+  try {
+    const fx = await import('../src/lib/forgefx.js')
+    fx.setDemo(true)
+    assert.equal(fx.isDemo(), true, 'the demo will not start without somewhere to write it down')
+    fx.setDemo(false)
+    assert.equal(fx.isDemo(), false, 'the demo cannot be turned off without somewhere to write it down')
+  } finally {
+    if (had) globalThis.localStorage = saved
+  }
+})
+
 test('a value that really did not stick is still reported, and says which channel', async () => {
   /*
    * The other half. Silencing the false alarms must not silence a real one —
