@@ -11,6 +11,7 @@
     "test": "node test/run.mjs",
     "serve": "node scripts/serve.mjs",
     "icon": "node scripts/icon.mjs",
+    "sync:rules": "node scripts/sync-relay-rules.mjs",
     "vendor:forgefx": "node scripts/vendor-forgefx.mjs"
   },
   "dependencies": {
@@ -24,7 +25,9 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
+    "base64-js": "^1.5.1",
     "bonjour-service": "^1.4.4",
+    "fflate": "^0.8.3",
     "vite": "^5.4.11"
   }
 }
