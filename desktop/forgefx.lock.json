@@ -39,13 +39,20 @@
     "host now honours an optional `host` field naming the Mac a request is meant",
     "for, and stays silent on anything addressed elsewhere. Absent on every request",
     "from a client that has only ever seen one host, so it is inert until there are",
-    "two."
+    "two.",
+    "",
+    "And tuner readings now cross the relay. They were dropped with the meter and",
+    "CPU cadence, which was right for those -- they run continuously for any",
+    "subscribed client -- and wrong for the tuner, whose poll exists only while",
+    "somebody has it open. Dropping it broke the one place a remote tuner is worth",
+    "anything: tuning from a phone away from the Mac. Throttled to one reading",
+    "every 80 ms so a future poll cadence cannot flood the relay."
   ],
   "forgefx": {
     "repo": "justinnewbold/forgefx",
     "upstream": "sKuhLight/forgefx",
-    "tag": "v0.7.1-beta+rename+host",
-    "commit": "7aa677252cc5b53f42a0a7bab46e41c50ecfe881",
+    "tag": "v0.7.1-beta+rename+host+tuner",
+    "commit": "dfb747691572cf878148ccad61bda1a3ce876b46",
     "branch": "claude/address-one-host"
   },
   "forgefx-midi": {
