@@ -23,6 +23,23 @@ one you would pick.
 base branch and fails if they match. `desktop/package.json` has to move with
 it — a test holds the two to each other.
 
+**Node 20 is past end of life, and that is a watching brief, not a job.**
+Justin has decided not to upgrade until it actually costs something, and the
+reasoning is sound: the packaged Mac app runs the device server on Electron's
+bundled Node (`desktop/main.js` spawns `process.execPath` with
+`ELECTRON_RUN_AS_NODE`), so moving off Node 20 means moving Electron, which
+means rebuilding `serialport` and `@julusian/midi` — compiled addons bound to
+the runtime. That is the one change that can stop the app finding the FM3, and
+it can only be proven with the hardware plugged in.
+
+Two things are the trigger, and TELL HIM when either happens:
+
+- GitHub actually drops Node 20 from its runners, so the test suite stops
+  running. The deprecation warning is already in every run's log.
+- Something he needs will not install on Node 20.
+
+Neither is an emergency and neither breaks the app on its own.
+
 **CI runs Node 20; a dev machine may not.** A bug that only appears on one
 Node version will pass locally and fail on CI, which has already happened
 once (a `localStorage` read that threw only because the two versions drain
