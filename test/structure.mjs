@@ -2513,13 +2513,15 @@ export function run(test) {
     // Asked before the model runs, so the answer costs one generation, not two.
     assert.match(
       src,
-      /requestSpec\(schema, description, null, \{ wantScenes: opts\.wantScenes \}\)/,
+      /requestSpec\(schema, description, null, \{\s*\n\s*wantScenes: opts\.wantScenes,\s*\n\s*sceneBudget: opts\.sceneBudget\s*\n\s*\}\)/,
       'the answer never reaches the model, so asking changed nothing'
     )
     const api = readFileSync(new URL('../api/generate.js', import.meta.url), 'utf8')
-    assert.match(api, /wantScenes/, 'the designer route ignores the answer')
-    assert.match(api, /SET OF SCENES/, 'a request for a set is not made plain to the model')
-    assert.match(api, /ONE SOUND/, 'a request for one sound is not made plain to the model')
+    assert.match(api, /sceneInstruction\(\{ wantScenes, sceneBudget, sceneCount: state\.sceneCount \}\)/, 'the designer route ignores the answer')
+    const scenes = readFileSync(new URL('../api/_scenes.js', import.meta.url), 'utf8')
+    assert.match(scenes, /SET OF SCENES/, 'a request for a set is not made plain to the model')
+    assert.match(scenes, /ONE SOUND/, 'a request for one sound is not made plain to the model')
+    assert.match(scenes, /EXACTLY \$\{n\} SCENES/, 'a request for a number is not made plain to the model')
     assert.match(api, /Name every scene you return/, 'the model is not told to name the scenes it makes')
   })
 

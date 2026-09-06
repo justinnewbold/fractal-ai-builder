@@ -2934,6 +2934,106 @@ test('a browser with no wake lock is not a browser that cannot send', async () =
   release()
 })
 
+console.log('\nhow many scenes')
+
+const scenesMod = await import('../api/_scenes.js')
+
+test('the choices come from the unit, not from a number in the source', () => {
+  const { sceneChoices } = scenesMod
+  // An FM3 has eight and the difference between a few and all of them is real.
+  assert.deepEqual(
+    sceneChoices(8).map((c) => [c.key, c.budget]),
+    [['one', 0], ['few', null], ['all', 8]]
+  )
+  assert.match(sceneChoices(8).find((c) => c.key === 'all').label, /All 8/)
+
+  /*
+   * An AM4 has four, where "a few" and "all four" are the same answer with two
+   * labels — a third button that changes nothing is worse than no button.
+   */
+  assert.deepEqual(
+    sceneChoices(4).map((c) => c.key),
+    ['one', 'few']
+  )
+  // A unit that never reported its count is assumed to be the common one.
+  assert.equal(sceneChoices().length, 3)
+  assert.equal(sceneChoices(undefined).find((c) => c.key === 'all').budget, 8)
+})
+
+test('a number asked for is clamped to the scenes the unit actually has', () => {
+  const { sceneBudgetFor } = scenesMod
+  assert.equal(sceneBudgetFor(8, 8), 8)
+  // Writing past the count is refused by the validator anyway; asking for it
+  // only spends a generation on scenes that cannot exist.
+  assert.equal(sceneBudgetFor(8, 4), 4, 'an AM4 was asked for eight scenes')
+  assert.equal(sceneBudgetFor(3, 8), 3)
+  // A set of one is not a set — that answer is the other button.
+  assert.equal(sceneBudgetFor(1, 8), null)
+  assert.equal(sceneBudgetFor(0, 8), null)
+  assert.equal(sceneBudgetFor(-2, 8), null)
+  assert.equal(sceneBudgetFor(null, 8), null)
+  assert.equal(sceneBudgetFor(undefined, 8), null)
+  assert.equal(sceneBudgetFor(2.5, 8), null, 'half a scene')
+  assert.equal(sceneBudgetFor('4', 8), 4, 'a number that arrived over JSON as a string')
+})
+
+test('a number the player chose overrides the rule that says three or four', () => {
+  const { sceneInstruction } = scenesMod
+
+  /*
+   * Rule 11 — "three or four well-judged scenes beat eight" — is a good
+   * default and was also a ceiling. Left to fight an explicit eight it wins,
+   * and somebody who asked for a full set gets four with no explanation.
+   */
+  const all = sceneInstruction({ wantScenes: true, sceneBudget: 8, sceneCount: 8 })
+  assert.match(all, /EXACTLY 8 SCENES/)
+  assert.match(all, /rule 11 does not apply/, 'the instruction and the rule are left to fight')
+  assert.match(all, /numbered 0 to 7/, 'nothing says the indices must be contiguous')
+  // The real failure of asking for a full set: eight near-copies of one tone.
+  assert.match(all, /rather than 8 near-copies/)
+
+  // Asked for a set but not for a number: exactly what it always said.
+  const few = sceneInstruction({ wantScenes: true, sceneCount: 8 })
+  assert.match(few, /SET OF SCENES/)
+  assert.match(few, /three or four/)
+  assert.ok(!/EXACTLY/.test(few), 'a default became a demand')
+
+  // One sound, and no question asked, are both unchanged.
+  assert.match(sceneInstruction({ wantScenes: false }), /ONE SOUND/)
+  assert.equal(sceneInstruction({}), '')
+  assert.equal(sceneInstruction(), '')
+  assert.equal(sceneInstruction({ wantScenes: undefined, sceneBudget: 8 }), '', 'a budget without an answer is not an answer')
+
+  // And a budget past the unit's count is spoken in the unit's terms.
+  assert.match(sceneInstruction({ wantScenes: true, sceneBudget: 8, sceneCount: 4 }), /EXACTLY 4 SCENES/)
+})
+
+test('the question and the instruction share one idea of "all of them"', () => {
+  /*
+   * Two files decide this — the sheet that asks and the route that prompts —
+   * and if they disagree the player taps "All 8" and gets four. One module,
+   * imported by both.
+   */
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  assert.match(app, /import \{ sceneChoices \} from '\.\.\/api\/_scenes\.js'/)
+  assert.match(app, /sceneChoices\(sceneCount\)\.map/, 'the sheet hardcodes its own options again')
+  assert.ok(
+    !/A set of scenes/.test(app),
+    'the old binary question is still in the sheet'
+  )
+  const api = readSrc(new URL('../api/generate.js', import.meta.url), 'utf8')
+  assert.match(api, /import \{ sceneInstruction \} from '\.\/_scenes\.js'/)
+})
+
+test('the answer names a budget only when a budget was chosen', () => {
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  const sheet = app.slice(app.indexOf('sceneChoices(sceneCount).map'))
+  // budget 0 is one sound; null is the model's judgement, and must arrive as
+  // absent rather than as a zero the route would read as a number.
+  assert.match(sheet, /wantScenes: choice\.budget !== 0/)
+  assert.match(sheet, /sceneBudget: choice\.budget \|\| undefined/)
+})
+
 console.log('\nparameter matching')
 
 const ampSchema = [
