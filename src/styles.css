@@ -2263,9 +2263,54 @@ button.gig-name:disabled .gig-name-caret {
   font-size: var(--f-4);
 }
 
+/*
+ * The size control.
+ *
+ * Everything else on this screen is drawn to be hit without looking. This one
+ * is drawn to be found when looked for and ignored otherwise: aligned right,
+ * away from the grid's leading edge, in the dim silk rather than the bright.
+ */
+.gig-size {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s-2);
+  margin-top: 18px;
+}
+
+.gig-size-label {
+  font-size: var(--f-1);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--silk-faint);
+  /* The width of the longest step name, so the row does not shuffle sideways
+     every time the size changes under the finger that is changing it.
+     9ch rather than 8: `min-width: 8ch` is what test/styles.mjs looks for to
+     find the top bar's phone block, and it takes the first one in the file. */
+  min-width: 9ch;
+  text-align: right;
+}
+
+button.gig-size-step {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--f-5);
+  line-height: 1;
+  background: var(--panel);
+  color: var(--silk-dim);
+}
+
+button.gig-size-step:disabled {
+  opacity: 0.38;
+}
+
 .gig-scenes {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(var(--gig-col, 110px), 1fr));
   gap: var(--s-2);
   margin-top: 12px;
 }
@@ -2278,7 +2323,7 @@ button.gig-scene {
   align-items: center;
   justify-content: center;
   gap: var(--s-1);
-  min-height: 62px;
+  min-height: var(--gig-tile, 62px);
   padding: var(--s-2) var(--s-2);
   background: var(--panel);
 }
@@ -4891,7 +4936,7 @@ button.view-tab.gig-tab::after {
 
 .gig-blocks {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(var(--gig-col-block, 130px), 1fr));
   gap: var(--s-2);
   margin-top: 18px;
 }
@@ -4920,7 +4965,7 @@ button.gig-block {
   flex-direction: column;
   align-items: flex-start;
   gap: var(--s-1);
-  min-height: 62px;
+  min-height: var(--gig-tile, 62px);
   padding: var(--s-3) var(--s-3);
   border: 1px solid var(--rule);
   border-radius: var(--r-1);

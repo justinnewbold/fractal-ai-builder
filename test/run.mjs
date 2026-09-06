@@ -18,6 +18,7 @@ import * as slots from '../src/lib/slots.js'
 import * as names from '../src/lib/presetName.js'
 import * as hold from '../src/lib/longPress.js'
 import * as lineage from '../src/lib/lineage.js'
+import * as gigSize from '../src/lib/gigSize.js'
 import { readFileSync as readSrc } from 'node:fs'
 import {
   patchSchemaValue,
@@ -2473,6 +2474,69 @@ test('a plan over the relay does not propose what the Mac alone can do', () => {
   )
   assert.deepEqual(home.actions.map((a) => a.kind), ['backupPreset', 'savePreset'])
   assert.deepEqual(home.problems, [], home.problems.join(' | '))
+})
+
+test('the stage screen is sized by whoever is holding it', () => {
+  /*
+   * One size was chosen once, for a phone at arm's length in the dark. That is
+   * the right default and the wrong rule: eight scenes and nine blocks do not
+   * fit at it, and two scenes waste the screen at it. Which you have changes
+   * with the preset, so it is a setting.
+   *
+   * The part that matters most is the default. This control changes the thing
+   * you reach for mid-song, so a player who never touches it must see exactly
+   * what they saw before it existed -- 62px tiles in 110px columns, the values
+   * the stylesheet shipped.
+   */
+  const { SIZES, DEFAULT_SIZE, clampSize, sizeVars, loadSize, saveSize } = gigSize
+
+  assert.deepEqual(sizeVars(DEFAULT_SIZE), {
+    '--gig-tile': '62px',
+    '--gig-col': '110px',
+    '--gig-col-block': '130px'
+  }, 'the default step no longer reproduces the screen as it shipped')
+
+  // Bigger is bigger and smaller is smaller, the whole way up.
+  for (let i = 1; i < SIZES.length; i++) {
+    assert.ok(SIZES[i].tile > SIZES[i - 1].tile, `step ${i} is not taller than ${i - 1}`)
+    assert.ok(SIZES[i].col > SIZES[i - 1].col, `step ${i} is not wider than ${i - 1}`)
+  }
+
+  // Every step clears the floor for something pressed on a dark stage.
+  for (const s of SIZES) assert.ok(s.tile >= 44, `${s.name} is under the tap floor at ${s.tile}px`)
+
+  // Nothing out of storage can put the screen in a state with no buttons on it.
+  assert.equal(clampSize(99), SIZES.length - 1)
+  assert.equal(clampSize(-5), 0)
+  assert.equal(clampSize('nonsense'), DEFAULT_SIZE)
+  assert.equal(clampSize(null), DEFAULT_SIZE)
+
+  // Kept across a reload, on this device.
+  const mem = new Map()
+  const store = {
+    getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+    setItem: (k, v) => mem.set(k, v)
+  }
+  assert.equal(loadSize(store), DEFAULT_SIZE, 'a device that has never chosen gets the default')
+  saveSize(3, store)
+  assert.equal(loadSize(store), 3)
+  saveSize(99, store)
+  assert.equal(loadSize(store), SIZES.length - 1, 'an out-of-range save was stored out of range')
+
+  /*
+   * A private window throws on both, and has done since the first iOS that
+   * had one. The stage screen renders at the default rather than not at all.
+   */
+  const hostile = {
+    getItem: () => {
+      throw new Error('denied')
+    },
+    setItem: () => {
+      throw new Error('denied')
+    }
+  }
+  assert.equal(loadSize(hostile), DEFAULT_SIZE, 'a blocked read takes the screen down')
+  assert.equal(saveSize(2, hostile), false, 'a blocked write is reported as a success')
 })
 
 test('a confirmed write updates the cached value in place', () => {
