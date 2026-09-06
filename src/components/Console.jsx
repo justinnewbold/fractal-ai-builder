@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { blockColor } from '../lib/blockColors'
 import { useDismiss } from '../lib/dismiss'
+import { marksFor, toggleFavourite } from '../lib/presetMarks'
 
 const SHORT = {
   wah: 'WAH',
@@ -167,11 +168,24 @@ export function PresetList({
   progress,
   deviceSlots,
   addressing,
-  slowNames
+  slowNames,
+  device
 }) {
   const [filter, setFilter] = useState('')
   const [showAll, setShowAll] = useState(false)
   const rows = useRef(null)
+  /*
+   * Starred, and where you have just been.
+   *
+   * Read once when the list mounts — the sheet unmounts its children on close,
+   * so every opening gets the current answer without this having to watch
+   * storage. `view` is which of the three lists is on screen; it goes back to
+   * everything each time, because a filter you cannot see is a list that is
+   * lying about how much the unit holds.
+   */
+  const [marks, setMarks] = useState(() => marksFor(device))
+  const [view, setView] = useState('all')
+  const star = (n) => setMarks((m) => ({ ...m, favourites: toggleFavourite(device, n, undefined) }))
   /* Which preset we have already centred on, so typing in the filter does not
      get yanked back and a re-render does not re-scroll a list being read. */
   const centredOn = useRef(null)
@@ -189,7 +203,20 @@ export function PresetList({
   // hidden with the unread ones, behind the same "Show all" chip. On a
   // factory unit every slot is named, so this hides nothing there.
   const named = known.filter((s) => (s.name || '').trim())
-  const base = needle || showAll ? slots : named
+  /*
+   * Recent keeps the order it was played in, which is the whole point of it —
+   * sorting it by slot number would throw away the only thing it knows. The
+   * other two read as a list of presets and stay in slot order.
+   */
+  const byNumber = new Map(slots.map((s) => [s.number, s]))
+  const picked =
+    view === 'recent'
+      ? marks.recent.map((n) => byNumber.get(n)).filter(Boolean)
+      : view === 'starred'
+        ? marks.favourites.map((n) => byNumber.get(n)).filter(Boolean)
+        : null
+
+  const base = picked || (needle || showAll ? slots : named)
   const shown = needle
     ? base.filter(
         (s) => (s.name || '').toLowerCase().includes(needle) || String(s.number) === needle
@@ -286,7 +313,34 @@ export function PresetList({
         aria-label="Filter presets"
       />
 
-      {jumps.length && !needle ? (
+      {/*
+        Three ways to look at 512 presets: all of them, the ones you starred,
+        and the ones you were just on. Only offered where they mean something —
+        a unit with nothing starred and nothing played does not need a chooser
+        between three empty lists.
+      */}
+      {!needle && (marks.favourites.length || marks.recent.length) ? (
+        <div className="preset-views" role="group" aria-label="Which presets to show">
+          {[
+            ['all', 'All', true],
+            ['starred', `★ ${marks.favourites.length}`, marks.favourites.length > 0],
+            ['recent', `Recent ${marks.recent.length}`, marks.recent.length > 0]
+          ]
+            .filter(([, , show]) => show)
+            .map(([id, label]) => (
+              <button
+                key={id}
+                className={`preset-view ${view === id ? 'current' : ''}`}
+                onClick={() => setView(id)}
+                aria-pressed={view === id}
+              >
+                {label}
+              </button>
+            ))}
+        </div>
+      ) : null}
+
+      {jumps.length && !needle && view === 'all' ? (
         <div className="preset-jumps" role="group" aria-label="Jump to a range">
           {jumps.map((n) => (
             <button key={n} className="preset-jump mono" onClick={() => jumpTo(n)} aria-label={`Jump to preset ${n}`}>
@@ -327,8 +381,21 @@ export function PresetList({
           <p className="hint pad">Nothing matches “{filter}”.</p>
         ) : (
           shown.map((slot, i) => (
+            /*
+              The star is its own button beside the row, not inside it: nested
+              buttons are invalid, and more to the point a thumb going for a
+              star must never load a preset by missing it.
+            */
+            <span className="preset-line" key={slot.number}>
             <button
-              key={slot.number}
+              className={`preset-star ${marks.favourites.includes(slot.number) ? 'on' : ''}`}
+              onClick={() => star(slot.number)}
+              aria-pressed={marks.favourites.includes(slot.number)}
+              aria-label={`${marks.favourites.includes(slot.number) ? 'Unstar' : 'Star'} preset ${slot.number}`}
+            >
+              {marks.favourites.includes(slot.number) ? '★' : '☆'}
+            </button>
+            <button
               className={`preset-row ${slot.number === current ? 'current' : ''} ${
                 !needle && startsBank(slot.number, i === 0 ? null : shown[i - 1].number, addressing)
                   ? 'bank-start'
@@ -353,6 +420,7 @@ export function PresetList({
                 )}
               </span>
             </button>
+            </span>
           ))
         )}
         {!needle && hidden > 0 ? (

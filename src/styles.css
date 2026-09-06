@@ -3009,6 +3009,65 @@ input.bpm-box:focus {
 /* ---------- preset list ---------- */
 
 /*
+ * Which of the three lists is on screen.
+ */
+.preset-views {
+  display: flex;
+  gap: var(--s-2);
+  padding: 0 var(--s-3) var(--s-2) var(--s-3);
+}
+
+button.preset-view {
+  flex: 1 1 0;
+  min-height: 44px;
+  padding: 0 var(--s-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  background: var(--panel);
+  color: var(--silk-dim);
+  font-size: var(--f-2);
+  letter-spacing: 0.04em;
+}
+
+button.preset-view.current {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--on-signal);
+}
+
+/*
+ * A row and its star.
+ *
+ * The star is a sibling of the row, not a child of it: nested buttons are
+ * invalid, and a thumb going for a star must never load a preset by missing.
+ */
+.preset-line {
+  display: flex;
+  align-items: stretch;
+  gap: var(--s-1);
+}
+
+.preset-line .preset-row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+button.preset-star {
+  flex: 0 0 auto;
+  width: 44px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--silk-faint);
+  font-size: var(--f-4);
+  line-height: 1;
+}
+
+button.preset-star.on {
+  color: var(--signal);
+}
+
+/*
  * The range jumps.
  *
  * A row of five, under the filter and above the list, because that is the
