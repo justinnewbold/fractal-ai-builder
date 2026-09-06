@@ -993,6 +993,53 @@ test('a model we cannot name is left unnamed', () => {
   assert.equal(lineage.gearLine('amp', undefined), null)
 })
 
+test('the picker keeps what the native menu did for free', () => {
+  /*
+   * Replacing a <select> means inheriting its whole job, and the parts that
+   * cost nothing to have are the parts easiest to lose: it opened at the model
+   * you were on, closed on a tap outside and on Escape, took arrow keys, and
+   * gave a row you could hit on a dark stage. Losing any of them to get a green
+   * caption would be a bad trade.
+   */
+  const src = readSrc(new URL('../src/components/Console.jsx', import.meta.url), 'utf8')
+
+  // Outside tap and Escape, from the same helper every other popover uses.
+  assert.match(src, /useDismiss\(picker, \(\) => setPicking\(false\), \{ open: picking, ignore: '\.type-open' \}\)/)
+  // Opens where you already are, rather than at the top of three hundred names.
+  assert.match(src, /querySelector\('\[aria-selected="true"\]'\)/)
+  assert.match(src, /scrollIntoView\(\{ block: 'center' \}\)/)
+  // Arrows, Home and End, wrapping at both ends.
+  for (const key of ['ArrowDown', 'ArrowUp', 'Home', 'End']) {
+    assert.ok(src.includes(`e.key === '${key}'`), `${key} does nothing in the model list`)
+  }
+  assert.match(src, /pickAt\(\(i - 1 \+ models\.length\) % models\.length\)/, 'arrowing up off the top does not wrap')
+
+  // Announced as what it is, so it is a listbox to a screen reader too.
+  assert.match(src, /aria-haspopup="listbox"/)
+  assert.match(src, /aria-expanded=\{picking\}/)
+  assert.match(src, /role="listbox" aria-label="Model"/)
+  assert.match(src, /aria-selected=\{m\.value === chosenValue\}/)
+
+  const css = readSrc(new URL('../src/styles.css', import.meta.url), 'utf8')
+  const rule = (sel) => css.slice(css.indexOf(sel), css.indexOf('}', css.indexOf(sel)))
+  // A stage-sized target. The blanket 44px floor is on `button`, and this is a
+  // button, but the rule sets its own padding so it says the floor out loud.
+  assert.match(rule('.type-row {'), /min-height: 44px/)
+  // Three hundred rows scroll inside the list rather than running off the end.
+  assert.match(rule('.type-list {'), /max-height: min\(55vh, 380px\)/)
+  assert.match(rule('.type-list {'), /overflow-y: auto/)
+  assert.match(rule('.type-list {'), /overscroll-behavior: contain/)
+  /*
+   * And it takes its own space rather than floating over the panel. The panel
+   * sits inside a sheet whose body scrolls, and a scroll container clips
+   * absolutely positioned children at its edge — the first build came out with
+   * its last row sliced in half at the bottom of the sheet, and would have lost
+   * more of itself on a shorter phone. No z-index fixes that; only not being
+   * inside the clip does.
+   */
+  assert.ok(!/position: absolute/.test(rule('.type-list {')), 'the list floats again, so the sheet can clip it')
+})
+
 test('a family names the amp behind a whole run of models', async () => {
   /*
    * "Search for the real life names that each AMP and all other effects are
@@ -1087,19 +1134,32 @@ test('the list itself says what each model is, not just the one already chosen',
    * above it were the actual question.
    */
   const src = readSrc(new URL('../src/components/Console.jsx', import.meta.url), 'utf8')
-  assert.match(src, /const listedAs = \(m\) => \(m\.basedOn \? `\$\{m\.name\} — \$\{m\.basedOn\}` : m\.name\)/)
-  assert.match(src, /<option key=\{m\.value\} value=\{m\.value\}>\s*\n\s*\{listedAs\(m\)\}/, 'the option shows the bare name again')
-  // The maker alone is not used here on purpose: "— Mesa/Boogie" on forty rows
-  // tells nobody which one is the Rectifier, and costs the width to say it.
-  assert.ok(!/listedAs[\s\S]{0,200}manufacturer/.test(src), 'every row is being suffixed with its maker')
+  /*
+   * Two elements, not one string. It WAS one string — "Name — Real Amp" inside
+   * an <option> — and that is as far as a native menu goes: an option is a
+   * single run of text, and on iOS the system draws it and ignores the rest.
+   * There was no half of it to make smaller and no half to make green, so the
+   * list is ours and the two halves are two spans.
+   */
+  assert.match(src, /<span className="type-row-name">\{m\.name\}<\/span>/)
+  assert.match(src, /\{m\.basedOn \? <span className="type-row-gear">\{m\.basedOn\}<\/span> : null\}/)
+  // The maker alone is not used here on purpose: "Mesa/Boogie" under forty rows
+  // tells nobody which one is the Rectifier.
+  assert.ok(!/type-row-gear">\{m\.manufacturer/.test(src), 'every row is being captioned with its maker')
+  assert.ok(!/<option /.test(src), 'a native option is back, and cannot carry two sizes')
 
-  // The name leads, so what the closed control cannot fit is cut off the far
-  // end — the half that is spelled out underneath it anyway.
   const css = readSrc(new URL('../src/styles.css', import.meta.url), 'utf8')
-  const rule = css.slice(css.indexOf('.type-select {'), css.indexOf('}', css.indexOf('.type-select {')))
-  assert.match(rule, /overflow: hidden/)
-  assert.match(rule, /white-space: nowrap/)
-  assert.match(rule, /text-overflow: ellipsis/)
+  const rule = (sel) => css.slice(css.indexOf(sel), css.indexOf('}', css.indexOf(sel)))
+
+  // Smaller, and green: --f-1 is the smallest step the app keeps and --ok is
+  // the green it already says a sure thing in, tuned for both themes.
+  assert.match(rule('.type-row-gear {'), /font-size: var\(--f-1\)/)
+  assert.match(rule('.type-row-gear {'), /color: var\(--ok\)/)
+  assert.match(rule('.type-row-name {'), /font-size: var\(--f-3\)/)
+
+  // The name still leads on the closed control, so what cannot fit is trimmed
+  // off the far end — the half spelled out underneath it anyway.
+  assert.match(rule('.type-open-name {'), /text-overflow: ellipsis/)
 })
 
 test('what a model really is reaches the screen and the generator', () => {

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { blockColor } from '../lib/blockColors'
+import { useDismiss } from '../lib/dismiss'
 
 const SHORT = {
   wah: 'WAH',
@@ -438,6 +439,58 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
    */
   const listedAs = (m) => (m.basedOn ? `${m.name} — ${m.basedOn}` : m.name)
 
+  /*
+   * A list of our own, because a native one cannot say two things at once.
+   *
+   * "Let's make the model name that it's based off of smaller text and a
+   * different color like green." An <option> is a single run of text to every
+   * browser that renders one, and on iOS it is drawn by the system entirely —
+   * there is no half of it to make smaller, and no half to make green. So the
+   * menu is ours now: a button that opens a listbox, one row per model, the
+   * name and the amp as two elements that can be styled apart.
+   *
+   * What the native control was good at is kept deliberately. It opened at the
+   * model you were on, so this scrolls to it. It closed on a tap outside and on
+   * Escape, so useDismiss does that. It took arrow keys and Enter, so those are
+   * handled below. And the row stays one tall tap target rather than two lines
+   * of small print.
+   */
+  const [picking, setPicking] = useState(false)
+  const picker = useRef(null)
+  const listRef = useRef(null)
+  useDismiss(picker, () => setPicking(false), { open: picking, ignore: '.type-open' })
+
+  // Open where you already are. A native menu does this and a list that starts
+  // at the top of three hundred names would be a step backwards without it.
+  useEffect(() => {
+    if (!picking) return
+    const here = listRef.current?.querySelector('[aria-selected="true"]')
+    here?.scrollIntoView({ block: 'center' })
+    here?.focus?.({ preventScroll: true })
+  }, [picking])
+
+  const pickAt = (i) => {
+    const row = listRef.current?.querySelectorAll('.type-row')[i]
+    row?.focus()
+    row?.scrollIntoView({ block: 'nearest' })
+  }
+
+  const onPickKey = (e, i) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      pickAt((i + 1) % models.length)
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      pickAt((i - 1 + models.length) % models.length)
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      pickAt(0)
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      pickAt(models.length - 1)
+    }
+  }
+
   const valueOf = (p) => (local[p.id] !== undefined ? local[p.id] : p.value)
 
   const commit = async (p, override) => {
@@ -587,36 +640,56 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
       ) : null}
 
       {models.length ? (
-        <select
-          className="type-select"
-          aria-label="Model"
-          value={
-            type && models.some((m) => m.value === type.value)
-              ? type.value
-              : (models.find((m) => m.name === type?.name)?.value ?? '')
-          }
-          onChange={(e) => e.target.value !== '' && swapModel(e.target.value)}
-        >
-          {/* Only reachable while the model is genuinely unknown — an older
-              firmware that doesn't report one, or the read still in flight. */}
-          <option value="">{type?.name || `${models.length} models…`}</option>
-          {/*
-            The model name first, always, and the amp after it.
-            
-            This carried the name alone for a while, because "— 1959 narrow-panel
-            Fender Tweed Bassman, 5F6-A" inside the option overran the closed
-            control on a phone. That was the right problem and the wrong fix: it
-            took the answer off the only screen where the question is asked. The
-            order is what settles it — the name leads, so anything the closed
-            control has to cut is cut off the far end, and the full line is
-            still spelled out underneath it.
-          */}
-          {models.map((m) => (
-            <option key={m.value} value={m.value}>
-              {listedAs(m)}
-            </option>
-          ))}
-        </select>
+        <div className="type-pick" ref={picker}>
+          <button
+            type="button"
+            className="type-open"
+            aria-haspopup="listbox"
+            aria-expanded={picking}
+            onClick={() => setPicking((v) => !v)}
+          >
+            {/* The closed control names the model and nothing else. What it is
+                based on is the line underneath, in full, with no width to run
+                out of — which is what the truncation was ever about. */}
+            <span className="type-open-name">
+              {type?.name || `${models.length} models…`}
+            </span>
+            <span className="type-open-caret" aria-hidden="true">
+              ⌄
+            </span>
+          </button>
+
+          {picking ? (
+            <div className="type-list" role="listbox" aria-label="Model" ref={listRef}>
+              {models.map((m, i) => (
+                <button
+                  type="button"
+                  key={m.value}
+                  role="option"
+                  aria-selected={m.value === chosenValue}
+                  tabIndex={-1}
+                  className={`type-row ${m.value === chosenValue ? 'current' : ''}`}
+                  onKeyDown={(e) => onPickKey(e, i)}
+                  onClick={() => {
+                    setPicking(false)
+                    swapModel(m.value)
+                  }}
+                >
+                  {/*
+                    Two elements rather than one string, which is the whole
+                    reason this is not a <select> any more. The name is the
+                    thing being chosen and stays the size it was; the amp
+                    behind it is the note that helps you find it, and reads as
+                    a note — smaller, and in the green the rest of the app
+                    already uses for a fact it is sure of.
+                  */}
+                  <span className="type-row-name">{m.name}</span>
+                  {m.basedOn ? <span className="type-row-gear">{m.basedOn}</span> : null}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
       ) : null}
       {models.length && gear ? <p className="hint pad based-on">{gear}</p> : null}
 
