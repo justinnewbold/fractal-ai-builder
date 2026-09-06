@@ -3188,6 +3188,100 @@ test('nothing in the event stream keeps the preset number current', () => {
   )
 })
 
+console.log('\nscene names surviving the phone')
+
+test('a scene name is written down, not forgotten, by the hand that set it', async () => {
+  /*
+   * "After writing a scene, saving a scene and the unit confirmed it was saved,
+   * when I go back on the phone and then forward again it's not there anymore."
+   *
+   * Renaming called forgetSceneNames — sound reasoning where a name changed
+   * somewhere else, and exactly wrong where we are the one who changed it. On a
+   * phone those caches are the ONLY copy: scene names live in a preset dump,
+   * dumps are refused over the relay, and the summary does not carry them. So
+   * the name reached the hardware and became unreadable from the handset that
+   * had just written it.
+   */
+  const store = {}
+  globalThis.localStorage = {
+    getItem: (k) => (k in store ? store[k] : null),
+    setItem: (k, v) => {
+      store[k] = String(v)
+    },
+    removeItem: (k) => {
+      delete store[k]
+    }
+  }
+  const fx = await import('../src/lib/forgefx.js')
+  try {
+    // What the panel had on screen, and the one being changed.
+    fx.noteSceneName(501, 2, 'Lead', ['Clean', 'Rhythm', '', '', '', '', '', ''])
+
+    const cache = JSON.parse(store['fractal.sceneNames'] || '{}')
+    const kept = Object.values(cache)[0]
+    assert.ok(Array.isArray(kept), 'nothing was written down at all')
+    assert.equal(kept[2], 'Lead', 'the name just set was not kept')
+    assert.equal(kept[0], 'Clean', 'the names already known were thrown away')
+    assert.equal(kept[1], 'Rhythm')
+
+    // A slot with nothing on screen still keeps what it was told.
+    fx.noteSceneName(502, 0, 'Verse', [])
+    const second = JSON.parse(store['fractal.sceneNames'] || '{}')
+    assert.equal(Object.values(second).find((v) => v[0] === 'Verse')?.[0], 'Verse')
+
+    // Past the end of what was known, rather than dropped.
+    fx.noteSceneName(503, 5, 'Solo', ['One'])
+    const third = Object.values(JSON.parse(store['fractal.sceneNames'] || '{}')).find((v) => v[5] === 'Solo')
+    assert.equal(third[5], 'Solo')
+    assert.equal(third[0], 'One')
+    assert.equal(third[3], '', 'the gap was filled with something other than a blank')
+
+    // Nothing to say, nothing written: a plan that named no scene must not
+    // stamp an empty list over names a previous session managed to read.
+    const before = store['fractal.sceneNames']
+    fx.noteSceneNames(501, new Map())
+    fx.noteSceneNames(null, new Map([[0, 'Nope']]))
+    assert.equal(store['fractal.sceneNames'], before, 'an empty rename overwrote what was known')
+  } finally {
+    delete globalThis.localStorage
+  }
+})
+
+test('a generated scene plan writes its names down too', () => {
+  /*
+   * The bigger path, and the one the report came from: a plan names all eight
+   * scenes at once and none of them were kept. The unit had them; the handset
+   * that asked for them could not see one.
+   */
+  const src = readSrc(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+  const apply = src.slice(src.indexOf('export async function applyScenes'), src.indexOf('/** Load a preset by slot'))
+
+  assert.match(apply, /export async function applyScenes\(scenes, onProgress, presetNumber = null\)/)
+  // Recorded only where the write actually landed — a refused rename must not
+  // leave a name on screen the unit does not have.
+  assert.match(apply, /await setSceneName\(scene\.index, scene\.name\)\s*\n\s*named\.set\(scene\.index, scene\.name\)/)
+  // One merge at the end rather than a host round trip per scene.
+  assert.match(apply, /noteSceneNames\(presetNumber, named\)/)
+
+  // And the slot reaches it from the apply flow.
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  const call = app.slice(app.indexOf('await applyScenes('), app.indexOf('failures.push(...sceneFailures)'))
+  assert.match(call, /result\.scenes,/)
+  assert.match(call, /preset\?\.number \?\? null/, 'the slot never reaches the thing that writes the names down')
+
+  // And a save records them under the slot the buffer just became — the one
+  // moment the answer is certain, and the moment the report was about.
+  const saveAt = app.indexOf('await storePreset(number)')
+  const save = app.slice(saveAt, app.indexOf('setApplied((prev) => ({ ...prev, savedTo: number })', saveAt))
+  assert.match(save, /noteSceneNames\(number, new Map\(sceneNames\.map\(\(n, i\) => \[i, \(n \|\| ''\)\.trim\(\)\]\)\)\)/)
+  assert.match(save, /sceneNames\.some\(\(n\) => \(n \|\| ''\)\.trim\(\)\)/, 'an unnamed buffer stamps blanks over what the slot had')
+
+  // The rename path no longer throws the names away.
+  const scenes = readSrc(new URL('../src/components/Scenes.jsx', import.meta.url), 'utf8')
+  assert.match(scenes, /noteSceneName\(preset\?\.number, index, name, names\)/)
+  assert.ok(!/forgetSceneNames\(/.test(scenes), 'the rename still forgets the name it just set')
+})
+
 console.log('\nwriting one amp on three channels')
 
 test('a value checked on the wrong channel is not a value that did not stick', async () => {

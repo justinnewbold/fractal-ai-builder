@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { setSceneName, setChannel, forgetSceneNames } from '../lib/forgefx'
+import { setSceneName, setChannel, noteSceneName } from '../lib/forgefx'
 import { useDevice, refreshScene, writeScene } from '../lib/deviceState'
 
 /**
@@ -64,9 +64,17 @@ export default function Scenes({
     if (!name) return
     try {
       await setSceneName(index, name)
-      // Gig keeps a copy so a remote session can still show names. Drop it, or
-      // the old name outlives the thing it named.
-      forgetSceneNames(preset?.number)
+      /*
+       * Kept, not dropped.
+       *
+       * This forgot the cached names, so that an old name could not outlive the
+       * thing it named. Sound where a name changed elsewhere; wrong here, where
+       * we are the one who changed it and know what to. On a phone the cache is
+       * not a convenience but the only copy there is — dumps do not travel the
+       * relay — so forgetting left the name on the hardware and unreadable from
+       * the handset that had just written it. See noteSceneName.
+       */
+      noteSceneName(preset?.number, index, name, names)
       onChanged(`Named scene ${index + 1} "${name}"`)
       await refreshScene()
     } catch (err) {
