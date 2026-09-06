@@ -298,6 +298,50 @@ export function run(test) {
         `(${scale[inset]}px inset + ${height}px tall) — the last row of controls cannot be scrolled clear of it`
     )
   })
+  test('what sits above the bar clears the status bar too', () => {
+    /*
+     * The bar carries safe-area-inset-top of its own, which is why it has
+     * always looked right on a notched phone. Nothing else did — and the
+     * update notice is above it deliberately, since a stale tab makes
+     * everything else on screen a possible lie about what the code does.
+     *
+     * Added to a home screen there is no browser chrome over the page, so that
+     * notice came up underneath the clock and the signal bars. Reported as a
+     * screenshot with "A newer version of this app is out" struck through by
+     * 7:10 and a battery icon.
+     *
+     * On the shell rather than on the notice, so the next thing put above the
+     * bar cannot inherit the bug. And it must come after the @supports block,
+     * which is the rule that actually applies — same specificity, later in the
+     * source; setting it earlier changes nothing on any real browser, the
+     * mistake the padding test above exists to catch.
+     */
+    /*
+     * Every rule that sets it, not the last one written. The phone-width block
+     * tightens this padding — that is the rule that applies on the device the
+     * notice was hiding on — so a guard reading one rule passes while the fix
+     * is undone in the only place it was ever needed.
+     */
+    const tops = []
+    for (const m of code.matchAll(/\.shell \{([^}]*)\}/g)) {
+      const top = m[1].match(/padding-top:[^;]*/)
+      if (top) tops.push(top[0].trim())
+    }
+    assert.ok(tops.length, 'nothing sets the top of the page at all')
+    for (const top of tops) {
+      assert.match(
+        top,
+        /env\(safe-area-inset-top, 0px\)/,
+        `"${top}" leaves the top of the page under the status bar, so anything above the bar hides behind the clock`
+      )
+    }
+    // The shorthand would reset it, so it must not carry one after these.
+    assert.ok(
+      !/\.shell \{[^}]*padding: /.test(code.slice(code.indexOf('@supports (padding: max(0px))'))),
+      'a padding shorthand after the inset rules puts the top back where it was'
+    )
+  })
+
   test('inside a sheet the preset list is not a second scroller', () => {
     /*
      * A 300px window over a 23,000px list, inside a sheet body that scrolls

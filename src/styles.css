@@ -665,6 +665,25 @@ input[type='text']:focus-visible {
   border-left-color: var(--fault);
 }
 
+/* What a request in words just did, on the screen it moved you to. The live
+   colour rather than the fault one: this is the good outcome, and it was
+   arriving as no outcome at all. */
+.notice[data-kind='did'] {
+  border-left-color: var(--live);
+}
+
+/* Named, not counted. Plain rows — a bullet in front of "Drive on" reads as a
+   list of options rather than a list of things that happened. */
+.did-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  gap: var(--s-1);
+  color: var(--silk-dim);
+  font-size: var(--f-3);
+}
+
 .notice h2 {
   font-family: var(--display);
   font-size: var(--f-3);
@@ -4030,6 +4049,27 @@ ol.action-list li.destructive::marker {
   }
 }
 
+/*
+ * And the same at the top, for what is above the bar.
+ *
+ * The bar carries safe-area-inset-top of its own, which is why it has always
+ * looked right. Nothing else did — and the update notice is rendered above it
+ * deliberately, since a stale tab makes everything else on the screen a
+ * possible lie. Added to a home screen there is no browser chrome over the
+ * page, so on a notched phone that notice came up underneath the clock and the
+ * signal bars: reported as a screenshot with "A newer version of this app is
+ * out" struck through by 7:10 and a battery icon.
+ *
+ * Here rather than on the notice, because the next thing put above the bar
+ * would have had the same bug and no reason to suspect it. It costs nothing
+ * where there is no inset — every browser tab reports 0 — and nothing is
+ * double-counted: the bar's own padding is inside its box and starts from
+ * wherever the flow put it.
+ */
+.shell {
+  padding-top: calc(var(--s-5) + env(safe-area-inset-top, 0px));
+}
+
 
 /* ==================================================================
    Light theme
@@ -5783,8 +5823,12 @@ button.sheet-close:active {
    the tabs, and then what you came for. Every pixel between them is spent
    twice, once at the top of every screen. */
 @media (max-width: 620px) {
+  /* Tighter than the desktop gap, and still clear of the status bar — this is
+     the rule that actually applies on the phone where the notice was hiding
+     under the clock, so dropping the inset here undoes the fix entirely while
+     leaving it looking done everywhere it was never broken. */
   .shell {
-    padding-top: var(--s-3);
+    padding-top: calc(var(--s-3) + env(safe-area-inset-top, 0px));
   }
 
   .views {

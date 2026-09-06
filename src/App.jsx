@@ -325,6 +325,20 @@ export default function App() {
   const [sceneAsk, setSceneAsk] = useState(null)
   const [progress, setProgress] = useState(null)
   const [applied, setApplied] = useState(null)
+  /*
+   * What a request in words just did, for the screen it takes you to.
+   *
+   * The chat already said it — "Done — 3 changes." goes into the conversation
+   * — and then the app immediately walks away from the conversation to put the
+   * thing that changed on screen. So the answer was written to the one screen
+   * the person was no longer looking at, and what they got was a jump to Edit
+   * with nothing said: "it pulled up the screen automatically, but didn't tell
+   * me that anything got changed, so I'm confused."
+   *
+   * The report travels with them now. Only where the conversation isn't —
+   * saying it twice on the Ask screen would be noise, not reassurance.
+   */
+  const [justDid, setJustDid] = useState(null)
   const [slot, setSlot] = useState('')
   const [saveName, setSaveName] = useState('')
   // A failed save is shown on the save bar as well as in the banner — the bar is
@@ -2442,8 +2456,22 @@ export default function App() {
    * raised as an error, so the transcript stays an honest record of what
    * actually reached the unit.
    */
+  /**
+   * A screen the person went to themselves.
+   *
+   * Which clears the report of what the last request did: they have either
+   * read it or gone somewhere it does not answer, and both mean it has stopped
+   * being the thing on screen.
+   */
+  const changeView = (next) => {
+    setJustDid(null)
+    setView(next)
+  }
+
   const perform = async (actions) => {
     setRunningPlan(true)
+    // Whatever the last one did is no longer what is happening.
+    setJustDid(null)
     try {
       const failures = await runPlan(actions, (done, total, label) =>
         setProgress(`${done} of ${total} - ${label}`)
@@ -2483,6 +2511,13 @@ export default function App() {
             text: done.length === 1 ? `Done — ${done[0]}.` : `Done — ${done.length} changes.`
           }
         ])
+        /*
+         * And the same thing again, for the screen showWhatChanged is about to
+         * move to. The turn above lands in a conversation nobody is looking at
+         * a moment later, which is how a request answered in full arrives as
+         * an unexplained jump to another tab.
+         */
+        setJustDid({ labels: done })
       }
 
       // Saving is what makes things permanent, so a plan containing one leaves
@@ -3276,11 +3311,46 @@ export default function App() {
       ) : null}
 
       {/*
+        What the last request in words did, on the screen it moved you to.
+
+        Outside the screens rather than inside one, because the whole problem
+        is that the answer was tied to a screen: the conversation says "Done —
+        3 changes" and then the app switches tabs, so the report and the person
+        end up in different places. Not shown on Ask, where the conversation is
+        already saying it — an answer repeated beside itself reads as two
+        different answers.
+      */}
+      {justDid && view !== 'ask' ? (
+        <div className="notice" data-kind="did" role="status">
+          <h2>
+            {justDid.labels.length === 1
+              ? 'Done — one change'
+              : `Done — ${justDid.labels.length} changes`}
+          </h2>
+          {/* Named, not counted. "3 changes" and a jump to a screen full of
+              blocks still leaves you looking for which three. */}
+          <ul className="did-list">
+            {justDid.labels.map((label, i) => (
+              <li key={i}>{label}</li>
+            ))}
+          </ul>
+          <div className="history-actions">
+            <button className="chip" onClick={() => setView('ask')}>
+              Back to the chat
+            </button>
+            <button className="chip" onClick={() => setJustDid(null)}>
+              Got it
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/*
         The three screens, one shown, swiped between on a phone. The wrapper
         takes nothing on touchstart — every control on every screen is inside
         it — and only claims a drag that has plainly gone sideways.
       */}
-      <Screens view={view} enabled={status === 'live'} onChange={setView}>
+      <Screens view={view} enabled={status === 'live'} onChange={changeView}>
       {status === 'live' && view === 'play' ? (
         <Gig
           preset={preset}
