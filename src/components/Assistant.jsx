@@ -43,7 +43,7 @@ const HOLD_MS = 1900
  * box, or a system that has asked for less motion. A placeholder animating under
  * someone's cursor while they think is a distraction, not a hint.
  */
-function useTypedSuggestion(active, own = []) {
+function useTypedSuggestion(active, own = [], silent = false) {
   /*
    * The player's own past requests first, then the general examples.
    *
@@ -111,6 +111,21 @@ function useTypedSuggestion(active, own = []) {
    * against; `shown` is what anyone reads.
    */
   const full = lines[index % lines.length]
+  /*
+   * Nothing shown, but still measured.
+   *
+   * `silent` is a different thing from `!active`, and collapsing the two would
+   * be wrong in both directions. Inactive means the animation is not running —
+   * because someone is typing, or has asked for less motion — and the right
+   * placeholder there is the whole suggestion, standing still. Silent means
+   * show no placeholder at all.
+   *
+   * `full` is returned regardless, because it is what the box is measured
+   * against. Returning '' with it would shrink the box to one line the moment a
+   * generation started and grow it back when the generation ended — a jump
+   * under the thumb, to save space nothing else was using.
+   */
+  if (silent) return { shown: '', full }
   if (reduced || !active) return { shown: full, full }
   return { shown: text, full }
 }
@@ -158,18 +173,38 @@ export default function Assistant({
 
   // Only animate in an idle, empty box.
   /*
-   * The suggestions keep moving while a tone is being built.
+   * The suggestions stop while a tone is being built, and the box goes blank.
    *
-   * They used to stop on `busy`, which is the whole of a generation — so the
-   * one moment there is nothing else happening on screen is the moment the
-   * screen went still, and a thirty-second wait looked like a hang. "When
-   * generating a new tone the suggestion typewriter stops and freezes. Can we
-   * keep the live suggestions going?"
+   * This has been both ways, and the reason it can be this way now is worth
+   * keeping. They originally stopped on `busy`; that was changed because the
+   * one moment nothing else moves on screen was the moment the screen went
+   * still, and a thirty-second wait read as a hang — "when generating a new
+   * tone the suggestion typewriter stops and freezes. Can we keep the live
+   * suggestions going?"
    *
-   * Still stops for the things it should: something typed, the box focused, or
-   * a reduced-motion setting.
+   * That reasoning was right and no longer applies. The working line counts the
+   * wait out loud now — "Designing… 40s", ticking every ten seconds off the
+   * server's own heartbeat — so a generation is visibly alive without borrowing
+   * the composer to prove it. Which leaves the cost with nothing to buy: a box
+   * typing "Change gain to 7 on the a|" underneath a tone being built invites
+   * an answer it will not take, since sending is disabled until the run
+   * finishes, and it is motion next to the one line somebody is actually trying
+   * to read.
+   *
+   * Blank, not frozen. A half-typed suggestion left mid-word is the thing that
+   * looked broken in the first place.
+   *
+   * Still stops for the things it always did: something typed, the box focused,
+   * or a reduced-motion setting.
    */
-  const { shown: typed, full: typedFull } = useTypedSuggestion(!text && !focused, suggestions)
+  const { shown: typed, full: typedFull } = useTypedSuggestion(
+    // Not running while a tone is being built: no timers, and nothing to
+    // resume from half a word in.
+    !busy && !text && !focused,
+    suggestions,
+    // And nothing shown at all while it is.
+    busy
+  )
 
   useEffect(() => {
     /*
