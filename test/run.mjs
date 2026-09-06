@@ -3188,6 +3188,106 @@ test('nothing in the event stream keeps the preset number current', () => {
   )
 })
 
+console.log('\nwriting one amp on three channels')
+
+test('a value checked on the wrong channel is not a value that did not stick', async () => {
+  /*
+   * "15 values read back different from what was sent" — and the list named
+   * Amp 1 Gain 1 three times, wanting 6.5, then 3, then 8.5, and reading 8
+   * every time. One readout, held up against three different intentions.
+   *
+   * A preset that dials a rhythm and a lead out of one amp lists that block
+   * once per channel, which is the documented way to do it: values belong to a
+   * channel, not to a block. applyChanges honours that. verifyChanges did not —
+   * it read whichever channel the write pass finished on and compared it
+   * against every change for that block, so every channel but the last was
+   * reported wrong, in full, with real-looking numbers. Nothing had failed to
+   * stick; the checking was looking in one place for three answers.
+   *
+   * Run against the demo device rather than asserted about the source, because
+   * the demo keeps its values keyed by "effectId:channel" — which is the very
+   * thing the bug ignored.
+   */
+  const store = {}
+  globalThis.localStorage = {
+    getItem: (k) => (k in store ? store[k] : null),
+    setItem: (k, v) => {
+      store[k] = String(v)
+    },
+    removeItem: (k) => {
+      delete store[k]
+    }
+  }
+  const fx = await import('../src/lib/forgefx.js')
+  fx.setDemo(true)
+  try {
+    const blocks = await fx.presetBlocks()
+    const amp = blocks.find((b) => b.slug === 'amp')
+    assert.ok(amp, 'the demo has no amp to dial')
+    const read = async () => (await fx.blockParams(amp.effectId))?.named || []
+    const gain = (await read()).find((p) => /gain/i.test(p.name))
+    assert.ok(gain, 'the demo amp has no gain control')
+
+    // One block, two channels, deliberately far apart — the shape the report
+    // came from.
+    const changes = [
+      {
+        eid: amp.effectId,
+        name: amp.name,
+        channel: 'A',
+        params: [{ id: gain.id, name: gain.name, to: 3, unit: '', range: { min: gain.min, max: gain.max } }]
+      },
+      {
+        eid: amp.effectId,
+        name: amp.name,
+        channel: 'B',
+        params: [{ id: gain.id, name: gain.name, to: 9, unit: '', range: { min: gain.min, max: gain.max } }]
+      }
+    ]
+
+    const failures = await fx.applyChanges(changes)
+    assert.deepEqual(failures, [], 'the write pass could not dial two channels')
+
+    const mismatches = await fx.verifyChanges(changes)
+    assert.deepEqual(
+      mismatches,
+      [],
+      `channel A was checked against channel B's readout — ${JSON.stringify(mismatches)}`
+    )
+
+    // And checking did not move the rig: the block is left where the write
+    // pass left it, which is the last channel the plan named.
+    const after = await fx.blockParams(amp.effectId)
+    const nowGain = (after?.named || []).find((p) => p.id === gain.id)
+    assert.equal(Math.round(nowGain.value), 9, 'verifying left the amp on a different channel than the write did')
+  } finally {
+    fx.setDemo(false)
+    delete globalThis.localStorage
+  }
+})
+
+test('a value that really did not stick is still reported, and says which channel', async () => {
+  /*
+   * The other half. Silencing the false alarms must not silence a real one —
+   * a write the unit clamps is exactly what this check exists to catch.
+   */
+  const src = readSrc(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+  const verify = src.slice(src.indexOf('export async function verifyChanges'))
+
+  // Selected before reading, the same move applyChanges makes.
+  assert.match(verify, /if \(change\.channel !== undefined\) \{\s*\n\s*try \{\s*\n\s*await setChannel\(change\.eid, change\.channel\)/)
+  // The channel travels with the finding, so three lines about one control can
+  // be told apart rather than reading as one control failing three times.
+  assert.match(verify, /channel: change\.channel \?\? null/)
+  // Put back where the write pass left it: checking a preset must not change it.
+  assert.match(verify, /for \(const \[eid, channel\] of leftOn\)/)
+  assert.match(verify, /if \(change\.channel !== undefined\) leftOn\.set\(change\.eid, change\.channel\)/)
+
+  // And the report says the channel out loud.
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  assert.match(app, /\$\{m\.block\}\$\{m\.channel \? ` ch \$\{m\.channel\}` : ''\}/)
+})
+
 console.log('\nthe conversation surviving the phone')
 
 const sessionMod = await import('../src/lib/session.js')

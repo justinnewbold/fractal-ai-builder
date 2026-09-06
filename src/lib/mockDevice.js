@@ -17,10 +17,16 @@
  * from the response alone, and none of them were catchable without hardware
  * until now.
  */
-import ampTypes from '../data/amp-types.json'
-import driveTypes from '../data/drive-types.json'
-import cabTypes from '../data/cab-types.json'
-import ampParams from '../data/amp-params.json'
+/*
+ * With the attribute, as lineage.js already does. Vite is happy either way;
+ * node is not, and without it this module — and everything that imports it,
+ * which is the whole device layer — could only ever be checked by reading its
+ * source. The write-and-read-back path is worth running rather than grepping.
+ */
+import ampTypes from '../data/amp-types.json' with { type: 'json' }
+import driveTypes from '../data/drive-types.json' with { type: 'json' }
+import cabTypes from '../data/cab-types.json' with { type: 'json' }
+import ampParams from '../data/amp-params.json' with { type: 'json' }
 import { fromNormalized } from './scale.js'
 import { createSceneState } from './sceneState.js'
 import { storedSceneNames, keepSceneNames, DEFAULT_SCENE_NAMES } from './demoMemory.js'
