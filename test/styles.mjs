@@ -652,9 +652,13 @@ export function run(test) {
   })
 
   test('the model picker clips with an ellipsis, not mid-word', () => {
-    const rule = code.slice(code.indexOf('.type-select {'), code.indexOf('}', code.indexOf('.type-select {')))
+    // The control is a button now, not a select: an <option> is one run of text
+    // and could not carry a name in one size beside an amp in another. The
+    // truncation rule follows the element that shows the chosen name.
+    const rule = code.slice(code.indexOf('.type-open-name {'), code.indexOf('}', code.indexOf('.type-open-name {')))
     assert.match(rule, /text-overflow: ellipsis/)
     assert.ok(!/;;/.test(rule), 'a stray double semicolon is back')
+    assert.ok(!code.includes('.type-select'), 'the styling for the select the app no longer renders is still here')
   })
 
   /*
