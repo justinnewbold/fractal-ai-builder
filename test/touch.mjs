@@ -76,7 +76,10 @@ export function run(test) {
     }
     assert.ok(!/<Sheet\b/.test(inside), 'a sheet is inside the swipe surface — it would travel with the page')
     assert.ok(!inside.includes('className="views"'), 'the tabs are inside the surface they switch')
-    assert.match(app, /<Screens view=\{view\} enabled=\{status === 'live'\} onChange=\{setView\}>/)
+    // onChange is a named handler rather than setView itself: a tab pressed by
+    // hand also clears the report of what the last request in words did, which
+    // is otherwise left on a screen the person has moved on from.
+    assert.match(app, /<Screens view=\{view\} enabled=\{status === 'live'\} onChange=\{changeView\}>/)
   })
 
   test('a grab surface holding a control lets the control have its tap', () => {

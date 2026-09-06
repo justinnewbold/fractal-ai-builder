@@ -351,6 +351,37 @@ export function run(test) {
     }
   })
 
+  test('what a request in words did travels to the screen it moves you to', () => {
+    /*
+     * "After requesting in the chat that it changed settings, it pulled up the
+     * screen automatically, but didn't tell me that anything got changed, so
+     * I'm confused."
+     *
+     * Both halves were already built and they cancelled each other out. The
+     * chat writes "Done — 3 changes." into the conversation, and then
+     * showWhatChanged switches to Edit so the thing that changed is visible —
+     * which leaves the answer on the one screen the person is no longer on.
+     *
+     * So the report goes with them: outside the screens, not inside one, and
+     * not on Ask where the conversation is already saying it.
+     */
+    assert.match(src, /setJustDid\(\{ labels: done \}\)/, 'a finished request no longer reports outside the chat')
+    assert.match(
+      src,
+      /\{justDid && view !== 'ask' \?/,
+      'the report is tied to a screen again, or doubles the conversation on Ask'
+    )
+    assert.ok(
+      src.indexOf("{justDid && view !== 'ask' ?") < src.indexOf('<Screens '),
+      'the report is inside a screen, so it only shows where it was already said'
+    )
+    // Named, not counted: "3 changes" over a screen full of blocks still
+    // leaves you looking for which three.
+    assert.match(src, /justDid\.labels\.map\(/, 'the report counts the changes without naming them')
+    // And it stops being the thing on screen once it has been read.
+    assert.match(src, /const changeView = \(next\) => \{\s*\n\s*setJustDid\(null\)/, 'the report survives a tab pressed by hand')
+  })
+
   test('the bar that carries the whole app renders in every state', () => {
     /*
      * It replaced six stacked elements, all of which were gated on being
