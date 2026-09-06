@@ -1574,6 +1574,18 @@ export default function App() {
              */
             else if (e.kind === 'open')
               setProgress(e.attempt ? `${THINKING}… (second try)` : `${THINKING}…`)
+            /*
+             * The wait, counted out loud.
+             *
+             * The model thinks before it writes anything, and on a big preset
+             * that is a minute or more of a line that does not move. Saying how
+             * long is not decoration — it is the difference between a screen
+             * that looks stuck and one that is visibly still going, and it is
+             * the only honest thing there is to report until the first block
+             * arrives.
+             */
+            else if (e.kind === 'waiting')
+              setProgress(`${THINKING}… ${Math.round((e.thinkingMs || 0) / 1000)}s`)
             else if (e.kind === 'partial') {
               setProgress(
                 e.blocks

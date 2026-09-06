@@ -498,6 +498,28 @@ export default async function handler(req, res) {
   const args = {
     model,
     maxOutputTokens: 16000,
+    /*
+     * How hard the model thinks before it says anything, set rather than left
+     * to the default.
+     *
+     * "The AI accepted the request and then sent nothing back for 90 seconds,
+     * twice." That was not the AI being slow in a way nobody could help — it
+     * was this request asking for the deepest thinking the model does. Claude
+     * Sonnet 5 runs adaptive thinking whether or not `thinking` is passed, at
+     * effort `high` when none is named, and returns its reasoning with the text
+     * omitted by default. None of that produces an object partial, so a phone
+     * watching `partialObjectStream` sees nothing at all for the whole thinking
+     * phase — on a request carrying every roster the unit has, comfortably past
+     * the ninety seconds the browser waits.
+     *
+     * Medium, because of what this call actually is: the tone judgement lives
+     * in a long and very prescriptive system prompt, and the model's job here
+     * is to apply it and emit a constrained object. That is nearer extraction
+     * than open reasoning, and the top of the effort range earns its latency on
+     * problems that are neither. An env var so it can be tuned against real
+     * tones without a deploy.
+     */
+    providerOptions: { anthropic: { effort: process.env.GENERATOR_EFFORT || 'medium' } },
     // Narrowed to this preset's own ids, so an id it does not hold cannot be
     // returned at all. Built per request because every preset holds a different
     // four (or twelve) of them.
@@ -578,9 +600,33 @@ export default async function handler(req, res) {
 
     send({ type: 'open' })
 
+    /*
+     * Proof of life while the model is thinking.
+     *
+     * The hello says the route is open and the first partial says the model has
+     * started; between them there was nothing, and the browser cannot tell a
+     * model deep in thought from a pipe that died. It waited ninety seconds and
+     * then said so — correctly, on the evidence it had.
+     *
+     * A frame every ten seconds is that evidence. It costs nothing, it keeps
+     * whatever sits in between from deciding the connection is idle, and it
+     * carries how long the wait has been so the screen can say it out loud
+     * rather than going quiet and hoping.
+     */
+    const startedAt = Date.now()
+    let beating = setInterval(() => {
+      send({ type: 'waiting', ms: Date.now() - startedAt })
+    }, 10000)
+    const stopBeating = () => {
+      if (beating) clearInterval(beating)
+      beating = null
+    }
+
     try {
       const result = streamObject(args)
       for await (const partial of result.partialObjectStream) {
+        // The model has started; the wait this covers is over.
+        stopBeating()
         send({ type: 'partial', object: partial })
       }
 
@@ -613,6 +659,14 @@ export default async function handler(req, res) {
       })
     } catch (err) {
       send({ type: 'error', error: err.message })
+    } finally {
+      /*
+       * Cleared on every way out, not only the happy one. A timer left running
+       * writes into a response that has already ended, which on a serverless
+       * function is an unhandled error on a request nobody is listening to any
+       * more — and holds the invocation open until its own ceiling.
+       */
+      stopBeating()
     }
     res.end()
     return
