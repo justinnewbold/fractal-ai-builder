@@ -32,9 +32,36 @@
  */
 import ampTypes from '../data/amp-types.json' with { type: 'json' }
 import driveTypes from '../data/drive-types.json' with { type: 'json' }
+import ampFamilies from '../data/amp-lineage.json' with { type: 'json' }
+import effectFamilies from '../data/effect-lineage.json' with { type: 'json' }
 
 /** The families we have a catalog for. A slug not in here has no lineage. */
 const CATALOGS = { amp: ampTypes, drive: driveTypes }
+
+/**
+ * The amp behind a whole run of models, rather than one model at a time.
+ *
+ * The per-model catalog left two thirds of the roster saying only "Mesa/Boogie"
+ * — true, and not the thing anyone wanted to know from "Recto2 Orange Vintage".
+ * The names are built the same way throughout: a family, then the channel and
+ * the mode. "Recto2" is the Dual Rectifier; "Orange Vintage" is which of its
+ * channels, in which mode. So the family is the part worth translating, and one
+ * line covers every model built on it.
+ *
+ * The docstring above warns against exactly this and it was right to: the
+ * version that took the longest name prefix shared with a SIBLING read "USA MK
+ * IV Lead" as a Mark IIC+, because they share "USA MK". What makes this safe is
+ * that the families are written down rather than derived — "USA MK IV" and "USA
+ * MK IIC+" are two entries, the longest one wins, and no amount of shared
+ * spelling can make one inherit the other's amp.
+ *
+ * Every line comes from Yek's Guide to the Fractal Audio Amplifier Models or
+ * from Fractal's own Blocks Guide, except a handful the guides predate — those
+ * were each confirmed against Fractal's forum before being written down. A
+ * family nobody could source is not in here, and the models under it fall back
+ * to their maker or to silence, which is what they did before.
+ */
+const FAMILIES = { amp: ampFamilies, ...effectFamilies }
 
 /**
  * Words that name a voicing of an amp rather than a different amp.
@@ -136,8 +163,39 @@ function indexFor(slug) {
  */
 export function lineageFor(slug, name) {
   const found = indexFor(slug).get(key(name))
+  // A model named outright, with the specific amp behind it, is the best answer
+  // there is. Only a maker and no amp is worse than what the family knows.
+  if (found?.basedOn) return found
+  const family = familyFor(slug, name)
+  if (family) {
+    return {
+      manufacturer: found?.manufacturer || family.manufacturer || null,
+      basedOn: family.basedOn
+    }
+  }
   if (!found || (!found.manufacturer && !found.basedOn)) return null
   return found
+}
+
+/**
+ * The longest family whose name begins this model's name, or null.
+ *
+ * On whole words only: without that, "Recto1" would claim "Recto10" if such a
+ * thing were ever added, and a family named "SV" would claim "SV Bass" and
+ * "SVT" alike. Longest first, so "USA MK IIC++" is never answered by "USA MK
+ * IIC+" and "Plexi Studio 20" is never answered by "Plexi".
+ */
+export function familyFor(slug, name) {
+  const model = key(name)
+  if (!model) return null
+  let best = null
+  for (const entry of FAMILIES[slug] || []) {
+    const family = key(entry.family)
+    if (!family || !entry.basedOn) continue
+    if (model !== family && !model.startsWith(family + ' ')) continue
+    if (!best || family.length > key(best.family).length) best = entry
+  }
+  return best
 }
 
 /**
@@ -161,7 +219,9 @@ export function gearLine(slug, name) {
  * This only fills in the nulls, which on an AM4 is all of them.
  */
 export function withLineage(slug, models) {
-  if (!Array.isArray(models) || !CATALOGS[slug]) return models
+  // Guarded on either source: wah and comp have families and no per-model
+  // catalog, and guarding on the catalog alone would have skipped them whole.
+  if (!Array.isArray(models) || (!CATALOGS[slug] && !FAMILIES[slug])) return models
   return models.map((model) => {
     if (model?.basedOn) return model
     const found = lineageFor(slug, model?.name)

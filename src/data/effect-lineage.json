@@ -1,0 +1,21 @@
+{
+  "wah": [
+    { "family": "Clyde", "manufacturer": "Vox", "basedOn": "Vox Clyde McCoy wah" },
+    { "family": "Cry Babe", "manufacturer": "Dunlop", "basedOn": "Dunlop Cry Baby" },
+    { "family": "VX846", "manufacturer": "Vox", "basedOn": "Vox V846-HW hand-wired wah" },
+    { "family": "VX845", "manufacturer": "Vox", "basedOn": "Vox V845" },
+    { "family": "Color-Tone", "manufacturer": "Colorsound", "basedOn": "Colorsound wah" },
+    { "family": "Mortal", "manufacturer": "Morley", "basedOn": "Morley wah/volume pedal" },
+    { "family": "Paragon", "manufacturer": "Tychobrahe", "basedOn": "Tychobrahe Parapedal" }
+  ],
+  "comp": [
+    { "family": "DynamiComp", "manufacturer": "MXR", "basedOn": "MXR Dyna Comp" },
+    { "family": "Optical", "manufacturer": "Urei", "basedOn": "Urei 1176, loosely" },
+    { "family": "Tube Compressor", "manufacturer": "Altec Lansing", "basedOn": "Classic tube compressors such as the Altec Lansing" }
+  ],
+  "delay": [
+    { "family": "2290", "manufacturer": "TC Electronic", "basedOn": "TC Electronic 2290 rack delay" },
+    { "family": "Graphite Copy", "manufacturer": "MXR", "basedOn": "MXR Carbon Copy analog delay" },
+    { "family": "Deluxe Mind Guy", "manufacturer": "Electro-Harmonix", "basedOn": "Electro-Harmonix Deluxe Memory Man" }
+  ]
+}

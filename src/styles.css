@@ -3271,6 +3271,12 @@ button.chan-btn.current {
 
 .type-select {
   width: 100%;
+  /* The three together, because ellipsis alone does nothing: rows now read
+     "Recto1 Orange Normal — Mesa/Boogie two-channel Dual Rectifier", and what
+     the closed control cannot fit should trail off rather than be sliced. The
+     name leads, so what goes is the half already written out underneath. */
+  overflow: hidden;
+  white-space: nowrap;
   text-overflow: ellipsis;
   margin: var(--s-2) 0 0;
   padding: var(--s-2) var(--s-2);

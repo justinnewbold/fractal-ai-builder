@@ -937,15 +937,17 @@ test('a model roster with no lineage on it gets one', () => {
   const [brit, markV, iic] = lineage.withLineage('amp', fromTheUnit)
 
   assert.equal(brit.basedOn, '50W Marshall JCM 800 2204', 'the roster came back as bare as it went in')
-  // No lineage recorded for this one, but the maker is — and "Mesa" is most of
-  // what somebody wanted to know, where naming a specific amp would be a guess.
-  assert.equal(markV.basedOn, null)
-  assert.equal(markV.manufacturer, 'Mesa')
+  /*
+   * This one used to answer "Mesa" and nothing more, which is true and is not
+   * what anybody wanted to know from a menu of forty Mesas. The family catalog
+   * names the amp. See "a family names the amp behind a whole run of models".
+   */
+  assert.equal(markV.basedOn, 'Mesa/Boogie Mark V')
   // A voicing of a model we know is that model.
   assert.equal(iic.basedOn, 'MESA/Boogie Mark IIC+')
 
   assert.equal(lineage.gearLine('drive', 'Rat Distortion'), 'Pro Co RAT', 'the pedals say nothing')
-  assert.equal(lineage.gearLine('amp', 'USA MK V Red XT'), 'Mesa')
+  assert.equal(lineage.gearLine('amp', 'USA MK V Red XT'), 'Mesa/Boogie Mark V')
 
   // The unit is the better authority on its own models: a roster that already
   // carries lineage keeps it.
@@ -974,12 +976,130 @@ test('a model we cannot name is left unnamed', () => {
    * the bright input, the deep switch, the jumpered jacks — and the rest of the
    * name has to match a model in the data exactly.
    */
-  assert.equal(lineage.gearLine('amp', 'USA MK IV Lead'), null, 'a Mark IV is being called something else')
-  assert.equal(lineage.gearLine('amp', 'Mr Z Highway 66'), null, 'an amp is being attributed by a shared word')
-  assert.equal(lineage.gearLine('drive', "Box o' Crunch"), null, 'a pedal with no recorded lineage was given one')
+  /*
+   * Both of these are now named, and named CORRECTLY — which is the whole
+   * point. The danger was never that they stayed blank; it was the two wrong
+   * answers above. A written-down family cannot produce either, because "USA MK
+   * IV" and "USA MK IIC+" are two entries and the longer match wins.
+   */
+  assert.equal(lineage.gearLine('amp', 'USA MK IV Lead'), 'Mesa/Boogie Mark IV')
+  assert.equal(lineage.gearLine('amp', 'Mr Z Highway 66'), 'Dr. Z Route 66')
+  assert.equal(lineage.gearLine('amp', 'USA MK IIC+ Deep'), 'MESA/Boogie Mark IIC+')
+
+  // Still nothing invented: a name nobody sourced gets no answer at all.
+  assert.equal(lineage.gearLine('drive', 'Nobelium OVD-1'), null, 'a pedal with no recorded lineage was given one')
   assert.equal(lineage.gearLine('amp', 'A Model That Does Not Exist'), null)
   assert.equal(lineage.gearLine('amp', ''), null)
   assert.equal(lineage.gearLine('amp', undefined), null)
+})
+
+test('a family names the amp behind a whole run of models', async () => {
+  /*
+   * "Search for the real life names that each AMP and all other effects are
+   * based off of and list them next to the name."
+   *
+   * Two thirds of the roster used to answer with a maker: "Mesa/Boogie", forty
+   * times over, in a menu whose whole difficulty is telling forty Mesas apart.
+   * The names are built family-then-voicing throughout — "Recto2" is the amp,
+   * "Orange Vintage" is which channel in which mode — so the family is the part
+   * worth translating and one line covers every model on it.
+   */
+  const amps = (await import('../src/data/amp-types.json', { with: { type: 'json' } })).default
+  const named = amps.filter((m) => lineage.lineageFor('amp', m.name)?.basedOn)
+  assert.equal(named.length, amps.length, `${amps.length - named.length} amp models still cannot say what they are`)
+
+  assert.equal(lineage.gearLine('amp', 'Recto1 Orange Normal'), 'Mesa/Boogie two-channel Dual Rectifier')
+  assert.equal(lineage.gearLine('amp', 'Recto2 Red Modern'), 'Mesa/Boogie three-channel Dual Rectifier')
+  assert.equal(lineage.gearLine('amp', 'Archean Clean'), 'PRS Archon')
+  assert.equal(lineage.gearLine('amp', 'Triple Crest 3'), 'Mesa/Boogie Triple Crown')
+})
+
+test('the longest family wins, so one amp never answers for another', () => {
+  /*
+   * The guard that makes a prefix rule safe at all. "USA MK IIC++" is a modded
+   * IIC+ and its name begins with "USA MK IIC+"; "Plexi Studio 20" is a 20-watt
+   * head and its name begins with "Plexi". Shortest-match would get both wrong
+   * with total confidence.
+   */
+  assert.equal(lineage.familyFor('amp', 'USA MK IIC++').family, 'USA MK IIC++')
+  assert.equal(lineage.familyFor('amp', 'USA MK IIC+ Deep').family, 'USA MK IIC+')
+  assert.equal(lineage.familyFor('amp', 'Plexi Studio 20').family, 'Plexi Studio 20')
+  assert.equal(lineage.familyFor('amp', 'Plexi 50W Jumped').family, 'Plexi')
+  assert.equal(lineage.familyFor('amp', 'Euro Uber').family, 'Euro Uber')
+
+  // Whole words only. Without that a family claims any name it merely begins.
+  // A model named exactly for its family is that family: "Mr Z Highway 66" and
+  // "5F1 Tweed" are both the whole name and the whole family.
+  assert.equal(lineage.familyFor('amp', 'Recto1').family, 'Recto1')
+  assert.equal(lineage.familyFor('amp', 'Rectofoo Bright'), null, '"Recto1" claimed a name it only spells the start of')
+  assert.equal(lineage.familyFor('amp', 'Recto1x Red'), null, 'the match crossed the middle of a word')
+  assert.equal(lineage.familyFor('amp', 'Nothing At All'), null)
+  assert.equal(lineage.familyFor('amp', ''), null)
+  assert.equal(lineage.familyFor('nosuchblock', 'Recto1 Orange Normal'), null)
+})
+
+test('a model the unit already named is never overruled by a family', () => {
+  // The per-model catalog is the more specific of the two, and where the unit
+  // itself supplies one it is the better authority still.
+  assert.equal(
+    lineage.gearLine('amp', 'Brit 800 2204 High'),
+    '50W Marshall JCM 800 2204',
+    'a family answered over a model that named itself more precisely'
+  )
+  const [kept] = lineage.withLineage('amp', [
+    { value: 1, name: 'Recto1 Orange Normal', manufacturer: null, basedOn: 'what the unit said' }
+  ])
+  assert.equal(kept.basedOn, 'what the unit said')
+})
+
+test('the pedals and the wahs say what they are too', () => {
+  /*
+   * "…and all other effects." Drives already had a catalog; the wahs had none
+   * and every one of them is a code word for a real pedal. Both come from
+   * Fractal's own Blocks Guide, which names them outright.
+   */
+  assert.equal(lineage.gearLine('wah', 'Cry Babe'), 'Dunlop Cry Baby')
+  assert.equal(lineage.gearLine('wah', 'Clyde'), 'Vox Clyde McCoy wah')
+  assert.equal(lineage.gearLine('comp', 'DynamiComp'), 'MXR Dyna Comp')
+  assert.equal(lineage.gearLine('delay', 'Graphite Copy Delay'), 'MXR Carbon Copy analog delay')
+  assert.equal(lineage.gearLine('drive', "Box o' Crunch"), 'MI Audio Crunch Box')
+
+  // withLineage guarded on the per-model catalog, which wah and comp do not
+  // have — guarding on that alone skipped the new families whole.
+  const [wah] = lineage.withLineage('wah', [{ value: 0, name: 'Cry Babe', manufacturer: null, basedOn: null }])
+  assert.equal(wah.basedOn, 'Dunlop Cry Baby')
+
+  /*
+   * And the families that genuinely have nothing to translate keep saying
+   * nothing. A Fractal reverb type is called "Medium Plate" — it is already in
+   * plain English, and inventing a machine for it would be the one failure this
+   * whole file exists to avoid.
+   */
+  assert.equal(lineage.gearLine('reverb', 'Medium Plate'), null)
+  assert.equal(lineage.gearLine('chorus', 'Analog Stereo'), null)
+  assert.equal(lineage.gearLine('cab', '4x12 CITRUS'), null)
+})
+
+test('the list itself says what each model is, not just the one already chosen', () => {
+  /*
+   * The line under the control describes the model already selected, which is
+   * the one model nobody is wondering about. Two hundred code words in the menu
+   * above it were the actual question.
+   */
+  const src = readSrc(new URL('../src/components/Console.jsx', import.meta.url), 'utf8')
+  assert.match(src, /const listedAs = \(m\) => \(m\.basedOn \? `\$\{m\.name\} — \$\{m\.basedOn\}` : m\.name\)/)
+  assert.match(src, /<option key=\{m\.value\} value=\{m\.value\}>\s*\n\s*\{listedAs\(m\)\}/, 'the option shows the bare name again')
+  // The maker alone is not used here on purpose: "— Mesa/Boogie" on forty rows
+  // tells nobody which one is the Rectifier, and costs the width to say it.
+  assert.ok(!/listedAs[\s\S]{0,200}manufacturer/.test(src), 'every row is being suffixed with its maker')
+
+  // The name leads, so what the closed control cannot fit is cut off the far
+  // end — the half that is spelled out underneath it anyway.
+  const css = readSrc(new URL('../src/styles.css', import.meta.url), 'utf8')
+  const rule = css.slice(css.indexOf('.type-select {'), css.indexOf('}', css.indexOf('.type-select {')))
+  assert.match(rule, /overflow: hidden/)
+  assert.match(rule, /white-space: nowrap/)
+  assert.match(rule, /text-overflow: ellipsis/)
 })
 
 test('what a model really is reaches the screen and the generator', () => {
