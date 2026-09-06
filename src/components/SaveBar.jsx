@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { remoteActive } from '../lib/remote'
 
 /**
@@ -20,7 +21,10 @@ import { remoteActive } from '../lib/remote'
  * the write is still two taps from anywhere, but the second tap is on a button
  * that names the slot, next to the list of what is in it.
  */
-export default function SaveBar({ preset, dirty, busy, saving, compact, onOpenSave, queued, savedHere }) {
+/** How long "Saved" stays up before the button gets out of the way. */
+const SAVED_FOR_MS = 4000
+
+export default function SaveBar({ preset, dirty, busy, saving, compact, onOpenSave, queued, savedAt }) {
   /*
    * A slot write is on ForgeFX's never-remote list, and it should be — a phone
    * at the far side of a room shouldn't be able to overwrite a slot on a mis-tap.
@@ -49,7 +53,38 @@ export default function SaveBar({ preset, dirty, busy, saving, compact, onOpenSa
    * slot, there is nothing pending and nothing saved either, and the button
    * claimed the second. "This says 'Saved' when there is nothing saved yet. It
    * should say SAVE if it hasn't been saved yet."
+   *
+   * And then it said "Save" instead, on a preset nobody had touched, which is
+   * the same fault wearing the other word: a button offering to do a thing
+   * there is no thing to do. "Only show the Save button is there something to
+   * save. I literally just loaded a brand new scene and it still says save."
+   *
+   * So it is not a label any more, it is a presence. Nothing pending, nothing
+   * in flight, nothing just done — no button. The bar on a phone is four
+   * controls wide and every one of them has to be earning it.
    */
+
+  /*
+   * "Saved" is the one state with no work behind it, so it is the one that has
+   * to expire. Four seconds is long enough to be read by somebody watching for
+   * it and short enough that walking away leaves a clean bar.
+   *
+   * The timer only exists to re-render when the window closes; the answer is
+   * computed from the clock, so a component that mounts long after a save is
+   * already past it and says nothing.
+   */
+  const [, redraw] = useState(0)
+  const justSaved = !!savedAt && Date.now() - savedAt < SAVED_FOR_MS
+  useEffect(() => {
+    if (!justSaved) return undefined
+    const left = SAVED_FOR_MS - (Date.now() - savedAt)
+    const timer = setTimeout(() => redraw((n) => n + 1), Math.max(left, 0))
+    return () => clearTimeout(timer)
+  }, [justSaved, savedAt])
+
+  // Nothing to save, nothing being saved, nothing just saved: no button.
+  if (!queued && !saving && !dirty && !justSaved) return null
+
   return (
     <div className="save-cluster" data-dirty={dirty ? 'yes' : 'no'}>
       <div className="save-cluster-row">
@@ -68,7 +103,7 @@ export default function SaveBar({ preset, dirty, busy, saving, compact, onOpenSa
               : 'Waiting for the Mac…'
             : saving
               ? 'Saving…'
-              : !dirty && savedHere
+              : !dirty && justSaved
                 ? 'Saved'
                 : remote && !compact
                   ? 'Save at the Mac'
