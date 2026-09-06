@@ -18,6 +18,7 @@ import * as slots from '../src/lib/slots.js'
 import * as names from '../src/lib/presetName.js'
 import * as hold from '../src/lib/longPress.js'
 import * as lineage from '../src/lib/lineage.js'
+import * as gigSize from '../src/lib/gigSize.js'
 import { readFileSync as readSrc } from 'node:fs'
 import {
   patchSchemaValue,
@@ -795,55 +796,48 @@ test('two Macs on one account cannot quietly write to two units', async () => {
   const odd = await hostNamesFrom([answer('Studio Mac'), { id: 'x', body: 'not json' }], read)
   assert.deepEqual(odd, ['Studio Mac', 'a Mac'], 'a Mac that answered was not counted')
 
-  // One Mac is the ordinary case and says nothing at all.
+  // The census still counts them. What it no longer does is refuse — see the
+  // test below, and hostConflict in shared/relay-rules.mjs.
   assert.equal(hostConflict(['Justins MacBook Pro']), null)
   assert.equal(hostConflict([]), null)
-
-  const clash = hostConflict(['Justins MacBook Pro', 'Studio Mac'], null, false)
-  assert.match(clash, /Justins MacBook Pro and Studio Mac/, 'the person is not told which two')
-  assert.match(clash, /both units/, 'nothing says what would actually happen')
-  assert.match(clash, /[Cc]hoose the one/, 'nothing says what to do about it')
 })
 
-test('one Mac chosen, and proved to be the only one listening', () => {
+test('more than one Mac answering is not a reason to refuse', () => {
   /*
-   * The fix rather than the guard rail: a request can name the host it is meant
-   * for, and the others stay out of it.
+   * This used to be the guard rail: two Macs answering meant a write might
+   * land on two units, so the app refused until one was chosen and the choice
+   * was proved to be honoured.
    *
-   * The catch is that only a new enough ForgeFX knows what that means. An older
-   * one has never heard of an addressed request and answers it like any other —
-   * so the app does not take the feature on trust. It asks the chosen Mac one
-   * addressed question and counts the answers, and only exactly one is evidence
-   * that a write will land in one place.
+   * The detection was never wrong — a host is anything signed into the account
+   * that answers the census, so an old install or a stray tab answers exactly
+   * like the Mac doing the work. The consequence was. What it guarded against
+   * needs two hosts each with an amp plugged in; answering a broadcast is not
+   * that, and conflating the two left a one-amp rig being asked to choose
+   * between two Macs, over and over, with no choice that settled it.
    *
-   * Which makes a half-updated pair fail the same way as an un-updated one, and
-   * that way is the careful one.
+   * Removed by the owner's decision for a rig with one unit. The cost is real
+   * and is not hidden: with two hosts each holding an amp, a write reaches
+   * both and nothing here says so.
+   *
+   * Every shape that used to produce a sentence is checked, so restoring the
+   * guard is a deliberate act rather than something that comes back by
+   * accident on the next edit.
    */
   const two = ['Justins MacBook Pro', 'Studio Mac']
 
-  // Chosen and proved: settled, nothing to say.
+  assert.equal(hostConflict(two, null, false), null, 'two Macs still refuse a write')
+  assert.equal(hostConflict(two, 'Studio Mac', false), null, 'an unproved choice still refuses')
   assert.equal(hostConflict(two, 'Studio Mac', true), null)
-
-  // Chosen but not proved — the other Mac answered a question meant for this
-  // one, so something out there is too old to be trusted with a write.
-  const stale = hostConflict(two, 'Studio Mac', false)
-  assert.match(stale, /meant only for Studio Mac/, 'the person is not told what was actually tried')
-  assert.match(stale, /[Uu]pdate the app/, 'nothing says what to do about an out-of-date Mac')
-
-  // Nothing chosen yet: an offer, not a complaint.
-  assert.match(hostConflict(two, null, false), /[Cc]hoose the one/)
-
-  // Two Macs with the same name cannot be told apart by the one thing that
-  // distinguishes them on the wire, so the fix is not in this app.
-  const same = hostConflict(['MacBook Pro', 'MacBook Pro'], null, false)
-  assert.match(same, /both called MacBook Pro/, 'a name clash is reported as an ordinary choice')
-  assert.match(same, /[Rr]ename one/, 'nothing says how to make them tellable apart')
-  // And a name clash is never talked out of by a choice, because a choice
-  // cannot be honoured: both Macs answer to it.
-  assert.match(hostConflict(['MacBook Pro', 'MacBook Pro'], 'MacBook Pro', true), /both called/)
-
-  // One Mac stays the ordinary case whatever else is set.
+  assert.equal(hostConflict(['MacBook Pro', 'MacBook Pro'], null, false), null, 'a name clash still refuses')
+  assert.equal(hostConflict(['MacBook Pro', 'MacBook Pro'], 'MacBook Pro', true), null)
+  assert.equal(hostConflict(['a', 'b', 'c'], null, false), null, 'three Macs still refuse')
   assert.equal(hostConflict(['Studio Mac'], null, false), null)
+  assert.equal(hostConflict([]), null)
+
+  // The phone carries its own copy of this rule and the two must not drift:
+  // a banner gone on one surface and still up on the other is the same bug
+  // reported in half the places. test/mobile.mjs holds them to each other.
+  assert.equal(typeof hostConflict, 'function', 'the signature callers rely on is gone')
 })
 
 test('nothing is written while two Macs are listening', () => {
@@ -2418,6 +2412,133 @@ test('backing up a preset needs no confirmation', () => {
   assert.ok(!r.actions[0].destructive)
 })
 
+test('a plan over the relay does not propose what the Mac alone can do', () => {
+  /*
+   * The host refuses a slot write and a backup from a distance — deliberately,
+   * and REMOTE_FORBIDDEN in shared/relay-rules.mjs says so in words. The plan
+   * used to propose them anyway: every other action applied, the unit made the
+   * sound asked for, and the one step that would have kept it failed at the
+   * end as a single line among the successes. A tone you can hear and did not
+   * keep reads as "it worked" until the next preset change takes it away.
+   *
+   * So the refusal moves to where a plan is still a proposal. Said before
+   * anything is written, not reported after everything else was.
+   */
+  const away = { ...caps, remote: true }
+
+  const save = validatePlan(
+    { actions: [{ kind: 'savePreset', value: 67, text: 'Dimebag', why: '' }] },
+    cmdBlocks,
+    away
+  )
+  assert.deepEqual(save.actions, [], 'a slot write was proposed over the relay')
+  assert.match(save.problems[0] || '', /only works at the Mac/, save.problems.join(' | '))
+  assert.match(save.problems[0] || '', /67/, 'the refusal does not say which slot was left alone')
+
+  const backup = validatePlan(
+    { actions: [{ kind: 'backupPreset', value: 3, why: '' }] },
+    cmdBlocks,
+    away
+  )
+  assert.deepEqual(backup.actions, [], 'a backup was proposed over the relay')
+  assert.match(backup.problems[0] || '', /only works at the Mac/, backup.problems.join(' | '))
+
+  // Everything else still travels: the tone is applied over the relay exactly
+  // as it was, and only the two steps the host refuses are held back.
+  const mixed = validatePlan(
+    {
+      actions: [
+        { kind: 'setParam', eid: 58, paramId: 7, value: 6, why: '' },
+        { kind: 'savePreset', value: 67, why: '' }
+      ]
+    },
+    cmdBlocks,
+    away
+  )
+  assert.deepEqual(
+    mixed.actions.map((a) => a.kind),
+    ['setParam'],
+    'the relay plan lost an action it could have carried out'
+  )
+
+  // And at the Mac both are proposed as they always were.
+  const home = validatePlan(
+    {
+      actions: [
+        { kind: 'savePreset', value: 67, why: '' },
+        { kind: 'backupPreset', value: 3, why: '' }
+      ]
+    },
+    cmdBlocks,
+    caps
+  )
+  assert.deepEqual(home.actions.map((a) => a.kind), ['backupPreset', 'savePreset'])
+  assert.deepEqual(home.problems, [], home.problems.join(' | '))
+})
+
+test('the stage screen is sized by whoever is holding it', () => {
+  /*
+   * One size was chosen once, for a phone at arm's length in the dark. That is
+   * the right default and the wrong rule: eight scenes and nine blocks do not
+   * fit at it, and two scenes waste the screen at it. Which you have changes
+   * with the preset, so it is a setting.
+   *
+   * The part that matters most is the default. This control changes the thing
+   * you reach for mid-song, so a player who never touches it must see exactly
+   * what they saw before it existed -- 62px tiles in 110px columns, the values
+   * the stylesheet shipped.
+   */
+  const { SIZES, DEFAULT_SIZE, clampSize, sizeVars, loadSize, saveSize } = gigSize
+
+  assert.deepEqual(sizeVars(DEFAULT_SIZE), {
+    '--gig-tile': '62px',
+    '--gig-col': '110px',
+    '--gig-col-block': '130px'
+  }, 'the default step no longer reproduces the screen as it shipped')
+
+  // Bigger is bigger and smaller is smaller, the whole way up.
+  for (let i = 1; i < SIZES.length; i++) {
+    assert.ok(SIZES[i].tile > SIZES[i - 1].tile, `step ${i} is not taller than ${i - 1}`)
+    assert.ok(SIZES[i].col > SIZES[i - 1].col, `step ${i} is not wider than ${i - 1}`)
+  }
+
+  // Every step clears the floor for something pressed on a dark stage.
+  for (const s of SIZES) assert.ok(s.tile >= 44, `${s.name} is under the tap floor at ${s.tile}px`)
+
+  // Nothing out of storage can put the screen in a state with no buttons on it.
+  assert.equal(clampSize(99), SIZES.length - 1)
+  assert.equal(clampSize(-5), 0)
+  assert.equal(clampSize('nonsense'), DEFAULT_SIZE)
+  assert.equal(clampSize(null), DEFAULT_SIZE)
+
+  // Kept across a reload, on this device.
+  const mem = new Map()
+  const store = {
+    getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+    setItem: (k, v) => mem.set(k, v)
+  }
+  assert.equal(loadSize(store), DEFAULT_SIZE, 'a device that has never chosen gets the default')
+  saveSize(3, store)
+  assert.equal(loadSize(store), 3)
+  saveSize(99, store)
+  assert.equal(loadSize(store), SIZES.length - 1, 'an out-of-range save was stored out of range')
+
+  /*
+   * A private window throws on both, and has done since the first iOS that
+   * had one. The stage screen renders at the default rather than not at all.
+   */
+  const hostile = {
+    getItem: () => {
+      throw new Error('denied')
+    },
+    setItem: () => {
+      throw new Error('denied')
+    }
+  }
+  assert.equal(loadSize(hostile), DEFAULT_SIZE, 'a blocked read takes the screen down')
+  assert.equal(saveSize(2, hostile), false, 'a blocked write is reported as a success')
+})
+
 test('a confirmed write updates the cached value in place', () => {
   resetSchemaCache()
   const params = [{ id: 7, name: 'Gain', value: 5, min: 0, max: 10 }]
@@ -3357,6 +3478,37 @@ test('a value checked on the wrong channel is not a value that did not stick', a
   } finally {
     fx.setDemo(false)
     delete globalThis.localStorage
+  }
+})
+
+test('the demo can be turned off where there is no browser to remember it', async () => {
+  /*
+   * setDemo wrote the demo flag to localStorage without checking there was
+   * one. In a browser there always is; in the tests there is not, except where
+   * a test installs a fake — and the tests drive the mock device through this
+   * very function to check the write and verify paths without hardware.
+   *
+   * So turning the demo ON worked (the caller had installed a fake by then)
+   * and turning it OFF threw, in a `finally`, after the real assertions had
+   * passed. It read as the code under test failing. It surfaced only on Node
+   * 20, which is what CI runs and which drains the test queue in a different
+   * order from Node 22, so it passed on the machine it was written on and was
+   * red on main from the commit that added it.
+   *
+   * Run with the global genuinely absent, which is the condition that broke
+   * it, and put back whatever was there for whoever runs next.
+   */
+  const had = Object.prototype.hasOwnProperty.call(globalThis, 'localStorage')
+  const saved = had ? globalThis.localStorage : undefined
+  delete globalThis.localStorage
+  try {
+    const fx = await import('../src/lib/forgefx.js')
+    fx.setDemo(true)
+    assert.equal(fx.isDemo(), true, 'the demo will not start without somewhere to write it down')
+    fx.setDemo(false)
+    assert.equal(fx.isDemo(), false, 'the demo cannot be turned off without somewhere to write it down')
+  } finally {
+    if (had) globalThis.localStorage = saved
   }
 })
 

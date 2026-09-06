@@ -379,7 +379,13 @@ export function run(test) {
     // leaves you looking for which three.
     assert.match(src, /justDid\.labels\.map\(/, 'the report counts the changes without naming them')
     // And it stops being the thing on screen once it has been read.
-    assert.match(src, /const changeView = \(next\) => \{\s*\n\s*setJustDid\(null\)/, 'the report survives a tab pressed by hand')
+    // The guard that drops an unreachable screen sits above this; what matters
+    // is that a change that does happen still clears the report.
+    assert.match(
+      src,
+      /const changeView = \(next\) => \{[\s\S]{0,240}?setJustDid\(null\)/,
+      'the report survives a tab pressed by hand'
+    )
   })
 
   test('the bar that carries the whole app renders in every state', () => {
@@ -876,8 +882,18 @@ export function run(test) {
     assert.match(body, /\n\s*scene,\s*\n\s*sceneNames,\s*\n\s*sceneCount/, 'the chat request no longer carries the scene names')
     assert.match(
       src,
-      /validatePlan\(body, withPositions, \{ \.\.\.\(device\?\.capabilities \|\| \{\}\), activeScene: scene, sceneNames \}\)/,
+      /validatePlan\(body, withPositions, \{[\s\S]{0,200}?activeScene: scene,[\s\S]{0,80}?sceneNames,/,
       'the plan is checked without knowing which scene is live'
+    )
+    /*
+     * And without knowing whether it is being checked over the relay, it would
+     * go on proposing a slot write the host refuses from a distance — which
+     * applies a whole tone and then fails on the one step that keeps it.
+     */
+    assert.match(
+      src,
+      /validatePlan\(body, withPositions, \{[\s\S]{0,600}?remote: remoteActive\(\)/,
+      'the plan is checked without knowing it is being driven over the relay'
     )
   })
 
@@ -977,8 +993,8 @@ export function run(test) {
     // And the sheet route survives for the screens that are not the conversation.
     assert.match(
       src,
-      /view !== 'ask' \? \(\s*\n?\s*<button\s*\n?\s*className="ask-anywhere"/,
-      'the floating Ask button no longer opens the conversation from Play and Edit'
+      /view !== 'ask' && views\.includes\('ask'\) \? \(\s*\n?\s*<button\s*\n?\s*className="ask-anywhere"/,
+      'the floating Ask button no longer opens the conversation from Play and Edit, or is back on a phone'
     )
     const styles = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
     assert.ok(
@@ -1462,8 +1478,8 @@ export function run(test) {
     assert.match(src, /className="ask-anywhere"/, 'the button that opens the chat from elsewhere is gone')
     assert.match(
       src,
-      /status === 'live' && view !== 'ask' \? \(/,
-      'the ask button no longer hides on Create, where it would offer to open what is open'
+      /status === 'live' && view !== 'ask' && views\.includes\('ask'\) \? \(/,
+      'the ask button no longer hides on Create, where it would offer to open what is open — or no longer hides on a phone, which has no conversation to open'
     )
   })
 
@@ -3061,6 +3077,66 @@ export function run(test) {
       'the release build floats onto whatever image GitHub ships next'
     )
     assert.match(flow, /runs-on: macos-\d+/, 'the runner is not pinned to a numbered image')
+  })
+
+  test('a phone reaches the stage screen and nothing else', () => {
+    /*
+     * Ask and Edit are bench work: a conversation to read and reply to, and a
+     * 4x12 grid to drag blocks around on. Both were one sideways swipe from
+     * the stage screen, which is how a generate button and a grid editor came
+     * to be within reach of a thumb mid-song. The phone apps in `mobile/` have
+     * never carried either and say why in Stage.js; this is the same rule
+     * applied to the web app, which was missing it.
+     *
+     * Hidden by viewport, not deleted: a desktop browser is where both belong.
+     *
+     * Every route in is checked, because closing three of four is the same as
+     * closing none — the tab row, the swipe order, the floating Ask button on
+     * the stage screen, and Back restoring an entry pushed while the window
+     * was wide.
+     */
+    const screens = readFileSync(new URL('../src/components/Screens.jsx', import.meta.url), 'utf8')
+    assert.match(screens, /export const viewsFor/, 'Screens no longer decides which views a viewport reaches')
+    assert.match(
+      screens,
+      /export const BENCH = \['ask', 'shape'\]/,
+      'the bench screens are no longer named, so nothing can be held back from a phone'
+    )
+    assert.match(
+      screens,
+      /order\.length < 2/,
+      'the swipe listener still engages with one screen, so a drag on the stage screen is measured against nothing'
+    )
+    assert.ok(
+      !/const at = ORDER\.indexOf\(view\)/.test(screens),
+      'the swipe still navigates the full order rather than the reachable one'
+    )
+
+    assert.match(
+      src,
+      /\.filter\(\(\[id\]\) => views\.includes\(id\)\)/,
+      'the tab row still offers every screen, including the ones a phone cannot reach'
+    )
+    assert.match(
+      src,
+      /<Screens[^>]*order=\{views\}/,
+      'the swipe surface is not told which screens this viewport reaches'
+    )
+    assert.match(
+      src,
+      /view !== 'ask' && views\.includes\('ask'\) \? \(\s*<button\s+className="ask-anywhere"/,
+      'the floating Ask button is back on the stage screen of a phone'
+    )
+    assert.match(
+      src,
+      /if \(!viewsRef\.current\.includes\(st\.view\)\) return/,
+      'Back can still restore a screen this viewport has no tab for'
+    )
+    assert.match(
+      src,
+      /if \(!views\.includes\(view\)\) setView\('play'\)/,
+      'a window narrowed while Ask was open leaves the app on a screen with no body and no way out'
+    )
   })
 
   test('the tour teaches what a scene actually is', () => {

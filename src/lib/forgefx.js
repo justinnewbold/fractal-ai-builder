@@ -75,6 +75,18 @@ export const isDemo = () => mock !== null
 
 export function setDemo(on) {
   mock = on ? createMockDevice() : null
+  /*
+   * Remembering the demo across reloads is a browser's job, and this is not
+   * only called in a browser: the tests drive the mock device through here to
+   * check the write and verify paths without hardware. Unguarded, the line
+   * below made turning the demo OFF throw where turning it on had worked,
+   * which reads as the code under test failing rather than as this.
+   *
+   * The check three lines down already guards the same global on the way in.
+   * This is the same rule on the way out: the demo still runs, it just is not
+   * written down anywhere to come back to.
+   */
+  if (typeof localStorage === 'undefined') return
   if (on) localStorage.setItem('forgefx.demo', '1')
   else localStorage.removeItem('forgefx.demo')
 }
