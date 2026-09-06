@@ -3,6 +3,21 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.90.1
+
+**The check that only passed on the machine that wrote it.** `npm test` reads
+the phone's payload decoder against a real gzip frame, and that decoder needs
+two small libraries — which live in `mobile/node_modules`, a second install CI
+has no reason to have made. So the check imported packages that were not there
+and failed on every runner, while passing locally for whoever had run
+`npm install` inside `mobile/`. It merged red.
+
+- The root carries `base64-js` and `fflate` as dev dependencies now, so the
+  suite stands on the root install alone, the way every other check in it does.
+- Which is fine until the two sides are bumped apart, at which point the suite
+  is checking a decoder the phone does not ship. The specifiers are pinned to
+  each other by a test rather than left to good intentions.
+
 ## 7.90.0
 
 **The phone apps.** iOS and Android, in `mobile/`, joining the same private

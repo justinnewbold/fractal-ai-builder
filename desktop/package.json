@@ -1,7 +1,7 @@
 {
   "name": "fractal-ai-builder-desktop",
   "productName": "Fractal Remote",
-  "version": "7.90.0",
+  "version": "7.90.1",
   "private": true,
   "description": "Serves Fractal Remote from the machine with the cable, so a phone on the same wifi can reach the unit.",
   "author": "Justin Newbold",
