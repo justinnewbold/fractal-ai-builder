@@ -2165,7 +2165,7 @@ export function run(test) {
      * but previously it was still reading the tuning back to the phone. On the
      * FM3 it works fine."
      *
-     * Two different things, and only one of them is a fault.
+     * Two different things, and only one of them was a fault.
      *
      * The unit's screen not changing is correct: the device server sends a
      * gen-3 unit a tuner-page open, which is why an FM3 lights up, and the
@@ -2173,13 +2173,15 @@ export function run(test) {
      * the unit into tuner mode. Nothing was there to say so, and from the
      * outside it looks like a button that missed.
      *
-     * The readings are the fault, and the old sentence misdiagnosed it: "only
-     * the app at the Mac. Tune there." The phone remote is the route that
-     * cannot carry a tuner — the host bridges discrete changes and drops the
-     * meter/tuner cadence rather than flooding the relay. A phone on the same
-     * wifi is not on that route: it opens the event stream on the Mac directly
-     * and gets every reading. Telling somebody with a working route that they
-     * have none is the expensive kind of wrong.
+     * The readings were the fault, and this sentence has now been wrong twice,
+     * in opposite directions. First "only the app at the Mac. Tune there." —
+     * false, a phone on the same wifi always worked. Then "readings don't cross
+     * the phone-remote link" — true when written, and no longer: the host
+     * bridges them now, throttled to one every 80 ms.
+     *
+     * So what this holds is that the message never again names a cause it
+     * cannot see. It may say what to try; it may not diagnose the link or the
+     * unit as though it had looked.
      */
     const gig = readFileSync(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8')
     const bare = gig.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
@@ -2188,14 +2190,30 @@ export function run(test) {
     assert.match(bare, /device\.gen !== 3/, 'every unit is told its screen will not change, including the ones where it does')
     assert.match(bare, /switching the unit into tuner mode/, 'nothing explains a unit whose screen stays put')
 
-    /* And the route that works is named, rather than a machine. */
-    const stall = bare.slice(bare.indexOf('remoteActive() ? ('), bare.indexOf('No tuner readings are arriving'))
+    // Whitespace-flattened: JSX wraps a sentence wherever the line ran out, so
+    // matching raw source tests the formatter rather than the words.
+    const stall = bare
+      .slice(bare.indexOf('remoteActive() ? ('), bare.indexOf('gig-scenes'))
+      .replace(/\s+/g, ' ')
     assert.ok(stall.length > 40, 'the remote explanation is gone')
-    assert.match(stall, /same wifi/, 'the one route that does carry tuner readings is not mentioned')
-    assert.match(stall, /Phone remote/, 'nothing says where to find it')
+
+    /* Neither of the two sentences that turned out to be false. */
     assert.ok(
       !/Tune there|only the app at the Mac/.test(bare),
       'the tuner still says a phone cannot do this, which is only true of one of its two routes'
+    )
+    assert.ok(
+      !/don.{1,8}t cross the phone-remote link|carries changes, not/.test(bare),
+      'the tuner still says readings cannot cross the link, which the host now bridges'
+    )
+
+    /* What is left is the two things still worth trying, and no diagnosis. */
+    assert.match(stall, /this version of the app/, 'nothing names the Mac being on an older version')
+    assert.match(stall, /same wifi/, 'the route that works whatever the Mac is running is not mentioned')
+    assert.match(
+      stall,
+      /footswitch/,
+      'nothing suggests engaging the tuner on the unit, which is how an AM4 is put into it'
     )
   })
 

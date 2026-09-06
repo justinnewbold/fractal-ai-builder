@@ -180,8 +180,14 @@ export default function Gig({ preset, device, capabilities, onError, onChanged, 
    *
    * There is nothing to open on the unit — the AM4's tuner block is always
    * live, and what "the tuner works in Axis" turned out to mean is a display in
-   * the app, fed by the same poll. So that is what this is. POST /tuner and the
-   * bridged events both travel the relay, so it works the same from a phone.
+   * the app, fed by the same poll. So that is what this is.
+   *
+   * The line that used to sit here said the readings travel the relay "so it
+   * works the same from a phone". They did not, and it did not: the host bridged
+   * five kinds of event and dropped the tuner with the meter cadence, so a phone
+   * got a display and no numbers. Two comments in this one file disagreed about
+   * it, and the wrong one was the one next to the code. The host relays them now
+   * (forgefx.lock.json), which is what makes this true rather than intended.
    */
   const toggleTuner = async () => {
     const next = !tunerOn
@@ -369,23 +375,27 @@ export default function Gig({ preset, device, capabilities, onError, onChanged, 
           {remoteActive() ? (
             <>
               {/*
-                What this used to say was wrong in the way that costs somebody
-                an evening: "only the app at the Mac. Tune there." The phone
-                remote is the route that cannot carry a tuner — the host bridges
-                param, changed, scene, tempo and config, and drops everything at
-                the meter/tuner cadence rather than flooding the relay with
-                eight readings a second. A phone on the same wifi is not on that
-                route at all: it opens the event stream on the Mac directly and
-                gets every reading. So the answer is a different route, not a
-                different machine, and now it says so.
+                This has been wrong twice, in opposite directions, and both cost
+                somebody an evening. First "only the app at the Mac. Tune there."
+                — false, a phone on the same wifi always worked. Then "readings
+                don't cross the phone-remote link" — true when written, and no
+                longer: the host bridges them now, throttled.
+
+                So it stops naming a cause it cannot see. What is left is the two
+                things that are actually still possible, in the order worth
+                trying, and neither of them is a guess about the unit.
               */}
-              Tuner readings don&rsquo;t cross the phone-remote link &mdash; it carries changes, not
-              the eight readings a second a tuner sends. They do reach a phone on the same wifi as
-              the Mac: at the Mac, open <strong>Setup &rsaquo; Phone remote</strong> and scan the
-              code with this phone.
+              No readings are reaching this phone. The Mac needs to be running this version of the
+              app too &mdash; older ones don&rsquo;t send tuner readings over the link at all. On the
+              same wifi as the Mac it works either way.
             </>
           ) : (
-            'No tuner readings are arriving. If the unit is making sound, the Fractal app on the Mac may need updating.'
+            <>
+              No readings are arriving from the unit. Some units only send them while their own tuner
+              is engaged &mdash; on an AM4 that is holding the footswitch down rather than tapping
+              it. If it is already engaged and making sound, the Fractal app on the Mac may need
+              updating.
+            </>
           )}
         </p>
       ) : null}
