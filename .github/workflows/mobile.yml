@@ -1,0 +1,117 @@
+# Check and build the phone apps.
+#
+# Two jobs, because they answer different questions and only one of them needs
+# a secret.
+#
+# `check` runs on every pull request that touches the app and needs nothing at
+# all. It bundles for both platforms with Metro, which is the only thing that
+# catches the failures this app is actually prone to: an import Metro cannot
+# resolve, a package the installed SDK does not match, a screen that references
+# something that no longer exists. None of that shows up in `npm test`, and all
+# of it shows up minutes into an EAS build otherwise — on a build machine, at
+# the far end of a queue.
+#
+# `build` is started by hand and produces something installable. It needs
+# EXPO_TOKEN, an Expo access token with build permission, in the repository
+# secrets. Without it the job says so and stops rather than failing halfway
+# through with an authentication error that reads like a code problem.
+#
+# There is no push-to-main build on purpose. An iOS build consumes a queue slot
+# and, on a paid plan, money; a native build on every merge would spend both on
+# changes that never touch the phone.
+name: mobile
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Which platform to build'
+        type: choice
+        default: all
+        options: [all, ios, android]
+      profile:
+        description: 'Which eas.json build profile'
+        type: choice
+        default: preview
+        options: [preview, production, development]
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - 'shared/**'
+      - 'scripts/sync-relay-rules.mjs'
+      - '.github/workflows/mobile.yml'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # The suite that holds the two clients in agreement — the relay rules,
+      # the project both ends sign into, how an empty slot reads.
+      - run: npm ci
+      - name: The repository checks, phone apps included
+        run: npm test
+
+      - name: Install the app's own dependencies
+        working-directory: mobile
+        run: npm ci
+
+      - name: The config is one the installed SDK understands
+        working-directory: mobile
+        run: npx expo-doctor
+
+      # Both platforms, because they resolve differently: a module with a
+      # `.ios.js` variant, or a native package missing on one side, bundles on
+      # one and not the other.
+      - name: It bundles for iOS
+        working-directory: mobile
+        run: npx expo export --platform ios --output-dir /tmp/bundle-ios
+
+      - name: It bundles for Android
+        working-directory: mobile
+        run: npx expo export --platform android --output-dir /tmp/bundle-android
+
+  build:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: There is a token to build with
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "${EXPO_TOKEN}" ]; then
+            echo "::error::No EXPO_TOKEN secret. Add an Expo access token with build permission under Settings › Secrets › Actions, then start this again."
+            exit 1
+          fi
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install the app's own dependencies
+        working-directory: mobile
+        run: npm ci
+
+      # Non-interactive and queued rather than waited on: an iOS build can sit
+      # in a queue longer than a job is allowed to run, and a workflow that
+      # times out waiting looks like a build that failed.
+      - name: Build
+        working-directory: mobile
+        run: |
+          eas build \
+            --platform "${{ inputs.platform }}" \
+            --profile "${{ inputs.profile }}" \
+            --non-interactive \
+            --no-wait
