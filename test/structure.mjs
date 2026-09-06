@@ -1495,8 +1495,8 @@ export function run(test) {
       'App draws its own copy of the working line - the bars belong to <Thinking>, and a second set of them is a second line saying the same thing'
     )
     assert.match(
-      src,
-      /<Thinking message=\{progress\} active=\{thinking\} startedAt=\{genStarted\} \/>/,
+      src.replace(/\s+/g, ' '),
+      /<Thinking message=\{progress\} active=\{thinking\} startedAt=\{genStarted\} typicalMs=\{typicalMs\(past\)\} \/>/,
       'the one working line has lost the elapsed clock, which was the only thing the third line knew that the other two did not'
     )
 

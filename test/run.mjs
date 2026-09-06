@@ -529,6 +529,91 @@ test('the app refuses to serve from a port something else already holds', async 
   assert.match(host.PORT_TAKEN(), /serial port/, 'the reason two cannot share is not explained')
 })
 
+test('what a generation usually takes is measured, not asserted', async () => {
+  /*
+   * "Every tone generator says it takes longer than usual. How long is usual?
+   * If it takes longer than usual, why does it always say that?"
+   *
+   * Because "usual" was a literal 60 seconds that nobody had measured. It came
+   * from a server ceiling that has since been RAISED — stream.js now calls
+   * ninety seconds before the first token "slow, not broken" — so the warning
+   * fired on runs the rest of the app considers ordinary, every time. A warning
+   * that always fires is one nobody reads.
+   *
+   * A number the app made up cannot be corrected by the app. One it measures
+   * can.
+   */
+  const { typicalMs, buildEntry } = await import('../src/lib/history.js')
+  const runs = (...ms) => ms.map((m) => ({ ms: m }))
+
+  // Silence until there is enough to mean anything. The honest answer to "is
+  // this longer than usual" with one run of data is that we do not know.
+  assert.equal(typicalMs(runs()), null)
+  assert.equal(typicalMs(runs(40000)), null)
+  assert.equal(typicalMs(runs(40000, 44000)), null, 'two runs is not a norm')
+  assert.equal(typicalMs(runs(38000, 44000, 41000)), 41000)
+
+  /*
+   * A median, not a mean. One run that ran to the two-and-a-half-minute cap is
+   * exactly the kind of outlier that would drag a mean up and make the app
+   * stop warning about the next one.
+   */
+  assert.equal(typicalMs(runs(38000, 41000, 44000, 52000, 150000)), 44000)
+
+  // Only real measurements count, and only the recent ones.
+  assert.equal(typicalMs([{ ms: null }, { ms: 0 }, { ms: -5 }, ...runs(40000, 42000, 44000)]), 42000)
+  assert.equal(typicalMs(runs(...Array(20).fill(30000), 999999), { over: 12 }), 30000)
+
+  // And a kept generation carries the number, or there is nothing to measure.
+  assert.equal(buildEntry({ name: 'x', ms: 41234 }).ms, 41234)
+  assert.equal(buildEntry({ name: 'x', ms: 41234.7 }).ms, 41235, 'rounded')
+  assert.equal(buildEntry({ name: 'x' }).ms, null, 'an unmeasured run is null, not zero')
+  assert.equal(buildEntry({ name: 'x', ms: -1 }).ms, null)
+})
+
+test('the waiting line answers the question somebody actually has', () => {
+  /*
+   * Two questions, answered separately, because only one of them needs a norm.
+   *
+   * "Is my rig safe" is what somebody has while waiting, and the answer is the
+   * same at forty seconds and at two minutes — so it is said on the clock alone
+   * and states a fact rather than making a comparison.
+   *
+   * "Is this one slow" needs a norm, and is said only where there is a measured
+   * one.
+   */
+  const live = readSrc(new URL('../src/components/LiveGeneration.jsx', import.meta.url), 'utf8')
+
+  /*
+   * `seconds >= 60` still appears once, formatting minutes — that is arithmetic
+   * about a clock face, not a claim about speed. What must not come back is the
+   * old pairing: the message hung off that same literal.
+   */
+  const aside = live.slice(live.indexOf('function aside('), live.indexOf('export function Thinking'))
+  assert.ok(aside.length > 40, 'the aside is gone')
+  assert.ok(
+    !/\b60\b/.test(aside),
+    'the waiting line is back on a literal sixty seconds, which is a server ceiling that moved'
+  )
+  assert.match(live, /const REASSURE_AT = \d+/, 'the reassurance has no named threshold')
+  assert.match(
+    live,
+    /nothing has been sent to your unit yet/,
+    'the one thing somebody waiting actually wants to know is gone'
+  )
+  // The comparison is made against the measurement, never against a constant.
+  assert.match(
+    live,
+    /longer than your usual \$\{usual\}s/,
+    'the app claims a run is longer than usual without saying what usual is'
+  )
+  assert.match(
+    live,
+    /const slow = usual !== null &&/,
+    'a run can be called slow with no measurement to call it slow against'
+  )
+})
+
 test('two Macs on one account cannot quietly write to two units', async () => {
   /*
    * "If I have one Mac connected to an AM4 and one Mac connected to an FM3 and
