@@ -52,8 +52,17 @@ const STALL_MS = 45000
  * broken, and it is idempotent to ask again — nothing has been written anywhere.
  */
 const FIRST_MS = 90000
-/** The whole attempt, kept well inside the function's own ceiling. */
-const HARD_CAP_MS = 150000
+/**
+ * The whole attempt, kept inside the function's own ceiling.
+ *
+ * The route's maxDuration is 300 seconds. This sat at 150 because, without a
+ * heartbeat, a long silence was indistinguishable from a dead pipe and there
+ * was no reason to wait through more of it. The server sends proof of life
+ * every ten seconds now, so the remaining question is only how long a tone is
+ * worth waiting for — and being cut off at 150 seconds by our own clock, while
+ * the model was demonstrably still working, is the worse answer.
+ */
+const HARD_CAP_MS = 240000
 
 /**
  * What happened, in order, on the last few generations.
@@ -135,6 +144,8 @@ async function attemptOnce(
   let firstByte = false
   /** A frame from the model itself, as opposed to the server's hello. */
   let answering = false
+  /** Heartbeats seen: how we know the far end was alive while it was quiet. */
+  let beats = 0
   /*
    * One timer, two budgets. Silence before the model has said anything is the
    * model thinking and gets a minute and a half; silence after it has started
@@ -240,6 +251,23 @@ async function attemptOnce(
           onEvent?.({ kind: 'open', ms: since(), attempt })
           continue
         }
+        /*
+         * A heartbeat is the server saying the model is still thinking.
+         *
+         * It must not count as the model answering. `answering` swaps the
+         * watchdog from the ninety-second first-token budget to the
+         * forty-five-second dead-stream one, and a request that is thinking
+         * hard is exactly the case that needs the longer clock — treating a
+         * keepalive as an answer would cut the wait in half instead of
+         * extending it. Reading the frame at all is what matters: the loop
+         * above stamps `lastByteAt` on arrival, so the budget starts again.
+         */
+        if (frame.type === 'waiting') {
+          beats += 1
+          note('waiting', { ms: since(), thinkingMs: frame.ms })
+          onEvent?.({ kind: 'waiting', ms: since(), thinkingMs: frame.ms })
+          continue
+        }
         answering = true
         if (frame.type === 'partial') {
           partials += 1
@@ -298,10 +326,24 @@ async function attemptOnce(
          * a person at the one part they cannot usefully change wastes their
          * next attempt and blames them for a delay that is ours.
          */
+        /*
+         * Two different silences, told apart at last.
+         *
+         * This used to guess — "that wait is the AI being slow" — because
+         * there was nothing to go on. The heartbeat settles it: frames arriving
+         * with no answer behind them means the model was demonstrably alive and
+         * thinking for the whole wait, and no frames at all means the pipe was
+         * dead and the model may never have been reached. They deserve
+         * different sentences because they have different fixes.
+         */
         throw fail(
-          `The AI accepted the request and then sent nothing back for ${Math.round(
-            firstMs / 1000
-          )} seconds${attempt ? ', twice' : ''}, so we stopped waiting. Nothing was written to your unit. That wait is the AI being slow rather than anything about what you asked for — trying again in a moment usually works.`,
+          beats
+            ? `The AI thought for ${Math.round(
+                firstMs / 1000
+              )} seconds without finishing${attempt ? ', twice' : ''}, so we stopped waiting. Nothing was written to your unit. A shorter, more specific description finishes sooner — or ask again and it usually lands.`
+            : `The AI accepted the request and then went quiet for ${Math.round(
+                firstMs / 1000
+              )} seconds${attempt ? ', twice' : ''}, so we stopped waiting. Nothing was written to your unit. Nothing came back at all, not even a heartbeat, so this is the connection rather than your description — trying again in a moment usually works.`,
           // Deliberately the same kind as a stall: nothing arrived and nothing
           // was written, so the one automatic retry above applies.
           'stalled'

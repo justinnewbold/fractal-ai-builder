@@ -3820,6 +3820,103 @@ const PARTIAL = JSON.stringify({ type: 'partial', object: { blocks: [{ slug: 'am
 const OPEN = JSON.stringify({ type: 'open' }) + '\n'
 const timing = { stallMs: 60, firstMs: 60, capMs: 400 }
 
+const WAITING = (ms) => JSON.stringify({ type: 'waiting', ms }) + '\n'
+
+test('a heartbeat keeps the long clock, and does not start the short one', async () => {
+  /*
+   * "The AI accepted the request and then sent nothing back for 90 seconds,
+   * twice." Sonnet 5 runs adaptive thinking whether or not it is asked to, and
+   * none of that thinking produces an object partial — so the browser saw
+   * silence and called it dead.
+   *
+   * The heartbeat is the proof of life. It must extend the first-token budget
+   * rather than flip to the shorter dead-stream one: a request that is thinking
+   * hard is exactly the case that needs the LONGER clock, and treating a
+   * keepalive as an answer would halve the wait instead.
+   */
+  const f = scheduledFetch([
+    {
+      steps: [
+        { at: 10, chunk: OPEN },
+        { at: 50, chunk: WAITING(50) },
+        { at: 100, chunk: WAITING(100) },
+        { at: 150, chunk: WAITING(150) },
+        { at: 200, chunk: DONE }
+      ]
+    }
+  ])
+  globalThis.fetch = f.fetch
+  const events = []
+  // Every gap here is under the 60ms budget only because the beats land in
+  // between: without them, 200ms of silence would abort at 60.
+  const spec = await streamSpec({}, { timing, onEvent: (e) => events.push(e) })
+  assert.deepEqual(spec, { blocks: [] })
+  assert.equal(f.calls(), 1, 'it gave up and retried through a live connection')
+  const beats = events.filter((e) => e.kind === 'waiting')
+  assert.equal(beats.length, 3)
+  assert.equal(beats[2].thinkingMs, 150, 'the wait is not carried to the screen')
+})
+
+test('a heartbeat is not mistaken for the model answering', async () => {
+  /*
+   * The distinction that matters: after a beat, silence still gets the first-
+   * token budget. Here the stall budget is a tenth of the first-token one, so a
+   * gap that only the long clock survives proves which one is running.
+   */
+  const slow = { stallMs: 20, firstMs: 200, capMs: 900 }
+  const f = scheduledFetch([
+    { steps: [{ at: 10, chunk: OPEN }, { at: 40, chunk: WAITING(40) }, { at: 150, chunk: DONE }] }
+  ])
+  globalThis.fetch = f.fetch
+  const spec = await streamSpec({}, { timing: slow })
+  assert.deepEqual(spec, { blocks: [] }, 'a beat switched the watchdog to the dead-stream clock')
+})
+
+test('a real partial still switches to the short clock', async () => {
+  // The other half: once tokens flow, a long gap IS a dead pipe and must not
+  // inherit the thinking budget.
+  const slow = { stallMs: 20, firstMs: 400, capMs: 900 }
+  const f = scheduledFetch([
+    { steps: [{ at: 10, chunk: OPEN }, { at: 30, chunk: PARTIAL }], end: false },
+    { steps: [{ at: 10, chunk: DONE }] }
+  ])
+  globalThis.fetch = f.fetch
+  await assert.rejects(() => streamSpec({}, { timing: slow }), /stopped partway|dropped/)
+})
+
+test('a wait that ends in nothing says which kind of nothing it was', () => {
+  /*
+   * It used to guess — "that wait is the AI being slow" — because there was
+   * nothing to go on. Beats settle it: frames with no answer behind them means
+   * the model was alive and thinking; no frames at all means the pipe was dead.
+   */
+  const src = readSrc(new URL('../src/lib/stream.js', import.meta.url), 'utf8')
+  assert.match(src, /beats\s*\n?\s*\? `The AI thought for/, 'both silences get one sentence again')
+  assert.match(src, /not even a heartbeat/)
+  // A beat must never count as the model answering.
+  assert.ok(
+    src.indexOf("frame.type === 'waiting'") < src.indexOf('answering = true'),
+    'the heartbeat falls through to the branch that starts the short clock'
+  )
+})
+
+test('the model is told how hard to think, and says so while it does', () => {
+  const api = readSrc(new URL('../api/generate.js', import.meta.url), 'utf8')
+  /*
+   * Sonnet 5 runs adaptive thinking with or without a `thinking` block, at
+   * effort `high` when none is named. This call is nearer extraction than open
+   * reasoning — the judgement is all in the system prompt — so the top of the
+   * range bought minutes of latency and nothing else.
+   */
+  assert.match(api, /providerOptions: \{ anthropic: \{ effort: process\.env\.GENERATOR_EFFORT \|\| 'medium' \} \}/)
+  // The heartbeat, and the cleanup that keeps a timer from writing into a
+  // response that has already ended.
+  assert.match(api, /send\(\{ type: 'waiting', ms: Date\.now\(\) - startedAt \}\)/)
+  assert.match(api, /\}, 10000\)/)
+  assert.match(api, /\} finally \{[\s\S]{0,400}stopBeating\(\)/)
+  assert.match(api, /stopBeating\(\)\n\s*send\(\{ type: 'partial'/, 'the beat carries on after the model has started')
+})
+
 test('a slow first byte is not a stall', async () => {
   // The old clock started at the request: 45 s of waiting for the first token read as the model going quiet.
   const f = scheduledFetch([{ steps: [{ at: 150, chunk: DONE }] }])
@@ -3903,7 +4000,9 @@ test('quiet after the hello is the AI, and it says so without naming machines', 
   globalThis.fetch = f.fetch
   await assert.rejects(
     streamSpec({}, { timing }),
-    (err) => err.generationFailure === 'stalled' && /sent nothing back/.test(err.message)
+    // No beats in this script, so this is the dead-pipe half of the sentence:
+    // nothing came back at all, which is the connection rather than the ask.
+    (err) => err.generationFailure === 'stalled' && /went quiet for/.test(err.message)
   )
   assert.equal(f.calls(), 2, 'a quiet start was not retried — nothing had been written, so it was free to ask again')
 })
@@ -3924,6 +4023,12 @@ test('a wait of our own making is not blamed on what the player typed', async ()
   ])
   globalThis.fetch = f.fetch
   await assert.rejects(streamSpec({}, { timing }), (err) => {
+    /*
+     * Still true where it was written: this script sends no heartbeat, so
+     * nothing came back at all and the description cannot be the cause. The
+     * other branch — beats arrived, the model thought and did not finish — may
+     * suggest a shorter one, because there it is the honest advice.
+     */
     assert.ok(
       !/shorter description|fewer words/i.test(err.message),
       `it still blames the description — ${err.message}`
