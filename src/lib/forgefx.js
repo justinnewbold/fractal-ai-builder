@@ -1106,10 +1106,52 @@ export async function presetRange(start, count, onProgress) {
  */
 export async function verifyChanges(changes, onProgress) {
   const mismatches = []
+
+  /*
+   * Read each channel's values back on that channel.
+   *
+   * "15 values read back different from what was sent" — and the list named
+   * Amp 1 Gain 1 three times, wanting 6.5, then 3, then 8.5, and reading 8
+   * every time. One readout, held up against three different intentions.
+   *
+   * A preset that dials a rhythm and a lead out of one amp lists that block
+   * once per channel, which is the documented way to do it: values belong to a
+   * channel, not to a block. applyChanges honours that — it selects the channel
+   * before writing the values that belong to it. This did not. It read
+   * whichever channel the write pass happened to finish on and compared it
+   * against every change for that block, so every channel except the last one
+   * was reported wrong, in full, with real-looking numbers.
+   *
+   * Nothing had actually failed to stick. The writes were fine; the checking
+   * was looking in one place for three answers.
+   */
+  const leftOn = new Map()
+  for (const change of changes) {
+    if (change.channel !== undefined) leftOn.set(change.eid, change.channel)
+  }
+
   for (let i = 0; i < changes.length; i++) {
     const change = changes[i]
     if (!change.params.length) continue
     onProgress?.(i + 1, changes.length, change.name)
+
+    /*
+     * Same move applyChanges made, for the same reason. A block whose change
+     * named no channel is left alone: it has one set of values and is already
+     * showing them.
+     */
+    if (change.channel !== undefined) {
+      try {
+        await setChannel(change.eid, change.channel)
+      } catch (err) {
+        const stop = relayGone(err, i, changes.length, 'blocks checked')
+        if (stop) throw stop
+        // Could not get to the channel, so there is nothing to say about it —
+        // reporting the wrong channel's values is what this change exists to
+        // stop.
+        continue
+      }
+    }
 
     let live
     try {
@@ -1133,11 +1175,33 @@ export async function verifyChanges(changes, onProgress) {
           block: change.name,
           param: param.name,
           wanted: param.to,
-          got: actual.value
+          got: actual.value,
+          // Which channel this was true on, so three lines about one control
+          // can be told apart rather than reading as the same one failing
+          // three times.
+          channel: change.channel ?? null
         })
       }
     }
   }
+
+  /*
+   * Put every block back on the channel the write pass left it on.
+   *
+   * Checking a preset must not change it. Without this, verifying ends with
+   * each block sitting on whichever channel happened to be checked last — the
+   * app quietly rearranging the rig on its way out, which is the same thing
+   * applyScenes restores the player's own scene to avoid.
+   */
+  for (const [eid, channel] of leftOn) {
+    try {
+      await setChannel(eid, channel)
+    } catch {
+      // Best effort. A block left on the wrong channel is worth neither an
+      // error on a check that has already reported, nor losing the report.
+    }
+  }
+
   return mismatches
 }
 

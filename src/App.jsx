@@ -2035,7 +2035,10 @@ export default function App() {
             ...c.params.map((p) => `${c.name} - ${p.name} ${p.from} -> ${p.to}${p.unit}`)
           ]),
           ...failures,
-          ...mismatches.map((m) => `did not stick: ${m.block} ${m.param} wanted ${m.wanted}, reads ${m.got}`)
+          ...mismatches.map(
+            (m) =>
+              `did not stick: ${m.block}${m.channel ? ` ch ${m.channel}` : ''} ${m.param} wanted ${m.wanted}, reads ${m.got}`
+          )
         ]
       )
       await read()
@@ -3204,7 +3207,13 @@ export default function App() {
                   failed to stick. */}
               {applied.mismatches.map((m, i) => (
                 <p key={i} className="mono problem">
-                  {`${m.block} ${m.param} — wanted ${m.wanted}, reads ${m.got ?? '—'}`}
+                  {/*
+                    The channel, where there is one. A preset that dials a
+                    rhythm and a lead out of one amp reports "Amp 1 Gain 1"
+                    twice, and without saying which channel each line is about
+                    they read as one control failing repeatedly.
+                  */}
+                  {`${m.block}${m.channel ? ` ch ${m.channel}` : ''} ${m.param} — wanted ${m.wanted}, reads ${m.got ?? '—'}`}
                 </p>
               ))}
             </>
