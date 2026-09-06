@@ -140,6 +140,23 @@ export function Chain({ blocks, selected, onSelect, onToggle }) {
  * A filter box matters more here than in most lists: 512 presets is a lot to
  * scroll, and half of them are called some variation of "Lead".
  */
+/**
+ * The ancestor that actually scrolls, or null.
+ *
+ * Which element that is depends on where this list was opened. In the desktop
+ * panel `.preset-scroll` has a max-height and scrolls itself; inside a sheet
+ * that max-height is removed on purpose — a 300px window over 512 rows fought
+ * the same thumb the sheet did — so the SHEET body is the thing that moves.
+ * Asking the DOM beats hard-coding either one.
+ */
+function scrollerOf(el) {
+  for (let n = el?.parentElement; n; n = n.parentElement) {
+    const oy = getComputedStyle(n).overflowY
+    if ((oy === 'auto' || oy === 'scroll') && n.scrollHeight > n.clientHeight + 1) return n
+  }
+  return null
+}
+
 export function PresetList({
   slots,
   current,
@@ -154,6 +171,10 @@ export function PresetList({
 }) {
   const [filter, setFilter] = useState('')
   const [showAll, setShowAll] = useState(false)
+  const rows = useRef(null)
+  /* Which preset we have already centred on, so typing in the filter does not
+     get yanked back and a re-render does not re-scroll a list being read. */
+  const centredOn = useRef(null)
 
   const needle = filter.trim().toLowerCase()
   /*
@@ -176,6 +197,35 @@ export function PresetList({
     : base
   const unread = slots.length - known.length
   const hidden = slots.length - named.length
+
+  /*
+   * Open where you already are.
+   *
+   * Opening at 000 with the loaded preset 165 rows below it is a list you have
+   * to search to find the thing you are standing on. The model picker two
+   * hundred lines down has done this since it stopped being a native menu; a
+   * list of 512 needs it more, not less.
+   *
+   * Not scrollIntoView: it moves every scrollable ancestor including the page,
+   * which is the bug the conversation log already had — see Assistant.jsx. The
+   * scrollbox is found and only that one is moved.
+   *
+   * Held off while there is a filter, because then the matches are the point
+   * and the top of the list is where they are. Recorded per preset so this
+   * happens once per opening rather than on every keystroke and every name
+   * that arrives mid-scan.
+   */
+  useEffect(() => {
+    if (needle || current === undefined || current === null) return
+    if (centredOn.current === current) return
+    const row = rows.current?.querySelector('.preset-row.current')
+    if (!row) return
+    const box = scrollerOf(row)
+    if (!box) return
+    const gap = row.getBoundingClientRect().top - box.getBoundingClientRect().top
+    box.scrollTop += gap - (box.clientHeight - row.offsetHeight) / 2
+    centredOn.current = current
+  }, [needle, current, shown.length])
 
   return (
     <div className="preset-panel">
@@ -209,7 +259,7 @@ export function PresetList({
         </div>
       ) : null}
 
-      <div className="preset-scroll">
+      <div className="preset-scroll" ref={rows}>
         {named.length === 0 && !needle && !showAll ? (
           <p className="hint pad">
             {scanning ? (
