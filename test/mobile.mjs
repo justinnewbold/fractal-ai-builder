@@ -71,8 +71,39 @@ export function run(test) {
     }
   })
 
+  test('the decoder is tested against the versions the app ships', () => {
+    /*
+     * The decoder needs two small libraries, and the suite that checks it needs
+     * them too — `npm ci` at the root installs only what the root declares, and
+     * mobile/node_modules is a different install that CI has no reason to have
+     * made. The check below therefore imported packages that were not there,
+     * and turned green only on a machine where somebody had run `npm install`
+     * inside mobile/. It merged red.
+     *
+     * So the root carries them as dev dependencies. Which is fine right up
+     * until the two sides are bumped apart, at which point this suite is
+     * checking a decoder the phone does not ship. They are pinned together
+     * here rather than left to good intentions.
+     */
+    const root = JSON.parse(read('package.json'))
+    const phone = JSON.parse(read('mobile/package.json'))
+
+    for (const name of ['base64-js', 'fflate']) {
+      const wanted = phone.dependencies?.[name]
+      assert.ok(wanted, `the phone no longer depends on ${name}`)
+      assert.equal(
+        root.devDependencies?.[name],
+        wanted,
+        `the root tests ${name}@${root.devDependencies?.[name]} while the phone ships ${wanted}`
+      )
+    }
+  })
+
   test('the phone decodes every framing the host sends', async () => {
     /*
+     * Imported through the root's own copies of the two libraries — pinned to
+     * the phone's by the check above.
+     *
      * Hermes has no atob, no Blob and no DecompressionStream, so the browser's
      * decoder throws on a phone — and it throws inside the request that asked,
      * which surfaces as "your Mac didn't answer" about a Mac that answered.
