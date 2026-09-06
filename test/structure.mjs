@@ -1646,9 +1646,29 @@ export function run(test) {
     )
     assert.match(
       generate,
-      /channels: z\s*\n?\s*\.array\(/,
+      /channels: onlyWhenPlaced\(\s*\n?\s*eids,\s*\n?\s*z\.array\(/,
       'a scene cannot name the channels it plays'
     )
+
+    /*
+     * And an empty preset cannot be asked to change anything at all.
+     *
+     * The id narrowing has a hole exactly where it matters most: `z.literal([])`
+     * cannot be built — an enum with no members can never be satisfied — so an
+     * empty preset fell back to a plain integer, and the one case where EVERY
+     * id is invalid was the one case with no constraint on it. Reported from a
+     * real run into an empty slot: six changes proposed against effects 94,
+     * 118, 58, 58, 58 and 66, all six thrown away, six identical rejections
+     * printed under REJECTED DURING CHECKING.
+     *
+     * `maxItems: 0` is the constraint that CAN be expressed for an empty set,
+     * and it has to cover all three places an id can appear or the intent
+     * simply moves to whichever one was left open.
+     */
+    assert.match(generate, /const onlyWhenPlaced = \(eids, array, whenEmpty\) =>/, 'the empty-preset hole is open again')
+    assert.match(generate, /eids\.length \? array : array\.max\(0\)/, 'an empty preset can be sent block changes again')
+    assert.match(generate, /blocks: onlyWhenPlaced\(/, 'blocks are not capped on an empty preset')
+    assert.match(generate, /engaged: onlyWhenPlaced\(/, 'a scene can still switch on a block that does not exist')
   })
 
   /*

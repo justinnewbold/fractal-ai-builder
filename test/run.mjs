@@ -202,9 +202,30 @@ test('drops an out-of-range value', () => {
   assert.match(r.problems[0], /outside/)
 })
 
-test('drops an unknown block', () => {
+test('drops an unknown block, and says so once', () => {
   const r = validateSpec({ blocks: [{ eid: 999, params: [] }] }, schema)
-  assert.match(r.problems[0], /no such block/)
+  assert.equal(r.changes.length, 0)
+  assert.match(r.problems[0], /not in this preset/)
+  assert.match(r.problems[0], /Amp 1 \(58\)/, 'the ids the preset does hold are the half that names the mismatch')
+
+  /*
+   * The same sentence per rejected change turned a preset with nothing in it
+   * into six identical lines under a heading reading REJECTED DURING CHECKING.
+   * The reader learns nothing from the second copy. The count stays, because
+   * how much of the answer went missing is the part worth knowing.
+   */
+  const many = validateSpec(
+    { blocks: [94, 118, 58, 58, 66].map((eid) => ({ eid, params: [] })) },
+    []
+  )
+  const dropped = many.problems.filter((p) => /dropped/.test(p))
+  assert.equal(dropped.length, 1, `said ${dropped.length} times: ${dropped.join(' / ')}`)
+  assert.match(dropped[0], /all 5 changes/, 'the number dropped is not said')
+  assert.match(dropped[0], /empty/, 'an empty preset is not named as the reason')
+  assert.ok(
+    many.problems.some((p) => /add an amp and a cab/.test(p)),
+    'nothing says how to get blocks into an empty preset'
+  )
 })
 
 /*
