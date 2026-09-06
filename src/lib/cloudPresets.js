@@ -17,6 +17,7 @@
  * safety.
  */
 import { supabaseClient } from './remote.js'
+import { signatureOf } from './history.js'
 
 const TABLE = 'presets'
 
@@ -92,25 +93,72 @@ export async function deleteCloudPreset(id) {
 }
 
 /**
- * Copy everything in this browser up to the account.
+ * Copy everything on this device up to the account — each tone once.
  *
  * The migration path for exactly the loss that prompted this. Local entries
  * are left alone: this is a copy, not a move, because the two stores are not
  * the same thing and a failure part-way through should not have eaten the
  * originals.
+ *
+ * Two things it now gets right, both of which made it useless in the one place
+ * it mattered most:
+ *
+ * A tone already on the account is skipped. Every insert was unconditional, so
+ * the button was safe to press exactly once and doubled the account every time
+ * after — and nothing about a button reading "copy your presets up" says it may
+ * only ever be pressed once. Skipping by the same signature the library
+ * deduplicates by means pressing it again is simply a no-op.
+ *
+ * And an item may be a tone or a way to fetch one. On a Mac with a folder
+ * chosen, a design is written to disk INSTEAD of browser storage, and the
+ * listing that surface holds is a name and a time, not the tone. Reading only
+ * browser storage meant the machine that keeps its designs as files — the one
+ * whose whole library is stranded on it — had nothing to copy up.
+ *
+ * Both sides of the network are injected, the way everything in host.mjs is,
+ * so the rule about what gets skipped can be tested without an account.
  */
-export async function pushLocalPresets(entries, onProgress) {
-  const done = []
+export async function pushLocalPresets(
+  items,
+  onProgress,
+  { existing = listCloudPresets, save = saveCloudPreset } = {}
+) {
+  // Asked once, up front. Asking per item would be a round trip each, and the
+  // answer cannot change under us: this is the only thing writing.
+  const already = new Set((await existing()).map(signatureOf))
   const failed = []
-  for (let i = 0; i < entries.length; i++) {
-    onProgress?.(i + 1, entries.length, entries[i]?.name)
+  let saved = 0
+  let skipped = 0
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    onProgress?.(i + 1, items.length, item?.name)
     try {
-      done.push(await saveCloudPreset(entries[i]))
+      /*
+       * Resolved before the check, never after: a folder listing has no
+       * description, so its signature before loading is not the signature it
+       * will have, and matching on that would skip the wrong things.
+       */
+      const entry = item?.spec ? item : await item?.load?.()
+      if (!entry?.spec) {
+        skipped++
+        continue
+      }
+      const signature = signatureOf(entry)
+      // The set grows as we go, so two copies of one tone inside this batch —
+      // the browser's and the folder's — also count as one.
+      if (already.has(signature)) {
+        skipped++
+        continue
+      }
+      already.add(signature)
+      await save(entry)
+      saved++
     } catch (err) {
-      failed.push(`${entries[i]?.name || 'Untitled'} — ${err.message}`)
+      failed.push(`${item?.name || 'Untitled'} — ${err.message}`)
     }
   }
-  return { saved: done.length, failed }
+  return { saved, skipped, failed }
 }
 
 /**

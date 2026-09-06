@@ -1302,6 +1302,31 @@ export function run(test) {
       /files\s*\n?\s*\.filter\(\(f\) => f\.kind === 'design'\)/,
       'the folder is never read, so designs kept there stay invisible'
     )
+    /*
+     * And the copy-to-account button is offered every store on this device.
+     *
+     * It read browser storage and nothing else, which is the wrong half on the
+     * machine it exists for: choosing a folder means a design is written to
+     * disk INSTEAD of browser storage, so a Mac with a folder set had, by that
+     * button's reckoning, nothing to copy — while holding the entire library
+     * the button was written to rescue.
+     */
+    assert.match(
+      src,
+      /const onThisDevice = useMemo\(\s*\n\s*\(\) => \[\s*\n\s*\.\.\.listPresets\(\),\s*\n\s*\.\.\.folderSaves/,
+      'the copy-to-account list is back to browser storage only'
+    )
+    assert.match(
+      src,
+      /<CloudPresets[\s\S]{0,200}local=\{onThisDevice\}[\s\S]{0,80}missing=\{stranded\}/,
+      'the account panel is not handed what is on this device, so it reads storage itself'
+    )
+    assert.match(
+      src,
+      /note=\{\s*\n\s*cloudReady\(\) && stranded/,
+      'a stranded library is invisible until the folded panel is opened'
+    )
+
     assert.match(
       src,
       /profileFrom\(library\)/,
