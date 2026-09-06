@@ -898,20 +898,36 @@ input[type='text']:focus-visible {
     gap: var(--s-1);
   }
 
-  /* With a unit answering, its name and the word "connected" are the least of
-     it on a narrow screen: the lamp says the state, the gear holds the rest,
-     and the room goes to the preset — the one fact here you actually read.
-     With nothing answering there is no preset, and the bar's whole job is to
-     say so, so both come back. */
-  /* The lamp already carries the state and the demo banner already says it is
-     a simulation, so on a narrow screen the unit's name and the connection
-     word are the two facts worth spending on the preset name instead — which
-     is the one thing the bar exists to show, and was being cut to "D…". */
+  /*
+   * The connection word goes; the unit's name stays.
+   *
+   * Both used to go. The reasoning was room — the preset name is what the bar
+   * exists to show and it was being cut to "D…" — and the word "connected" is
+   * still the right thing to drop, because the chip on the right of this same
+   * bar says exactly that and the lamp says it again in colour.
+   *
+   * The unit's name is not a repeat of anything. "Please show what device the
+   * unit is currently connected to in the top left. AM4, FM3, Axe-Fx." With two
+   * Macs and two units on one account it is the one fact that says WHICH RIG
+   * this screen is driving, and a phone is exactly where you cannot see the
+   * unit to check.
+   *
+   * The room came from elsewhere in the end: the separate UNSAVED word is gone,
+   * and Save now appears only when there is something to save. `--f-2` and a
+   * cap keep a long one ("Axe-Fx III") from spending the preset's eight
+   * characters, which is the floor set just below.
+   */
   .topbar[data-status='live'] .topbar-how,
-  .topbar[data-status='live'] .topbar-unit,
-  .topbar[data-status='demo'] .topbar-how,
-  .topbar[data-status='demo'] .topbar-unit {
+  .topbar[data-status='demo'] .topbar-how {
     display: none;
+  }
+
+  .topbar-unit {
+    font-size: var(--f-2);
+    max-width: 9ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   button.save-options.compact {

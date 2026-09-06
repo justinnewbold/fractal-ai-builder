@@ -356,6 +356,46 @@ export function run(test) {
     assert.match(del, /min-height: 44px/, 'the delete button is under the touch floor')
   })
 
+  test('a phone says which unit it is driving', () => {
+    /*
+     * "Please show what device the unit is currently connected to in the top
+     * left. AM4, FM3, Axe-Fx."
+     *
+     * It was there on a desktop and hidden on a phone, along with the word
+     * "connected", to buy room for the preset name — which was being cut to
+     * "D…". Dropping the word is still right: the chip on the right of this same
+     * bar says exactly that, and the lamp says it again in colour.
+     *
+     * The unit's name is not a repeat of anything, and with two Macs and two
+     * units on one account it is the one fact that says WHICH RIG this screen is
+     * driving — on the device where you cannot look over and check.
+     *
+     * The room came from elsewhere in the end: the separate UNSAVED word is
+     * gone, and Save now appears only when there is something to save.
+     */
+    // Every narrow block, not the first one that matches: there are three, and
+    // the topbar rules are not in the first.
+    let narrow = ''
+    for (const m of code.matchAll(/@media \(max-width: 620px\)/g)) narrow += balanced(code, m.index)
+    assert.ok(narrow.includes('.topbar-'), 'the narrow bar rules are gone')
+
+    const hidden = [...narrow.matchAll(/([^{}]+)\{[^{}]*display: none[^{}]*\}/g)]
+      .map((m) => m[1].replace(/\s+/g, ' ').trim())
+      .join(' | ')
+    assert.ok(
+      !/\.topbar-unit/.test(hidden),
+      'the unit name is hidden on a phone again, which is the one fact saying which rig this is'
+    )
+    assert.ok(/\.topbar-how/.test(hidden), 'the connection word is back, saying what the chip beside it already says')
+
+    /*
+     * And a long one is capped, so "Axe-Fx III" cannot spend the eight
+     * characters the preset name is guaranteed just below it.
+     */
+    const unit = narrow.slice(narrow.indexOf('.topbar-unit {'))
+    assert.match(unit.slice(0, unit.indexOf('}')), /max-width/, 'a long unit name can eat the preset name')
+  })
+
   test('the Macs to choose between both fit on the screen', () => {
     /*
      * A Mac is called whatever its owner called it, so the buttons here read
