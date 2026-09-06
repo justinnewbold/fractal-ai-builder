@@ -29,7 +29,6 @@ export function validateSpec(spec, schema, sceneCount = 8, channelNames = ['A', 
   }
 
   const blocksByEid = new Map(schema.map((b) => [b.eid, b]))
-  let hinted = false
   // When a lookup misses, the id the spec used is only half the story — what
   // ids the preset actually holds is the half that names the mismatch. A run
   // where every change was skipped and this line was absent cost a full
@@ -39,19 +38,39 @@ export function validateSpec(spec, schema, sceneCount = 8, channelNames = ['A', 
       ? `This preset has: ${schema.map((b) => `${b.name || b.slug} (${b.eid})`).join(', ')}.`
       : 'This preset reports no blocks at all.'
 
+  /*
+   * Said once, however many there are.
+   *
+   * On an empty preset every id is wrong, so this used to print the same
+   * sentence per rejected change — six of them, identical but for a number,
+   * under a heading that made the run look like a catastrophe rather than a
+   * preset with nothing in it yet. The reader learns nothing from the second
+   * copy that the first did not tell them.
+   *
+   * The count stays, because "six changes were dropped" is the part that says
+   * how much of the answer went missing.
+   */
+  const missing = (spec.blocks || []).map((b) => b.eid).filter((eid) => !blocksByEid.has(eid))
+  if (missing.length) {
+    const ids = [...new Set(missing)]
+    problems.push(
+      schema.length
+        ? `${missing.length === 1 ? 'One change was' : `${missing.length} changes were`} dropped: ` +
+          `effect ${ids.join(', ')} ${ids.length === 1 ? 'is' : 'are'} not in this preset. ${inventory()}`
+        : `This preset is empty, so all ${missing.length} changes were dropped — there is nothing in it to set yet.`
+    )
+    problems.push(
+      schema.length
+        ? 'If the tone needs a block the chain doesn\u2019t have, say "add a reverb" (or whichever block) and it will be placed in a free slot first.'
+        : 'Say "add an amp and a cab" (or whichever blocks) to place them first, then ask for the tone.'
+    )
+  }
+
   for (const block of spec.blocks || []) {
     const known = blocksByEid.get(block.eid)
 
-    if (!known) {
-      problems.push(`Skipped effect ${block.eid} — no such block in this preset. ${inventory()}`)
-      if (!hinted) {
-        hinted = true
-        problems.push(
-          'If the tone needs a block the chain doesn\u2019t have, say "add a reverb" (or whichever block) and it will be placed in a free slot first.'
-        )
-      }
-      continue
-    }
+    // Already reported above, once, with a count.
+    if (!known) continue
 
     const change = {
       eid: known.eid,

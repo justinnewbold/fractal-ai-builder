@@ -64,6 +64,25 @@ function resolveModel() {
 const eidField = (eids, what) =>
   eids.length ? z.literal(eids).describe(what) : z.number().int().describe(what)
 
+/**
+ * An array that cannot be filled when the preset holds no blocks.
+ *
+ * The narrowing above has a hole exactly where it matters most. `z.literal([])`
+ * cannot be built — an enum with no members can never be satisfied — so an
+ * empty preset falls back to a plain integer, and the one case where EVERY id
+ * is invalid is the one case with no constraint on it at all. The model then
+ * did what it always does with an open number: on a preset with nothing in it,
+ * it asked to change effects 94, 118, 58, 58, 58 and 66, and the validator
+ * threw all six away and printed six identical rejections.
+ *
+ * `maxItems: 0` is the constraint that CAN be expressed for an empty set. The
+ * request has one outlet left then — "wanted", which names the families the
+ * tone needs — and that is the only useful answer about a preset with no
+ * blocks in it.
+ */
+const onlyWhenPlaced = (eids, array, whenEmpty) =>
+  eids.length ? array : array.max(0).describe(whenEmpty)
+
 const buildPresetSpec = (eids = []) =>
   z.object({
   presetName: z
@@ -90,8 +109,9 @@ const buildPresetSpec = (eids = []) =>
         'only, no ids and no settings: dial the tone with the blocks that ARE placed and list ' +
         'the gaps here. Empty array when the placed chain covers it.'
     ),
-  blocks: z
-    .array(
+  blocks: onlyWhenPlaced(
+    eids,
+    z.array(
       z.object({
         eid: eidField(eids, 'Effect id, copied from the supplied block list.'),
         bypassed: z.boolean().describe('Whether this block should be bypassed.'),
@@ -125,6 +145,7 @@ const buildPresetSpec = (eids = []) =>
           .describe('Parameters to set on this block. May be empty.')
       })
     )
+  , 'This preset is EMPTY — it holds no blocks, so there is nothing to change and this MUST stay []. Name every family the tone needs in "wanted" instead.')
     .describe('Only blocks you are changing.'),
   scenes: z
     .array(
@@ -136,19 +157,25 @@ const buildPresetSpec = (eids = []) =>
         name: z
           .string()
           .describe('Short name for this scene — "Clean", "Rhythm", "Lead". Eight characters or fewer reads best on the unit.'),
-        engaged: z
-          .array(eidField(eids, 'An effect id that is ON in this scene.'))
+        engaged: onlyWhenPlaced(
+          eids,
+          z.array(eidField(eids, 'An effect id that is ON in this scene.')),
+          'This preset is EMPTY — there is nothing to switch on, so this MUST stay [].'
+        )
           .describe(
             'Effect ids that are ON in this scene. Every other block placed in the preset is off. ' +
               'Copy ids from the supplied block list.'
           ),
-        channels: z
-          .array(
+        channels: onlyWhenPlaced(
+          eids,
+          z.array(
             z.object({
               eid: eidField(eids, 'Effect id from the supplied block list.'),
               channel: z.string().describe('Channel letter A, B, C or D this scene plays.')
             })
-          )
+          ),
+          'This preset is EMPTY — there are no blocks to put on a channel, so this MUST stay [].'
+        )
           .describe(
             'Blocks that play a particular channel in this scene. Leave a block out to keep it ' +
               'on the channel it is already on. Empty array if every block stays put.'
