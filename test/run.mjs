@@ -3127,6 +3127,67 @@ test('a browser with no wake lock is not a browser that cannot send', async () =
   release()
 })
 
+test('the save guard asks the unit which preset is loaded, not the screen', () => {
+  /*
+   * "I keep seeing the 'Mac has moved to slot 7' but it had never moved."
+   *
+   * It hadn't. What had moved was the Mac page's idea of it, in the opposite
+   * direction — the unit was on 501 and the page still remembered 7.
+   *
+   * `preset.number` is React state, filled by read() and by nothing else. The
+   * device event stream carries scene, tempo and tuner and has never carried a
+   * preset change, so selecting a preset from the phone — or turning the knob
+   * on the unit — moves the hardware and leaves the page's number where it was,
+   * indefinitely. The guard compared a phone that knew the truth against a Mac
+   * that did not, and refused a save that was perfectly good.
+   */
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  const guard = app.slice(app.indexOf('const req = await takeParkedSave()'))
+  const scope = guard.slice(0, guard.indexOf('const timer = setInterval(look'))
+
+  // One live read, and the decision made on its answer.
+  assert.match(scope, /const now = await currentPreset\(\)/)
+  assert.match(scope, /loaded = now\.number/)
+  assert.match(
+    scope,
+    /const sameBuffer = req\.fromSlot == null \|\| req\.fromSlot === loaded/,
+    'the decision is still made against the page state'
+  )
+  // And the sentence names what is actually loaded, rather than the stale
+  // number it used to accuse the Mac of having moved to.
+  assert.match(scope, /The Mac had moved to slot \$\{loaded \?\? 'another preset'\}/)
+  assert.ok(
+    !/moved to slot \$\{preset\?\.number/.test(scope),
+    'the message still reports the number that was wrong in the first place'
+  )
+
+  // The screen was wrong too, so it is corrected rather than left disagreeing
+  // with the decision just made from it.
+  assert.match(scope, /if \(now\.number !== preset\?\.number\) setPreset\(now\)/)
+  // A unit that will not answer falls back to what the page has, which is what
+  // this used for everything before.
+  assert.match(scope, /let loaded = preset\?\.number \?\? null/)
+  // Nothing acted on after the component has gone.
+  assert.match(scope, /\}\n\s*if \(stop\) return/)
+})
+
+test('nothing in the event stream keeps the preset number current', () => {
+  /*
+   * The reason the guard has to ask. If a preset-change event is ever added to
+   * handleEvent, this test is the thing that should be revisited — until then
+   * the live read is not belt-and-braces, it is the only source of truth.
+   */
+  const ds = readSrc(new URL('../src/lib/deviceState.js', import.meta.url), 'utf8')
+  const handler = ds.slice(ds.indexOf('export function handleEvent'), ds.indexOf('export function listen'))
+  for (const known of ['scene', 'tempo', 'tuner']) {
+    assert.ok(handler.includes(`'${known}'`) || handler.includes(known), `${known} stopped being handled`)
+  }
+  assert.ok(
+    !/set\(\{ preset/.test(handler),
+    'the event stream sets the preset now — the guard can stop reading it live'
+  )
+})
+
 console.log('\nthe conversation surviving the phone')
 
 const sessionMod = await import('../src/lib/session.js')

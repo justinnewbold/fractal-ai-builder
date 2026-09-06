@@ -1229,7 +1229,47 @@ export default function App() {
       if (stop || !req?.id || !Number.isInteger(req.slot)) return
       if (handledSaves.current.includes(req.id)) return
       const fresh = Date.now() - (req.at || 0) < 15 * 60 * 1000
-      const sameBuffer = req.fromSlot == null || req.fromSlot === preset?.number
+
+      /*
+       * Ask the unit what is loaded. Do not ask the screen.
+       *
+       * "I keep seeing the 'Mac has moved to slot 7' but it had never moved."
+       * It hadn't. What had moved was this page's idea of it, in the opposite
+       * direction: the unit was on 501 and the Mac was still remembering 7.
+       *
+       * `preset.number` is React state, filled by `read()` and by nothing else.
+       * The device event stream carries scene, tempo and tuner — see
+       * deviceState.handleEvent — and has never carried a preset change. So
+       * selecting a preset from the phone, or turning the knob on the unit
+       * itself, moves the hardware and leaves this page's number exactly where
+       * it was, indefinitely. The guard then compared a phone that knew the
+       * truth against a Mac that did not, found them different, and refused a
+       * save that was perfectly good — naming the stale number as the one the
+       * Mac had "moved to", which is precisely backwards.
+       *
+       * One read settles it. It costs a round trip and happens only when there
+       * is actually a request parked, which is rare.
+       */
+      let loaded = preset?.number ?? null
+      try {
+        const now = await currentPreset()
+        if (Number.isInteger(now?.number)) {
+          loaded = now.number
+          /*
+           * And the screen was wrong too, so it is corrected here rather than
+           * left to say one thing while the decision was made on another. The
+           * preset alone: a full re-read from a six-second poll would fight
+           * whoever is working at the Mac, and the number is what was lying.
+           */
+          if (now.number !== preset?.number) setPreset(now)
+        }
+      } catch {
+        // The unit would not answer. What the screen has is all there is, and
+        // it is what this used to use for everything.
+      }
+      if (stop) return
+
+      const sameBuffer = req.fromSlot == null || req.fromSlot === loaded
       if (fresh && sameBuffer) {
         await carryOutSave(req)
         return
@@ -1246,7 +1286,7 @@ export default function App() {
         slot: req.slot,
         error: sameBuffer
           ? 'The Mac did not pick this up within fifteen minutes, so it was dropped rather than written to a preset that has moved on. Nothing was saved — ask again with the Mac awake.'
-          : `The Mac had moved to slot ${preset?.number ?? 'another preset'} by the time it saw this, so the sound you edited was no longer loaded. Nothing was saved.`
+          : `The Mac had moved to slot ${loaded ?? 'another preset'} by the time it saw this, so the sound you edited was no longer loaded. Nothing was saved.`
       }).catch(() => {})
     }
     look()
