@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { blockColor } from '../lib/blockColors'
 import { useDismiss } from '../lib/dismiss'
+import { marksFor, toggleFavourite } from '../lib/presetMarks'
 
 const SHORT = {
   wah: 'WAH',
@@ -140,6 +141,23 @@ export function Chain({ blocks, selected, onSelect, onToggle }) {
  * A filter box matters more here than in most lists: 512 presets is a lot to
  * scroll, and half of them are called some variation of "Lead".
  */
+/**
+ * The ancestor that actually scrolls, or null.
+ *
+ * Which element that is depends on where this list was opened. In the desktop
+ * panel `.preset-scroll` has a max-height and scrolls itself; inside a sheet
+ * that max-height is removed on purpose — a 300px window over 512 rows fought
+ * the same thumb the sheet did — so the SHEET body is the thing that moves.
+ * Asking the DOM beats hard-coding either one.
+ */
+function scrollerOf(el) {
+  for (let n = el?.parentElement; n; n = n.parentElement) {
+    const oy = getComputedStyle(n).overflowY
+    if ((oy === 'auto' || oy === 'scroll') && n.scrollHeight > n.clientHeight + 1) return n
+  }
+  return null
+}
+
 export function PresetList({
   slots,
   current,
@@ -150,10 +168,27 @@ export function PresetList({
   progress,
   deviceSlots,
   addressing,
-  slowNames
+  slowNames,
+  device
 }) {
   const [filter, setFilter] = useState('')
   const [showAll, setShowAll] = useState(false)
+  const rows = useRef(null)
+  /*
+   * Starred, and where you have just been.
+   *
+   * Read once when the list mounts — the sheet unmounts its children on close,
+   * so every opening gets the current answer without this having to watch
+   * storage. `view` is which of the three lists is on screen; it goes back to
+   * everything each time, because a filter you cannot see is a list that is
+   * lying about how much the unit holds.
+   */
+  const [marks, setMarks] = useState(() => marksFor(device))
+  const [view, setView] = useState('all')
+  const star = (n) => setMarks((m) => ({ ...m, favourites: toggleFavourite(device, n, undefined) }))
+  /* Which preset we have already centred on, so typing in the filter does not
+     get yanked back and a re-render does not re-scroll a list being read. */
+  const centredOn = useRef(null)
 
   const needle = filter.trim().toLowerCase()
   /*
@@ -168,7 +203,20 @@ export function PresetList({
   // hidden with the unread ones, behind the same "Show all" chip. On a
   // factory unit every slot is named, so this hides nothing there.
   const named = known.filter((s) => (s.name || '').trim())
-  const base = needle || showAll ? slots : named
+  /*
+   * Recent keeps the order it was played in, which is the whole point of it —
+   * sorting it by slot number would throw away the only thing it knows. The
+   * other two read as a list of presets and stay in slot order.
+   */
+  const byNumber = new Map(slots.map((s) => [s.number, s]))
+  const picked =
+    view === 'recent'
+      ? marks.recent.map((n) => byNumber.get(n)).filter(Boolean)
+      : view === 'starred'
+        ? marks.favourites.map((n) => byNumber.get(n)).filter(Boolean)
+        : null
+
+  const base = picked || (needle || showAll ? slots : named)
   const shown = needle
     ? base.filter(
         (s) => (s.name || '').toLowerCase().includes(needle) || String(s.number) === needle
@@ -176,6 +224,72 @@ export function PresetList({
     : base
   const unread = slots.length - known.length
   const hidden = slots.length - named.length
+
+  /*
+   * Getting to the 300s without a thumb marathon.
+   *
+   * 512 rows is about forty screens. The centring below solves opening at the
+   * one you are on; it does nothing for going somewhere else, which on a unit
+   * this size is most of what the list is for.
+   *
+   * These SCROLL, they do not load. Tapping 300 while a set is running must
+   * not change what is coming out of the amp — the row underneath is still
+   * chosen deliberately, this only carries you to it.
+   *
+   * Offered against the unit's own size, so a smaller Fractal gets fewer of
+   * them and nothing offers a slot that isn't there.
+   */
+  const total = deviceSlots || slots.length
+  const jumps = [100, 200, 300, 400, 500].filter((n) => n < total)
+
+  const jumpTo = (n) => {
+    const box = rows.current
+    if (!box) return
+    /*
+     * The first row AT or PAST the number. An unnamed slot is not in the list
+     * unless "show all" is on, so 300 itself is often not a row — landing on
+     * 304 is the answer somebody asking for 300 wanted anyway.
+     */
+    const row = [...box.querySelectorAll('.preset-row')].find(
+      (r) => Number(r.dataset.slot) >= n
+    )
+    const scroller = row && scrollerOf(row)
+    if (!scroller) return
+    // Top of the box rather than the middle: the point is the run of presets
+    // starting there, and half of them would be above the fold if centred.
+    scroller.scrollTop += row.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 8
+    /* Nothing is loaded, so the list must say where it went. */
+    centredOn.current = current
+  }
+
+  /*
+   * Open where you already are.
+   *
+   * Opening at 000 with the loaded preset 165 rows below it is a list you have
+   * to search to find the thing you are standing on. The model picker two
+   * hundred lines down has done this since it stopped being a native menu; a
+   * list of 512 needs it more, not less.
+   *
+   * Not scrollIntoView: it moves every scrollable ancestor including the page,
+   * which is the bug the conversation log already had — see Assistant.jsx. The
+   * scrollbox is found and only that one is moved.
+   *
+   * Held off while there is a filter, because then the matches are the point
+   * and the top of the list is where they are. Recorded per preset so this
+   * happens once per opening rather than on every keystroke and every name
+   * that arrives mid-scan.
+   */
+  useEffect(() => {
+    if (needle || current === undefined || current === null) return
+    if (centredOn.current === current) return
+    const row = rows.current?.querySelector('.preset-row.current')
+    if (!row) return
+    const box = scrollerOf(row)
+    if (!box) return
+    const gap = row.getBoundingClientRect().top - box.getBoundingClientRect().top
+    box.scrollTop += gap - (box.clientHeight - row.offsetHeight) / 2
+    centredOn.current = current
+  }, [needle, current, shown.length])
 
   return (
     <div className="preset-panel">
@@ -199,6 +313,43 @@ export function PresetList({
         aria-label="Filter presets"
       />
 
+      {/*
+        Three ways to look at 512 presets: all of them, the ones you starred,
+        and the ones you were just on. Only offered where they mean something —
+        a unit with nothing starred and nothing played does not need a chooser
+        between three empty lists.
+      */}
+      {!needle && (marks.favourites.length || marks.recent.length) ? (
+        <div className="preset-views" role="group" aria-label="Which presets to show">
+          {[
+            ['all', 'All', true],
+            ['starred', `★ ${marks.favourites.length}`, marks.favourites.length > 0],
+            ['recent', `Recent ${marks.recent.length}`, marks.recent.length > 0]
+          ]
+            .filter(([, , show]) => show)
+            .map(([id, label]) => (
+              <button
+                key={id}
+                className={`preset-view ${view === id ? 'current' : ''}`}
+                onClick={() => setView(id)}
+                aria-pressed={view === id}
+              >
+                {label}
+              </button>
+            ))}
+        </div>
+      ) : null}
+
+      {jumps.length && !needle && view === 'all' ? (
+        <div className="preset-jumps" role="group" aria-label="Jump to a range">
+          {jumps.map((n) => (
+            <button key={n} className="preset-jump mono" onClick={() => jumpTo(n)} aria-label={`Jump to preset ${n}`}>
+              {n}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {scanning && progress ? (
         <div className="scan-bar">
           <div className="scan-fill" style={{ width: `${progress.pct}%` }} />
@@ -209,7 +360,7 @@ export function PresetList({
         </div>
       ) : null}
 
-      <div className="preset-scroll">
+      <div className="preset-scroll" ref={rows}>
         {named.length === 0 && !needle && !showAll ? (
           <p className="hint pad">
             {scanning ? (
@@ -230,13 +381,27 @@ export function PresetList({
           <p className="hint pad">Nothing matches “{filter}”.</p>
         ) : (
           shown.map((slot, i) => (
+            /*
+              The star is its own button beside the row, not inside it: nested
+              buttons are invalid, and more to the point a thumb going for a
+              star must never load a preset by missing it.
+            */
+            <span className="preset-line" key={slot.number}>
             <button
-              key={slot.number}
+              className={`preset-star ${marks.favourites.includes(slot.number) ? 'on' : ''}`}
+              onClick={() => star(slot.number)}
+              aria-pressed={marks.favourites.includes(slot.number)}
+              aria-label={`${marks.favourites.includes(slot.number) ? 'Unstar' : 'Star'} preset ${slot.number}`}
+            >
+              {marks.favourites.includes(slot.number) ? '★' : '☆'}
+            </button>
+            <button
               className={`preset-row ${slot.number === current ? 'current' : ''} ${
                 !needle && startsBank(slot.number, i === 0 ? null : shown[i - 1].number, addressing)
                   ? 'bank-start'
                   : ''
               }`}
+              data-slot={slot.number}
               onClick={() => onSelect(slot.number)}
             >
               <span className="preset-id mono">{slotLabel(slot.number, addressing)}:</span>
@@ -255,6 +420,7 @@ export function PresetList({
                 )}
               </span>
             </button>
+            </span>
           ))
         )}
         {!needle && hidden > 0 ? (
