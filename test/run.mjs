@@ -2540,6 +2540,44 @@ test('the stage screen is sized by whoever is holding it', () => {
   assert.equal(saveSize(2, hostile), false, 'a blocked write is reported as a success')
 })
 
+test('the quick jumps fit the unit that is plugged in', async () => {
+  /*
+   * One rule, not a table of devices: about five stops, each on a round
+   * number. The two he named are the two ends of it — a gen-3 unit's 512
+   * presets want hundreds, an AM4's 104 want twenties — and a unit nobody has
+   * plugged in yet gets whatever its own count deserves without this file
+   * being edited again.
+   */
+  const { jumpStep, jumpsFor } = await import('../src/lib/presetJumps.js')
+
+  assert.equal(jumpStep(512), 100, 'a 512-slot unit is not jumping in hundreds')
+  assert.deepEqual(jumpsFor(512), [100, 200, 300, 400, 500])
+
+  assert.equal(jumpStep(104), 20, 'an AM4 is not jumping in twenties')
+  assert.deepEqual(jumpsFor(104), [20, 40, 60, 80, 100])
+
+  // An Axe-Fx II holds 384. Nobody wrote that number down here; the rule
+  // reaches it on its own.
+  assert.equal(jumpStep(384), 50)
+  assert.ok(jumpsFor(384).every((n) => n < 384), 'a jump points past the last slot')
+
+  // Short lists get nothing. A VP4's handful of slots is already one flick
+  // from top to bottom, and a row of buttons over it would be furniture.
+  assert.deepEqual(jumpsFor(4), [])
+  assert.deepEqual(jumpsFor(40), [])
+  assert.deepEqual(jumpsFor(0), [])
+
+  // A count that never arrived must not become a row of NaN.
+  assert.deepEqual(jumpsFor(undefined), [])
+  assert.deepEqual(jumpsFor(null), [])
+
+  // Five stops is the shape, wherever the count lands.
+  for (const total of [104, 128, 256, 384, 512, 1024]) {
+    const n = jumpsFor(total).length
+    assert.ok(n >= 3 && n <= 9, `${total} slots gave ${n} buttons, which is not a row you can read`)
+  }
+})
+
 test('recent presets and favourites, per unit', () => {
   /*
    * A 512-slot unit is forty screens of list. Range jumps get you to a
