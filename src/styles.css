@@ -2190,11 +2190,22 @@ button.view-tab.current:not(:disabled) {
    name left, that inset is padding around padding — and on this screen the
    currency is scene buttons you can hit without looking. */
 .gig-preset {
+  /* The name and the size control, one row. The name takes what is left. */
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
   padding: var(--s-3) var(--s-4);
   background: var(--panel);
   border: 1px solid var(--rule);
   border-left: 2px solid var(--signal);
   border-radius: var(--r-1);
+}
+
+.gig-preset button.gig-name {
+  flex: 1 1 auto;
+  /* The name is long and the two small buttons beside it are not negotiable,
+     so this is the thing that gives. */
+  min-width: 0;
 }
 
 /* A button that has to keep reading as a sign: the name is what you check from
@@ -2271,18 +2282,14 @@ button.gig-name:disabled .gig-name-caret {
  * is drawn to be found when looked for and ignored otherwise: aligned right,
  * away from the grid's leading edge, in the dim silk rather than the bright.
  */
+/* Beside the preset name now, not in the tab row. It sizes this screen, so it
+   belongs on this screen; and the name beside it is the one thing here wide
+   enough to give up the space. */
 .gig-size {
   display: flex;
   align-items: center;
-  gap: var(--s-2);
-  /* Pushed to the far end of the tab row: the tabs are what a thumb aims at
-     on this row, and this is not. It also puts it diagonally opposite the
-     scenes, which is the other thing it must not be mistaken for. */
-  margin-left: auto;
-  /* Sits ON the row's rule rather than above it, so the row stays one bar
-     deep — a test checks that the chrome above the first control does not
-     grow, and this is chrome. */
-  padding-bottom: var(--s-1);
+  gap: var(--s-1);
+  flex: 0 0 auto;
 }
 
 .gig-size-label {
@@ -2296,6 +2303,9 @@ button.gig-name:disabled .gig-name-caret {
      find the top bar's phone block, and it takes the first one in the file. */
   min-width: 9ch;
   text-align: right;
+  /* Beside a preset name that is already fighting for the row: this never
+     shrinks, and the name is what gives. */
+  flex: 0 0 auto;
 }
 
 button.gig-size-step {
@@ -2333,12 +2343,25 @@ button.gig-scene {
   min-height: var(--gig-tile, 62px);
   padding: var(--s-2) var(--s-2);
   background: var(--panel);
+  /*
+   * The scene's own colour, on the edge until it is the live one.
+   *
+   * Exactly the grammar the effect tiles below already use for off against on:
+   * the hue says WHICH, the fill says WHETHER. Eight identical panels told
+   * apart by a numeral is a reading task between two bars of a song; a colour
+   * is not. See lib/sceneColors.
+   */
+  border-left: 3px solid var(--scene-fill, var(--rule));
 }
 
 button.gig-scene.current {
-  background: var(--signal);
-  border-color: var(--signal);
-  color: var(--on-signal);
+  background: var(--scene-fill, var(--signal));
+  border-color: var(--scene-fill, var(--signal));
+  color: var(--scene-ink, var(--on-signal));
+  /* The live scene against seven coloured neighbours needs more than a fill,
+     so it keeps the amber the rest of the app uses for the audio path — as a
+     ring around its own colour rather than instead of it. */
+  box-shadow: inset 0 0 0 2px var(--signal);
 }
 
 .gig-scene-num {
@@ -2352,8 +2375,10 @@ button.gig-scene.named .gig-scene-num {
   color: var(--silk-faint);
 }
 
-button.gig-scene.named.current .gig-scene-num {
-  color: var(--on-signal-dim);
+button.gig-scene.named.current .gig-scene-num,
+button.gig-scene.current .gig-scene-name {
+  color: var(--scene-ink, var(--on-signal-dim));
+  opacity: 0.85;
 }
 
 .gig-scene-name {
@@ -5185,6 +5210,27 @@ button.gig-block:disabled {
 }
 
 /*
+ * Full name by default; three letters where the tile is too narrow for one.
+ *
+ * Both are in the DOM and CSS picks — so the accessible name is always the
+ * real one, and nothing here counts characters to guess what will fit. The
+ * abbreviation is hidden from screen readers for the same reason.
+ */
+.gig-block-abbr {
+  display: none;
+}
+
+@media (max-width: 620px) {
+  .gig[data-fx-abbr] .gig-block-full {
+    display: none;
+  }
+
+  .gig[data-fx-abbr] .gig-block-abbr {
+    display: inline;
+  }
+}
+
+/*
  * The phone used to opt out of the size control, which is where it is needed.
  *
  * This block hard-coded a 108px column floor and a 66px tile, overriding the
@@ -5197,8 +5243,21 @@ button.gig-block:disabled {
  * set still gets the phone layout this was written for.
  */
 @media (max-width: 620px) {
+  /*
+   * On a phone the size control names the COLUMN COUNT, not a pixel floor.
+   *
+   * A floor says "at least this wide" and lets the viewport pick the rest,
+   * which is why the default kept coming out three scenes across when the
+   * layout he chose is two. minmax(0, 1fr) rather than 1fr so a long scene
+   * name cannot push its own column wider than its share — the same
+   * min-content trap that had the effects stuck three to a row.
+   */
+  .gig-scenes {
+    grid-template-columns: repeat(var(--gig-scene-cols, 2), minmax(0, 1fr));
+  }
+
   .gig-blocks {
-    grid-template-columns: repeat(auto-fit, minmax(var(--gig-col-block, 108px), 1fr));
+    grid-template-columns: repeat(var(--gig-fx-cols, 4), minmax(0, 1fr));
   }
 
   button.gig-block,
@@ -5591,34 +5650,55 @@ button.gig-block.off {
 
 /* Two modes on one row. Stacked full-width they cost 98px of a 664px screen,
    between the preset you just changed and the scenes you are about to press. */
-.gig-modes {
+/*
+ * The bar along the bottom: the tuner and tap tempo, together.
+ *
+ * They were a full-width row in the MIDDLE of the screen, between the preset
+ * you just changed and the scenes you are about to press — prime thumb space
+ * for two controls you use between songs rather than inside one. (Tap did not
+ * exist at all: forgefx.js has carried tapTempo() the whole time with nothing
+ * calling it.)
+ *
+ * Sticky, not fixed. Fixed would float over the last row of effects and, on
+ * iOS, fight the URL bar for the same strip of glass. Sticky keeps its place
+ * in the layout — nothing is ever underneath it — and still holds the bottom
+ * of the screen while the page scrolls at the larger sizes.
+ */
+.gig-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: var(--s-2);
-  margin-top: var(--s-4);
+  margin-top: var(--s-3);
+  padding: var(--s-2) 0 max(var(--s-2), env(safe-area-inset-bottom, 0px));
+  /* Opaque: the effects scroll underneath it. */
+  background: var(--chassis);
+  border-top: 1px solid var(--rule);
 }
 
-button.gig-mode {
-  min-height: 48px;
-  padding: var(--s-3);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-1);
-  background: var(--panel);
-  font-family: var(--display);
+button.gig-bar-btn {
+  min-height: 52px;
+  padding: var(--s-2);
   font-size: var(--f-3);
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+  background: var(--panel);
   color: var(--silk-dim);
 }
 
-/* Lit, not merely outlined: on a dark stage the difference between a mode that
-   is on and one that is off has to survive being glanced at. */
-button.gig-mode.on {
-  border-color: var(--live);
-  color: var(--live);
-  background: var(--live-halo);
+button.gig-bar-btn.on {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--on-signal);
 }
+
+button.gig-bar-btn:disabled {
+  opacity: 0.5;
+}
+
 
 /* Everything scaled for a glance from standing height: the note fills the
    panel, the needle bar is thick enough to read at arm's length in the dark. */
@@ -7371,13 +7451,13 @@ button.view-tab {
   min-height: 44px;
 }
 
-.gig[data-compact] .gig-modes {
+.gig[data-compact] .gig-bar {
   margin-top: var(--s-2);
 }
 
-.gig[data-compact] button.gig-mode {
+.gig[data-compact] button.gig-bar-btn {
   min-height: 44px;
-  padding: var(--s-2);
+  padding: var(--s-1) var(--s-2);
 }
 
 .gig[data-compact] .gig-scenes {

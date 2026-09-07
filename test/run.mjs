@@ -2484,18 +2484,34 @@ test('the stage screen is sized by whoever is holding it', () => {
    * fit at it, and two scenes waste the screen at it. Which you have changes
    * with the preset, so it is a setting.
    *
-   * The part that matters most is the default. This control changes the thing
-   * you reach for mid-song, so a player who never touches it must see exactly
-   * what they saw before it existed -- 62px tiles in 110px columns, the values
-   * the stylesheet shipped.
+   * The default used to be "the screen exactly as it shipped" -- 62px tiles in
+   * 110px columns -- which was right while this control only resized what was
+   * already there. It now also carries the LAYOUT he picked from a screenshot:
+   * scenes two across in colour, effects four across in three letters. The
+   * pixel figures are unchanged; the column counts are the new part, and they
+   * are what a floor could never express, since a floor says "at least this
+   * wide" and lets the viewport pick the rest.
    */
   const { SIZES, DEFAULT_SIZE, clampSize, sizeVars, loadSize, saveSize } = gigSize
 
   assert.deepEqual(sizeVars(DEFAULT_SIZE), {
     '--gig-tile': '62px',
     '--gig-col': '110px',
-    '--gig-col-block': '130px'
+    '--gig-col-block': '130px',
+    '--gig-scene-cols': '2',
+    '--gig-fx-cols': '4'
   }, 'the default step no longer reproduces the screen as it shipped')
+
+  // The ladder only ever gets roomier. A step that put MORE on a row than the
+  // one below it would make the minus button add clutter.
+  for (let i = 1; i < SIZES.length; i += 1) {
+    assert.ok(SIZES[i].scenes <= SIZES[i - 1].scenes, `step ${i} fits more scenes per row than step ${i - 1}`)
+    assert.ok(SIZES[i].fx <= SIZES[i - 1].fx, `step ${i} fits more effects per row than step ${i - 1}`)
+    assert.ok(SIZES[i].tile > SIZES[i - 1].tile, `step ${i} is not taller than step ${i - 1}`)
+  }
+  // Smallest is the one that has to hold a whole rig, so it is the widest row.
+  assert.equal(SIZES[0].scenes, 4)
+  assert.equal(SIZES[0].fx, 4)
 
   // Bigger is bigger and smaller is smaller, the whole way up.
   for (let i = 1; i < SIZES.length; i++) {

@@ -3249,6 +3249,47 @@ export function run(test) {
     assert.match(list, /if \(needle[^)]*\) return/, 'centring fights the filter being typed')
   })
 
+  test('the stage screen is the layout he picked, not the one it grew into', () => {
+    /*
+     * From a screenshot, with "like this": scenes two across in colour, the
+     * effects four across in three letters, tuner and tap in a bar along the
+     * bottom, and the size control beside the preset name.
+     *
+     * Each of those replaces something that had drifted. The tuner had a
+     * full-width row in the MIDDLE of the screen — prime thumb space for
+     * something you press between songs. Tap tempo had no button at all, while
+     * forgefx.js carried tapTempo() with nothing calling it. And the size
+     * control sat in the tab row, a different strip of the app from the screen
+     * it sizes.
+     */
+    const gig = readFileSync(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8')
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    const bare = (t) => t.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ' ')
+    const g = bare(gig)
+
+    // The bar, and both things in it.
+    const bar = g.slice(g.indexOf('className="gig-bar"'), g.indexOf('className="gig-bar"') + 900)
+    assert.ok(bar.length > 0, 'the tuner and tap bar is gone')
+    assert.match(bar, /Tuner/, 'the tuner left the bar')
+    assert.match(bar, /Tap/, 'tap tempo left the bar')
+    assert.ok(!/className="gig-modes"/.test(g), 'the tuner is back in a row of its own mid-screen')
+    assert.match(g, /tapTempo\(\)/, 'nothing calls tapTempo, so the button does nothing')
+
+    // The size control moved to the screen it sizes, and left the tab row.
+    const preset = g.slice(g.indexOf('className="gig-preset"'), g.indexOf('className="gig-signal"'))
+    assert.match(preset, /className="gig-size"/, 'the size control is not beside the preset name')
+    assert.match(preset, /gig-size-label/, 'the step name is gone, so the control has no readout')
+    assert.ok(
+      !/className="gig-size"/.test(bare(app)),
+      'the size control is still drawn in the tab row as well — two of them'
+    )
+
+    // A scene carries its own colour; an effect carries both its names.
+    assert.match(g, /--scene-fill/, 'scenes are back to eight identical panels')
+    assert.match(g, /shortBlock\(block\)/, 'the effect tiles lost their three-letter name')
+    assert.match(g, /gig-block-full/, 'the full effect name is gone, so nothing reads it aloud')
+  })
+
   test('the range jumps carry you there without loading anything', () => {
     /*
      * 512 rows is about forty screens, and opening at the one you are on does

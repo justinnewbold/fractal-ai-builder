@@ -619,17 +619,36 @@ export function run(test) {
      * actually protecting is that a scene and a block never drift apart in
      * size — so it checks that, and that the figure comes from --gig-tile.
      */
-    const phone = code.slice(code.indexOf('@media (max-width: 620px) {\n  .gig-blocks {'))
+    /* The 620px block that carries the two grids — there is more than one
+       620px block in this file, and balanced() is here for exactly this. */
+    const at = code.lastIndexOf(
+      '@media (max-width: 620px) {',
+      code.indexOf('.gig-scenes {\n    grid-template-columns')
+    )
+    const phone = balanced(code, at)
     assert.match(
-      phone.slice(0, 700),
+      phone,
       /button\.gig-block,\s*\n\s*button\.gig-scene \{\s*min-height: var\(--gig-tile/,
       'on a phone the scenes and the blocks are sized apart again, or sized past the control'
     )
-    assert.match(
-      phone.slice(0, 400),
-      /grid-template-columns: repeat\(auto-fit, minmax\(var\(--gig-col-block/,
-      'the phone block grid hard-codes its column width again, so the size control cannot reach it'
-    )
+    /*
+     * And the COLUMN COUNT comes from the control too.
+     *
+     * A pixel floor says "at least this wide" and lets the viewport pick how
+     * many fit, which is why the default kept coming out three scenes across
+     * when the layout he chose is two. minmax(0, 1fr) rather than 1fr because
+     * a grid item's default min-width is its min-content — the trap that had
+     * the effects stuck three to a row no matter what the floor said.
+     */
+    for (const [grid, v] of [['.gig-scenes', '--gig-scene-cols'], ['.gig-blocks', '--gig-fx-cols']]) {
+      const rule = phone.slice(phone.indexOf(grid + ' {'), phone.indexOf('}', phone.indexOf(grid + ' {')))
+      assert.match(
+        rule,
+        new RegExp(`grid-template-columns: repeat\\(var\\(${v}`),
+        `${grid} on a phone no longer takes its column count from the size control`
+      )
+      assert.match(rule, /minmax\(0, 1fr\)/, `${grid} lets its content push a column wider than its share`)
+    }
     assert.match(rule('.gig-block-name'), /font-size: var\(--f-4\)/, 'the block name is small again')
     assert.match(rule('button.gig-scene.named .gig-scene-name'), /font-size: var\(--f-4\)/, 'the scene name is small again')
     assert.match(rule('.gig-block-state'), /font-size: var\(--f-2\)/)
