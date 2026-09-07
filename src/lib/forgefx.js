@@ -548,9 +548,25 @@ export async function loadPresetBytes(bytes) {
   return parsed
 }
 
-/** Live per-block output meters, for showing where signal actually is. */
-export const liveMeters = () =>
-  mock ? tick().then(() => mock.meters()) : request('/preset/monitors/live')
+/**
+ * Live block meters, for showing where signal actually is.
+ *
+ * ASK FOR ONE BLOCK. The host reads the monitors of whichever blocks you name,
+ * and naming none means all of them — which it can only do by fetching the
+ * whole grid first. ForgeFX says what that costs, in gen3.ts liveMonitors():
+ * grid()'s cache lasts 500ms, so an all-blocks call on a 500ms tick fires "a
+ * full ~24KB preset dump on every tick", serialised in front of every other
+ * read on a port that handles one request at a time. Its author called the
+ * all-blocks form "(rare)". A screen that polls it is not rare.
+ *
+ * The unit is doing that work while it is also making sound, which is what a
+ * player hears: the audio cutting out for as long as the app is open, and
+ * stopping the moment it is closed.
+ */
+export const liveMeters = (effectId) =>
+  mock
+    ? tick().then(() => mock.meters())
+    : request(`/preset/monitors/live${Number.isInteger(effectId) ? `?eid=${effectId}` : ''}`)
 
 
 /** Read one parameter's current value, for confirming a write landed. */

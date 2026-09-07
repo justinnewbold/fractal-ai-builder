@@ -154,21 +154,45 @@ export default function Gig({ preset, device, capabilities, size, onError, onCha
   }, [preset])
 
   /*
-   * The signal bar, at a cadence the connection can afford.
+   * The signal bar, at a cadence the connection can afford — and asking for
+   * ONE block, not all of them.
    *
-   * Twice a second is nothing over localhost. Over the relay it is a broadcast
-   * round trip every 500ms competing for the same serial port as the reads that
-   * actually matter — the block list on an AM4 is a full preset dump, and a
-   * meter poll in front of it is why that read was timing out. Meters are a
-   * nicety; the chain is the screen.
+   * This asked for every block's monitors twice a second. The host can only
+   * answer that by fetching the whole grid first, and its own note in
+   * gen3.ts liveMonitors() says what that costs: grid()'s cache lasts 500ms,
+   * so an all-blocks call on a 500ms tick fires "a full ~24KB preset dump on
+   * every tick", serialised ahead of every other read on a port that takes one
+   * request at a time. That author called the all-blocks form "(rare)". This
+   * screen made it the resting state, and on a phone this screen is the app.
+   *
+   * The unit was doing all of that while also making sound — reported as the
+   * audio cutting out whenever the app was open and stopping the moment it was
+   * closed.
+   *
+   * One block is all this bar ever needed. It draws a single number, the peak,
+   * and the output block is where the signal leaving the unit actually is. If
+   * the chain has not arrived yet there is nothing to ask about, and asking
+   * anyway is what fetched the grid.
    */
+  const meterEid = useMemo(
+    () => allBlocks.find((b) => b.slug === 'output')?.effectId ?? null,
+    [allBlocks]
+  )
+
   useEffect(() => {
+    // Hidden at the smallest size, and a bar nobody can see is not worth a
+    // round trip to the unit — let alone one every half second, on the size
+    // step whose whole reason to exist is a rig that has to fit.
+    if (meterEid === null || size === 0) {
+      setMeters([])
+      return undefined
+    }
     let stop = false
     const tick = async () => {
       const remote = remoteActive()
       if (!(typeof document !== 'undefined' && document.hidden)) {
         try {
-          const data = await liveMeters()
+          const data = await liveMeters(meterEid)
           if (!stop) setMeters(Array.isArray(data) ? data : data?.blocks || [])
         } catch {
           /* meters are a nicety here, not worth surfacing an error over */
@@ -180,7 +204,7 @@ export default function Gig({ preset, device, capabilities, size, onError, onCha
     return () => {
       stop = true
     }
-  }, [])
+  }, [meterEid, size])
 
   /**
    * The tuner, on this screen, where tuning actually happens.
