@@ -4541,27 +4541,38 @@ test('a heartbeat keeps the long clock, and does not start the short one', async
    * hard is exactly the case that needs the LONGER clock, and treating a
    * keepalive as an answer would halve the wait instead.
    */
+  /*
+   * Its own budget, and a roomy one, because this test is real wall-clock
+   * timers rather than fake ones. On the shared 60ms budget the beats were
+   * scheduled 50ms apart — ten milliseconds of headroom, three times in a row —
+   * and a macOS runner under load slipped past it: one beat arrived late, the
+   * stream was called dead, and it retried through a connection that was alive.
+   *
+   * A hundred milliseconds between beats against a 300ms budget says the same
+   * thing with two hundred to spare. What is being proved is unchanged and
+   * still cannot pass by accident: 400ms of silence separates the hello from
+   * the answer, so without the beats extending it this aborts.
+   */
+  const patient = { stallMs: 300, firstMs: 300, capMs: 2000 }
   const f = scheduledFetch([
     {
       steps: [
-        { at: 10, chunk: OPEN },
-        { at: 50, chunk: WAITING(50) },
-        { at: 100, chunk: WAITING(100) },
-        { at: 150, chunk: WAITING(150) },
-        { at: 200, chunk: DONE }
+        { at: 20, chunk: OPEN },
+        { at: 120, chunk: WAITING(120) },
+        { at: 220, chunk: WAITING(220) },
+        { at: 320, chunk: WAITING(320) },
+        { at: 420, chunk: DONE }
       ]
     }
   ])
   globalThis.fetch = f.fetch
   const events = []
-  // Every gap here is under the 60ms budget only because the beats land in
-  // between: without them, 200ms of silence would abort at 60.
-  const spec = await streamSpec({}, { timing, onEvent: (e) => events.push(e) })
+  const spec = await streamSpec({}, { timing: patient, onEvent: (e) => events.push(e) })
   assert.deepEqual(spec, { blocks: [] })
   assert.equal(f.calls(), 1, 'it gave up and retried through a live connection')
   const beats = events.filter((e) => e.kind === 'waiting')
   assert.equal(beats.length, 3)
-  assert.equal(beats[2].thinkingMs, 150, 'the wait is not carried to the screen')
+  assert.equal(beats[2].thinkingMs, 320, 'the wait is not carried to the screen')
 })
 
 test('a heartbeat is not mistaken for the model answering', async () => {
