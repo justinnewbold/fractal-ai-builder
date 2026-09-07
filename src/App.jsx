@@ -3647,38 +3647,6 @@ export default function App() {
               {label}
             </button>
           ))}
-          {/*
-            The size of the buttons on Play, in the row that already exists.
-
-            It had a line of its own above the scenes, which is a whole row of
-            a stage screen spent on something pressed while setting up. The tab
-            row carries one word on a phone now, so the space was already there
-            — and being off to the right of it keeps it away from the thumb
-            going for a scene, which is why it was never put beside them.
-          */}
-          {onPlay ? (
-            <div className="gig-size" role="group" aria-label="Button size">
-              <span className="gig-size-label">{SIZES[size].name}</span>
-              <button
-                type="button"
-                className="gig-size-step"
-                onClick={() => resize(-1)}
-                disabled={size <= 0}
-                aria-label="Smaller buttons, fit more on screen"
-              >
-                &minus;
-              </button>
-              <button
-                type="button"
-                className="gig-size-step"
-                onClick={() => resize(1)}
-                disabled={size >= SIZES.length - 1}
-                aria-label="Bigger buttons, fit less on screen"
-              >
-                +
-              </button>
-            </div>
-          ) : null}
         </nav>
       ) : null}
 
@@ -3747,6 +3715,7 @@ export default function App() {
           device={device}
           capabilities={device?.capabilities}
           size={size}
+          onSize={(n) => resize(n - size)}
           onError={setError}
           onChanged={read}
           onPickPreset={() => setPresetMenu(true)}

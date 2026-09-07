@@ -21,16 +21,27 @@
  * `tile` is the button's min-height; `col` the grid's column floor, which is
  * what actually decides how many land on a row.
  *
- * STEP 1 IS TODAY'S SCREEN, exactly — 62px tiles in 110px columns. A player
- * who never touches this sees what they have always seen, which is the only
- * honest default for a control that changes the thing you reach for mid-song.
+ * STEP 1 IS THE DEFAULT, and it is now the layout he chose from a screenshot:
+ * scenes two across in colour, effects four across in three letters. It was
+ * "today's screen, exactly" before that, which is the right instinct for a
+ * control that changes what you reach for mid-song — but the whole point of
+ * this change is that the default look moved.
+ *
+ * `scenes` and `fx` are how many land on a ROW ON A PHONE, which is the thing
+ * the layout he asked for is actually about: scenes two across in colour, the
+ * effects four across underneath in three letters. A pixel floor could not say
+ * that — it says "at least this wide" and lets the viewport decide the rest,
+ * which is why the default came out three across and never two.
+ *
+ * Phone only. On a desktop the grids stay on the pixel floors and auto-fit,
+ * because two scene buttons across 1200px is not a design, it is a mistake.
  */
 export const SIZES = [
-  { name: 'Smallest', tile: 48, col: 88 },
-  { name: 'Small', tile: 62, col: 110 },
-  { name: 'Medium', tile: 78, col: 132 },
-  { name: 'Large', tile: 96, col: 158 },
-  { name: 'Largest', tile: 120, col: 190 }
+  { name: 'Smallest', tile: 48, col: 88, scenes: 4, fx: 4 },
+  { name: 'Small', tile: 62, col: 110, scenes: 2, fx: 4 },
+  { name: 'Medium', tile: 78, col: 132, scenes: 2, fx: 3 },
+  { name: 'Large', tile: 96, col: 158, scenes: 2, fx: 2 },
+  { name: 'Largest', tile: 120, col: 190, scenes: 1, fx: 1 }
 ]
 
 export const DEFAULT_SIZE = 1
@@ -67,7 +78,9 @@ export const sizeVars = (n) => {
      * name inside is clipped to one line at this size, so the width no longer
      * has to hold a whole name; it holds a state and a channel.
      */
-    '--gig-col-block': `${s.col + (i === 0 ? 4 : 20)}px`
+    '--gig-col-block': `${s.col + (i === 0 ? 4 : 20)}px`,
+    '--gig-scene-cols': String(s.scenes),
+    '--gig-fx-cols': String(s.fx)
   }
 }
 

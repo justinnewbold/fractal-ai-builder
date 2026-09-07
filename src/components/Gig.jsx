@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { selectPreset, liveMeters, setChannel, setMetersWanted } from '../lib/forgefx'
+import { selectPreset, liveMeters, setChannel, setMetersWanted, tapTempo } from '../lib/forgefx'
 import {
   useDevice,
   refreshBlocks as reReadChain,
@@ -12,12 +12,14 @@ import {
 import { remoteActive } from '../lib/remote'
 import { EXCLUDED_BLOCKS } from '../lib/guardrails'
 import { blockColor } from '../lib/blockColors'
+import { sceneColor } from '../lib/sceneColors'
+import { shortBlock } from '../lib/shortName'
 import { presetLabel } from '../lib/presetName'
 import { tick as haptic } from '../lib/feedback'
 import { useLongPress } from '../lib/longPress'
 import { useDismiss } from '../lib/dismiss'
 import { Tuner } from './Console'
-import { sizeVars } from '../lib/gigSize'
+import { sizeVars, SIZES } from '../lib/gigSize'
 
 /**
  * The stand, not the bench.
@@ -37,7 +39,7 @@ const ofBlocks = (s) => s.blocks
 const ofTunerOn = (s) => s.tunerOn
 const ofTuning = (s) => s.tuning
 
-export default function Gig({ preset, device, capabilities, size, onError, onChanged, onPickPreset }) {
+export default function Gig({ preset, device, capabilities, size, onSize, onError, onChanged, onPickPreset }) {
   /*
    * How big the buttons are is decided in the tab bar, a row this screen does
    * not own, so the step arrives as a prop. Only the CSS variables are applied
@@ -307,6 +309,29 @@ export default function Gig({ preset, device, capabilities, size, onError, onCha
     }
   }
 
+  /*
+   * Tap tempo, which had no button anywhere.
+   *
+   * forgefx.js has carried tapTempo() the whole time and nothing called it —
+   * so the one control on this screen a player uses WHILE PLAYING, in time,
+   * was the one control that did not exist. It sits in the bar at the bottom
+   * next to the tuner: the two things you reach for between songs rather than
+   * inside one, and the two that were competing with the scenes for the
+   * middle of the screen.
+   */
+  const [tapping, setTapping] = useState(false)
+  const tap = async () => {
+    setTapping(true)
+    try {
+      await tapTempo()
+      haptic()
+    } catch (err) {
+      onError(err.message)
+    } finally {
+      setTapping(false)
+    }
+  }
+
   const step = async (delta) => {
     const next = (preset?.number ?? 0) + delta
     if (next < 0) return
@@ -336,7 +361,14 @@ export default function Gig({ preset, device, capabilities, size, onError, onCha
      * Smallest is the setting for someone who wants the whole rig on one
      * screen, so it spends the screen on the rig.
      */
-    <div className="gig" data-compact={size === 0 ? 'yes' : undefined} style={sizeVars(size)}>
+    <div
+      className="gig"
+      data-compact={size === 0 ? 'yes' : undefined}
+      /* Three effects to a row still fits a name; four does not. The switch to
+         three letters rides the column count rather than a width guess. */
+      data-fx-abbr={SIZES[size].fx >= 4 ? 'yes' : undefined}
+      style={sizeVars(size)}
+    >
       {/*
         The name, big, and only the name.
         The unit and the slot are in the bar above this, at every moment, on
@@ -364,6 +396,38 @@ export default function Gig({ preset, device, capabilities, size, onError, onCha
             ⌄
           </span>
         </button>
+        {/*
+          The size control, beside the thing it sizes.
+          It lived at the far right of the tab row, which is a different strip
+          of the app from the screen it changes, and on a phone that row now
+          carries one word. Here it reads as what it is: this screen, bigger or
+          smaller. Same state, same storage — App still owns the step, because
+          the first paint has to know it before this component mounts.
+        */}
+        {onSize ? (
+          <div className="gig-size" role="group" aria-label="Button size">
+            {/* The step's name stays. He read it off the screen to tell me
+                "this says it's the smallest" — a control with five positions
+                and no readout is one you have to press to interrogate. */}
+            <span className="gig-size-label">{SIZES[size].name}</span>
+            <button
+              className="gig-size-step"
+              onClick={() => onSize(size - 1)}
+              disabled={size <= 0}
+              aria-label="Smaller buttons"
+            >
+              −
+            </button>
+            <button
+              className="gig-size-step"
+              onClick={() => onSize(size + 1)}
+              disabled={size >= SIZES.length - 1}
+              aria-label="Bigger buttons"
+            >
+              +
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div className="gig-signal" aria-label="Signal level">
@@ -391,17 +455,6 @@ export default function Gig({ preset, device, capabilities, size, onError, onCha
         doesn't get a button that can only disappoint. Absent means unknown —
         an older ForgeFX predating the flag — and unknown still gets to try.
       */}
-      <div className="gig-modes">
-        {capabilities?.tuner !== false ? (
-          <button
-            className={`gig-mode ${tunerOn ? 'on' : ''}`}
-            onClick={toggleTuner}
-            aria-pressed={tunerOn}
-          >
-            Tuner
-          </button>
-        ) : null}
-      </div>
 
       {tunerOn ? (
         <div className="gig-tuner">
@@ -472,6 +525,9 @@ export default function Gig({ preset, device, capabilities, size, onError, onCha
               className={`gig-scene ${i === scene ? 'current' : ''} ${
                 names[i] ? 'named' : ''
               }`}
+              /* Identity, not state. See sceneColors: the fill says which
+                 scene, the edge-against-fill says whether it is the live one. */
+              style={{ '--scene-fill': sceneColor(i).fill, '--scene-ink': sceneColor(i).ink }}
               /* The word "Scene" belongs in the label even though it is left
                  off the face, for the same reason the group is named: a bare
                  "3" is not a control anyone can identify. */
@@ -555,6 +611,33 @@ export default function Gig({ preset, device, capabilities, size, onError, onCha
           ))}
         </div>
       ) : null}
+
+      {/*
+        The bar along the bottom: the two things you press between songs.
+        Sticky rather than fixed. Fixed would float over the last row of
+        effects and, on iOS, fight the URL bar for the same strip of glass;
+        sticky keeps its place in the layout — so nothing is ever underneath
+        it — and still holds the bottom of the screen while the page scrolls at
+        the larger sizes. At Smallest the page fits, and it simply sits where a
+        bar should.
+
+        Tuner only where the unit has one. Absent means unknown, an older host
+        predating the flag, and unknown still gets to try.
+      */}
+      <div className="gig-bar" role="group" aria-label="Tuner and tempo">
+        {capabilities?.tuner !== false ? (
+          <button
+            className={`gig-bar-btn ${tunerOn ? 'on' : ''}`}
+            onClick={toggleTuner}
+            aria-pressed={tunerOn}
+          >
+            Tuner
+          </button>
+        ) : null}
+        <button className="gig-bar-btn" onClick={tap} disabled={tapping} aria-label="Tap tempo">
+          Tap
+        </button>
+      </div>
     </div>
   )
 }
@@ -621,7 +704,21 @@ function BlockTile({ block, channels, busy, onToggle, onError, onChanged }) {
         aria-pressed={!block.bypassed}
         {...hold}
       >
-        <span className="gig-block-name">{block.name || block.slug}</span>
+        {/*
+          Two names, one shown at a time by CSS.
+
+          Four effects to a row leaves about ninety pixels a tile, and a whole
+          name in ninety pixels is an ellipsis. The abbreviation is what a
+          player reads at that width; the full name is what a mouse hovers and
+          what a screen reader says, so both are here and neither is faked with
+          a character count in JavaScript.
+        */}
+        <span className="gig-block-name" title={block.name || block.slug}>
+          <span className="gig-block-full">{block.name || block.slug}</span>
+          <span className="gig-block-abbr mono" aria-hidden="true">
+            {shortBlock(block)}
+          </span>
+        </span>
         <span className="gig-block-state">
           {block.bypassed ? 'Off' : 'On'}
           {/*
