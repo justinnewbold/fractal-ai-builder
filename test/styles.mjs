@@ -608,12 +608,91 @@ export function run(test) {
     const rule = (sel) => code.slice(code.indexOf(sel + ' {'), code.indexOf('}', code.indexOf(sel + ' {')))
     const height = (text) => text.match(/min-height: (\d+)px/)?.[1]
     assert.equal(height(rule('button.gig-scene')), height(rule('button.gig-block')), 'scene tiles and effect blocks differ in height')
+    /*
+     * On a phone the two are still one rule, and both take their size from the
+     * control rather than from a number written here.
+     *
+     * This used to pin the literal `min-height: 66px`, which pinned the bug:
+     * that block hard-coded a 108px column floor and a 66px tile, so the − / +
+     * buttons were overruled on the one screen they exist for and "Smallest"
+     * was three blocks to a row whatever a player chose. What the test is
+     * actually protecting is that a scene and a block never drift apart in
+     * size — so it checks that, and that the figure comes from --gig-tile.
+     */
     const phone = code.slice(code.indexOf('@media (max-width: 620px) {\n  .gig-blocks {'))
-    assert.match(phone.slice(0, 400), /button\.gig-block,\s*\n\s*button\.gig-scene \{\s*min-height: 66px/, 'on a phone the scenes and the blocks are sized apart again')
+    assert.match(
+      phone.slice(0, 700),
+      /button\.gig-block,\s*\n\s*button\.gig-scene \{\s*min-height: var\(--gig-tile/,
+      'on a phone the scenes and the blocks are sized apart again, or sized past the control'
+    )
+    assert.match(
+      phone.slice(0, 400),
+      /grid-template-columns: repeat\(auto-fit, minmax\(var\(--gig-col-block/,
+      'the phone block grid hard-codes its column width again, so the size control cannot reach it'
+    )
     assert.match(rule('.gig-block-name'), /font-size: var\(--f-4\)/, 'the block name is small again')
     assert.match(rule('button.gig-scene.named .gig-scene-name'), /font-size: var\(--f-4\)/, 'the scene name is small again')
     assert.match(rule('.gig-block-state'), /font-size: var\(--f-2\)/)
     assert.match(rule('.topbar-name'), /font-size: var\(--f-3\)/, 'the preset name in the bar is a headline again')
+  })
+
+  test('at Smallest a tile is a fixed box, so a long scene name cannot push the blocks off the screen', () => {
+    /*
+     * "This says it's the smallest. It's still too big. All buttons need to be
+     * able to fit on screen at the smallest."
+     *
+     * Two things were letting the screen grow past what the control asked for.
+     *
+     * `min-height` is a floor, not a height, so a scene called WET CRUNCH FUNK
+     * wrapped to three lines and stood three times as tall as one called LEAD.
+     * The height of the Play screen therefore depended on how a player had
+     * named their scenes — which is why Smallest fitted the demo, whose scenes
+     * are RHYTHM / LEAD / CLEAN, and did not fit his rig.
+     *
+     * And a grid item's default `min-width: auto` is its min-content width, so
+     * a track declared `minmax(92px, 1fr)` still came out 130px because the
+     * longest block name said so. The column floor was overruled by the text
+     * inside it.
+     *
+     * Both are properties of the CSS, not of a screenshot, so both are pinned
+     * here. Measured alongside: 8 scenes and 14 blocks at 440x790 with no
+     * scroll.
+     */
+    const rule = (sel) => code.slice(code.indexOf(sel + ' {'), code.indexOf('}', code.indexOf(sel + ' {')))
+
+    for (const sel of ['.gig[data-compact] button.gig-scene', '.gig[data-compact] button.gig-block']) {
+      const r = rule(sel)
+      assert.match(r, /\n\s*height: \d+px/, `${sel} is a floor again rather than a height`)
+      assert.match(r, /min-height: 0/, `${sel} keeps a floor that can beat its own height`)
+      assert.match(r, /overflow: hidden/, `${sel} lets its contents out of the box again`)
+    }
+
+    // The names are clamped, so neither can spend a line it has not got.
+    assert.match(
+      rule('.gig[data-compact] .gig-scene-name'),
+      /-webkit-line-clamp: 2/,
+      'a scene name wraps as far as it likes again'
+    )
+    assert.match(
+      rule('.gig[data-compact] .gig-block-name'),
+      /text-overflow: ellipsis[\s\S]*white-space: nowrap/,
+      'a block name wraps again, so a row of blocks is as tall as its longest name'
+    )
+
+    // And the tiles can be as narrow as they were asked to be.
+    const narrow = code.slice(code.indexOf('.gig[data-compact] .gig-block-cell,'))
+    assert.match(narrow.slice(0, 200), /min-width: 0/, 'the tiles can push their own columns wider again')
+
+    // A phone has no floating Ask button, so it keeps none of its footprint —
+    // that was 80px at the bottom of the screen with the least room.
+    // Anchored on the rule that hides the button, not on the width — there is
+    // an earlier 700px block in this file and it is about something else.
+    const noFab = code.slice(code.indexOf('.ask-anywhere {\n    display: none;'))
+    assert.match(
+      noFab.slice(0, 1400),
+      /\.shell \{\s*padding-bottom: max\(16px, env\(safe-area-inset-bottom/,
+      'the phone keeps 80px clear under a button it does not have'
+    )
   })
 
   test('the search row the arrows are on is visible', () => {

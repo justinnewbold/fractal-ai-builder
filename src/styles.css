@@ -5184,14 +5184,26 @@ button.gig-block:disabled {
   opacity: 0.4;
 }
 
+/*
+ * The phone used to opt out of the size control, which is where it is needed.
+ *
+ * This block hard-coded a 108px column floor and a 66px tile, overriding the
+ * variables the − / + buttons set. So on a phone every step of that control
+ * did far less than it said, and "Smallest" was three blocks to a row in 130px
+ * columns whatever a player chose — the FM3 screenshot that started this was
+ * exactly that. Predating the control, and never revisited when it landed.
+ *
+ * The numbers stay as the fallbacks, so a browser that somehow has no variables
+ * set still gets the phone layout this was written for.
+ */
 @media (max-width: 620px) {
   .gig-blocks {
-    grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(var(--gig-col-block, 108px), 1fr));
   }
 
   button.gig-block,
   button.gig-scene {
-    min-height: 66px;
+    min-height: var(--gig-tile, 66px);
   }
 }
 
@@ -6684,6 +6696,23 @@ button.topbar-preset.open .topbar-caret {
   .ask-anywhere {
     display: none;
   }
+
+  /*
+   * And with it gone, so is the 80px kept clear underneath it.
+   *
+   * That padding is the floating button's footprint — 16px of inset, 48px of
+   * button, 16px of air — held at the bottom of the page so the last row of
+   * controls has somewhere to scroll out from under it. On a phone there is no
+   * button there and never has been, so it was eighty pixels of nothing at the
+   * bottom of the one screen with the least room: a whole row of blocks, on
+   * the size step whose reason to exist is fitting them all.
+   *
+   * The home-indicator inset stays, and a floor under it so the last row is
+   * not flush against the edge of the glass.
+   */
+  .shell {
+    padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  }
 }
 
 /* ---------- the introduction ---------- */
@@ -7359,17 +7388,75 @@ button.view-tab {
   margin-top: var(--s-3);
 }
 
-/* Names that wrap to three lines are what makes a scene tile tall, and at this
-   size the number above them is an index rather than the thing being read. */
+/*
+ * At this size a tile is a fixed box, and the name lives inside it.
+ *
+ * This is the thing that was still wrong. Trimming the chrome bought room and
+ * then the tiles spent it: `min-height` is a floor, not a height, so a scene
+ * called WET CRUNCH FUNK wrapped to three lines and stood three times as tall
+ * as one called LEAD. The screen's height therefore depended on how a player
+ * had named their scenes, which is why "Smallest" fitted the demo and did not
+ * fit his rig.
+ *
+ * So the height is stated and the name is clamped to it. A name too long to
+ * fit is cut with an ellipsis rather than allowed to push the blocks off the
+ * bottom — on a dark stage the first line and the number are what identify a
+ * scene anyway, and the full name is one press away on the unit itself.
+ *
+ * Both boxes stay over the 44px touch floor.
+ */
 .gig[data-compact] button.gig-scene {
+  height: 56px;
+  min-height: 0;
   padding: var(--s-1);
   gap: 0;
+  overflow: hidden;
 }
 
 .gig[data-compact] .gig-scene-name {
   line-height: 1.15;
+  /* Two lines, then stop. -webkit-line-clamp is the only cross-browser way to
+     say that; it is understood by every engine this app runs in, Safari and
+     the Electron shell included. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-width: 0;
+  word-break: break-word;
 }
 
 .gig[data-compact] button.gig-block {
+  height: 52px;
+  min-height: 0;
   padding: var(--s-2);
+  overflow: hidden;
+}
+
+/* One line for a block. "REVERB 1" and "MULTITAP DELAY 2" have to cost the
+   same height or the grid goes ragged and the last row falls off the screen. */
+.gig[data-compact] .gig-block-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * And the tile has to be allowed to be as narrow as it was asked to be.
+ *
+ * A grid item's default `min-width: auto` is its MIN-CONTENT width, so a track
+ * declared `minmax(92px, 1fr)` still came out 130px wide because the longest
+ * block name in the preset said so. The column floor was being overruled by
+ * the text inside it: three blocks to a row instead of four, and a fourteen
+ * block preset five rows deep. Clipping the name (above) made that worse, not
+ * better — an unwrapped line has a wider min-content than a wrapped one.
+ *
+ * `min-width: 0` hands the decision back to the size setting, which is the
+ * whole point of the control. The ellipsis then does what it is there for.
+ */
+.gig[data-compact] .gig-block-cell,
+.gig[data-compact] button.gig-block,
+.gig[data-compact] button.gig-scene {
+  min-width: 0;
 }
