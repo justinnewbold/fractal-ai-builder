@@ -4098,6 +4098,7 @@ export default function App() {
           <Versions
             preset={preset}
             busy={busy}
+            deviceSlots={device?.capabilities?.presets?.count}
             onError={setError}
             onChanged={(summary) => {
               record('version', summary)

@@ -2578,6 +2578,70 @@ test('the quick jumps fit the unit that is plugged in', async () => {
   }
 })
 
+test('every unit the server can detect is addressed on its own terms', async () => {
+  /*
+   * Six units, one app. The shapes are not close to each other — 6x14 against
+   * 1x4, 512 slots against 104 against a count nobody has ever taken — and
+   * every one of them arrives as a capability payload rather than a branch in
+   * this code. That is the whole design, so this is the test that says the
+   * design holds rather than that one device works.
+   *
+   * The VP4 row is the one that matters most. It used to be handed the AM4's
+   * 104 locations and its A01..Z04 bank letters, purely because both units run
+   * a linear chain — see ForgeFX's driver capabilities. A null count has to
+   * stay null all the way through: no jumps, no bound to refuse a save
+   * against, and no bank letters on a unit that has no banks.
+   */
+  const { slotCount, slotLabel, slotOutside } = await import('../src/lib/slots.js')
+  const { jumpsFor } = await import('../src/lib/presetJumps.js')
+
+  const grid = (rows, cols, count) => ({
+    slotModel: 'grid',
+    grid: { rows, cols },
+    sceneCount: 8,
+    presets: { count, addressing: 'numeric' }
+  })
+
+  const units = {
+    'Axe-Fx III': grid(6, 14, 512),
+    FM3: grid(4, 12, 512),
+    FM9: grid(6, 14, 512),
+    'Axe-Fx II': grid(4, 12, 384),
+    AM4: { slotModel: 'linear', slotCount: 4, sceneCount: 4, presets: { count: 104, addressing: 'bankLetter' } },
+    VP4: { slotModel: 'linear', slotCount: 4, sceneCount: 4, presets: { count: null, addressing: 'numeric' } }
+  }
+
+  // The count each unit actually holds, taken from what it says rather than
+  // from the gen-3 number the app used to assume.
+  assert.equal(slotCount(units['Axe-Fx III']), 512)
+  assert.equal(slotCount(units.FM9), 512)
+  assert.equal(slotCount(units['Axe-Fx II']), 384)
+  assert.equal(slotCount(units.AM4), 104)
+  assert.equal(slotCount(units.VP4), null, 'a VP4 is being told how many presets it has')
+
+  // Banks only where there are banks. A gen-3 unit numbers its slots and has
+  // none; the AM4 shows A01..Z04 on its own display.
+  assert.equal(slotLabel(0, units.FM9.presets.addressing), '000')
+  assert.equal(slotLabel(103, units.AM4.presets.addressing), '103 Z04')
+  assert.equal(slotLabel(0, units.VP4.presets.addressing), '000', 'a VP4 is being given bank letters')
+
+  // The guard that stops a save being aimed at a slot the unit has not got.
+  for (const [name, caps] of Object.entries(units)) {
+    const count = slotCount(caps)
+    if (count === null) {
+      assert.equal(slotOutside(500, caps), false, `${name} refuses a slot on a count it never stated`)
+      continue
+    }
+    assert.equal(slotOutside(count - 1, caps), false, `${name} refuses its own last slot`)
+    assert.equal(slotOutside(count, caps), true, `${name} accepts one past its last slot`)
+  }
+
+  // And the jumps, per unit, from the same one rule.
+  assert.deepEqual(jumpsFor(slotCount(units.FM9)), [100, 200, 300, 400, 500])
+  assert.deepEqual(jumpsFor(slotCount(units.AM4)), [20, 40, 60, 80, 100])
+  assert.deepEqual(jumpsFor(slotCount(units.VP4) ?? 0), [], 'a VP4 gets jump buttons over a list of four')
+})
+
 test('recent presets and favourites, per unit', () => {
   /*
    * A 512-slot unit is forty screens of list. Range jumps get you to a
