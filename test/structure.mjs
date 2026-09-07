@@ -3220,12 +3220,18 @@ export function run(test) {
     assert.match(jump, /scrollTop/, 'the range jump no longer scrolls')
 
     // Offered against the unit's own size, so a smaller Fractal is not given
-    // buttons for slots it does not have.
+    // buttons for slots it does not have — and an AM4's 104 presets get
+    // twenties rather than one lonely hundred. The step lives in presetJumps.
     assert.match(
       list,
-      /\[100, 200, 300, 400, 500\]\.filter\(\(n\) => n < total\)/,
+      /const jumps = jumpsFor\(total\)/,
       'the jumps are a fixed list rather than what this unit actually holds'
     )
+
+    // They sit in the heading beside the word Presets, which is where he asked
+    // for them and a row closer to the thumb than under the filter box.
+    const head = list.slice(list.indexOf('panel-head'), list.indexOf('preset-filter'))
+    assert.match(head, /preset-jumps/, 'the jumps left the heading')
 
     // And the row knows its own number, so a jump never parses a label to
     // work out where it is going.

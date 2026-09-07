@@ -12,7 +12,7 @@ import { formatWhen } from '../lib/history'
  * how it was". Only the second can answer that, because only the second knows
  * what "it was" actually contained.
  */
-export function Versions({ preset, onError, onChanged, busy }) {
+export function Versions({ preset, onError, onChanged, busy, deviceSlots }) {
   const [versions, setVersions] = useState(null)
   const [scope, setScope] = useState('slot')
   const [confirming, setConfirming] = useState(null)
@@ -173,9 +173,16 @@ export function DeviceBackup({ onError, onChanged, busy }) {
           {running ? 'Reading all slots…' : 'Back up all slots'}
         </button>
       </div>
+      {/*
+        The unit's own count, not 512. That number is the gen-3 one — an AM4
+        holds 104 and an Axe-Fx II 384 — and a sentence that states it as a
+        fact is the app telling a player something about their hardware that
+        is not true. A unit that has never said falls back to "every slot",
+        which is accurate whatever the number turns out to be.
+      */}
       <p className="hint">
-        Reads all 512 slots down one serial port, so it takes a while. Worth doing once before you
-        let anything write in bulk.
+        Reads {deviceSlots ? `all ${deviceSlots} slots` : 'every slot'} down one serial port, so it
+        takes a while. Worth doing once before you let anything write in bulk.
       </p>
     </section>
   )

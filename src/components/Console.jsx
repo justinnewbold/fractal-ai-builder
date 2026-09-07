@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { blockColor } from '../lib/blockColors'
 import { useDismiss } from '../lib/dismiss'
 import { marksFor, toggleFavourite } from '../lib/presetMarks'
+import { jumpsFor } from '../lib/presetJumps'
 
 const SHORT = {
   wah: 'WAH',
@@ -236,11 +237,12 @@ export function PresetList({
    * not change what is coming out of the amp — the row underneath is still
    * chosen deliberately, this only carries you to it.
    *
-   * Offered against the unit's own size, so a smaller Fractal gets fewer of
-   * them and nothing offers a slot that isn't there.
+   * The step comes from the unit's own size rather than a list of hundreds
+   * written down here — an AM4 holds 104 presets, so hundreds would give it a
+   * single button and twenties give it five. See presetJumps.js.
    */
   const total = deviceSlots || slots.length
-  const jumps = [100, 200, 300, 400, 500].filter((n) => n < total)
+  const jumps = jumpsFor(total)
 
   const jumpTo = (n) => {
     const box = rows.current
@@ -293,8 +295,30 @@ export function PresetList({
 
   return (
     <div className="preset-panel">
+      {/*
+        The jumps ride in the heading, beside the word they belong to.
+
+        They were under the filter box, which is a row further from the thumb
+        and a row further from the title that says what they act on. Up here
+        they are the first thing in the panel after its name, which is the
+        order somebody opening a list of 512 wants them in.
+      */}
       <div className="panel-head">
         <p className="panel-title">Presets</p>
+        {jumps.length && !needle && view === 'all' ? (
+          <div className="preset-jumps" role="group" aria-label="Jump to a range">
+            {jumps.map((n) => (
+              <button
+                key={n}
+                className="preset-jump mono"
+                onClick={() => jumpTo(n)}
+                aria-label={`Jump to preset ${n}`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <button
           className="icon-btn"
           onClick={scanning ? onStop : onScan}
@@ -337,16 +361,6 @@ export function PresetList({
                 {label}
               </button>
             ))}
-        </div>
-      ) : null}
-
-      {jumps.length && !needle && view === 'all' ? (
-        <div className="preset-jumps" role="group" aria-label="Jump to a range">
-          {jumps.map((n) => (
-            <button key={n} className="preset-jump mono" onClick={() => jumpTo(n)} aria-label={`Jump to preset ${n}`}>
-              {n}
-            </button>
-          ))}
         </div>
       ) : null}
 

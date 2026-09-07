@@ -3074,16 +3074,27 @@ button.preset-star.on {
  * order somebody uses them in: narrow it, or skip to where you are going.
  * Mono, like every other number in this app that gets compared at a glance.
  */
+/*
+ * In the heading now, between the word Presets and the re-read button.
+ *
+ * The heading is a fixed-height row, so these size to their digits and take
+ * whatever is left in the middle rather than each claiming a fifth of the
+ * panel. `auto` margin on the left pushes the set away from the title and
+ * keeps it against the button it sits beside.
+ */
 .preset-jumps {
   display: flex;
-  gap: var(--s-2);
-  padding: 0 var(--s-3) var(--s-2) var(--s-3);
+  gap: var(--s-1);
+  /* The heading is space-between, so letting it place this leaves an equal gap
+     either side rather than one shoulder against the title and none by the
+     button it sits next to. */
+  padding: 0;
 }
 
 button.preset-jump {
-  flex: 1 1 0;
   min-height: 44px;
-  padding: 0;
+  min-width: 44px;
+  padding: 0 var(--s-1);
   border: 1px solid var(--rule);
   border-radius: var(--r-1);
   background: var(--panel);
