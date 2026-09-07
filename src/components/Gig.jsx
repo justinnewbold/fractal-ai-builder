@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { selectPreset, liveMeters, setChannel } from '../lib/forgefx'
+import { selectPreset, liveMeters, setChannel, setMetersWanted } from '../lib/forgefx'
 import {
   useDevice,
   refreshBlocks as reReadChain,
@@ -178,6 +178,26 @@ export default function Gig({ preset, device, capabilities, size, onError, onCha
     () => allBlocks.find((b) => b.slug === 'output')?.effectId ?? null,
     [allBlocks]
   )
+
+  /*
+   * And tell the HOST, which is the expensive half.
+   *
+   * Stopping this screen's own poll stops one request every 500ms. The host's
+   * telemetry supervisor is the other thing, and it does not watch this
+   * screen: it starts on its first event listener and runs four output-meter
+   * round trips every 100ms for as long as anything is subscribed — about
+   * forty SysEx transactions a second at a unit that is also making sound.
+   * Nothing here could reach it, so nothing did.
+   *
+   * Off, it keeps the front-panel scene and channel watches (a footswitch
+   * press still lands) and drops to two reads every 800ms.
+   */
+  useEffect(() => {
+    const wanted = meterEid !== null && size !== 0
+    setMetersWanted(wanted).catch(() => {
+      /* An older host without the route keeps the behaviour it already had. */
+    })
+  }, [meterEid, size])
 
   useEffect(() => {
     // Hidden at the smallest size, and a bar nobody can see is not worth a

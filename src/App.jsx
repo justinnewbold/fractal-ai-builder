@@ -95,7 +95,8 @@ import {
   forgetPresetName,
   noteSceneNames,
   readSceneNames,
-  currentDeviceSlug
+  currentDeviceSlug,
+  setTelemetryMode
 } from './lib/forgefx'
 import { savePreset, buildEntry, deletePreset, typicalMs, notOnAccount } from './lib/history'
 import { costOf } from './lib/cost'
@@ -2992,6 +2993,33 @@ export default function App() {
       document.removeEventListener('keydown', touch)
     }
   }, [])
+
+  /*
+   * Ask the Mac to poll the unit gently while a phone is the one watching.
+   *
+   * ForgeFX starts its telemetry supervisor as soon as anything subscribes to
+   * its event stream, and the relay bridge subscribing on this phone's behalf
+   * is enough. At the balanced default that is a 100ms tick of FOUR output
+   * meter round trips — about forty SysEx transactions a second at the unit's
+   * control processor, for as long as this screen is open. Reported as the
+   * sound cutting in and out whenever the app was open and stopping the moment
+   * it was closed.
+   *
+   * A phone cannot use that rate for anything. Its own meter read is on a
+   * 2000ms tick over the relay, so twenty of every twenty-one of those polls
+   * are thrown away before they reach a screen — and the one thing they draw
+   * is a peak bar. 'reduced' quarters the tick, which is still five times
+   * faster than the phone reads.
+   *
+   * Only over the relay. At the Mac the cable is short, the meters are drawn
+   * at full rate, and nothing here has been shown to cost that end anything.
+   */
+  useEffect(() => {
+    if (status !== 'live' || !remote || isDemo()) return
+    setTelemetryMode('reduced').catch(() => {
+      /* An older host without the route is not a problem worth a banner. */
+    })
+  }, [status, remote])
 
   /** Start the scan, or change its pace. Nothing to do once every slot is known. */
   const readNames = useCallback(

@@ -725,6 +725,23 @@ export function run(test) {
       'the signal bar polls at the smallest size, where it is not even drawn'
     )
 
+    /*
+     * And the HOST is told, which is the expensive half.
+     *
+     * Stopping this screen's own poll stops one request every 500ms. ForgeFX's
+     * telemetry supervisor does not watch this screen: it starts on its first
+     * event listener and runs four output-meter round trips every 100ms for as
+     * long as anything is subscribed — about forty SysEx transactions a second
+     * at a unit that is also making sound. A phone connecting supplies that
+     * listener through the relay, and closing the app removes it, which is the
+     * shape of what was reported in both directions.
+     */
+    assert.match(
+      gig,
+      /setMetersWanted\(/,
+      'nothing tells the host whether a meter is being drawn, so it polls four of them regardless'
+    )
+
     // And the block reaches the host as ?eid=, which is what makes it one read
     // rather than a grid fetch.
     const fx = files['lib/forgefx.js']
