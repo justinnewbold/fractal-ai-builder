@@ -284,7 +284,15 @@ export default function Gig({ preset, device, capabilities, size, onError, onCha
   const peak = meters.length ? Math.max(...meters.map((m) => m.norm ?? 0)) : 0
 
   return (
-    <div className="gig" style={sizeVars(size)}>
+    /*
+     * At the smallest step this is not just smaller tiles: the chrome above
+     * the grids gives way too. Measured on a 440x790 phone, that chrome was
+     * 441px — more than half the screen — before a single scene appeared, and
+     * the preset name inside it is already in the bar at the top of the app.
+     * Smallest is the setting for someone who wants the whole rig on one
+     * screen, so it spends the screen on the rig.
+     */
+    <div className="gig" data-compact={size === 0 ? 'yes' : undefined} style={sizeVars(size)}>
       {/*
         The name, big, and only the name.
         The unit and the slot are in the bar above this, at every moment, on

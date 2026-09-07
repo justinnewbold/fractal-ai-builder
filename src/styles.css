@@ -7283,3 +7283,82 @@ button.view-tab {
     font-size: var(--f-input);
   }
 }
+
+/*
+ * Smallest: the whole rig on one screen.
+ *
+ * The steps above this one resize the two grids and leave everything else
+ * alone, which is right for them. It is not right for the bottom step, whose
+ * whole reason to exist is a preset with eight scenes and nine blocks that
+ * does not otherwise fit. Measured on a 440x790 phone, the chrome above the
+ * scenes was 441px — more than half the screen gone before the first thing
+ * anybody came here to press.
+ *
+ * So the chrome gives way too. What goes is chosen by what is said twice or
+ * said big: the preset name is already in the bar at the top of the app, so
+ * here it is a line rather than a headline; the signal meter is a five-pixel
+ * strip carrying ten pixels of margin; and the gaps between rows were tuned
+ * for a screen with room to breathe.
+ *
+ * Nothing is removed. Every control on the screen at the other sizes is on
+ * the screen at this one, and nothing pressable drops below the 44px floor.
+ */
+.gig[data-compact] .gig-preset {
+  padding: var(--s-1) var(--s-3);
+}
+
+/* A line, not a headline. The bar at the top of the app has the same name at
+   a size you can read, and two of them is the single largest thing standing
+   between this preset and its own blocks. */
+.gig[data-compact] button.gig-name {
+  font-size: var(--f-5);
+  line-height: 1.2;
+}
+
+/* Five pixels of meter and ten of margin, for something the amber tiles
+   already tell you. */
+.gig[data-compact] .gig-signal {
+  display: none;
+}
+
+.gig[data-compact] .gig-nav {
+  margin-top: var(--s-2);
+}
+
+.gig[data-compact] .gig-nav button {
+  padding: var(--s-2);
+  font-size: var(--f-3);
+  min-height: 44px;
+}
+
+.gig[data-compact] .gig-modes {
+  margin-top: var(--s-2);
+}
+
+.gig[data-compact] button.gig-mode {
+  min-height: 44px;
+  padding: var(--s-2);
+}
+
+.gig[data-compact] .gig-scenes {
+  margin-top: var(--s-2);
+}
+
+.gig[data-compact] .gig-blocks {
+  margin-top: var(--s-3);
+}
+
+/* Names that wrap to three lines are what makes a scene tile tall, and at this
+   size the number above them is an index rather than the thing being read. */
+.gig[data-compact] button.gig-scene {
+  padding: var(--s-1);
+  gap: 0;
+}
+
+.gig[data-compact] .gig-scene-name {
+  line-height: 1.15;
+}
+
+.gig[data-compact] button.gig-block {
+  padding: var(--s-2);
+}
