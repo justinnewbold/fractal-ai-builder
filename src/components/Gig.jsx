@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { selectPreset, liveMeters, setChannel, setMetersWanted, tapTempo } from '../lib/forgefx'
+import { selectPreset, liveMeters, setChannel, setMetersWanted } from '../lib/forgefx'
 import {
   useDevice,
   refreshBlocks as reReadChain,
@@ -7,7 +7,9 @@ import {
   refreshSceneNames,
   writeScene,
   writeBypass,
-  writeTuner
+  writeTuner,
+  tapBeat,
+  refreshTempo
 } from '../lib/deviceState'
 import { remoteActive } from '../lib/remote'
 import { EXCLUDED_BLOCKS } from '../lib/guardrails'
@@ -38,6 +40,7 @@ const ofSceneNames = (s) => s.sceneNames
 const ofBlocks = (s) => s.blocks
 const ofTunerOn = (s) => s.tunerOn
 const ofTuning = (s) => s.tuning
+const ofBpm = (s) => s.bpm
 
 export default function Gig({ preset, device, capabilities, size, onSize, onError, onChanged, onPickPreset }) {
   /*
@@ -59,6 +62,7 @@ export default function Gig({ preset, device, capabilities, size, onSize, onErro
   const allBlocks = useDevice(ofBlocks)
   const tunerOn = useDevice(ofTunerOn)
   const tuning = useDevice(ofTuning)
+  const bpm = useDevice(ofBpm)
 
   // Input, output, looper and gate are not stage controls.
   const blocks = useMemo(
@@ -319,18 +323,41 @@ export default function Gig({ preset, device, capabilities, size, onSize, onErro
    * inside one, and the two that were competing with the scenes for the
    * middle of the screen.
    */
-  const [tapping, setTapping] = useState(false)
+  const reread = useRef(null)
   const tap = async () => {
-    setTapping(true)
+    /*
+     * The tap goes NOW; the read-back waits for the burst to end.
+     *
+     * deviceState.tapBeat says why the two must not be folded together: the
+     * unit works the tempo out from the spacing between taps, so a tap held
+     * back by a debounce is not a tap. The number on the button is the other
+     * half of that — it can only be read once tapping has stopped, because
+     * reading mid-burst returns the tempo of the taps before this one and
+     * puts a stale figure on the button you are still pressing.
+     *
+     * So: fire every press, and re-read once, 900ms after the last one. Four
+     * taps at 60bpm are three seconds apart at the slowest tempo anyone counts
+     * in, and 900ms is comfortably inside that.
+     */
+    clearTimeout(reread.current)
+    haptic()
     try {
-      await tapTempo()
-      haptic()
+      await tapBeat()
     } catch (err) {
       onError(err.message)
-    } finally {
-      setTapping(false)
+      return
     }
+    reread.current = setTimeout(() => refreshTempo(), 900)
   }
+
+  /* A pending read on a screen that has gone is a write into nothing. */
+  useEffect(() => () => clearTimeout(reread.current), [])
+
+  /* Read aloud, the face is "Tap 120" — which is a tempo, not an instruction.
+     The label says what the button does and what the number means. */
+  const tapLabel = Number.isFinite(bpm)
+    ? `Tap tempo — currently ${Math.round(bpm)} BPM`
+    : 'Tap tempo'
 
   const step = async (delta) => {
     const next = (preset?.number ?? 0) + delta
@@ -634,8 +661,20 @@ export default function Gig({ preset, device, capabilities, size, onSize, onErro
             Tuner
           </button>
         ) : null}
-        <button className="gig-bar-btn" onClick={tap} disabled={tapping} aria-label="Tap tempo">
-          Tap
+        {/*
+          The tempo lives on the button that sets it.
+
+          A tap button with no readout is a control you have to trust: you tap
+          four times and find out whether it took by listening to the delay. The
+          figure is what the unit currently holds, so it is also the answer to
+          "what is this preset at" without opening anything.
+
+          Absent until the unit has said — a dash would read as zero, and a
+          unit whose driver has no tempo at all should not be shown one.
+        */}
+        <button className="gig-bar-btn gig-tap" onClick={tap} aria-label={tapLabel}>
+          <span>Tap</span>
+          {Number.isFinite(bpm) ? <span className="gig-tap-bpm mono">{Math.round(bpm)}</span> : null}
         </button>
       </div>
     </div>

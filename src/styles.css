@@ -5689,6 +5689,23 @@ button.gig-bar-btn {
   color: var(--silk-dim);
 }
 
+/* Tap carries a number, so it is a column rather than a line of text. The word
+   stays the size of the tuner's beside it; the figure sits under it, quieter. */
+button.gig-tap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  line-height: 1.1;
+}
+
+.gig-tap-bpm {
+  font-size: var(--f-1);
+  letter-spacing: 0.06em;
+  color: var(--silk-faint);
+}
+
 button.gig-bar-btn.on {
   background: var(--signal);
   border-color: var(--signal);
