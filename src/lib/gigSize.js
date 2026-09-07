@@ -35,9 +35,14 @@
  *
  * Phone only. On a desktop the grids stay on the pixel floors and auto-fit,
  * because two scene buttons across 1200px is not a design, it is a mistake.
+ *
+ * A scene is WIDER than an effect at every step, including the smallest — "try
+ * making them wider". Two grids of identical tiles read as one grid however
+ * they are coloured, and size is the difference you notice before you have
+ * looked at anything.
  */
 export const SIZES = [
-  { name: 'Smallest', tile: 48, col: 88, scenes: 4, fx: 4 },
+  { name: 'Smallest', tile: 48, col: 88, scenes: 2, fx: 4 },
   { name: 'Small', tile: 62, col: 110, scenes: 2, fx: 4 },
   { name: 'Medium', tile: 78, col: 132, scenes: 2, fx: 3 },
   { name: 'Large', tile: 96, col: 158, scenes: 2, fx: 2 },

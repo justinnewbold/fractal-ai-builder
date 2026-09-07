@@ -746,6 +746,9 @@ export default function App() {
    * measured the chrome from a comment.
    */
   const onPlay = view === 'play'
+  /* A row of tabs is worth a row of the screen only when it can take you
+     somewhere. On a phone it cannot: Play is the only screen there is. */
+  const tabsWorthShowing = status === 'live' && views.length > 1
   const resize = (by) => {
     const next = clampSize(size + by)
     if (next === size) return
@@ -3609,7 +3612,24 @@ export default function App() {
         </div>
       ) : null}
 
-      {status === 'live' ? (
+      {/*
+        No tab row when there is one screen.
+
+        A phone reaches Play and nothing else — Ask and Edit are bench work and
+        were taken off it deliberately. What was left was a row containing the
+        word "Play", underlined, which cannot be pressed to any effect and
+        cannot be left. "An entire row with no buttons that can even be
+        changed."
+
+        It earned its keep while it also held the size control; that moved to
+        the preset row, and this had nothing.
+
+        The condition is named rather than written inline: test/structure.mjs
+        reads this file as text and takes the first hit, so a second
+        `views.length > 1` higher up — a comment included — hands it the wrong
+        block. See CLAUDE.md.
+      */}
+      {tabsWorthShowing ? (
         <nav className="views" aria-label="Screens">
           {/* The ids are the app's own vocabulary and stay put — showWhatChanged
               and revealResult anchor to them. Only the words a player reads
