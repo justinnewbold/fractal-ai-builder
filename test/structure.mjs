@@ -3381,6 +3381,36 @@ export function run(test) {
     assert.match(list, /data-slot=\{slot\.number\}/, 'rows no longer carry their slot number')
   })
 
+  test('a chain read on the Play screen does not take the first no', () => {
+    /*
+     * "Now I'm switching seems I keep getting this error message. Couldn't
+     * read the chain from the phone, so there's nothing to switch here yet.
+     * Hitting the try again button always fixes it, but it really shouldn't
+     * happen."
+     *
+     * The read runs straight after a preset change, which is exactly when the
+     * unit is still loading that preset and its port is busy. One empty answer
+     * became an error and a button whose only job was to ask again. The
+     * presence check has been hardened against this for months; this read had
+     * never been.
+     */
+    const gig = readFileSync(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8')
+    const g = gig.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ' ')
+    /* From the read's own position: there are useEffects above it, and
+       indexOf from zero would have sliced backwards to nothing. */
+    const at = g.indexOf('const refreshBlocks = async')
+    assert.ok(at > 0, 'the chain read is gone from the Play screen')
+    const fn = g.slice(at, g.indexOf('useEffect(() => {', at))
+    assert.match(fn, /confirmedChain\(/, 'one empty chain read is a verdict again — the Try again bug is back')
+    assert.ok(
+      !/setChain\(\(await reReadChain\(\)\)/.test(fn),
+      'the chain read still decides on a single ask'
+    )
+    /* And the phone gets the longer allowance, for the same reason the
+       presence check does: the read travels a relay to a busy Mac. */
+    assert.match(fn, /remote: remoteActive\(\)/, 'the phone reads the chain on the Mac\u2019s shorter allowance')
+  })
+
   test('the tour teaches what a scene actually is', () => {
     const tour = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
     const card = tour.slice(tour.indexOf('Scenes are one rig'), tour.indexOf('Scenes are one rig') + 1200)
