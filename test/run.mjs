@@ -559,6 +559,95 @@ test('ForgeFX is only found where the server actually is', () => {
   assert.equal(host.findForgeFX({ env: { HOME: '/Users/x' }, exists: () => false }), null)
 })
 
+test('npm can be started on Windows, where npm is not a program', () => {
+  /*
+   * "Do you actually have to have an app for Windows or is it just a script you
+   * can paste into the Windows terminal?"
+   *
+   * A script, and one already existed — `npm run serve`. It died on its first
+   * line on Windows and nowhere else, for a reason that has nothing to do with
+   * this app: `npm` there is `npm.cmd`, a batch file, and Node will not spawn
+   * one. It used to; the fix for a command-injection flaw (CVE-2024-27980)
+   * made it refuse instead.
+   *
+   * The shell is only ever asked for on the platform that needs it, because
+   * turning it on everywhere would change how arguments are parsed on the two
+   * platforms this is known to work on.
+   */
+  assert.deepEqual(host.npmSpawn({ platform: 'win32' }), { shell: true })
+  assert.deepEqual(host.npmSpawn({ platform: 'darwin' }), {})
+  assert.deepEqual(host.npmSpawn({ platform: 'linux' }), {})
+})
+
+test('the serve script actually asks for that, at both places it starts npm', () => {
+  /*
+   * Two spawns, and missing either one is a Windows-only failure nobody here
+   * can see: the build, and the device server itself.
+   */
+  const src = readSrc(new URL('../scripts/serve.mjs', import.meta.url), 'utf8')
+  const code = src.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ' ')
+  assert.match(code, /import \{[\s\S]*?npmSpawn[\s\S]*?\} from '\.\.\/desktop\/lib\/host\.mjs'/,
+    'serve.mjs no longer imports npmSpawn, so npm cannot start on Windows')
+  /* Balanced, not a regex. `spawn('npm', ['run','dev'], { cwd: join(a, b) })`
+     ends at a bracket the naive pattern took for the end of the call. */
+  const calls = []
+  for (let i = code.indexOf('spawn('); i !== -1; i = code.indexOf('spawn(', i + 1)) {
+    let depth = 0
+    for (let j = i + 'spawn'.length; j < code.length; j++) {
+      if (code[j] === '(') depth++
+      else if (code[j] === ')' && --depth === 0) {
+        calls.push(code.slice(i, j + 1))
+        break
+      }
+    }
+  }
+  assert.ok(calls.length >= 2, `the serve script starts ${calls.length} things, not the build and the server`)
+  for (const call of calls) {
+    assert.match(call, /npmSpawn\(\)/, `a spawn in serve.mjs skips npmSpawn: ${call.slice(0, 60)}`)
+  }
+})
+
+test('the Windows installer keeps the layout the server needs', () => {
+  /*
+   * The one-paste installer. It cannot be run from here — there is no
+   * PowerShell in CI — so what is checked is the handful of decisions that are
+   * silent when wrong.
+   */
+  const ps = readSrc(new URL('../public/windows.ps1', import.meta.url), 'utf8')
+
+  /* Siblings. The server depends on the codec by relative path, so nesting the
+     two makes that link dangle and the build fails somewhere unrelated. */
+  assert.match(ps, /\$server = Join-Path \$Root 'forgefx'/, 'the server moved out of the shared root')
+  assert.match(ps, /\$codec = Join-Path \$Root 'forgefx-midi'/, 'the codec moved out of the shared root')
+
+  /* The pins come from the app's own lock file rather than being copied here,
+     which is the only way this and the Mac build cannot drift. */
+  assert.match(ps, /forgefx\.lock\.json/, 'the installer no longer reads the pinned versions')
+  assert.ok(
+    !/d7b17a305c1f|553d24b74093/.test(ps),
+    'a commit is hard-coded in the installer — it will rot the moment the lock file moves'
+  )
+
+  /* The codec builds before the server, whose build reads its types. */
+  assert.ok(
+    ps.indexOf("'building the preset codec'") < ps.indexOf("'building the device server'"),
+    'the server is built before the codec it compiles against'
+  )
+
+  /* The token never reaches a URL: one in a remote URL is written into
+     .git/config and reprinted in every error git gives about that remote. */
+  assert.ok(
+    !/https:\/\/[^'"\s]*\$(Token|env:FORGEFX_TOKEN)/.test(ps),
+    'the token is embedded in a git URL, where it persists in .git/config'
+  )
+  assert.match(ps, /credential\.helper=/, 'the credential helper is gone, so a private fetch cannot authenticate')
+
+  /* `exit` in a script piped into iex closes the whole window, taking the
+     message with it — which is every guard clause here. */
+  assert.ok(!/^\s*exit\b/m.test(ps), 'an exit would close the terminal of anyone who piped this into iex')
+  assert.match(ps, /^Install-FractalRemote$/m, 'nothing calls the installer, so pasting it does nothing')
+})
+
 test('a phone that cannot reach the Mac is told the likely reason', async () => {
   /*
    * The address in the menu works from the Mac and fails from a phone, and
@@ -4452,27 +4541,38 @@ test('a heartbeat keeps the long clock, and does not start the short one', async
    * hard is exactly the case that needs the LONGER clock, and treating a
    * keepalive as an answer would halve the wait instead.
    */
+  /*
+   * Its own budget, and a roomy one, because this test is real wall-clock
+   * timers rather than fake ones. On the shared 60ms budget the beats were
+   * scheduled 50ms apart — ten milliseconds of headroom, three times in a row —
+   * and a macOS runner under load slipped past it: one beat arrived late, the
+   * stream was called dead, and it retried through a connection that was alive.
+   *
+   * A hundred milliseconds between beats against a 300ms budget says the same
+   * thing with two hundred to spare. What is being proved is unchanged and
+   * still cannot pass by accident: 400ms of silence separates the hello from
+   * the answer, so without the beats extending it this aborts.
+   */
+  const patient = { stallMs: 300, firstMs: 300, capMs: 2000 }
   const f = scheduledFetch([
     {
       steps: [
-        { at: 10, chunk: OPEN },
-        { at: 50, chunk: WAITING(50) },
-        { at: 100, chunk: WAITING(100) },
-        { at: 150, chunk: WAITING(150) },
-        { at: 200, chunk: DONE }
+        { at: 20, chunk: OPEN },
+        { at: 120, chunk: WAITING(120) },
+        { at: 220, chunk: WAITING(220) },
+        { at: 320, chunk: WAITING(320) },
+        { at: 420, chunk: DONE }
       ]
     }
   ])
   globalThis.fetch = f.fetch
   const events = []
-  // Every gap here is under the 60ms budget only because the beats land in
-  // between: without them, 200ms of silence would abort at 60.
-  const spec = await streamSpec({}, { timing, onEvent: (e) => events.push(e) })
+  const spec = await streamSpec({}, { timing: patient, onEvent: (e) => events.push(e) })
   assert.deepEqual(spec, { blocks: [] })
   assert.equal(f.calls(), 1, 'it gave up and retried through a live connection')
   const beats = events.filter((e) => e.kind === 'waiting')
   assert.equal(beats.length, 3)
-  assert.equal(beats[2].thinkingMs, 150, 'the wait is not carried to the screen')
+  assert.equal(beats[2].thinkingMs, 320, 'the wait is not carried to the screen')
 })
 
 test('a heartbeat is not mistaken for the model answering', async () => {

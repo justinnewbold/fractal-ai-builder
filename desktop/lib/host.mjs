@@ -447,6 +447,29 @@ export function publish(
   }
 }
 
+/**
+ * Running npm, on the one operating system where npm is not a program.
+ *
+ * On Windows `npm` is `npm.cmd`, a batch file — and Node will not spawn a batch
+ * file directly. It used to. The fix for a command-injection flaw
+ * (CVE-2024-27980) made it refuse instead, so `spawn('npm', …)` now fails with
+ * EINVAL on every supported Node on Windows, and nowhere else. `npm run serve`
+ * therefore died on its first line on a Windows machine and worked everywhere
+ * it was ever tried.
+ *
+ * `shell: true` is the documented way through, and it is safe HERE because
+ * every argument at these call sites is a literal in our own source — 'run',
+ * 'build', 'dev'. It would not be safe for anything a person typed, so this is
+ * deliberately a helper for spawning npm rather than a general one.
+ *
+ * A path with a space in it — `C:\Users\Justin Newbold\src` — stays safe
+ * because the working directory travels in the spawn options, not on the
+ * command line the shell parses.
+ */
+export function npmSpawn({ platform = process.platform } = {}) {
+  return platform === 'win32' ? { shell: true } : {}
+}
+
 /** What to tell someone when ForgeFX cannot be found. One place, both callers. */
 export const MISSING_FORGEFX =
   'Cannot find ForgeFX.\n\n' +
@@ -455,7 +478,9 @@ export const MISSING_FORGEFX =
   '  git clone https://github.com/sKuhLight/forgefx ~/src/forgefx\n' +
   '  git clone https://github.com/sKuhLight/forgefx-midi ~/src/forgefx-midi\n' +
   '  cd ~/src/forgefx-midi && npm install && npm run build\n' +
-  '  cd ~/src/forgefx/server && npm install\n'
+  '  cd ~/src/forgefx/server && npm install\n\n' +
+  'On Windows there is a script that does all of it:\n\n' +
+  '  irm https://fractal.newbold.cloud/windows.ps1 | iex\n'
 
 /**
  * Stop serving, and actually stop.

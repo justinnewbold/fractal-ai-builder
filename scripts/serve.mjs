@@ -29,6 +29,7 @@ import {
   armHost,
   findForgeFX,
   lanAddress,
+  npmSpawn,
   publish,
   serverEnv
 } from '../desktop/lib/host.mjs'
@@ -37,9 +38,11 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const port = Number(process.env.PORT || DEFAULT_PORT)
 const name = process.env.FRACTAL_MDNS_NAME || mdnsName()
 
+/* npmSpawn is what makes this work on Windows, where npm is a batch file Node
+   will not launch on its own. See desktop/lib/host.mjs. */
 const run = (cmd, args, opts) =>
   new Promise((ok, fail) => {
-    const child = spawn(cmd, args, { stdio: 'inherit', ...opts })
+    const child = spawn(cmd, args, { stdio: 'inherit', ...npmSpawn(), ...opts })
     child.on('error', fail)
     child.on('exit', (code) => (code === 0 ? ok() : fail(new Error(`${cmd} exited ${code}`))))
   })
@@ -68,7 +71,8 @@ console.log('\n  Ctrl-C to stop.\n')
 const server = spawn('npm', ['run', 'dev'], {
   cwd: join(forgefx, 'server'),
   stdio: 'inherit',
-  env: serverEnv({ port, dist: join(root, 'dist') })
+  env: serverEnv({ port, dist: join(root, 'dist') }),
+  ...npmSpawn()
 })
 
 /*
