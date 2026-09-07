@@ -695,6 +695,45 @@ export function run(test) {
     assert.ok(/m\.norm/.test(gig), "the gig screen's signal bar no longer reads norm")
     assert.ok(!/\.level\b/.test(gig), 'the signal bar reads .level again — monitors have none')
 
+    /*
+     * And it asks for ONE block.
+     *
+     * Reported as "when the app is open it keeps cutting out and if I close
+     * the app, then it doesn't" — the audio, on a unit that serialises every
+     * request while it is also making sound.
+     *
+     * `liveMeters()` with no block asks the host for every block's monitors,
+     * which it can only answer by fetching the whole grid first. ForgeFX's own
+     * note in gen3.ts liveMonitors() says what that costs: grid()'s cache
+     * lasted 500ms, so an all-blocks call on a 500ms tick fired "a full ~24KB
+     * preset dump on every tick". Its author called the all-blocks form
+     * "(rare)". This screen was polling it twice a second, and on a phone this
+     * screen is the whole app.
+     *
+     * The bar draws one number. One block is all it ever needed.
+     */
+    const meterCall = gig.match(/await liveMeters\(([^)]*)\)/)
+    assert.ok(meterCall, 'the signal bar no longer polls meters at all')
+    assert.notEqual(
+      meterCall[1].trim(),
+      '',
+      'the signal bar asks for every block again — that fetches the whole preset on every tick'
+    )
+    assert.match(
+      gig,
+      /size === 0/,
+      'the signal bar polls at the smallest size, where it is not even drawn'
+    )
+
+    // And the block reaches the host as ?eid=, which is what makes it one read
+    // rather than a grid fetch.
+    const fx = files['lib/forgefx.js']
+    assert.match(
+      fx.slice(fx.indexOf('export const liveMeters'), fx.indexOf('export const liveMeters') + 400),
+      /\?eid=\$\{effectId\}/,
+      'liveMeters drops the block on the floor, so the host reads every one of them'
+    )
+
     // Modifiers: the source ordinal is what gets written to the device, so a
     // wrong field name here is not a blank label, it is a bad write.
     const mods = files['components/Modifiers.jsx']
