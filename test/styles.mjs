@@ -677,19 +677,37 @@ export function run(test) {
     const scene = rule('button.gig-scene')
     const effect = rule('button.gig-block.off')
 
-    const tab = /border-left: (\d+)px solid var\(--scene-fill/.exec(scene)
-    assert.ok(tab, 'a scene no longer carries its colour as a tab down one edge')
-
-    const ring = /\n\s*border: (\d+)px solid var\(--block-fill/.exec(effect)
-    assert.ok(ring, 'an effect is back to a stripe rather than a ring — same shape as a scene')
-    assert.ok(
-      !/border-left: \d+px solid var\(--block-fill/.test(effect),
-      'an effect carries a left stripe again, which is the scenes\' treatment'
+    /*
+     * A tab was not enough either — "they still look too similar" — and could
+     * not be: a tab and a ring are both a thin line of colour on a white card,
+     * and at arm's length in the dark that is one thing, not two.
+     *
+     * So the scenes stop being white. A row of pale colour above a row of white
+     * cards is a difference nobody has to inspect. The tile is WASHED with its
+     * own hue; the one you are standing in takes the hue at full strength.
+     */
+    const wash = /background: color-mix\([^;]*--scene-fill[^;]*\);/.exec(scene)
+    assert.ok(wash, 'a scene is a white card again, which is what the effects below it are')
+    assert.match(
+      rule('button.gig-scene.current'),
+      /background: var\(--scene-fill/,
+      'the scene you are standing in is no longer the full colour against the pale ones'
     )
 
+    // And the effects keep the ring, on white — never a wash, or the two grids
+    // are two washes and we are back where we started.
+    assert.match(
+      effect,
+      /\n\s*border: \d+px solid var\(--block-fill/,
+      'an effect is back to a stripe rather than a ring — same shape as a scene'
+    )
     assert.ok(
-      Number(tab[1]) > Number(ring[1]),
-      `the scene tab (${tab[1]}px) is no heavier than the effect ring (${ring[1]}px), so both read as a thin line`
+      !/border-left: \d+px solid var\(--block-fill/.test(effect),
+      'an effect carries a left stripe again, which was the scenes\' treatment'
+    )
+    assert.ok(
+      !/background: color-mix/.test(effect),
+      'an effect is washed like a scene, so both grids read the same again'
     )
   })
 

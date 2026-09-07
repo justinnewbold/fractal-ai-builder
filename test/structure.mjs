@@ -3312,6 +3312,24 @@ export function run(test) {
       'the size control is still drawn in the tab row as well — two of them'
     )
 
+    /*
+     * And no tab row when there is one screen.
+     *
+     * A phone reaches Play and nothing else — Ask and Edit are bench work and
+     * were taken off it on purpose. What was left was a row containing the word
+     * "Play", underlined, which cannot be pressed to any effect and cannot be
+     * left: "an entire row with no buttons that can even be changed". It earned
+     * its keep while it also held the size control; that moved to the preset
+     * row, and this had nothing.
+     */
+    const a = bare(app)
+    assert.match(
+      a,
+      /const tabsWorthShowing = status === 'live' && views\.length > 1/,
+      'the tab row is drawn whenever the app is live, so a phone gets a row holding one unpressable word'
+    )
+    assert.match(a, /\{tabsWorthShowing \? \(\s*<nav className="views"/, 'the tab row no longer reads that condition')
+
     // A scene carries its own colour; an effect carries both its names.
     assert.match(g, /--scene-fill/, 'scenes are back to eight identical panels')
     assert.match(g, /shortBlock\(block\)/, 'the effect tiles lost their three-letter name')

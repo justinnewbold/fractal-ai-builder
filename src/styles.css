@@ -2327,7 +2327,6 @@ button.gig-scene {
   gap: var(--s-1);
   min-height: var(--gig-tile, 62px);
   padding: var(--s-2) var(--s-2);
-  background: var(--panel);
   /*
    * The scene's own colour, on the edge until it is the live one.
    *
@@ -2336,12 +2335,27 @@ button.gig-scene {
    * apart by a numeral is a reading task between two bars of a song; a colour
    * is not. See lib/sceneColors.
    */
-  /* Heavier than the 2px ring on the effects below, on purpose: a thin tab
-     beside a thin ring is two thin lines, and the point is that the two grids
-     do not read as one. */
-  border-left: 6px solid var(--scene-fill, var(--rule));
+  /*
+   * A light wash of the scene's own colour, over the whole tile.
+   *
+   * The tab was not enough — "they still look too similar" — and it could not
+   * be, because a tab and a ring are both a thin line of colour on a white
+   * card, and at arm's length in the dark that is one thing, not two.
+   *
+   * So the scenes stop being white. A row of pale colour above a row of white
+   * cards is a difference you cannot miss and do not have to inspect; the
+   * effects below keep their ring, and now it is a ring on white against a
+   * wash, rather than two lines against each other.
+   *
+   * The border takes some of the hue too, so the tile still has an edge on the
+   * dark theme where a 14% wash is nearly the panel colour.
+   */
+  background: color-mix(in srgb, var(--scene-fill, var(--panel)) 14%, var(--panel));
+  border-color: color-mix(in srgb, var(--scene-fill, var(--rule)) 40%, var(--rule));
 }
 
+/* And the one you are standing in goes dark: the full colour against seven
+   pale ones, which is a bigger step than a fill against seven whites was. */
 button.gig-scene.current {
   background: var(--scene-fill, var(--signal));
   border-color: var(--scene-fill, var(--signal));

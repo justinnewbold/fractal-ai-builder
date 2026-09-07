@@ -2509,9 +2509,26 @@ test('the stage screen is sized by whoever is holding it', () => {
     assert.ok(SIZES[i].fx <= SIZES[i - 1].fx, `step ${i} fits more effects per row than step ${i - 1}`)
     assert.ok(SIZES[i].tile > SIZES[i - 1].tile, `step ${i} is not taller than step ${i - 1}`)
   }
-  // Smallest is the one that has to hold a whole rig, so it is the widest row.
-  assert.equal(SIZES[0].scenes, 4)
-  assert.equal(SIZES[0].fx, 4)
+  /*
+   * A scene is WIDER than an effect at every step — "try making them wider".
+   * Two grids of identically sized tiles read as one grid however they are
+   * coloured, and size is the difference you notice before looking at anything.
+   */
+  for (const [i, step] of SIZES.entries()) {
+    assert.ok(
+      step.scenes <= step.fx,
+      `at ${step.name} a scene is NARROWER than an effect (${step.scenes} vs ${step.fx} per row)`
+    )
+    // Strictly wider at the three steps a phone is actually used at. The top
+    // two are already tiles you could hit with a boot, and there the wash does
+    // the telling apart on its own.
+    if (i <= 2) {
+      assert.ok(
+        step.scenes < step.fx,
+        `at ${step.name} a scene is no wider than an effect (${step.scenes} vs ${step.fx} per row)`
+      )
+    }
+  }
 
   // Bigger is bigger and smaller is smaller, the whole way up.
   for (let i = 1; i < SIZES.length; i++) {
