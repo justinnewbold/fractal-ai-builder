@@ -2292,21 +2292,6 @@ button.gig-name:disabled .gig-name-caret {
   flex: 0 0 auto;
 }
 
-.gig-size-label {
-  font-size: var(--f-1);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--silk-faint);
-  /* The width of the longest step name, so the row does not shuffle sideways
-     every time the size changes under the finger that is changing it.
-     9ch rather than 8: `min-width: 8ch` is what test/styles.mjs looks for to
-     find the top bar's phone block, and it takes the first one in the file. */
-  min-width: 9ch;
-  text-align: right;
-  /* Beside a preset name that is already fighting for the row: this never
-     shrinks, and the name is what gives. */
-  flex: 0 0 auto;
-}
 
 button.gig-size-step {
   width: 44px;
@@ -2351,7 +2336,10 @@ button.gig-scene {
    * apart by a numeral is a reading task between two bars of a song; a colour
    * is not. See lib/sceneColors.
    */
-  border-left: 3px solid var(--scene-fill, var(--rule));
+  /* Heavier than the 2px ring on the effects below, on purpose: a thin tab
+     beside a thin ring is two thin lines, and the point is that the two grids
+     do not read as one. */
+  border-left: 6px solid var(--scene-fill, var(--rule));
 }
 
 button.gig-scene.current {
@@ -5630,10 +5618,26 @@ button.gig-block.on .gig-block-state {
   color: var(--block-ink, var(--signal));
 }
 
-/* Off keeps a sliver of the family colour on the leading edge — enough to find
-   the delay you're about to stomp, without it reading as engaged. */
+/*
+ * Off carries the family colour ALL THE WAY ROUND, not as a sliver on the
+ * leading edge.
+ *
+ * The edge was enough while the scenes above were plain. It stopped being
+ * enough the moment they got colours of their own: two grids of same-sized
+ * tiles, same white face, same 3px stripe down the left, one above the other —
+ * "the scenes and effects look too similar". Nothing said where one grid ended
+ * and the next began.
+ *
+ * A ring and a tab are different objects at a glance, in a way that two tabs of
+ * different colours are not. So the effects are ringed and the scenes keep the
+ * tab, and the difference survives being seen sideways in the dark, which is
+ * the only viewing condition that matters here.
+ *
+ * Still not a fill: filled means ENGAGED on this screen and that meaning is not
+ * for sale.
+ */
 button.gig-block.off {
-  border-left: 3px solid var(--block-fill, var(--rule));
+  border: 2px solid var(--block-fill, var(--rule));
 }
 
 /* The read-only chain diagram carries the family colour as an edge rather than

@@ -655,6 +655,44 @@ export function run(test) {
     assert.match(rule('.topbar-name'), /font-size: var\(--f-3\)/, 'the preset name in the bar is a headline again')
   })
 
+  test('a scene and an effect are different objects, not two tiles with a stripe', () => {
+    /*
+     * "The scenes and effects look too similar."
+     *
+     * They were: two grids of same-sized tiles, same white face, same 3px
+     * colour down the left edge, one directly above the other. Nothing said
+     * where one grid ended and the next began — the colours told you WHICH
+     * tile and nothing told you which KIND.
+     *
+     * So the effects are RINGED and the scenes are TABBED. A ring and a tab
+     * are different objects at a glance, in a way two tabs of different
+     * colours are not, and the tab is heavier than the ring so the two are not
+     * simply a pair of thin lines.
+     *
+     * Neither is a fill: on this screen a filled tile means engaged, or the
+     * scene you are standing in, and that meaning is not for sale.
+     */
+    const rule = (sel) => code.slice(code.indexOf(sel + ' {'), code.indexOf('}', code.indexOf(sel + ' {')))
+
+    const scene = rule('button.gig-scene')
+    const effect = rule('button.gig-block.off')
+
+    const tab = /border-left: (\d+)px solid var\(--scene-fill/.exec(scene)
+    assert.ok(tab, 'a scene no longer carries its colour as a tab down one edge')
+
+    const ring = /\n\s*border: (\d+)px solid var\(--block-fill/.exec(effect)
+    assert.ok(ring, 'an effect is back to a stripe rather than a ring — same shape as a scene')
+    assert.ok(
+      !/border-left: \d+px solid var\(--block-fill/.test(effect),
+      'an effect carries a left stripe again, which is the scenes\' treatment'
+    )
+
+    assert.ok(
+      Number(tab[1]) > Number(ring[1]),
+      `the scene tab (${tab[1]}px) is no heavier than the effect ring (${ring[1]}px), so both read as a thin line`
+    )
+  })
+
   test('at Smallest a tile is a fixed box, so a long scene name cannot push the blocks off the screen', () => {
     /*
      * "This says it's the smallest. It's still too big. All buttons need to be
