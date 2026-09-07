@@ -19,6 +19,7 @@ import * as names from '../src/lib/presetName.js'
 import * as hold from '../src/lib/longPress.js'
 import * as lineage from '../src/lib/lineage.js'
 import * as gigSize from '../src/lib/gigSize.js'
+import * as marks from '../src/lib/presetMarks.js'
 import { readFileSync as readSrc } from 'node:fs'
 import {
   patchSchemaValue,
@@ -2537,6 +2538,81 @@ test('the stage screen is sized by whoever is holding it', () => {
   }
   assert.equal(loadSize(hostile), DEFAULT_SIZE, 'a blocked read takes the screen down')
   assert.equal(saveSize(2, hostile), false, 'a blocked write is reported as a success')
+})
+
+test('recent presets and favourites, per unit', () => {
+  /*
+   * A 512-slot unit is forty screens of list. Range jumps get you to a
+   * neighbourhood; these get you to a preset.
+   */
+  const { pushRecent, toggleIn, MAX_RECENT, marksFor, remember, toggleFavourite } = marks
+
+  // Most recent first, and playing something again moves it up rather than
+  // listing it twice — the difference between eight presets and one preset
+  // eight times.
+  assert.deepEqual(pushRecent([], 5), [5])
+  assert.deepEqual(pushRecent([3, 2, 1], 2), [2, 3, 1])
+  assert.deepEqual(pushRecent([1, 2, 3], 4), [4, 1, 2, 3])
+
+  // Eight, and the ninth pushes the oldest off the end.
+  const many = [9, 8, 7, 6, 5, 4, 3, 2, 1].reduce((l, n) => pushRecent(l, n), [])
+  assert.equal(many.length, MAX_RECENT)
+  assert.equal(many[0], 1, 'the newest is not first')
+  assert.ok(!many.includes(9), 'the ninth-oldest survived the cap')
+
+  // Slot 0 is a real slot. Anything that is not a slot number is not one.
+  assert.deepEqual(pushRecent([], 0), [0])
+  assert.deepEqual(pushRecent([1], null), [1])
+  assert.deepEqual(pushRecent([1], -2), [1])
+  assert.deepEqual(pushRecent([1], 1.5), [1])
+
+  // Stars go on and off, and read back in slot order.
+  assert.deepEqual(toggleIn([1, 5], 3), [1, 3, 5])
+  assert.deepEqual(toggleIn([1, 3, 5], 3), [1, 5])
+  assert.deepEqual(toggleIn([], 0), [0])
+
+  /*
+   * Kept per unit. Slot 4 on an FM3 and slot 4 on an AM4 are different
+   * sounds, and this was got wrong once already: the marks were keyed on a
+   * field the device object does not carry, so every unit shared one bucket.
+   */
+  const mem = new Map()
+  const store = {
+    getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+    setItem: (k, v) => mem.set(k, v)
+  }
+  remember('fm3', 7, store)
+  remember('fm3', 4, store)
+  toggleFavourite('fm3', 4, store)
+  remember('am4', 1, store)
+
+  assert.deepEqual(marksFor('fm3', store).recent, [4, 7])
+  assert.deepEqual(marksFor('fm3', store).favourites, [4])
+  assert.deepEqual(marksFor('am4', store).recent, [1], 'one unit is reading another unit\'s history')
+  assert.deepEqual(marksFor('am4', store).favourites, [], 'a star crossed between two units')
+
+  // A unit that has never been seen is empty, not a crash.
+  assert.deepEqual(marksFor('vp4', store), { recent: [], favourites: [] })
+
+  /*
+   * A private window throws on both reads and writes, and has since the first
+   * iOS that had one. An empty list is the right answer; a broken picker is
+   * not.
+   */
+  const hostile = {
+    getItem: () => {
+      throw new Error('denied')
+    },
+    setItem: () => {
+      throw new Error('denied')
+    }
+  }
+  assert.deepEqual(marksFor('fm3', hostile), { recent: [], favourites: [] })
+  assert.deepEqual(remember('fm3', 3, hostile), [3], 'a blocked write loses the list it just built')
+
+  // And nonsense in storage reads as empty rather than throwing.
+  const junk = { getItem: () => '{"fm3":{"recent":"nope","favourites":[2,"x",2]}}', setItem: () => {} }
+  assert.deepEqual(marksFor('fm3', junk), { recent: [], favourites: [2] })
 })
 
 test('a confirmed write updates the cached value in place', () => {

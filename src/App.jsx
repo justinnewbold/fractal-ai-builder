@@ -72,6 +72,7 @@ import { createNameScan } from './lib/nameScan'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
 import Screens, { viewsFor } from './components/Screens'
 import { SIZES, loadSize, saveSize, clampSize } from './lib/gigSize'
+import { remember as rememberPreset } from './lib/presetMarks'
 import {
   getTempo,
   setTempo,
@@ -93,7 +94,8 @@ import {
   readSaveResult,
   forgetPresetName,
   noteSceneNames,
-  readSceneNames
+  readSceneNames,
+  currentDeviceSlug
 } from './lib/forgefx'
 import { savePreset, buildEntry, deletePreset, typicalMs, notOnAccount } from './lib/history'
 import { costOf } from './lib/cost'
@@ -2236,6 +2238,13 @@ export default function App() {
     try {
       await selectPreset(number)
       record('select', `Loaded slot ${number}`)
+      /*
+       * Recorded after the unit took it, not when it was asked for: a slot the
+       * device refuses is not one you were recently on. Every route counts —
+       * the list, Previous and Next, a footswitch — because "recent" is about
+       * where you have been, not how you got there.
+       */
+      rememberPreset(currentDeviceSlug(), number)
       setDirty(false)
       setSavedAt(null)
       setSafety(null)
@@ -3332,6 +3341,7 @@ export default function App() {
       <PresetList
         slots={allSlots}
         slowNames={namesCostADump()}
+        device={currentDeviceSlug()}
         current={preset?.number}
         deviceSlots={device?.capabilities?.presets?.count}
         addressing={device?.capabilities?.presets?.addressing}
@@ -4009,6 +4019,7 @@ export default function App() {
         <PresetList
           slots={allSlots}
           slowNames={namesCostADump()}
+          device={currentDeviceSlug()}
           current={preset?.number}
           deviceSlots={device?.capabilities?.presets?.count}
           addressing={device?.capabilities?.presets?.addressing}
