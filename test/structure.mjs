@@ -3273,7 +3273,31 @@ export function run(test) {
     assert.match(bar, /Tuner/, 'the tuner left the bar')
     assert.match(bar, /Tap/, 'tap tempo left the bar')
     assert.ok(!/className="gig-modes"/.test(g), 'the tuner is back in a row of its own mid-screen')
-    assert.match(g, /tapTempo\(\)/, 'nothing calls tapTempo, so the button does nothing')
+    assert.match(g, /tapBeat\(\)/, 'nothing taps, so the button does nothing')
+
+    /*
+     * And the tempo is ON the button that sets it.
+     *
+     * A tap button with no readout is a control you have to trust: you tap
+     * four times and find out whether it took by listening to the delay.
+     *
+     * The read-back is separate from the tap on purpose — deviceState.tapBeat
+     * records why the two must not be folded together, and the same reasoning
+     * runs the other way: a read taken mid-burst returns the tempo of the taps
+     * BEFORE this one, so it waits for the burst to end. If that timer ever
+     * collapses into the tap itself, the number on the button starts lying.
+     */
+    assert.match(bar, /gig-tap-bpm/, 'the tap button lost its tempo readout')
+    /* The HANDLER only. Sliced to `const step` it ran on past the unmount
+       cleanup, which clears the same timer — so deleting the debounce from the
+       handler still found a clearTimeout and the test passed. It does not now. */
+    const tapFn = g.slice(g.indexOf('const tap = async'), g.indexOf('useEffect(() => () => clearTimeout'))
+    assert.match(tapFn, /clearTimeout\(reread\.current\)/, 'a second tap no longer cancels the pending read')
+    assert.match(tapFn, /setTimeout\(\(\) => refreshTempo\(\)/, 'the tempo is never re-read, so the number goes stale')
+    assert.ok(
+      tapFn.indexOf('await tapBeat()') < tapFn.indexOf('setTimeout'),
+      'the read is scheduled before the tap is sent'
+    )
 
     // The size control moved to the screen it sizes, and left the tab row.
     const preset = g.slice(g.indexOf('className="gig-preset"'), g.indexOf('className="gig-signal"'))
