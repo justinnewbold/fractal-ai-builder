@@ -5926,6 +5926,76 @@ test('at the Mac the first no still stands', async () => {
   assert.equal(n, 1, 'the Mac now waits out a retry loop for an empty rig')
 })
 
+/*
+ * The same fault, on the chain read.
+ *
+ * "Now I'm switching seems I keep getting this error message. Couldn't read
+ * the chain from the phone, so there's nothing to switch here yet. Hitting the
+ * try again button always fixes it, but it really shouldn't happen."
+ *
+ * Right on both counts. The presence check was hardened against a busy port
+ * and this read never was, so it kept the old behaviour: one ask, one verdict,
+ * an error on the screen and a button whose only job was to ask again.
+ */
+test('a chain that comes back on the second ask is not an error on screen', async () => {
+  const answers = [null, [{ id: 1 }]]
+  let waited = 0
+  const list = await ds.confirmedChain({
+    read: async () => answers.shift(),
+    wait: async (ms) => {
+      waited += ms
+    }
+  })
+  assert.deepEqual(list, [{ id: 1 }], 'the first empty answer was taken as the verdict')
+  assert.ok(waited > 0, 'it asked again with no pause at all, which asks the same busy port')
+})
+
+test('a chain read that works costs nothing extra', async () => {
+  /*
+   * Retries are only allowed to spend time on the case that used to show an
+   * error. Every preset change runs this, so a pause on the good path would be
+   * a pause on every preset change.
+   */
+  let n = 0
+  const list = await ds.confirmedChain({
+    read: async () => {
+      n++
+      return []
+    },
+    wait: never
+  })
+  assert.deepEqual(list, [], 'an empty preset is a real answer, not a failed read')
+  assert.equal(n, 1, 'a good read was asked for more than once')
+})
+
+test('a chain that never reads still reports it, rather than asking for ever', async () => {
+  let n = 0
+  const list = await ds.confirmedChain({
+    read: async () => {
+      n++
+      return null
+    },
+    wait: async () => {}
+  })
+  assert.equal(list, null, 'a unit that will not report its chain was passed off as read')
+  assert.equal(n, ds.SETTLE_TRIES, 'it gave up early or kept asking for ever')
+})
+
+test('from a phone the chain read gets the relay allowance', async () => {
+  /*
+   * The read travels a relay to a Mac whose port is already busy with its own
+   * polling — the same reason the presence check asks more times from a phone.
+   */
+  let n = 0
+  const list = await ds.confirmedChain({
+    read: async () => (++n >= 4 ? [] : null),
+    wait: async () => {},
+    remote: true
+  })
+  assert.deepEqual(list, [], 'the phone gave up before the Mac was free to answer')
+  assert.equal(n, 4)
+})
+
 test('nothing was live, so the first answer stands', async () => {
   /*
    * The other half of the rule, and the reason this is not just a retry: an

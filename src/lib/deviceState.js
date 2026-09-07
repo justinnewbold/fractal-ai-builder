@@ -275,6 +275,46 @@ export async function refreshBlocks() {
   }
 }
 
+/**
+ * Read the chain, and do not take the first no for an answer.
+ *
+ * "Now I'm switching seems I keep getting this error message. Couldn't read
+ * the chain from the phone... Hitting the try again button always fixes it,
+ * but it really shouldn't happen."
+ *
+ * Right on both counts. This is the same fault confirmedDetect exists for, on
+ * a different read: a chain read fired straight after a preset change lands
+ * while the unit is still loading that preset, the port is busy, and the read
+ * comes back empty. One empty answer became "couldn't read the chain". Try
+ * again works because trying again is all that was ever needed — the second
+ * ask lands after the unit has finished.
+ *
+ * The presence check was hardened against exactly this and this read never
+ * was, so it kept the old behaviour: one ask, one verdict.
+ *
+ * Retries cost nothing when the read works, because a good read returns on the
+ * first attempt. They only spend time on the case that used to show an error.
+ *
+ * Takes its read and its wait, so the policy is tested in node against a fake
+ * that never touches a port.
+ */
+export async function confirmedChain({
+  read,
+  wait,
+  remote = false,
+  tries = SETTLE_TRIES,
+  relayTries = RELAY_TRIES,
+  gap = SETTLE_MS
+}) {
+  const attempts = remote ? Math.max(1, relayTries) : Math.max(1, tries)
+  for (let i = 0; i < attempts; i++) {
+    if (i) await wait(gap)
+    const list = await read()
+    if (Array.isArray(list)) return list
+  }
+  return null
+}
+
 export async function refreshScene() {
   if (!driver?.getScene) return
   try {

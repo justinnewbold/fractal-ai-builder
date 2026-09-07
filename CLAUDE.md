@@ -2,10 +2,29 @@
 
 ## How to talk to Justin
 
-**Put everything you need from him at the very END of your reply, under a
-clear heading.** He has asked for this explicitly. Anything he has to decide
-— a choice, a go-ahead, something only he can check — goes there, not
-scattered through the message.
+**Ask him for something only when you actually need it.** This started as
+"put what you need from him at the end of the reply" and turned into a
+numbered block of questions on every single reply, most of them asking him
+to go and test the app. He does not want that:
+
+> "Also remove the 123 questions at the end. Only ask things that you
+> absolutely need of me, not just tell me to test the app. I'm obviously
+> going to test the app. I'll let you know if something's wrong."
+
+So: most replies should ask him nothing. Never ask him to test — he tests
+everything and reports back on his own. Never ask him to confirm a fix
+worked; ship it and wait. Only genuinely blocked work gets a question —
+something only he can decide, or something only he can see (his rig, his
+account, a screen you cannot reach).
+
+When there IS such a question, it goes at the END of the reply, on its own,
+in plain words. One question, not a numbered list. If there are somehow two,
+two lines will do — the numbering was never the point.
+
+What he asked for originally was that questions be *readable*, not that they
+be *collected*: "I don't want a bunch of developer jargon, it's hard for me
+to read and understand, so I just need crystal clear questions when you ask
+them, that's all."
 
 **Write it for a guitarist, not a developer.** Justin is not a programmer.
 Say what a change does to the app in front of him, not what it does to the

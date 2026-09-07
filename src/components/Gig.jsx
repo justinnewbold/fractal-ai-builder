@@ -3,6 +3,7 @@ import { selectPreset, liveMeters, setChannel, setMetersWanted } from '../lib/fo
 import {
   useDevice,
   refreshBlocks as reReadChain,
+  confirmedChain,
   refreshScene,
   refreshSceneNames,
   writeScene,
@@ -105,11 +106,26 @@ export default function Gig({ preset, device, capabilities, size, onSize, onErro
    */
   const refreshBlocks = async ({ quiet = false } = {}) => {
     if (!quiet) setChain('reading')
-    // The list lives in the store; what's local is whether the last read
-    // worked. A unit that won't report its chain still gets scenes and preset
-    // steps — but it says so rather than showing an empty row and letting you
-    // assume the preset is empty.
-    setChain((await reReadChain()) ? 'ok' : 'failed')
+    /*
+     * The list lives in the store; what's local is whether the last read
+     * worked. A unit that won't report its chain still gets scenes and preset
+     * steps — but it says so rather than showing an empty row and letting you
+     * assume the preset is empty.
+     *
+     * One empty answer is not a verdict. This runs straight after a preset
+     * change, which is exactly when the unit is still loading that preset and
+     * its port is busy — so the ask has to survive a first no the same way the
+     * presence check does. Hitting Try again always worked because trying
+     * again was the whole fix; confirmedChain does it without the tap.
+     */
+    const list = await confirmedChain({
+      read: reReadChain,
+      wait: (ms) => new Promise((go) => setTimeout(go, ms)),
+      /* From a phone the read travels a relay to a Mac whose port is already
+         busy with its own polling, so a first no there means even less. */
+      remote: remoteActive()
+    })
+    setChain(list ? 'ok' : 'failed')
   }
 
   /*
