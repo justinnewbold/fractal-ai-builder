@@ -433,10 +433,15 @@ export default function Gig({ preset, device, capabilities, size, onSize, onErro
         */}
         {onSize ? (
           <div className="gig-size" role="group" aria-label="Button size">
-            {/* The step's name stays. He read it off the screen to tell me
-                "this says it's the smallest" — a control with five positions
-                and no readout is one you have to press to interrogate. */}
-            <span className="gig-size-label">{SIZES[size].name}</span>
+            {/*
+              No word. It said SMALLEST / SMALL / MEDIUM beside the buttons, on
+              a row already carrying a preset name that wraps to two lines — and
+              the size of the thing you are looking at is not something a label
+              has to tell you. The buttons disable at each end, which is the
+              only part of that readout doing work.
+
+              (SIZES is still what says where the ends are.)
+            */}
             <button
               className="gig-size-step"
               onClick={() => onSize(size - 1)}

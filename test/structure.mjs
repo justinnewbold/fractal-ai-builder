@@ -3302,7 +3302,11 @@ export function run(test) {
     // The size control moved to the screen it sizes, and left the tab row.
     const preset = g.slice(g.indexOf('className="gig-preset"'), g.indexOf('className="gig-signal"'))
     assert.match(preset, /className="gig-size"/, 'the size control is not beside the preset name')
-    assert.match(preset, /gig-size-label/, 'the step name is gone, so the control has no readout')
+    /* And it is the two buttons alone. The step's name was beside them —
+       "remove the word smallest, only show the plus minus" — on a row that
+       already carries a preset name long enough to wrap. The buttons disable at
+       each end, which is the part of that readout that was doing work. */
+    assert.ok(!/gig-size-label/.test(g), 'the size control is captioned again')
     assert.ok(
       !/className="gig-size"/.test(bare(app)),
       'the size control is still drawn in the tab row as well — two of them'
