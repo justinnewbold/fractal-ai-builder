@@ -2059,6 +2059,45 @@ export const selectPort = ({ transport = 'serial', id = null, inId, outId, model
       })
 
 /**
+ * How hard the host polls the unit while anything is listening.
+ *
+ * ForgeFX starts a telemetry supervisor the moment it has ONE event listener,
+ * and it keeps running for as long as that listener is there. On a gen-3 unit
+ * the balanced default is a 100ms tick, and each tick is FOUR back-to-back
+ * output-meter round trips — about forty SysEx transactions a second, at the
+ * control processor of a unit that is also making sound, forever.
+ *
+ * Reported as the audio cutting in and out for as long as the app was open and
+ * stopping the moment it was closed. Opening the app is what supplies the
+ * listener.
+ *
+ * 'reduced' takes that tick to 400ms and halves the CPU read, so the same
+ * screen costs the unit a quarter of the traffic. The three modes are
+ * ForgeFX's own — see telemetryProfiles.ts.
+ */
+export const setTelemetryMode = (mode) =>
+  mock
+    ? tick().then(() => ({ ok: true, mode }))
+    : request('/telemetry/config', { method: 'PUT', body: JSON.stringify({ mode }) })
+
+/**
+ * Tell the host whether this client is drawing a meter at all.
+ *
+ * The other half of setTelemetryMode. The mode decides how fast the meter
+ * loop runs; this decides whether it makes the meter reads. Off, the host
+ * keeps only the front-panel scene and channel watches — so a footswitch
+ * press is still noticed — and drops from four round trips every 100ms to two
+ * every 800ms. Measured on ForgeFX's own suite: 35 frames per 900ms against 2.
+ *
+ * A host that predates the route answers 404, which is not worth a word to
+ * anybody: it simply keeps the behaviour it already had.
+ */
+export const setMetersWanted = (on) =>
+  mock
+    ? tick().then(() => ({ ok: true, meters: !!on }))
+    : request('/telemetry/meters', { method: 'POST', body: JSON.stringify({ on: !!on }) })
+
+/**
  * Whether this page is being served from ForgeFX itself.
  *
  * It matters for reaching the server from another device. A browser lets an
