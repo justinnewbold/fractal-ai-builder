@@ -55,11 +55,19 @@ export const clampSize = (n) => {
  * the gap between them is kept rather than recomputed.
  */
 export const sizeVars = (n) => {
-  const s = SIZES[clampSize(n)]
+  const i = clampSize(n)
+  const s = SIZES[i]
   return {
     '--gig-tile': `${s.tile}px`,
     '--gig-col': `${s.col}px`,
-    '--gig-col-block': `${s.col + 20}px`
+    /*
+     * A block column is wider than a scene column at every size but the bottom
+     * one, where the extra 20px is what puts blocks three to a row instead of
+     * four — and a fourteen-block preset five rows deep instead of four. The
+     * name inside is clipped to one line at this size, so the width no longer
+     * has to hold a whole name; it holds a state and a channel.
+     */
+    '--gig-col-block': `${s.col + (i === 0 ? 4 : 20)}px`
   }
 }
 
