@@ -48,14 +48,16 @@
     "anything: tuning from a phone away from the Mac. Throttled to one reading",
     "every 80 ms so a future poll cadence cannot flood the relay.",
     "",
-    "The branch moved again, and for a fault a player hit twice: \"PRESET_DUMP_HEADER: expected func 0x77 at offset 0, got 0x78\" on switching presets. The server decided a preset dump had arrived by checking for chunks and a terminator and taking the header on trust, so a dump whose HEADER went missing was handed to the codec instead of being re-read by the retry that was already there. The fix sits on top of the three patches above rather than on upstream main, which does not carry them — re-pinning to main would have taken renaming, host addressing and the remote tuner away with it."
+    "The branch moved again, and for a fault a player hit twice: \"PRESET_DUMP_HEADER: expected func 0x77 at offset 0, got 0x78\" on switching presets. The server decided a preset dump had arrived by checking for chunks and a terminator and taking the header on trust, so a dump whose HEADER went missing was handed to the codec instead of being re-read by the retry that was already there. The fix sits on top of the three patches above rather than on upstream main, which does not carry them — re-pinning to main would have taken renaming, host addressing and the remote tuner away with it.",
+    "",
+    "And the branch carries one more, for the units this app has no cable to. The capability report answered HOW MANY PRESETS a unit stores by reading the shape of its SIGNAL CHAIN -- grid meant 512, linear meant 104. Those are not the same fact. A VP4 runs a linear chain and is not an AM4, so it was served the AM4's 104 locations and its A01..Z04 bank letters; an Axe-Fx II, having a grid, was told it held 512 where the codec's own gen-2 device says 384. Every driver now states its own count, and a unit nobody has counted on hardware says null rather than borrowing another one's."
   ],
   "forgefx": {
     "repo": "justinnewbold/forgefx",
     "upstream": "sKuhLight/forgefx",
-    "tag": "v0.7.2-beta+rename+host+tuner+dumphdr",
-    "commit": "21fdd946cb3c4f5a6dd897ff5f645e58f5bd4ca9",
-    "branch": "claude/dump-header-fix"
+    "tag": "v0.7.3-beta+rename+host+tuner+dumphdr+presetloc",
+    "commit": "a354dc7c6a049a27eef505338ded9b4b99387db5",
+    "branch": "claude/address-one-host"
   },
   "forgefx-midi": {
     "repo": "justinnewbold/forgefx-midi",
