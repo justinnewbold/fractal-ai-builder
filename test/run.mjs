@@ -6616,6 +6616,7 @@ test('the Tap button opens the tempo box on a hold or a right-click, at both end
   assert.match(sync, /shared\/tempo\.mjs.*mobile\/src\/lib\/tempo\.js/, 'the phone’s copy of the tempo rule is not generated')
 })
 
+<<<<<<< HEAD
 
 console.log('\nthe Mac app closes, updates, and reopens')
 /*
@@ -6780,6 +6781,8 @@ test('an app run from Downloads is offered a home in Applications first', () => 
   assert.match(ui, /state\?\.detail[\s\S]*?Technical details/, 'what macOS wrote about the failed install is not shown anywhere')
 })
 
+=======
+>>>>>>> origin/main
 await settle()
 /*
  * The tally has to say when it is red.
