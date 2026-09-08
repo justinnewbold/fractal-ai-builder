@@ -3,6 +3,14 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.116.0
+
+**One clock while the model thinks.** The line read "Thinking… 30s · 37s":
+the server's heartbeat wrote its own count, rounded to tens, beside the live
+clock that already counts every second. "Only show it counting the actual
+amount of seconds." The rounded one is gone; the heartbeat still keeps the
+line alive, and the seconds are the real ones.
+
 ## 7.115.0
 
 **The save button stays under your thumb.** "On the phone … clicking on a

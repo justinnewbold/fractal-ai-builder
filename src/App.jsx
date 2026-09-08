@@ -1739,17 +1739,17 @@ export default function App() {
             else if (e.kind === 'open')
               setProgress(e.attempt ? `${THINKING}… (second try)` : `${THINKING}…`)
             /*
-             * The wait, counted out loud.
-             *
-             * The model thinks before it writes anything, and on a big preset
-             * that is a minute or more of a line that does not move. Saying how
-             * long is not decoration — it is the difference between a screen
-             * that looks stuck and one that is visibly still going, and it is
-             * the only honest thing there is to report until the first block
-             * arrives.
+             * The wait is counted out loud — once. <Thinking> keeps a live
+             * clock of its own, to the second, from when the request began.
+             * This event used to write the server's coarser count into the
+             * line beside it, so the screen read "Thinking… 30s · 37s": two
+             * numbers for one wait, one of them jumping by tens. "Only show it
+             * counting the actual amount of seconds." The heartbeat still
+             * matters — it is what proves the model is still there — but the
+             * line it keeps alive already says everything it would add.
              */
             else if (e.kind === 'waiting')
-              setProgress(`${THINKING}… ${Math.round((e.thinkingMs || 0) / 1000)}s`)
+              setProgress((was) => (was && was.startsWith(THINKING) ? was : `${THINKING}…`))
             else if (e.kind === 'partial') {
               setProgress(
                 e.blocks
