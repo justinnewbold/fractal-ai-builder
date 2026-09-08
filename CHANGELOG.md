@@ -3,6 +3,22 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.112.0
+
+**"Restart to update", like every other Mac app.** "On most Mac apps that
+update it usually says refresh app to update and they click one button and it
+closes the app for them. Is it possible for us to do that?" It already did:
+the notice had an Install now button that closes the app and reopens it on
+the new version. But the notice led with "installs when you quit" and the
+button read as a technicality under a wait.
+
+- The notice now says the version is ready to install, that restarting closes
+  and reopens the app in a few seconds, and offers **Restart to update** as
+  the thing to press. **Later** is still there, and still means it installs
+  the next time you quit — nothing restarts itself.
+- The same button appears in Setup → Updates while an update is waiting, so
+  dismissing the notice is not the end of it.
+
 ## 7.111.0
 
 **Nobody has to sign in to connect a phone.** "User shouldn't be required to

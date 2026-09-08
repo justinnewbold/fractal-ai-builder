@@ -1655,6 +1655,28 @@ test('an update never depends on the quit working', () => {
   assert.match(main, /async function stopServing\(\)/, 'the teardown is not shared with the quit')
 })
 
+test('the update offers a restart in the words every other Mac app uses', () => {
+  /*
+   * "On most Mac apps that update it usually says refresh app to update and
+   * they click one button and it closes the app for them. Is it possible for
+   * us to do that?" It already did — but the notice led with "installs when
+   * you quit" and the button said "Install now", so the one-button restart
+   * read as a technicality under a wait.
+   */
+  const ui = readSrc(new URL('../src/components/Updates.jsx', import.meta.url), 'utf8')
+  const notice = ui.slice(ui.indexOf('export function UpdateReadyNotice'))
+  assert.match(notice, /Restart to update/, 'the button does not say what it does')
+  assert.match(notice, /closes and reopens/, 'nothing says the app comes back on its own')
+  assert.match(notice, /className="primary"[\s\S]*?Restart to update/, 'the restart is a chip beside Later rather than the thing to press')
+  assert.ok(!/'Install now'/.test(ui), 'the button still says Install now')
+  // The quiet default is unchanged: Later still leaves it to install on quit.
+  assert.match(notice, /installs the next time you quit/)
+  assert.match(notice, /Later/)
+  // And Setup offers the same button, so the notice being dismissed is not the end of it.
+  const panel = ui.slice(ui.indexOf('export default function Updates'), ui.indexOf('export function UpdateReadyNotice'))
+  assert.match(panel, /updateReady\(state\) && bridge\.updates\.install[\s\S]*?Restart to update/, 'Setup has no way to finish an update that is sitting there')
+})
+
 test('nothing can stop the app closing', () => {
   /*
    * Three separate ways the quit could stall, each of which read to the person
