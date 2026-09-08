@@ -7240,6 +7240,56 @@ button.phone-chip.dim {
   margin-top: var(--s-6);
 }
 
+/*
+ * The pairing code, typed. Wide letter-spaced mono so a code read off a Mac
+ * across the room can be checked group by group; the button sits under it
+ * because a 19-character field and a button do not share a phone's width.
+ */
+.connect-code-row {
+  width: 100%;
+  max-width: 320px;
+}
+
+.connect-code-row input {
+  width: 100%;
+  min-height: 52px;
+  padding: var(--s-2) var(--s-3);
+  font-family: var(--mono);
+  font-size: var(--f-3);
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--silk);
+  background: var(--chassis);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+}
+
+.connect-code-row input::placeholder {
+  letter-spacing: 0.12em;
+  color: var(--silk-dim);
+  opacity: 0.6;
+}
+
+/* Signing in, offered third and for what it buys — same rule and weight as the wifi route. */
+.connect-account {
+  width: 100%;
+  max-width: 420px;
+  margin-top: var(--s-5);
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--rule);
+  text-align: left;
+}
+
+/* The code a paired Mac shows, under its QR. */
+.pair-code {
+  margin: 0;
+  font-size: var(--f-3);
+  letter-spacing: 0.14em;
+  color: var(--signal);
+  user-select: all;
+}
+
 /* The sign-in form: two fields stacked, the button under them, the two
    side-doors as plain links. */
 .signin {

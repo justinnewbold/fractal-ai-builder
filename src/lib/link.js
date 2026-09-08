@@ -48,8 +48,11 @@ import {
   remoteHosts,
   remoteChosenHost,
   pickHost,
-  signOut
+  signOut,
+  remoteSignUp
 } from './remote.js'
+import { isPairAccount, makePairCode, normalizePairCode, pairCredentials, pairCodeFromUrl } from '../../shared/pairing.mjs'
+export { isPairAccount, formatPairCode, pairLink, normalizePairCode, isPairCode } from '../../shared/pairing.mjs'
 
 /**
  * Which end this is.
@@ -141,10 +144,12 @@ export function describeLink(state) {
 
   if (role === 'mac') {
     if (link === 'connected') {
+      // A paired Mac has an account nobody chose; naming it would only puzzle.
+      const paired = isPairAccount(email)
       return {
         word: 'remote on',
-        sentence: `Phone remote is on${email ? ` for ${email}` : ''}`,
-        note: `On${email ? ` · ${email}` : ''}`,
+        sentence: `Phone remote is on${paired ? ' — paired, no account' : email ? ` for ${email}` : ''}`,
+        note: `On${paired ? ' · paired' : email ? ` · ${email}` : ''}`,
         tone: 'good'
       }
     }
@@ -161,7 +166,7 @@ export function describeLink(state) {
     return {
       word: 'remote off',
       sentence: 'Phone remote is off',
-      note: `Off${email ? ` · ${email}` : ''}`,
+      note: `Off${email && !isPairAccount(email) ? ` · ${email}` : ''}`,
       tone: 'dim'
     }
   }
@@ -325,7 +330,9 @@ let state = {
   /** remote role: every Mac that answered the roll call, by name. */
   hosts: [],
   /** remote role: which of them requests are addressed to, or null. */
-  chosenHost: null
+  chosenHost: null,
+  // Why the last pairing from a scanned code failed, for the connect screen.
+  pairError: null
 }
 let joining = false
 /*
@@ -644,7 +651,29 @@ export async function bootLink() {
   if (role === 'mac') {
     await readMac()
   } else if (role === 'remote') {
-    if (account && wantsAutoConnect() !== false) {
+    /*
+     * A phone that scanned the Mac's code arrives with it in the address.
+     * Pairing is the whole of what it came to do, so it happens here, before
+     * the connect screen could ask for anything — and the code comes out of
+     * the address at once, so a reload or a shared link does not pair twice.
+     */
+    const scanned =
+      typeof window !== 'undefined'
+        ? pairCodeFromUrl({ hash: window.location.hash, search: window.location.search })
+        : null
+    if (scanned) {
+      try {
+        window.history.replaceState(null, '', window.location.pathname)
+      } catch {
+        // The address stays; pairing still happens.
+      }
+      try {
+        await pairPhone(scanned)
+      } catch (err) {
+        set({ pairError: err.message })
+        refresh()
+      }
+    } else if (account && wantsAutoConnect() !== false) {
       // join() announces itself as joining first, so the screen goes from
       // "connecting" to "connecting" — never through "isn't answering".
       await join()
@@ -724,13 +753,76 @@ export async function disconnectPhone() {
  * to be three forms.
  */
 export async function setUpMac({ email, password }) {
-  const { cloudLogin, remoteEnable, writeHostDoc, readHostDoc } = await device()
   const config = loadRemoteConfig() || {}
   await remoteSignIn({ url: config.url, anonKey: config.anonKey, email, password })
-  saveRemoteConfig({ ...config, email: email.trim() })
-  const account = await currentAccount()
-  set({ account })
+  // A person's own account replaces any pairing this Mac had.
+  saveRemoteConfig({ ...config, email: email.trim(), pairCode: null })
+  set({ account: await currentAccount() })
+  await turnOnMac({ email, password })
+  return state
+}
 
+/**
+ * Set the Mac up with nobody making an account.
+ *
+ * Makes a pairing code, makes the hidden account the code stands for, signs
+ * both the browser and the device server in as it, and turns the host on —
+ * the same three steps as setUpMac, with the code where the form was. The
+ * code is kept here so the Mac can show it again: to a second phone, or to
+ * the same phone after it forgot.
+ *
+ * The one thing that can stop it is the account service insisting on a
+ * confirmation email, which nothing will ever read. That is a project
+ * setting, not a person's mistake, and the message says so in words.
+ */
+export async function pairMac() {
+  const config = loadRemoteConfig() || {}
+  const code = makePairCode()
+  const { email, password } = pairCredentials(code)
+  const { needsConfirmation } = await remoteSignUp({ url: config.url, anonKey: config.anonKey, email, password })
+  if (needsConfirmation) {
+    throw new Error(
+      'This Mac couldn’t pair without an account, because the account service is set to confirm every new account by email. Sign in with an account instead, or turn off “Confirm email” for the project.'
+    )
+  }
+  await remoteSignIn({ url: config.url, anonKey: config.anonKey, email, password })
+  saveRemoteConfig({ ...config, email, pairCode: code })
+  set({ account: await currentAccount() })
+  await turnOnMac({ email, password })
+  return state
+}
+
+/** The code this Mac was paired with, if it was paired from this browser. */
+export const savedPairCode = () => {
+  const config = loadRemoteConfig()
+  const code = config?.pairCode ? normalizePairCode(config.pairCode) : null
+  return code && isPairAccount(config?.email) ? code : null
+}
+
+/**
+ * Connect this phone with the code the Mac shows. No account is asked for;
+ * the code stands for one, and the phone stays paired from here on.
+ */
+export async function pairPhone(code) {
+  const clean = normalizePairCode(code)
+  if (!clean) throw new Error('That isn’t a pairing code. It’s 16 letters and numbers, shown on your Mac.')
+  set({ pairError: null })
+  try {
+    await connectPhone(pairCredentials(clean))
+  } catch (err) {
+    // The sign-in failed because there is no such account — a mistyped code,
+    // or a Mac that was paired again since. Say that, not "invalid login".
+    if (/didn’t match|invalid login/i.test(err.message || '')) {
+      throw new Error('No Mac is paired with that code. Check it against the code your Mac shows.')
+    }
+    throw err
+  }
+  return state
+}
+
+/** Sign the device server in with the same details, and turn the host on. */
+async function turnOnMac({ email, password }) {
+  const { cloudLogin, remoteEnable, writeHostDoc, readHostDoc } = await device()
   await cloudLogin(email, password)
   const res = await remoteEnable(true)
   if (res?.error) throw new Error("Signed in, but couldn't turn the phone remote on. Try again.")
@@ -781,6 +873,6 @@ export function _resetLink() {
   joining = false
   restoring = false
   booted = false
-  state = { role: 'unknown', link: 'off', account: null, hostOn: false, macName: null, since: Date.now(), cloud: null, clash: null, hosts: [], chosenHost: null }
+  state = { role: 'unknown', link: 'off', account: null, hostOn: false, macName: null, since: Date.now(), cloud: null, clash: null, hosts: [], chosenHost: null, pairError: null }
   watchers.clear()
 }

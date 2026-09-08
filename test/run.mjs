@@ -6454,6 +6454,90 @@ test('what the link says contains no plumbing', () => {
   assert.equal(link.describeLink({ role: 'mac', link: 'signed-out', account: null }).word, 'remote')
 })
 
+
+console.log('\npairing')
+/*
+ * The phone was asked for an email and a password before it would do
+ * anything. "User shouldn't be required to sign in unless they want to save
+ * and sync across the cloud. It's requiring a login to connect." The relay
+ * still needs an account at both ends; the code stands for one nobody sees.
+ */
+import * as pairing from '../shared/pairing.mjs'
+
+test('a code is 16 symbols nobody misreads, shown in fours', () => {
+  const bytes = (arr) => arr.map((_, i) => i * 7)
+  const code = pairing.makePairCode(bytes)
+  assert.equal(code.length, 16)
+  assert.match(code, /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{16}$/, 'the alphabet has a 0, 1, I or O in it')
+  assert.equal(pairing.formatPairCode(code), `${code.slice(0, 4)}-${code.slice(4, 8)}-${code.slice(8, 12)}-${code.slice(12)}`)
+  // Two calls with real randomness never agree.
+  assert.notEqual(pairing.makePairCode(), pairing.makePairCode())
+})
+
+test('a code typed carelessly is still the code', () => {
+  const code = 'ABCDEFGHJKLMNPQR'
+  for (const typed of ['abcd-efgh-jklm-npqr', 'ABCD EFGH JKLM NPQR', ' abcdefghjklmnpqr ', 'ABCD-EFGH-JKLM-NPQR']) {
+    assert.equal(pairing.normalizePairCode(typed), code, typed)
+    assert.ok(pairing.isPairCode(typed), typed)
+  }
+  assert.equal(pairing.normalizePairCode('ABCD-EFGH-JKLM-NPQ'), null, 'fifteen symbols passed as a code')
+  assert.equal(pairing.normalizePairCode('ABCD-EFGH-JKLM-NPQ0'), null, 'a zero passed, and no code has one')
+  assert.equal(pairing.normalizePairCode(''), null)
+  assert.equal(pairing.normalizePairCode(null), null)
+})
+
+test('the same code is the same account at both ends, and the address gives half of it away at most', () => {
+  const a = pairing.pairCredentials('abcd-efgh-jklm-npqr')
+  const b = pairing.pairCredentials('ABCDEFGHJKLMNPQR')
+  assert.deepEqual(a, b, 'a typed code and a scanned one sign in as different people')
+  assert.equal(a.email, 'pair-abcdefgh@pair.fractal.newbold.cloud')
+  assert.equal(a.password, 'pair-ABCDEFGHJKLMNPQR')
+  assert.ok(a.password.length >= 6, 'the account service refuses passwords under six')
+  assert.ok(!a.email.toUpperCase().includes('JKLMNPQR'), 'the address, which screens show, carries the whole code')
+  assert.throws(() => pairing.pairCredentials('nope'), /isn’t a pairing code/)
+})
+
+test('a paired account is told apart from a person’s, so no screen shows it as an email', () => {
+  assert.ok(pairing.isPairAccount('pair-abcdefgh@pair.fractal.newbold.cloud'))
+  assert.ok(!pairing.isPairAccount('justin@example.com'))
+  assert.ok(!pairing.isPairAccount('pair-abcdefgh@example.com'), 'anyone with a pair- address would be shown as paired')
+  assert.ok(!pairing.isPairAccount(null))
+  const paired = { email: 'pair-abcdefgh@pair.fractal.newbold.cloud' }
+  for (const l of ['connected', 'off']) {
+    const said = link.describeLink({ role: 'mac', link: l, account: paired })
+    assert.ok(!/pair-abcdefgh|@/.test(said.sentence + said.note), `${l}: ${said.sentence} / ${said.note}`)
+  }
+  assert.match(link.describeLink({ role: 'mac', link: 'connected', account: paired }).sentence, /paired/i)
+  assert.match(link.describeLink({ role: 'mac', link: 'connected', account: { email: 'j@x.com' } }).sentence, /for j@x.com/)
+})
+
+test('the QR opens the hosted app with the code in the fragment, and the phone reads it back', () => {
+  const url = pairing.pairLink('abcd-efgh-jklm-npqr')
+  assert.equal(url, 'https://fractal.newbold.cloud/#pair=ABCDEFGHJKLMNPQR')
+  assert.equal(pairing.pairLink('bad'), null)
+  assert.equal(pairing.pairCodeFromUrl({ hash: '#pair=ABCDEFGHJKLMNPQR' }), 'ABCDEFGHJKLMNPQR')
+  assert.equal(pairing.pairCodeFromUrl({ hash: '#pair=abcd-efgh-jklm-npqr' }), 'ABCDEFGHJKLMNPQR', 'a code typed into a link is not read')
+  assert.equal(pairing.pairCodeFromUrl({ search: '?x=1&pair=ABCDEFGHJKLMNPQR' }), 'ABCDEFGHJKLMNPQR')
+  assert.equal(pairing.pairCodeFromUrl({ hash: '#other', search: '' }), null)
+  assert.equal(pairing.pairCodeFromUrl({}), null)
+  // The hosted origin the QR points at is the one the app already knows itself by.
+  const platform = readSrc(new URL('../src/lib/platform.js', import.meta.url), 'utf8')
+  assert.match(platform, new RegExp(`HOSTED = '${new URL(pairing.HOSTED_ORIGIN).hostname}'`), 'the QR points somewhere other than the hosted app')
+})
+
+test('a scanned code pairs before the connect screen can ask for anything', () => {
+  const src = readSrc(new URL('../src/lib/link.js', import.meta.url), 'utf8')
+  const boot = src.slice(src.indexOf('export async function bootLink'))
+  assert.match(boot, /pairCodeFromUrl\(\{ hash: window\.location\.hash/, 'bootLink never looks for a code in the address')
+  assert.match(boot, /replaceState\(null, '', window\.location\.pathname\)/, 'the code stays in the address, so a reload pairs again')
+  assert.match(boot, /await pairPhone\(scanned\)/, 'a scanned code is found and not acted on')
+  assert.match(src, /set\(\{ pairError: err\.message \}\)/, 'a bad scanned code fails silently')
+  // The Mac's pairing and a person's sign-in are the same three steps after the account.
+  assert.match(src, /export async function pairMac\(\)[\s\S]*?await turnOnMac\(/, 'pairing the Mac does not turn the host on')
+  assert.match(src, /export async function setUpMac\([\s\S]*?await turnOnMac\(/, 'signing the Mac in no longer turns the host on')
+  assert.match(src, /needsConfirmation[\s\S]*?Confirm email/, 'a project that confirms every account fails pairing with no words about why')
+})
+
 await settle()
 /*
  * The tally has to say when it is red.

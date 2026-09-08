@@ -3480,4 +3480,50 @@ export function run(test) {
       'the scenes card still says a lead scene cannot have a hotter amp'
     )
   })
+
+  test('nobody has to sign in to connect a phone', () => {
+    /*
+     * "User shouldn't be required to sign in unless they want to save and
+     * sync across the cloud. It's requiring a login to connect."
+     *
+     * The phone's Connect button opened the sign-in sheet, and the Mac's
+     * "Set up phone remote" opened it too. Now the first thing either end
+     * offers is a code — made at the Mac, scanned or typed at the phone — and
+     * signing in is offered third, for what it buys.
+     */
+    const connect = readFileSync(new URL('../src/components/ConnectScreen.jsx', import.meta.url), 'utf8')
+    const codeAt = connect.indexOf('connect-code-row')
+    const wifiAt = connect.indexOf('connect-local"')
+    const accountAt = connect.indexOf('connect-account')
+    assert.ok(codeAt > 0, 'the phone has nowhere to type the code from the Mac')
+    assert.ok(accountAt > 0, 'signing in is not offered at all')
+    assert.ok(codeAt < wifiAt && wifiAt < accountAt, 'signing in comes before the routes that need no account')
+    assert.match(connect, /No account needed/, 'the code route does not say the thing that makes it the first choice')
+    assert.match(connect, /onPair\(code\)/, 'a typed code goes nowhere')
+    assert.match(connect, /autoComplete="one-time-code"/, 'the code field is not offered as a code to the keyboard')
+    assert.match(connect, /pairError/, 'a scanned code that fails is failed silently')
+    assert.ok(!/Sign in and this phone becomes/.test(connect), 'the phone still leads with signing in')
+    // A paired phone is never shown its hidden address as though it were an email.
+    assert.match(connect, /paired \? 'Connect' : `Connect as \$\{remembered\}`/, 'a paired phone is offered "Connect as pair-…@…"')
+
+    const panel = readFileSync(new URL('../src/components/PhoneRemote.jsx', import.meta.url), 'utf8')
+    const macIdle = panel.slice(panel.indexOf("if (link.link === 'signed-out')"), panel.indexOf('const paired = isPairAccount(email)'))
+    assert.match(macIdle, /onAction\('mac-pair'\)[\s\S]*?Set up phone remote/, 'the Mac’s Set up phone remote still opens the sign-in sheet')
+    assert.match(macIdle, /Sign in with an account instead/, 'the Mac no longer offers an account at all')
+    assert.match(panel, /function PairCard/, 'a paired Mac has no code to show')
+    assert.match(panel, /pairLink\(code\)/, 'the Mac’s QR does not carry the code')
+    assert.match(panel, /formatPairCode\(code\)/, 'the code is shown only as a QR, so a camera that will not focus is stuck')
+    assert.match(panel, /Unpair this Mac/, 'a paired Mac has no way out of pairing')
+
+    assert.match(src, /kind === 'mac-pair'[\s\S]*?await pairMac\(\)/, 'the Mac’s pair button does nothing')
+    assert.match(src, /onPair=\{pairFromCode\}/, 'the connect screen’s code is not wired to anything')
+    assert.match(src, /await pairPhone\(code\)/, 'a typed code never signs the phone in')
+
+    // The phone apps take the same code, derived the same way, from the same source.
+    const sync = readFileSync(new URL('../scripts/sync-relay-rules.mjs', import.meta.url), 'utf8')
+    assert.match(sync, /shared\/pairing\.mjs.*mobile\/src\/lib\/pairing\.js/, 'the phone app has its own idea of what a code means')
+    const native = readFileSync(new URL('../mobile/src/screens/SignIn.js', import.meta.url), 'utf8')
+    assert.match(native, /useState\('code'\)/, 'the phone app still leads with the account form')
+    assert.match(native, /pairCredentials\(code\)/, 'the phone app’s code does not sign in')
+  })
 }

@@ -3,6 +3,32 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.111.0
+
+**Nobody has to sign in to connect a phone.** "User shouldn't be required to
+sign in unless they want to save and sync across the cloud. It's requiring a
+login to connect." The phone's Connect button opened a sign-in form, and the
+Mac's Set up phone remote opened the same form. Both ends now lead with a code.
+
+- At the Mac, **Set up phone remote** makes a pairing code and shows it as a
+  QR and as text — `XXXX-XXXX-XXXX-XXXX`. No email, no password. Signing in
+  with an account is still offered beside it, for what it buys: presets and
+  what the AI has learned about your taste following you between devices.
+- On the phone, the first thing on the connect screen is the code. Point the
+  camera at the Mac's QR and the app opens already connected; or type the
+  code. The same-wifi route is second, and signing in is third.
+- The phone apps take the same code on their first screen, with the account
+  form one tap behind it.
+- Underneath, the link still runs on a private channel between two ends signed
+  in as the same account — that is the security model and it has not moved.
+  The code stands for an account the person never sees, derived the same way
+  at both ends from `shared/pairing.mjs`, which the phone app carries a
+  generated copy of. The address the Mac signs in with carries only half the
+  code, so no screen that names the account gives away enough to connect.
+- The one thing that can stop pairing is the account service insisting on a
+  confirmation email for every new account. The Mac says so in words if it
+  happens, and offers the account route instead.
+
 ## 7.90.1
 
 **The check that only passed on the machine that wrote it.** `npm test` reads
