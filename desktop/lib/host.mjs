@@ -397,6 +397,105 @@ export async function whoHasPort({ port = DEFAULT_PORT, fetch = globalThis.fetch
   return { free: false, forgefx: false }
 }
 
+/**
+ * Whether a process listening on the port is a device server THIS APP started.
+ *
+ * Force Quit leaves one behind: the app dies with SIGKILL, no quit handler
+ * runs, and the server it spawned keeps the port. The next launch found it,
+ * said "ForgeFX is already running", and quit — so the app could not be opened
+ * again until the Mac was restarted. Reported in exactly those words.
+ *
+ * A stray of ours is safe to stop: nobody else is using it, by construction —
+ * it is a child whose parent is gone. Somebody's own ForgeFX in a Terminal is
+ * not ours to touch, so the command line has to say it came out of this app:
+ * the server path inside a Fractal Remote bundle, or the wrapper this app
+ * starts it through. Pure, so it can be tested with strings.
+ */
+export function isOurServer(command) {
+  const c = String(command || '')
+  if (!/forgefx\/server\/dist\/index\.js/.test(c)) return false
+  return /Fractal Remote\.app\//.test(c) || /\/lib\/child\.cjs/.test(c)
+}
+
+/**
+ * The processes listening on the port, with their command lines.
+ *
+ * `run` executes a command and returns its stdout; injected so this is
+ * testable without lsof. lsof exits non-zero when nothing listens, which is an
+ * answer rather than a failure. Never throws: a sweep that cannot look simply
+ * finds nothing, and the caller falls back to the message it always showed.
+ */
+export function listeners({ port = DEFAULT_PORT, run }) {
+  let out = ''
+  try {
+    out = run('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t']) || ''
+  } catch {
+    return []
+  }
+  const pids = [...new Set(out.split(/\s+/).map((x) => Number(x)).filter((n) => Number.isInteger(n) && n > 0))]
+  return pids.map((pid) => {
+    let command = ''
+    try {
+      command = (run('ps', ['-o', 'command=', '-p', String(pid)]) || '').trim()
+    } catch {
+      // A process that vanished between the two calls. Nothing to stop.
+    }
+    return { pid, command }
+  })
+}
+
+/**
+ * Take the port back from a device server this app left behind.
+ *
+ *   'none'      — nothing of ours is holding it
+ *   'reclaimed' — it was, and it is gone now
+ *   'failed'    — it was, and it would not go
+ *
+ * SIGTERM first and a moment to let it close the serial port cleanly, then
+ * SIGKILL, then a moment more. Every wait has a deadline; the caller is the
+ * app's startup and it must not hang there.
+ */
+export async function reclaimPort({
+  port = DEFAULT_PORT,
+  run,
+  kill = (pid, signal) => process.kill(pid, signal),
+  alive = (pid) => {
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch {
+      return false
+    }
+  },
+  sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
+  grace = 3000,
+  step = 100
+} = {}) {
+  const ours = listeners({ port, run }).filter((p) => isOurServer(p.command))
+  if (!ours.length) return 'none'
+  const wait = async (pid) => {
+    let waited = 0
+    while (waited < grace && alive(pid)) {
+      await sleep(step)
+      waited += step
+    }
+    return !alive(pid)
+  }
+  let all = true
+  for (const { pid } of ours) {
+    try {
+      kill(pid, 'SIGTERM')
+      if (await wait(pid)) continue
+      kill(pid, 'SIGKILL')
+      if (!(await wait(pid))) all = false
+    } catch {
+      // Already gone between the look and the kill — that is the outcome we want.
+      if (alive(pid)) all = false
+    }
+  }
+  return all ? 'reclaimed' : 'failed'
+}
+
 /** What to say when the port is held by a ForgeFX we did not start. */
 export const PORT_TAKEN = (port = DEFAULT_PORT) =>
   `ForgeFX is already running on this Mac, on port ${port}.\n\n` +

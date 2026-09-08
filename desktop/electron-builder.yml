@@ -28,6 +28,10 @@ files:
   - lib/**
   - trayTemplate*.png
   - package.json
+# The server's watchdog is run by the Electron binary as a plain Node script,
+# which needs a real path rather than one inside the archive. See main.js.
+asarUnpack:
+  - lib/child.cjs
 extraResources:
   - from: ../dist
     to: dist

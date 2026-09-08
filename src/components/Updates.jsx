@@ -55,7 +55,29 @@ export default function Updates() {
         {line || 'Nothing checked yet this session.'}
       </p>
       {advice ? <p className="hint">{advice}</p> : null}
+      {/*
+        Why, when an install did not take. The lines macOS wrote while it tried
+        are the only record of what went wrong, and until this the app had no
+        way to show them — "the same update is available" was the whole report.
+        Folded, because it is for pasting into a message, not for reading.
+      */}
+      {state?.detail ? (
+        <details className="updates-detail">
+          <summary>Technical details</summary>
+          <pre className="mono">{state.detail}</pre>
+        </details>
+      ) : null}
       <div className="history-actions">
+        {(state?.kind === 'misplaced' || state?.kind === 'stuck') && bridge.updates.moveToApplications ? (
+          <button className="primary" disabled={asking} onClick={() => bridge.updates.moveToApplications().catch(() => {})}>
+            Move to Applications
+          </button>
+        ) : null}
+        {(state?.kind === 'stuck' || state?.kind === 'misplaced') && bridge.updates.openReleases ? (
+          <button className="chip" onClick={() => bridge.updates.openReleases().catch(() => {})}>
+            Download from GitHub
+          </button>
+        ) : null}
         {updateReady(state) && bridge.updates.install ? (
           <button
             className="primary"

@@ -51,6 +51,12 @@ contextBridge.exposeInMainWorld('fractalDesktop', {
      */
     install: () => ipcRenderer.invoke('updates:install'),
 
+    /** Open the release page in the browser — the way out when an install will not take. */
+    openReleases: () => ipcRenderer.invoke('updates:releases'),
+
+    /** Move the app into Applications and reopen it from there. macOS only. */
+    moveToApplications: () => ipcRenderer.invoke('updates:move'),
+
     /**
      * Told when it changes. Returns the unsubscribe, because a page that
      * navigates without one leaks a listener per visit.

@@ -48,8 +48,16 @@ export function updateAdvice(state) {
     case 'downloading':
     case 'found':
       return 'It downloads in the background. You will be told when it is ready.'
+    case 'staging':
+      return 'Downloaded. macOS is checking it over; Restart to update appears when it is done.'
     case 'trouble':
-      return 'The check failed — usually no internet, or GitHub being slow. The app works regardless.'
+      return state.message
+        ? 'Something went wrong with the update. The app works regardless; try Check for updates again.'
+        : 'The check failed — usually no internet, or GitHub being slow. The app works regardless.'
+    case 'stuck':
+      return 'The app restarted but macOS did not swap it. This nearly always means the app is not in your Applications folder. Move it there and try again — or download the new version from GitHub and drag it into Applications.'
+    case 'misplaced':
+      return 'Fractal Remote is not in your Applications folder, and macOS only replaces an app that is. Move it there and updates install themselves again.'
     case 'current':
       return 'This is the newest version.'
     case 'checking':

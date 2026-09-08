@@ -6,9 +6,10 @@
  * `npm run serve` and tested without a Mac. What is left here is the part that
  * genuinely needs Electron: a window, a menu-bar item, and a child process.
  *
- * It lives in the menu bar rather than the dock because it is a service with a
- * status, not a document you open. Quitting it is how you stop serving; closing
- * the window is not.
+ * It lives in the menu bar as well as the dock because it is a service with a
+ * status. Closing its window quits it — "the app does not close out all the
+ * way when you click the close button" was the report, and an app that looks
+ * closed while still holding the unit is worse than one you have to reopen.
  *
  * ForgeFX runs as a child process rather than in-process. Importing it is the
  * path it documents, and Axis takes it — but it opens a serial port through
@@ -17,9 +18,13 @@
  * run on real hardware for a while; not worth guessing at from a container.
  */
 const { app, BrowserWindow, Tray, Menu, shell, nativeImage, dialog, ipcMain } = require('electron')
-const { spawn, execFileSync } = require('node:child_process')
-const { join } = require('node:path')
+const { spawn, execFile, execFileSync } = require('node:child_process')
+const { join, sep } = require('node:path')
+const { existsSync, readFileSync, writeFileSync, unlinkSync } = require('node:fs')
 const net = require('node:net')
+
+/** Where the new version can always be fetched by hand. */
+const RELEASES_URL = 'https://github.com/justinnewbold/fractal-ai-builder/releases/latest'
 
 let tray = null
 let win = null
@@ -52,6 +57,15 @@ const host = () => import('./lib/host.mjs')
  * is nothing to say anyway, which is exactly what the null it returns means.
  */
 let updateLine = () => null
+
+/**
+ * The watchdog the server runs inside, as a real file on disk.
+ *
+ * This shell is packed into app.asar; a script the Electron binary is asked to
+ * run as Node has to be readable as a plain path, so electron-builder leaves
+ * lib/child.cjs unpacked beside the archive and this points there.
+ */
+const wrapperPath = () => join(__dirname, 'lib', 'child.cjs').replace(`app.asar${sep}`, `app.asar.unpacked${sep}`)
 
 /** The built web app, bundled beside this file by electron-builder. */
 const distPath = () =>
@@ -112,11 +126,24 @@ async function start() {
     }
   })
   if (held.forgefx) {
-    dialog.showErrorBox('ForgeFX is already running', PORT_TAKEN(port))
-    app.quit()
-    return
-  }
-  if (!held.free) {
+    /*
+     * Ours, left behind by a Force Quit? Then it is nobody's, and it goes.
+     * Force Quit is SIGKILL: no quit handler, no chance to stop the server we
+     * started, and the next launch used to find it holding the port, say so,
+     * and quit — "the only way to get around it was to restart the Mac."
+     * Somebody's own ForgeFX in a Terminal still gets the message below.
+     */
+    const { reclaimPort } = await host()
+    const took = await reclaimPort({
+      port,
+      run: (cmd, args) => execFileSync(cmd, args, { encoding: 'utf8', timeout: 4000 })
+    })
+    if (took !== 'reclaimed') {
+      dialog.showErrorBox('ForgeFX is already running', PORT_TAKEN(port))
+      app.quit()
+      return
+    }
+  } else if (!held.free) {
     dialog.showErrorBox(
       'Something else is using this port',
       `Port ${port} is in use by another program, so the app cannot serve from it.\n\n` +
@@ -152,7 +179,11 @@ async function start() {
     onError: (err) => console.error('[mdns]', err?.message || err)
   })
 
-  server = spawn(process.execPath, [join(forgefx, 'server', 'dist', 'index.js')], {
+  /*
+   * Through lib/child.cjs rather than directly, so the server leaves when this
+   * process does — however this process goes. See that file.
+   */
+  server = spawn(process.execPath, [wrapperPath(), join(forgefx, 'server', 'dist', 'index.js')], {
     env: serverEnv({ port, dist: distPath(), asNode: true }),
     stdio: 'inherit'
   })
@@ -427,9 +458,20 @@ function wireUpdateChannel() {
    * by the time electron-updater asks the app to quit there is nothing left to
    * wait for and the quit is a formality.
    */
+  ipcMain.handle('updates:releases', async () => {
+    await shell.openExternal(RELEASES_URL)
+    return { ok: true }
+  })
+  ipcMain.handle('updates:move', async () => ({ ok: moveToApplications() }))
+
   ipcMain.handle('updates:install', async () => {
     if (!updates?.install) return { ok: false, reason: 'no-updater' }
     if (update?.kind !== 'ready') return { ok: false, reason: 'nothing-ready' }
+    /*
+     * Written before anything else, so that whatever happens next the next
+     * launch can tell whether it worked. See installOutcome in lib/updates.mjs.
+     */
+    writeMarker({ version: update.version || null, from: app.getVersion(), at: Date.now() })
     await stopServing()
     /*
      * If the install has not taken the process by now it is not going to, and
@@ -442,15 +484,102 @@ function wireUpdateChannel() {
   })
 }
 
+/*
+ * The note the app leaves itself before an install: which version it expected
+ * to be on when it came back. See installOutcome in lib/updates.mjs.
+ */
+const markerPath = () => join(app.getPath('userData'), 'pending-update.json')
+function writeMarker(marker) {
+  try {
+    writeFileSync(markerPath(), JSON.stringify(marker))
+  } catch (err) {
+    console.error('[updates] could not note the pending install', err?.message || err)
+  }
+}
+function readMarker() {
+  try {
+    return existsSync(markerPath()) ? JSON.parse(readFileSync(markerPath(), 'utf8')) : null
+  } catch {
+    return null
+  }
+}
+function clearMarker() {
+  try {
+    if (existsSync(markerPath())) unlinkSync(markerPath())
+  } catch {
+    // A note that will not go is read again next launch and found stale then.
+  }
+}
+
+/**
+ * What macOS's installer wrote while it tried. The only record of WHY an
+ * install did not take, and until now there was no way to see it from the app.
+ * Best effort with a deadline; an empty answer is an answer.
+ */
+function shipItLog() {
+  if (process.platform !== 'darwin') return Promise.resolve('')
+  return new Promise((resolve) => {
+    execFile(
+      'log',
+      [
+        'show',
+        '--style',
+        'compact',
+        '--last',
+        '30m',
+        '--predicate',
+        'process == "ShipIt" OR (process == "Fractal Remote" AND (eventMessage CONTAINS "Squirrel" OR eventMessage CONTAINS "update"))'
+      ],
+      { encoding: 'utf8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
+      (err, out) => {
+        if (err || !out) return resolve('')
+        const lines = out.split('\n').filter((l) => l.trim() && !/^Filtering|^Timestamp/.test(l))
+        resolve(lines.slice(-40).join('\n'))
+      }
+    )
+  })
+}
+
+function publish(state) {
+  update = state
+  if (tray) buildTray()
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('updates:state', { ...state, line: updateLine(state) })
+  }
+}
+
 async function beginUpdates() {
   if (!app.isPackaged) return
   try {
     const { autoUpdater } = require('electron-updater')
+    const { autoUpdater: native } = require('electron')
     const mod = await import('./lib/updates.mjs')
-    const { wireUpdates } = mod
+    const { wireUpdates, installOutcome } = mod
     updateLine = mod.updateLine
+
+    /*
+     * Where the app is decides whether there is any point. An app macOS will
+     * not replace in place gets one line saying what to do, and no download
+     * that would only come back as the same offer.
+     */
+    if (misplaced) {
+      publish({ kind: 'misplaced' })
+      return
+    }
+
+    /*
+     * Did the last install take? A note left before it says what was expected;
+     * the version running says what happened. When they disagree the app says
+     * so, with whatever macOS wrote about it, instead of offering the same
+     * update again as if nothing had been tried.
+     */
+    const marker = readMarker()
+    const outcome = installOutcome({ marker, version: app.getVersion() })
+    if (marker) clearMarker()
+
     updates = wireUpdates({
       updater: autoUpdater,
+      native,
       onState: (state) => {
         update = state
         if (tray) buildTray()
@@ -465,15 +594,75 @@ async function beginUpdates() {
       },
       log: (err) => console.error('[updates]', err?.message || err)
     })
+    if (outcome === 'stuck') {
+      // Said at once; the reason follows when macOS's log has been read, which
+      // can take a few seconds and must not hold the window up.
+      publish({ kind: 'stuck', version: marker.version, detail: '' })
+      shipItLog().then((detail) => {
+        if (update?.kind === 'stuck') publish({ ...update, detail })
+      })
+      // Not checked again on its own this launch: a fresh download would only
+      // paper over the reason. Check for updates still works by hand.
+      return
+    }
     await updates.check()
   } catch (err) {
     console.error('[updates] not available', err?.message || err)
   }
 }
 
+/**
+ * Whether the app sits where macOS will let it be replaced.
+ *
+ * An app opened from Downloads is run from a hidden read-only copy, and an
+ * update installed there is thrown away with the copy — the app relaunches, on
+ * the old version, and offers the same update again. Reported as "it closes
+ * the app and restarts and then it still says the same update is available".
+ * Moving it into Applications is the only cure, so the app offers to, once,
+ * on the way in. Declining is remembered for this launch only.
+ */
+let misplaced = false
+async function settleInPlace() {
+  if (!app.isPackaged || process.platform !== 'darwin') return true
+  const { installPlace } = await import('./lib/updates.mjs')
+  let inApplications = true
+  try {
+    inApplications = app.isInApplicationsFolder()
+  } catch {
+    return true
+  }
+  const place = installPlace({ exePath: app.getPath('exe'), inApplications })
+  if (place.ok) return true
+  const choice = dialog.showMessageBoxSync({
+    type: 'question',
+    buttons: ['Move to Applications', 'Not now'],
+    defaultId: 0,
+    cancelId: 1,
+    message: 'Move Fractal Remote to your Applications folder?',
+    detail:
+      'It is running from somewhere macOS will not update it in place, so new versions would download and never install. ' +
+      'Moving it takes a moment and the app reopens on its own.'
+  })
+  if (choice === 0 && moveToApplications()) return false
+  misplaced = true
+  return true
+}
+
+/** Move the app and reopen it from Applications. True when that is under way. */
+function moveToApplications() {
+  try {
+    // Replaces an older copy already there; that copy is what we are updating.
+    return app.moveToApplicationsFolder({ conflictHandler: () => true })
+  } catch (err) {
+    console.error('[place] could not move to Applications', err?.message || err)
+    return false
+  }
+}
+
 app.whenReady().then(async () => {
   // A service, not a document: no dock icon, no window until asked.
   showInDock(false)
+  if (!(await settleInPlace())) return // reopening from Applications
   const answering = await start()
   if (!where) return
   buildTray()
@@ -496,8 +685,20 @@ app.whenReady().then(async () => {
   openWindow()
 })
 
-// The window closing is not the app closing — it is still serving.
-app.on('window-all-closed', () => {})
+/*
+ * Closing the window closes the app.
+ *
+ * It did not, by design: the app was a menu-bar service, still serving the
+ * phone with its window gone. What that felt like was an app that would not
+ * close — no window, no dock icon, still running, and "the only way to close
+ * it out all the way is Force Quit". Force Quit is the one thing that must not
+ * happen to this app, because it skips the quit that installs updates and
+ * leaves the device server holding the port. So the close button quits, the
+ * ordinary way, through the same shutdown as ⌘Q.
+ */
+app.on('window-all-closed', () => {
+  if (!quitting) app.quit()
+})
 
 /*
  * Quitting, in a way that always finishes.

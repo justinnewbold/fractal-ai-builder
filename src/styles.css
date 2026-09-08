@@ -7322,6 +7322,26 @@ button.phone-chip.dim {
   text-align: left;
 }
 
+/* What macOS said while it tried to install, folded away for pasting. */
+.updates-detail summary {
+  cursor: pointer;
+  color: var(--silk-dim);
+  font-size: var(--f-2);
+}
+
+.updates-detail pre {
+  max-height: 200px;
+  overflow: auto;
+  padding: var(--s-2);
+  font-size: var(--f-1);
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--chassis);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+}
+
 /* The code a paired Mac shows, under its QR. */
 .pair-code {
   margin: 0;

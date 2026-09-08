@@ -3,6 +3,40 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.114.0
+
+**The Mac app closes, updates, and reopens.** "After installing … it closes
+the app and restarts and then it still says the same update is available. …
+It said ForgeFX was currently using the port. The only way to get around it
+was to restart the Mac completely. … The app does not close out all the way
+when you click the close button."
+
+- **Closing the window quits the app.** It used to keep running in the menu bar
+  with nothing on screen, which read as an app that would not close and led
+  to Force Quit — the one thing that skips the quit an update needs.
+- **A device server left behind is cleaned up.** Force Quit kills the app but
+  not the server it started, which kept the port; the next launch said
+  "ForgeFX is already running" and quit. Now the app recognises a server of its
+  own left holding the port, stops it, and carries on. The server also runs
+  inside a small watchdog that leaves the moment the app is gone, however it
+  went, so this stops happening in the first place.
+- **An app run from Downloads is offered a move to Applications.** macOS runs
+  such an app from a hidden read-only copy and cannot replace it in place: the
+  update downloads, "installs", relaunches the old version, and is offered
+  again for ever. The app now asks to move itself on launch, and Setup →
+  Updates offers the move too.
+- **"Ready" means macOS has it.** The app said an update was ready when it had
+  only downloaded the file; macOS's own updater still had to take a copy and
+  check it. Restart pressed in between did nothing. Now the line says
+  "Preparing…" until macOS has it, and any refusal from macOS — a signature it
+  will not accept, a place it cannot write — is shown in its own words.
+- **A failed install is reported, with why.** Before restarting to update, the
+  app notes which version it expects to come back as. If it comes back on the
+  old one, Setup → Updates says the update didn't install, shows what macOS
+  wrote while it tried under Technical details, and offers Move to
+  Applications and Download from GitHub — instead of offering the same update
+  again as if nothing had happened.
+
 ## 7.113.0
 
 **Hold Tap to type the tempo.** "On the tap button, let's do where they hold
