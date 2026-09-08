@@ -3004,6 +3004,21 @@ input.bpm-box:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /*
+   * It wraps, because on a phone it cannot not wrap.
+   *
+   * PRESETS, five 44px jump buttons and the refresh button want about 370px
+   * between them, and a phone's sheet has less than that once its own padding
+   * is taken. Without this the row simply grew: the refresh button was carried
+   * out past the sheet's rounded corner, and the whole panel became wider than
+   * the screen, so the filter box, the view buttons and every preset row were
+   * cut off at the right and the sheet slid sideways under a thumb.
+   *
+   * Shrinking the buttons instead is not available — 44px is the touch floor
+   * this app holds everything to, and test/styles.mjs enforces it.
+   */
+  flex-wrap: wrap;
+  gap: var(--s-2);
   padding: var(--s-2) var(--s-3);
   border-bottom: 1px solid var(--rule);
 }
@@ -3116,6 +3131,10 @@ button.preset-star.on {
      either side rather than one shoulder against the title and none by the
      button it sits next to. */
   padding: 0;
+  /* And they wrap among themselves rather than as one block, so a unit with
+     more ranges than fit takes a second short line instead of a wide one. */
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 button.preset-jump {
@@ -3133,6 +3152,31 @@ button.preset-jump {
 button.preset-jump:active {
   background: var(--panel-hi);
   color: var(--silk);
+}
+
+/*
+ * On a phone the ranges take the line under the title.
+ *
+ * Wrapping alone was not enough. The refresh button is last in the row, so
+ * when the jumps pushed it off the first line it landed alone on the left of
+ * the second — further from the title it belongs to than before, and reading
+ * as a stray control rather than the panel's own button.
+ *
+ * Giving the jumps the whole width instead puts the refresh back beside the
+ * title where it started and hands the buttons the room they were short of:
+ * five equal targets across the panel rather than five 44px boxes crushed
+ * against a heading. The desktop layout, which has width to spare and fits
+ * them inline, is untouched.
+ */
+@media (max-width: 620px) {
+  .panel-head .preset-jumps {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .panel-head button.preset-jump {
+    flex: 1 1 0;
+  }
 }
 
 .preset-scroll {
@@ -6066,6 +6110,14 @@ button.sheet-close:active {
   min-height: 0;
   padding: var(--s-3) var(--s-4);
   overflow-y: auto;
+  /*
+   * Up and down only. A sheet is a fixed-width surface a thumb rests on, and
+   * anything inside it that does not fit is a bug to be found rather than a
+   * thing to be scrolled to — sliding the panel sideways only hides that the
+   * layout has already broken. It is stated here as well as fixed at the head
+   * above, because this is the guard that holds for the next thing too.
+   */
+  overflow-x: hidden;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
 }
