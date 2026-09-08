@@ -9,7 +9,7 @@ import History from './components/History'
 import { CabPicker, Backup } from './components/Hardware'
 import Gig from './components/Gig'
 import SaveBar from './components/SaveBar'
-import SaveSheet from './components/SaveSheet'
+import SaveSheet, { SaveFooter } from './components/SaveSheet'
 import CloudPresets from './components/CloudPresets'
 import { LiveGeneration, Thinking, THINKING } from './components/LiveGeneration'
 import { streamSpec } from './lib/stream'
@@ -4055,6 +4055,21 @@ export default function App() {
         onClose={() => setSheet(null)}
         title="Save"
         note={preset?.name?.trim() || null}
+        footer={
+          <SaveFooter
+            preset={preset}
+            slot={slot}
+            onSave={async () => {
+              await save()
+              setSheet(null)
+            }}
+            busy={busy}
+            saving={saving}
+            remote={remote}
+            queued={queuedSave}
+            slots={allSlots}
+          />
+        }
       >
         <SaveSheet
           preset={preset}

@@ -3,6 +3,20 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.115.0
+
+**The save button stays under your thumb.** "On the phone … clicking on a
+preset does absolutely nothing and nothing saves." Tapping a row was doing
+what it was meant to — choosing the slot — but the button that saves sat at
+the top of the sheet, above a list of 512 rows, so by the time a slot was
+picked it was two screens up and out of sight.
+
+- The Save button lives in the sheet's footer now, which does not scroll. Pick
+  a slot anywhere in the list and the button is right there, reading "Save to
+  slot 474" and, when that slot holds something else, "Replaces Metallicaz".
+- On the phone it still reads "Ask the Mac to save", because the Mac does the
+  writing; the footer says when it is queued and when it lands.
+
 ## 7.114.0
 
 **The Mac app closes, updates, and reopens.** "After installing … it closes

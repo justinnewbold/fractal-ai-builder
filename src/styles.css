@@ -6718,6 +6718,17 @@ button.topbar-preset.open .topbar-caret {
   width: 100%;
 }
 
+/* The footer the button lives in: the one line about the slot, then the button. */
+.save-foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.save-foot .hint {
+  margin: 0;
+}
+
 /* The one line that turns an overwrite into a decision. */
 .save-target-warn {
   color: var(--silk);
