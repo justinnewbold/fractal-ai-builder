@@ -3545,6 +3545,7 @@ export function run(test) {
     assert.match(src, /title="Save"[\s\S]*?footer=\{\s*<SaveFooter/, 'the Save sheet is not given the footer')
     assert.match(src, /<SaveFooter[\s\S]*?slots=\{allSlots\}/, 'the footer cannot name what the slot holds')
   })
+<<<<<<< HEAD
 
   test('the wait is counted once, to the second', () => {
     /*
@@ -3558,4 +3559,6 @@ export function run(test) {
     const live = readFileSync(new URL('../src/components/LiveGeneration.jsx', import.meta.url), 'utf8')
     assert.match(live, /clock = seconds >= 60 \? `\$\{Math\.floor\(seconds \/ 60\)\}m \$\{seconds % 60\}s` : `\$\{seconds\}s`/, 'the live clock is gone, so nothing counts at all')
   })
+=======
+>>>>>>> origin/main
 }
