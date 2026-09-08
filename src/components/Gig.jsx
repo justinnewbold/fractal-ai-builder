@@ -43,7 +43,17 @@ const ofTunerOn = (s) => s.tunerOn
 const ofTuning = (s) => s.tuning
 const ofBpm = (s) => s.bpm
 
-export default function Gig({ preset, device, capabilities, size, onSize, onError, onChanged, onPickPreset }) {
+export default function Gig({
+  preset,
+  device,
+  capabilities,
+  size,
+  onSize,
+  onError,
+  onChanged,
+  onPickPreset,
+  onAsk
+}) {
   /*
    * How big the buttons are is decided in the tab bar, a row this screen does
    * not own, so the step arrives as a prop. Only the CSS variables are applied
@@ -697,6 +707,26 @@ export default function Gig({ preset, device, capabilities, size, onSize, onErro
           <span>Tap</span>
           {Number.isFinite(bpm) ? <span className="gig-tap-bpm mono">{Math.round(bpm)}</span> : null}
         </button>
+        {/*
+          Ask, on the bar rather than floating over the rig.
+
+          The floating button this replaces is fixed to the bottom-right
+          corner, and styles.css says why it is hidden below 700px: that corner
+          is where the last tile in every grid lands, so on a phone it sits ON
+          scene 6. Unhiding it would have covered a scene button to reach a
+          conversation — worse than not having it.
+
+          Here it costs nothing. The bar is already the strip for the things
+          you use BETWEEN songs rather than during one, which is exactly what
+          asking for a tone is, and it reflows to two buttons when play mode
+          takes this away.
+        */}
+        {onAsk ? (
+          <button className="gig-bar-btn gig-ask" onClick={onAsk} aria-label="Ask for a change">
+            <span aria-hidden="true">✦</span>
+            <span>Ask</span>
+          </button>
+        ) : null}
       </div>
     </div>
   )

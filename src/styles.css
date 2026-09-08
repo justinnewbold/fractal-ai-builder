@@ -5768,6 +5768,26 @@ button.gig-tap {
   color: var(--silk-faint);
 }
 
+/* Ask sits with the tuner and the tap, and reads as the same kind of thing:
+   something you press between songs, not during one. The star is the same mark
+   the wide-screen button uses, so the two are recognisably one control in two
+   places. */
+button.gig-ask {
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-1);
+  /*
+   * Off by default: above the breakpoint below, the floating .ask-anywhere is
+   * the way in and two Ask buttons on one screen is one too many.
+   *
+   * The two rules are deliberately the SAME breakpoint, not merely similar
+   * ones. `narrow` in App.jsx is 620px, and gating this on that instead would
+   * leave every window between 620 and 700 with no Ask button at all — the
+   * floating one already hidden, this one not yet shown.
+   */
+  display: none;
+}
+
 button.gig-bar-btn.on {
   background: var(--signal);
   border-color: var(--signal);
@@ -6862,6 +6882,12 @@ button.topbar-preset.open .topbar-caret {
 @media (max-width: 700px) {
   .ask-anywhere {
     display: none;
+  }
+
+  /* And the bar takes over here — same line, opposite side of it. The bar is
+     laid out along the bottom already, so nothing is covered by it. */
+  button.gig-ask {
+    display: flex;
   }
 
   /*

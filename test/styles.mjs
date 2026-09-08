@@ -1008,6 +1008,53 @@ export function run(test) {
    * side of it. Also, let's make the chat box text entry a little more rounded
    * instead of square."
    */
+  test('there is exactly one Ask button at every width', () => {
+    /*
+     * Two of them draw the same control: .ask-anywhere floats bottom-right on
+     * a wide screen, and .gig-ask sits in the stage bar on a phone.
+     *
+     * They must swap at THE SAME width. The floating one is hidden below
+     * 700px because that corner is where the last tile in every grid lands —
+     * on a phone it sits on scene 6 — and the bar one is shown below 700px.
+     * Move either number alone and there is a band of widths with two Ask
+     * buttons or, worse, none: `narrow` in App.jsx is 620px, and reaching for
+     * that instead would have left 620-700 with neither.
+     */
+    /*
+     * Each breakpoint is read back FROM ITS OWN RULE rather than looked up by
+     * number. Searching for `@media (max-width: 700px)` finds the first block
+     * with that width, which is not necessarily the one these rules are in —
+     * the same first-hit trap CLAUDE.md records for App.jsx. And asserting a
+     * hardcoded 700 twice would pass happily while the two drifted apart.
+     */
+    const breakpointOver = (needle) => {
+      const at = code.indexOf(needle)
+      if (at === -1) return null
+      const before = code.slice(0, at)
+      const media = [...before.matchAll(/@media \(max-width: (\d+)px\)/g)].pop()
+      return media ? Number(media[1]) : null
+    }
+
+    const floatingOff = code.search(/\.ask-anywhere\s*\{\s*display:\s*none/)
+    assert.ok(floatingOff > -1, 'the floating Ask no longer stands down anywhere, so on a phone it covers a scene tile')
+    const barOn = code.search(/button\.gig-ask\s*\{\s*display:\s*flex/)
+    assert.ok(barOn > -1, 'the stage bar never gets an Ask button, so a phone has no way in')
+
+    const offAt = breakpointOver(code.slice(floatingOff, floatingOff + 20))
+    const onAt = breakpointOver(code.slice(barOn, barOn + 22))
+    assert.ok(offAt, 'the floating Ask is hidden outside any breakpoint — it is gone on desktop too')
+    assert.equal(
+      onAt,
+      offAt,
+      `the two Ask buttons swap at different widths (bar at ${onAt}, floating at ${offAt}) — one band of widths now shows two, or none`
+    )
+
+    /* Off by default, or a wide screen draws both. */
+    const base = code.slice(code.indexOf('button.gig-ask {'), code.indexOf('}', code.indexOf('button.gig-ask {')))
+    assert.ok(base.length > 20, 'the bar Ask has no style of its own')
+    assert.match(base, /display:\s*none/, 'the bar Ask is drawn on desktop too, beside the floating one')
+  })
+
   test('the composer ends in a round arrow and the box is not a rectangle', () => {
     const btn = code.slice(code.indexOf('button.send-btn {'), code.indexOf('}', code.indexOf('button.send-btn {')))
     assert.ok(btn.length > 40, 'the send arrow has no style of its own')
