@@ -1595,12 +1595,12 @@ test('an advert that never answers cannot hold the app open', async () => {
   assert.equal(polite.advert, 'stopped')
 })
 
-test('closing the window is not the end of the app', () => {
+test('clicking the app again opens its window', () => {
   /*
-   * A menu-bar app has no dock icon, so closing its window leaves nothing on
-   * screen. macOS does not start a second copy when the app is clicked again;
-   * it activates the running one and sends `activate`. With nothing listening
-   * for that, the click did nothing and the app looked dead.
+   * macOS does not start a second copy when the app is clicked again; it
+   * activates the running one and sends `activate`. With nothing listening for
+   * that, the click did nothing and the app looked dead. (Closing the window
+   * now quits — see the test below — but the tray icon still opens it.)
    */
   const main = readSrc(new URL('../desktop/main.js', import.meta.url), 'utf8')
   assert.match(main, /app\.on\('activate', \(\) => \{\s*\n\s*if \(where\) openWindow\(\)/, 'clicking the app again opens nothing')
@@ -6614,6 +6614,170 @@ test('the Tap button opens the tempo box on a hold or a right-click, at both end
   assert.match(stage, /await writeTempo\(checked\.bpm\)/, 'a typed tempo on the phone goes nowhere')
   const sync = readSrc(new URL('../scripts/sync-relay-rules.mjs', import.meta.url), 'utf8')
   assert.match(sync, /shared\/tempo\.mjs.*mobile\/src\/lib\/tempo\.js/, 'the phone’s copy of the tempo rule is not generated')
+})
+
+
+console.log('\nthe Mac app closes, updates, and reopens')
+/*
+ * "It does say that there's an update available and then it says install.
+ * After installing it says to close the app or you clicked the button and it
+ * closes the app and restarts and then it still says the same update is
+ * available. … It said that ForgeFX was currently using the port. The only way
+ * to get around it was to restart the Mac completely. … The app does not close
+ * out all the way when you click the close button."
+ */
+
+test('closing the window quits the app, through the same shutdown as ⌘Q', () => {
+  const main = readSrc(new URL('../desktop/main.js', import.meta.url), 'utf8')
+  assert.match(main, /app\.on\('window-all-closed', \(\) => \{\s*\n\s*if \(!quitting\) app\.quit\(\)/, 'closing the window leaves the app running with nothing on screen')
+  assert.ok(!/app\.on\('window-all-closed', \(\) => \{\}\)/.test(main), 'the window-close no-op is back')
+})
+
+test('a device server this app left behind is stopped, not reported', async () => {
+  const bundle = '/Applications/Fractal Remote.app/Contents/Resources/vendor/forgefx/server/dist/index.js'
+  const exe = '/Applications/Fractal Remote.app/Contents/MacOS/Fractal Remote'
+  assert.ok(host.isOurServer(`${exe} ${bundle}`), 'the server inside our own bundle is not recognised as ours')
+  assert.ok(host.isOurServer(`${exe} /Applications/Fractal Remote.app/Contents/Resources/app/lib/child.cjs ${bundle}`), 'the server run through our wrapper is not recognised')
+  assert.ok(!host.isOurServer('node /Users/j/src/forgefx/server/dist/index.js'), 'somebody’s own ForgeFX in a Terminal would be killed')
+  assert.ok(!host.isOurServer(`${exe} something-else.js`), 'a process of ours that is not the server would be killed')
+  assert.ok(!host.isOurServer(''))
+
+  // lsof says who listens; ps says what they are. Only ours are touched.
+  const ps = { 4242: `${exe} ${bundle}`, 5151: 'node /Users/j/src/forgefx/server/dist/index.js' }
+  const run = (cmd, args) => {
+    if (cmd === 'lsof') return '4242\n5151\n'
+    if (cmd === 'ps') return ps[args[args.length - 1]] || ''
+    throw new Error(`unexpected ${cmd}`)
+  }
+  assert.deepEqual(host.listeners({ port: 5056, run }).map((p) => p.pid), [4242, 5151])
+  assert.deepEqual(host.listeners({ port: 5056, run: () => { throw new Error('no lsof') } }), [], 'a Mac without lsof is a crash instead of a no-op')
+
+  const signals = []
+  let living = new Set([4242, 5151])
+  const polite = await host.reclaimPort({
+    port: 5056,
+    run,
+    kill: (pid, sig) => {
+      signals.push([pid, sig])
+      if (sig === 'SIGTERM') living.delete(pid)
+    },
+    alive: (pid) => living.has(pid),
+    sleep: async () => {}
+  })
+  assert.equal(polite, 'reclaimed')
+  assert.deepEqual(signals, [[4242, 'SIGTERM']], 'the stranger’s ForgeFX was signalled, or ours was killed without being asked first')
+
+  // One that ignores SIGTERM is killed; one that survives even that is reported, never waited on for ever.
+  signals.length = 0
+  living = new Set([4242])
+  const forced = await host.reclaimPort({
+    port: 5056,
+    run,
+    kill: (pid, sig) => {
+      signals.push([pid, sig])
+      if (sig === 'SIGKILL') living.delete(pid)
+    },
+    alive: (pid) => living.has(pid),
+    sleep: async () => {}
+  })
+  assert.equal(forced, 'reclaimed')
+  assert.deepEqual(signals, [[4242, 'SIGTERM'], [4242, 'SIGKILL']])
+  const immortal = await host.reclaimPort({ port: 5056, run, kill: () => {}, alive: () => true, sleep: async () => {} })
+  assert.equal(immortal, 'failed')
+  assert.equal(await host.reclaimPort({ port: 5056, run: () => '' }), 'none')
+
+  // And the app tries this before it gives up and shows the box.
+  const main = readSrc(new URL('../desktop/main.js', import.meta.url), 'utf8')
+  const check = main.slice(main.indexOf('if (held.forgefx)'), main.indexOf('const forgefx = findForgeFX'))
+  assert.match(check, /await reclaimPort\(/, 'a stray server of ours still stops the app opening')
+  assert.ok(check.indexOf('reclaimPort(') < check.indexOf("showErrorBox('ForgeFX is already running'"), 'the box is shown before the sweep')
+})
+
+test('the device server leaves when the app does, however the app goes', () => {
+  const wrapper = readSrc(new URL('../desktop/lib/child.cjs', import.meta.url), 'utf8')
+  assert.match(wrapper, /process\.ppid !== parent\) process\.exit\(0\)/, 'the wrapper never notices its parent has gone')
+  assert.match(wrapper, /import\(pathToFileURL\(entry\)\.href\)/, 'the wrapper does not start the server')
+  const main = readSrc(new URL('../desktop/main.js', import.meta.url), 'utf8')
+  assert.match(main, /spawn\(process\.execPath, \[wrapperPath\(\), join\(forgefx, 'server', 'dist', 'index\.js'\)\]/, 'the server is started bare, so a Force Quit orphans it')
+  // It has to ship as a real file: the shell is packed into app.asar, and a
+  // script run by the Electron binary as Node needs a plain path.
+  const builder = readSrc(new URL('../desktop/electron-builder.yml', import.meta.url), 'utf8')
+  assert.match(builder, /- lib\/\*\*/, 'lib/ is not packaged, so the wrapper is missing from the installed app')
+  assert.match(builder, /asarUnpack:\s*\n\s*- lib\/child\.cjs/, 'the wrapper is inside app.asar, where a Node child cannot be started from')
+  assert.match(main, /app\.asar\.unpacked/, 'the spawn points into app.asar rather than at the unpacked file')
+})
+
+test('an install that did not take is said so, with why', async () => {
+  assert.equal(updates.installOutcome({ marker: { version: '7.113.0' }, version: '7.82.0' }), 'stuck')
+  assert.equal(updates.installOutcome({ marker: { version: '7.113.0' }, version: '7.113.0' }), 'installed')
+  assert.equal(updates.installOutcome({ marker: { version: '7.113.0' }, version: '7.114.0' }), 'installed', 'a newer version than expected reads as a failure')
+  assert.equal(updates.installOutcome({ marker: null, version: '7.113.0' }), null)
+  assert.equal(updates.installOutcome({ marker: { version: null }, version: '7.113.0' }), null)
+  assert.equal(updates.compareVersions('7.9.0', '7.10.0'), -1, 'versions are compared as text, so 7.9 beats 7.10')
+  assert.equal(updates.compareVersions('7.10.0', '7.10'), 0)
+  assert.match(updates.updateLine({ kind: 'stuck', version: '7.113.0' }), /7\.113\.0 didn’t install/)
+  assert.match(updates.updateLine({ kind: 'misplaced' }), /Applications/)
+  assert.match(updates.updateLine({ kind: 'staging', version: '7.113.0' }), /Preparing 7\.113\.0/)
+  assert.match(updates.updateLine({ kind: 'trouble', message: 'Code signature did not pass validation' }), /Code signature/, 'macOS’s reason is dropped from the menu')
+
+  // The note is written before the app starts shutting anything down.
+  const main = readSrc(new URL('../desktop/main.js', import.meta.url), 'utf8')
+  const install = main.slice(main.indexOf("ipcMain.handle('updates:install'"), main.indexOf('updates.install()'))
+  assert.match(install, /writeMarker\(\{ version: update\.version/, 'nothing records which version the install was meant to reach')
+  assert.ok(install.indexOf('writeMarker(') < install.indexOf('await stopServing()'), 'the note is written after the server is already going down')
+  // And read back on the way in, before any new download is started.
+  const begin = main.slice(main.indexOf('async function beginUpdates'), main.indexOf('app.whenReady'))
+  assert.match(begin, /installOutcome\(\{ marker, version: app\.getVersion\(\) \}\)/, 'the note is never read back')
+  assert.match(begin, /if \(outcome === 'stuck'\) \{[\s\S]*?shipItLog\(\)\.then[\s\S]*?return/, 'a stuck install is followed by the same download again')
+  assert.ok(!/detail: await shipItLog/.test(begin), 'reading the system log holds the window up')
+  assert.match(begin, /if \(misplaced\) \{\s*\n\s*publish\(\{ kind: 'misplaced' \}\)\s*\n\s*return/, 'an app macOS cannot replace still downloads updates it cannot install')
+})
+
+test('ready means macOS has the update, not merely that we downloaded it', async () => {
+  /*
+   * The library downloads the file and says "downloaded"; then macOS's own
+   * updater takes a copy and checks it, and only then can anything install.
+   * The app called the first one ready, so Restart pressed in between did
+   * nothing but close the app.
+   */
+  const seen = []
+  const u = fakeUpdater()
+  const n = fakeUpdater()
+  updates.wireUpdates({ updater: u, native: n, onState: (s) => seen.push(s) })
+  u.emit('update-available', { version: '7.113.0' })
+  u.emit('update-downloaded', { version: '7.113.0' })
+  assert.equal(seen.at(-1).kind, 'staging', 'the library’s download is called ready before macOS has it')
+  assert.equal(seen.at(-1).version, '7.113.0')
+  n.emit('update-downloaded')
+  assert.deepEqual(seen.at(-1), { kind: 'ready', version: '7.113.0' })
+  n.emit('error', new Error('Code signature at URL file:///x did not pass validation\nmore'))
+  assert.equal(seen.at(-1).kind, 'trouble')
+  assert.equal(seen.at(-1).message, 'Code signature at URL file:///x did not pass validation', 'macOS’s reason is not carried to the screen')
+  // Without the native updater (tests, other platforms) the library's word is the only one.
+  const plain = []
+  const p = fakeUpdater()
+  updates.wireUpdates({ updater: p, onState: (s) => plain.push(s) })
+  p.emit('update-downloaded', { version: '7.113.0' })
+  assert.equal(plain.at(-1).kind, 'ready')
+  // main.js hands the native updater in.
+  const main = readSrc(new URL('../desktop/main.js', import.meta.url), 'utf8')
+  assert.match(main, /const \{ autoUpdater: native \} = require\('electron'\)/, 'the native updater is never listened to')
+  assert.match(main, /wireUpdates\(\{\s*\n\s*updater: autoUpdater,\s*\n\s*native,/, 'the native updater is not handed to wireUpdates')
+})
+
+test('an app run from Downloads is offered a home in Applications first', () => {
+  assert.deepEqual(updates.installPlace({ exePath: '/private/var/folders/zz/T/AppTranslocation/ABC/d/Fractal Remote.app/Contents/MacOS/Fractal Remote', inApplications: false }), { ok: false, reason: 'translocated' })
+  assert.deepEqual(updates.installPlace({ exePath: '/Users/j/Downloads/Fractal Remote.app/Contents/MacOS/Fractal Remote', inApplications: false }), { ok: false, reason: 'not-applications' })
+  assert.deepEqual(updates.installPlace({ exePath: '/Applications/Fractal Remote.app/Contents/MacOS/Fractal Remote', inApplications: true }), { ok: true })
+  const main = readSrc(new URL('../desktop/main.js', import.meta.url), 'utf8')
+  assert.match(main, /if \(!\(await settleInPlace\(\)\)\) return/, 'the app starts serving before asking where it lives')
+  assert.ok(main.indexOf('await settleInPlace()') < main.indexOf('const answering = await start()'), 'the move is offered after the server is already running from the wrong place')
+  assert.match(main, /app\.moveToApplicationsFolder\(\{ conflictHandler: \(\) => true \}\)/, 'moving never replaces the older copy already in Applications')
+  assert.match(main, /buttons: \['Move to Applications', 'Not now'\]/, 'the move is done without asking, or asked in other words')
+  const ui = readSrc(new URL('../src/components/Updates.jsx', import.meta.url), 'utf8')
+  assert.match(ui, /moveToApplications/, 'Setup offers no way to move the app once the launch-time offer was declined')
+  assert.match(ui, /Download from GitHub/, 'a stuck install offers no other way to the new version')
+  assert.match(ui, /state\?\.detail[\s\S]*?Technical details/, 'what macOS wrote about the failed install is not shown anywhere')
 })
 
 await settle()
