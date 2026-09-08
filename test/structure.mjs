@@ -3545,4 +3545,17 @@ export function run(test) {
     assert.match(src, /title="Save"[\s\S]*?footer=\{\s*<SaveFooter/, 'the Save sheet is not given the footer')
     assert.match(src, /<SaveFooter[\s\S]*?slots=\{allSlots\}/, 'the footer cannot name what the slot holds')
   })
+
+  test('the wait is counted once, to the second', () => {
+    /*
+     * "It says 30 seconds and then the actual amount of seconds — only show
+     * it counting the actual amount of seconds." <Thinking> has a live clock;
+     * the server's heartbeat was writing a second, coarser count into the same
+     * line, so it read "Thinking… 30s · 37s".
+     */
+    assert.ok(!/THINKING\}… \$\{Math\.round\(\(e\.thinkingMs/.test(src), 'the heartbeat writes its own count of seconds beside the live clock')
+    assert.match(src, /e\.kind === 'waiting'\)\s*\n\s*setProgress\(\(was\) => \(was && was\.startsWith\(THINKING\) \? was : `\$\{THINKING\}…`\)\)/, 'a heartbeat no longer keeps the Thinking line alive, or overwrites "(second try)"')
+    const live = readFileSync(new URL('../src/components/LiveGeneration.jsx', import.meta.url), 'utf8')
+    assert.match(live, /clock = seconds >= 60 \? `\$\{Math\.floor\(seconds \/ 60\)\}m \$\{seconds % 60\}s` : `\$\{seconds\}s`/, 'the live clock is gone, so nothing counts at all')
+  })
 }
