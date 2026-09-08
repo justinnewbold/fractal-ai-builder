@@ -12,6 +12,7 @@ import {
 } from '../lib/relay'
 import { useRig } from '../lib/rig'
 import { savePlayMode } from '../lib/playMode'
+import { isPairAccount } from '../lib/pairing'
 import Lamp from '../components/Lamp'
 import Note from '../components/Note'
 import Press from '../components/Press'
@@ -148,7 +149,11 @@ export default function Settings({
       <View style={{ gap: space.md }}>
         <Section>Account</Section>
         <Text style={{ color: color.silkDim, fontSize: font.small }}>
-          {account?.email ? `Signed in as ${account.email}.` : 'Signed in.'}
+          {isPairAccount(account?.email)
+            ? 'Paired with your Mac, no account. What you save stays on this phone.'
+            : account?.email
+              ? `Signed in as ${account.email}.`
+              : 'Signed in.'}
         </Text>
 
         <TextInput

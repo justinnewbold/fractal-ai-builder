@@ -143,6 +143,9 @@ import {
   reconnectPhone,
   disconnectPhone,
   setUpMac,
+  pairMac,
+  pairPhone,
+  isPairAccount,
   setMacRemote,
   signOutHere,
   recheckHosts,
@@ -1139,6 +1142,14 @@ export default function App() {
         if (kind === 'connect') {
           if (linkState().account) await reconnectPhone()
           else setSignIn(true)
+        } else if (kind === 'mac-pair') {
+          /*
+           * The Mac set up with nobody making an account: a code is made, the
+           * hidden account behind it is made, and the host is turned on. The
+           * code shows in Setup for the phone to scan.
+           */
+          await pairMac()
+          record('remote', 'Phone remote set up — paired, no account')
         } else if (kind === 'retry') {
           pokeLink()
           await reconnectPhone()
@@ -1181,6 +1192,20 @@ export default function App() {
       }
     },
     [read, record]
+  )
+
+  /** The phone's Connect with a code typed in: paired, and connected, in one go. */
+  const pairFromCode = useCallback(
+    async (code) => {
+      setError(null)
+      try {
+        await pairPhone(code)
+        record('remote', 'Paired with the Mac')
+      } catch (err) {
+        setError(err.message)
+      }
+    },
+    [record]
   )
 
   /** The sign-in sheet's submit: the same form does a different job per role. */
@@ -3515,9 +3540,11 @@ export default function App() {
           key={tick}
           link={link}
           busy={busy}
+          onPair={pairFromCode}
           onConnect={() => linkAction('connect')}
           onRetry={() => linkAction('retry')}
           onSwitchAccount={() => linkAction('switch')}
+          onUnpair={() => linkAction('signout')}
           onDemo={() => {
             setDemo(true)
             window.location.reload()
@@ -4003,7 +4030,7 @@ export default function App() {
       <SignInSheet
         open={signIn}
         role={link.role}
-        email={link.account?.email || loadRemoteConfig()?.email || ''}
+        email={[link.account?.email, loadRemoteConfig()?.email].find((e) => e && !isPairAccount(e)) || ''}
         busy={busy}
         onClose={() => setSignIn(false)}
         onSubmit={signInSubmit}

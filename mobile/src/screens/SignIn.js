@@ -10,33 +10,46 @@ import {
 
 import { color, font, radius, space, TAP } from '../lib/theme'
 import { sendPasswordReset, signIn, signUp } from '../lib/relay'
+import { formatPairCode, isPairCode, pairCredentials } from '../lib/pairing'
 import Note from '../components/Note'
 import Press from '../components/Press'
 
 /**
- * One account, two ends.
+ * One account, two ends — and a way in that never mentions it.
  *
  * Nothing here mentions a channel, a relay, or the name of the account service.
- * What a player needs to know is that this is the same sign-in as the Mac, and
- * that being signed in as the same person is the whole of why the two ends find
- * each other — so that is what it says.
+ * The first thing offered is the code the Mac shows: type it and the phone is
+ * the Mac's remote, with nobody making an account. Signing in is the second
+ * thing, for a person who wants presets to follow them between devices — so
+ * that is what it says.
  */
 export default function SignIn({ onSignedIn }) {
-  const [mode, setMode] = useState('in') // 'in' | 'up'
+  const [mode, setMode] = useState('code') // 'code' | 'in' | 'up'
+  const [code, setCode] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [note, setNote] = useState(null)
 
-  const ready = email.includes('@') && password.length >= 6
+  const ready = mode === 'code' ? isPairCode(code) : email.includes('@') && password.length >= 6
 
   const go = async () => {
     setBusy(true)
     setError(null)
     setNote(null)
     try {
-      if (mode === 'up') {
+      if (mode === 'code') {
+        try {
+          await signIn(pairCredentials(code))
+        } catch (err) {
+          // No such account is a mistyped code, or a Mac paired again since.
+          if (/didn’t match|invalid login/i.test(err.message || '')) {
+            throw new Error('No Mac is paired with that code. Check it against the code your Mac shows.')
+          }
+          throw err
+        }
+      } else if (mode === 'up') {
         const { needsConfirmation } = await signUp({ email: email.trim(), password })
         if (needsConfirmation) {
           setNote('Account made. Confirm it from the email we just sent, then sign in.')
@@ -71,6 +84,12 @@ export default function SignIn({ onSignedIn }) {
     }
   }
 
+  const switchTo = (next) => {
+    setMode(next)
+    setError(null)
+    setNote(null)
+  }
+
   const field = {
     minHeight: TAP,
     backgroundColor: color.panel,
@@ -96,68 +115,89 @@ export default function SignIn({ onSignedIn }) {
             Fractal Remote
           </Text>
           <Text style={{ color: color.silkDim, fontSize: font.body, lineHeight: 22 }}>
-            Sign in with the same account as the Mac your unit is plugged into, and this phone
-            becomes its remote — from anywhere, not just the same wifi.
+            {mode === 'code'
+              ? 'Type the code your Mac shows under Set up phone remote, and this phone becomes its remote — from anywhere, with no account.'
+              : 'Sign in with the same account as the Mac your unit is plugged into. Your presets and what the AI has learned about your taste follow you to any device.'}
           </Text>
         </View>
 
-        <View style={{ gap: space.md }}>
+        {mode === 'code' ? (
           <TextInput
-            style={field}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Email"
+            style={{ ...field, textAlign: 'center', letterSpacing: 2, fontVariant: ['tabular-nums'] }}
+            value={code}
+            onChangeText={(text) => setCode(formatPairCode(text))}
+            placeholder="XXXX-XXXX-XXXX-XXXX"
             placeholderTextColor={color.silkFaint}
-            accessibilityLabel="Email"
-            autoCapitalize="none"
+            accessibilityLabel="The pairing code your Mac shows"
+            autoCapitalize="characters"
             autoCorrect={false}
-            autoComplete="email"
-            inputMode="email"
-            keyboardType="email-address"
-            returnKeyType="next"
-          />
-          <TextInput
-            style={field}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Password"
-            placeholderTextColor={color.silkFaint}
-            accessibilityLabel="Password"
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete={mode === 'up' ? 'new-password' : 'current-password'}
-            secureTextEntry
+            autoComplete="one-time-code"
+            maxLength={19}
             returnKeyType="go"
             onSubmitEditing={() => ready && !busy && go()}
           />
-        </View>
+        ) : (
+          <View style={{ gap: space.md }}>
+            <TextInput
+              style={field}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="Email"
+              placeholderTextColor={color.silkFaint}
+              accessibilityLabel="Email"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="email"
+              inputMode="email"
+              keyboardType="email-address"
+              returnKeyType="next"
+            />
+            <TextInput
+              style={field}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Password"
+              placeholderTextColor={color.silkFaint}
+              accessibilityLabel="Password"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete={mode === 'up' ? 'new-password' : 'current-password'}
+              secureTextEntry
+              returnKeyType="go"
+              onSubmitEditing={() => ready && !busy && go()}
+            />
+          </View>
+        )}
 
         {error ? <Note tone="fault">{error}</Note> : null}
         {note ? <Note>{note}</Note> : null}
 
         <Press
-          label={busy ? 'Working…' : mode === 'up' ? 'Create account' : 'Sign in'}
+          label={busy ? 'Working…' : mode === 'up' ? 'Create account' : mode === 'in' ? 'Sign in' : 'Connect'}
           tone="signal"
           on={ready && !busy}
           disabled={!ready || busy}
           onPress={go}
         />
 
-        <View style={{ flexDirection: 'row', gap: space.md }}>
-          <Press
-            grow
-            label={mode === 'up' ? 'I already have one' : 'Make an account'}
-            disabled={busy}
-            onPress={() => {
-              setMode(mode === 'up' ? 'in' : 'up')
-              setError(null)
-              setNote(null)
-            }}
-          />
-          {mode === 'in' ? (
-            <Press grow label="Forgot password" disabled={busy} onPress={reset} />
-          ) : null}
-        </View>
+        {mode === 'code' ? (
+          <Press label="Sign in with an account instead" disabled={busy} onPress={() => switchTo('in')} />
+        ) : (
+          <View style={{ gap: space.md }}>
+            <View style={{ flexDirection: 'row', gap: space.md }}>
+              <Press
+                grow
+                label={mode === 'up' ? 'I already have one' : 'Make an account'}
+                disabled={busy}
+                onPress={() => switchTo(mode === 'up' ? 'in' : 'up')}
+              />
+              {mode === 'in' ? (
+                <Press grow label="Forgot password" disabled={busy} onPress={reset} />
+              ) : null}
+            </View>
+            <Press label="Use the code from the Mac instead" disabled={busy} onPress={() => switchTo('code')} />
+          </View>
+        )}
 
         <Text style={{ color: color.silkFaint, fontSize: font.micro, lineHeight: 18 }}>
           Saving to a slot, backups and firmware stay at the Mac. Your Mac refuses them from a

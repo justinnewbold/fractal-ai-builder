@@ -32,6 +32,12 @@ import { fileURLToPath } from 'node:url'
  */
 export const FILES = [
   { source: '../shared/relay-rules.mjs', target: '../mobile/src/lib/relay-rules.js' },
+  /*
+   * How a pairing code becomes the account both ends sign in as. A phone that
+   * derived it differently from the Mac would look, to the person holding it,
+   * exactly like a Mac that is off.
+   */
+  { source: '../shared/pairing.mjs', target: '../mobile/src/lib/pairing.js' },
   { source: '../shared/tone-steps.mjs', target: '../mobile/src/lib/tone-steps.js' },
   { source: '../shared/play-mode.mjs', target: '../mobile/src/lib/play-mode.js' },
   { source: '../src/lib/guardrails.js', target: '../mobile/src/lib/guardrails.js' },
