@@ -19,6 +19,7 @@ export default function Press({
   label,
   sub,
   onPress,
+  onLongPress,
   tone = 'plain',
   on = false,
   disabled = false,
@@ -41,6 +42,18 @@ export default function Press({
         haptic?.()
         onPress?.()
       }}
+      /* A hold is a different thing from a press, and RN keeps them apart: a
+         press that becomes a hold never fires onPress. Only wired when asked
+         for, so a button with nothing to hold ignores a slow finger. */
+      onLongPress={
+        onLongPress
+          ? () => {
+              haptic?.()
+              onLongPress()
+            }
+          : undefined
+      }
+      delayLongPress={450}
       style={({ pressed }) => [
         {
           minHeight: height,

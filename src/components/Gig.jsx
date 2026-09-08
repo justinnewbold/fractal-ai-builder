@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { selectPreset, liveMeters, setChannel, setMetersWanted } from '../lib/forgefx'
+import { selectPreset, liveMeters, setChannel, setMetersWanted, setTempo } from '../lib/forgefx'
 import {
   useDevice,
   refreshBlocks as reReadChain,
@@ -22,6 +22,7 @@ import { tick as haptic } from '../lib/feedback'
 import { useLongPress } from '../lib/longPress'
 import { useDismiss } from '../lib/dismiss'
 import { Tuner } from './Console'
+import BpmBox from './BpmBox'
 import { sizeVars, SIZES } from '../lib/gigSize'
 
 /**
@@ -382,8 +383,39 @@ export default function Gig({
   /* Read aloud, the face is "Tap 120" — which is a tempo, not an instruction.
      The label says what the button does and what the number means. */
   const tapLabel = Number.isFinite(bpm)
-    ? `Tap tempo — currently ${Math.round(bpm)} BPM`
-    : 'Tap tempo'
+    ? `Tap tempo — currently ${Math.round(bpm)} BPM. Hold to type a tempo.`
+    : 'Tap tempo. Hold to type a tempo.'
+
+  /*
+   * Hold Tap, or right-click it, to type the tempo.
+   *
+   * "On the tap button, let's do where they hold the tap button they can
+   * manually enter in the beats per minute they want. On the Mac let them
+   * right click to pull up the text box to enter the BPM."
+   *
+   * Tapping gets you close; a song chart says 132. The same hold-or-right-click
+   * the block tiles use opens a box over the button with the current tempo
+   * selected, so typing replaces it; Enter sets it, Escape or a tap elsewhere
+   * leaves it alone. The tap that would have followed the hold is swallowed by
+   * useLongPress, so holding never sends a stray beat.
+   */
+  const [typing, setTyping] = useState(false)
+  const tapCell = useRef(null)
+  const holdTap = useLongPress(() => {
+    haptic()
+    clearTimeout(reread.current)
+    setTyping(true)
+  })
+  useDismiss(tapCell, () => setTyping(false), { open: typing })
+  const typeTempo = async (n) => {
+    try {
+      await setTempo(n)
+      await refreshTempo()
+      onChanged?.(`Tempo → ${n} BPM`)
+    } catch (err) {
+      onError(err.message)
+    }
+  }
 
   const step = async (delta) => {
     const next = (preset?.number ?? 0) + delta
@@ -703,10 +735,19 @@ export default function Gig({
           Absent until the unit has said — a dash would read as zero, and a
           unit whose driver has no tempo at all should not be shown one.
         */}
-        <button className="gig-bar-btn gig-tap" onClick={tap} aria-label={tapLabel}>
-          <span>Tap</span>
-          {Number.isFinite(bpm) ? <span className="gig-tap-bpm mono">{Math.round(bpm)}</span> : null}
-        </button>
+        <div className="gig-tap-cell" ref={tapCell}>
+          <button className="gig-bar-btn gig-tap" onClick={tap} aria-label={tapLabel} {...holdTap}>
+            <span>Tap</span>
+            {Number.isFinite(bpm) ? <span className="gig-tap-bpm mono">{Math.round(bpm)}</span> : null}
+          </button>
+          {typing ? (
+            <div className="gig-tempo" role="group" aria-label="Type a tempo">
+              <span className="silk-label">Tempo</span>
+              <BpmBox bpm={bpm} autoFocus onSet={typeTempo} onError={onError} onDone={() => setTyping(false)} />
+              <span className="hint">Enter sets it</span>
+            </div>
+          ) : null}
+        </div>
         {/*
           Ask, on the bar rather than floating over the rig.
 

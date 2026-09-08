@@ -6560,6 +6560,62 @@ test('a scanned code pairs before the connect screen can ask for anything', () =
   assert.match(src, /needsConfirmation[\s\S]*?Confirm email/, 'a project that confirms every account fails pairing with no words about why')
 })
 
+
+console.log('\ntyping a tempo')
+/*
+ * "On the tap button, let's do where they hold the tap button they can
+ * manually enter in the beats per minute they want. On the Mac let them right
+ * click to pull up the text box to enter the BPM." The check on what was typed
+ * is shared with the phone apps, so both refuse the same things in the same
+ * words.
+ */
+import * as tempo from '../shared/tempo.mjs'
+
+test('a typed tempo is a whole number inside the unit’s range', () => {
+  assert.deepEqual(tempo.checkBpm('120'), { bpm: 120 })
+  assert.deepEqual(tempo.checkBpm(' 132 '), { bpm: 132 })
+  assert.deepEqual(tempo.checkBpm('99.6'), { bpm: 100 }, 'a decimal is rounded, not refused')
+  assert.deepEqual(tempo.checkBpm(''), { empty: true }, 'nothing typed is not an error')
+  assert.deepEqual(tempo.checkBpm(null), { empty: true })
+  assert.equal(tempo.BPM_MIN, 20)
+  assert.equal(tempo.BPM_MAX, 400)
+})
+
+test('an impossible tempo is refused in words, never clamped', () => {
+  for (const bad of ['19', '401', '0', '9999']) {
+    const out = tempo.checkBpm(bad)
+    assert.ok(out.error, `${bad} was accepted`)
+    assert.match(out.error, /20 to 400/, `${bad}: the range is not named`)
+    assert.equal(out.bpm, undefined, `${bad} was clamped into a tempo nobody typed`)
+  }
+  assert.match(tempo.checkBpm('fast').error, /number/i)
+  assert.match(tempo.checkBpm('1x0').error, /number/i)
+})
+
+test('the Tap button opens the tempo box on a hold or a right-click, at both ends', () => {
+  const gig = readSrc(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8')
+  assert.match(gig, /const holdTap = useLongPress\(/, 'Tap cannot be held')
+  assert.match(gig, /className="gig-bar-btn gig-tap"[^>]*\{\.\.\.holdTap\}/, 'the hold is not on the Tap button')
+  assert.match(gig, /clearTimeout\(reread\.current\)\s*\n\s*setTyping\(true\)/, 'a hold leaves the tap’s re-read pending under the box')
+  assert.match(gig, /<BpmBox bpm=\{bpm\} autoFocus onSet=\{typeTempo\}/, 'the box does not open with the tempo selected')
+  assert.match(gig, /await setTempo\(n\)\s*\n\s*await refreshTempo\(\)/, 'a typed tempo is sent but the number on the button is not re-read')
+  assert.match(gig, /useDismiss\(tapCell, \(\) => setTyping\(false\), \{ open: typing \}\)/, 'nothing closes the box on a tap elsewhere or Escape')
+  // The box itself refuses with the shared words, and no longer sits unused in App.
+  const box = readSrc(new URL('../src/components/BpmBox.jsx', import.meta.url), 'utf8')
+  assert.match(box, /checkBpm\(typed\)/, 'the box has its own idea of a valid tempo')
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  assert.ok(!/function BpmBox/.test(app), 'the tempo box is still defined in App.jsx, where nothing renders it')
+  // The phone app: the same hold, the same check, from the same source.
+  const press = readSrc(new URL('../mobile/src/components/Press.js', import.meta.url), 'utf8')
+  assert.match(press, /onLongPress=\{\s*onLongPress/, 'the phone’s button cannot be held')
+  const stage = readSrc(new URL('../mobile/src/screens/Stage.js', import.meta.url), 'utf8')
+  assert.match(stage, /label="Tap"[^>]*onLongPress=\{\(\) => setTyping\(true\)\}/, 'holding Tap on the phone does nothing')
+  assert.match(stage, /checkBpm\(typed\)/, 'the phone checks a typed tempo by its own rule')
+  assert.match(stage, /await writeTempo\(checked\.bpm\)/, 'a typed tempo on the phone goes nowhere')
+  const sync = readSrc(new URL('../scripts/sync-relay-rules.mjs', import.meta.url), 'utf8')
+  assert.match(sync, /shared\/tempo\.mjs.*mobile\/src\/lib\/tempo\.js/, 'the phone’s copy of the tempo rule is not generated')
+})
+
 await settle()
 /*
  * The tally has to say when it is red.

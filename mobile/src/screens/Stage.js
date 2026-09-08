@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Platform, RefreshControl, ScrollView, Text, View } from 'react-native'
+import { Platform, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native'
 import { useKeepAwake } from 'expo-keep-awake'
 
 import { color, font, mono, space, TAP } from '../lib/theme'
@@ -13,8 +13,10 @@ import {
   writeBypass,
   writeChannel,
   writeScene,
+  writeTempo,
   writeTuner
 } from '../lib/rig'
+import { checkBpm } from '../lib/tempo'
 import { nope, thud } from '../lib/feedback'
 import Note from '../components/Note'
 import Press from '../components/Press'
@@ -61,6 +63,31 @@ export default function Stage({ onOpenSettings, onOpenTone }) {
   const tunerOn = useRig(ofTunerOn)
   const tuning = useRig(ofTuning)
   const bpm = useRig(ofBpm)
+  /* The tempo box under Tap, open only while somebody is typing into it. */
+  const [typing, setTyping] = useState(false)
+  const [typed, setTyped] = useState('')
+  const [typedError, setTypedError] = useState(null)
+  useEffect(() => {
+    if (typing) {
+      setTyped(Number.isFinite(bpm) ? String(Math.round(bpm)) : '')
+      setTypedError(null)
+    }
+  }, [typing]) // eslint-disable-line react-hooks/exhaustive-deps
+  const commitTyped = async () => {
+    const checked = checkBpm(typed)
+    setTyping(false)
+    if (checked.error) {
+      setTypedError(checked.error)
+      return
+    }
+    if (checked.bpm !== undefined && checked.bpm !== Math.round(bpm)) {
+      try {
+        await writeTempo(checked.bpm)
+      } catch (err) {
+        setTypedError(err.message)
+      }
+    }
+  }
   const error = useRig(ofError)
 
   const [refreshing, setRefreshing] = useState(false)
@@ -268,8 +295,46 @@ export default function Stage({ onOpenSettings, onOpenTone }) {
             * arriving twice is a beat that never happened, so the relay
             * excludes this route from its retry.
             */}
-          <Press grow label="Tap" tone="signal" onPress={tapTempo} />
+          {/*
+            * Hold Tap to type the tempo. "On the tap button, let's do where
+            * they hold the tap button they can manually enter in the beats per
+            * minute they want." The field opens beneath with the current
+            * tempo selected; the keyboard's Done sets it.
+            */}
+          <Press grow label="Tap" tone="signal" onPress={tapTempo} onLongPress={() => setTyping(true)} />
         </View>
+        {typing ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+            <TextInput
+              autoFocus
+              selectTextOnFocus
+              value={typed}
+              onChangeText={(t) => setTyped(t.replace(/[^0-9]/g, ''))}
+              keyboardType="number-pad"
+              returnKeyType="done"
+              accessibilityLabel="Tempo in beats per minute"
+              placeholder="BPM"
+              placeholderTextColor={color.silkFaint}
+              onSubmitEditing={commitTyped}
+              onBlur={() => setTyping(false)}
+              style={{
+                flexGrow: 1,
+                minHeight: TAP,
+                backgroundColor: color.panel,
+                borderWidth: 1,
+                borderColor: color.live,
+                borderRadius: 10,
+                paddingHorizontal: space.md,
+                color: color.silk,
+                fontSize: font.hero,
+                fontFamily: face,
+                textAlign: 'center'
+              }}
+            />
+            <Press label="Set" tone="signal" on onPress={commitTyped} />
+          </View>
+        ) : null}
+        {typedError ? <Note tone="fault">{typedError}</Note> : null}
       </View>
 
       {/* ----------------------------------------------------------- tuner */}

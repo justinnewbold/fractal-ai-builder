@@ -38,6 +38,8 @@ export const FILES = [
    * exactly like a Mac that is off.
    */
   { source: '../shared/pairing.mjs', target: '../mobile/src/lib/pairing.js' },
+  /* What counts as a tempo somebody typed. The unit's range, once, for both boxes. */
+  { source: '../shared/tempo.mjs', target: '../mobile/src/lib/tempo.js' },
   { source: '../shared/tone-steps.mjs', target: '../mobile/src/lib/tone-steps.js' },
   { source: '../shared/play-mode.mjs', target: '../mobile/src/lib/play-mode.js' },
   { source: '../src/lib/guardrails.js', target: '../mobile/src/lib/guardrails.js' },
