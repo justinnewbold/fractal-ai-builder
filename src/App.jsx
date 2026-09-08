@@ -72,6 +72,7 @@ import { createNameScan } from './lib/nameScan'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
 import Screens, { viewsFor } from './components/Screens'
 import { SIZES, loadSize, saveSize, clampSize } from './lib/gigSize'
+import { loadPlayMode, savePlayMode, askButtonShows } from './lib/playMode'
 import { remember as rememberPreset } from './lib/presetMarks'
 import {
   getTempo,
@@ -732,6 +733,34 @@ export default function App() {
    * screen that paints at one size and jumps to another is worse than either,
    * and the jump lands exactly when someone is reaching for it.
    */
+  /*
+   * Playing, or at the desk.
+   *
+   * The switch that takes the Ask button off the stage screen. Read
+   * synchronously for the first paint for the same reason the size is: a
+   * button that appears a frame after the screen does is a button that can be
+   * hit by somebody reaching for what used to be there.
+   *
+   * Why the button is back on a phone at all, and why a switch rather than a
+   * rule the app infers, is written down in lib/playMode.js.
+   */
+  const [playing, setPlaying] = useState(loadPlayMode)
+
+  /*
+   * Whether the Ask button is drawn, decided once and named.
+   *
+   * It used to end in `views.includes('ask')`, which is false on a phone — the
+   * line that took tone generation off a handset altogether. It does not
+   * belong to the viewport any more: Ask is a SHEET, not one of the screens
+   * the tab row and the swipe move between, so a phone can open it without Ask
+   * becoming somewhere a stray drag can land. That distinction is the whole
+   * change, and the bench screens are still bench screens.
+   *
+   * The rule itself lives in lib/playMode.js — testable without a browser, and
+   * out of reach of a comment in this file impersonating it.
+   */
+  const askShows = askButtonShows({ status, view, playing })
+
   const [size, setSize] = useState(loadSize)
   /*
    * Named rather than written inline in the tab row.
@@ -3675,7 +3704,7 @@ export default function App() {
         already the screen. Create has it full height and does not need a way
         to open what is open.
       */}
-      {status === 'live' && view !== 'ask' && views.includes('ask') ? (
+      {askShows ? (
         <button
           className="ask-anywhere"
           onClick={() => setSheet('chat')}
@@ -3739,6 +3768,9 @@ export default function App() {
           onError={setError}
           onChanged={read}
           onPickPreset={() => setPresetMenu(true)}
+          /* Absent, not disabled, when play mode is on: the bar closes up to
+             two buttons rather than keeping a dead third. */
+          onAsk={askShows ? () => setSheet('chat') : null}
         />
       ) : null}
 
@@ -4223,6 +4255,34 @@ export default function App() {
             that worked when a relay went quiet. This one drops a dead relay
             and rejoins the session before it reads. */}
         <DeviceDetail status={status} device={device} onRetry={reconnect} busy={busy} />
+
+        {/*
+          The switch that clears the screen for playing.
+
+          First in the sheet, above the connection panels, because it is the
+          one thing here somebody reaches for in a hurry and with the lights
+          down — the rest of this sheet is read once when something is wrong.
+        */}
+        <Section key="playing" title="Playing" note={playing ? 'Ask is hidden' : 'Ask is available'}>
+          <label className="rename-choice">
+            <input
+              type="checkbox"
+              checked={playing}
+              onChange={(e) => {
+                const on = e.target.checked
+                setPlaying(on)
+                savePlayMode(on)
+              }}
+            />
+            <span>
+              Play mode
+              <span className="hint">
+                Takes the ✦ Ask button off the Play screen, so nothing on it can start
+                building a tone. Everything else works the same. This phone remembers it.
+              </span>
+            </span>
+          </label>
+        </Section>
 
         <Section key="phone-remote" title="Phone remote" note={describeLink(link).note}>
           {/*

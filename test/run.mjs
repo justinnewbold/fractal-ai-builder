@@ -507,6 +507,83 @@ test('the client never sends user_id', async () => {
   assert.ok(!/user_id\s*:/.test(code), 'cloudPresets sets user_id from the client')
 })
 
+console.log('\nplay mode')
+
+const play = await import('../src/lib/playMode.js')
+
+/* A store that behaves like the real one, and one that throws like a private
+   window does. */
+const playStore = () => {
+  const map = new Map()
+  return {
+    getItem: (k) => (map.has(k) ? map.get(k) : null),
+    setItem: (k, v) => map.set(k, String(v))
+  }
+}
+const blockedStore = {
+  getItem: () => {
+    throw new Error('site data is blocked')
+  },
+  setItem: () => {
+    throw new Error('site data is blocked')
+  }
+}
+
+test('a phone that has never heard of play mode shows the Ask button', () => {
+  /*
+   * Off by default, because a switch that HIDES things has to be asked for.
+   * Defaulting it on would restore the button and then hide it, which reads as
+   * the button never having come back.
+   */
+  assert.equal(play.loadPlayMode(playStore()), false)
+})
+
+test('the switch is remembered on this phone', () => {
+  const store = playStore()
+  assert.equal(play.savePlayMode(true, store), true)
+  assert.equal(play.loadPlayMode(store), true)
+  play.savePlayMode(false, store)
+  assert.equal(play.loadPlayMode(store), false)
+})
+
+test('a browser that will not store anything still renders a stage screen', () => {
+  /*
+   * A private window throws on read AND on write. The screen this switch sits
+   * on is the one someone is looking at in the dark, so neither may be a
+   * crash — the read falls back to showing the button, and the write reports
+   * that it did not stick rather than throwing through the tap.
+   */
+  assert.equal(play.loadPlayMode(blockedStore), false)
+  assert.equal(play.savePlayMode(true, blockedStore), false)
+})
+
+test('the Ask button waits for a unit, stays off its own screen, and goes when playing', () => {
+  /*
+   * Three parts, and the first two are the ones easy to lose. There is nothing
+   * to ask about before a unit has answered, and offering to open the
+   * conversation you are already reading is a button that does nothing.
+   */
+  assert.equal(play.askButtonShows({ status: 'live', view: 'play', playing: false }), true)
+  assert.equal(play.askButtonShows({ status: 'idle', view: 'play', playing: false }), false)
+  assert.equal(play.askButtonShows({ status: 'live', view: 'ask', playing: false }), false)
+  assert.equal(play.askButtonShows({ status: 'live', view: 'play', playing: true }), false)
+})
+
+test('anything unreadable in the store is not playing', () => {
+  /*
+   * One-sided on purpose: a value nobody can parse must never come back as
+   * "hide the button". A missing button reads as the feature being gone; an
+   * extra one is a button somebody can ignore.
+   */
+  assert.equal(play.clampMode(null), false)
+  assert.equal(play.clampMode(undefined), false)
+  assert.equal(play.clampMode('0'), false)
+  assert.equal(play.clampMode('nonsense'), false)
+  assert.equal(play.clampMode('1'), true)
+  assert.equal(play.clampMode('true'), true)
+  assert.equal(play.clampMode(true), true)
+})
+
 console.log('\nserving it locally')
 
 const host = await import('../desktop/lib/host.mjs')

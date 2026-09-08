@@ -17,6 +17,9 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 
 const src = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+/* The Ask button's rule lives in a module so it can be asserted as behaviour
+   rather than as a line of App.jsx that a comment could impersonate. */
+const play = await import('../src/lib/playMode.js')
 
 /** Everything rendered inside one view's conditional block. */
 function view(name) {
@@ -1047,10 +1050,18 @@ export function run(test) {
       'the tab row is no longer three screens'
     )
     // And the sheet route survives for the screens that are not the conversation.
+    /* The button is gated on a NAME now, not on a viewport — see playMode.js
+       for why a phone gets it back. What must not change is that it never
+       offers to open the conversation you are already reading. */
     assert.match(
       src,
-      /view !== 'ask' && views\.includes\('ask'\) \? \(\s*\n?\s*<button\s*\n?\s*className="ask-anywhere"/,
-      'the floating Ask button no longer opens the conversation from Play and Edit, or is back on a phone'
+      /\{askShows \? \(\s*\n?\s*<button\s*\n?\s*className="ask-anywhere"/,
+      'the floating Ask button no longer opens the conversation from Play and Edit'
+    )
+    assert.match(
+      src,
+      /const askShows = askButtonShows\(\{ status, view, playing \}\)/,
+      'the ask button decides for itself again, where a comment can impersonate the rule'
     )
     const styles = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
     assert.ok(
@@ -1532,11 +1543,14 @@ export function run(test) {
 
     // The way in, on the screens that are not already it.
     assert.match(src, /className="ask-anywhere"/, 'the button that opens the chat from elsewhere is gone')
-    assert.match(
-      src,
-      /status === 'live' && view !== 'ask' && views\.includes\('ask'\) \? \(/,
-      'the ask button no longer hides on Create, where it would offer to open what is open — or no longer hides on a phone, which has no conversation to open'
+    /* Hiding on Create is now playMode's rule rather than a line written here;
+       it is asserted against that module, which is testable without a DOM. */
+    assert.equal(
+      play.askButtonShows({ status: 'live', view: 'ask', playing: false }),
+      false,
+      'the ask button no longer hides on Create, where it would offer to open what is open'
     )
+    assert.equal(play.askButtonShows({ status: 'live', view: 'play', playing: false }), true)
   })
 
   test('the demo is not a one-way door on a phone', () => {
@@ -3178,10 +3192,24 @@ export function run(test) {
       /<Screens[^>]*order=\{views\}/,
       'the swipe surface is not told which screens this viewport reaches'
     )
-    assert.match(
-      src,
-      /view !== 'ask' && views\.includes\('ask'\) \? \(\s*<button\s+className="ask-anywhere"/,
-      'the floating Ask button is back on the stage screen of a phone'
+    /*
+     * The Ask BUTTON is deliberately back — the rest of this test is what
+     * makes that safe.
+     *
+     * Ask is a sheet, not one of the screens the tab row and the swipe move
+     * between, so a phone opening it is not a phone that can land on it by
+     * dragging sideways mid-song. Everything above still holds; what changed
+     * is one button, and it now answers to a switch instead of to the width of
+     * the screen. See lib/playMode.js.
+     */
+    assert.ok(
+      !/views\.includes\('ask'\) \? \(\s*<button\s+className="ask-anywhere"/.test(src),
+      'the ask button is gated on the viewport again, which is what took tone generation off the phone'
+    )
+    assert.equal(
+      play.askButtonShows({ status: 'live', view: 'play', playing: true }),
+      false,
+      'play mode no longer hides the ask button, so there is no way to clear the stage screen'
     )
     assert.match(
       src,
@@ -3409,6 +3437,34 @@ export function run(test) {
     /* And the phone gets the longer allowance, for the same reason the
        presence check does: the read travels a relay to a busy Mac. */
     assert.match(fn, /remote: remoteActive\(\)/, 'the phone reads the chain on the Mac\u2019s shorter allowance')
+  })
+
+  test('the switch that clears the stage screen is reachable and sticks', () => {
+    /*
+     * The Ask button is back on a phone, so there has to be a way to take it
+     * away again — that was the condition: "an option to have it disappear
+     * when in play mode".
+     *
+     * In the Setup sheet, which is the one place a phone can already reach
+     * settings from the top bar, and ABOVE the connection panels: the rest of
+     * that sheet is read once when something is wrong, this is reached in a
+     * hurry with the lights down.
+     */
+    const setup = src.slice(src.indexOf("open={sheet === 'settings'}"))
+    assert.ok(setup.length > 0, 'the Setup sheet is gone')
+    const panel = setup.slice(0, setup.indexOf('phone-remote'))
+    assert.match(panel, /key="playing"/, 'the play mode switch is not above the connection panels')
+    assert.match(panel, /Play mode/, 'the switch no longer says what it is')
+    assert.match(panel, /checked=\{playing\}/, 'the switch does not show the state it controls')
+    assert.match(panel, /savePlayMode\(on\)/, 'the switch is forgotten as soon as the page reloads')
+
+    /* And it is read back for the FIRST paint. An Ask button that appears a
+       frame late is one a thumb reaching for something else can catch. */
+    assert.match(
+      src,
+      /useState\(loadPlayMode\)/,
+      'play mode is restored in an effect, so the stage screen paints wrong and then corrects itself'
+    )
   })
 
   test('the tour teaches what a scene actually is', () => {
