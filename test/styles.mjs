@@ -711,6 +711,43 @@ export function run(test) {
     )
   })
 
+  test('the preset sheet does not slide sideways, and keeps its refresh button', () => {
+    /*
+     * "On this preset screen set it to not move horizontal at all and fix the
+     * refresh button that's out of boundaries."
+     *
+     * One cause, two symptoms. The panel heading was a flex row that could not
+     * wrap: PRESETS, five 44px range buttons and the refresh button want about
+     * 370px, and a phone's sheet has less. So the row grew instead — carrying
+     * the refresh button out past the sheet's rounded corner, and making the
+     * whole panel wider than the screen, which is why the filter box, the view
+     * buttons and every preset row were cut off at the right and the sheet
+     * could be dragged sideways.
+     */
+    const head = code.slice(code.indexOf('.panel-head {'), code.indexOf('}', code.indexOf('.panel-head {')))
+    assert.match(head, /flex-wrap: wrap/, 'the panel heading cannot wrap, so a phone pushes its last button out')
+
+    /* And on a phone the ranges take the whole second line. Wrapping alone put
+       the refresh button — last in the row — alone on the left of the second
+       line, further from the title than it started. */
+    const at = code.indexOf('.panel-head .preset-jumps {')
+    assert.notEqual(at, -1, 'the phone rule that gives the ranges their own line is gone')
+    const jumps = code.slice(at, code.indexOf('}', at))
+    assert.match(jumps, /flex-basis: 100%/, 'the ranges no longer take their own line, so the refresh button wraps below them')
+
+    /* Sideways is stated as well as fixed: a sheet is a fixed-width surface,
+       and anything inside it that does not fit is a bug rather than something
+       to scroll to. */
+    const bodyAt = code.indexOf('.sheet-body {')
+    const body = code.slice(bodyAt, code.indexOf('}', bodyAt))
+    assert.match(body, /overflow-x: hidden/, 'the sheet can be dragged sideways again')
+
+    /* The buttons that grew into that line are still real targets. */
+    const jumpAt = code.indexOf('button.preset-jump {')
+    const jump = code.slice(jumpAt, code.indexOf('}', jumpAt))
+    assert.match(jump, /min-height: 44px/, 'a range button dropped under the touch floor')
+  })
+
   test('at Smallest a tile is a fixed box, so a long scene name cannot push the blocks off the screen', () => {
     /*
      * "This says it's the smallest. It's still too big. All buttons need to be
