@@ -29,19 +29,251 @@ function* walk(dir) {
 }
 
 export function run(test) {
-  test('the phone and the browser use the same relay rules, character for character', async () => {
+  /**
+   * A unit that answers like an FM3 and never touches a port.
+   *
+   * Records every call in order, because the ORDER is most of what these tests
+   * are about — a tone written in the wrong sequence produces a preset nobody
+   * asked for without a single error.
+   */
+  const fakeUnit = (over = {}) => {
+    const calls = []
+    const unit = {
+      calls,
+      presetBlocks: async () => [
+        { effectId: 100, name: 'Amp 1', slug: 'amp', bypassed: false, channel: 'A' }
+      ],
+      blockParams: async (eid) => {
+        calls.push(`read:${eid}`)
+        return { named: [{ id: 1, name: 'Gain', value: 5, min: 0, max: 10 }] }
+      },
+      blockTypes: async () => [],
+      setChannel: async (eid, ch) => calls.push(`channel:${eid}:${ch}`),
+      setType: async (eid, t) => calls.push(`type:${eid}:${t}`),
+      setBypass: async (eid, b) => calls.push(`bypass:${eid}:${b}`),
+      setParamConfirmed: async (eid, id, to) => {
+        calls.push(`param:${eid}:${id}:${to}`)
+        return { ok: true }
+      },
+      getScene: async () => ({ index: 0 }),
+      setScene: async (i) => calls.push(`scene:${i}`),
+      setSceneName: async (i, n) => calls.push(`sceneName:${i}:${n}`),
+      selectPreset: async (n) => calls.push(`select:${n}`)
+    }
+    return { ...unit, ...over, calls }
+  }
+
+  test('the way into the tone screen waits until it knows, then obeys the switch', async () => {
     /*
-     * The web app imports shared/relay-rules.mjs; the phone gets a generated
-     * copy, because Metro would otherwise have to reach outside mobile/ and an
-     * EAS build that uploads only that directory would fail on a build machine
-     * minutes in. The copy is only safe while this passes.
+     * Three states, not two. `null` is "the setting has not been read back
+     * yet", which AsyncStorage makes unavoidable — the browser reads
+     * localStorage synchronously and this cannot.
+     *
+     * Hidden during that gap on purpose. Both choices flicker; only one of them
+     * flickers dangerously. A button that appears a beat late is one nobody has
+     * reached for. A button that vanishes out from under a thumb already on its
+     * way down turns into a press on whatever the layout put there instead,
+     * which in a row of stage controls is a scene change mid-song.
      */
-    const { generate, sourceText, copyText } = await import('../scripts/sync-relay-rules.mjs')
+    const { toneWayIn, clampMode } = await import('../shared/play-mode.mjs')
+    assert.equal(toneWayIn({ connected: true, playing: false }), true)
+    assert.equal(toneWayIn({ connected: true, playing: true }), false)
     assert.equal(
-      copyText(),
-      generate(sourceText()),
-      'mobile/src/lib/relay-rules.js is stale — run `npm run sync:rules`'
+      toneWayIn({ connected: true, playing: null }),
+      false,
+      'the button is drawn before the switch has been read, so it can vanish under a press'
     )
+    /* And nothing to ask about until the Mac is answering. */
+    assert.equal(toneWayIn({ connected: false, playing: false }), false)
+
+    /* Unreadable is never "hide it": a missing button reads as the feature
+       being gone, an extra one is a button somebody can ignore. */
+    assert.equal(clampMode('nonsense'), false)
+    assert.equal(clampMode(null), false)
+    assert.equal(clampMode('1'), true)
+  })
+
+  test('the tone screen is reachable, and says what it cannot do', () => {
+    const app = read('mobile/App.js')
+    const stage = read('mobile/src/screens/Stage.js')
+    const tone = read('mobile/src/screens/Tone.js')
+
+    assert.match(app, /screen === 'tone'/, 'nothing routes to the tone screen')
+    assert.match(app, /toneWayIn\(/, 'the tone button ignores play mode')
+    assert.match(stage, /onOpenTone \? \(/, 'the stage screen draws a dead tone button rather than none')
+
+    /*
+     * The promise this screen makes. A phone cannot save to a slot, which is
+     * the whole reason a generate button is allowed near a stage screen at all
+     * — so the screen has to offer the undo and say why it is safe.
+     */
+    assert.match(tone, /revert\(device, result\.presetNumber\)/, 'there is no way back from a tone on the phone')
+    assert.match(tone, /can’t save to a slot/, 'the screen no longer says why nothing here is permanent')
+    assert.match(tone, /running\.current\?\.abort\(\)/, 'a stuck generation can only be escaped by force-quitting')
+  })
+
+  test('the phone writes a tone in the order the unit needs', async () => {
+    /*
+     * The whole reason the order is shared rather than written twice. Every one
+     * of these is silent when wrong: values dialled on a channel nobody hears,
+     * ranges from a model that is no longer there, a block audible half-dialled.
+     */
+    const tone = await import('../mobile/src/lib/tone.js')
+    const unit = fakeUnit()
+    await tone.applyChanges(unit, [
+      {
+        eid: 100,
+        name: 'Amp 1',
+        channel: 2,
+        type: 42,
+        typeName: 'Recto',
+        bypassed: false,
+        params: [{ id: 1, name: 'Gain', to: 7, range: { min: 0, max: 10 } }]
+      }
+    ])
+    assert.deepEqual(unit.calls, [
+      'channel:100:2',
+      'type:100:42',
+      'read:100',
+      'param:100:1:7',
+      'bypass:100:false'
+    ])
+  })
+
+  test('a write the unit ignored is reported rather than counted as done', async () => {
+    /*
+     * The device accepts a write it then ignores and reports success either
+     * way. setParamConfirmed reads it back; this is what happens when both
+     * write paths fail.
+     */
+    const tone = await import('../mobile/src/lib/tone.js')
+    const unit = fakeUnit({ setParamConfirmed: async () => ({ ok: false }) })
+    const failures = await tone.applyChanges(unit, [
+      { eid: 100, name: 'Amp 1', params: [{ id: 1, name: 'Gain', to: 7, range: { min: 0, max: 10 } }] }
+    ])
+    assert.equal(failures.length, 1)
+    assert.match(failures[0], /ignored both write paths/)
+  })
+
+  test('one step failing does not abandon the rest of the tone', async () => {
+    /*
+     * Half a tone with a list of what did not land beats a run that stopped at
+     * step three and left the rig in a state nobody can describe.
+     */
+    const tone = await import('../mobile/src/lib/tone.js')
+    const unit = fakeUnit({
+      setChannel: async () => {
+        throw new Error('the relay dropped')
+      }
+    })
+    const failures = await tone.applyChanges(unit, [
+      { eid: 100, name: 'Amp 1', channel: 2, params: [], bypassed: true }
+    ])
+    assert.equal(failures.length, 1)
+    assert.ok(unit.calls.includes('bypass:100:true'), 'the rest of the block was abandoned')
+  })
+
+  test('scenes are written standing in each one, and put you back where you were', async () => {
+    /*
+     * A scene remembers a bypass and a channel, so writing one means standing
+     * in it. A run that does not restore leaves somebody on scene 8 wondering
+     * what happened.
+     */
+    const tone = await import('../mobile/src/lib/tone.js')
+    const unit = fakeUnit({ getScene: async () => ({ index: 3 }) })
+    await tone.applyScenes(unit, [
+      { index: 0, name: 'Rhythm', blocks: [{ eid: 100, name: 'Amp 1', bypassed: false }] }
+    ])
+    assert.deepEqual(unit.calls, [
+      'scene:0',
+      'sceneName:0:Rhythm',
+      'bypass:100:false',
+      'scene:3'
+    ])
+  })
+
+  test('a scene name the Mac refuses is said out loud, not swallowed', async () => {
+    /*
+     * This was an empty catch once. Naming was refused outright over a remote
+     * session for months and, because nothing said so, it read as the feature
+     * simply not working.
+     */
+    const tone = await import('../mobile/src/lib/tone.js')
+    const unit = fakeUnit({
+      setSceneName: async () => {
+        throw new Error('not allowed from a phone')
+      }
+    })
+    const failures = await tone.applyScenes(unit, [{ index: 0, name: 'Lead', blocks: [] }])
+    assert.equal(failures.length, 1)
+    assert.match(failures[0], /kept its old name/)
+  })
+
+  test('a rig that reads back empty is refused rather than designed against', async () => {
+    /*
+     * A relay that has gone reads every block empty, and what comes out the far
+     * end is a rig with no controls in it that the model then cheerfully
+     * designs a tone for.
+     */
+    const tone = await import('../mobile/src/lib/tone.js')
+    const unit = fakeUnit({ presetBlocks: async () => [] })
+    await assert.rejects(
+      tone.buildTone({ unit, description: 'warmer', device: {} }),
+      /Nothing came back from the unit/
+    )
+  })
+
+  test('undo is the saved version, which a phone can always get back to', async () => {
+    /*
+     * Not an undo stack — the unit already has one. A phone cannot save to a
+     * slot, so what is stored is always the version from before the tone.
+     */
+    const tone = await import('../mobile/src/lib/tone.js')
+    const unit = fakeUnit()
+    await tone.revert(unit, 28)
+    assert.deepEqual(unit.calls, ['select:28'])
+  })
+
+  test('the phone and the browser share every rule they must agree on, character for character', async () => {
+    /*
+     * The web app imports these directly; the phone gets a generated copy,
+     * because Metro would otherwise have to reach outside mobile/ and an EAS
+     * build that uploads only that directory would fail on a build machine
+     * minutes in. The copy is only safe while this passes.
+     *
+     * It is four files now rather than one. The relay allowlist was the first —
+     * allowing something the host refuses turns a friendly sentence into a bare
+     * status code mid-song. The generation rules joined it when the phone
+     * learned to build a tone: a handset validating by looser rules than the
+     * Mac is a handset writing something the Mac would have refused, into a rig
+     * somebody is about to play.
+     */
+    const { state } = await import('../scripts/sync-relay-rules.mjs')
+    const files = state()
+    assert.ok(files.length >= 7, `only ${files.length} files are kept in step; the tone rules are not among them`)
+    for (const file of files) {
+      const name = file.target.replace('../', '')
+      assert.ok(file.copyText !== null, `${name} does not exist — run \`npm run sync:rules\``)
+      assert.equal(file.copyText, file.expected, `${name} is stale — run \`npm run sync:rules\``)
+    }
+
+    /* And the safety rules are actually among them, by name. A list that
+       quietly lost validate.js would still pass the loop above. */
+    const targets = files.map((f) => f.target)
+    for (const needed of [
+      'play-mode.js',
+      'guardrails.js',
+      'validate.js',
+      'tone-steps.js',
+      'relay-rules.js',
+      'scale.js',
+      'encoding.js'
+    ]) {
+      assert.ok(
+        targets.some((t) => t.endsWith(needed)),
+        `${needed} is no longer kept in step between the two apps`
+      )
+    }
   })
 
   test('the phone signs into the project the Mac hosts on', () => {
