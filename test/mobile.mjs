@@ -110,6 +110,18 @@ export function run(test) {
     assert.match(tone, /revert\(device, result\.presetNumber\)/, 'there is no way back from a tone on the phone')
     assert.match(tone, /can’t save to a slot/, 'the screen no longer says why nothing here is permanent')
     assert.match(tone, /running\.current\?\.abort\(\)/, 'a stuck generation can only be escaped by force-quitting')
+
+    /*
+     * The unit is named, not just described. api/generate.js reads
+     * `device.name` and FALLS BACK TO 'FM3' when it is absent, so a request
+     * carrying only capabilities designs an FM3 tone on whatever is plugged in
+     * — silently, and wrongly on an AM4.
+     */
+    assert.match(
+      tone,
+      /device: \{ name: deviceName, capabilities: caps \}/,
+      'the unit is not named in the request, so the generator designs for an FM3 whatever is plugged in'
+    )
   })
 
   test('the phone writes a tone in the order the unit needs', async () => {

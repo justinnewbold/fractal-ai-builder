@@ -11,6 +11,7 @@ import Press from '../components/Press'
 const ofPreset = (s) => s.preset
 const ofCaps = (s) => s.capabilities
 const ofSceneNames = (s) => s.sceneNames
+const ofDeviceName = (s) => s.deviceName
 
 /**
  * Asking for a sound in words, from the phone.
@@ -35,6 +36,7 @@ export default function Tone({ onBack }) {
   const preset = useRig(ofPreset)
   const caps = useRig(ofCaps)
   const sceneNames = useRig(ofSceneNames)
+  const deviceName = useRig(ofDeviceName)
 
   const [words, setWords] = useState('')
   const [busy, setBusy] = useState(false)
@@ -62,7 +64,14 @@ export default function Tone({ onBack }) {
       const built = await buildTone({
         unit: device,
         description,
-        device: { capabilities: caps },
+        /*
+         * The NAME as well as the capabilities. The generator reads
+         * `device.name` and falls back to 'FM3' when it is missing, so sending
+         * only the capabilities would have designed every tone for an FM3 —
+         * including on an AM4, which is a different unit with a different chain
+         * and a different idea of what a preset is.
+         */
+        device: { name: deviceName, capabilities: caps },
         sceneNames,
         presetNumber: preset?.number ?? null,
         signal: control.signal,
