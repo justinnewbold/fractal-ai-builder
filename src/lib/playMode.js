@@ -25,10 +25,15 @@
  * phone that has never heard of this shows the button.
  */
 
-const KEY = 'fractal.playMode'
+/*
+ * The rule itself is shared with the phone app, which asks the same question
+ * about its own stage screen. Only the storage differs, and it differs enough
+ * to matter — see toneWayIn's third state over there.
+ */
+export { clampMode, askButtonShows } from '../../shared/play-mode.mjs'
+import { clampMode } from '../../shared/play-mode.mjs'
 
-/** Anything unreadable is "not playing", never a crash and never a hidden button. */
-export const clampMode = (v) => v === true || v === 'true' || v === '1'
+const KEY = 'fractal.playMode'
 
 /** Whether this device is set to playing. */
 export function loadPlayMode(storage) {
@@ -52,19 +57,3 @@ export function savePlayMode(on, storage) {
     return false
   }
 }
-
-/**
- * Whether the Ask button is drawn.
- *
- * One place, because the gate has four parts and three of them are easy to
- * forget: the app has to be live (there is nothing to ask about otherwise),
- * the conversation must not already be the screen you are on, and play mode
- * takes it away wherever you are — a desk is not a reason to leave it up if
- * somebody has said they are playing.
- *
- * Named rather than written inline, because test/structure.mjs reads App.jsx
- * as text and takes the first hit: a condition spelled out at the call site is
- * one a comment elsewhere can impersonate. See CLAUDE.md.
- */
-export const askButtonShows = ({ status, view, playing }) =>
-  status === 'live' && view !== 'ask' && !playing

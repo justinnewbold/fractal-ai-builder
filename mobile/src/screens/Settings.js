@@ -11,6 +11,7 @@ import {
   remoteHosts
 } from '../lib/relay'
 import { useRig } from '../lib/rig'
+import { savePlayMode } from '../lib/playMode'
 import Lamp from '../components/Lamp'
 import Note from '../components/Note'
 import Press from '../components/Press'
@@ -24,7 +25,15 @@ const ofDeviceName = (s) => s.deviceName
  * password are all things done about once, and none of them should be within
  * reach of a thumb that is looking for the next scene.
  */
-export default function Settings({ link, macName, onBack, onReconnect, onSignOut }) {
+export default function Settings({
+  link,
+  macName,
+  playing,
+  onPlayMode,
+  onBack,
+  onReconnect,
+  onSignOut
+}) {
   const deviceName = useRig(ofDeviceName)
   const [account, setAccount] = useState(null)
   const [hosts, setHosts] = useState(remoteHosts())
@@ -61,6 +70,32 @@ export default function Settings({ link, macName, onBack, onReconnect, onSignOut
           Setup
         </Text>
         <Press label="Done" height={40} onPress={onBack} />
+      </View>
+
+      {/* --------------------------------------------------------- playing */}
+      <View style={{ gap: space.md }}>
+        <Section>Playing</Section>
+        {/*
+          First, above the link panels, because it is the one thing in here
+          somebody reaches for in a hurry with the lights down. The rest of this
+          screen is read once, when something is wrong.
+        */}
+        <Press
+          label={playing ? 'Play mode is on' : 'Play mode is off'}
+          sub={playing ? 'The Tone button is hidden' : 'The Tone button is on the stage screen'}
+          on={!!playing}
+          tone="signal"
+          disabled={playing === null}
+          onPress={() => {
+            const next = !playing
+            onPlayMode?.(next)
+            savePlayMode(next)
+          }}
+        />
+        <Note>
+          Play mode takes the ✦ Tone button off the stage screen, so nothing there can start
+          building a sound. Everything else works the same. This phone remembers it.
+        </Note>
       </View>
 
       {/* ------------------------------------------------------------ link */}

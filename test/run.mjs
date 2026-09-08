@@ -507,6 +507,134 @@ test('the client never sends user_id', async () => {
   assert.ok(!/user_id\s*:/.test(code), 'cloudPresets sets user_id from the client')
 })
 
+console.log('\nthe order a tone is written in')
+
+const steps = await import('../shared/tone-steps.mjs')
+
+const oneBlock = (extra) => [{ eid: 3, name: 'Amp 1', params: [], ...extra }]
+
+test('a channel is set before the values that belong to it', () => {
+  /*
+   * A block's parameters belong to the channel it is on. Dial gain on A and
+   * then move the block to B and you have dialled a channel nobody hears — and
+   * nothing errors, which is what makes this worth pinning.
+   */
+  const order = steps
+    .stepsFor(oneBlock({ channel: 1, params: [{ id: 1, name: 'Gain', to: 6 }] }))
+    .map((s) => s.kind)
+  assert.deepEqual(order, ['channel', 'reread', 'param'])
+})
+
+test('a model is swapped before anything is dialled on it', () => {
+  /* Swapping a model replaces the whole parameter set. */
+  const order = steps
+    .stepsFor(oneBlock({ type: 42, typeName: 'Recto', params: [{ id: 1, name: 'Gain', to: 6 }] }))
+    .map((s) => s.kind)
+  assert.deepEqual(order, ['type', 'reread', 'param'])
+})
+
+test('ranges are re-read whenever the block moved, and never when it did not', () => {
+  /*
+   * Ranges belong to the model on the channel — a Plexi's gain and a Recto's
+   * gain are the same word over a different span, so a value computed against
+   * the old range lands somewhere else entirely.
+   *
+   * It is a STEP rather than something the executor is trusted to remember,
+   * because leaving it out is silent: every value still writes.
+   */
+  const moved = steps.stepsFor(oneBlock({ channel: 2, params: [{ id: 1, name: 'Gain', to: 6 }] }))
+  assert.ok(moved.some((s) => s.kind === 'reread'), 'a moved block is dialled against the ranges it used to have')
+
+  const still = steps.stepsFor(oneBlock({ params: [{ id: 1, name: 'Gain', to: 6 }] }))
+  assert.ok(!still.some((s) => s.kind === 'reread'), 'a block that did not move pays for a read it does not need')
+})
+
+test('bypass is last, so nothing is briefly audible half-dialled', () => {
+  /*
+   * A block switched on before its values land is a noise through the amp at
+   * exactly the moment somebody is listening to hear whether the tone worked.
+   */
+  const order = steps
+    .stepsFor(oneBlock({ bypassed: false, params: [{ id: 1, name: 'Gain', to: 6 }] }))
+    .map((s) => s.kind)
+  assert.deepEqual(order, ['param', 'bypass'])
+})
+
+test('the whole order, on a block that changes everything at once', () => {
+  const order = steps
+    .stepsFor(
+      oneBlock({
+        channel: 1,
+        type: 42,
+        typeName: 'Recto',
+        bypassed: false,
+        params: [{ id: 1, name: 'Gain', to: 6 }, { id: 2, name: 'Master', to: 5 }]
+      })
+    )
+    .map((s) => s.kind)
+  assert.deepEqual(order, ['channel', 'type', 'reread', 'param', 'param', 'bypass'])
+})
+
+test('the count a progress line shows includes the re-read', () => {
+  /*
+   * A bar that skips it stalls visibly on every block that changed model while
+   * claiming nothing is happening.
+   */
+  assert.equal(steps.stepCount(oneBlock({ channel: 1, params: [{ id: 1, name: 'G', to: 1 }] })), 3)
+  assert.equal(steps.stepCount([]), 0)
+  assert.equal(steps.stepCount(null), 0)
+})
+
+test('a step says what it is doing in words both apps will use', () => {
+  const [channel] = steps.stepsFor(oneBlock({ channel: 2 }))
+  assert.equal(channel.label, 'Amp 1 → channel 2')
+  const [, , param] = steps.stepsFor(
+    oneBlock({ channel: 2, params: [{ id: 1, name: 'Gain', to: 6, unit: 'dB' }] })
+  )
+  assert.equal(param.label, 'Amp 1 · Gain → 6dB')
+})
+
+test('rubbish in the plan is skipped rather than written somewhere', () => {
+  /* A change with no block id cannot name a target, and guessing one writes to
+     whatever block happens to be there. */
+  assert.deepEqual(steps.stepsFor([null, {}, { eid: 'two' }]), [])
+})
+
+test('scenes go after the rig, never with it', () => {
+  /*
+   * A scene records WHICH BLOCKS ARE ON, not what they sound like. Write them
+   * the other way round and every scene is a pattern over a preset that has not
+   * been dialled yet.
+   */
+  assert.equal(steps.rigBeforeScenes([{ eid: 1 }], [{ index: 0 }]), true)
+  assert.equal(steps.rigBeforeScenes([], [{ index: 0 }]), false)
+  assert.equal(steps.rigBeforeScenes([{ eid: 1 }], []), false)
+})
+
+test('the browser still writes in the order the phone does', () => {
+  /*
+   * The one place these can drift. forgefx.js has carried this order since
+   * before it was written down, in numbered comments; the phone reads it off
+   * shared/tone-steps.mjs. If somebody reorders the loop over there, the two
+   * apps write different presets from the same plan and neither errors.
+   */
+  const src = readSrc(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+  const body = src.slice(src.indexOf('export async function applyChanges'))
+  const marks = [
+    '1. the channel these values belong to',
+    '2. the model on it',
+    '3. re-read ranges if either moved',
+    '4. parameters, then bypass'
+  ]
+  let at = -1
+  for (const mark of marks) {
+    const found = body.indexOf(mark)
+    assert.ok(found > -1, `applyChanges no longer says "${mark}" — the order it writes in is unpinned`)
+    assert.ok(found > at, `applyChanges moved "${mark}" out of order, so the two apps write differently`)
+    at = found
+  }
+})
+
 console.log('\nplay mode')
 
 const play = await import('../src/lib/playMode.js')

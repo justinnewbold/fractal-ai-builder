@@ -18,6 +18,8 @@
  */
 import { remoteRequest } from './relay'
 import { cleanPresetName, isEmptySlotName } from './unit.mjs'
+import { preferredEncoding, rememberEncoding } from './encoding'
+import { toNormalized } from './scale'
 
 export {
   EXCLUDED_BLOCKS,
@@ -30,6 +32,8 @@ import { EXCLUDED_BLOCKS } from './unit.mjs'
 
 const post = (path, body) =>
   remoteRequest(path, { method: 'POST', body: body === undefined ? null : JSON.stringify(body) })
+
+const put = (path, body) => remoteRequest(path, { method: 'PUT', body: JSON.stringify(body) })
 
 /* ---------------------------------------------------------------- */
 /* Reading                                                           */
@@ -71,6 +75,23 @@ export const getScene = () => remoteRequest('/scene')
 /** Current tempo, in BPM. */
 export const getTempo = () => remoteRequest('/tempo')
 
+/**
+ * Every knob on one block, with the range each one moves over.
+ *
+ * The read a tone is designed against, and the one the write check below reads
+ * back through. Live off the hardware rather than out of the host's grid cache
+ * — gen3's blockParams opens a connection rather than reusing the dump — which
+ * is what makes confirming a write mean anything from a phone, where the cache
+ * cannot be cleared.
+ */
+export const blockParams = (eid) => remoteRequest(`/preset/blocks/${eid}/params`)
+
+/** One knob's current value, read back off the unit. */
+async function readParamValue(eid, paramId) {
+  const res = await blockParams(eid)
+  return (res?.named || []).find((p) => p.id === paramId)?.value
+}
+
 /* ---------------------------------------------------------------- */
 /* Changing                                                          */
 /* ---------------------------------------------------------------- */
@@ -109,3 +130,78 @@ export const tapTempo = () => post('/tempo/tap')
  * see a needle move. The tuner says exactly that after five silent seconds.
  */
 export const setTuner = (on) => post('/tuner', { on })
+
+
+/* ---------------------------------------------------------------- */
+/* Writing a tone                                                    */
+/* ---------------------------------------------------------------- */
+
+/**
+ * Swap the model on a block — a Plexi for a Recto.
+ *
+ * Discrete by nature: a model is an ordinal out of a fixed list, and
+ * normalising one would be meaningless. Option 2 of 5 is not "40% of the way
+ * along".
+ */
+export const setType = (eid, value) => post(`/preset/blocks/${eid}/type`, { value })
+
+/** Every model a block family offers, so a tone can ask for one by name. */
+export const blockTypes = async (slug) => (await remoteRequest(`/blocks/${slug}/types`)) || []
+
+/** Name the preset, and name a scene. Both land in the edit buffer only. */
+export const setPresetName = (name) => post('/preset/name', { name })
+export const setSceneName = (index, name) => post('/scene/name', { index, name })
+
+/**
+ * Write one knob, on whichever of the two paths the unit actually honours.
+ *
+ * The device accepts a write it then ignores, and reports success either way,
+ * so confirming is the only way to know it landed. Tolerance is proportional
+ * because the unit rounds — asking for 40 Hz can read back 39.998.
+ *
+ * Which path to try first is not a guess: encoding.js records that starting on
+ * the discrete path slams every AM4 knob to its minimum before the retry
+ * corrects it, which is audible. That file is generated from the browser's copy
+ * so the two apps cannot drift on it.
+ *
+ * The browser clears the host's editor cache before each read-back. A phone
+ * cannot — DELETE is not on the relay allowlist — and does not need to: the
+ * value comes back off the hardware, not out of the dump the host holds for
+ * fifteen seconds.
+ */
+export async function setParamConfirmed(eid, paramId, value, param) {
+  const norm = toNormalized(value, param)
+  if (norm === null) {
+    // A guessed value is worse than no value: it lands somewhere real and
+    // sounds like a decision somebody made.
+    throw new Error(`No range known for ${param?.name || `parameter ${paramId}`}.`)
+  }
+
+  const write = (continuous) =>
+    put(`/preset/blocks/${eid}/params/${paramId}`, { value: norm, continuous })
+
+  const landed = async () => {
+    try {
+      const actual = await readParamValue(eid, paramId)
+      if (typeof actual !== 'number') return false
+      return Math.abs(actual - value) <= Math.max(0.05, Math.abs(value) * 0.02)
+    } catch {
+      return false
+    }
+  }
+
+  const first = preferredEncoding(eid, paramId)
+  await write(first)
+  if (await landed()) {
+    rememberEncoding(eid, paramId, first)
+    return { ok: true, continuous: first, retried: false }
+  }
+
+  await write(!first)
+  if (await landed()) {
+    rememberEncoding(eid, paramId, !first)
+    return { ok: true, continuous: !first, retried: true }
+  }
+
+  return { ok: false, continuous: null, retried: true }
+}

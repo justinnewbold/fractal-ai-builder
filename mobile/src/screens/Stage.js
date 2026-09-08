@@ -46,7 +46,7 @@ const ofError = (s) => s.error
  * button within reach of a stage tap is a hazard, and saving to a slot is
  * refused by the Mac anyway.
  */
-export default function Stage({ onOpenSettings }) {
+export default function Stage({ onOpenSettings, onOpenTone }) {
   // The screen is the instrument panel for as long as this is open. A phone
   // that locks itself between songs is a phone you have to wake and unlock
   // while the count-in is happening.
@@ -118,12 +118,35 @@ export default function Stage({ onOpenSettings }) {
             {Number.isInteger(preset?.number) ? `SLOT ${preset.number}` : 'SLOT —'}
             {slots ? ` OF ${slots}` : ''}
           </Text>
-          <Press
-            label="Setup"
-            height={36}
-            style={{ paddingHorizontal: space.md }}
-            onPress={onOpenSettings}
-          />
+          <View style={{ flexDirection: 'row', gap: space.sm }}>
+            {/*
+              The way to the tone screen, beside Setup rather than down among
+              the scenes.
+
+              Both of the things up here take you OFF this screen, which is the
+              honest grouping: everything below the preset name acts on the rig
+              you are playing, and neither of these does. It is also the corner
+              furthest from where a thumb rests during a song.
+
+              Absent, not disabled, when play mode is on — and absent until the
+              setting has been read back, because a button that appears late is
+              safer than one that vanishes under a press. See lib/playMode.js.
+            */}
+            {onOpenTone ? (
+              <Press
+                label="✦ Tone"
+                height={36}
+                style={{ paddingHorizontal: space.md }}
+                onPress={onOpenTone}
+              />
+            ) : null}
+            <Press
+              label="Setup"
+              height={36}
+              style={{ paddingHorizontal: space.md }}
+              onPress={onOpenSettings}
+            />
+          </View>
         </View>
 
         <Text

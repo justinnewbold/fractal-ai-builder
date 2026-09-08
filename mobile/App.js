@@ -10,13 +10,15 @@ import Lamp from './src/components/Lamp'
 import Settings from './src/screens/Settings'
 import SignIn from './src/screens/SignIn'
 import Stage from './src/screens/Stage'
+import Tone from './src/screens/Tone'
+import { loadPlayMode, toneWayIn } from './src/lib/playMode'
 
 /**
  * Fractal Remote.
  *
- * Three states and no navigator. Signed out, playing, or looking at setup —
- * that is the whole of the app, and a routing library for it would be more
- * moving parts than the thing being routed.
+ * Four states and no navigator. Signed out, playing, looking at setup, or
+ * asking for a tone — that is the whole of the app, and a routing library for
+ * it would be more moving parts than the thing being routed.
  *
  * The status bar at the top is the one thing on every screen: what the link is
  * doing, said in words rather than an icon, because "connected" and "connected
@@ -27,8 +29,23 @@ export default function App() {
   const [auth, setAuth] = useState('checking')
   const [screen, setScreen] = useState('stage')
   const [link, setLink] = useState(linkState())
+  /*
+   * null until the setting has been read back — which is not the same as "not
+   * playing", and is why the tone button stays away rather than appearing and
+   * then being taken back. AsyncStorage cannot be read synchronously the way
+   * the browser reads localStorage.
+   */
+  const [playing, setPlaying] = useState(null)
 
   useEffect(() => subscribeLink(setLink), [])
+
+  useEffect(() => {
+    let alive = true
+    loadPlayMode().then((on) => alive && setPlaying(on))
+    return () => {
+      alive = false
+    }
+  }, [])
 
   // A session left over from last time is the ordinary case: a phone that
   // signed in once is a remote, and it should say "Connecting…" from its first
@@ -63,10 +80,14 @@ export default function App() {
         ) : (
           <>
             <LinkBar link={link} />
-            {screen === 'settings' ? (
+            {screen === 'tone' ? (
+              <Tone onBack={() => setScreen('stage')} />
+            ) : screen === 'settings' ? (
               <Settings
                 link={link.link}
                 macName={link.macName}
+                playing={playing}
+                onPlayMode={setPlaying}
                 onBack={() => setScreen('stage')}
                 onReconnect={probeNow}
                 onSignOut={async () => {
@@ -84,7 +105,16 @@ export default function App() {
                 }}
               />
             ) : (
-              <Stage onOpenSettings={() => setScreen('settings')} />
+              <Stage
+                onOpenSettings={() => setScreen('settings')}
+                /* Absent rather than disabled when play mode is on, so the row
+                   closes up instead of keeping a dead button. */
+                onOpenTone={
+                  toneWayIn({ connected: link.link === 'connected', playing })
+                    ? () => setScreen('tone')
+                    : null
+                }
+              />
             )}
           </>
         )}
