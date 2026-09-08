@@ -3526,4 +3526,23 @@ export function run(test) {
     assert.match(native, /useState\('code'\)/, 'the phone app still leads with the account form')
     assert.match(native, /pairCredentials\(code\)/, 'the phone app’s code does not sign in')
   })
+
+  test('the save button is under your thumb, not above five hundred rows', () => {
+    /*
+     * "Clicking on a preset does absolutely nothing and nothing saves." It
+     * did something — it chose the slot — but the button that saves was at the
+     * top of the sheet, and picking a slot means scrolling into a list of 512,
+     * so by the time a row was tapped the button was two screens up. The
+     * sheet's footer does not scroll; that is where the button lives now.
+     */
+    const sheet = readFileSync(new URL('../src/components/SaveSheet.jsx', import.meta.url), 'utf8')
+    const body = sheet.slice(sheet.indexOf('export default function SaveSheet'))
+    assert.ok(!/save-confirm/.test(body), 'the save button is back in the scrolling body of the sheet')
+    assert.match(sheet, /export function SaveFooter/, 'there is no footer to hold the save button')
+    const foot = sheet.slice(sheet.indexOf('export function SaveFooter'), sheet.indexOf('export default function SaveSheet'))
+    assert.match(foot, /className="primary save-confirm"/, 'the footer has no save button')
+    assert.match(foot, /Replaces <strong>/, 'the footer does not say what the picked slot holds')
+    assert.match(src, /title="Save"[\s\S]*?footer=\{\s*<SaveFooter/, 'the Save sheet is not given the footer')
+    assert.match(src, /<SaveFooter[\s\S]*?slots=\{allSlots\}/, 'the footer cannot name what the slot holds')
+  })
 }

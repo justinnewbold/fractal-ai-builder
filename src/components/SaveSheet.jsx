@@ -12,6 +12,46 @@ import { PresetList } from './Console'
  * The field stays. Someone who knows the number should not have to scroll to
  * it, and a 512-slot list on a phone is a scroll.
  */
+/**
+ * The button, in the sheet's footer rather than its body.
+ *
+ * It sat above the slot list, and the slot list is five hundred rows. On a
+ * phone, picking a slot meant scrolling into the list — and the button was
+ * gone off the top by the time a row was tapped. "Clicking on a preset does
+ * absolutely nothing and nothing saves." Tapping a row was working exactly as
+ * designed, choosing the destination, and the thing that saves was two screens
+ * up. The footer does not scroll, so the button is under your thumb wherever
+ * the list is, and it names the slot you just picked.
+ */
+export function SaveFooter({ preset, slot, onSave, busy, saving, remote, queued, slots }) {
+  const target = slot === '' ? preset?.number : Number(slot)
+  const targetLabel = Number.isInteger(target) ? target : '--'
+  const elsewhere = Number.isInteger(target) && target !== preset?.number
+  const occupant = slots?.find((s) => s.number === target)
+  const holds = occupant?.name?.trim()
+
+  return (
+    <div className="save-foot">
+      {queued ? (
+        <p className="hint">
+          Slot {queued.slot} is queued &mdash; the Mac writes it and this says so the moment it lands.
+        </p>
+      ) : elsewhere ? (
+        <p className="hint">
+          Replaces <strong>{holds || (occupant ? 'an empty slot' : 'what is in slot ' + targetLabel)}</strong>.
+        </p>
+      ) : null}
+      <button className="primary save-confirm" onClick={onSave} disabled={busy || !!queued}>
+        {saving
+          ? 'Saving…'
+          : remote
+            ? `Ask the Mac to save to slot ${targetLabel}`
+            : `Save to slot ${targetLabel}`}
+      </button>
+    </div>
+  )
+}
+
 export default function SaveSheet({
   preset,
   saveName,
@@ -97,14 +137,6 @@ export default function SaveSheet({
           replaces it.
         </p>
       ) : null}
-
-      <button className="primary save-confirm" onClick={onSave} disabled={busy || !!queued}>
-        {saving
-          ? 'Saving…'
-          : remote
-            ? `Ask the Mac to save to slot ${targetLabel}`
-            : `Save to slot ${targetLabel}`}
-      </button>
 
       {!dirty ? <p className="hint">Nothing has changed since this was last saved.</p> : null}
 
