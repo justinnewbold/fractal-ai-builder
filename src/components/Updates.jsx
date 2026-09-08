@@ -41,6 +41,7 @@ export default function Updates() {
 
   const line = state?.line
   const advice = updateAdvice(state)
+  const [installing, setInstalling] = useState(false)
 
   return (
     <div className="updates">
@@ -55,6 +56,22 @@ export default function Updates() {
       </p>
       {advice ? <p className="hint">{advice}</p> : null}
       <div className="history-actions">
+        {updateReady(state) && bridge.updates.install ? (
+          <button
+            className="primary"
+            disabled={installing}
+            onClick={async () => {
+              setInstalling(true)
+              try {
+                await bridge.updates.install()
+              } catch {
+                // The app is on its way out; there is nobody left to tell.
+              }
+            }}
+          >
+            {installing ? 'Restarting\u2026' : 'Restart to update'}
+          </button>
+        ) : null}
         <button
           className="chip"
           disabled={asking || state?.kind === 'checking'}
@@ -110,9 +127,18 @@ export function UpdateReadyNotice() {
 
   return (
     <div className="notice updates-notice">
+      {/*
+        Said the way every other Mac app says it. "It installs when you quit"
+        led, and the button under it said "Install now", so the whole thing
+        read as a wait with a technical option attached. "On most Mac apps
+        that update it usually says refresh app to update and they click one
+        button and it closes the app for them." That button was already here;
+        it just did not say so.
+      */}
       <p>
-        {state.version ? `Version ${state.version} is ready.` : 'An update is ready.'} It installs
-        when you quit the app &mdash; nothing is interrupted until then.
+        {state.version ? `Version ${state.version} is ready to install.` : 'An update is ready to install.'}{' '}
+        Restart to update &mdash; the app closes and reopens on the new version in a few seconds.
+        Or leave it, and it installs the next time you quit.
       </p>
       <div className="history-actions">
         {/*
@@ -130,7 +156,7 @@ export function UpdateReadyNotice() {
         */}
         {bridge.updates.install ? (
           <button
-            className="chip"
+            className="primary"
             disabled={installing}
             onClick={async () => {
               setInstalling(true)
@@ -141,7 +167,7 @@ export function UpdateReadyNotice() {
               }
             }}
           >
-            {installing ? 'Installing\u2026' : 'Install now'}
+            {installing ? 'Restarting\u2026' : 'Restart to update'}
           </button>
         ) : null}
         <button className="chip" onClick={() => setHidden(true)}>
