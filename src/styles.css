@@ -5768,6 +5768,47 @@ button.gig-tap {
   color: var(--silk-faint);
 }
 
+/* The Tap button and the box that opens over it. The cell is a grid so the
+   button still fills its column of the bar exactly as it did unwrapped. */
+.gig-tap-cell {
+  position: relative;
+  display: grid;
+}
+
+/*
+ * Hold Tap, or right-click it: a box to type the tempo, above the button.
+ *
+ * Above rather than over. The bar is stuck to the bottom of the screen, so
+ * "over the button" would put the field under a thumb and the keyboard over
+ * both; opening upward keeps the number, the field and the finger apart.
+ */
+.gig-tempo {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + var(--s-2));
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  background: var(--panel);
+  border: 1px solid var(--live);
+  border-radius: var(--r-1);
+  box-shadow: var(--e-2);
+}
+
+.gig-tempo input.bpm-box {
+  width: 100%;
+  min-height: 48px;
+  font-size: var(--f-input); /* a thumb types here; anything smaller and iOS zooms the page on focus */
+}
+
+.gig-tempo .hint {
+  margin: 0;
+}
+
 /* Ask sits with the tuner and the tap, and reads as the same kind of thing:
    something you press between songs, not during one. The star is the same mark
    the wide-screen button uses, so the two are recognisably one control in two

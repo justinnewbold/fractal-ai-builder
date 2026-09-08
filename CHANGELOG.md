@@ -3,6 +3,24 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.113.0
+
+**Hold Tap to type the tempo.** "On the tap button, let's do where they hold
+the tap button they can manually enter in the beats per minute they want. On
+the Mac let them right click to pull up the text box to enter the BPM."
+
+- On the stage screen, hold the Tap button — or right-click it on a Mac — and
+  a box opens above it with the current tempo selected. Type the number, press
+  Enter, and the unit is set to it; Escape or a tap elsewhere leaves the tempo
+  alone. Holding never sends a stray beat.
+- The phone apps get the same hold on their Tap button, opening a number field
+  under it with a Set button.
+- Both check what was typed by one shared rule: a whole number from 20 to 400,
+  the unit's own range. Anything else is refused in words, never clamped into
+  a number nobody typed.
+- The typeable tempo box had been sitting in the code with nothing showing it.
+  It is its own component now, and this is where it appears.
+
 ## 7.112.0
 
 **"Restart to update", like every other Mac app.** "On most Mac apps that
