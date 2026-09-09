@@ -3,6 +3,21 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.131.0
+
+**Previous and Next follow a setlist.** "Let's set up favorite presets and
+setlist when in gig mode — hitting next or previous cycles through songs
+on the favorites or setlists." The two buttons at the bottom of Play used
+to step the slot number by one: 44, 45, 46, which is the unit's order and
+never the night's. A new button between them says what they step through
+and opens a sheet to change it: every preset as before, the presets you
+have starred in the picker (in slot order), or a setlist — a named list
+you build in the order you play it, from the preset you are on or by
+finding one by name, with up, down and remove on each song. A setlist
+wraps, so after the last song Next goes back to the first. The button
+shows where you are, "Saturday 3/12". Starred and setlists are kept per
+unit and per browser, like the stars.
+
 ## 7.130.0
 
 **The scene plan names the amp on each channel.** "Does the AI check and

@@ -2294,15 +2294,56 @@ button.gig-name:disabled .gig-name-caret {
   border-top: 1px solid var(--rule);
 }
 
+/*
+ * Previous, the setlist, Next.
+ *
+ * Three across, in the one row: the middle button says what the two either
+ * side of it step through — All, Starred 3/7, or a setlist by name — and
+ * opens the sheet that changes it. A row of its own would have cost the
+ * screen 44px on the size step whose whole point is fitting the rig.
+ */
 .gig-nav {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr minmax(88px, 0.9fr) 1fr;
   gap: var(--s-2);
 }
 
 .gig-nav button {
   padding: var(--s-4);
   font-size: var(--f-4);
+}
+
+.gig-nav button.gig-nav-source {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-1);
+  min-width: 0;
+  padding: var(--s-2);
+  font-size: var(--f-2);
+  color: var(--silk-dim);
+}
+
+.gig-nav button.gig-nav-source.on {
+  border-color: var(--signal);
+  color: var(--silk);
+}
+
+.gig-nav-source-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gig-nav-source-pos {
+  font-size: var(--f-1);
+  color: var(--signal);
+}
+
+.gig-nav button.gig-nav-source:not(.on) .gig-nav-source-pos {
+  color: var(--silk-faint);
 }
 
 /*
@@ -5267,6 +5308,222 @@ button.gig-chan-btn.current {
   margin-top: var(--s-3);
 }
 
+/*
+ * The setlist sheet.
+ *
+ * Sources first, as rows the height of a scene tile with the name on the
+ * left and what it means on the right; then the preset you are on, with its
+ * star; then the chosen setlist's songs, each with its two nudges and a
+ * remove. Everything here is pressed with a thumb between songs, so nothing
+ * is under 44px.
+ */
+.setlist-sources {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+button.setlist-source {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  width: 100%;
+  min-height: 52px;
+  padding: var(--s-2) var(--s-3);
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2);
+  color: var(--silk-dim);
+}
+
+button.setlist-source.current {
+  background: var(--live-halo);
+  border-color: var(--live);
+  color: var(--live);
+  box-shadow: inset 0 0 0 2px var(--live);
+}
+
+.setlist-source-name {
+  font-size: var(--f-4);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.setlist-source-note {
+  flex: none;
+  font-size: var(--f-1);
+  color: var(--silk-faint);
+}
+
+button.setlist-source.current .setlist-source-note {
+  color: var(--live);
+}
+
+button.chip.setlist-new,
+.setlist-edit button.chip {
+  min-height: 44px;
+  align-self: flex-start;
+}
+
+.setlist-here {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-4);
+}
+
+.setlist-here-name {
+  flex-basis: 100%;
+}
+
+button.setlist-star,
+button.setlist-add-here {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  min-height: 44px;
+  padding: 0 var(--s-3);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  color: var(--silk-dim);
+}
+
+button.setlist-star.on {
+  color: var(--signal);
+  border-color: var(--signal);
+}
+
+.setlist-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  margin-top: var(--s-4);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--rule);
+}
+
+.setlist-name {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+
+.setlist-name input[type='text'],
+input.setlist-filter {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  font-family: var(--body);
+}
+
+.setlist-songs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+
+.setlist-song {
+  display: grid;
+  grid-template-columns: 2ch minmax(0, 1fr) 44px 44px 44px;
+  align-items: center;
+  gap: var(--s-1);
+  min-height: 44px;
+  padding-left: var(--s-1);
+  border: 1px solid transparent;
+  border-radius: var(--r-1);
+}
+
+/* The one playing, lit the way the live scene is. */
+.setlist-song.current {
+  border-color: var(--live);
+  background: var(--live-halo);
+}
+
+.setlist-song-pos {
+  font-size: var(--f-1);
+  color: var(--silk-faint);
+  text-align: right;
+}
+
+.setlist-song-name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--f-3);
+  color: var(--silk);
+}
+
+.setlist-song-slot {
+  flex: none;
+  font-size: var(--f-1);
+  color: var(--silk-faint);
+}
+
+.setlist-song button.setlist-move,
+.setlist-song button.setlist-remove {
+  min-height: 44px;
+  padding: 0;
+  font-size: var(--f-2);
+}
+
+.setlist-song button.setlist-remove {
+  color: var(--silk-dim);
+}
+
+.setlist-find {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.setlist-found {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+
+button.setlist-found-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--s-2);
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--s-2);
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  color: var(--silk);
+}
+
+.setlist-found-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.chip.setlist-delete.armed {
+  color: var(--signal);
+  border-color: currentColor;
+}
+
+.setlist-note {
+  margin-top: var(--s-4);
+}
+
 /* On carries the signal colour and a lit edge, so which blocks are live reads
    at a glance without having to compare labels. */
 button.gig-block.on {
@@ -7710,6 +7967,11 @@ button.view-tab {
   padding: var(--s-2);
   font-size: var(--f-3);
   min-height: 44px;
+}
+
+.gig[data-compact] .gig-nav button.gig-nav-source {
+  font-size: var(--f-1);
+  gap: 0;
 }
 
 
