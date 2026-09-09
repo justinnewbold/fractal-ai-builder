@@ -3,6 +3,22 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.122.0
+
+**A garbled preset dump is asked for again.** "PRESET_DUMP_HEADER: expected
+func 0x77 at offset 0, got 0x78" on switching presets, once more. The unit
+answers a preset dump as a header frame and then body chunks; a read that
+lands while the unit is still loading the preset it was just sent can find a
+body chunk where the header should be, and until now that came straight to
+the screen as DIDN'T WORK.
+
+- Any read that fails in those words is asked for again, twice, a moment
+  apart, before anything is shown. Selecting a preset or a scene gets the
+  same, because selecting twice is harmless; other writes are never re-sent.
+- The volume slider re-reads the Output level when the preset changes, not
+  on every re-read of the preset. Keyed the old way it added one more
+  dump-hungry read at exactly the wrong moment.
+
 ## 7.121.0
 
 **A shorter bar at the bottom of Play.** "Make the bottom tab bar buttons

@@ -44,12 +44,23 @@ export default function Volume({ eid, preset, onError }) {
   const dragging = useRef(false)
 
   /*
-   * Read on arrival and again whenever the preset is re-read: a generation
-   * may have moved the amp, a footswitch may have changed the preset, and the
-   * slider has to show where the unit actually is rather than where it was.
+   * Read on arrival and again when the preset CHANGES — a footswitch, Next,
+   * the picker — so the slider shows where the unit actually is.
+   *
+   * On the preset's number, not on every re-read of it. The app re-reads the
+   * preset after a tempo, a channel, a generation; keyed on the object that
+   * came back, this asked the unit for the output block on each of those,
+   * and that read wants the preset dump the block list and the scene names
+   * are already asking for at the same moment. One more dump-hungry read on
+   * a port that is still loading the preset is how "expected func 0x77, got
+   * 0x78" reached the screen. Nothing on the app's side moves the Output
+   * level but this slider — the model may not touch it — so between preset
+   * changes the value it holds is the value the unit holds.
+   *
    * Never mid-drag — a read landing under a moving thumb would yank it back
    * to a value that is already stale.
    */
+  const slot = preset?.number
   useEffect(() => {
     if (eid === null || eid === undefined) {
       setLevel(null)
@@ -70,7 +81,8 @@ export default function Volume({ eid, preset, onError }) {
     return () => {
       stop = true
     }
-  }, [eid, preset])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eid, slot])
 
   /* One write on the wire at a time; the newest value wins. See lib/volume. */
   const writer = useMemo(

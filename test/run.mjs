@@ -5414,6 +5414,99 @@ test('a write that fails mid-drag does not stop the next one, and is reported on
   assert.equal(await w.settled(), null, 'the same failure was reported twice')
 })
 
+console.log('\na garbled preset dump is asked for again')
+/*
+ * "PRESET_DUMP_HEADER: expected func 0x77 at offset 0, got 0x78" on switching
+ * presets. The read came while the unit was still loading; asking again gets
+ * the dump. lib/retry.js holds the rule, forgefx.js applies it at the one
+ * place every request passes through.
+ */
+const retry = await import('../src/lib/retry.js')
+
+test('the words the codec uses for a garbled dump are recognised, and nothing else is', () => {
+  assert.ok(retry.isGarbledDump('PRESET_DUMP_HEADER: expected func 0x77 at offset 0, got 0x78'))
+  assert.ok(retry.isGarbledDump('expected func 0x77 at offset 0, got 0x78'))
+  assert.ok(!retry.isGarbledDump('Can’t reach the Fractal app on your Mac.'))
+  assert.ok(!retry.isGarbledDump('No unit'))
+  assert.ok(!retry.isGarbledDump(undefined))
+})
+
+test('reads and selects may be asked twice; writes may not', () => {
+  assert.ok(retry.canAskAgain('GET', '/preset/blocks'))
+  assert.ok(retry.canAskAgain('GET', '/preset/blocks/42/params?x=1'))
+  assert.ok(retry.canAskAgain('POST', '/preset/select'))
+  assert.ok(retry.canAskAgain('POST', '/scene'))
+  assert.ok(!retry.canAskAgain('POST', '/preset/store'), 'a save was re-sent')
+  assert.ok(!retry.canAskAgain('PUT', '/preset/blocks/42/params/1'), 'a parameter write was re-sent')
+  assert.ok(!retry.canAskAgain('POST', '/tempo/tap'), 'a tap was re-sent')
+  assert.ok(!retry.canAskAgain('DELETE', '/device/cache'))
+})
+
+test('a read that garbles twice and lands the third time is one answer, not an error', async () => {
+  const waits = []
+  let calls = 0
+  const out = await retry.withRetry(
+    async () => {
+      calls++
+      if (calls < 3) throw new Error('PRESET_DUMP_HEADER: expected func 0x77 at offset 0, got 0x78')
+      return { ok: true, calls }
+    },
+    { method: 'GET', path: '/preset/blocks', wait: async (ms) => waits.push(ms) }
+  )
+  assert.deepEqual(out, { ok: true, calls: 3 })
+  assert.deepEqual(waits, [400, 800], 'the waits do not grow while the unit loads')
+})
+
+test('a read that garbles every time is still reported, in the codec’s own words, after the last try', async () => {
+  let calls = 0
+  await assert.rejects(
+    retry.withRetry(
+      async () => {
+        calls++
+        throw new Error('PRESET_DUMP_HEADER: expected func 0x77 at offset 0, got 0x78')
+      },
+      { method: 'GET', path: '/preset/blocks', wait: async () => {} }
+    ),
+    /PRESET_DUMP_HEADER/
+  )
+  assert.equal(calls, 1 + retry.RETRIES)
+})
+
+test('a different failure, or a write, is not asked again', async () => {
+  let calls = 0
+  await assert.rejects(
+    retry.withRetry(async () => { calls++; throw new Error('No unit') }, { method: 'GET', path: '/x', wait: async () => {} }),
+    /No unit/
+  )
+  assert.equal(calls, 1, 'an unrelated failure was retried')
+  calls = 0
+  await assert.rejects(
+    retry.withRetry(
+      async () => { calls++; throw new Error('PRESET_DUMP_HEADER: expected func 0x77 at offset 0, got 0x78') },
+      { method: 'PUT', path: '/preset/blocks/42/params/1', wait: async () => {} }
+    ),
+    /PRESET_DUMP_HEADER/
+  )
+  assert.equal(calls, 1, 'a write was re-sent on a garbled read-back')
+})
+
+test('every request the app makes passes through the retry, at the Mac and over the relay', () => {
+  const src = readSrc(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+  assert.match(src, /import \{ withRetry \} from '\.\/retry\.js'/, 'forgefx.js does not import the retry')
+  assert.match(
+    src,
+    /async function request\(path, options = \{\}\) \{[\s\S]*?return withRetry\(\(\) => requestOnce\(path, options\), \{ method: options\.method \|\| 'GET', path \}\)/,
+    'request() no longer asks again on a garbled dump'
+  )
+  const once = src.slice(src.indexOf('async function requestOnce('))
+  assert.match(once, /remoteRequest\(path, options\)/, 'the relay path is outside the retry')
+  assert.match(once, /return directRequest\(path, options\)/, 'the local path is outside the retry')
+  // And the slider reads the level on a new preset, not on every re-read of it.
+  const vol = readSrc(new URL('../src/components/Volume.jsx', import.meta.url), 'utf8')
+  assert.match(vol, /const slot = preset\?\.number/, 'the slider no longer keys its read on the preset number')
+  assert.match(vol, /\}, \[eid, slot\]\)/, 'the slider re-reads the output block on every preset re-read again')
+})
+
 console.log('\nstructure')
 const { run: structure } = await import('./structure.mjs')
 structure(test)
