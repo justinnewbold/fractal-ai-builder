@@ -3,6 +3,12 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.129.0
+
+**Volume first.** "Move the volume slider above the preset button." The
+volume row is the first thing on Play now, above the preset tile; the
+meter stays under the preset.
+
 ## 7.128.0
 
 **The word Volume, on the phone too.** "Add the word volume somewhere on
