@@ -2354,6 +2354,23 @@ export function run(test) {
     assert.match(bare, /gig-chan-btn/, 'there is nothing to pick once one is held')
 
     /*
+     * "It's tiny right now. Maybe pull up a slide-up menu when you hold the
+     * button down?" The pick is a sheet — the app's own, portalled out of the
+     * swipe surface — with one big button per channel, not four pills inside
+     * the tile. One sheet for the grid, owned by Gig, fed the block held.
+     */
+    assert.match(bare, /import Sheet from '\.\/Sheet'/, 'the channel pick is not the app\u2019s sheet')
+    const chanSheet = bare.slice(bare.indexOf('function ChannelSheet('))
+    assert.match(chanSheet, /<Sheet open=\{!!block\} onClose=\{onClose\} title=\{name\} note="Channel">/, 'the channel sheet does not slide up under the block\u2019s name')
+    assert.match(chanSheet, /await setChannel\(block\.effectId, ch\)\s*\n\s*onClose\(\)/, 'the sheet does not go down once the channel is written')
+    assert.match(bare, /onHold=\{\(\) => setChanEid\(block\.effectId\)\}/, 'a held tile no longer opens the sheet')
+    assert.equal((bare.match(/<Sheet\b/g) || []).length, 1, 'more than one channel sheet — one per tile again')
+    const chanCss = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    const pill = chanCss.match(/button\.gig-chan-btn \{([^}]*)\}/)?.[1] || ''
+    assert.match(pill, /min-height: 88px/, 'a channel button is thin again')
+    assert.ok(!/\.gig-chan \{[^}]*position: absolute/.test(chanCss), 'the channels are back inside the tile')
+
+    /*
      * The failure that matters, and it is not a cosmetic one.
      *
      * A press produces a click afterwards. Without swallowing it, the tile

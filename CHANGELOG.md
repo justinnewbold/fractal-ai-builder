@@ -3,6 +3,16 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.126.0
+
+**Hold a block, get a sheet of channels.** "It's tiny right now. Maybe pull
+up a slide-up menu when you hold the button down to switch between A B C
+D?" Holding an effect on Play (or right-clicking it on the Mac) now slides
+up a sheet with the block's name and one big button per channel, the height
+of a scene tile and a quarter of the screen wide. The live channel is lit;
+tapping another writes it and the sheet goes down. It was four thin pills
+inside the tile you were holding.
+
 ## 7.125.0
 
 **The preset is a tile, and the size steps live in Setup.** "Make this

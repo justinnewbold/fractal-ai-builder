@@ -23,6 +23,7 @@ import { useLongPress } from '../lib/longPress'
 import { useDismiss } from '../lib/dismiss'
 import { Tuner } from './Console'
 import BpmBox from './BpmBox'
+import Sheet from './Sheet'
 import Volume from './Volume'
 import { sizeVars, SIZES } from '../lib/gigSize'
 
@@ -400,6 +401,18 @@ export default function Gig({
    * useLongPress, so holding never sends a stray beat.
    */
   const [typing, setTyping] = useState(false)
+  /*
+   * Which block's channels are up, as a sheet.
+   *
+   * "It's tiny right now. Maybe pull up a slide-up menu when you hold the
+   * button down to switch between A B C D?" The hold used to open four thin
+   * pills inside the tile it was held on — thirty pixels each across a
+   * phone-width tile, on the one screen whose whole premise is a target you
+   * can hit in the dark. One sheet for the whole grid, holding the block
+   * being changed, so a fourteen-block preset does not mount fourteen.
+   */
+  const [chanEid, setChanEid] = useState(null)
+  const chanBlock = chanEid === null ? null : blocks.find((b) => b.effectId === chanEid) || null
   const tapCell = useRef(null)
   const holdTap = useLongPress(() => {
     haptic()
@@ -683,12 +696,19 @@ export default function Gig({
               channels={channels}
               busy={toggling === block.effectId}
               onToggle={() => toggle(block)}
-              onError={onError}
-              onChanged={onChanged}
+              onHold={() => setChanEid(block.effectId)}
             />
           ))}
         </div>
       ) : null}
+
+      <ChannelSheet
+        block={chanBlock}
+        channels={channels}
+        onClose={() => setChanEid(null)}
+        onError={onError}
+        onChanged={onChanged}
+      />
 
       {/*
         The bar along the bottom: the two things you press between songs.
@@ -775,43 +795,24 @@ export default function Gig({
  * The channels were reachable already, on the Edit screen, three taps into a
  * sheet. That is the right place to study a block and the wrong one to change
  * it between two bars of a song, which is the whole reason this screen exists.
+ *
+ * The hold is answered by Gig, which owns the one channel sheet; the tile
+ * only says it was held.
  */
-function BlockTile({ block, channels, busy, onToggle, onError, onChanged }) {
-  const [open, setOpen] = useState(false)
-  const [writing, setWriting] = useState(null)
-  const cell = useRef(null)
-
+function BlockTile({ block, channels, busy, onToggle, onHold }) {
   /* Only where there is something to choose. Not every block is channelled,
      and a menu with one entry in it is a menu that wasted a gesture. */
   const has = (channels?.length || 0) > 1
   const hold = useLongPress(
     () => {
       haptic()
-      setOpen(true)
+      onHold?.()
     },
     { enabled: has && !busy }
   )
 
-  useDismiss(cell, () => setOpen(false), { open })
-
-  const pick = async (ch) => {
-    setWriting(ch)
-    try {
-      await setChannel(block.effectId, ch)
-      /* Closed on the way out rather than on the way back: the write goes down
-         a serial port and a menu that sits there through it reads as a tap
-         that missed. */
-      setOpen(false)
-      onChanged?.(`${block.name || block.slug} → channel ${ch}`)
-    } catch (err) {
-      onError?.(err.message)
-    } finally {
-      setWriting(null)
-    }
-  }
-
   return (
-    <div className="gig-block-cell" ref={cell}>
+    <div className="gig-block-cell">
       <button
         className={`gig-block ${block.bypassed ? 'off' : 'on'}`}
         style={{
@@ -855,22 +856,62 @@ function BlockTile({ block, channels, busy, onToggle, onError, onChanged }) {
           {block.channel ? <span className="gig-block-channel">{block.channel}</span> : null}
         </span>
       </button>
-
-      {open ? (
-        <div className="gig-chan" role="group" aria-label={`Channel for ${block.name || block.slug}`}>
-          {channels.map((ch) => (
-            <button
-              key={ch}
-              className={`gig-chan-btn ${block.channel === ch ? 'current' : ''}`}
-              onClick={() => pick(ch)}
-              disabled={writing !== null}
-              aria-pressed={block.channel === ch}
-            >
-              {ch}
-            </button>
-          ))}
-        </div>
-      ) : null}
     </div>
+  )
+}
+
+/**
+ * The channels of one block, as a sheet that slides up from the bottom.
+ *
+ * "It's tiny right now. Maybe pull up a slide-up menu when you hold the
+ * button down to switch between A B C D?" Four buttons the height of a
+ * scene tile and a quarter of the screen wide each, under the block's name,
+ * on the same sheet every other picker in the app uses — so it slides up
+ * the same way, is dragged down the same way, and Escape and Back close it
+ * the same way. The one that is live is lit; a tap on another writes it,
+ * and the sheet goes down on the way out rather than on the way back: the
+ * write goes down a serial port, and a sheet that sits there through it
+ * reads as a tap that missed.
+ */
+function ChannelSheet({ block, channels, onClose, onError, onChanged }) {
+  const [writing, setWriting] = useState(null)
+  const name = block?.name || block?.slug || ''
+
+  const pick = async (ch) => {
+    if (!block) return
+    haptic()
+    setWriting(ch)
+    try {
+      await setChannel(block.effectId, ch)
+      onClose()
+      onChanged?.(`${name} → channel ${ch}`)
+    } catch (err) {
+      onError?.(err.message)
+    } finally {
+      setWriting(null)
+    }
+  }
+
+  return (
+    <Sheet open={!!block} onClose={onClose} title={name} note="Channel">
+      <div className="gig-chan" role="group" aria-label={`Channel for ${name}`}>
+        {(channels || []).map((ch) => (
+          <button
+            key={ch}
+            className={`gig-chan-btn ${block?.channel === ch ? 'current' : ''}`}
+            onClick={() => pick(ch)}
+            disabled={writing !== null}
+            aria-pressed={block?.channel === ch}
+            aria-label={`Channel ${ch}`}
+          >
+            {ch}
+          </button>
+        ))}
+      </div>
+      <p className="hint">
+        {block?.channel ? `${name} is on channel ${block.channel}.` : ''} Each channel keeps its own
+        model and settings; the scene remembers which one this block plays.
+      </p>
+    </Sheet>
   )
 }
