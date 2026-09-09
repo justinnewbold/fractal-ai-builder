@@ -3647,6 +3647,16 @@ export function run(test) {
     const slider = gig.indexOf('<Volume ')
     const nav = gig.indexOf('className="gig-nav"')
     assert.ok(meter !== -1 && slider > meter && nav > slider, 'the slider is not under the meter and above Previous/Next')
+    /* "Move Previous / Next directly above the bottom tap bar." The nav sits
+       in the sticky foot with the bar, after the block grid — never back
+       between the volume and the scenes. */
+    const foot = gig.indexOf('className="gig-foot"')
+    const barAt = gig.indexOf('className="gig-bar"')
+    const grid = gig.indexOf('className="gig-blocks"')
+    assert.ok(foot !== -1 && grid < foot && foot < nav && nav < barAt, 'Previous / Next is not directly above the bar in the sticky foot')
+    const footCss = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    assert.match(footCss, /\.gig-foot \{[^}]*position: sticky;\s*bottom: 0/, 'the foot no longer sticks to the bottom')
+    assert.ok(!/\.gig-bar \{[^}]*position: sticky/.test(footCss), 'the bar sticks on its own, leaving Previous / Next to scroll away')
 
     const vol = bare(readFileSync(new URL('../src/components/Volume.jsx', import.meta.url), 'utf8'))
     assert.match(vol, /latestWriter\(\(v\) => setParam\(eid, param\.id, v, param\)\)/, 'the slider writes without coalescing')
