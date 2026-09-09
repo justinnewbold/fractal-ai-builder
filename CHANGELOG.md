@@ -3,6 +3,15 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.120.0
+
+**A dB at a time.** "Do a plus minus on the sides of the volume slider that
+does 1 dB at a time." A − and a + now sit either side of the Play screen's
+volume slider. Each press moves the Output level by exactly one dB, goes to
+the unit the same way a drag does, and reads back what landed. The buttons
+grey out at the ends of the range. On a phone the word "Volume" steps aside
+so the track keeps its width.
+
 ## 7.119.0
 
 **A volume slider on Play.** "Add volume slider to the play screen to

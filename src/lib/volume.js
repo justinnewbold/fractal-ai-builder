@@ -44,6 +44,30 @@ export function volumeStep(param) {
   return span >= 100 ? 1 : span >= 10 ? 0.1 : 0.01
 }
 
+/**
+ * One press of the − or + beside the slider, in the parameter's own units.
+ *
+ * "Do a plus minus on the sides of the volume slider that does 1 dB at a
+ * time." A dB is the unit a soundperson talks in, and a whole one is the
+ * smallest change worth a button press; the slider is there for the sweep,
+ * the buttons for landing on a number. On a control that is not in dB the
+ * step is ten notches of the slider, which is the same idea.
+ */
+export function volumeNudge(param) {
+  if (!usable(param)) return 1
+  if (/db/i.test(String(param.unit || ''))) return 1
+  return volumeStep(param) * 10
+}
+
+/** A value the − or + lands on: moved, rounded to the notch, and kept in range. */
+export function nudged(value, param, delta) {
+  if (!usable(param)) return value
+  const from = typeof value === 'number' && Number.isFinite(value) ? value : param.min
+  const step = volumeStep(param)
+  const next = Math.round((from + delta) / step) * step
+  return Math.max(param.min, Math.min(param.max, Math.round(next * 1000) / 1000))
+}
+
 /** Where the thumb sits, 0-100, for the fill drawn behind it. */
 export function volumePercent(value, param) {
   if (!usable(param) || typeof value !== 'number' || !Number.isFinite(value)) return 0

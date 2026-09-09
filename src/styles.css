@@ -7788,11 +7788,50 @@ button.view-tab {
  */
 .gig-volume {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  /* word · − · track · + · figure */
+  grid-template-columns: auto auto 1fr auto auto;
   align-items: center;
-  gap: var(--s-3);
+  gap: var(--s-2);
   margin-top: var(--s-1);
   padding: 0 var(--s-1);
+}
+
+/*
+ * One dB a press, either side of the track.
+ *
+ * The same shape as the size steps beside the preset name, so the two pairs
+ * read as one kind of control; a full 44px tall here because these are
+ * pressed mid-set, in the dark, and the size steps are not.
+ */
+button.gig-volume-step {
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--f-5);
+  line-height: 1;
+  background: var(--panel);
+  color: var(--silk-dim);
+}
+
+button.gig-volume-step:disabled {
+  opacity: 0.38;
+}
+
+/* On a phone the word gives its width to the track: two buttons, a figure
+   and a label leave a 390px screen with a track too short to sweep. The
+   group is still named Volume for a screen reader, and the buttons say
+   what they do. */
+@media (max-width: 620px) {
+  .gig-volume {
+    grid-template-columns: auto 1fr auto auto;
+  }
+
+  .gig-volume-word {
+    display: none;
+  }
 }
 
 .gig-volume-word {
