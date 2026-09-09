@@ -37,15 +37,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Against the commit this pull request was based on, not against the base
+      # branch as it stands when the job runs. Pull requests here are merged
+      # within seconds of being pushed, so by the time this ran the base branch
+      # already carried the new version and the job said "still 7.117.0" about
+      # a change that had moved it — a red mark on every push, none of them
+      # true. "I keep getting a failed notification from GitHub every time you
+      # push." The base SHA is fixed at the moment of the push and cannot be
+      # overtaken by the merge.
       - name: The version moved
         env:
           BASE: ${{ github.base_ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          git fetch --no-tags --depth=1 origin "$BASE"
-          before=$(git show FETCH_HEAD:package.json | node -pe "JSON.parse(require('fs').readFileSync(0,'utf8')).version")
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          before=$(git show "$BASE_SHA":package.json | node -pe "JSON.parse(require('fs').readFileSync(0,'utf8')).version")
           now=$(node -pe "require('./package.json').version")
-          echo "$BASE is $before; this branch is $now"
+          echo "$BASE was $before at ${BASE_SHA:0:7}; this branch is $now"
           if [ "$before" = "$now" ]; then
             echo "::error file=package.json::Still $now. Every change gets a new version."
             exit 1

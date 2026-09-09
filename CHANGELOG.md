@@ -3,6 +3,16 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.118.0
+
+**The red mark on every push.** "I keep getting a failed notification from
+GitHub every time you push." The check that every change carries a new version
+compared the branch against the main branch as it stood when the check ran.
+Pull requests here are merged within seconds of being pushed, so by then main
+already had the new version, and the check said "still the same" about a change
+that had moved it. It now compares against the commit the pull request was
+based on, which is fixed at the push and cannot be overtaken by the merge.
+
 ## 7.117.0
 
 **"Turn the volume down a little" does something.** It answered "Nothing to
