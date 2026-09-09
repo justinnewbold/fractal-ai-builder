@@ -2276,11 +2276,28 @@ button.gig-name:disabled .gig-name-caret {
   transition: width 200ms linear;
 }
 
+/*
+ * The foot: Previous / Next over Tuner, Tap and Ask, stuck to the bottom.
+ *
+ * "Move Previous / Next directly above the bottom tap bar." Sticky rather
+ * than fixed, for the reasons the bar gives below; the sticking moved from
+ * the bar to this wrapper so the two rows travel as one.
+ */
+.gig-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin-top: var(--s-3);
+  padding: var(--s-2) 0 max(var(--s-1), env(safe-area-inset-bottom, 0px));
+  /* Opaque: the effects scroll underneath it. */
+  background: var(--chassis);
+  border-top: 1px solid var(--rule);
+}
+
 .gig-nav {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--s-2);
-  margin-top: 12px;
 }
 
 .gig-nav button {
@@ -5747,18 +5764,11 @@ button.gig-block.off {
  * of the screen while the page scrolls at the larger sizes.
  */
 .gig-bar {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
   gap: var(--s-2);
-  margin-top: var(--s-3);
-  padding: var(--s-1) 0 max(var(--s-1), env(safe-area-inset-bottom, 0px));
-  /* Opaque: the effects scroll underneath it. */
-  background: var(--chassis);
-  border-top: 1px solid var(--rule);
+  margin-top: var(--s-2);
 }
 
 /*
@@ -7692,7 +7702,7 @@ button.view-tab {
   display: none;
 }
 
-.gig[data-compact] .gig-nav {
+.gig[data-compact] .gig-foot {
   margin-top: var(--s-2);
 }
 
@@ -7702,9 +7712,6 @@ button.view-tab {
   min-height: 44px;
 }
 
-.gig[data-compact] .gig-bar {
-  margin-top: var(--s-2);
-}
 
 .gig[data-compact] .gig-scenes {
   margin-top: var(--s-2);

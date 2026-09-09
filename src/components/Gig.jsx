@@ -525,15 +525,6 @@ export default function Gig({
       */}
       <Volume eid={meterEid} preset={preset} onError={onError} />
 
-      <div className="gig-nav">
-        <button onClick={() => step(-1)} disabled={working || (preset?.number ?? 0) <= 0}>
-          ‹ Previous
-        </button>
-        <button onClick={() => step(1)} disabled={working}>
-          Next ›
-        </button>
-      </div>
-
       {/*
         Two modes, one row.
         They were a stacked pair of full-width buttons — 98px of the screen,
@@ -722,6 +713,25 @@ export default function Gig({
         Tuner only where the unit has one. Absent means unknown, an older host
         predating the flag, and unknown still gets to try.
       */}
+      {/*
+        The foot of the screen: Previous / Next, then Tuner, Tap and Ask.
+
+        "Move Previous / Next directly above the bottom tap bar." They sat
+        between the volume and the scenes, which is where you read, not where
+        your thumb rests. Both rows are one sticky footer now, so stepping
+        presets is always where the bar is — at the bottom, under the thumb —
+        however far the effects have scrolled.
+      */}
+      <div className="gig-foot">
+      <div className="gig-nav">
+        <button onClick={() => step(-1)} disabled={working || (preset?.number ?? 0) <= 0}>
+          ‹ Previous
+        </button>
+        <button onClick={() => step(1)} disabled={working}>
+          Next ›
+        </button>
+      </div>
+
       <div className="gig-bar" role="group" aria-label="Tuner and tempo">
         {capabilities?.tuner !== false ? (
           <button
@@ -776,6 +786,7 @@ export default function Gig({
             <span>Ask</span>
           </button>
         ) : null}
+      </div>
       </div>
     </div>
   )

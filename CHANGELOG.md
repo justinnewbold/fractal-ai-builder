@@ -3,6 +3,14 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.127.0
+
+**Previous / Next at the bottom.** "Move Previous / Next directly above the
+bottom tap bar." The two preset buttons sat between the volume and the
+scenes. They now sit right above Tuner, Tap and Ask, and the two rows stick
+to the bottom of the screen together, so stepping presets is always under
+your thumb however far the effects have scrolled.
+
 ## 7.126.0
 
 **Hold a block, get a sheet of channels.** "It's tiny right now. Maybe pull
