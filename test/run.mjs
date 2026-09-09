@@ -21,6 +21,7 @@ import * as lineage from '../src/lib/lineage.js'
 import * as gigSize from '../src/lib/gigSize.js'
 import * as marks from '../src/lib/presetMarks.js'
 import * as setlists from '../src/lib/setlists.js'
+import { historyTurns, describeDesign } from '../api/command.js'
 import { readFileSync as readSrc } from 'node:fs'
 import {
   patchSchemaValue,
@@ -7127,6 +7128,104 @@ test('a setlist is built, reordered and kept per unit', () => {
   assert.deepEqual(listsFor('fm3', { getItem: () => '{not json', setItem: () => {} }), [])
   assert.equal(sourceFor('fm3', { getItem: () => '[]', setItem: () => {} }), ALL)
   assert.deepEqual(listsFor('fm3', { getItem: () => { throw new Error('blocked') }, setItem: () => {} }), [])
+})
+
+test('the chat is the player’s Fractal agent, not a command parser', () => {
+  /*
+   * "Why did you choose the tones that you did? Where did you get your
+   * information from?" — answered with "That question isn't about the
+   * Fractal preset or your rig". The instructions said it was a parser; a
+   * player who has just had a preset built and asks why is asking the most
+   * reasonable question there is.
+   */
+  const command = readSrc(new URL('../api/command.js', import.meta.url), 'utf8')
+  assert.match(command, /`WHO YOU ARE\n/, 'the model is not told who it is')
+  assert.match(command, /the real amplifiers and speakers each is modelled on/, 'the model is not told it knows the amps')
+  assert.match(command, /Bands, players, their rigs and their records/, 'the model is not told it knows the music')
+  assert.match(command, /Never tell the player a question is not about the preset or the rig/, 'the refusal that started this is still allowed')
+  assert.match(command, /A question is\s+never a failure and is never off topic/)
+  assert.match(command, /\nEXPLAINING WHAT YOU DO\n/, 'nothing asks the model to explain itself')
+  assert.match(command, /dictated on a phone/, 'the model is not told to read past dictation typos')
+  // The answer field is allowed to be an answer.
+  const understood = command.slice(command.indexOf('  understood: z'), command.indexOf('  actions: z'))
+  assert.match(understood, /paragraphs as it deserves/, 'the reply is still capped at two sentences')
+  assert.ok(!/one or two plain sentences\. This is read/.test(understood))
+
+  // It is given what it needs to answer: the design and its reasoning, and
+  // the taste profile the designer already gets.
+  const handler = command.slice(command.indexOf('export default async function handler'))
+  assert.match(handler, /design,\s*\n\s*taste,\s*\n\s*corrections\s*\n\s*\} = req\.body/, 'the route does not read the design, taste or corrections')
+  assert.match(handler, /design: describeDesign\(design\)/, 'the design never reaches the model state')
+  assert.match(command, /That\s+summary IS the reasoning behind the choices/, 'the model is not told where the why lives')
+  assert.match(handler, /historyTurns\(history\)/, 'the transcript is not passed through the one labelled reader')
+
+  // Its own model setting, defaulting to the most capable general model.
+  assert.match(command, /process\.env\.CHAT_MODEL \|\| process\.env\.GENERATOR_MODEL \|\| 'claude-opus-5'/, 'the chat has no model of its own')
+  assert.ok(!/claude-sonnet-4\.5/.test(command), 'the gateway fallback still names a retired model')
+  assert.match(handler, /thinking: \{ type: 'adaptive' \}/, 'the model is given no room to think')
+  // And a refused model is not a dead chat: one retry on the designer's model.
+  assert.match(command, /const FALLBACK_MODEL = process\.env\.GENERATOR_MODEL \|\| 'claude-sonnet-5'/, 'no fallback model')
+  assert.match(handler, /if \(FALLBACK_MODEL !== MODEL_NAME\) attempts\.push\(\{ model: resolveModel\(FALLBACK_MODEL\) \}\)/, 'the fallback is never tried')
+  assert.match(handler, /for \(const attempt of attempts\)/, 'the attempts are not walked')
+
+  // And the app sends them.
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  const send = app.slice(app.indexOf("aiUrl('/api/command'"), app.indexOf("aiUrl('/api/command'") + 1600)
+  assert.match(send, /design: lastDesign/, 'the app never sends the last design')
+  assert.match(send, /taste: describeProfile\(taste\)/, 'the chat gets no taste profile')
+  assert.match(send, /corrections: tasteOn \? describeCorrections\(corrections\)/, 'the chat gets no corrections')
+  assert.match(send, /history: turns\.map\(\(t\) => \(\{ role: t\.role, text: t\.text \}\)\)/, 'the roles are rewritten before the route can label them')
+  // The design is remembered at every landing and marked when written.
+  assert.equal((app.match(/setLastDesign\(designMemory\(validated\)\)/g) || []).length, 3, 'a design landing is not remembered')
+  assert.match(app, /setLastDesign\(\(prev\) => \(prev \? \{ \.\.\.prev, applied: true \}/, 'writing the design never marks it applied')
+})
+
+test('the chat reads the transcript with the notes labelled, and the design said small', () => {
+  const turns = historyTurns([
+    { role: 'user', text: 'warm clean' },
+    { role: 'assistant', text: 'Designing that.' },
+    { role: 'system', text: 'Chain in: Amp (3), Cab (4)' },
+    { role: 'hand', text: 'Named scene 4 Solo' },
+    { role: 'user', text: '   ' },
+    null,
+    { role: 'user', text: 'x'.repeat(5000) }
+  ])
+  assert.deepEqual(turns.slice(0, 4), [
+    { role: 'user', content: 'warm clean' },
+    { role: 'assistant', content: 'Designing that.' },
+    { role: 'user', content: '(App note: Chain in: Amp (3), Cab (4))' },
+    { role: 'user', content: '(Hand edit, by me: Named scene 4 Solo)' }
+  ])
+  assert.equal(turns.length, 5, 'blank and missing turns reached the model')
+  assert.equal(turns[4].content.length, 2400, 'a turn is sent whole however long')
+  // Deeper than eight: "why did you do that" needs the that.
+  const many = historyTurns(Array.from({ length: 40 }, (_, i) => ({ role: 'user', text: `t${i}` })))
+  assert.equal(many.length, 24)
+  assert.equal(many[0].content, 't16')
+
+  assert.equal(describeDesign(null), undefined)
+  assert.equal(describeDesign('x'), undefined)
+  const d = describeDesign({
+    name: 'Back In Black 2204',
+    description: 'AC/DC rhythm',
+    summary: 'Rebuilt around Brit 800 2204 High — the JCM800 Angus and Malcolm ran.',
+    notes: '',
+    applied: true,
+    changes: [
+      { name: 'Amp 1', typeName: 'Brit 800 2204 High', params: Array.from({ length: 15 }, (_, i) => ({ name: `p${i}`, to: i, unit: '' })) },
+      { name: 'Drive 1', typeName: null, bypassed: true, params: [{ name: 'Drive', to: 3.5, unit: '' }] }
+    ]
+  })
+  assert.equal(d.name, 'Back In Black 2204')
+  assert.equal(d.askedFor, 'AC/DC rhythm')
+  assert.match(d.summary, /JCM800/)
+  assert.equal(d.applied, 'written to the unit')
+  assert.equal(d.changes[0].model, 'Brit 800 2204 High')
+  assert.equal(d.changes[0].settings.length, 12)
+  assert.equal(d.changes[0].more, 3)
+  assert.equal(d.changes[1].bypassed, true)
+  assert.equal(d.changes[1].model, undefined)
+  assert.equal(describeDesign({ changes: [] }).applied, 'designed, not yet written')
 })
 
 test('the model is told what volume means, and never to answer with silence', () => {

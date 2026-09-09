@@ -3,6 +3,25 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.132.0
+
+**Ask is your Fractal agent now.** "Why did you choose the tones that you
+did? Where did you get your information from?" came back as "That
+question isn't about the Fractal preset or your rig." It was built as a
+command parser, and that is what the instructions said it was. Now it is
+told who it is: the player's Fractal agent, which knows the unit, the amps
+the models are based on, the players and their records, and what it has
+just done itself. It answers questions properly, in paragraphs when they
+deserve it, and never tells you a question is off topic. To answer "why",
+it is handed the last design with the designer's own reasoning, whether
+that design has been written yet, and the same taste profile the designer
+uses. It reads dictation typos for what was meant. It remembers more of the
+conversation, and the app's own notes in it are labelled so they are not
+read as things you said. Each change it proposes now shows its reason
+under it. The chat runs on Claude Opus 5 by default — its own CHAT_MODEL
+setting, apart from the designer's. Also: a save reported from the Mac no
+longer lands in the conversation twice.
+
 ## 7.131.0
 
 **Previous and Next follow a setlist.** "Let's set up favorite presets and
