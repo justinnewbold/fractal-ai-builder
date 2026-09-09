@@ -3667,6 +3667,11 @@ export function run(test) {
     assert.match(vol, /if \(!param\) return null/, 'a unit with no reachable level still gets a slider')
     assert.match(vol, /type="range"/, 'the control is not a slider')
     assert.match(vol, /aria-labelledby="gig-volume-word"/, 'the slider has no accessible name')
+    // "Add the word volume somewhere on the volume slider bar." Over the
+    // figure at the right, and never hidden on a phone.
+    assert.match(vol, /className="gig-volume-read">\s*<span className="silk-label gig-volume-word"/, 'the word Volume is not over the figure')
+    const volCss = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    assert.ok(!/\.gig-volume-word \{\s*display: none/.test(volCss), 'the word Volume is hidden on a phone again')
     assert.match(vol, /aria-valuetext=\{label\}/, 'read aloud the slider is a bare number with no unit')
     assert.match(vol, /if \(stop \|\| dragging\.current\) return/, 'a read landing mid-drag yanks the thumb back')
 

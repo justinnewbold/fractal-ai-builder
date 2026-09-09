@@ -166,9 +166,6 @@ export default function Volume({ eid, preset, onError }) {
 
   return (
     <div className="gig-volume" role="group" aria-label="Volume">
-      <span className="silk-label gig-volume-word" id="gig-volume-word">
-        Volume
-      </span>
       <button
         type="button"
         className="gig-volume-step"
@@ -204,8 +201,23 @@ export default function Volume({ eid, preset, onError }) {
       >
         +
       </button>
-      <span className="gig-volume-value mono" aria-hidden="true">
-        {label}
+      {/*
+        The word and the figure, stacked at the right.
+
+        "Add the word volume somewhere on the volume slider bar." The word
+        stood at the left on a Mac and stepped aside on a phone, where the
+        track needs the width more — so on the phone the row was a slider,
+        two buttons and a number with nothing saying what it was. Over the
+        figure it costs no width at all, and the number it captions is the
+        one thing on the row that already draws the eye.
+      */}
+      <span className="gig-volume-read">
+        <span className="silk-label gig-volume-word" id="gig-volume-word">
+          Volume
+        </span>
+        <span className="gig-volume-value mono" aria-hidden="true">
+          {label}
+        </span>
       </span>
     </div>
   )

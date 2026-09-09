@@ -3,6 +3,13 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.128.0
+
+**The word Volume, on the phone too.** "Add the word volume somewhere on
+the volume slider bar." It stood at the left on a Mac and was dropped on a
+phone to keep the track wide. It now sits over the dB figure at the right,
+on every screen, costing the slider no width.
+
 ## 7.127.0
 
 **Previous / Next at the bottom.** "Move Previous / Next directly above the

@@ -7806,8 +7806,8 @@ button.view-tab {
  */
 .gig-volume {
   display: grid;
-  /* word · − · track · + · figure */
-  grid-template-columns: auto auto 1fr auto auto;
+  /* − · track · + · word over figure */
+  grid-template-columns: auto 1fr auto auto;
   align-items: center;
   gap: var(--s-2);
   margin-top: var(--s-1);
@@ -7838,29 +7838,25 @@ button.gig-volume-step:disabled {
   opacity: 0.38;
 }
 
-/* On a phone the word gives its width to the track: two buttons, a figure
-   and a label leave a 390px screen with a track too short to sweep. The
-   group is still named Volume for a screen reader, and the buttons say
-   what they do. */
-@media (max-width: 620px) {
-  .gig-volume {
-    grid-template-columns: auto 1fr auto auto;
-  }
-
-  .gig-volume-word {
-    display: none;
-  }
+/* The word over the figure, right-aligned in a fixed slot so the track does
+   not jump between "−6.5 dB" and "+2.0 dB". Two lines inside a 44px row:
+   an 11px label and a 13px number fit with room over. On a phone the word
+   used to step aside for the track; stacked, it costs the track nothing. */
+.gig-volume-read {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--s-1);
+  min-width: 8ch;
+  line-height: 1;
 }
 
 .gig-volume-word {
   margin: 0;
 }
 
-/* The figure, right-aligned in a fixed slot so the track does not jump
-   between "−6.5 dB" and "+2.0 dB". Tabular so the digits sit still while it
-   moves. */
+/* Tabular so the digits sit still while it moves. */
 .gig-volume-value {
-  min-width: 8ch;
   text-align: right;
   font-size: var(--f-3);
   font-variant-numeric: tabular-nums;
