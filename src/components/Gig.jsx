@@ -23,6 +23,7 @@ import { useLongPress } from '../lib/longPress'
 import { useDismiss } from '../lib/dismiss'
 import { Tuner } from './Console'
 import BpmBox from './BpmBox'
+import Volume from './Volume'
 import { sizeVars, SIZES } from '../lib/gigSize'
 
 /**
@@ -523,6 +524,17 @@ export default function Gig({
       <div className="gig-signal" aria-label="Signal level">
         <div className="gig-signal-fill" style={{ width: `${Math.round(peak * 100)}%` }} />
       </div>
+
+      {/*
+        The volume, under the meter that shows it.
+
+        "Add volume slider to the play screen to quickly turn volume up or
+        down." It moves the Output block's Level, the same block the meter
+        above reads — so the bar says what is leaving the unit and the slider
+        says how loud. Absent, not disabled, on a unit whose output block has no
+        level the app can reach; Volume.jsx says how a drag becomes writes.
+      */}
+      <Volume eid={meterEid} preset={preset} onError={onError} />
 
       <div className="gig-nav">
         <button onClick={() => step(-1)} disabled={working || (preset?.number ?? 0) <= 0}>

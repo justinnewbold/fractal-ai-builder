@@ -3,6 +3,21 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.119.0
+
+**A volume slider on Play.** "Add volume slider to the play screen to
+quickly turn volume up or down." It sits under the signal meter and moves the
+Output block's Level — the whole preset's volume, the knob on the unit's front
+panel. The number beside it is what the unit holds, read back when you let
+go, not where the thumb happens to be.
+
+- A drag sends one write at a time and the newest value wins, so a two-second
+  sweep does not queue a hundred writes for the unit to work through after
+  your thumb has stopped.
+- The slider is absent, not greyed, on a unit whose output block reports no
+  level the app can move.
+- The Output level stays the player's alone: the model still may not touch it.
+
 ## 7.118.0
 
 **The red mark on every push.** "I keep getting a failed notification from
