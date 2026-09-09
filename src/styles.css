@@ -2189,51 +2189,64 @@ button.view-tab.current:not(:disabled) {
    "FM3 · slot 500" line that the top bar was already printing. With only the
    name left, that inset is padding around padding — and on this screen the
    currency is scene buttons you can hit without looking. */
+/*
+ * The preset, as a tile.
+ *
+ * "Make this button smaller, the same size as the presets, and add the
+ * preset number to it as well as the name." It was a headline at 52px that
+ * wrapped to three lines on a phone. Now it is the shape of a scene button
+ * — number small on top, name under it — and the height of one tile at
+ * whatever size the tiles are, so it grows and shrinks with them. The amber
+ * edge is what says it is the preset and not scene nine.
+ */
 .gig-preset {
-  /* The name and the size control, one row. The name takes what is left. */
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-  padding: var(--s-3) var(--s-4);
-  background: var(--panel);
-  border: 1px solid var(--rule);
-  border-left: 2px solid var(--signal);
-  border-radius: var(--r-1);
+  display: grid;
 }
 
-.gig-preset button.gig-name {
-  flex: 1 1 auto;
-  /* The name is long and the two small buttons beside it are not negotiable,
-     so this is the thing that gives. */
-  min-width: 0;
-}
-
-/* A button that has to keep reading as a sign: the name is what you check from
-   arm's length in the dark, so it keeps its size and loses every other thing a
-   button brings with it. The caret is the only tell, and it is deliberately
-   quiet — it says "there is more here" without competing with the name. */
 button.gig-name {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-1);
+  width: 100%;
+  min-height: var(--gig-tile, 62px);
+  padding: var(--s-2) var(--s-3);
+  margin: 0;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--signal);
+  border-radius: var(--r-1);
+  text-align: center;
+  color: var(--silk);
+  line-height: 1.15;
+}
+
+.gig-name-num {
+  font-size: var(--f-2);
+  color: var(--silk-faint);
+}
+
+.gig-name-row {
+  display: inline-flex;
   align-items: baseline;
   gap: var(--s-2);
-  width: 100%;
-  padding: 0;
-  background: none;
-  border: none;
-  border-radius: var(--r-1);
-  text-align: left;
-  color: inherit;
+  max-width: 100%;
+}
+
+.gig-name-word {
   font-family: var(--display);
   font-weight: 700;
-  font-size: clamp(30px, 9vw, 52px);
+  font-size: var(--f-4);
   letter-spacing: 0.02em;
-  line-height: 1.05;
-  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .gig-name-caret {
   flex: 0 0 auto;
-  font-size: var(--f-4);
+  font-size: var(--f-3);
   color: var(--silk-faint);
 }
 
@@ -2276,26 +2289,21 @@ button.gig-name:disabled .gig-name-caret {
 }
 
 /*
- * The size control.
+ * The button-size steps, in Setup.
  *
- * Everything else on this screen is drawn to be hit without looking. This one
- * is drawn to be found when looked for and ignored otherwise: aligned right,
- * away from the grid's leading edge, in the dim silk rather than the bright.
+ * "Let's move the sizing to the Settings menu." Two 44px buttons either
+ * side of the size's name, on a row of their own where nothing is fighting
+ * them for width.
  */
-/* Beside the preset name now, not in the tab row. It sizes this screen, so it
-   belongs on this screen; and the name beside it is the one thing here wide
-   enough to give up the space. */
-.gig-size {
+.size-steps {
   display: flex;
   align-items: center;
-  gap: var(--s-1);
-  flex: 0 0 auto;
+  gap: var(--s-3);
 }
 
-
-button.gig-size-step {
+button.size-step {
   width: 44px;
-  height: 36px;
+  min-height: 44px;
   padding: 0;
   display: flex;
   align-items: center;
@@ -2306,8 +2314,18 @@ button.gig-size-step {
   color: var(--silk-dim);
 }
 
-button.gig-size-step:disabled {
+button.size-step:disabled {
   opacity: 0.38;
+}
+
+.size-name {
+  /* Nine, not eight: a test anchors the bar's phone block on the bar's own
+     "min-width: 8ch", and this rule sits earlier in the file. */
+  min-width: 9ch;
+  text-align: center;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: var(--f-4);
 }
 
 .gig-scenes {
@@ -7666,18 +7684,6 @@ button.view-tab {
  * Nothing is removed. Every control on the screen at the other sizes is on
  * the screen at this one, and nothing pressable drops below the 44px floor.
  */
-.gig[data-compact] .gig-preset {
-  padding: var(--s-1) var(--s-3);
-}
-
-/* A line, not a headline. The bar at the top of the app has the same name at
-   a size you can read, and two of them is the single largest thing standing
-   between this preset and its own blocks. */
-.gig[data-compact] button.gig-name {
-  font-size: var(--f-5);
-  line-height: 1.2;
-}
-
 /* Five pixels of meter and ten of margin, for something the amber tiles
    already tell you. */
 .gig[data-compact] .gig-signal {
@@ -7932,7 +7938,6 @@ input.gig-volume-slider::-moz-range-thumb {
  */
 .gig .gig-preset,
 .gig button.gig-name,
-.gig button.gig-size-step,
 .gig button.gig-volume-step,
 .gig .gig-nav button,
 .gig button.gig-scene,
