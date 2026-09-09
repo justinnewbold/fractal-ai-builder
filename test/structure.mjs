@@ -3648,6 +3648,17 @@ export function run(test) {
     assert.match(bar, /min-height: 44px/, 'the bar buttons are taller than the touch floor again')
     const tap = css.match(/button\.gig-tap \{([^}]*)\}/)?.[1] || ''
     assert.match(tap, /flex-direction: row/, 'the tempo is stacked under Tap again, which is what made the bar tall')
+
+    // "Let's make all these buttons rounded like iOS." Every pressable thing
+    // on Play takes the furniture radius; the rest of the app keeps its edge.
+    const round = css.slice(css.lastIndexOf('rounded like iOS'))
+    const corner = round.match(/\.gig \.gig-preset,[\s\S]*?\{([^}]*)\}/)
+    assert.ok(corner, 'the Play screen has lost its rounded corners')
+    assert.match(corner[1], /border-radius: var\(--r-2\)/, 'the Play controls are back on the hardware corner')
+    const selectors = round.slice(0, round.indexOf('{'))
+    for (const s of ['button.gig-scene', 'button.gig-block', 'button.gig-bar-btn', '.gig-nav button', 'button.gig-volume-step', 'button.gig-name']) {
+      assert.ok(selectors.includes(s), `${s} is square again`)
+    }
     const screens = readFileSync(new URL('../src/components/Screens.jsx', import.meta.url), 'utf8')
     const yields = screens.match(/YIELDS =\s*'([^']+)'/)?.[1] || ''
     assert.ok(yields.split(',').map((s) => s.trim()).includes('input'), 'a drag along the slider turns the page')

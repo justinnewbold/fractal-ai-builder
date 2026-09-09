@@ -7917,3 +7917,45 @@ input.gig-volume-slider::-moz-range-thumb {
 .gig[data-compact] .gig-volume {
   margin-top: 0;
 }
+
+/*
+ * "Let's make all these buttons rounded like iOS."
+ *
+ * The 3px corner is the hardware idiom, and everywhere else in the app it
+ * stays. The stage screen is the one a phone is held up to, and there the
+ * controls read as a phone's: every pressable thing on Play, and the boxes
+ * that open over them, take the furniture radius the sheets already use.
+ * The scale's own step, not a new number — the radius test holds it to
+ * three tiers and this is the middle one. The meter and the volume track
+ * go a step rounder still, because a thin strip with a 10px corner is a
+ * pill or it is nothing.
+ */
+.gig .gig-preset,
+.gig button.gig-name,
+.gig button.gig-size-step,
+.gig button.gig-volume-step,
+.gig .gig-nav button,
+.gig button.gig-scene,
+.gig button.gig-block,
+.gig button.gig-bar-btn,
+.gig button.gig-chan-btn,
+.gig .gig-chan,
+.gig .gig-tempo,
+.gig .gig-note-action button,
+.gig input.gig-volume-slider:focus-visible {
+  border-radius: var(--r-2);
+}
+
+.gig .gig-signal,
+.gig .gig-signal-fill {
+  border-radius: var(--r-3);
+}
+
+.gig input.gig-volume-slider::-webkit-slider-runnable-track {
+  border-radius: var(--r-3);
+}
+
+.gig input.gig-volume-slider::-moz-range-track,
+.gig input.gig-volume-slider::-moz-range-progress {
+  border-radius: var(--r-3);
+}
