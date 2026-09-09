@@ -20,6 +20,7 @@ import * as hold from '../src/lib/longPress.js'
 import * as lineage from '../src/lib/lineage.js'
 import * as gigSize from '../src/lib/gigSize.js'
 import * as marks from '../src/lib/presetMarks.js'
+import * as setlists from '../src/lib/setlists.js'
 import { readFileSync as readSrc } from 'node:fs'
 import {
   patchSchemaValue,
@@ -7016,6 +7017,116 @@ test('a reply with nothing in it says so, and says what would work', () => {
   const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
   assert.ok(!/'Nothing to change\.'/.test(app), 'the app still says "Nothing to change." on its own')
   assert.match(app, /text: replyFor\(checked\)/, 'the reply is not built by the one tested place')
+})
+
+test('Previous and Next step through the slots, the stars, or a setlist', () => {
+  /*
+   * "Hitting next or previous cycles through songs on the favorites or
+   * setlists." The two buttons walked the slots one at a time, which is the
+   * unit's order and never the night's.
+   */
+  const { nextIn, stepTarget, positionIn, orderFor, sourceLabel, ALL, STARRED } = setlists
+
+  // A list is walked in its own order, and it wraps: the encore is followed
+  // by the opener, not by a dead button.
+  assert.equal(nextIn([40, 7, 200], 40, 1), 7)
+  assert.equal(nextIn([40, 7, 200], 7, 1), 200)
+  assert.equal(nextIn([40, 7, 200], 200, 1), 40, 'the last song does not wrap to the first')
+  assert.equal(nextIn([40, 7, 200], 40, -1), 200, 'the first song does not wrap back to the last')
+  assert.equal(nextIn([40, 7, 200], 7, -1), 40)
+
+  // Off the list, Next goes to the first song and Previous to the last —
+  // what choosing a setlist mid-song on a stray preset should do.
+  assert.equal(nextIn([40, 7, 200], 99, 1), 40)
+  assert.equal(nextIn([40, 7, 200], 99, -1), 200)
+  assert.equal(nextIn([40, 7, 200], undefined, 1), 40)
+  assert.equal(nextIn([], 5, 1), null, 'an empty list has somewhere to go')
+  assert.equal(nextIn([5], 5, 1), 5, 'a list of one goes nowhere but itself')
+
+  assert.equal(positionIn([40, 7, 200], 7), 2)
+  assert.equal(positionIn([40, 7, 200], 99), 0)
+
+  // The slots view is what it always was: one step, no wrap, never below 0.
+  assert.equal(stepTarget({ source: ALL, current: 44, delta: 1 }), 45)
+  assert.equal(stepTarget({ source: ALL, current: 44, delta: -1 }), 43)
+  assert.equal(stepTarget({ source: ALL, current: 0, delta: -1 }), null, 'Previous goes below slot 0')
+  assert.equal(stepTarget({ source: ALL, current: undefined, delta: 1 }), 1)
+
+  // Starred steps the stars in slot order, however they were starred.
+  const favourites = [300, 12, 45]
+  assert.deepEqual(orderFor(STARRED, { favourites }), [300, 12, 45])
+  assert.equal(stepTarget({ source: STARRED, current: 12, delta: 1, favourites, lists: [] }), 45)
+  assert.equal(stepTarget({ source: STARRED, current: 45, delta: 1, favourites, lists: [] }), 300)
+  assert.equal(stepTarget({ source: STARRED, current: 12, delta: 1, favourites: [], lists: [] }), null, 'nothing starred, and Next still has somewhere to go')
+
+  // A setlist steps in its own order, and a deleted one falls back to the slots.
+  const lists = [{ id: 'sat', name: 'Saturday', presets: [45, 12, 300] }]
+  assert.equal(stepTarget({ source: 'sat', current: 45, delta: 1, favourites, lists }), 12)
+  assert.equal(stepTarget({ source: 'sat', current: 45, delta: -1, favourites, lists }), 300)
+  assert.equal(stepTarget({ source: 'gone', current: 45, delta: 1, favourites, lists }), 46, 'a missing setlist killed the buttons')
+  assert.equal(orderFor(ALL, { favourites, lists }), null)
+
+  assert.equal(sourceLabel(ALL, { lists }), 'All presets')
+  assert.equal(sourceLabel(STARRED, { lists }), 'Starred')
+  assert.equal(sourceLabel('sat', { lists }), 'Saturday')
+  assert.equal(sourceLabel('gone', { lists }), 'All presets')
+})
+
+test('a setlist is built, reordered and kept per unit', () => {
+  const { addTo, removeFrom, moveIn, createList, updateList, deleteList, listsFor, sourceFor, setSource, ALL, STARRED } = setlists
+
+  // Building: no song twice, and the order is the order it was built in.
+  assert.deepEqual(addTo([], 45), [45])
+  assert.deepEqual(addTo([45], 12), [45, 12])
+  assert.deepEqual(addTo([45, 12], 45), [45, 12], 'the same song was added twice')
+  assert.deepEqual(addTo([45], -1), [45])
+  assert.deepEqual(addTo([45], 1.5), [45])
+  assert.deepEqual(removeFrom([45, 12, 300], 12), [45, 300])
+
+  // Nudging: up, down, and nowhere past the ends.
+  assert.deepEqual(moveIn([1, 2, 3], 0, 1), [2, 1, 3])
+  assert.deepEqual(moveIn([1, 2, 3], 2, 1), [1, 3, 2])
+  assert.deepEqual(moveIn([1, 2, 3], 0, -1), [1, 2, 3], 'the first song moved above the top')
+  assert.deepEqual(moveIn([1, 2, 3], 2, 3), [1, 2, 3], 'the last song moved below the bottom')
+
+  // Stored per unit, like the stars, and read back clean.
+  const mem = new Map()
+  const store = {
+    getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+    setItem: (k, v) => mem.set(k, v)
+  }
+  assert.deepEqual(listsFor('fm3', store), [])
+  assert.equal(sourceFor('fm3', store), ALL, 'a fresh unit does not step the slots')
+
+  const sat = createList('fm3', 'Saturday', store)
+  assert.equal(sat.name, 'Saturday')
+  assert.deepEqual(sat.presets, [])
+  const untitled = createList('fm3', '   ', store)
+  assert.equal(untitled.name, 'Setlist 2', 'a blank name is not given a name')
+  assert.notEqual(sat.id, untitled.id)
+
+  updateList('fm3', sat.id, { presets: [45, 12, 45, -3, 'x', 300] }, store)
+  assert.deepEqual(listsFor('fm3', store).find((l) => l.id === sat.id).presets, [45, 12, 300], 'junk in a stored list survived the read')
+  updateList('fm3', sat.id, { name: 'Sat night' }, store)
+  assert.equal(listsFor('fm3', store)[0].name, 'Sat night')
+
+  assert.deepEqual(listsFor('am4', store), [], 'one unit is reading another unit\'s setlists')
+
+  // The chosen source sticks, and a setlist that goes takes its choice with it.
+  assert.equal(setSource('fm3', sat.id, store), sat.id)
+  assert.equal(sourceFor('fm3', store), sat.id)
+  assert.equal(sourceFor('am4', store), ALL, 'a choice crossed between two units')
+  assert.equal(setSource('fm3', STARRED, store), STARRED)
+  assert.equal(setSource('fm3', 'nonsense', store), ALL, 'an unknown setlist id was kept as the source')
+  setSource('fm3', sat.id, store)
+  deleteList('fm3', sat.id, store)
+  assert.equal(listsFor('fm3', store).length, 1)
+  assert.equal(sourceFor('fm3', store), ALL, 'the buttons still follow a deleted setlist')
+
+  // Nothing readable is nothing, never a throw.
+  assert.deepEqual(listsFor('fm3', { getItem: () => '{not json', setItem: () => {} }), [])
+  assert.equal(sourceFor('fm3', { getItem: () => '[]', setItem: () => {} }), ALL)
+  assert.deepEqual(listsFor('fm3', { getItem: () => { throw new Error('blocked') }, setItem: () => {} }), [])
 })
 
 test('the model is told what volume means, and never to answer with silence', () => {

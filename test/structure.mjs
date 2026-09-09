@@ -3310,6 +3310,53 @@ export function run(test) {
     assert.match(list, /if \(needle[^)]*\) return/, 'centring fights the filter being typed')
   })
 
+  test('Previous and Next on Play follow a setlist, and the button between them says which', () => {
+    /*
+     * "Hitting next or previous cycles through songs on the favorites or
+     * setlists." The two buttons stepped the slot number by one, in this
+     * component, with nothing between them. Now the target comes from
+     * lib/setlists — the slots, the stars, or a setlist — and the button in
+     * the middle of the same row says which and opens the sheet that
+     * changes it. Same row, because a row of its own costs the smallest
+     * size step the 44px it exists to save.
+     */
+    const gig = readFileSync(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8')
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    const bare = (t) => t.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ' ').replace(/\{\s*\}/g, '')
+    const g = bare(gig)
+
+    const stepFn = g.slice(g.indexOf('const step = async'), g.indexOf('setWorking(true)', g.indexOf('const step = async')))
+    assert.ok(!/\(preset\?\.number \?\? 0\) \+ delta/.test(stepFn), 'Next is back to adding one to the slot number')
+    assert.match(g, /stepTarget\(\{ source, current: preset\?\.number, delta, favourites, lists \}\)/, 'the target does not come from lib/setlists')
+
+    const nav = g.slice(g.indexOf('className="gig-nav"'), g.indexOf('className="gig-bar"'))
+    assert.match(nav, /‹ Previous/, 'Previous left the row')
+    assert.match(nav, /Next ›/, 'Next left the row')
+    assert.match(nav, /className=\{`gig-nav-source/, 'there is no button saying what the two step through')
+    assert.ok(
+      nav.indexOf('‹ Previous') < nav.indexOf('gig-nav-source') && nav.indexOf('gig-nav-source') < nav.indexOf('Next ›'),
+      'the setlist button is not between Previous and Next'
+    )
+    assert.match(nav, /disabled=\{working \|\| landing\(-1\) === null\}/, 'Previous no longer goes dead where the list ends')
+    assert.match(nav, /disabled=\{working \|\| landing\(1\) === null\}/, 'Next no longer goes dead on an empty list')
+    assert.match(g, /<Setlists\b/, 'the sheet that builds a setlist is not on Play')
+
+    // Three across, in the one row.
+    const navCss = css.slice(css.indexOf('.gig-nav {'), css.indexOf('}', css.indexOf('.gig-nav {')))
+    assert.match(navCss, /grid-template-columns: 1fr minmax\(\d+px, [\d.]+fr\) 1fr/, 'the nav row is not three across')
+
+    // Both files are read back when either changes: the star is pressed in
+    // the picker, over this screen.
+    assert.match(g, /addEventListener\(MARKS_CHANGED/, 'a star pressed in the picker never reaches the count on the button')
+    assert.match(g, /addEventListener\(SETLISTS_CHANGED/, 'a setlist edited on the sheet never reaches the buttons')
+
+    // Per unit, with names: App hands Play the same key and list the picker gets.
+    const play = app.slice(app.indexOf('<Gig'), app.indexOf('/>', app.indexOf('<Gig')))
+    assert.match(play, /deviceKey=\{currentDeviceSlug\(\)\}/, 'Play does not know which unit the setlists are for')
+    assert.match(play, /slots=\{allSlots\}/, 'the setlist sheet has no preset names to show')
+  })
+
   test('the stage screen is the layout he picked, not the one it grew into', () => {
     /*
      * From a screenshot, with "like this": scenes two across in colour, the

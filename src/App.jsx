@@ -3789,6 +3789,10 @@ export default function App() {
         <Gig
           preset={preset}
           device={device}
+          /* The stars and setlists are kept per unit; the slot list gives
+             the setlist sheet its names. Both are what the picker gets. */
+          deviceKey={currentDeviceSlug()}
+          slots={allSlots}
           capabilities={device?.capabilities}
           size={size}
           onError={setError}

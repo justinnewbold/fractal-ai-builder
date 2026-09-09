@@ -18,6 +18,17 @@ import { blockColor } from '../lib/blockColors'
 import { sceneColor } from '../lib/sceneColors'
 import { shortBlock } from '../lib/shortName'
 import { presetLabel } from '../lib/presetName'
+import { marksFor, CHANGED as MARKS_CHANGED } from '../lib/presetMarks'
+import {
+  listsFor,
+  sourceFor,
+  orderFor,
+  stepTarget,
+  sourceLabel,
+  positionIn,
+  CHANGED as SETLISTS_CHANGED
+} from '../lib/setlists'
+import Setlists from './Setlists'
 import { tick as haptic } from '../lib/feedback'
 import { useLongPress } from '../lib/longPress'
 import { useDismiss } from '../lib/dismiss'
@@ -49,6 +60,8 @@ const ofBpm = (s) => s.bpm
 export default function Gig({
   preset,
   device,
+  deviceKey,
+  slots,
   capabilities,
   size,
   onError,
@@ -430,9 +443,41 @@ export default function Gig({
     }
   }
 
+  /*
+   * What Previous and Next step through.
+   *
+   * The slots, the starred presets, or a setlist — chosen on the sheet behind
+   * the button between the two, kept per unit in this browser. Read back from
+   * storage whenever either file changes, because the star is pressed in the
+   * picker, over this screen, and the count on the button has to follow it.
+   * See lib/setlists for the order each source gives.
+   */
+  const [marksRev, setMarksRev] = useState(0)
+  useEffect(() => {
+    const bump = () => setMarksRev((n) => n + 1)
+    window.addEventListener(MARKS_CHANGED, bump)
+    window.addEventListener(SETLISTS_CHANGED, bump)
+    return () => {
+      window.removeEventListener(MARKS_CHANGED, bump)
+      window.removeEventListener(SETLISTS_CHANGED, bump)
+    }
+  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const favourites = useMemo(() => marksFor(deviceKey).favourites, [deviceKey, marksRev])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const lists = useMemo(() => listsFor(deviceKey), [deviceKey, marksRev])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const source = useMemo(() => sourceFor(deviceKey), [deviceKey, marksRev])
+  const order = orderFor(source, { favourites, lists })
+  const [setlistOpen, setSetlistOpen] = useState(false)
+
+  /* Where a press would land, or null when the button has nothing to do. */
+  const landing = (delta) =>
+    stepTarget({ source, current: preset?.number, delta, favourites, lists })
+
   const step = async (delta) => {
-    const next = (preset?.number ?? 0) + delta
-    if (next < 0) return
+    const next = landing(delta)
+    if (next === null) return
     setWorking(true)
     try {
       await selectPreset(next)
@@ -443,6 +488,19 @@ export default function Gig({
       setWorking(false)
     }
   }
+
+  /*
+   * The button between the two: what they walk, and where you are in it.
+   * "Starred 3/7" is the third starred preset of seven; a setlist shows its
+   * name. Off the list altogether it shows only the count, and Next goes to
+   * the first song.
+   */
+  const sourceName = sourceLabel(source, { favourites, lists })
+  const at = order ? positionIn(order, preset?.number) : 0
+  const sourceWhere = order ? (at ? `${at}/${order.length}` : `${order.length}`) : ''
+  const sourceAria = order
+    ? `Previous and Next step through ${sourceName}${at ? `, song ${at} of ${order.length}` : `, ${order.length} songs`}. Change setlist.`
+    : 'Previous and Next step through every preset. Choose a setlist.'
 
   // `norm`, not `level` — the monitor route reports a normalised 0..1 per
   // monitored parameter. Reading the field the old mock invented pinned this
@@ -702,6 +760,18 @@ export default function Gig({
         onChanged={onChanged}
       />
 
+      <Setlists
+        open={setlistOpen}
+        onClose={() => setSetlistOpen(false)}
+        deviceKey={deviceKey}
+        preset={preset}
+        slots={slots}
+        addressing={capabilities?.presets?.addressing}
+        favourites={favourites}
+        lists={lists}
+        source={source}
+      />
+
       {/*
         The bar along the bottom: the two things you press between songs.
         Sticky rather than fixed. Fixed would float over the last row of
@@ -724,11 +794,29 @@ export default function Gig({
         however far the effects have scrolled.
       */}
       <div className="gig-foot">
+      {/*
+        Previous, the setlist, Next.
+
+        "Hitting next or previous cycles through songs on the favorites or
+        setlists." The two buttons walked the slots one at a time, which is
+        the unit's order and never the night's. The button between them says
+        what they walk now and opens the sheet that changes it; it sits in
+        the same row so the footer costs the screen nothing more.
+      */}
       <div className="gig-nav">
-        <button onClick={() => step(-1)} disabled={working || (preset?.number ?? 0) <= 0}>
+        <button onClick={() => step(-1)} disabled={working || landing(-1) === null}>
           ‹ Previous
         </button>
-        <button onClick={() => step(1)} disabled={working}>
+        <button
+          type="button"
+          className={`gig-nav-source ${order ? 'on' : ''}`}
+          onClick={() => setSetlistOpen(true)}
+          aria-label={sourceAria}
+        >
+          <span className="gig-nav-source-name">{order ? sourceName : 'All'}</span>
+          {sourceWhere ? <span className="gig-nav-source-pos mono">{sourceWhere}</span> : null}
+        </button>
+        <button onClick={() => step(1)} disabled={working || landing(1) === null}>
           Next ›
         </button>
       </div>

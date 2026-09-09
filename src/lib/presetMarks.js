@@ -39,15 +39,29 @@ function readAll(storage) {
   }
 }
 
+/**
+ * Fired on window after every write.
+ *
+ * The stage screen steps through the starred presets, and the star is pressed
+ * in the picker — a different component, mounted over it. Without this the
+ * count between Previous and Next was the count from when Play opened.
+ */
+export const CHANGED = 'fractal:presetMarks'
+
 function writeAll(all, storage) {
   try {
     store(storage)?.setItem(KEY, JSON.stringify(all))
-    return true
   } catch {
     // A private window, or a full quota. The list on screen is still right for
     // this session; only coming back to it later is lost.
     return false
   }
+  try {
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event(CHANGED))
+  } catch {
+    /* no window, nobody listening */
+  }
+  return true
 }
 
 /** Slot numbers only, deduped, in the order given. Anything else is dropped. */
