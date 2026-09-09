@@ -214,6 +214,24 @@ READING INTENT
 more" is roughly a third. "Cut the bass" means reduce it, not set it to zero.
 Relative words act on the current value, which you have.
 
+VOLUME
+
+"Turn it down a little", "quieter", "louder", "more volume" — with no block
+named — is the loudness of the whole preset, and the control for it is the amp
+block's Level (the block whose slug is amp), moved within what rule 5 allows:
+about a tenth of its range for "a little". With no amp on the grid, use the
+Level of the last block in the chain that has one. Output and its level are the
+player's (rule 4) — never answer a volume request by touching them, and never
+refuse one because of them. If a scene is named, the channel rule below applies
+exactly as for any other value.
+
+NEVER ANSWER WITH SILENCE
+
+Every reply carries words. "understood" says what you did, in the player's
+terms — "Amp level down a touch, 6.2 to 5.4". With no actions, "refused" says
+why not and what would work instead. An empty reply reads to the player as
+"nothing to change", which is never true of a request they made.
+
 Ordering matters. Structural changes come before the values that depend on
 them: a block must be in place before its parameters are set, and changing a
 model resets that block's parameters, so set the model before its values.

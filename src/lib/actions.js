@@ -101,6 +101,25 @@ const ORDER = {
   keepInLibrary: 21
 }
 
+/**
+ * What the reply says when the plan has been checked.
+ *
+ * "Turn the volume down a little" came back as "Nothing to change." — the
+ * model had returned no actions and no words, and that was the app's default
+ * for a silence. It read as a verdict on the request. The model is now told
+ * never to answer with silence, and this is the app's side of the same
+ * promise: a reply with nothing in it says so honestly and says what would
+ * work, and a plan whose every change was refused says that it was refused,
+ * with the reasons listed beneath.
+ */
+export function replyFor({ understood, refused, actions = [], problems = [] } = {}) {
+  if (understood) return understood
+  if (refused) return refused
+  if (actions.length) return `${actions.length} change${actions.length === 1 ? '' : 's'} ready.`
+  if (problems.length) return 'I couldn’t make that change:'
+  return 'I couldn’t work out what to change for that. Name the control — “amp level down a little”, “less gain on the drive”, “more reverb”.'
+}
+
 export function validatePlan(plan, blocks, capabilities) {
   const problems = []
   const actions = []
