@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { blockParams, clearDeviceCache, setParam } from '../lib/forgefx'
-import { latestWriter, outputLevelParam, volumeLabel, volumePercent, volumeStep } from '../lib/volume'
+import {
+  latestWriter,
+  nudged,
+  outputLevelParam,
+  volumeLabel,
+  volumeNudge,
+  volumePercent,
+  volumeStep
+} from '../lib/volume'
 
 /**
  * The volume, on the stage screen, under the meter that shows it.
@@ -117,16 +125,47 @@ export default function Volume({ eid, preset, onError }) {
     window.addEventListener('pointercancel', lift)
   }
 
+  /*
+   * The − and + either side of the track, one dB a press.
+   *
+   * "Do a plus minus on the sides of the volume slider that does 1 dB at a
+   * time." A slider is for the sweep; a thumb cannot reliably land it on
+   * exactly one dB less, and on a dark stage the buttons are the thing you
+   * can hit without looking. Each press goes through the same writer as the
+   * drag and the same read-back as letting go, so the number beside it is
+   * still the unit's answer.
+   */
+  const nudge = (delta) => {
+    if (!writer || !param) return
+    const next = nudged(value ?? param.value, param, delta)
+    if (next === (value ?? param.value)) return
+    dragging.current = true
+    setValue(next)
+    writer.send(next)
+    release()
+  }
+
   if (!param) return null
 
   const now = value ?? param.value
   const label = volumeLabel(now, param)
+  const by = volumeNudge(param)
+  const unit = param.unit ? ` ${param.unit}` : ''
 
   return (
     <div className="gig-volume" role="group" aria-label="Volume">
       <span className="silk-label gig-volume-word" id="gig-volume-word">
         Volume
       </span>
+      <button
+        type="button"
+        className="gig-volume-step"
+        onClick={() => nudge(-by)}
+        disabled={typeof now === 'number' && now <= param.min}
+        aria-label={`Volume down ${by}${unit}`}
+      >
+        −
+      </button>
       <input
         type="range"
         className="gig-volume-slider"
@@ -144,6 +183,15 @@ export default function Volume({ eid, preset, onError }) {
         }}
         onBlur={release}
       />
+      <button
+        type="button"
+        className="gig-volume-step"
+        onClick={() => nudge(by)}
+        disabled={typeof now === 'number' && now >= param.max}
+        aria-label={`Volume up ${by}${unit}`}
+      >
+        +
+      </button>
       <span className="gig-volume-value mono" aria-hidden="true">
         {label}
       </span>

@@ -5358,6 +5358,19 @@ test('the figure beside the slider carries a sign and a unit', () => {
   assert.equal(volume.volumePercent(99, p), 100, 'a value past the end is not past the end')
 })
 
+test('the buttons either side of the slider move it one dB, and stop at the ends', () => {
+  const p = { min: -80, max: 20, unit: 'dB' }
+  assert.equal(volume.volumeNudge(p), 1, 'a press is not one dB')
+  assert.equal(volume.nudged(-6.5, p, 1), -5.5)
+  assert.equal(volume.nudged(-6.5, p, -1), -7.5)
+  assert.equal(volume.nudged(19.5, p, 1), 20, 'a press past the top is not held at the top')
+  assert.equal(volume.nudged(-79.5, p, -1), -80, 'a press past the bottom is not held at the bottom')
+  assert.equal(volume.nudged(undefined, p, 1), -79, 'with no value known a press counts from the bottom')
+  // A control that is not in dB: ten notches, the same idea.
+  assert.equal(volume.volumeNudge({ min: 0, max: 10 }), 1)
+  assert.equal(volume.nudged(0.37, { min: 0, max: 10 }, 1), 1.4, 'the landing is not on a notch')
+})
+
 test('a drag sends one write at a time and the newest value wins', async () => {
   const sent = []
   let release = null

@@ -3611,6 +3611,23 @@ export function run(test) {
     assert.match(vol, /aria-valuetext=\{label\}/, 'read aloud the slider is a bare number with no unit')
     assert.match(vol, /if \(stop \|\| dragging\.current\) return/, 'a read landing mid-drag yanks the thumb back')
 
+    /*
+     * "Do a plus minus on the sides of the volume slider that does 1 dB at a
+     * time." One button before the track and one after it, each a whole dB,
+     * through the same writer and the same read-back as the drag.
+     */
+    const track = vol.indexOf('type="range"')
+    const minus = vol.indexOf('onClick={() => nudge(-by)}')
+    const plus = vol.indexOf('onClick={() => nudge(by)}')
+    assert.ok(minus !== -1 && plus !== -1, 'the − and + beside the slider are gone')
+    assert.ok(minus < track && track < plus, 'the − and + are not either side of the track')
+    assert.match(vol, /const by = volumeNudge\(param\)/, 'the buttons do not step by the shared rule')
+    assert.match(vol, /const next = nudged\(value \?\? param\.value, param, delta\)/, 'a press is not clamped to the range')
+    assert.match(vol, /writer\.send\(next\)\s*\n\s*release\(\)/, 'a press does not go through the writer and the read-back')
+    assert.match(vol, /disabled=\{typeof now === 'number' && now <= param\.min\}/, 'the − does not stop at the bottom')
+    assert.match(vol, /disabled=\{typeof now === 'number' && now >= param\.max\}/, 'the + does not stop at the top')
+    assert.match(vol, /aria-label=\{`Volume down \$\{by\}\$\{unit\}`\}/, 'the − does not say what it does')
+
     // Every prop the call site passes is one the component declares.
     const sig = vol.match(/export default function Volume\(\{([^}]*)\}/)?.[1] || ''
     for (const prop of ['eid', 'preset', 'onError']) {
@@ -3622,6 +3639,8 @@ export function run(test) {
     const rule = css.match(/input\.gig-volume-slider \{([^}]*)\}/)?.[1] || ''
     assert.match(rule, /min-height: 44px/, 'the slider is under the touch floor')
     assert.match(rule, /touch-action: pan-y/, 'a finger on the slider cannot scroll the page, or scrolls it instead of sliding')
+    const step = css.match(/button\.gig-volume-step \{([^}]*)\}/)?.[1] || ''
+    assert.match(step, /min-height: 44px/, 'the − and + are under the touch floor')
     const screens = readFileSync(new URL('../src/components/Screens.jsx', import.meta.url), 'utf8')
     const yields = screens.match(/YIELDS =\s*'([^']+)'/)?.[1] || ''
     assert.ok(yields.split(',').map((s) => s.trim()).includes('input'), 'a drag along the slider turns the page')
