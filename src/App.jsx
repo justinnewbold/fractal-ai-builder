@@ -3791,7 +3791,6 @@ export default function App() {
           device={device}
           capabilities={device?.capabilities}
           size={size}
-          onSize={(n) => resize(n - size)}
           onError={setError}
           onChanged={read}
           onPickPreset={() => setPresetMenu(true)}
@@ -4305,6 +4304,41 @@ export default function App() {
           one thing here somebody reaches for in a hurry and with the lights
           down — the rest of this sheet is read once when something is wrong.
         */}
+        {/*
+          How big the buttons on Play are.
+
+          "Let's move the sizing to the Settings menu." The two steps sat
+          beside the preset name on Play, on the one row there that was
+          already fighting for width. It is set once and kept, which is what
+          this sheet is for. Same state, same storage — App owns the step
+          because the first paint has to know it before Play mounts.
+        */}
+        <Section key="size" title="Button size" note={SIZES[size].name}>
+          <div className="size-steps" role="group" aria-label="Button size">
+            <button
+              className="size-step"
+              onClick={() => resize(-1)}
+              disabled={size <= 0}
+              aria-label="Smaller buttons"
+            >
+              −
+            </button>
+            <span className="size-name">{SIZES[size].name}</span>
+            <button
+              className="size-step"
+              onClick={() => resize(1)}
+              disabled={size >= SIZES.length - 1}
+              aria-label="Bigger buttons"
+            >
+              +
+            </button>
+          </div>
+          <p className="hint">
+            The scenes, effects and preset tile on Play, bigger or smaller. This device
+            remembers it.
+          </p>
+        </Section>
+
         <Section key="playing" title="Playing" note={playing ? 'Ask is hidden' : 'Ask is available'}>
           <label className="rename-choice">
             <input

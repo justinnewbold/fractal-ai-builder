@@ -3343,18 +3343,34 @@ export function run(test) {
       'the read is scheduled before the tap is sent'
     )
 
-    // The size control moved to the screen it sizes, and left the tab row.
+    /*
+     * The size control lives in Setup now, and Play carries none of it.
+     *
+     * "Let's move the sizing to the Settings menu so this one just shows
+     * the preset." It had moved once already — from the tab row to beside
+     * the preset name — and the preset name is the one row on Play that
+     * was already fighting for width.
+     */
     const preset = g.slice(g.indexOf('className="gig-preset"'), g.indexOf('className="gig-signal"'))
-    assert.match(preset, /className="gig-size"/, 'the size control is not beside the preset name')
-    /* And it is the two buttons alone. The step's name was beside them —
-       "remove the word smallest, only show the plus minus" — on a row that
-       already carries a preset name long enough to wrap. The buttons disable at
-       each end, which is the part of that readout that was doing work. */
-    assert.ok(!/gig-size-label/.test(g), 'the size control is captioned again')
-    assert.ok(
-      !/className="gig-size"/.test(bare(app)),
-      'the size control is still drawn in the tab row as well — two of them'
-    )
+    assert.ok(!/gig-size|onSize/.test(g), 'the size control is back on the Play screen')
+    const setup = sheet('Setup')
+    assert.match(setup, /title="Button size"/, 'Setup has no Button size section')
+    assert.match(setup, /className="size-steps"/, 'the size steps are not in Setup')
+    assert.match(setup, /aria-label="Smaller buttons"[\s\S]*?aria-label="Bigger buttons"/, 'Setup has lost a size step')
+    assert.ok(!/onSize=/.test(bare(app)), 'App still hands Play a size control')
+
+    /*
+     * And the preset is a tile: number on top, name under it, one line, the
+     * height of a scene. "Add the preset number to it as well as the name."
+     */
+    assert.match(preset, /className="gig-name-num mono">\{preset\?\.number \?\? '--'\}/, 'the preset tile has no slot number')
+    assert.match(preset, /className="gig-name-word">\{presetLabel\(preset\)\}/, 'the preset tile has no name')
+    assert.ok(preset.indexOf('gig-name-num') < preset.indexOf('gig-name-word'), 'the number is not above the name')
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    const tileCss = css.match(/button\.gig-name \{([^}]*)\}/)?.[1] || ''
+    assert.match(tileCss, /min-height: var\(--gig-tile, 62px\)/, 'the preset tile is not the height of a scene tile')
+    assert.match(tileCss, /flex-direction: column/, 'the number and the name are not stacked')
+    assert.ok(!/clamp\(30px, 9vw, 52px\)/.test(css), 'the preset name is a headline again')
 
     /*
      * And no tab row when there is one screen.

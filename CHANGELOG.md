@@ -3,6 +3,17 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.125.0
+
+**The preset is a tile, and the size steps live in Setup.** "Make this
+button smaller, the same size as the presets, move the sizing to the
+Settings menu, and add the preset number to it as well as the name." The
+preset name on Play was a headline that wrapped to three lines on a phone,
+with the − / + size steps crammed beside it. It is now a tile the shape and
+height of a scene button: the slot number small on top, the name under it,
+one line. It grows and shrinks with the other tiles. The size steps are
+under Button size in Setup, with the size's name between them.
+
 ## 7.124.0
 
 **A tick or a cross in the bar.** "Make the connected button just a round

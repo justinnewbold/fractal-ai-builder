@@ -50,7 +50,6 @@ export default function Gig({
   device,
   capabilities,
   size,
-  onSize,
   onError,
   onChanged,
   onPickPreset,
@@ -470,55 +469,32 @@ export default function Gig({
         second list of its own: one preset picker, two ways in.
       */}
       <div className="gig-preset">
+        {/*
+          A tile, like the scenes under it.
+
+          "Make this button smaller, the same size as the presets, and add
+          the preset number to it as well as the name." It was a headline —
+          a name at 52px that wrapped to three lines on a phone, with the
+          size steps crammed beside it. Now it is the shape of a scene
+          button: the slot number small on top, the name under it, the height
+          of one tile at whatever size the tiles are. The same tap opens the
+          same preset picker as the bar.
+        */}
         <button
           type="button"
           className="gig-name"
           onClick={onPickPreset}
           disabled={!onPickPreset}
-          aria-label={`${presetLabel(preset)} — choose another preset`}
+          aria-label={`Preset ${preset?.number ?? '--'} — ${presetLabel(preset)} — choose another preset`}
         >
-          <span>{presetLabel(preset)}</span>
-          <span className="gig-name-caret" aria-hidden="true">
-            ⌄
+          <span className="gig-name-num mono">{preset?.number ?? '--'}</span>
+          <span className="gig-name-row">
+            <span className="gig-name-word">{presetLabel(preset)}</span>
+            <span className="gig-name-caret" aria-hidden="true">
+              ⌄
+            </span>
           </span>
         </button>
-        {/*
-          The size control, beside the thing it sizes.
-          It lived at the far right of the tab row, which is a different strip
-          of the app from the screen it changes, and on a phone that row now
-          carries one word. Here it reads as what it is: this screen, bigger or
-          smaller. Same state, same storage — App still owns the step, because
-          the first paint has to know it before this component mounts.
-        */}
-        {onSize ? (
-          <div className="gig-size" role="group" aria-label="Button size">
-            {/*
-              No word. It said SMALLEST / SMALL / MEDIUM beside the buttons, on
-              a row already carrying a preset name that wraps to two lines — and
-              the size of the thing you are looking at is not something a label
-              has to tell you. The buttons disable at each end, which is the
-              only part of that readout doing work.
-
-              (SIZES is still what says where the ends are.)
-            */}
-            <button
-              className="gig-size-step"
-              onClick={() => onSize(size - 1)}
-              disabled={size <= 0}
-              aria-label="Smaller buttons"
-            >
-              −
-            </button>
-            <button
-              className="gig-size-step"
-              onClick={() => onSize(size + 1)}
-              disabled={size >= SIZES.length - 1}
-              aria-label="Bigger buttons"
-            >
-              +
-            </button>
-          </div>
-        ) : null}
       </div>
 
       <div className="gig-signal" aria-label="Signal level">
