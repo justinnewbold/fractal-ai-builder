@@ -3558,4 +3558,20 @@ export function run(test) {
     const live = readFileSync(new URL('../src/components/LiveGeneration.jsx', import.meta.url), 'utf8')
     assert.match(live, /clock = seconds >= 60 \? `\$\{Math\.floor\(seconds \/ 60\)\}m \$\{seconds % 60\}s` : `\$\{seconds\}s`/, 'the live clock is gone, so nothing counts at all')
   })
+
+  test('the version check compares against the commit the pull request was based on', () => {
+    /*
+     * "I keep getting a failed notification from GitHub every time you push."
+     * The job fetched the base branch as it stood when the job RAN. Pull
+     * requests here merge within seconds of the push, so the base already had
+     * the new version and the job called the change "still the same". The
+     * base SHA is fixed at the push and cannot be overtaken.
+     */
+    const web = readFileSync(new URL('../.github/workflows/web.yml', import.meta.url), 'utf8')
+    const job = web.slice(web.indexOf('  version:'))
+    assert.match(job, /BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/, 'the job has no fixed point to compare against')
+    assert.match(job, /git fetch --no-tags --depth=1 origin "\$BASE_SHA"/, 'the job still fetches the moving base branch')
+    assert.match(job, /git show "\$BASE_SHA":package\.json/, 'the comparison still reads the base branch tip')
+    assert.ok(!/git show FETCH_HEAD:package\.json/.test(job), 'the comparison against the moving tip is back')
+  })
 }
