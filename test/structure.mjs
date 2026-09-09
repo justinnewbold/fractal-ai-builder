@@ -3641,6 +3641,13 @@ export function run(test) {
     assert.match(rule, /touch-action: pan-y/, 'a finger on the slider cannot scroll the page, or scrolls it instead of sliding')
     const step = css.match(/button\.gig-volume-step \{([^}]*)\}/)?.[1] || ''
     assert.match(step, /min-height: 44px/, 'the − and + are under the touch floor')
+
+    // "Make the bottom tab bar buttons smaller." The bar is the touch floor
+    // and no more, and Tap is one line: the tempo beside the word.
+    const bar = css.match(/button\.gig-bar-btn \{([^}]*)\}/)?.[1] || ''
+    assert.match(bar, /min-height: 44px/, 'the bar buttons are taller than the touch floor again')
+    const tap = css.match(/button\.gig-tap \{([^}]*)\}/)?.[1] || ''
+    assert.match(tap, /flex-direction: row/, 'the tempo is stacked under Tap again, which is what made the bar tall')
     const screens = readFileSync(new URL('../src/components/Screens.jsx', import.meta.url), 'utf8')
     const yields = screens.match(/YIELDS =\s*'([^']+)'/)?.[1] || ''
     assert.ok(yields.split(',').map((s) => s.trim()).includes('input'), 'a drag along the slider turns the page')
