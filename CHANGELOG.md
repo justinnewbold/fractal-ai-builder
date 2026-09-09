@@ -3,6 +3,15 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.123.0
+
+**Rounded corners on Play.** "Let's make all these buttons rounded like
+iOS." Every button on the Play screen — the preset name, the size and
+volume steps, Previous and Next, the scenes, the effects, the channel
+picker, Tuner, Tap and Ask — takes the rounder corner the app's sheets
+already use, and the meter and volume track become pills. The rest of the
+app keeps its hardware edge.
+
 ## 7.122.0
 
 **A garbled preset dump is asked for again.** "PRESET_DUMP_HEADER: expected
