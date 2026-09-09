@@ -236,6 +236,32 @@ const REMOTE_BLOCKED_KINDS = new Set(['savePreset', 'backupPreset', 'keepInLibra
  */
 const UNSAVES_PRESET = new Set(['edit', 'grid', 'scene', 'cab', 'modifier', 'tempo'])
 
+/**
+ * What the chat is told about a design: enough to explain it, not the spec.
+ *
+ * The result panel holds the whole validated plan. The chat needs the name,
+ * what was asked for, the designer's summary and notes — that summary is the
+ * reasoning, "matched the 2204 Angus and Malcolm actually ran" — and, per
+ * block, the model chosen and the settings moved. `applied` flips when the
+ * plan is written, so "did you change my amp" has a true answer.
+ */
+function designMemory(validated) {
+  if (!validated || !Array.isArray(validated.changes)) return null
+  return {
+    name: validated.presetName || '',
+    description: validated.description || '',
+    summary: validated.summary || '',
+    notes: validated.notes || '',
+    applied: false,
+    changes: validated.changes.map((c) => ({
+      name: c.name,
+      typeName: c.typeName || null,
+      bypassed: c.bypassed === true,
+      params: (c.params || []).map((p) => ({ name: p.name, to: p.to, unit: p.unit || '' }))
+    }))
+  }
+}
+
 const HAND_EDIT_KINDS = new Set([
   'edit',
   'scene',
@@ -285,6 +311,16 @@ export default function App() {
    */
   const restored = useRef(loadSession()).current
   const [result, setResult] = useState(restored?.result ?? null)
+  /*
+   * The most recent design, kept after the panel that showed it has gone.
+   *
+   * "Why did you choose the tones that you did?" was asked of a chat that
+   * could see fifty-two changes had been written and nothing about why: the
+   * designer's summary lived in the result panel, and the result panel is
+   * cleared by the next design, a reload, or a Leave it. This survives all
+   * three so the conversation can answer from the record. See designMemory.
+   */
+  const [lastDesign, setLastDesign] = useState(() => designMemory(restored?.result ?? null))
   /*
    * The tones asked for earlier in this conversation.
    *
@@ -1421,6 +1457,13 @@ export default function App() {
     const timer = setInterval(async () => {
       const res = await readSaveResult()
       if (stop || res?.id !== queuedSave.id) return
+      /*
+       * Taken once. Two ticks can be in flight over a slow relay, and both
+       * came back with the same answer before the state change below had
+       * torn this interval down — so "The Mac saved it to slot 499" landed
+       * in the conversation twice.
+       */
+      stop = true
       setQueuedSave(null)
       if (res.ok) {
         setDirty(false)
@@ -2003,6 +2046,7 @@ export default function App() {
        */
       if (spec?._trace) validated._trace = spec._trace
       setResult(validated)
+      setLastDesign(designMemory(validated))
       // Kept here, not on the way out of a write: a tone you never send is
       // still a tone you asked for, and it used to vanish with the next one.
       keepGeneration(validated)
@@ -2150,6 +2194,18 @@ export default function App() {
       // to write it again until one of the tick boxes changes what "it" means.
       setSentPlan({ result, withScenes, renamePreset, scene })
       setDirty(true)
+      // The chat is told the difference between a tone on screen and one on
+      // the unit, and this is the moment it crosses.
+      setLastDesign((prev) => (prev ? { ...prev, applied: true } : prev))
+      setTurns((prev) => [
+        ...prev,
+        {
+          role: 'system',
+          text: `Wrote "${result.presetName || preset?.name || 'the tone'}" to the unit — ${count} changes${
+            failures.length ? `, ${failures.length} failed` : ''
+          }.`
+        }
+      ])
 
       /*
        * Keeping it is `keepGeneration`'s job now, and it happened the moment
@@ -2404,6 +2460,7 @@ export default function App() {
 
       keep(replacing)
       setResult(validated)
+      setLastDesign(designMemory(validated))
       setSaveName(validated.presetName || entry.name)
       revealResult()
       record('reload', `Loaded saved preset "${entry.name}"`, [
@@ -2471,6 +2528,7 @@ export default function App() {
       validated.description = instruction
       keep(replacing)
       setResult(validated)
+      setLastDesign(designMemory(validated))
       // A refinement is its own tone — a different spec, asked for separately —
       // so it is kept like one. Restoring from the library is NOT: that entry
       // is already saved, and keeping it again would grow a duplicate each time
@@ -2596,11 +2654,16 @@ export default function App() {
           sceneCount: device?.capabilities?.sceneCount,
           presetName: preset?.name,
           presetNumber: preset?.number,
-          history: turns.map((t) =>
-            t.role === 'hand'
-              ? { role: 'user', text: `(I did this by hand: ${t.text})` }
-              : { role: t.role, text: t.text }
-          )
+          /*
+           * What the conversation has to know to answer for itself: the last
+           * design with its reasoning, and the same taste and corrections the
+           * designer already gets. The roles travel as they are — the route
+           * labels app notes and hand edits so the model knows who said what.
+           */
+          design: lastDesign,
+          taste: describeProfile(taste),
+          corrections: tasteOn ? describeCorrections(corrections) : '',
+          history: turns.map((t) => ({ role: t.role, text: t.text }))
         })
       })
       const body = await res.json()

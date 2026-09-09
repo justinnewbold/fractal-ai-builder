@@ -209,14 +209,24 @@ depends on pickups and room rather than on a text description. See
 
 ## Asking for changes
 
-`/api/command` takes an instruction in words — "move the drive before the amp",
-"turn up the gain a little and cut the bass" — and returns an ordered list of
+`/api/command` is the conversation on the Ask screen: the player's Fractal
+agent. Give it an instruction in words — "move the drive before the amp", "turn
+up the gain a little and cut the bass" — and it returns an ordered list of
 actions covering everything a player can do by hand: parameters, models, bypass,
-channels, block placement and moves, per-scene states, tempo and naming.
+channels, block placement and moves, per-scene states, tempo and naming. Ask it
+a question — why it picked that amp, what Angus actually used, what a control
+does — and it answers, in paragraphs when the question deserves them.
 
 The model chooses actions; it does not perform them. Every id is checked against
 what the device reported, every value against its real range, and the plan is
-shown before anything is written.
+shown before anything is written. Each action carries its reason, shown under
+it.
+
+To answer for itself it is given the last design with the designer's summary
+(which is the reasoning), whether that design has been written to the unit, the
+taste profile and corrections the designer gets, and the recent transcript with
+the app's own notes labelled. It runs on `CHAT_MODEL` (falling back to
+`GENERATOR_MODEL`, then Claude Opus 5).
 
 Ordering is enforced in `src/lib/actions.js` rather than trusted from the model.
 Structure has to settle before the values that depend on it, and a model swap

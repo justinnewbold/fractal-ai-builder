@@ -323,6 +323,15 @@ export default function Assistant({
     ask.current(next)
   }, [busy, queue])
 
+  /** Blank-line separated paragraphs, or the one line there is. */
+  const paragraphs = (text) => {
+    const parts = String(text || '')
+      .split(/\n\s*\n/)
+      .map((t) => t.trim())
+      .filter(Boolean)
+    return parts.length ? parts : ['']
+  }
+
   /** One turn, drawn the same wherever it falls relative to the design. */
   const renderTurn = (turn, i) => (
           <div key={i} className={`turn turn-${turn.role}`}>
@@ -332,13 +341,27 @@ export default function Assistant({
                 model is still told which turns were hand edits, and the row
                 keeps its own quiet style — but nothing here wears a label.
                 The only turns that are the player's are the ones they typed. */}
-            <p className="turn-text">{turn.text}</p>
+            {/*
+              A real answer has paragraphs. The model is asked for them,
+              separated by blank lines, and a single <p> would have run them
+              together — so each one is its own paragraph here.
+            */}
+            {paragraphs(turn.text).map((para, j) => (
+              <p key={j} className="turn-text">
+                {para}
+              </p>
+            ))}
 
             {turn.actions?.length ? (
               <ul className="turn-actions">
                 {turn.actions.map((a, j) => (
-                  <li key={j} className="mono">
-                    {turn.pending ? a.label : `${turn.failed?.includes(a.label) ? '×' : '✓'} ${a.label}`}
+                  <li key={j}>
+                    <span className="mono">
+                      {turn.pending ? a.label : `${turn.failed?.includes(a.label) ? '×' : '✓'} ${a.label}`}
+                    </span>
+                    {/* The reason, beside the change. The model has always
+                        written one per action; it was never shown. */}
+                    {a.why ? <span className="turn-why">{a.why}</span> : null}
                   </li>
                 ))}
               </ul>
@@ -382,7 +405,8 @@ export default function Assistant({
         {turns.length === 0 ? (
           <p className="hint assistant-empty">
             Tell me what you want and I&rsquo;ll do it &mdash; change a control, move a block,
-            rename it, save it to a slot. Ask a question and I&rsquo;ll just answer.
+            rename it, save it to a slot, design a whole tone. Ask me anything about the unit,
+            the amps, the players or the music and I&rsquo;ll just answer.
           </p>
         ) : null}
 

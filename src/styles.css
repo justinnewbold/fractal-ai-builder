@@ -4726,6 +4726,20 @@ ol.action-list li.destructive::marker {
   line-height: 1.5;
 }
 
+/* A second paragraph of an answer stands off from the first. */
+.turn-text + .turn-text {
+  margin-top: var(--s-2);
+}
+
+/* The reason for a change, under the change. */
+.turn-why {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--body);
+  font-size: var(--f-1);
+  color: var(--silk-faint);
+}
+
 /* The player's own words are set apart so a long exchange stays readable. */
 .turn-user .turn-text {
   padding-left: var(--s-2);

@@ -1076,11 +1076,14 @@ export function run(test) {
     assert.match(src, /useEffect\(\(\) => setSheet\(null\), \[view\]\)/, 'a sheet no longer closes when the screen changes under it')
     // "You: Done — 3 changes." — the app's own narration wore the player's label.
     assert.equal((src.match(/role: 'hand'/g) || []).length, 1, 'hand edits are not the one producer of the hand role')
-    assert.match(src, /t\.role === 'hand'\s*\n?\s*\? \{ role: 'user', text: `\(I did this by hand/, 'the model is no longer told which turns were hand edits')
+    // The labelling moved to the route, which also labels the app's own notes.
+    const command = readFileSync(new URL('../api/command.js', import.meta.url), 'utf8')
+    assert.match(command, /if \(m\.role === 'hand'\) return \{ role: 'user', content: `\(Hand edit, by me/, 'the model is no longer told which turns were hand edits')
+    assert.match(command, /return \{ role: 'user', content: `\(App note: /, 'the app’s own notes reach the model as the player’s words')
     const assistant = read('Assistant.jsx')
     // "You: Named scene 4 Solo" — a hand edit is an event, not speech. Nothing in the transcript wears "You:".
     assert.ok(!/You:/.test(assistant), 'a "You:" prefix is back in the transcript')
-    assert.match(assistant, /<p className="turn-text">\{turn\.text\}<\/p>/, 'the turn text is decorated')
+    assert.match(assistant, /<p key=\{j\} className="turn-text">\s*\{para\}\s*<\/p>/, 'the turn text is decorated')
     // Two narration sites were filed as hand edits: the app's own words about itself must pass fromAssistant.
     assert.match(src, /record\('grid', 'Built a chain into the empty slot', \[\], true\)/, 'the design’s own chain build is recorded as a hand edit')
     // The wording moved when keeping became a thing that happens at generation
@@ -3355,6 +3358,34 @@ export function run(test) {
     const play = app.slice(app.indexOf('<Gig'), app.indexOf('/>', app.indexOf('<Gig')))
     assert.match(play, /deviceKey=\{currentDeviceSlug\(\)\}/, 'Play does not know which unit the setlists are for')
     assert.match(play, /slots=\{allSlots\}/, 'the setlist sheet has no preset names to show')
+  })
+
+  test('an answer on Ask has paragraphs, every change shows its reason, and a save lands once', () => {
+    /*
+     * The model was asked for two sentences and drawn in one <p>; now it is
+     * asked for a real answer and each blank-line paragraph is its own <p>.
+     * Every action has always carried a "why" the player was meant to read,
+     * and the row only ever showed the label.
+     */
+    const assistant = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
+    const a = assistant.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ' ').replace(/\{\s*\}/g, '')
+    assert.match(a, /paragraphs\(turn\.text\)\.map\(\(para, j\) => \(/, 'a reply is drawn as one paragraph again')
+    assert.match(a, /\.split\(\/\\n\\s\*\\n\/\)/, 'paragraphs are not split on blank lines')
+    assert.match(a, /a\.why \? <span className="turn-why">\{a\.why\}<\/span> : null/, 'the reason for a change is not shown')
+    assert.match(a, /Ask me anything about the unit,\s*the amps, the players or the music/, 'the empty screen still says it only answers about the preset')
+
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    assert.match(css, /\.turn-text \+ \.turn-text \{/, 'a second paragraph has no space above it')
+    assert.match(css, /\.turn-why \{/, 'the reason has no style')
+
+    /*
+     * "The Mac saved it to slot 499" twice in the same conversation: two
+     * ticks of the poll were in flight over the relay and both took the same
+     * answer before the state change tore the interval down.
+     */
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    const poll = app.slice(app.indexOf('const res = await readSaveResult()'), app.indexOf('const res = await readSaveResult()') + 700)
+    assert.match(poll, /stop = true\s*\n\s*setQueuedSave\(null\)/, 'a second poll tick can report the same save again')
   })
 
   test('the stage screen is the layout he picked, not the one it grew into', () => {

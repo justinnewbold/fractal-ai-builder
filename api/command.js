@@ -1,31 +1,57 @@
 /**
  * POST /api/command
  *
- * Turns "move the drive before the amp" or "turn up the gain a little and cut
- * the bass" into an ordered list of actions.
+ * The conversation on the Ask screen: the player's Fractal agent.
  *
- * Distinct from /api/generate, which designs a whole preset. This is for the
- * things a player would otherwise reach into the editor to do — one or two
- * changes, described the way you'd say them out loud.
+ * It started as a command parser — "move the drive before the amp" into an
+ * ordered list of actions, and nothing else. That is still the half that
+ * touches the unit, and it is still checked here and shown before anything is
+ * written. What changed is the other half. "Why did you choose the tones you
+ * did? Where did you get your information from?" came back as "That question
+ * isn't about the Fractal preset or your rig", because that is what the
+ * instructions said it was for. A person who has just had a preset built for
+ * them and asks why is asking the most reasonable question there is.
  *
- * The model chooses actions; it does not perform them. Everything comes back as
- * a list, gets checked against what the device actually reported, and is shown
- * before anything is written.
+ * So the model is now told who it is — the player's Fractal agent, which
+ * knows the unit, the amps the models are based on, the music, and what it
+ * itself has just done — and is given what it needs to answer: the design on
+ * screen with its own reasoning, the player's taste profile, and a longer
+ * memory of the conversation. It answers like a person who knows the rig;
+ * it acts through the same checked actions as before.
+ *
+ * Distinct from /api/generate, which designs a whole preset.
  */
 import { generateObject } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 import { cors } from './_cors.js'
 
-const MODEL_NAME = process.env.GENERATOR_MODEL || 'claude-sonnet-5'
+/*
+ * Which model talks.
+ *
+ * Its own setting, apart from the designer's: a conversation that explains a
+ * tone, answers a question about a Marshall, and decides whether "make it
+ * heavier" is a nudge or a redesign is the harder judgement in this app, and
+ * it runs on far fewer tokens per call than a design does. CHAT_MODEL wins,
+ * then the shared GENERATOR_MODEL, then the default.
+ */
+const MODEL_NAME = process.env.CHAT_MODEL || process.env.GENERATOR_MODEL || 'claude-opus-5'
+/*
+ * Where to land if that model is refused. The designer's own model is one that
+ * is known to answer on this deployment, because designs come back. A chat
+ * that fails outright because a newer model is not yet enabled on an account
+ * is worse than a chat on last season's model.
+ */
+const FALLBACK_MODEL = process.env.GENERATOR_MODEL || 'claude-sonnet-5'
 
-function resolveModel() {
+function resolveModel(name) {
   if (process.env.ANTHROPIC_API_KEY) {
     const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-    return anthropic(MODEL_NAME)
+    return anthropic(name)
   }
   if (process.env.AI_GATEWAY_API_KEY) {
-    return process.env.GENERATOR_MODEL || 'anthropic/claude-sonnet-4.5'
+    // The gateway names models "anthropic/claude-…"; a bare id is given the prefix.
+    return name.includes('/') ? name : `anthropic/${name}`
   }
   return null
 }
@@ -94,8 +120,9 @@ const Plan = z.object({
   understood: z
     .string()
     .describe(
-      'Your reply to the player, in one or two plain sentences. This is read as conversation, ' +
-        'so answer questions here too, not just describe changes.'
+      'Your reply to the player, as conversation. For a change: one or two plain sentences ' +
+        'saying what you did and why. For a question: a real answer — as many sentences or short ' +
+        'paragraphs as it deserves, separated by blank lines. Plain words, no markdown.'
     ),
   actions: z.array(Action).describe('Ordered. Empty if the request cannot be done.'),
   refused: z
@@ -103,14 +130,64 @@ const Plan = z.object({
     .describe('If nothing can be done, why — otherwise an empty string.')
 })
 
-const SYSTEM = `You are the way a guitarist operates their Fractal unit. They talk to
-you; you do the thing. Anything they could reach in and change by hand, you can
+const SYSTEM = `WHO YOU ARE
+
+You are the player's Fractal agent: the way a guitarist operates their Fractal
+unit, and the person they talk to about it. They talk to you; you do the thing,
+and you explain it. Anything they could reach in and change by hand, you can
 change, including saving and loading presets.
+
+You know this territory properly. The Fractal units and how they work — presets,
+scenes, channels, the grid, blocks, modifiers, controllers, tempo, the tuner.
+The amp and cab models, the real amplifiers and speakers each is modelled on,
+and what those amps actually sound like and were used for. Drive pedals,
+delays, reverbs, modulation, compression, gates, and how a chain is ordered.
+Guitar tone in general: pickups, tunings, gain structure, EQ, why a rhythm sound
+sits and a lead sound cuts. Bands, players, their rigs and their records. Music
+itself — theory, songs, playing, practice. Ask you anything in that world and
+you answer it, the way a knowledgeable friend who owns the same unit would.
+
+Talk like that friend. Plain words, no jargon unless they used it first, no
+lecture. Match the size of the question: a nudge gets a line, a real question
+gets a real answer, in short paragraphs. Never send them to a manual, a forum
+or another app for something you can answer or do yourself.
+
+Messages are often dictated on a phone and arrive with wrong words in them —
+"towns" for tones, "seen" for scene, "pre-set", missing punctuation. Read for
+what they meant, and only ask when it genuinely cannot be told.
 
 WHAT YOU ARE GIVEN
 
 The blocks currently placed, their grid positions, their parameters with real
 ranges, and the models each block family offers on this specific unit.
+
+You may also be given "design": the tone most recently designed in this
+conversation — its name, what the player asked for, the designer's own summary
+of the approach and which reference it matched, its notes, and what it changed
+block by block. Whether it has been written to the unit yet is stated. That
+summary IS the reasoning behind the choices, and the taste profile below is
+where "this player's most-reached-for amp" came from. When they ask why an amp,
+cab or setting was chosen, or where the information came from, answer from
+these, plainly: name the reference amp, the record or player it points at, and
+what in their own history tipped the choice. Where the design record does not
+say, say what generally guides such a choice and be clear that you are
+reconstructing rather than remembering.
+
+"taste" is a profile built from the presets this player has kept — the amps and
+effects they reach for most. "corrections" is what they fix by hand after a
+design. Use both to answer "what do I usually…" and to shape what you propose.
+Neither is a secret; if they ask what you know about them, tell them.
+
+EXPLAINING WHAT YOU DO
+
+Every action carries a "why" the player will read beside it. Make it the actual
+reason in their terms — "brings the mids up so the solo cuts" — not a restatement
+of the action. When asked what you did, what you are about to do, or what
+something you changed does to the sound, explain it. When asked what you can
+do, say so in terms of the unit: change any control, swap models, switch blocks
+on and off per scene, move channels, place and move blocks, rename, set tempo,
+save and load slots, keep to the library, and design a whole tone from a
+description.
 
 HARD RULES
 
@@ -135,11 +212,18 @@ HARD RULES
 
 CONVERSATION
 
-You may be given earlier turns. Use them: "make it darker still" means darker
+You are given the earlier turns. Use them: "make it darker still" means darker
 than the change you just made, and "put that back" refers to what you just did.
+Lines marked as app notes are things the app did or reported — a save that
+landed, a chain that went in, a tone that was written — and lines marked as hand
+edits are changes the player made on the unit or in the editor themselves.
+
 If someone asks a question rather than requesting a change — what amp is this,
-what does that control do, is this saved — answer it in "understood" and return
-no actions. A question is not a failure, so leave "refused" empty for it.
+what does that control do, is this saved, why did you pick that, what did Angus
+actually use — answer it in "understood" and return no actions. A question is
+never a failure and is never off topic: leave "refused" empty for it. "refused"
+is only for a change that cannot be made, and it says why and what would work
+instead. Never tell the player a question is not about the preset or the rig.
 
 AN EMPTY PRESET
 
@@ -238,6 +322,49 @@ model resets that block's parameters, so set the model before its values.
 
 Reply with the actions and nothing else.`
 
+/** Older turns as the model should read them: who said what, and what was a note. */
+export function historyTurns(history, { keep = 24, chars = 2400 } = {}) {
+  return (Array.isArray(history) ? history : [])
+    .slice(-keep)
+    .filter((m) => m && typeof m.text === 'string' && m.text.trim())
+    .map((m) => {
+      const text = m.text.slice(0, chars)
+      if (m.role === 'assistant') return { role: 'assistant', content: text }
+      if (m.role === 'user') return { role: 'user', content: text }
+      if (m.role === 'hand') return { role: 'user', content: `(Hand edit, by me: ${text})` }
+      return { role: 'user', content: `(App note: ${text})` }
+    })
+}
+
+/**
+ * The last design, said small enough to sit beside the preset.
+ *
+ * Fifty-two parameter values are not what "why" is about; the block, the model
+ * it was given and how many settings moved are. The summary and notes go
+ * whole — they are the reasoning.
+ */
+export function describeDesign(design) {
+  if (!design || typeof design !== 'object') return undefined
+  const changes = Array.isArray(design.changes) ? design.changes : []
+  return {
+    name: design.name || undefined,
+    askedFor: design.description || undefined,
+    summary: design.summary || undefined,
+    notes: design.notes || undefined,
+    applied: design.applied === true ? 'written to the unit' : 'designed, not yet written',
+    changes: changes.slice(0, 40).map((c) => {
+      const params = Array.isArray(c.params) ? c.params : []
+      return {
+        block: c.name,
+        model: c.typeName || undefined,
+        bypassed: c.bypassed === true ? true : undefined,
+        settings: params.slice(0, 12).map((p) => `${p.name} ${p.to ?? p.value}${p.unit || ''}`),
+        more: params.length > 12 ? params.length - 12 : undefined
+      }
+    })
+  }
+}
+
 export default async function handler(req, res) {
   // Local mode serves this app from the player's own machine, so the page is a
   // cross-origin caller here. Preflight is answered and nothing else runs.
@@ -248,14 +375,27 @@ export default async function handler(req, res) {
     return
   }
 
-  const model = resolveModel()
+  const model = resolveModel(MODEL_NAME)
   if (!model) {
     res.status(500).json({ error: 'No model key configured.' })
     return
   }
 
-  const { instruction, device, blocks, grid, scene, sceneNames, sceneCount, presetName, presetNumber, history } =
-    req.body || {}
+  const {
+    instruction,
+    device,
+    blocks,
+    grid,
+    scene,
+    sceneNames,
+    sceneCount,
+    presetName,
+    presetNumber,
+    history,
+    design,
+    taste,
+    corrections
+  } = req.body || {}
 
   if (!instruction || typeof instruction !== 'string') {
     res.status(400).json({ error: 'Say what you want changed.' })
@@ -310,12 +450,47 @@ export default async function handler(req, res) {
       channel: b.channel,
       params: (b.params || []).map(({ does, ...rest }) => rest)
     })),
-    placeable: grid?.palette || []
+    placeable: grid?.palette || [],
+    /*
+     * The tone this conversation designed, with the designer's reasoning.
+     *
+     * Without this the chat could see that "52 changes" were written and
+     * nothing about why — so "why did you choose those amps" had no answer
+     * anywhere on the server. The App keeps the last design even after the
+     * panel has been cleared; `applied` says whether it reached the unit.
+     */
+    design: describeDesign(design),
+    taste: typeof taste === 'string' && taste.trim() ? taste : undefined,
+    corrections: typeof corrections === 'string' && corrections.trim() ? corrections : undefined
   }
 
-  try {
-    const { object, usage } = await generateObject({
+  /*
+   * The same request, in two shapes: the chat's model with room to think,
+   * and — only if that is refused — the designer's model, plain.
+   *
+   * Room to think, at a modest effort: "is 'make it heavier' a nudge or a
+   * redesign" and "why did this design pick a 2204" are judgement, and a
+   * moment of it is cheap next to the roster the request already carries.
+   * Passed only to the Anthropic provider directly; the gateway route is a
+   * plain model string and its defaults stand.
+   */
+  const attempts = [
+    {
       model,
+      ...(typeof model === 'string'
+        ? {}
+        : {
+            providerOptions: {
+              anthropic: { thinking: { type: 'adaptive' }, effort: 'medium' }
+            }
+          })
+    }
+  ]
+  if (FALLBACK_MODEL !== MODEL_NAME) attempts.push({ model: resolveModel(FALLBACK_MODEL) })
+
+  const ask = (attempt) =>
+    generateObject({
+      ...attempt,
       schema: Plan,
       schemaName: 'command_plan',
       system: SYSTEM,
@@ -330,16 +505,13 @@ export default async function handler(req, res) {
             }
           ]
         },
-        // Earlier turns, so "a bit more" and "put that back" mean something.
-        // Trimmed to the last few: the preset state below is always current, and
-        // stale block data from ten turns ago is worse than no memory at all.
-        ...(Array.isArray(history) ? history : [])
-          .slice(-8)
-          .filter((m) => m && typeof m.text === 'string' && m.text.trim())
-          .map((m) => ({
-            role: m.role === 'assistant' ? 'assistant' : 'user',
-            content: m.text.slice(0, 1200)
-          })),
+        // Earlier turns, so "a bit more" and "put that back" mean something —
+        // and so "why did you do that" has the that. Trimmed rather than whole:
+        // the preset state below is always current, and stale block data from
+        // an hour ago is worse than no memory at all. Notes the app wrote into
+        // the transcript are labelled, so the model does not read "Chain in:
+        // Amp (3), Cab (4)" as something the player said.
+        ...historyTurns(history),
         {
           role: 'user',
           content: `Preset right now:\n${JSON.stringify(state)}\n\nInstruction: ${instruction}`
@@ -347,17 +519,25 @@ export default async function handler(req, res) {
       ]
     })
 
-    res.status(200).json({
-      ...object,
-      _usage: {
-        inputTokens: usage?.inputTokens ?? null,
-        outputTokens: usage?.outputTokens ?? null,
-        cachedInputTokens:
-          usage?.cachedInputTokens ?? usage?.inputTokenDetails?.cacheReadTokens ?? null,
-        model: typeof model === 'string' ? model : model?.modelId || MODEL_NAME
-      }
-    })
-  } catch (err) {
-    res.status(502).json({ error: `Could not work that out: ${err.message}` })
+  let last = null
+  for (const attempt of attempts) {
+    try {
+      const { object, usage } = await ask(attempt)
+      const used = attempt.model
+      res.status(200).json({
+        ...object,
+        _usage: {
+          inputTokens: usage?.inputTokens ?? null,
+          outputTokens: usage?.outputTokens ?? null,
+          cachedInputTokens:
+            usage?.cachedInputTokens ?? usage?.inputTokenDetails?.cacheReadTokens ?? null,
+          model: typeof used === 'string' ? used : used?.modelId || MODEL_NAME
+        }
+      })
+      return
+    } catch (err) {
+      last = err
+    }
   }
+  res.status(502).json({ error: `Could not work that out: ${last?.message || 'no answer'}` })
 }
