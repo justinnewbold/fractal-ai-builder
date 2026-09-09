@@ -5735,31 +5735,39 @@ button.gig-block.off {
   grid-auto-columns: 1fr;
   gap: var(--s-2);
   margin-top: var(--s-3);
-  padding: var(--s-2) 0 max(var(--s-2), env(safe-area-inset-bottom, 0px));
+  padding: var(--s-1) 0 max(var(--s-1), env(safe-area-inset-bottom, 0px));
   /* Opaque: the effects scroll underneath it. */
   background: var(--chassis);
   border-top: 1px solid var(--rule);
 }
 
+/*
+ * "Make the bottom tab bar buttons smaller."
+ *
+ * They were 52px plus padding, and Tap stacked its tempo under the word, so
+ * on a phone the row stood 60px tall over the last row of effects. They are
+ * the 44px touch floor now and no more: a strip you press between songs
+ * should not take the height of a scene button.
+ */
 button.gig-bar-btn {
-  min-height: 52px;
-  padding: var(--s-2);
-  font-size: var(--f-3);
+  min-height: 44px;
+  padding: var(--s-1) var(--s-2);
+  font-size: var(--f-2);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   background: var(--panel);
   color: var(--silk-dim);
 }
 
-/* Tap carries a number, so it is a column rather than a line of text. The word
-   stays the size of the tuner's beside it; the figure sits under it, quieter. */
+/* Tap carries a number, beside the word rather than under it, so the button
+   is one line tall like the two it sits between. The figure stays quieter. */
 button.gig-tap {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 0;
-  line-height: 1.1;
+  gap: var(--s-2);
+  line-height: 1;
 }
 
 .gig-tap-bpm {
@@ -7688,11 +7696,6 @@ button.view-tab {
 
 .gig[data-compact] .gig-bar {
   margin-top: var(--s-2);
-}
-
-.gig[data-compact] button.gig-bar-btn {
-  min-height: 44px;
-  padding: var(--s-1) var(--s-2);
 }
 
 .gig[data-compact] .gig-scenes {

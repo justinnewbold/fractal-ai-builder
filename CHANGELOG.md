@@ -3,6 +3,14 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.121.0
+
+**A shorter bar at the bottom of Play.** "Make the bottom tab bar buttons
+smaller." Tuner, Tap and Ask stood 60px tall on a phone, with the tempo
+stacked under the word Tap. They are the 44px touch minimum now, the tempo
+sits beside the word, and the strip gives the row of effects above it the
+room back.
+
 ## 7.120.0
 
 **A dB at a time.** "Do a plus minus on the sides of the volume slider that
