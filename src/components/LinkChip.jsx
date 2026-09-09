@@ -48,6 +48,20 @@ export default function LinkChip({ link, compact, onAction, busy }) {
             : { label: 'Connect', kind: 'leave-demo' }
           : { label: 'Turn on', kind: 'mac-on' }
 
+  /*
+   * In the bar, a mark rather than a word.
+   *
+   * "Make the connected button just a round green checkmark when it is
+   * connected and a red X when it's not, the same size as the settings
+   * gear." The word was the widest thing in a bar whose width belongs to the
+   * preset name, and "connected" beside a teal lamp said the same thing
+   * twice. A green tick is up; a red cross is not; the amber dots are on
+   * the way. The sentence is still what a screen reader hears, and the
+   * popover still carries it in words.
+   */
+  const mark = said.tone === 'good' ? 'ok' : said.tone === 'busy' ? 'wait' : 'no'
+  const glyph = mark === 'ok' ? '✓' : mark === 'wait' ? '…' : '✕'
+
   return (
     <span className="phone-link" ref={wrap}>
       <button
@@ -56,8 +70,16 @@ export default function LinkChip({ link, compact, onAction, busy }) {
         aria-expanded={open}
         aria-label={`${said.sentence} — phone remote options`}
       >
-        {compact ? null : <span className="lamp" data-state={said.tone === 'good' ? 'live' : said.tone === 'bad' ? 'fault' : 'idle'} />}
-        {compact ? said.word : said.sentence}
+        {compact ? (
+          <span className={`phone-mark ${mark}`} aria-hidden="true">
+            {glyph}
+          </span>
+        ) : (
+          <>
+            <span className="lamp" data-state={said.tone === 'good' ? 'live' : said.tone === 'bad' ? 'fault' : 'idle'} />
+            {said.sentence}
+          </>
+        )}
       </button>
 
       {open ? (

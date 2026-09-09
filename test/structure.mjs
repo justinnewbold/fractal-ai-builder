@@ -1207,6 +1207,22 @@ export function run(test) {
     assert.match(hook, /cameFrom\.focus\?\.\(\{ preventScroll: true \}\)/, 'focus does not return to where it was')
     const chip = read('components/LinkChip.jsx')
     assert.match(chip, /useDismiss\(wrap, \(\) => setOpen\(false\), \{ open, ignore: '\.phone-chip' \}\)/, 'the link chip does not dismiss through the shared hook')
+
+    /*
+     * "Make the connected button just a round green checkmark when it is
+     * connected and a red X when it's not, the same size as the settings
+     * gear." In the bar the chip is a mark; the sentence stays on the button
+     * for a screen reader and in the popover for everyone.
+     */
+    assert.match(chip, /const mark = said\.tone === 'good' \? 'ok' : said\.tone === 'busy' \? 'wait' : 'no'/, 'the mark no longer follows the link tone')
+    assert.match(chip, /compact \? \(\s*<span className=\{`phone-mark \$\{mark\}`\} aria-hidden="true">/, 'the bar chip is a word again')
+    assert.match(chip, /aria-label=\{`\$\{said\.sentence\} — phone remote options`\}/, 'the mark has no words for a screen reader')
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    const markCss = css.slice(css.lastIndexOf('The link chip in the bar is a mark'))
+    assert.match(markCss, /button\.phone-chip\.compact \{[^}]*min-width: 44px;\s*min-height: 44px/, 'the mark is not the gear\u2019s size')
+    assert.match(markCss, /\.phone-mark\.ok \{\s*background: var\(--ok\)/, 'connected is not green')
+    assert.match(markCss, /\.phone-mark\.no \{\s*background: var\(--fault\)/, 'not connected is not red')
+    assert.match(markCss, /\.phone-mark \{[^}]*border-radius: 50%/, 'the mark is not round')
     assert.ok(!/addEventListener\('pointerdown'/.test(chip), 'the link chip keeps a private outside-tap listener')
     const scenes = read('components/Scenes.jsx')
     assert.match(scenes, /e\.key === 'Escape'\) \{\s*e\.stopPropagation\(\)\s*setRenaming\(null\)/, 'Escape does not leave the rename row, or leaves the sheet with it')
