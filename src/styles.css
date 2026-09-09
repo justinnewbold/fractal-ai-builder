@@ -7959,3 +7959,57 @@ input.gig-volume-slider::-moz-range-thumb {
 .gig input.gig-volume-slider::-moz-range-progress {
   border-radius: var(--r-3);
 }
+
+/*
+ * The link chip in the bar is a mark, not a word.
+ *
+ * "Make the connected button just a round green checkmark when it is
+ * connected and a red X when it's not, the same size as the settings gear."
+ * The button is the gear's box — 44px both ways, no border, nothing behind
+ * it — and the mark inside is a 28px disc: green with a tick when the link
+ * is up, red with a cross when it is not, amber with dots while it is on
+ * its way. The base rule's word styles stay for the sentence form the
+ * connect screen still draws.
+ */
+button.phone-chip.compact {
+  min-width: 44px;
+  min-height: 44px;
+  justify-content: center;
+  gap: 0;
+  background: none;
+  border-color: transparent;
+}
+
+.phone-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-family: var(--display);
+  font-size: var(--f-4);
+  font-weight: 700;
+  line-height: 1;
+  color: #ffffff;
+}
+
+.phone-mark.ok {
+  background: var(--ok);
+}
+
+.phone-mark.no {
+  background: var(--fault);
+}
+
+.phone-mark.wait {
+  background: var(--signal);
+  color: var(--on-signal);
+}
+
+/* The chip's tone colours drew a border under the word; on a bare mark they
+   are noise. */
+button.phone-chip.compact.good,
+button.phone-chip.compact.bad {
+  border-color: transparent;
+}

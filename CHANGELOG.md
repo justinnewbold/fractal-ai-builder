@@ -3,6 +3,16 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.124.0
+
+**A tick or a cross in the bar.** "Make the connected button just a round
+green checkmark when it is connected and a red X when it's not, the same
+size as the settings gear." The word beside the gear is a round mark now:
+green with a tick when the phone is connected to the Mac (or the Mac's
+phone remote is on), red with a cross when it is not, amber with dots while
+it is connecting. Tapping it still opens the same options, and the words
+are still there for a screen reader.
+
 ## 7.123.0
 
 **Rounded corners on Play.** "Let's make all these buttons rounded like
