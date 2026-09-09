@@ -5317,6 +5317,90 @@ test('useDismiss: a tap outside or Escape closes, the trigger is ignored, focus 
   void React
 })
 
+console.log('\nthe volume slider on Play')
+/*
+ * "Add volume slider to the play screen to quickly turn volume up or down."
+ * The slider moves the Output block's Level. What is checked here is the part
+ * that does not need a browser: which parameter it picks, what it says, and
+ * how a stream of drag values becomes writes a serial port can keep up with.
+ */
+const volume = await import('../src/lib/volume.js')
+
+test('the slider drives the Output block\u2019s Level and nothing else', () => {
+  const named = [
+    { id: 3, name: 'Balance', value: 0, min: -100, max: 100, unit: '%' },
+    { id: 1, name: 'Level', value: -3, min: -80, max: 20, unit: 'dB' },
+    { id: 9, name: 'Boost Level', value: 0, min: 0, max: 10 }
+  ]
+  assert.equal(volume.outputLevelParam(named)?.id, 1, 'the Level is not the one picked')
+  // A driver that says "Out Level" still gets a slider.
+  assert.equal(volume.outputLevelParam([{ id: 4, name: 'Out Level', min: -80, max: 20 }])?.id, 4)
+  // "Boost Level" and "Input Level" are gain, not volume — never the slider's.
+  assert.equal(volume.outputLevelParam([{ id: 9, name: 'Boost Level', min: 0, max: 10 }]), null)
+  assert.equal(volume.outputLevelParam([{ id: 5, name: 'Input Level', min: 0, max: 10 }]), null)
+  // No range, no slider: a write without a range is a guessed value, and setParam refuses those.
+  assert.equal(volume.outputLevelParam([{ id: 1, name: 'Level' }]), null)
+  assert.equal(volume.outputLevelParam(null), null)
+  assert.equal(volume.outputLevelParam(undefined), null)
+})
+
+test('the figure beside the slider carries a sign and a unit', () => {
+  const p = { min: -80, max: 20, unit: 'dB' }
+  assert.equal(volume.volumeLabel(-6.5, p), '\u22126.5 dB')
+  assert.equal(volume.volumeLabel(2, p), '+2.0 dB')
+  assert.equal(volume.volumeLabel(0, p), '0.0 dB')
+  assert.equal(volume.volumeLabel(undefined, p), '\u2014')
+  assert.equal(volume.volumeStep(p), 0.5, 'a dB slider moves in half-dB notches')
+  assert.equal(volume.volumeStep({ min: 0, max: 10 }), 0.1)
+  assert.equal(volume.volumePercent(-30, p), 50)
+  assert.equal(volume.volumePercent(-80, p), 0)
+  assert.equal(volume.volumePercent(20, p), 100)
+  assert.equal(volume.volumePercent(99, p), 100, 'a value past the end is not past the end')
+})
+
+test('a drag sends one write at a time and the newest value wins', async () => {
+  const sent = []
+  let release = null
+  const write = (v) => {
+    sent.push(v)
+    return new Promise((done) => {
+      release = done
+    })
+  }
+  const w = volume.latestWriter(write)
+  w.send(1)
+  w.send(2)
+  w.send(3)
+  assert.deepEqual(sent, [1], 'a second write went out while the first was still on the wire')
+  assert.ok(w.busy)
+  const settled = w.settled()
+  release()
+  await new Promise((go) => setTimeout(go, 0))
+  assert.deepEqual(sent, [1, 3], 'the value in the middle of the drag was written; only the newest should be')
+  release()
+  const err = await settled
+  assert.equal(err, null)
+  assert.deepEqual(sent, [1, 3])
+  assert.ok(!w.busy)
+  // Nothing in flight: settled answers at once.
+  assert.equal(await w.settled(), null)
+})
+
+test('a write that fails mid-drag does not stop the next one, and is reported once at the release', async () => {
+  const sent = []
+  const write = async (v) => {
+    sent.push(v)
+    if (v === 1) throw new Error('port busy')
+  }
+  const w = volume.latestWriter(write)
+  w.send(1)
+  w.send(2)
+  const err = await w.settled()
+  assert.deepEqual(sent, [1, 2], 'the failure stopped the value behind it')
+  assert.match(err?.message || '', /port busy/, 'the failure was swallowed rather than handed to the release')
+  assert.equal(await w.settled(), null, 'the same failure was reported twice')
+})
+
 console.log('\nstructure')
 const { run: structure } = await import('./structure.mjs')
 structure(test)

@@ -7775,3 +7775,103 @@ button.view-tab {
 .gig[data-compact] button.gig-scene {
   min-width: 0;
 }
+
+/*
+ * The volume slider on Play, under the meter.
+ *
+ * A native range input, restyled: the track is the same strip the meter above
+ * it is, filled in the amber of the audio path up to where the thumb sits;
+ * the thumb is a round knob big enough to find in the dark. The input itself
+ * is 44px tall so a thumb lands on it, while the track it draws stays thin.
+ * Screens.jsx already leaves any input its own sideways gesture, so a drag
+ * along the track moves the volume and never turns the page.
+ */
+.gig-volume {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--s-3);
+  margin-top: var(--s-1);
+  padding: 0 var(--s-1);
+}
+
+.gig-volume-word {
+  margin: 0;
+}
+
+/* The figure, right-aligned in a fixed slot so the track does not jump
+   between "−6.5 dB" and "+2.0 dB". Tabular so the digits sit still while it
+   moves. */
+.gig-volume-value {
+  min-width: 8ch;
+  text-align: right;
+  font-size: var(--f-3);
+  font-variant-numeric: tabular-nums;
+  color: var(--silk-dim);
+}
+
+input.gig-volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  /* The page may still scroll under a finger going up or down; sideways is the slider's. */
+  touch-action: pan-y;
+  --vol: 0%;
+}
+
+input.gig-volume-slider:focus-visible {
+  outline: 2px solid var(--live);
+  outline-offset: 2px;
+  border-radius: var(--r-1);
+}
+
+input.gig-volume-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: var(--r-1);
+  background: linear-gradient(to right, var(--signal) 0 var(--vol), var(--panel-hi) var(--vol) 100%);
+}
+
+input.gig-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  margin-top: -11px; /* (28 − 6) / 2: centred on the track */
+  border-radius: 50%;
+  background: var(--silk);
+  border: 2px solid var(--chassis);
+  box-shadow: var(--e-1);
+}
+
+input.gig-volume-slider::-moz-range-track {
+  height: 6px;
+  border-radius: var(--r-1);
+  background: var(--panel-hi);
+}
+
+input.gig-volume-slider::-moz-range-progress {
+  height: 6px;
+  border-radius: var(--r-1);
+  background: var(--signal);
+}
+
+input.gig-volume-slider::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--silk);
+  border: 2px solid var(--chassis);
+  box-shadow: var(--e-1);
+}
+
+/* At Smallest the meter above it goes; the slider stays, because it is a
+   control and the meter was a readout, but it gives up its margin. */
+.gig[data-compact] .gig-volume {
+  margin-top: 0;
+}

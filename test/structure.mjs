@@ -3574,4 +3574,56 @@ export function run(test) {
     assert.match(job, /git show "\$BASE_SHA":package\.json/, 'the comparison still reads the base branch tip')
     assert.ok(!/git show FETCH_HEAD:package\.json/.test(job), 'the comparison against the moving tip is back')
   })
+
+  test('the Play screen has a volume slider, and it moves the Output level the way the port can take', () => {
+    /*
+     * "Add volume slider to the play screen to quickly turn volume up or down."
+     *
+     * Two halves. Gig renders it under the meter, bound to the same Output
+     * block the meter reads, so a unit with no output block gets neither. And
+     * Volume writes through the coalescing writer rather than straight to
+     * setParam on every pixel — the port takes one request at a time, and a
+     * drag that queued sixty writes a second would land long after the thumb
+     * stopped and block the next scene behind it.
+     */
+    const bare = (x) => x.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ' ')
+    const gig = bare(readFileSync(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8'))
+    assert.match(gig, /import Volume from '\.\/Volume'/, 'the Play screen does not import the slider')
+    assert.match(
+      gig,
+      /<Volume eid=\{meterEid\} preset=\{preset\} onError=\{onError\} \/>/,
+      'the slider is not bound to the Output block the meter reads'
+    )
+    const meter = gig.indexOf('className="gig-signal"')
+    const slider = gig.indexOf('<Volume ')
+    const nav = gig.indexOf('className="gig-nav"')
+    assert.ok(meter !== -1 && slider > meter && nav > slider, 'the slider is not under the meter and above Previous/Next')
+
+    const vol = bare(readFileSync(new URL('../src/components/Volume.jsx', import.meta.url), 'utf8'))
+    assert.match(vol, /latestWriter\(\(v\) => setParam\(eid, param\.id, v, param\)\)/, 'the slider writes without coalescing')
+    assert.ok(!/setParamConfirmed/.test(vol), 'every drag value is a confirmed write — three round trips per pixel')
+    assert.match(vol, /writer\.send\(v\)/, 'the drag does not go through the writer')
+    assert.match(vol, /await writer\.settled\(\)[\s\S]*?clearDeviceCache\(\)[\s\S]*?blockParams\(eid\)/, 'the release does not read back what the unit holds')
+    assert.match(vol, /outputLevelParam\(res\?\.named\)/, 'the slider does not pick the Level by the shared rule')
+    assert.match(vol, /if \(!param\) return null/, 'a unit with no reachable level still gets a slider')
+    assert.match(vol, /type="range"/, 'the control is not a slider')
+    assert.match(vol, /aria-labelledby="gig-volume-word"/, 'the slider has no accessible name')
+    assert.match(vol, /aria-valuetext=\{label\}/, 'read aloud the slider is a bare number with no unit')
+    assert.match(vol, /if \(stop \|\| dragging\.current\) return/, 'a read landing mid-drag yanks the thumb back')
+
+    // Every prop the call site passes is one the component declares.
+    const sig = vol.match(/export default function Volume\(\{([^}]*)\}/)?.[1] || ''
+    for (const prop of ['eid', 'preset', 'onError']) {
+      assert.ok(sig.includes(prop), `Volume does not declare ${prop}`)
+    }
+
+    // And the slider is a touch target, drawn from the app's own tokens.
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    const rule = css.match(/input\.gig-volume-slider \{([^}]*)\}/)?.[1] || ''
+    assert.match(rule, /min-height: 44px/, 'the slider is under the touch floor')
+    assert.match(rule, /touch-action: pan-y/, 'a finger on the slider cannot scroll the page, or scrolls it instead of sliding')
+    const screens = readFileSync(new URL('../src/components/Screens.jsx', import.meta.url), 'utf8')
+    const yields = screens.match(/YIELDS =\s*'([^']+)'/)?.[1] || ''
+    assert.ok(yields.split(',').map((s) => s.trim()).includes('input'), 'a drag along the slider turns the page')
+  })
 }
