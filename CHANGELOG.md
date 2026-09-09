@@ -3,6 +3,16 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.130.0
+
+**The scene plan names the amp on each channel.** "Does the AI check and
+replace different amps based on what it finds out about the artist, or is
+it just copying the amps and changing the settings?" It picks — each channel
+of the amp block carries its own model — but the plan only said "Amp 1 on
+channel C", so three channels looked like one amp three times. Each channel
+line now names the model the plan puts there and the real amp it was
+modelled on: "Amp 1 on channel C · USA Lead+ (Mesa Mark IIC+)".
+
 ## 7.129.0
 
 **Volume first.** "Move the volume slider above the preset button." The
