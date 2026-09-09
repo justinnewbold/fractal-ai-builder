@@ -5507,6 +5507,29 @@ test('every request the app makes passes through the retry, at the Mac and over 
   assert.match(vol, /\}, \[eid, slot\]\)/, 'the slider re-reads the output block on every preset re-read again')
 })
 
+console.log('\nthe scene plan names the amp on each channel')
+const scenePlan = await import('../src/lib/scenePlan.js')
+
+test('a channel the plan puts a model on says which, with the real amp behind it', () => {
+  const changes = [
+    { eid: 4, name: 'Amp 1', channel: 'A', typeName: 'USA Clean', typeBasedOn: 'Mesa Mark IV' },
+    { eid: 4, name: 'Amp 1', channel: 'C', typeName: 'USA Lead+', typeBasedOn: 'Mesa Mark IIC+' },
+    { eid: 9, name: 'Drive 1', channel: 'B', typeName: 'TS808 Mod' }
+  ]
+  assert.deepEqual(scenePlan.modelOnChannel(changes, 4, 'C'), { name: 'USA Lead+', basedOn: 'Mesa Mark IIC+' })
+  assert.equal(scenePlan.channelLine({ eid: 4, name: 'Amp 1', channel: 'C' }, changes), 'Amp 1 on channel C · USA Lead+ (Mesa Mark IIC+)')
+  assert.equal(scenePlan.channelLine({ eid: 4, name: 'Amp 1', channel: 'a' }, changes), 'Amp 1 on channel a · USA Clean (Mesa Mark IV)', 'a lower-case letter does not match')
+  // No lineage on the model: the name alone, no empty brackets.
+  assert.equal(scenePlan.channelLine({ eid: 9, name: 'Drive 1', channel: 'B' }, changes), 'Drive 1 on channel B · TS808 Mod')
+  // The plan writes nothing on that channel: the row keeps its old shape, and says nothing it does not know.
+  assert.equal(scenePlan.channelLine({ eid: 4, name: 'Amp 1', channel: 'B' }, changes), 'Amp 1 on channel B')
+  assert.equal(scenePlan.modelOnChannel(changes, 4, 'B'), null)
+  assert.equal(scenePlan.modelOnChannel(undefined, 4, 'A'), null)
+  // The plan is what feeds the row.
+  const gen = readSrc(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
+  assert.match(gen, /moved\.map\(\(b\) => channelLine\(b, changes\)\)/, 'the scene row no longer names the model on the channel')
+})
+
 console.log('\nstructure')
 const { run: structure } = await import('./structure.mjs')
 structure(test)

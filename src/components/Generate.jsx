@@ -1,3 +1,4 @@
+import { channelLine } from '../lib/scenePlan'
 export function Preview({
   result,
   onApply,
@@ -351,9 +352,12 @@ export function Preview({
                   </span>
                   <span className="scene-plan-blocks">
                     {on.map((b) => b.name).join(' · ')}
+                    {/* With the model the plan puts on that channel, so three
+                        scenes on A, B and C read as three amps when they are
+                        three amps — and as one when they are one. */}
                     {moved.length ? (
                       <span className="scene-plan-channels">
-                        {moved.map((b) => `${b.name} on channel ${b.channel}`).join(', ')}
+                        {moved.map((b) => channelLine(b, changes)).join(', ')}
                       </span>
                     ) : null}
                   </span>
