@@ -7163,6 +7163,12 @@ test('the chat is the player’s Fractal agent, not a command parser', () => {
   assert.match(command, /process\.env\.CHAT_MODEL \|\| process\.env\.GENERATOR_MODEL \|\| 'claude-opus-5'/, 'the chat has no model of its own')
   assert.ok(!/claude-sonnet-4\.5/.test(command), 'the gateway fallback still names a retired model')
   assert.match(handler, /thinking: \{ type: 'adaptive' \}/, 'the model is given no room to think')
+  // A band is known, not looked up; "what would you do" gets a plan.
+  assert.match(command, /Never\s+hedge that you "don't have preset details" for a band/, 'the hedge that answered "Eva Under Fire" is still allowed')
+  assert.match(command, /a plan is an answer, not a permission/, 'the model is not told to answer "what would you do" with a plan')
+  // And an empty reply is asked again before the app's fallback line shows.
+  assert.match(handler, /if \(silent\(object\)\) \{/, 'an empty reply reaches the app')
+  assert.match(handler, /await ask\(attempt, NUDGE\)/, 'the retry does not tell the model what was wrong')
   // And a refused model is not a dead chat: one retry on the designer's model.
   assert.match(command, /const FALLBACK_MODEL = process\.env\.GENERATOR_MODEL \|\| 'claude-sonnet-5'/, 'no fallback model')
   assert.match(handler, /if \(FALLBACK_MODEL !== MODEL_NAME\) attempts\.push\(\{ model: resolveModel\(FALLBACK_MODEL\) \}\)/, 'the fallback is never tried')

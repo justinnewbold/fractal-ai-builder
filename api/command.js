@@ -152,6 +152,19 @@ lecture. Match the size of the question: a nudge gets a line, a real question
 gets a real answer, in short paragraphs. Never send them to a manual, a forum
 or another app for something you can answer or do yourself.
 
+A band or a player is something you know, not something you look up in the
+preset. "Eva Under Fire" gets what they sound like — the genre, the guitars,
+the gain, the tunings, the records — and what that takes on this unit. Never
+hedge that you "don't have preset details" for a band or that your knowledge
+is "just general context": say what you know, and where you are unsure of a
+detail, say that detail is a guess and carry on.
+
+When asked what you would do — "if I ask for that, what are you going to do?"
+— lay out the plan in their terms: which amp and cab you would move to, what
+goes in front, how the scenes would fall, what it would overwrite, and what
+you would need to know from them. Then offer to go ahead. Do not design it
+until they say so; a plan is an answer, not a permission.
+
 Messages are often dictated on a phone and arrive with wrong words in them —
 "towns" for tones, "seen" for scene, "pre-set", missing punctuation. Read for
 what they meant, and only ask when it genuinely cannot be told.
@@ -488,7 +501,7 @@ export default async function handler(req, res) {
   ]
   if (FALLBACK_MODEL !== MODEL_NAME) attempts.push({ model: resolveModel(FALLBACK_MODEL) })
 
-  const ask = (attempt) =>
+  const ask = (attempt, nudge = null) =>
     generateObject({
       ...attempt,
       schema: Plan,
@@ -515,9 +528,23 @@ export default async function handler(req, res) {
         {
           role: 'user',
           content: `Preset right now:\n${JSON.stringify(state)}\n\nInstruction: ${instruction}`
-        }
+        },
+        ...(nudge ? [{ role: 'user', content: nudge }] : [])
       ]
     })
+
+  /*
+   * Nothing back is not an answer, and the app has a line for it — "I couldn't
+   * work out what to change for that. Name the control…" — which is the line
+   * a player saw after asking what the agent would do for a band. The
+   * instructions say never to answer with silence; this is the route holding
+   * the model to it, once, before the app's fallback shows.
+   */
+  const silent = (o) =>
+    !(o?.understood || '').trim() && !(o?.refused || '').trim() && !(o?.actions || []).length
+  const NUDGE =
+    '(Your reply had no words in it. Answer the player in "understood" — the question above ' +
+    'deserves a real answer in plain language, even if there is nothing to change.)'
 
   /*
    * A fallback that ran is said, not hidden. The reply carries which model
@@ -529,7 +556,11 @@ export default async function handler(req, res) {
   let fellBackFrom = null
   for (const attempt of attempts) {
     try {
-      const { object, usage } = await ask(attempt)
+      let { object, usage } = await ask(attempt)
+      if (silent(object)) {
+        console.warn('command: empty reply, asking once more')
+        ;({ object, usage } = await ask(attempt, NUDGE))
+      }
       const used = attempt.model
       res.status(200).json({
         ...object,

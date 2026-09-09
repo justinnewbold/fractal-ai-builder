@@ -3,6 +3,18 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.132.2
+
+**No more "I couldn't work out what to change" for a question.** "If I
+want you to make a tone based on Eva Under Fire, what are you going to
+do?" got the app's fallback line, which shows when the model sends back
+nothing at all. The route now asks the model once more, telling it the
+reply was empty, before that line can show. And a band is something the
+agent knows, not something it looks up in the preset: it no longer hedges
+that it "doesn't have preset details" for a band, and "what would you do"
+gets the plan — amp, cab, what goes in front, scenes, what it would
+overwrite — and an offer to go ahead.
+
 ## 7.132.1
 
 **The chat says which model answered.** When the chat's model is refused
