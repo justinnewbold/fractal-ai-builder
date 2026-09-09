@@ -5212,31 +5212,28 @@ button.gig-block {
  * is worse than one that covers the thing it belongs to — which is anchored,
  * obvious, and exactly where the finger already is.
  */
+/*
+ * The channel sheet: four big buttons under the block's name.
+ *
+ * "It's tiny right now." It was four thin pills inside the held tile —
+ * thirty pixels each across a phone-width tile. In a sheet the four get the
+ * full width of the screen between them and the height of a scene tile, so
+ * a channel is a thing you press mid-song rather than aim at.
+ */
 .gig-chan {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
   display: grid;
-  grid-auto-flow: column;
-  gap: var(--s-1);
-  padding: var(--s-1);
-  background: var(--panel);
-  border: 1px solid var(--live);
-  border-radius: var(--r-1);
-  box-shadow: var(--e-2);
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: var(--s-2);
+  margin-top: var(--s-2);
 }
 
 button.gig-chan-btn {
-  /* Four of these across a 130px tile is 30px each, and this is the screen
-     whose whole premise is a target you can hit in the dark. So they take the
-     tile's full height instead — a tall, thin target is still a target, and
-     the height is the dimension going spare. */
-  min-height: 100%;
+  min-height: 88px;
   padding: 0;
   font-family: var(--display);
-  font-size: var(--f-4);
+  font-size: var(--f-6);
   font-weight: 700;
-  background: var(--chassis);
+  background: var(--panel);
   border: 1px solid var(--rule);
   border-radius: var(--r-2);
   color: var(--silk-dim);
@@ -5246,6 +5243,11 @@ button.gig-chan-btn.current {
   background: var(--live-halo);
   border-color: var(--live);
   color: var(--live);
+  box-shadow: inset 0 0 0 2px var(--live);
+}
+
+.gig-chan + .hint {
+  margin-top: var(--s-3);
 }
 
 /* On carries the signal colour and a lit edge, so which blocks are live reads
@@ -7943,8 +7945,6 @@ input.gig-volume-slider::-moz-range-thumb {
 .gig button.gig-scene,
 .gig button.gig-block,
 .gig button.gig-bar-btn,
-.gig button.gig-chan-btn,
-.gig .gig-chan,
 .gig .gig-tempo,
 .gig .gig-note-action button,
 .gig input.gig-volume-slider:focus-visible {
