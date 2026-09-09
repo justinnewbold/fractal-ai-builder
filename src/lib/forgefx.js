@@ -10,6 +10,7 @@
 //   - /preset/store commits to a slot even when capabilities report supportsSave:false
 
 import { EXCLUDED_BLOCKS, safeParams } from './guardrails.js'
+import { withRetry } from './retry.js'
 import { cleanPresetName, isEmptySlotName } from './presetName.js'
 import { zeroBasedChain, wrongSlot } from './slots.js'
 import { toNormalized } from './scale.js'
@@ -136,6 +137,16 @@ class ForgeError extends Error {
 }
 
 async function request(path, options = {}) {
+  /*
+   * A dump that arrived garbled is asked for again before anyone sees it.
+   * lib/retry.js says why, and which requests may be asked twice. Here
+   * because this is the one place every read passes through, at the Mac or
+   * over the relay alike.
+   */
+  return withRetry(() => requestOnce(path, options), { method: options.method || 'GET', path })
+}
+
+async function requestOnce(path, options = {}) {
   // With a remote session up, everything travels the relay instead. This is the
   // one place that has to know, which is why it was worth keeping a single
   // chokepoint for every call the app makes.
