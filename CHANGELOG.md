@@ -3,6 +3,13 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.132.1
+
+**The chat says which model answered.** When the chat's model is refused
+and the designer's model answers instead, the reply now carries both
+names and the reason, so the cost panel and the logs can tell "the
+account has no Opus" from "the chat is set to Sonnet".
+
 ## 7.132.0
 
 **Ask is your Fractal agent now.** "Why did you choose the tones that you

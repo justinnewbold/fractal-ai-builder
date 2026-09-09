@@ -519,7 +519,14 @@ export default async function handler(req, res) {
       ]
     })
 
+  /*
+   * A fallback that ran is said, not hidden. The reply carries which model
+   * was tried first and why it was refused, so the cost panel can show it
+   * and a person reading the logs can tell "the account has no Opus" from
+   * "the chat is set to Sonnet".
+   */
   let last = null
+  let fellBackFrom = null
   for (const attempt of attempts) {
     try {
       const { object, usage } = await ask(attempt)
@@ -531,12 +538,19 @@ export default async function handler(req, res) {
           outputTokens: usage?.outputTokens ?? null,
           cachedInputTokens:
             usage?.cachedInputTokens ?? usage?.inputTokenDetails?.cacheReadTokens ?? null,
-          model: typeof used === 'string' ? used : used?.modelId || MODEL_NAME
+          model: typeof used === 'string' ? used : used?.modelId || MODEL_NAME,
+          configured: MODEL_NAME,
+          ...(fellBackFrom
+            ? { fellBackFrom, fallbackReason: String(last?.message || '').slice(0, 300) }
+            : {})
         }
       })
       return
     } catch (err) {
       last = err
+      const tried = attempt.model
+      fellBackFrom = typeof tried === 'string' ? tried : tried?.modelId || MODEL_NAME
+      console.warn(`command: ${fellBackFrom} refused — ${String(err?.message || err).slice(0, 300)}`)
     }
   }
   res.status(502).json({ error: `Could not work that out: ${last?.message || 'no answer'}` })
