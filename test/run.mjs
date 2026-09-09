@@ -6780,6 +6780,40 @@ test('an app run from Downloads is offered a home in Applications first', () => 
   assert.match(ui, /state\?\.detail[\s\S]*?Technical details/, 'what macOS wrote about the failed install is not shown anywhere')
 })
 
+
+console.log('\nasking for less volume')
+/*
+ * "I asked to turn the volume down a little and it said nothing to change."
+ * The model returned no actions and no words; the app's default for a silence
+ * was a verdict on the request. Two halves: the model is told what volume
+ * means here and never to answer with silence, and the app never says
+ * "nothing to change" on its own.
+ */
+import { replyFor } from '../src/lib/actions.js'
+
+test('a reply with nothing in it says so, and says what would work', () => {
+  assert.equal(replyFor({ understood: 'Amp level down a touch.', actions: [] }), 'Amp level down a touch.')
+  assert.equal(replyFor({ understood: '', refused: 'No amp on the grid.', actions: [] }), 'No amp on the grid.')
+  assert.match(replyFor({ understood: '', refused: '', actions: [{}, {}] }), /2 changes ready/)
+  assert.match(replyFor({ understood: '', refused: '', actions: [], problems: ['Amp / Level: levels can be nudged, not reset'] }), /couldn’t make that change/)
+  const empty = replyFor({ understood: '', refused: '', actions: [], problems: [] })
+  assert.ok(!/nothing to change/i.test(empty), 'a silent plan is still read back as "nothing to change"')
+  assert.match(empty, /amp level down a little/i, 'the fallback does not show what to say instead')
+  assert.equal(replyFor(), replyFor({}), 'a missing plan is not the same reply as an empty one')
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  assert.ok(!/'Nothing to change\.'/.test(app), 'the app still says "Nothing to change." on its own')
+  assert.match(app, /text: replyFor\(checked\)/, 'the reply is not built by the one tested place')
+})
+
+test('the model is told what volume means, and never to answer with silence', () => {
+  const command = readSrc(new URL('../api/command.js', import.meta.url), 'utf8')
+  assert.match(command, /\nVOLUME\n/, 'the prompt says nothing about volume')
+  assert.match(command, /amp\s+block's Level/, 'volume is not tied to the amp’s Level')
+  assert.match(command, /never answer a volume request by touching them, and never\s+refuse one because of them/, 'the model may still refuse "volume" because Output is off limits')
+  assert.match(command, /\nNEVER ANSWER WITH SILENCE\n/, 'nothing tells the model an empty reply is wrong')
+  assert.match(command, /"refused" says\s+why not and what would work instead/)
+})
+
 await settle()
 /*
  * The tally has to say when it is red.

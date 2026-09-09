@@ -47,7 +47,7 @@ import ParamSearch from './components/ParamSearch'
 import Assistant from './components/Assistant'
 import UpdateNotice from './components/UpdateNotice'
 import Updates, { UpdateReadyNotice } from './components/Updates'
-import { validatePlan, runPlan } from './lib/actions'
+import { validatePlan, replyFor, runPlan } from './lib/actions'
 import { listPresets, newestFirst } from './lib/history'
 import {
   profileFrom,
@@ -2757,7 +2757,7 @@ export default function App() {
 
       const reply = {
         role: 'assistant',
-        text: checked.understood || checked.refused || 'Nothing to change.',
+        text: replyFor(checked),
         actions: checked.actions,
         problems: checked.problems
       }

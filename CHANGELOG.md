@@ -3,6 +3,23 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.117.0
+
+**"Turn the volume down a little" does something.** It answered "Nothing to
+change." — the model had returned no actions and no words, because the whole
+preset's Output is the player's and it had nowhere else to go, and "nothing to
+change" was the app's default for a silence.
+
+- The model is told what volume means here: the amp block's Level, nudged
+  within the window it is already allowed, or the last block with a Level when
+  there is no amp. Output stays the player's, and is never a reason to refuse.
+- The model is told never to answer with silence: say what changed, or say why
+  not and what would work.
+- And the app keeps the same promise on its side. A reply with nothing in it
+  now reads "I couldn't work out what to change for that" and shows what to
+  say instead, and a plan whose every change was refused says so with the
+  reasons beneath it.
+
 ## 7.116.0
 
 **One clock while the model thinks.** The line read "Thinking… 30s · 37s":
