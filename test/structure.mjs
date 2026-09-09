@@ -3645,8 +3645,11 @@ export function run(test) {
     )
     const meter = gig.indexOf('className="gig-signal"')
     const slider = gig.indexOf('<Volume ')
+    const tile = gig.indexOf('className="gig-preset"')
     const nav = gig.indexOf('className="gig-nav"')
-    assert.ok(meter !== -1 && slider > meter && nav > slider, 'the slider is not under the meter and above Previous/Next')
+    /* "Move the volume slider above the preset button." First on the
+       screen: before the preset tile, which is before the meter. */
+    assert.ok(slider !== -1 && slider < tile && tile < meter && meter < nav, 'the slider is not first, above the preset tile')
     /* "Move Previous / Next directly above the bottom tap bar." The nav sits
        in the sticky foot with the bar, after the block grid — never back
        between the volume and the scenes. */

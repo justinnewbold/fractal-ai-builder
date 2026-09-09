@@ -7810,7 +7810,7 @@ button.view-tab {
   grid-template-columns: auto 1fr auto auto;
   align-items: center;
   gap: var(--s-2);
-  margin-top: var(--s-1);
+  margin-bottom: var(--s-2);
   padding: 0 var(--s-1);
 }
 
@@ -7926,7 +7926,7 @@ input.gig-volume-slider::-moz-range-thumb {
 /* At Smallest the meter above it goes; the slider stays, because it is a
    control and the meter was a readout, but it gives up its margin. */
 .gig[data-compact] .gig-volume {
-  margin-top: 0;
+  margin-bottom: var(--s-1);
 }
 
 /*
