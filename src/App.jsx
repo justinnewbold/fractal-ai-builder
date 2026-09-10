@@ -3838,16 +3838,21 @@ export default function App() {
 
   return (
     <div className={`shell ${status === 'live' && view === 'ask' ? 'shell-chat' : ''}`}>
-      {/* Above everything, because a stale tab makes every other thing on this
-          screen a possible lie about what the code does. */}
-      <UpdateNotice />
-
       {/*
-        The Mac app's update, when one is downloaded and waiting. Renders
-        nothing anywhere else — a phone has no updater to talk to.
-      */}
-      <UpdateReadyNotice />
+        NOTHING RENDERS ABOVE THE BAR, which is what lets the bar be pinned.
 
+        "Can you pin the header to the top of the screen — right now when you
+        scroll a little bit it comes down slightly and moves with the scroll."
+        It was sticky already; what moved it was the page reserving a strip
+        above it for whatever might be up there. The update notices were up
+        there, and on a notched phone that strip also had to clear the clock —
+        so the bar sat some seventy pixels down at rest and travelled up to
+        nothing every time the screen was touched.
+
+        The notices are below it now. They are still the first thing on the
+        page and still say that a stale tab is lying to you; they say it under
+        a bar that does not move, and the bar's own inset covers the notch.
+      */}
       {/*
         Saving rides in the bar, and stays off the gig screen: that screen
         exists to switch sounds with a thumb in the dark, and a slot overwrite
@@ -3889,6 +3894,16 @@ export default function App() {
           />
         ) : null}
       </TopBar>
+
+      {/* First on the page, under the bar: a stale tab makes every other thing
+          on this screen a possible lie about what the code does. */}
+      <UpdateNotice />
+
+      {/*
+        The Mac app's update, when one is downloaded and waiting. Renders
+        nothing anywhere else — a phone has no updater to talk to.
+      */}
+      <UpdateReadyNotice />
 
       {isDemo() && status === 'live' ? (
         <p className="demo-banner">

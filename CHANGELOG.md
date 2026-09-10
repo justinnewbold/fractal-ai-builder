@@ -3,6 +3,16 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.147.0
+
+**The header stays put.** It was pinned already — sticky at the top — but the
+page reserved a strip above it for the update notices, and on a notched phone
+that strip also had to clear the clock. So the bar started some seventy pixels
+down and rose to the top the moment anything scrolled. Nothing renders above it
+now: the notices sit under it, still the first thing on the page, and the bar
+covers the notch with the inset it has always carried. It is at the top from
+the first frame and does not move — and the seventy pixels go to the screen.
+
 ## 7.146.0
 
 **The last row of effects fits on the screen.** The preset tile was sized to a

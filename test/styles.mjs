@@ -298,30 +298,35 @@ export function run(test) {
         `(${scale[inset]}px inset + ${height}px tall) — the last row of controls cannot be scrolled clear of it`
     )
   })
-  test('what sits above the bar clears the status bar too', () => {
+  test('nothing sits above the bar, so the bar can be pinned', () => {
     /*
-     * The bar carries safe-area-inset-top of its own, which is why it has
-     * always looked right on a notched phone. Nothing else did — and the
-     * update notice is above it deliberately, since a stale tab makes
-     * everything else on screen a possible lie about what the code does.
+     * "Can you pin the header to the top of the screen — right now when you
+     * scroll a little bit it comes down slightly and moves with the scroll."
      *
-     * Added to a home screen there is no browser chrome over the page, so that
-     * notice came up underneath the clock and the signal bars. Reported as a
-     * screenshot with "A newer version of this app is out" struck through by
-     * 7:10 and a battery icon.
+     * The bar has always been sticky at 0. What moved it was the page
+     * reserving a strip ABOVE it: the update notice rendered up there, and on
+     * a notched phone that strip also had to clear the clock — the fix for a
+     * screenshot of "A newer version of this app is out" struck through by
+     * 7:10 and a battery icon. So the bar sat some seventy pixels down at rest
+     * and rose to the top the moment anything scrolled.
      *
-     * On the shell rather than on the notice, so the next thing put above the
-     * bar cannot inherit the bug. And it must come after the @supports block,
-     * which is the rule that actually applies — same specificity, later in the
-     * source; setting it earlier changes nothing on any real browser, the
-     * mistake the padding test above exists to catch.
+     * Both halves are held here, because dropping either brings a bug back:
+     * the notices render UNDER the bar now, and the page reserves nothing
+     * above it. The notch is covered by the bar's own inset, which it has
+     * always carried and which is why the bar itself never had that bug.
      */
-    /*
-     * Every rule that sets it, not the last one written. The phone-width block
-     * tightens this padding — that is the rule that applies on the device the
-     * notice was hiding on — so a guard reading one rule passes while the fix
-     * is undone in the only place it was ever needed.
-     */
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    const shell = app.indexOf('className={`shell ')
+    const bar = app.indexOf('<TopBar', shell)
+    assert.ok(shell !== -1 && bar > shell, 'the bar is not in the shell any more')
+    for (const above of ['<UpdateNotice', '<UpdateReadyNotice']) {
+      const at = app.indexOf(above, shell)
+      assert.ok(at > bar, `${above} renders above the bar again, which is what made the bar travel`)
+    }
+
+    /* Every rule that sets it, not the last one written: the phone-width block
+       sets this too, and a guard reading one rule passes while the other puts
+       the strip back on the device it was felt on. */
     const tops = []
     for (const m of code.matchAll(/\.shell \{([^}]*)\}/g)) {
       const top = m[1].match(/padding-top:[^;]*/)
@@ -329,17 +334,20 @@ export function run(test) {
     }
     assert.ok(tops.length, 'nothing sets the top of the page at all')
     for (const top of tops) {
-      assert.match(
-        top,
-        /env\(safe-area-inset-top, 0px\)/,
-        `"${top}" leaves the top of the page under the status bar, so anything above the bar hides behind the clock`
-      )
+      assert.match(top, /padding-top: 0/, `"${top}" reserves a strip above the bar, so the bar travels as you scroll`)
     }
-    // The shorthand would reset it, so it must not carry one after these.
+    // A shorthand after them would put it back.
     assert.ok(
       !/\.shell \{[^}]*padding: /.test(code.slice(code.indexOf('@supports (padding: max(0px))'))),
       'a padding shorthand after the inset rules puts the top back where it was'
     )
+
+    // And the bar still covers the notch itself, which is what makes all of
+    // the above safe on a phone added to a home screen.
+    const barRule = code.slice(code.indexOf('.topbar {'), code.indexOf('}', code.indexOf('.topbar {')))
+    assert.match(barRule, /position: sticky/, 'the bar is not pinned at all')
+    assert.match(barRule, /top: 0/, 'the bar pins somewhere other than the top')
+    assert.match(barRule, /padding-top: env\(safe-area-inset-top, 0px\)/, 'the bar no longer covers the notch')
   })
 
   test('the conversation never scrolls sideways', () => {
