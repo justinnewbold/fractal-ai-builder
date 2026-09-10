@@ -42,7 +42,8 @@ export default function Setlists({
   addressing,
   favourites,
   lists,
-  source
+  source,
+  synced = false
 }) {
   const current = preset?.number
   const chosen = lists.find((l) => l.id === source) || null
@@ -314,8 +315,19 @@ export default function Setlists({
         </div>
       ) : null}
 
+      {/*
+        Where they live, which is now a question with two answers.
+
+        "This says that setlists stay in this browser. Can we set that up to
+        save to the database across the cloud if user is signed in?" It does —
+        so signed in, this says so, and signed out it still says the truth
+        rather than an aspiration, because a setlist built on a phone that is
+        not signed in really does stay on that phone.
+      */}
       <p className="hint setlist-note">
-        Setlists live in this browser. Build one here on the phone and it stays on the phone.
+        {synced
+          ? 'Setlists and stars are kept with your account. Build one here and it is on every machine you sign in from.'
+          : 'Setlists live in this browser. Sign in and they follow your account onto every machine instead.'}
       </p>
     </Sheet>
   )

@@ -76,7 +76,9 @@ import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
 import Screens, { viewsFor } from './components/Screens'
 import { SIZES, loadSize, saveSize, clampSize } from './lib/gigSize'
 import { loadPlayMode, savePlayMode, askButtonShows } from './lib/playMode'
-import { remember as rememberPreset } from './lib/presetMarks'
+import { remember as rememberPreset, CHANGED as MARKS_CHANGED } from './lib/presetMarks'
+import { CHANGED as SETLISTS_CHANGED } from './lib/setlists'
+import { syncSetlists, setlistCloudReady } from './lib/cloudSetlists'
 import {
   getTempo,
   setTempo,
@@ -1184,6 +1186,62 @@ export default function App() {
       live = false
     }
   }, [link.account, turns, restored, record])
+
+  /*
+   * The setlists and the stars, with the account.
+   *
+   * "This says that setlists stay in this browser. Can we set that up to save
+   * to the database across the cloud if user is signed in?" They were browser
+   * storage because they started as a convenience; a night's running order
+   * built at the bench and then absent from the phone on the stand is not one.
+   *
+   * One round on sign-in — read the account, merge it with what is here, write
+   * both back — and another two seconds after any change made here, which is
+   * long enough for a drag through a running order to settle into one write.
+   *
+   * lib/cloudSetlists does the merging, per setlist and per star rather than
+   * per device, so a list built on the Mac and one built on the phone both
+   * survive meeting each other.
+   */
+  const syncedLists = useRef(false)
+  useEffect(() => {
+    if (!link.account || !setlistCloudReady()) return undefined
+    let live = true
+
+    const pull = async () => {
+      const res = await syncSetlists().catch(() => null)
+      if (!live || !res?.changedHere) return
+      const { lists, stars } = res.gained || {}
+      const parts = [
+        lists ? `${lists} setlist${lists === 1 ? '' : 's'}` : null,
+        stars ? `${stars} star${stars === 1 ? '' : 's'}` : null
+      ].filter(Boolean)
+      if (parts.length) {
+        record('setlists', `Picked up ${parts.join(' and ')} from ${res.from || 'your other device'}`)
+      }
+    }
+
+    if (!syncedLists.current) {
+      syncedLists.current = true
+      pull()
+    }
+
+    /* And after anything changes here. Both stores announce their own writes,
+       which is what the stage screen and the picker already listen to. */
+    let timer = null
+    const later = () => {
+      clearTimeout(timer)
+      timer = setTimeout(pull, 2000)
+    }
+    window.addEventListener(SETLISTS_CHANGED, later)
+    window.addEventListener(MARKS_CHANGED, later)
+    return () => {
+      live = false
+      clearTimeout(timer)
+      window.removeEventListener(SETLISTS_CHANGED, later)
+      window.removeEventListener(MARKS_CHANGED, later)
+    }
+  }, [link.account, record])
 
   const linkAction = useCallback(
     async (kind) => {

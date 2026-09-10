@@ -10,8 +10,10 @@
  * other. The key is whatever the caller calls the unit; an unknown device gets
  * its own bucket rather than borrowing somebody else's.
  *
- * This browser only. It is a convenience, not a record: nothing here is worth
- * a round trip to the Mac, and losing it costs somebody eight taps once.
+ * Recent is this browser's alone — which presets this phone played tonight is
+ * about the phone. The STARS are not: they are what Previous and Next step
+ * through when the source is Starred, they are built deliberately, and they
+ * follow the account when there is one. lib/cloudSetlists does that half.
  */
 
 const KEY = 'fractal.presetMarks'
@@ -114,13 +116,50 @@ export function remember(device, n, storage) {
   return recent
 }
 
-/** Star or unstar. Returns the new favourites list. */
+/**
+ * Star or unstar. Returns the new favourites list.
+ *
+ * `starredAt` is when this unit's stars last changed here. The stars follow
+ * the account now — see lib/cloudSetlists — and a set of stars is a toggle
+ * rather than a document: the later tap is simply the answer, and without a
+ * time on it an unstar on the phone would be undone by the Mac still holding
+ * the star.
+ */
 export function toggleFavourite(device, n, storage) {
   const all = readAll(storage)
   const key = device || 'unknown'
   const bucket = all[key] || {}
   const favourites = toggleIn(bucket.favourites, n)
-  all[key] = { ...bucket, favourites }
+  all[key] = { ...bucket, favourites, starredAt: Date.now() }
   writeAll(all, storage)
   return favourites
+}
+
+/** When this unit's stars last changed here, or 0. */
+export function starredAtFor(device, storage) {
+  const bucket = readAll(storage)[device || 'unknown'] || {}
+  return Number.isFinite(bucket.starredAt) ? bucket.starredAt : 0
+}
+
+/** Every unit this browser holds marks for. */
+export const devicesWithMarks = (storage) => Object.keys(readAll(storage))
+
+/**
+ * Put a merged set of stars back, with the time the merge settled on.
+ *
+ * Recent stays where it is: which presets this phone played tonight is about
+ * the phone, not the account, and syncing it would have two devices
+ * overwriting each other's history all evening for no gain.
+ */
+export function putFavourites(device, favourites, at, storage) {
+  const all = readAll(storage)
+  const key = device || 'unknown'
+  const bucket = all[key] || {}
+  all[key] = {
+    ...bucket,
+    favourites: clean(favourites),
+    starredAt: Number.isFinite(at) ? at : Date.now()
+  }
+  writeAll(all, storage)
+  return marksFor(device, storage).favourites
 }
