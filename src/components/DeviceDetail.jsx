@@ -78,9 +78,19 @@ export default function DeviceDetail({ status, device, onRetry, busy }) {
           </>
         ) : (
           <>
-            <span className="device-meta mono">
-              {demo ? 'simulated' : remote ? 'through your Mac' : getHost()}
-            </span>
+            {/*
+              What the app is talking to, when that is worth a word.
+
+              "Remove where it says 'through your Mac'." On a phone it was the
+              third thing in this sheet saying the same fact: the header says
+              CONNECTED, and Phone remote below it names the Mac it is
+              connected to. The address is still here on the machine with the
+              cable, where it is the thing you change, and the demo still says
+              it is a simulation, where nothing else does.
+            */}
+            {demo || !remote ? (
+              <span className="device-meta mono">{demo ? 'simulated' : getHost()}</span>
+            ) : null}
             <button onClick={toggleDemo}>{demo ? 'Use real device' : 'Demo mode'}</button>
             {!demo && !remote ? (
               <button onClick={() => setEditing(true)}>Change address</button>
