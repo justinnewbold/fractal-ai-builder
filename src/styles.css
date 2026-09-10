@@ -5837,6 +5837,37 @@ button.gig-block:disabled {
   color: var(--silk-dim);
 }
 
+/*
+ * The working dot on the Save button.
+ *
+ * A save from a phone is carried out at the Mac and answered on a poll, so
+ * the button can sit on one word for several seconds with nothing to say it
+ * is alive. This is that: the same pulse the chain's own busy dot uses, in
+ * the button's ink so it reads as part of the word rather than as a warning.
+ */
+.save-spin {
+  width: 8px;
+  height: 8px;
+  margin-right: var(--s-2);
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 700ms ease-in-out infinite;
+  flex: 0 0 auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .save-spin {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+.save-cluster button.save-now {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .save-cluster button.save-now:disabled {
   background: var(--panel);
   border-color: var(--rule);

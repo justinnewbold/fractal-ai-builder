@@ -21,8 +21,16 @@ import { remoteActive } from '../lib/remote'
  * the write is still two taps from anywhere, but the second tap is on a button
  * that names the slot, next to the list of what is in it.
  */
-/** How long "Saved" stays up before the button gets out of the way. */
-const SAVED_FOR_MS = 4000
+/**
+ * How long "Saved" stays up before the button gets out of the way.
+ *
+ * Was four seconds. A save asked for from a phone is carried out by the page
+ * at the Mac and reported back on a poll, so the word can arrive several
+ * seconds after the press — and the press was very likely made from across a
+ * room. Long enough to still be there when you look back at the phone; short
+ * enough that walking away leaves a clean bar.
+ */
+const SAVED_FOR_MS = 10000
 
 export default function SaveBar({ preset, dirty, busy, saving, compact, onOpenSave, queued, savedAt }) {
   /*
@@ -85,6 +93,10 @@ export default function SaveBar({ preset, dirty, busy, saving, compact, onOpenSa
   // Nothing to save, nothing being saved, nothing just saved: no button.
   if (!queued && !saving && !dirty && !justSaved) return null
 
+  /* Queued at the Mac and writing here are one state to a player: the preset
+     is being saved and the answer has not come back yet. */
+  const working = !!queued || !!saving
+
   return (
     <div className="save-cluster" data-dirty={dirty ? 'yes' : 'no'}>
       <div className="save-cluster-row">
@@ -97,17 +109,32 @@ export default function SaveBar({ preset, dirty, busy, saving, compact, onOpenSa
           {/* `saving`, not `busy`: busy is true for every long operation in the
               app, so this button used to announce a slot write while a tone was
               merely being designed. */}
-          {queued
+          {/*
+            A save in flight SAYS SAVING, and shows that it is working.
+
+            "It goes back to the gig screen and says Waiting — change that to
+            say Saving with a visual indicator it's working, then have it say
+            saved after it's completed." Quite right: waiting is what the app
+            is doing, and saving is what is happening to the preset. The word
+            was also the only difference between a save the Mac had picked up
+            and one it had not, which is a distinction for this app to worry
+            about and not for the player standing on a stage.
+
+            The dot beside it is the working part — it pulses while the write
+            is out, and is gone the moment the answer lands.
+          */}
+          {working ? <span className="save-spin" aria-hidden="true" /> : null}
+          {working
             ? compact
-              ? 'Waiting…'
-              : 'Waiting for the Mac…'
-            : saving
               ? 'Saving…'
-              : !dirty && justSaved
-                ? 'Saved'
-                : remote && !compact
-                  ? 'Save at the Mac'
-                  : 'Save'}
+              : remote
+                ? 'Saving at the Mac…'
+                : 'Saving…'
+            : !dirty && justSaved
+              ? '✓ Saved'
+              : remote && !compact
+                ? 'Save at the Mac'
+                : 'Save'}
         </button>
       </div>
     </div>
