@@ -7335,13 +7335,41 @@ button.topbar-preset.open .topbar-caret {
   gap: var(--s-2);
 }
 
+/*
+ * A row that carries what the preset IS, not only what it is called.
+ *
+ * The description used to be a `title` attribute — a tooltip, which a phone
+ * cannot show — so on the screen this list is actually used from, every entry
+ * was a name and a date and a leap of faith. The name and the date keep their
+ * one line; the description gets two under them and stops.
+ */
 .cloud-list .preset-row {
   flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--s-1);
+  text-align: left;
+  min-width: 0;
+}
+
+.preset-row-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--s-3);
-  text-align: left;
+  min-width: 0;
+}
+
+.preset-row-desc {
+  font-size: var(--f-1);
+  line-height: 1.4;
+  color: var(--silk-faint);
+  /* Two lines, then an ellipsis — the same clamp the scene names use. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .preset-row-name {

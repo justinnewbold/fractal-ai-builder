@@ -57,19 +57,39 @@ export default function CloudPresets({ onLoad, onError, busy, local = [], missin
       ) : entries.length === 0 ? (
         <p className="hint">Nothing kept with your account yet.</p>
       ) : (
+        <>
+        {/* Because a row that loads a preset should say that it loads a
+            preset, and that loading one writes nothing on its own. */}
+        <p className="hint">
+          Tap one to load it. It is checked against the preset on your unit and shown with a Send
+          button — nothing is written until you press that.
+        </p>
         <ul className="cloud-list">
           {entries.map((entry) => (
             <li key={entry.id}>
+              {/*
+                What it was, on the row.
+
+                "Tapping on a preset saved to my account doesn't pull up and
+                show me what it was, nothing." The description was here all
+                along — as a `title`, which is a tooltip, which a phone has no
+                way to show. So it is text now, two lines of it, and the row
+                says what you are about to load before you load it.
+              */}
               <button
                 className="preset-row"
                 disabled={busy}
                 onClick={() => onLoad?.(entry)}
-                title={entry.summary || entry.description}
               >
-                <span className="preset-row-name">{entry.name}</span>
-                <span className="preset-row-when mono">
-                  {new Date(entry.at).toLocaleDateString()}
+                <span className="preset-row-head">
+                  <span className="preset-row-name">{entry.name}</span>
+                  <span className="preset-row-when mono">
+                    {new Date(entry.at).toLocaleDateString()}
+                  </span>
                 </span>
+                {entry.description || entry.summary ? (
+                  <span className="preset-row-desc">{entry.description || entry.summary}</span>
+                ) : null}
               </button>
               <button
                 className="chip"
@@ -91,6 +111,7 @@ export default function CloudPresets({ onLoad, onError, busy, local = [], missin
             </li>
           ))}
         </ul>
+        </>
       )}
 
       {/* Only offered when there is something to copy. An empty migration

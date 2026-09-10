@@ -4025,6 +4025,57 @@ export function run(test) {
     assert.match(markup, /demo \? 'simulated' : getHost\(\)/, 'the demo no longer says it is a simulation, or the Mac has lost its address')
   })
 
+  test('a saved preset that is reloaded lands somewhere you can see it', () => {
+    /*
+     * "Tapping a preset saved to my account doesn't do anything... the one
+     * saved in the browser, you click reload, it looks like it's gonna reload
+     * and then says nothing and does nothing."
+     *
+     * It was doing all of it. The tone card — the thing that shows what came
+     * back and carries the Send button — is rendered inside the Ask sheet, and
+     * the press happened in the Presets sheet, which stayed over the top of
+     * it. So the progress, the result, the button and even the error banner
+     * were all behind the sheet you were looking at.
+     *
+     * So the load moves you to the sheet it lands in, and says so on the way:
+     * one line when it starts, one naming what came back and what to press,
+     * one when it fails.
+     */
+    const reload = src.slice(src.indexOf('const reload = async (entry)'), src.indexOf('const refine = async'))
+    assert.ok(reload, 'the reload handler is gone')
+    assert.match(reload, /setSheet\('chat'\)/, 'a reloaded preset still lands behind whatever sheet asked for it')
+    assert.ok(
+      reload.indexOf("setSheet('chat')") < reload.indexOf('const schema'),
+      'the sheet changes only after the read, so the wait happens behind the old one'
+    )
+    assert.match(reload, /Loading "\$\{entry\.name\}"/, 'nothing says the load has started')
+    assert.match(reload, /is loaded — \$\{ready\}/, 'nothing confirms what came back')
+    assert.match(reload, /with the button under it/, 'the confirmation does not say how to send it')
+    assert.match(reload, /none of it fits the preset on the unit/, 'a load that survives nothing still promises a Send button')
+    assert.match(reload, /Couldn't load "\$\{entry\.name\}"/, 'a failed load is only in the banner behind the sheet')
+
+    /* And the row you tap says what it is, rather than hiding it in a tooltip
+       no phone can show. */
+    const cloud = readFileSync(new URL('../src/components/CloudPresets.jsx', import.meta.url), 'utf8')
+    assert.ok(!/title=\{entry\.summary/.test(cloud), 'the description is back in a tooltip')
+    assert.match(cloud, /preset-row-desc/, 'the account rows no longer say what the preset is')
+    assert.match(cloud, /Tap one to load it/, 'nothing says what tapping a row does')
+  })
+
+  test('the backup panel declares the prop it reads', () => {
+    /*
+     * `deviceSlots` was read in DeviceBackup's markup and never declared or
+     * passed, so the panel threw on render and the Backups section of the
+     * Presets sheet was an error boundary's apology. Found one panel below the
+     * reload button that started all this.
+     */
+    const versions = readFileSync(new URL('../src/components/Versions.jsx', import.meta.url), 'utf8')
+    const sig = versions.match(/export function DeviceBackup\(\{([^}]*)\}/)?.[1] || ''
+    assert.ok(sig.includes('deviceSlots'), 'DeviceBackup reads deviceSlots without declaring it')
+    const call = src.slice(src.indexOf('<DeviceBackup'), src.indexOf('/>', src.indexOf('<DeviceBackup')))
+    assert.match(call, /deviceSlots=\{/, 'DeviceBackup is rendered without the prop it reads')
+  })
+
   test('a missing output block is said out loud, not shown as a missing slider', () => {
     /*
      * "The volume slider disappeared and no presets have sound."
