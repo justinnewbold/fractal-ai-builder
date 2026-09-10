@@ -26,6 +26,14 @@ export function Preview({
    * buttons again on a tone two generations old would write the wrong thing.
    */
   outcome = null,
+  /*
+   * "Where it says changes sent, add a button that says Save to FM3." A tone
+   * that has been written is on the unit and in no slot; the next thing
+   * anyone wants is to keep it. So once it is sent, the button that sent it
+   * offers the save instead of sitting greyed out saying what it did.
+   */
+  onSave = null,
+  saveTo = 'unit',
   children
 }) {
   if (!result) return null
@@ -164,6 +172,18 @@ export function Preview({
               it is reachable: clear the scene box on a plan that only had
               scenes and the count falls to nothing. Say so rather than
               inviting the press. */}
+          {sent && onSave ? (
+            <button
+              className="primary"
+              onClick={(e) => {
+                e.currentTarget.blur()
+                onSave()
+              }}
+              disabled={busy}
+            >
+              Save to {saveTo}
+            </button>
+          ) : (
           <button
             className="primary"
             onClick={(e) => {
@@ -189,8 +209,14 @@ export function Preview({
                   ? 'Nothing to send'
                   : `Send ${total} change${total === 1 ? '' : 's'}`}
           </button>
+          )}
         </div>
         )}
+        {sent && onSave ? (
+          <p className="hint preview-sent">
+            Changes sent. They are on the {saveTo} now but not in a slot until you save.
+          </p>
+        ) : null}
       </div>
 
       {changes.length === 0 ? (

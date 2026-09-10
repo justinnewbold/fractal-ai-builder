@@ -9,6 +9,7 @@
 //   - parameter writes take real units ({"value": 9} for a 0-10 gain), not 0-1
 //   - /preset/store commits to a slot even when capabilities report supportsSave:false
 
+import { logDebug } from './debugLog.js'
 import { EXCLUDED_BLOCKS, safeParams } from './guardrails.js'
 import { paletteFor } from './palette.js'
 import { withRetry } from './retry.js'
@@ -144,7 +145,15 @@ async function request(path, options = {}) {
    * because this is the one place every read passes through, at the Mac or
    * over the relay alike.
    */
-  return withRetry(() => requestOnce(path, options), { method: options.method || 'GET', path })
+  return withRetry(() => requestOnce(path, options), { method: options.method || 'GET', path }).catch(
+    (err) => {
+      // Every request the app makes comes through here, so this is the one
+      // place a failed one is written to the debug log — after the retry has
+      // had its say, so a garbled read that was asked again is not a failure.
+      logDebug('unit', `${options.method || 'GET'} ${path} failed`, err?.message || String(err))
+      throw err
+    }
+  )
 }
 
 async function requestOnce(path, options = {}) {
@@ -665,6 +674,12 @@ const wireLog = []
 function recordWire(entry) {
   wireLog.unshift({ ...entry, at: new Date() })
   if (wireLog.length > 120) wireLog.length = 120
+  logDebug(
+    'wire',
+    `${entry.name || '#' + entry.paramId} wanted ${entry.wanted} sent ${
+      entry.sent === null ? 'refused' : entry.sent
+    }${entry.outOfRange ? ' OUTSIDE RANGE' : ''}`
+  )
 }
 
 const checkLog = []
@@ -680,6 +695,14 @@ const checkLog = []
 function recordCheck(entry) {
   checkLog.unshift({ ...entry, at: new Date() })
   if (checkLog.length > 120) checkLog.length = 120
+  logDebug(
+    'check',
+    `${entry.name || '#' + entry.paramId} wanted ${entry.wanted} read back ${
+      entry.readBack === null ? 'unreadable' : entry.readBack
+    } ${entry.landed ? 'landed' : 'DID NOT LAND'}${entry.attempt > 1 ? ' (retry)' : ''}${
+      entry.deviceOk === false ? ' · unit said ok:false' : ''
+    }`
+  )
 }
 
 /** Every verified write, newest first. */

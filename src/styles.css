@@ -1671,6 +1671,38 @@ button.chip.active {
   margin-top: 26px;
 }
 
+/* The debug log: a scroll box of lines, and a box the text can be picked
+   out of by hand when the clipboard says no. */
+.debug-log-body {
+  padding: var(--s-2);
+  max-height: 260px;
+}
+
+.debug-line {
+  margin: 0 0 2px;
+  font-size: var(--f-1);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.debug-line[data-source='error'],
+.debug-line[data-source='crash'] {
+  color: var(--fault);
+}
+
+.debug-line[data-source='ai'] {
+  color: var(--signal);
+}
+
+textarea.debug-log-text {
+  width: 100%;
+  margin-top: var(--s-2);
+}
+
+.preview-sent {
+  margin: var(--s-2) 0 0;
+}
+
 .diag-actions {
   display: flex;
   align-items: center;

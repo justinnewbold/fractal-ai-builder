@@ -39,6 +39,14 @@ export default function TopBar({
   onLinkAction,
   presetsOpen,
   menu,
+  /*
+   * Whether the bar carries the preset at all. On Play the preset is a tile
+   * the width of the screen, right under this bar — "remove the preset name
+   * from the header, it's already a button on the screen" — and the bar
+   * gains the room it has been short of since the version and the link word
+   * joined it. Edit and Create have no tile, so there it stays.
+   */
+  showPreset = true,
   children
 }) {
   const demo = isDemo()
@@ -93,7 +101,7 @@ export default function TopBar({
 
         {/* The preset is a button because it's the thing you change most, and
             because a slot number nobody can act on is trivia. */}
-        {status === 'live' ? (
+        {status === 'live' && showPreset ? (
           <button
             className={`topbar-preset ${presetsOpen ? 'open' : ''}`}
             onClick={onOpenPresets}
