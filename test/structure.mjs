@@ -3948,7 +3948,21 @@ export function run(test) {
       build.indexOf('placeBlock') < build.indexOf('wireRow'),
       'the row is wired before the blocks are in it'
     )
-    assert.match(build, /slotModel !== 'linear'/, 'a unit with no grid is sent cable writes it has no cells for')
+    assert.match(build, /const linear = capabilities\?\.slotModel === 'linear'/, 'the grid work no longer asks whether the unit has a grid')
+    assert.match(build, /if \(!linear\) \{\s*\n\s*wiring = await d\.wireRow/, 'a unit with no grid is sent cable writes it has no cells for')
+
+    /*
+     * And the chain is built into the free cells rather than from column 0.
+     *
+     * "The volume slider disappeared and no presets have sound." The slider
+     * moves the output block's level, and the output block had been built
+     * over: a slot this app calls empty is a slot with nothing EDITABLE in it,
+     * and the input and the output are filtered out of that count. A preset
+     * with no output block makes no sound and has no level to move.
+     */
+    assert.match(build, /columnOf\('input'\)/, 'the builder no longer looks for the input before writing over it')
+    assert.match(build, /columnOf\('output'\)/, 'the builder no longer looks for the output before writing over it')
+    assert.match(build, /list\.find\(\(b\) => b\.slug === 'output'\)/, 'a preset left with no output block is not given one')
 
     const grid = readFileSync(new URL('../src/components/GridEditor.jsx', import.meta.url), 'utf8')
     const starter = grid.slice(grid.indexOf('const buildStarter'))
@@ -3962,6 +3976,25 @@ export function run(test) {
        them, rather than reporting a finished preset that cannot make a sound. */
     assert.match(src, /b\.col > 0 && !b\.fromRows\.length/, 'nothing checks whether the built chain is connected')
     assert.match(src, /won't make a sound until the row is joined up/, 'a disconnected chain is reported in jargon, or not at all')
+  })
+
+  test('a missing output block is said out loud, not shown as a missing slider', () => {
+    /*
+     * "The volume slider disappeared and no presets have sound."
+     *
+     * One fact, not two: the slider moves the output block's level, and a
+     * preset built over its own output block has neither a level to move nor
+     * anything reaching the jack. The slider going quiet was the only symptom
+     * on screen, and a control that vanishes without a word reads as a bug in
+     * the app rather than as the preset being broken.
+     */
+    const gig = readFileSync(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8')
+    const at = gig.indexOf('<Volume eid={meterEid}')
+    assert.notEqual(at, -1, 'the volume slider is gone from Play')
+    const after = gig.slice(at, at + 1400)
+    assert.match(after, /meterEid === null && chain === 'ok'/, 'a preset with no output block says nothing about it')
+    assert.match(after, /no Output block/, 'the reason is missing or written in jargon')
+    assert.match(after, /slotModel !== 'linear'/, 'a unit whose outputs are not a grid block is accused of missing one')
   })
 
   test('a read that could not clear the cache is not called a failed write', () => {
