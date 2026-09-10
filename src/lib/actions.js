@@ -717,9 +717,32 @@ export function validatePlan(plan, blocks, capabilities) {
               const res = await d.placeBlock(1, i, block.page ?? block.effectId)
               if (res?.ok === false) throw new Error(`The unit refused ${block.name}.`)
             }
+            /*
+             * And WIRE it, which is the difference between a chain and five
+             * blocks that make no sound.
+             *
+             * An empty preset has no cabling, so blocks placed into one sit
+             * outside the signal path: every value lands, the unit reads them
+             * back, the preset saves, and the player hears nothing. That is
+             * exactly what happened to every tone built from an empty slot.
+             *
+             * A linear unit has no grid and nothing to wire — an AM4's four
+             * slots are in the path by being slots.
+             */
+            let wiring = null
+            if (capabilities?.slotModel !== 'linear') {
+              wiring = await d.wireRow(1, (cols || fits.length) - 1)
+            }
             // Which blocks exist is the thing that just changed.
             d.invalidateSchema()
-            return { ok: true, placed: fits.length }
+            /*
+             * A refused cable is reported, not thrown. The blocks are in and
+             * the tone that follows is still worth having; what the player
+             * needs is to be told that the row has a gap in it, which is the
+             * one thing that would make the finished preset silent. Throwing
+             * here would abandon the design over a wire he can join himself.
+             */
+            return { ok: true, placed: fits.length, wiring }
           }
         })
         break

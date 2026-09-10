@@ -3916,4 +3916,78 @@ export function run(test) {
     const yields = screens.match(/YIELDS =\s*'([^']+)'/)?.[1] || ''
     assert.ok(yields.split(',').map((s) => s.trim()).includes('input'), 'a drag along the slider turns the page')
   })
+
+  test('a chain that is placed is also wired, or the preset makes no sound', () => {
+    /*
+     * "None of the tones created make any sound."
+     *
+     * They were all built into empty slots, and an empty slot has no cabling
+     * in it. Placing a block fills a cell; it does not join that cell to
+     * anything. So five blocks went in, sixty-three values landed, the unit
+     * read every one of them back, the preset saved — and none of it was in
+     * the signal path. Nothing in the app looked, so nothing said so.
+     *
+     * Both places that build a chain wire the row afterwards now, and the
+     * wire starts at the column BEFORE the first block, which is the input.
+     * A row joined from block to block but never fed is just as silent.
+     */
+    const fx = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+    const wire = fx.slice(fx.indexOf('export async function wireRow'))
+    assert.ok(wire, 'nothing wires a row of the grid')
+    assert.match(
+      wire.slice(0, wire.indexOf('}\n')),
+      /for \(let col = -1;/,
+      'the wire starts at the first block rather than at the input, so nothing feeds the chain'
+    )
+
+    const actions = readFileSync(new URL('../src/lib/actions.js', import.meta.url), 'utf8')
+    const build = actions.slice(actions.indexOf("case 'buildChain'"), actions.indexOf("default:\n"))
+    assert.ok(build.includes('placeBlock'), 'buildChain no longer places anything')
+    assert.match(build, /wireRow\(1,/, 'buildChain places blocks and never joins them up — the preset will be silent')
+    assert.ok(
+      build.indexOf('placeBlock') < build.indexOf('wireRow'),
+      'the row is wired before the blocks are in it'
+    )
+    assert.match(build, /slotModel !== 'linear'/, 'a unit with no grid is sent cable writes it has no cells for')
+
+    const grid = readFileSync(new URL('../src/components/GridEditor.jsx', import.meta.url), 'utf8')
+    const starter = grid.slice(grid.indexOf('const buildStarter'))
+    assert.match(
+      starter.slice(0, starter.indexOf('\n  }')),
+      /wireRow\(/,
+      'the starter chain is placed and never joined up'
+    )
+
+    /* And the app says so when the unit reports blocks with nothing feeding
+       them, rather than reporting a finished preset that cannot make a sound. */
+    assert.match(src, /b\.col > 0 && !b\.fromRows\.length/, 'nothing checks whether the built chain is connected')
+    assert.match(src, /won't make a sound until the row is joined up/, 'a disconnected chain is reported in jargon, or not at all')
+  })
+
+  test('a read that could not clear the cache is not called a failed write', () => {
+    /*
+     * From a phone, clearing the unit's cache is refused — it only works at
+     * the Mac — and the read that follows comes back one write behind. A log
+     * from an iPhone has five parameters in a row reported as not landing,
+     * each one reading back the PREVIOUS write's value scaled into its own
+     * range: Tone read back the drive's 7, Level read back the tone's 4, Mix
+     * read back the level's 6 as 60 out of 100. Every one of them had landed.
+     *
+     * So the app reports what it knows: unchecked, not failed.
+     */
+    const fx = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+    const check = fx.slice(fx.indexOf('async function landed('), fx.indexOf('const wireLog'))
+    assert.match(check, /clearDeviceCache\(\)\.catch\(\(\) => \{\s*stale = true/, 'a refused cache clear is swallowed again')
+    assert.match(check, /return \{ ok: [^}]*stale \}/, 'the check does not report whether it could be believed')
+    assert.match(fx, /NOT CHECKED/, 'the debug log still calls an unverifiable read a write that did not land')
+    assert.match(fx, /unverified: checkA\.stale && checkB\.stale/, 'a write nobody could check is reported as one the device ignored')
+    assert.match(fx, /couldn't be checked from your phone/, 'the failure line still blames the device for a read it could not take')
+
+    const diag = readFileSync(new URL('../src/components/Diagnostics.jsx', import.meta.url), 'utf8')
+    assert.equal(
+      (diag.match(/c\.stale \? 'not checked'/g) || []).length,
+      2,
+      'the verification table and the copied report disagree about unchecked reads'
+    )
+  })
 }

@@ -3,6 +3,26 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.139.0
+
+**The built presets make a sound now.** A chain built into an empty slot was
+placed and never wired: on an FM3 an empty preset has no cabling in it, and
+putting a block in a cell does not join that cell to anything. So the blocks
+went in, every value landed, the unit read them all back, the preset saved —
+and none of it was in the signal path. That is why every tone built from an
+empty slot was silent. Both places that build a chain now run the wire the
+length of the row, from the input, through every block, out to the output; if
+the unit refuses a connection it is said plainly, and if the unit reports a
+block with nothing feeding it the app says the preset won't make a sound until
+the row is joined up, instead of reporting a finished preset.
+
+**And the debug log stops accusing writes that landed.** Clearing the unit's
+parameter cache only works at the Mac, so from a phone the read that checks a
+write comes back one write behind — which is how five parameters in a row came
+to be reported as "DID NOT LAND" while each one read back the previous write's
+value. A check that could not clear the cache now says it could not check,
+in the log and in the verification table, rather than blaming the unit.
+
 ## 7.138.1
 
 **Whole effect names, and the preset name in the middle of its tile.** On

@@ -2891,6 +2891,36 @@ export default function App() {
               }
             ])
           }
+          /*
+           * And whether the unit says the blocks are joined up.
+           *
+           * A block that is on the grid and wired to nothing is a block that
+           * makes no sound, and until now nothing in this app could tell the
+           * two apart: the values landed, the reads agreed, the preset saved,
+           * and every tone built into an empty slot came back silent. The
+           * chain is wired when it is placed now — this is the check that the
+           * wiring took.
+           *
+           * `fromRows` is what the unit reports feeding each block. Only the
+           * blocks past the first column are asked about, because the first
+           * one is fed by the input rather than by a row. A unit that doesn't
+           * report the field is not accused of anything.
+           */
+          const wired = landed.filter((b) => Array.isArray(b.fromRows))
+          const orphans = wired.filter((b) => b.col > 0 && !b.fromRows.length)
+          if (wired.length && orphans.length) {
+            setTurns((prev) => [
+              ...prev,
+              {
+                role: 'assistant',
+                text: `The blocks are on the grid but ${
+                  orphans.length === 1 ? 'one of them is' : `${orphans.length} of them are`
+                } not connected to anything, so this preset won't make a sound until the row is joined up on the unit: ${orphans
+                  .map((b) => b.name || b.slug)
+                  .join(', ')}.`
+              }
+            ])
+          }
           if (!landed.length) {
             setTurns((prev) => [
               ...prev,

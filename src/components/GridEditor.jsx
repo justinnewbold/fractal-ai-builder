@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { placeBlock, clearCell, readGrid, blockCatalog } from '../lib/forgefx'
+import { placeBlock, clearCell, readGrid, blockCatalog, wireRow } from '../lib/forgefx'
 
 /**
  * A workable starting chain, by block family rather than by number.
@@ -239,7 +239,19 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
       const chain = STARTER_ORDER.map((slug) => palette.find((b) => b.slug === slug)).filter(Boolean)
       const fits = chain.slice(0, cols)
       for (const [i, block] of fits.entries()) await placeBlock(1, i, block.page)
+      /*
+       * And join the row up, or the starter chain is five blocks that make no
+       * sound. Placing a block fills a cell; it does not connect that cell to
+       * anything, and an empty preset has no cabling of its own to inherit.
+       * A linear unit has no grid and nothing to wire.
+       */
+      const wiring = linear ? null : await wireRow(1, (cols || fits.length) - 1)
       onChanged(`Built a starter chain — ${fits.map((b) => b.name).join(', ')}`)
+      if (wiring?.refused) {
+        setIssue(
+          `The blocks are in, but the unit refused ${wiring.refused} of the ${wiring.cables} connections along the row — until that row is joined up this preset will be silent.`
+        )
+      }
       await readGrid().catch(() => {})
     } catch (err) {
       setIssue(err.message)
