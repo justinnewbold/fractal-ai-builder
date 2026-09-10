@@ -3388,6 +3388,34 @@ export function run(test) {
     assert.match(poll, /stop = true\s*\n\s*setQueuedSave\(null\)/, 'a second poll tick can report the same save again')
   })
 
+  test('a reply lands with its first line in view, and the two sides of the chat look different', () => {
+    /*
+     * "After typing a question and the AI gives an output it leaves it at
+     * the bottom of the chat, so I have to scroll back to the top to see
+     * what it started saying." And: "make the chat more obvious of whether
+     * I'm talking or the AI is talking."
+     */
+    const a = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
+    const bare = a.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ' ')
+    const effect = bare.slice(bare.indexOf('const seenTurns = useRef(0)'), bare.indexOf('}, [turns, progress])'))
+    assert.match(effect, /last\?\.role === 'assistant' && lastTurn\.current/, 'a reply is not told apart from a question')
+    assert.match(effect, /box\.scrollTop = Math\.max\(0, offsetWithin\(lastTurn\.current, box\) - 4\)/, 'a reply is not brought to the top of the box')
+    assert.match(effect, /if \(landed\)/, 'a progress tick under a reply yanks it away')
+    assert.match(effect, /box\.scrollTop = box\.scrollHeight/, 'a question no longer goes to the bottom')
+    assert.match(bare, /const box = scrollerOf\(el\)/, 'the scroller is guessed rather than asked for')
+    assert.ok(!/scrollIntoView/.test(bare), 'scrollIntoView is back, and it drags the page')
+    assert.match(bare, /ref=\{i === turns\.length - 1 \? lastTurn : null\}/, 'the last turn cannot be found')
+    assert.match(bare, /aria-label=\{turn\.role === 'user' \? 'You' : turn\.role === 'assistant' \? 'Agent' : undefined\}/, 'a screen reader cannot tell the sides apart')
+
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    const rule = (sel) => css.slice(css.indexOf(sel + ' {'), css.indexOf('}', css.indexOf(sel + ' {')))
+    assert.match(rule('.turn-user'), /justify-content: flex-end/, 'the player’s words are not on the right')
+    assert.match(rule('.turn-user .turn-text'), /background: color-mix\(in srgb, var\(--signal\)/, 'the player’s bubble has no colour of its own')
+    assert.match(rule('.turn-assistant'), /background: var\(--chassis\)/, 'the agent’s bubble has no ground of its own')
+    assert.match(rule('.turn-assistant'), /border-radius: var\(--r-2\) var\(--r-2\) var\(--r-2\) var\(--r-1\)/, 'the two bubbles are the same shape')
+    assert.match(rule('.turn-system .turn-text,\n.turn-hand .turn-text'), /text-align: center/, 'a note is not set apart from both sides')
+  })
+
   test('the stage screen is the layout he picked, not the one it grew into', () => {
     /*
      * From a screenshot, with "like this": scenes two across in colour, the
