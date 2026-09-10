@@ -302,6 +302,26 @@ export function run(test) {
     )
   })
 
+  test('a different tone asked for over a waiting design starts over', () => {
+    /*
+     * "It said it was creating Metallica tones but then called it Killswitch
+     * Militia, which was the previous write." With a design on screen and not
+     * yet written, every tone description went to refine — right for "warmer",
+     * wrong for another band. The chat route now says which it is, and only
+     * an adjustment may reach refine.
+     */
+    const at = src.indexOf('const startOver = design.flag === true')
+    assert.notEqual(at, -1, 'the app no longer asks whether a design is an adjustment or a new tone')
+    const refineAt = src.indexOf('await refine(', at)
+    assert.notEqual(refineAt, -1)
+    const guard = src.slice(at, refineAt)
+    assert.match(guard, /result\?\.changes\?\.length && !startOver/, 'a new tone still goes to refine when one is waiting')
+
+    const api = readFileSync(new URL('../api/command.js', import.meta.url), 'utf8')
+    assert.match(api, /For designTone: true when the/, 'the chat model is never told to say new tone or adjustment')
+    assert.match(api, /flag true, and the app\nstarts over/, 'the instructions no longer explain what flag true does')
+  })
+
   test('the build says which build it is, not just which version', () => {
     /*
      * Seven merges shipped under v6.9.5, because the number is hand-written and

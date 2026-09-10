@@ -44,8 +44,12 @@ export function run(test) {
     const capMs = Number(stream.match(/const HARD_CAP_MS = (\d+)/)?.[1])
     const stallMs = Number(stream.match(/const STALL_MS = (\d+)/)?.[1])
     const firstMs = Number(stream.match(/const FIRST_MS = (\d+)/)?.[1])
+    const thinkMs = Number(stream.match(/const THINK_MS = (\d+)/)?.[1])
     assert.ok(
-      Number.isFinite(capMs) && Number.isFinite(stallMs) && Number.isFinite(firstMs),
+      Number.isFinite(capMs) &&
+        Number.isFinite(stallMs) &&
+        Number.isFinite(firstMs) &&
+        Number.isFinite(thinkMs),
       'the client caps moved'
     )
 
@@ -62,6 +66,16 @@ export function run(test) {
     assert.ok(
       firstMs < capMs,
       'the first-answer budget is not shorter than the hard cap, so the cap fires first and blames the wrong thing'
+    )
+    /*
+     * And the budget for a model that is alive but has not begun. The
+     * heartbeat restarts the first-answer clock on every beat, so with beats
+     * arriving this is the only clock that can end the wait before the cap —
+     * and it has to, or "Thinking" runs to the cap, twice.
+     */
+    assert.ok(
+      thinkMs < capMs,
+      'the thinking budget is not shorter than the hard cap, so a live model that never starts runs to the cap'
     )
   })
 

@@ -89,7 +89,15 @@ const Action = z.object({
         'a block type code, BPM, or a preset slot number for savePreset and loadPreset. ' +
         'Null when not needed.'
     ),
-  flag: z.boolean().nullable().describe('For setBypass and setSceneBlock: true means bypassed.'),
+  flag: z
+    .boolean()
+    .nullable()
+    .describe(
+      'For setBypass and setSceneBlock: true means bypassed. For designTone: true when the ' +
+        'player wants a different tone from the one in "design" — another sound, band or ' +
+        'preset — so it starts over; false when they are adjusting the design on screen. ' +
+        'Null otherwise.'
+    ),
   text: z
     .string()
     .nullable()
@@ -283,6 +291,17 @@ The difference is whether they named what to change. "Turn the gain up" and "set
 high cut to 5k" are changes. "Make it heavier" is a change if the current tone is
 close and a design if they want a different sound entirely -- when it is
 genuinely unclear, prefer designTone, because it stops to show its work.
+
+When "design" is present and says it has not been written yet, there is a tone
+on screen waiting for approval, and designTone must say which of two things the
+player means. An adjustment to it -- "warmer", "more gain", "less delay on the
+lead scene" -- is designTone with flag false, and the app reshapes that design.
+A different tone altogether -- another band, another sound, "make a full
+Metallica preset with 8 scenes" -- is designTone with flag true, and the app
+starts over: the waiting design is set aside unwritten and the new one takes
+its place. Say which in your words, plainly: "this replaces the Killswitch
+design, which was never written" -- never adjust one band's tone into another's
+and keep the old name on it.
 
 There are two places a preset can be kept and they are not the same. A slot is
 on the unit, numbered, and saving to one overwrites what was there. The library

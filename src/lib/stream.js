@@ -63,6 +63,22 @@ const FIRST_MS = 90000
  * the model was demonstrably still working, is the worse answer.
  */
 const HARD_CAP_MS = 240000
+/**
+ * A model that is alive and has not said its first word, from the server's
+ * hello.
+ *
+ * The heartbeat proves the far end is there, and the first-word budget above
+ * restarts on every byte — so once the beats began, that budget never ran out
+ * at all. The only clock left was the hard cap, per attempt, and the retry
+ * doubled it: "stuck thinking for almost 4 minutes, finally had to stop it",
+ * with the screen saying Thinking the whole way.
+ *
+ * So this one counts from the hello and is not restarted by a beat. Two
+ * minutes is longer than any tone should need before its first line, and
+ * past it the honest thing is to stop and say so, rather than prove for
+ * another two minutes that the model is still there.
+ */
+const THINK_MS = 120000
 
 /**
  * What happened, in order, on the last few generations.
@@ -110,7 +126,19 @@ export async function streamSpec(body, opts = {}) {
     try {
       return await attemptOnce(body, opts, started, attempt)
     } catch (err) {
-      const canRetry = err?.generationFailure === 'stalled' && !err.partials && attempt === 0 && !opts.signal?.aborted
+      /*
+       * Only a dead connection is asked again on its own. A model that was
+       * demonstrably alive and thinking for its whole budget will very likely
+       * take as long the second time, and asking the same thing again in
+       * silence is what turned one long wait into a four-minute one. That
+       * case is reported, and the Try again button is there for it.
+       */
+      const canRetry =
+        err?.generationFailure === 'stalled' &&
+        !err.partials &&
+        !err.alive &&
+        attempt === 0 &&
+        !opts.signal?.aborted
       if (!canRetry) throw err
       note('retrying', { ms: Date.now() - started })
       opts.onEvent?.({ kind: 'retrying', ms: Date.now() - started })
@@ -127,6 +155,7 @@ async function attemptOnce(
   const stallMs = timing?.stallMs ?? STALL_MS
   const firstMs = timing?.firstMs ?? FIRST_MS
   const capMs = timing?.capMs ?? HARD_CAP_MS
+  const thinkMs = timing?.thinkMs ?? THINK_MS
   const since = () => Date.now() - started
   const control = new AbortController()
   // The caller's Stop button and our own clocks both land on one signal.
@@ -146,6 +175,8 @@ async function attemptOnce(
   let answering = false
   /** Heartbeats seen: how we know the far end was alive while it was quiet. */
   let beats = 0
+  /** When the server said hello: the thinking budget counts from here. */
+  let openedAt = null
   /*
    * One timer, two budgets. Silence before the model has said anything is the
    * model thinking and gets a minute and a half; silence after it has started
@@ -155,12 +186,21 @@ async function attemptOnce(
    */
   const stallTimer = setInterval(() => {
     if (lastByteAt === null) return
+    /*
+     * Alive, and still not a word. Checked first, because a heartbeat keeps
+     * `lastByteAt` fresh and the budget below never fires while one arrives.
+     */
+    if (!answering && openedAt !== null && Date.now() - openedAt > thinkMs) {
+      reason = 'thinking'
+      control.abort()
+      return
+    }
     const budget = answering ? stallMs : firstMs
     if (Date.now() - lastByteAt > budget) {
       reason = answering ? 'stalled' : 'quiet-start'
       control.abort()
     }
-  }, Math.min(2000, Math.max(5, Math.floor(Math.min(stallMs, firstMs) / 4))))
+  }, Math.min(2000, Math.max(5, Math.floor(Math.min(stallMs, firstMs, thinkMs) / 4))))
   const capTimer = setTimeout(() => {
     reason = 'capped'
     control.abort()
@@ -172,12 +212,14 @@ async function attemptOnce(
     signal?.removeEventListener?.('abort', onAbort)
   }
 
-  const fail = (message, kind) => {
-    note('failed', { kind, ms: since(), message, partials })
+  const fail = (message, kind, alive = false) => {
+    note('failed', { kind, ms: since(), message, partials, alive })
     onEvent?.({ kind: 'failed', ms: since(), message })
     const err = new Error(message)
     err.generationFailure = kind
     err.partials = partials
+    // The far end was provably there the whole time: not a thing to retry unasked.
+    err.alive = alive
     return err
   }
 
@@ -241,6 +283,7 @@ async function attemptOnce(
         // The hello is the server, not the model: it proves the round trip
         // and starts nothing.
         if (frame.type === 'open') {
+          openedAt = Date.now()
           note('open', { ms: since() })
           /*
            * The attempt travels with it. The retry announced itself and then
@@ -309,6 +352,22 @@ async function attemptOnce(
   } catch (err) {
     if (err?.generationFailure) throw err
     if (control.signal.aborted) {
+      if (reason === 'thinking') {
+        /*
+         * The one wait that is about the ask itself. The AI had the request,
+         * kept saying so, and still had not begun — which on this app's own
+         * payload happens on the big asks: a whole preset, every scene, a
+         * band's whole catalogue. That is worth saying, because it is the one
+         * part of the wait the person can actually change.
+         */
+        throw fail(
+          `The AI had your request and thought about it for ${Math.round(
+            thinkMs / 1000
+          )} seconds without starting to write the tone, so we stopped waiting. Nothing was written to your unit. A whole preset takes longer than a tweak — ask again, or ask for it in fewer words.`,
+          'stalled',
+          true
+        )
+      }
       if (reason === 'stalled') {
         throw fail(
           'The answer stopped partway through and nothing more came. Nothing was written to your unit — ask again.',
