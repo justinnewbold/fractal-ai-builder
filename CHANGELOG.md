@@ -3,6 +3,23 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.143.0
+
+**A save in flight says Saving, and shows it.** The button read "Waiting…"
+after a save was handed to the Mac — which is what the app was doing, not what
+was happening to the preset — and nothing on it moved while the answer came
+back. It says Saving now, with a dot that pulses until the write lands, then
+✓ Saved, and it holds that word for ten seconds rather than four, because a
+save asked for from across a room is read when you look back at the phone.
+
+**And the rename tick box stops offering to rename a preset to its own name.**
+It appeared whenever a tone's name matched the preset's — every reload of a
+saved tone — as "Rename X to X", a decision with one outcome. The write path
+has always skipped a rename in that case; now the question isn't asked. Where
+the name genuinely changes it is still there, and what a save will overwrite is
+still named where it is actually asked: the Save sheet says which slot and what
+is in it.
+
 ## 7.142.0
 
 **Reloading a saved preset shows you the preset.** Tapping one kept with your

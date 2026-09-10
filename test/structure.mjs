@@ -1321,9 +1321,29 @@ export function run(test) {
      */
     assert.match(
       save,
-      /: !dirty && justSaved\s*\n?\s*\? 'Saved'/,
+      /: !dirty && justSaved\s*\n?\s*\? '✓ Saved'/,
       'the button says "Saved" about a preset that has never been saved'
     )
+    /*
+     * And a save in flight says SAVING, with something that moves.
+     *
+     * "It goes back to the gig screen and says Waiting — change that to say
+     * Saving with a visual indicator it's working, then have it say saved
+     * after it's completed." Waiting is what the app is doing; saving is what
+     * is happening to the preset, and whether the Mac has picked the request
+     * up yet is this app's problem rather than the player's.
+     */
+    /* Comments out: the word this replaced is quoted in the comment that says
+       why it went, and a comment that can fail a test is unwritable. */
+    assert.ok(
+      !/Waiting/.test(save.replace(/\/\*[\s\S]*?\*\//g, ' ')),
+      'the button is telling a player the app is waiting again'
+    )
+    assert.match(save, /const working = !!queued \|\| !!saving/, 'a queued save and a live one are two states again')
+    assert.match(save, /className="save-spin"/, 'a save in flight shows nothing moving')
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    assert.match(css, /\.save-spin \{[^}]*animation: pulse/, 'the working dot does not move')
+    assert.match(css, /prefers-reduced-motion: reduce\) \{\s*\.save-spin \{\s*animation: none/, 'the working dot ignores a player who asked for less motion')
     /*
      * And then it said "Save" instead, on a preset nobody had touched — the
      * same fault wearing the other word, a button offering to do a thing there
@@ -4023,6 +4043,34 @@ export function run(test) {
     assert.ok(!markup.includes("'through your Mac'"), 'the phone is told what it is connected through again')
     assert.match(markup, /\{demo \|\| !remote \?/, 'the address line no longer decides whether it has anything to say')
     assert.match(markup, /demo \? 'simulated' : getHost\(\)/, 'the demo no longer says it is a simulation, or the Mac has lost its address')
+  })
+
+  test('a rename that renames nothing is not offered', () => {
+    /*
+     * "There's a button that says rename, but it always just shows the exact
+     * preset name overwriting the exact preset name. There's no other options.
+     * I'm not sure what the point of that is."
+     *
+     * There wasn't one. The write path has always skipped a rename when the
+     * two names match — the common case after reloading a saved tone, whose
+     * name IS the preset's name — so the tick box was a decision with one
+     * outcome and a sentence that read like a mistake.
+     */
+    const gen = readFileSync(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
+    assert.match(
+      gen,
+      /const sameName = !!presetName && presetName\.trim\(\) === \(presetNow \|\| ''\)\.trim\(\)/,
+      'nothing compares the new name against the one already there'
+    )
+    assert.equal(
+      (gen.match(/&& !sameName \?/g) || []).length,
+      2,
+      'one of the two rename rows still offers to rename a preset to its own name'
+    )
+    /* And the question it was mistaken for — what this save replaces — is
+       still answered where it is actually asked. */
+    const sheet = readFileSync(new URL('../src/components/SaveSheet.jsx', import.meta.url), 'utf8')
+    assert.match(sheet, /currently holds/, 'the save sheet no longer says what is in the slot being written')
   })
 
   test('a saved preset that is reloaded lands somewhere you can see it', () => {

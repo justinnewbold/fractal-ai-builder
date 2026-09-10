@@ -50,6 +50,22 @@ export function Preview({
   } = result
   const total = writeCount + (withScenes ? sceneWriteCount : 0)
   /*
+   * A rename that renames nothing is not a question.
+   *
+   * "There's a button that says rename, but it always just shows the exact
+   * preset name overwriting the exact preset name. There's no other options.
+   * I'm not sure what the point of that is." There wasn't one: the write path
+   * has always skipped a rename when the two names match, so the tick box was
+   * a decision with one outcome — most often after reloading a saved tone,
+   * whose name IS the preset's name.
+   *
+   * Where a name is genuinely changing the row stays, because that is the one
+   * decision on this card that costs something if it is missed. What the save
+   * will overwrite is a different question and is answered where it is asked:
+   * the Save sheet names the slot and what is in it.
+   */
+  const sameName = !!presetName && presetName.trim() === (presetNow || '').trim()
+  /*
    * Which half of a write is scene-bound.
    *
    * Parameter values and models belong to the preset (and to a block's
@@ -239,7 +255,7 @@ export function Preview({
         has no name loses nothing, so that one rides with the rest of the
         detail and keeps the card short.
       */}
-      {presetName && onRenamePreset && (presetNow || '').trim() ? (
+      {presetName && onRenamePreset && (presetNow || '').trim() && !sameName ? (
         <label className="rename-choice">
           <input
             type="checkbox"
@@ -256,7 +272,7 @@ export function Preview({
         </label>
       ) : null}
 
-      {presetName && onRenamePreset && !(presetNow || '').trim() ? (
+      {presetName && onRenamePreset && !(presetNow || '').trim() && !sameName ? (
         <label className="rename-choice">
           <input
             type="checkbox"
