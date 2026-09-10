@@ -622,6 +622,65 @@ export function run(test) {
     assert.equal(keys.length, new Set(keys).size, 'duplicate Section keys')
   })
 
+  test('Setup is four doors, not twelve panels in a column', () => {
+    /*
+     * "It seems overwhelming and confusing with how many options there are."
+     *
+     * Twelve folds in one column, every one the same size, the same colour and
+     * the same weight — button size level with the debug log. Nothing was
+     * wrong with any single panel; the fault was that none of them was allowed
+     * to matter more than the others, so the whole list had to be read every
+     * time it was opened.
+     *
+     * Sorted by the reason somebody opens the sheet: what the screen looks
+     * like, what the rig is, something is wrong, what the AI knows. The
+     * introduction stays loose at the bottom because it is a way out of the
+     * sheet rather than a setting in it.
+     */
+    const setup = sheet('Setup')
+    const doors = [...setup.matchAll(/<Group key="([^"]+)" title="([^"]+)"/g)].map((m) => m[2])
+    assert.deepEqual(
+      doors,
+      ['Screen', 'My rig', "Something's wrong", 'What the AI knows'],
+      `Setup opens on ${doors.length} doors: ${doors.join(', ')}`
+    )
+
+    /* The groups are contiguous, so everything from the first to the last is
+       the grouped region and what is left is what stayed loose. */
+    const loose = [...setup.replace(/<Group[\s\S]*<\/Group>/, '').matchAll(/<Section\s+key="([^"]+)"/g)]
+      .map((m) => m[1])
+    assert.deepEqual(loose, ['how-this-works'], `panels loose in Setup again: ${loose.join(', ')}`)
+
+    const behind = (key) => {
+      const at = setup.indexOf(`<Group key="${key}"`)
+      assert.notEqual(at, -1, `the ${key} group is gone`)
+      return [...setup.slice(at, setup.indexOf('</Group>', at)).matchAll(/<Section\s+key="([^"]+)"/g)]
+        .map((m) => m[1])
+    }
+    for (const [door, panels] of [
+      ['screen', ['size', 'playing']],
+      ['rig', ['connection', 'phone-remote', 'footswitches', 'updates']],
+      ['wrong', ['preset-check', 'feedback', 'what-s-changed-this-session', 'debug-log']],
+      ['ai', ['what-it-has-learned', 'developer']]
+    ]) {
+      assert.deepEqual(behind(door), panels, `the ${door} door holds ${behind(door).join(', ')}`)
+    }
+
+    /*
+     * And a door is not a silkscreen legend. The panel titles are set in caps,
+     * which is right for a legend on a piece of equipment and wrong for a
+     * heading — caps strip the shape out of a word, so a column of them is
+     * read letter by letter. If the doors ever join them, the two levels stop
+     * telling themselves apart and the wall is back with four bricks in it.
+     */
+    const group = readFileSync(new URL('../src/components/Group.jsx', import.meta.url), 'utf8')
+    assert.ok(!/silk-label/.test(group), 'the doors are set in caps like the panels under them')
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    const rule = css.slice(css.indexOf('.group-title {'), css.indexOf('}', css.indexOf('.group-title {')))
+    assert.ok(rule.length > 0, '.group-title has no rule')
+    assert.ok(!/text-transform/.test(rule), 'the group headings are uppercased in CSS instead')
+  })
+
   test('every panel and every sheet is closed', () => {
     // SectionStack is gone with the drag-to-reorder it existed for; what is
     // left is the pairing, which a bad splice still breaks.
