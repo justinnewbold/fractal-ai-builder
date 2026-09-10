@@ -3584,7 +3584,27 @@ export function run(test) {
     assert.ok(preset.indexOf('gig-name-num') < preset.indexOf('gig-name-word'), 'the number is not before the name')
     const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
     const tileCss = css.match(/button\.gig-name \{([^}]*)\}/)?.[1] || ''
-    assert.match(tileCss, /min-height: var\(--gig-tile, 62px\)/, 'the preset tile is not the height of a scene tile')
+    /*
+     * And it is the touch floor, not a scene tile's height.
+     *
+     * "Make the preset button a little smaller, so that an extra row of
+     * effects can fit on the screen — right now they're being cut off." It was
+     * sized to a scene because it used to be shaped like one, a number stacked
+     * over a name; the number moved onto the name's line and the second line
+     * went with it, leaving one line of text in a 62px box. 44px is what every
+     * pressable thing gets, and the eighteen pixels went to the effects.
+     */
+    assert.match(tileCss, /min-height: 44px/, 'the preset tile is back to a scene tile\'s height')
+    /*
+     * The rest of the stack gave up a step each for the same reason. Held as
+     * tokens rather than numbers: a literal here is how 10px, 12px and 18px
+     * ended up in three rules that were meant to be the same gap.
+     */
+    const rule = (sel) => css.match(new RegExp(sel.replace('.', '\\.') + ' \\{([^}]*)\\}'))?.[1] || ''
+    assert.match(rule('.gig-signal'), /margin-top: var\(--s-2\)/, 'the meter has its old 10px back')
+    assert.match(rule('.gig-scenes'), /margin-top: var\(--s-2\)/, 'the scenes have their old 12px back')
+    assert.match(rule('.gig-blocks'), /margin-top: var\(--s-3\)/, 'the effects have their old 18px back')
+    assert.match(rule('.gig-foot'), /margin-top: var\(--s-2\)/, 'the foot has its old gap back')
     assert.match(tileCss, /flex-direction: row/, 'the number is stacked over the name again')
     const numCss = css.match(/\.gig-name-num \{([^}]*)\}/)?.[1] || ''
     const nameCss = css.match(/\.gig-name-word \{([^}]*)\}/)?.[1] || ''
