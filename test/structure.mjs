@@ -266,7 +266,7 @@ export function run(test) {
     for (const [title, names] of [
       ['Presets', ['PresetList', 'LocalLibrary', 'Backup', 'Versions', 'DeviceBackup']],
       ['Scenes', ['Scenes', 'SceneMatrix']],
-      ['Setup', ['DeviceDetail', 'PhoneRemote', 'Ports', 'ChangeLog', 'Diagnostics', 'LinkDetails']]
+      ['Setup', ['DeviceDetail', 'PhoneRemote', 'Ports', 'ChangeLog', 'DebugLog', 'Diagnostics', 'LinkDetails']]
     ]) {
       for (const name of names) {
         assert.ok(components(sheet(title)).includes(name), `${name} should be in the ${title} sheet`)
@@ -300,6 +300,54 @@ export function run(test) {
       src.indexOf('await refine(') > at,
       'refine must only be reachable when nothing was built'
     )
+  })
+
+  test('there is one debug log, everything writes to it, and Setup copies it', () => {
+    /*
+     * "Make a unified debug log with a copy log button to send back to you
+     * for debugging in the settings menu. Any debugging info already in menus
+     * move to debug log." Four separate records became one list; every
+     * source has to keep writing to it, or the one paste stops telling the
+     * whole story.
+     */
+    const read = (f) => readFileSync(new URL('../src/' + f, import.meta.url), 'utf8')
+    const stream = read('lib/stream.js')
+    assert.match(stream, /logDebug\('ai', event, detail\)/, 'a generation event no longer reaches the debug log')
+    const forge = read('lib/forgefx.js')
+    assert.match(forge, /function recordWire\(entry\) \{[\s\S]{0,200}logDebug\(\s*'wire'/, 'a write no longer reaches the debug log')
+    assert.match(forge, /function recordCheck\(entry\) \{[\s\S]{0,200}logDebug\(\s*'check'/, 'a verification no longer reaches the debug log')
+    assert.match(forge, /logDebug\('unit', `\$\{options\.method \|\| 'GET'\} \$\{path\} failed/, 'a failed request no longer reaches the debug log')
+    assert.match(src, /logDebug\('app', `\$\{kind\}: \$\{summary\}`/, 'the app\u2019s own change record no longer reaches the debug log')
+    assert.match(src, /if \(error\) logDebug\('error'/, 'an error shown on screen no longer reaches the debug log')
+    assert.match(src, /useEffect\(\(\) => installCrashCapture\(\), \[\]\)/, 'crashes are not captured')
+    assert.match(read('components/Boundary.jsx'), /logDebug\('crash'/, 'a panel that fails to draw is not logged')
+
+    const panel = read('components/DebugLog.jsx')
+    assert.match(panel, /Copy log/, 'the debug log has no Copy button')
+    assert.match(panel, /navigator\.clipboard\.writeText/, 'Copy does not use the clipboard')
+    assert.match(panel, /navigator\.share/, 'no fallback for a phone that refuses the clipboard')
+    assert.match(panel, /wireReport\(\)/, 'the wire tables are not in the copied text')
+    // The old copy button is gone: one place to copy from.
+    const diag = read('components/Diagnostics.jsx')
+    assert.ok(!/Copy all as text/.test(diag), 'Diagnostics still has a copy button of its own')
+    assert.match(diag, /export function wireReport/, 'the wire text is not shared with the debug log')
+    assert.match(src, /key="debug-log" title="Debug log"/, 'Setup has no Debug log section')
+  })
+
+  test('the bar drops the preset on Play, and a sent tone offers to save', () => {
+    /*
+     * "Remove the preset name from the header (it's already a button on the
+     * screen)" — on Play, where the tile is. "Where it says changes sent, add
+     * a button that says Save to FM3."
+     */
+    const bar = readFileSync(new URL('../src/components/TopBar.jsx', import.meta.url), 'utf8')
+    assert.match(bar, /status === 'live' && showPreset \?/, 'the bar always draws the preset')
+    assert.match(src, /showPreset=\{view !== 'play'\}/, 'the bar still carries the preset on Play')
+    const gen = readFileSync(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
+    assert.match(gen, /Save to \{saveTo\}/, 'a sent tone has no Save button')
+    assert.match(gen, /sent && onSave \? \(/, 'the Save button is not tied to the tone having been sent')
+    assert.match(src, /onSave=\{\(\) => setSheet\('save'\)\}/, 'Save on a tone does not open the Save sheet')
+    assert.match(src, /saveTo=\{device\?\.short \|\| device\?\.name \|\| 'unit'\}/, 'the button does not name the unit')
   })
 
   test('a different tone asked for over a waiting design starts over', () => {
@@ -813,7 +861,7 @@ export function run(test) {
      * plumbing — and it is behind the fold that says "for working out why
      * something went wrong".
      */
-    const techStart = src.indexOf('key="technical-details"')
+    const techStart = src.indexOf('key="debug-log"')
     const techEnd = src.indexOf('</Section>', techStart)
     const appProse = techStart === -1 ? src : src.slice(0, techStart) + src.slice(techEnd)
     const files = { 'App.jsx': appProse }

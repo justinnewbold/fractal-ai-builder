@@ -34,6 +34,7 @@
  */
 
 import { aiUrl } from './ai.js'
+import { logDebug } from './debugLog.js'
 
 /**
  * Silence after the model has begun answering: a stream that stopped.
@@ -94,6 +95,9 @@ const MAX_LOG = 60
 function note(event, detail = {}) {
   genLog.push({ at: Date.now(), event, ...detail })
   if (genLog.length > MAX_LOG) genLog.splice(0, genLog.length - MAX_LOG)
+  // And the same line in the one log, so the AI's timeline sits in order
+  // with the writes and errors around it.
+  logDebug('ai', event, detail)
 }
 
 export const getGenerationLog = () => genLog.slice()

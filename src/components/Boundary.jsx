@@ -1,4 +1,5 @@
 import { Component } from 'react'
+import { logDebug } from '../lib/debugLog'
 
 /**
  * A panel that fails says so, instead of taking the page with it.
@@ -27,6 +28,7 @@ export default class Boundary extends Component {
     // The stack is worth more than the message when someone is reading this out
     // of a console to describe what they saw.
     console.error(`[fractal] ${this.props.label || 'panel'} failed to draw`, error, info)
+    logDebug('crash', `${this.props.label || 'panel'} failed to draw: ${error?.message || error}`, error?.stack)
   }
 
   render() {

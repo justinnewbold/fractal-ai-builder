@@ -3,6 +3,8 @@ import TopBar from './components/TopBar'
 import { Preview } from './components/Generate'
 import { ChangeLog } from './components/ChangeLog'
 import Diagnostics from './components/Diagnostics'
+import DebugLog from './components/DebugLog'
+import { installCrashCapture, logDebug } from './lib/debugLog'
 import Cost from './components/Cost'
 import Scenes from './components/Scenes'
 import History from './components/History'
@@ -290,6 +292,14 @@ export default function App() {
   const preset = useDevice(ofPreset)
   const blocks = useDevice(ofBlocks)
   const [error, setError] = useState(null)
+  /*
+   * Every error the screen shows is a line in the debug log too, and so is a
+   * crash the screen never got to show. One place, so a report has both.
+   */
+  useEffect(() => {
+    if (error) logDebug('error', typeof error === 'string' ? error : error?.message || String(error))
+  }, [error])
+  useEffect(() => installCrashCapture(), [])
   const [busy, setBusy] = useState(false)
   /*
    * Saving needs its own flag, because `busy` is not about saving.
@@ -888,6 +898,8 @@ export default function App() {
    */
   const record = useCallback((kind, summary, detail = [], fromAssistant = false) => {
     setLog((prev) => append(prev, newEntry(kind, summary, detail)))
+    // The same line in the debug log, where it sits in order with the wire.
+    logDebug('app', `${kind}: ${summary}`, detail?.length ? detail : undefined)
 
     /*
      * Anything that alters the sound leaves the preset unsaved.
@@ -3439,6 +3451,10 @@ export default function App() {
           renamePreset={renamePreset}
           onRenamePreset={setRenamePreset}
           presetNow={preset?.name}
+          /* Once sent, the button offers to keep it: the same Save sheet the
+             bar opens, which over the link queues the save at the Mac. */
+          onSave={() => setSheet('save')}
+          saveTo={device?.short || device?.name || 'unit'}
           /* Choosing a scene switches to it rather than remembering it for
              later. Bypass is written into whatever scene is live, so making
              the choice real immediately is both simpler and honest — and you
@@ -3687,6 +3703,8 @@ export default function App() {
         preset={preset}
         dirty={dirty}
         presetsOpen={presetMenu}
+        /* Not on Play: the preset tile under the bar is the same button. */
+        showPreset={view !== 'play'}
         onOpenPresets={() => setPresetMenu((v) => !v)}
         onOpenSettings={() => setSheet('settings')}
         menu={
@@ -4729,7 +4747,16 @@ export default function App() {
           <ChangeLog log={log} onClear={() => setLog([])} />
         </Section>
 
-        <Section key="technical-details" title="Technical details" note="For working out why something went wrong">
+        <Section key="debug-log" title="Debug log" note="Copy it and paste it into the chat when something goes wrong">
+          {/*
+            One log, one Copy button. "Make a unified debug log with a copy
+            log button to send back to you for debugging in the settings menu.
+            Any debugging info already in menus move to debug log." The AI's
+            timeline, the wire, the app's own changes, every error: one list,
+            in order. The two detailed views under it are the same facts as
+            tables, for reading rather than sending.
+          */}
+          <DebugLog device={device} link={link} />
           <Diagnostics />
           <LinkDetails />
 

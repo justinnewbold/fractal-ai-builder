@@ -3,6 +3,21 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.138.0
+
+**One debug log, a Save button after a send, and a shorter header.**
+Setup's Technical details is now Debug log: everything that happens in a
+session — what the AI did and when, what was written to the unit and what
+it said back, what the app changed, every error and crash — in one list,
+in order, with a Copy log button that puts the whole thing on the
+clipboard with the version and unit at the top. Paste it into the chat
+when something goes wrong. The wire tables and the link test sit under
+it. After a tone's changes are sent, the greyed "Changes sent" button
+becomes "Save to FM3" (or whatever unit is connected) and opens the Save
+sheet. And on Play the header no longer repeats the preset name — the
+tile under it is the same button — so the version and the link word have
+room.
+
 ## 7.137.0
 
 **Four Play-screen tweaks.** The version number is in the header on a

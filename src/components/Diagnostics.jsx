@@ -5,6 +5,41 @@ import { FULL, BUILT_AT } from '../lib/version'
 import { fromNormalized } from '../lib/scale'
 
 /**
+ * The wire and verification logs as text, for the Debug log's Copy button.
+ *
+ * This was the body of a copy button of its own here. "Any debugging info
+ * already in menus move to debug log" — so one button, in one place, and
+ * this is the part of the text it appends.
+ */
+export function wireReport() {
+  const current = getWireLog()
+  const verified = getCheckLog()
+  if (!current.length && !verified.length) return ''
+  return [
+    `${current.length} writes, ${verified.length} verifications`,
+    '',
+    'VERIFIED — parameter | wanted | read back | landed | encoding | attempt | device said',
+    ...verified.map(
+      (c) =>
+        `${c.name || '#' + c.paramId} | ${c.wanted} | ${
+          c.readBack === null ? 'unreadable' : c.readBack
+        } | ${c.landed ? 'yes' : 'NO'} | ${c.encoding ? 'cont' : 'disc'} | ${c.attempt} | ${
+          c.deviceOk === undefined ? '—' : c.deviceOk ? 'ok' : 'ok:false'
+        }`
+    ),
+    '',
+    'WRITES — parameter | wanted | sent | means | range | encoding',
+    ...current.map((r) => {
+      const means = r.sent === null || !r.range ? '—' : round4(fromNormalized(r.sent, r.range))
+      const range = r.range
+        ? `${r.range.min}–${r.range.max}${r.range.log ? ' log' : ''}${r.outOfRange ? ' OUTSIDE' : ''}`
+        : 'NO RANGE'
+      return `${r.name || '#' + r.paramId} | ${r.wanted} | ${r.sent === null ? 'refused' : round4(r.sent)} | ${means} | ${range} | ${r.continuous ? 'cont' : 'disc'}`
+    })
+  ].join('\n')
+}
+
+/**
  * What actually went on the wire.
  *
  * The device accepts an out-of-range write silently — it clamps and reports
@@ -30,43 +65,6 @@ export default function Diagnostics() {
   const show = () => {
     refresh()
     setOpen(true)
-  }
-
-  const [copied, setCopied] = useState(false)
-
-  const copy = async () => {
-    const current = getWireLog()
-    const verified = getCheckLog()
-    const lines = [
-      `${FULL} — built ${BUILT_AT} UTC`,
-      `${current.length} writes, ${verified.length} verifications`,
-      '',
-      'VERIFIED — parameter | wanted | read back | landed | encoding | attempt | device said',
-      ...verified.map(
-        (c) =>
-          `${c.name || '#' + c.paramId} | ${c.wanted} | ${
-            c.readBack === null ? 'unreadable' : c.readBack
-          } | ${c.landed ? 'yes' : 'NO'} | ${c.encoding ? 'cont' : 'disc'} | ${c.attempt} | ${
-            c.deviceOk === undefined ? '—' : c.deviceOk ? 'ok' : 'ok:false'
-          }`
-      ),
-      '',
-      'parameter | wanted | sent | means | range | encoding',
-      ...current.map((r) => {
-        const means = r.sent === null || !r.range ? '—' : round4(fromNormalized(r.sent, r.range))
-        const range = r.range
-          ? `${r.range.min}–${r.range.max}${r.range.log ? ' log' : ''}${r.outOfRange ? ' OUTSIDE' : ''}`
-          : 'NO RANGE'
-        return `${r.name || '#' + r.paramId} | ${r.wanted} | ${r.sent === null ? 'refused' : round4(r.sent)} | ${means} | ${range} | ${r.continuous ? 'cont' : 'disc'}`
-      })
-    ]
-    try {
-      await navigator.clipboard.writeText(lines.join('\n'))
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2500)
-    } catch {
-      setCopied(false)
-    }
   }
 
   const suspicious = rows.filter(
@@ -122,9 +120,6 @@ export default function Diagnostics() {
           <div className="diag-actions">
             <button className="chip" onClick={refresh}>
               Refresh
-            </button>
-            <button className="chip" onClick={copy}>
-              {copied ? 'Copied' : 'Copy all as text'}
             </button>
             <button
               className="chip"
