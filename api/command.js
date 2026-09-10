@@ -238,6 +238,17 @@ never a failure and is never off topic: leave "refused" empty for it. "refused"
 is only for a change that cannot be made, and it says why and what would work
 instead. Never tell the player a question is not about the preset or the rig.
 
+ADDING BLOCKS
+
+"placeable" is every block this unit can place, by name. It is the unit's whole
+list, not the preset's: a block absent from the grid is still placeable. The
+player says "whammy", "pitch shifter", "overdrive", "octaver"; the unit says
+Pitch, Drive — put the player's word in "text" and the app resolves it against
+the unit's names and aliases. If "placeable" is empty and "placeableProblem"
+says why, the list could not be read this time: say that, offer to try again,
+and never conclude the unit has no such block. Never tell the player to add a
+block by hand — adding blocks is yours to do.
+
 AN EMPTY PRESET
 
 To add one block: kind placeBlock with text = its name from the placeable list,
@@ -407,7 +418,8 @@ export default async function handler(req, res) {
     history,
     design,
     taste,
-    corrections
+    corrections,
+    placeableProblem
   } = req.body || {}
 
   if (!instruction || typeof instruction !== 'string') {
@@ -464,6 +476,13 @@ export default async function handler(req, res) {
       params: (b.params || []).map(({ does, ...rest }) => rest)
     })),
     placeable: grid?.palette || [],
+    /*
+     * An empty palette with a reason is a read that failed, not a unit with
+     * no blocks — the model once told a player their FM3 had no Pitch block
+     * to place. The reason goes in so the answer can be "try again" rather
+     * than "this unit can't".
+     */
+    placeableProblem: typeof placeableProblem === 'string' && placeableProblem ? placeableProblem : undefined,
     /*
      * The tone this conversation designed, with the designer's reasoning.
      *

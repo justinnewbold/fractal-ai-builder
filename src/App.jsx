@@ -47,7 +47,7 @@ import ParamSearch from './components/ParamSearch'
 import Assistant from './components/Assistant'
 import UpdateNotice from './components/UpdateNotice'
 import Updates, { UpdateReadyNotice } from './components/Updates'
-import { validatePlan, replyFor, runPlan } from './lib/actions'
+import { validatePlan, replyFor, runPlan, resolvePlaceable } from './lib/actions'
 import { listPresets, newestFirst } from './lib/history'
 import {
   profileFrom,
@@ -97,7 +97,8 @@ import {
   noteSceneNames,
   readSceneNames,
   currentDeviceSlug,
-  setTelemetryMode
+  setTelemetryMode,
+  placeableBlocks
 } from './lib/forgefx'
 import { savePreset, buildEntry, deletePreset, typicalMs, notOnAccount } from './lib/history'
 import { costOf } from './lib/cost'
@@ -1980,6 +1981,67 @@ export default function App() {
     setHistoryKey((k) => k + 1)
   }
 
+  /**
+   * Put the blocks a design asked for onto the grid, by name.
+   *
+   * Names arrive as the designer wrote them — "delay", "pitch shifter /
+   * whammy" — and resolve against the unit's own list, aliases included, so
+   * "whammy" becomes the Pitch block. Anything the unit does not offer, or
+   * that has no free slot, is left for the note under the design. Returns
+   * the labels of what landed. The same verbatim copy of the slot is taken
+   * before the first structural write as the chain build takes, for the
+   * same reason; over the link a backup is refused and the edit buffer is
+   * still undone by reloading the preset.
+   */
+  const placeWanted = async (wanted, placed) => {
+    let list = []
+    try {
+      list = await placeableBlocks()
+    } catch {
+      return []
+    }
+    const slugs = []
+    for (const name of wanted) {
+      const hit = resolvePlaceable(list, name)
+      if (hit && !slugs.includes(hit.slug) && !placed.some((b) => b.slug === hit.slug)) slugs.push(hit.slug)
+    }
+    if (!slugs.length) return []
+
+    if (!safety && typeof preset?.number === 'number') {
+      try {
+        const dump = await backupPreset(preset.number)
+        if (dump?.bytes?.length) setSafety({ number: preset.number, name: preset.name, bytes: dump.bytes })
+      } catch {
+        // Not every device exposes the dump path, and the link refuses it.
+      }
+    }
+
+    const plan = validatePlan(
+      {
+        actions: slugs.map((slug) => ({
+          kind: 'placeBlock',
+          text: slug,
+          value: null,
+          row: null,
+          col: null,
+          why: 'the tone wanted it'
+        }))
+      },
+      placed,
+      { ...(device?.capabilities || {}), remote: remoteActive() }
+    )
+    const failed = new Set(
+      await runPlan(plan.actions, (done, total, label) => setProgress(`${done} of ${total} - ${label}`))
+    )
+    // runPlan reports failures by label; what is not in that list landed.
+    const landed = plan.actions
+      .map((a) => a.label)
+      .filter((label) => ![...failed].some((f) => String(f).includes(label)))
+      .map((label) => label.replace(/^Add a /, ''))
+    if (landed.length) record('grid', `Added ${landed.join(', ')} for the tone`, [], true)
+    return landed
+  }
+
   const generate = async (description, against = null, opts = {}) => {
     /*
      * Ask once, before the model runs. Asking afterwards would mean paying for
@@ -2039,6 +2101,37 @@ export default function App() {
       const validated = validateSpec(spec, schema, sceneCount, channelNames)
       validated.spec = spec
       validated.description = description
+
+      /*
+       * A tone that wanted a block the preset lacks gets the block.
+       *
+       * The designer is told to work with what is placed and to list the gaps
+       * — so "Killswitch Militia" came back dialled around a Whammy it could
+       * not reach, with a note to go and add a pitch block by hand and ask
+       * again. "I thought it can change blocks out freely." It can: placing
+       * is the chat's job, and this is the app doing it on the design's
+       * behalf. The wanted blocks that the unit offers go into free slots,
+       * and the tone is designed once more against the chain it asked for.
+       * Once — a second round that still wants something is shown as it is,
+       * with the note, rather than looping.
+       */
+      if (!opts.placedWanted && validated.wanted?.length) {
+        const added = await placeWanted(validated.wanted, against || blocks)
+        if (added.length) {
+          setTurns((prev) => [
+            ...prev,
+            {
+              role: 'system',
+              text: `Added ${added.join(', ')} — the tone wanted ${
+                added.length === 1 ? 'it' : 'them'
+              } — and designing again against the new chain.`
+            }
+          ])
+          const fresh = (await read()) || []
+          return await generate(description, fresh, { ...opts, placedWanted: true })
+        }
+      }
+
       /*
        * Carried up beside the result rather than left buried in the spec, so
        * the panel that explains a tone reads it from one place whether the
@@ -2627,18 +2720,28 @@ export default function App() {
       })
 
       setProgress(`${THINKING}…`)
-      // The placeable palette rides along so "add a reverb" is sayable: the
-      // model can only speak in names it has been shown, and type codes differ
-      // per unit. Cached per device inside blockCatalog's own layer.
+      /*
+       * The placeable palette rides along so "add a reverb" is sayable: the
+       * model can only speak in names it has been shown, and type codes differ
+       * per unit.
+       *
+       * This called blockCatalog() without ever importing it. The call threw
+       * "blockCatalog is not defined", the catch below swallowed it, and the
+       * chat was handed an empty list on every request from every device —
+       * which is why it told a player "this preset's placeable-block list is
+       * coming through empty" and declined to add a Pitch block an FM3 has
+       * always had. The read is imported now, remembered per unit (see
+       * lib/palette) so a phone whose read fails still has last time's list,
+       * and a failure with nothing remembered is SAID rather than emptied.
+       */
       let palette = []
+      let placeableProblem = null
       try {
-        const cat = await blockCatalog()
-        palette = (Array.isArray(cat) ? cat : cat?.blocks || []).map((b) => ({
-          slug: b.slug,
-          name: b.name
-        }))
-      } catch {
-        // A unit that won't list its palette just can't be added to by name.
+        palette = (await placeableBlocks()).map((b) => ({ slug: b.slug, name: b.name }))
+      } catch (err) {
+        placeableProblem = `The block list could not be read from the ${
+          remoteActive() ? 'Mac over the link' : 'unit'
+        }: ${err?.message || 'no answer'}.`
       }
 
       const res = await fetch(aiUrl('/api/command', getHost()), {
@@ -2648,6 +2751,7 @@ export default function App() {
           instruction,
           device,
           grid: { ...(device?.capabilities?.grid || {}), palette },
+          placeableProblem,
           blocks: withPositions,
           scene,
           sceneNames,

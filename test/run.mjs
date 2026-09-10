@@ -22,6 +22,7 @@ import * as gigSize from '../src/lib/gigSize.js'
 import * as marks from '../src/lib/presetMarks.js'
 import * as setlists from '../src/lib/setlists.js'
 import { historyTurns, describeDesign } from '../api/command.js'
+import * as palette from '../src/lib/palette.js'
 import { readFileSync as readSrc } from 'node:fs'
 import {
   patchSchemaValue,
@@ -5678,6 +5679,73 @@ test('placeable names resolve however the player said them', async () => {
   assert.equal(resolvePlaceable(palette, 'vol/pan').page, 102)
   assert.equal(resolvePlaceable(palette, 'rev').page, 66)
   assert.equal(resolvePlaceable(palette, 'chorus'), null)
+
+  /*
+   * What the player calls it against what the unit calls it. "Whammy" is a
+   * Pitch block; a design that wanted a "pitch shifter / whammy" and a chat
+   * asked to "add a whammy" both have to land on it, or the answer is "this
+   * unit has no block called whammy" — false, and said.
+   */
+  const fm3 = [
+    { slug: 'pitch', name: 'Pitch', page: 110 },
+    { slug: 'drive', name: 'Drive', page: 118 },
+    { slug: 'gate', name: 'Gate', page: 50 },
+    { slug: 'geq', name: 'Graphic EQ', page: 90 },
+    ...palette
+  ]
+  assert.equal(resolvePlaceable(fm3, 'whammy').slug, 'pitch')
+  assert.equal(resolvePlaceable(fm3, 'pitch shifter').slug, 'pitch')
+  assert.equal(resolvePlaceable(fm3, 'pitch shifter / whammy').slug, 'pitch')
+  assert.equal(resolvePlaceable(fm3, 'octaver').slug, 'pitch')
+  assert.equal(resolvePlaceable(fm3, 'overdrive').slug, 'drive')
+  assert.equal(resolvePlaceable(fm3, 'a distortion pedal'), null, 'a sentence matched a block')
+  assert.equal(resolvePlaceable(fm3, 'noise gate').slug, 'gate')
+  assert.equal(resolvePlaceable(fm3, 'graphic eq').slug, 'geq')
+  assert.equal(resolvePlaceable(fm3, 'echo').slug, 'delay')
+  assert.equal(resolvePlaceable(fm3, 'Pitch 1').slug, 'pitch')
+  assert.equal(resolvePlaceable(fm3, 'flanger'), null, 'a block the unit lacks was invented')
+})
+
+test('the block list is remembered per unit, and a failed read says so', async () => {
+  /*
+   * GET /blocks is a fixed list on the server and cannot be empty on an FM3.
+   * The chat was handed an empty one anyway — App called blockCatalog()
+   * without importing it, the catch swallowed "not defined", and every
+   * request from every device went out with nothing placeable. Now the read
+   * is remembered once it works, and a failure with nothing remembered is a
+   * failure, with words, not an empty unit.
+   */
+  const { normalizePalette, cachedPalette, rememberPalette, paletteFor } = palette
+  assert.deepEqual(normalizePalette(null), [])
+  assert.deepEqual(normalizePalette({ error: 'x' }), [])
+  assert.equal(normalizePalette([{ slug: 'amp', name: 'Amp', page: 58 }, { name: 'no slug' }, null]).length, 1)
+  assert.equal(normalizePalette({ blocks: [{ slug: 'cab' }] })[0].slug, 'cab')
+
+  const mem = new Map()
+  const store = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, v) }
+  assert.equal(cachedPalette('fm3', store), null)
+  assert.equal(rememberPalette('fm3', [], store), false, 'an empty list was kept as a list')
+  assert.equal(rememberPalette('fm3', [{ slug: 'pitch', name: 'Pitch', page: 110 }], store), true)
+  assert.equal(cachedPalette('fm3', store)[0].slug, 'pitch')
+  assert.equal(cachedPalette('am4', store), null, 'one unit reads another unit’s list')
+
+  // A good read is kept and served; a bad read serves what was kept.
+  const good = await paletteFor('am4', async () => [{ slug: 'amp', name: 'Amp', page: 1 }], store)
+  assert.equal(good.fromCache, false)
+  assert.equal(cachedPalette('am4', store)[0].slug, 'amp')
+  const bad = await paletteFor('am4', async () => { throw new Error('Your Mac didn’t answer.') }, store)
+  assert.equal(bad.fromCache, true)
+  assert.equal(bad.list[0].slug, 'amp')
+  assert.match(bad.error, /didn’t answer/)
+  const empty = await paletteFor('am4', async () => [], store)
+  assert.equal(empty.fromCache, true, 'an empty answer replaced the remembered list')
+  // Nothing remembered: the failure is the answer.
+  await assert.rejects(paletteFor('vp4', async () => { throw new Error('no answer') }, store), /no answer/)
+  await assert.rejects(paletteFor('vp4', async () => [], store), /empty block list/)
+  // Unreadable storage is no storage, never a throw.
+  const broken = { getItem: () => { throw new Error('blocked') }, setItem: () => { throw new Error('blocked') } }
+  assert.equal(cachedPalette('fm3', broken), null)
+  assert.equal((await paletteFor('fm3', async () => [{ slug: 'amp' }], broken)).list.length, 1)
 })
 
 console.log('\nxy pad')
@@ -7154,7 +7222,7 @@ test('the chat is the player’s Fractal agent, not a command parser', () => {
   // It is given what it needs to answer: the design and its reasoning, and
   // the taste profile the designer already gets.
   const handler = command.slice(command.indexOf('export default async function handler'))
-  assert.match(handler, /design,\s*\n\s*taste,\s*\n\s*corrections\s*\n\s*\} = req\.body/, 'the route does not read the design, taste or corrections')
+  assert.match(handler, /design,\s*\n\s*taste,\s*\n\s*corrections[\s\S]{0,40}\} = req\.body/, 'the route does not read the design, taste or corrections')
   assert.match(handler, /design: describeDesign\(design\)/, 'the design never reaches the model state')
   assert.match(command, /That\s+summary IS the reasoning behind the choices/, 'the model is not told where the why lives')
   assert.match(handler, /historyTurns\(history\)/, 'the transcript is not passed through the one labelled reader')
@@ -7232,6 +7300,40 @@ test('the chat reads the transcript with the notes labelled, and the design said
   assert.equal(d.changes[1].bypassed, true)
   assert.equal(d.changes[1].model, undefined)
   assert.equal(describeDesign({ changes: [] }).applied, 'designed, not yet written')
+})
+
+test('the chat can add blocks: the list reaches it, a failed read is said, a design gets what it wanted', () => {
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  const command = readSrc(new URL('../api/command.js', import.meta.url), 'utf8')
+  const forge = readSrc(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+  const actions = readSrc(new URL('../src/lib/actions.js', import.meta.url), 'utf8')
+
+  // The read that was called and never imported.
+  const imports = app.slice(0, app.indexOf('export default function App'))
+  assert.match(imports, /\bplaceableBlocks\b/, 'the block list is still not imported into App')
+  assert.ok(!/await blockCatalog\(\)/.test(app), 'App still calls the raw catalogue, which it never imported')
+  assert.match(forge, /export const placeableBlocks = \(\) =>\s*\n?\s*paletteFor\(currentDeviceSlug\(\), blockCatalog\)/, 'the remembered list is not served from forgefx')
+  assert.equal((actions.match(/await d\.placeableBlocks\(\)/g) || []).length, 2, 'placing and building do not read the remembered list')
+
+  // A failure is said, not emptied.
+  const askFor = app.slice(app.indexOf('const askFor = async'), app.indexOf("aiUrl('/api/command'"))
+  assert.match(askFor, /placeableProblem = `The block list could not be read/, 'a failed block list is still an empty list')
+  const send = app.slice(app.indexOf("aiUrl('/api/command'"), app.indexOf("aiUrl('/api/command'") + 1800)
+  assert.match(send, /placeableProblem,/, 'the reason never reaches the route')
+  assert.match(command, /placeableProblem: typeof placeableProblem === 'string'/, 'the route drops the reason')
+  assert.match(command, /\nADDING BLOCKS\n/, 'the model is not told how adding works')
+  assert.match(command, /Never tell the player to add a\s+block by hand/, 'the model may still send the player to the grid')
+  assert.match(command, /never conclude the unit has no such block/)
+
+  // A design that wanted a block gets it, once.
+  const gen = app.slice(app.indexOf('const generate = async'), app.indexOf('const generate = async') + 6000)
+  assert.match(gen, /if \(!opts\.placedWanted && validated\.wanted\?\.length\)/, 'a design that wanted blocks is shown as it is')
+  assert.match(gen, /const added = await placeWanted\(validated\.wanted, against \|\| blocks\)/)
+  assert.match(gen, /return await generate\(description, fresh, \{ \.\.\.opts, placedWanted: true \}\)/, 'the redesign is not capped at one round')
+  const pw = app.slice(app.indexOf('const placeWanted = async'), app.indexOf('const generate = async'))
+  assert.match(pw, /resolvePlaceable\(list, name\)/, 'wanted names are not resolved against the unit’s list')
+  assert.match(pw, /kind: 'placeBlock'/)
+  assert.match(pw, /backupPreset\(preset\.number\)/, 'the first structural write takes no safety copy')
 })
 
 test('the model is told what volume means, and never to answer with silence', () => {
