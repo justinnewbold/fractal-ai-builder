@@ -413,7 +413,16 @@ export function run(test) {
       // The swipe surface. It wraps the views rather than sitting above them
       // and adds no height of its own: the opening tag falls in this slice
       // only because the first view is inside it.
-      'Screens'
+      'Screens',
+      /*
+       * The two update notices, which moved from ABOVE the bar to under it so
+       * that the bar could be pinned — a page reserving a strip above the bar
+       * is a bar that travels every time the screen is touched. They render
+       * nothing at all unless there is an update, and when there is one, being
+       * the first thing under the bar is the point of them.
+       */
+      'UpdateNotice',
+      'UpdateReadyNotice'
     ])
     // The assistant used to be on this list — it sat above every screen at
     // once. It is the Ask tab now, which is what took the chrome down again.
