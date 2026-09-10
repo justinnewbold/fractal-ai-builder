@@ -3,6 +3,19 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.134.0
+
+**A reply starts in view, and the two sides of the chat look different.**
+"After typing a question and the AI gives an output it leaves it at the
+bottom of the chat, so I have to scroll back to the top to see what it
+started saying." A new reply now lands with its first line at the top of
+the box; your own question, a note, and the working line still go to the
+bottom, and the actions running under a reply no longer pull it away
+mid-read. And "make the chat more obvious of whether I'm talking or the
+AI is talking": your words sit to the right in an amber-tinted bubble,
+the agent's to the left in a bubble of their own; notes about what the
+app did sit small and quiet down the middle.
+
 ## 7.133.1
 
 **No code words in the chat.** It told a player about "the designTone

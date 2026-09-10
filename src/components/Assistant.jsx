@@ -130,6 +130,27 @@ function useTypedSuggestion(active, own = [], silent = false) {
   return { shown: text, full }
 }
 
+/*
+ * The nearest thing that scrolls, walking up from an element.
+ *
+ * In the Ask sheet the log is its own scrollbox; on Create it is the one
+ * scroller on the screen; inside a wide-screen rail it is the sheet body.
+ * Asking the DOM beats hard-coding any of them — the same reasoning as the
+ * preset list's scroller.
+ */
+function scrollerOf(el) {
+  for (let n = el?.parentElement; n; n = n.parentElement) {
+    const oy = getComputedStyle(n).overflowY
+    if ((oy === 'auto' || oy === 'scroll') && n.scrollHeight > n.clientHeight + 1) return n
+  }
+  return null
+}
+
+/** How far down `el` sits inside `box`, in the box's own scroll coordinates. */
+function offsetWithin(el, box) {
+  return el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop
+}
+
 export default function Assistant({
   turns,
   onAsk,
@@ -206,17 +227,43 @@ export default function Assistant({
     busy
   )
 
+  /*
+   * Where the conversation lands after something is said.
+   *
+   * "After typing a question and the AI gives an output it leaves it at the
+   * bottom of the chat, so I have to scroll back to the top to see what it
+   * started saying." Pinning to the bottom is right for the player's own
+   * turn and for the working line under it — that is where the next thing
+   * appears. It is wrong for an answer longer than the box: the end of a
+   * reply is not where reading starts.
+   *
+   * So a new reply is brought to the TOP of the box, and a new question, a
+   * note, or a progress tick goes to the bottom as before. A progress tick
+   * that lands after a reply leaves the reply where it is — the actions
+   * running under an answer must not yank it away mid-read.
+   *
+   * Only inside the nearest scrollbox, never the page. This used to be
+   * scrollIntoView, which scrolls every scrollable ancestor including the
+   * document: each tick yanked the whole screen down to this element, against
+   * the player's own scrolling. The page is not this component's to move.
+   */
+  const lastTurn = useRef(null)
+  const seenTurns = useRef(0)
   useEffect(() => {
-    /*
-     * Keep the conversation pinned to its latest turn — but only inside the
-     * log's own scrollbox. This used to be scrollIntoView, which scrolls every
-     * scrollable ancestor including the page: each new turn or progress tick
-     * yanked the whole screen down to this element, and during a generation it
-     * kept doing it against the player's own scrolling. The page is not this
-     * component's to move.
-     */
-    const log = tail.current?.parentElement
-    if (log) log.scrollTop = log.scrollHeight
+    const el = tail.current
+    if (!el) return
+    const box = scrollerOf(el)
+    if (!box) return
+    const landed = turns.length !== seenTurns.current
+    seenTurns.current = turns.length
+    const last = turns[turns.length - 1]
+    if (last?.role === 'assistant' && lastTurn.current) {
+      // A reply: its first line at the top of the box. Left alone when only
+      // the progress line changed underneath it.
+      if (landed) box.scrollTop = Math.max(0, offsetWithin(lastTurn.current, box) - 4)
+      return
+    }
+    box.scrollTop = box.scrollHeight
   }, [turns, progress])
 
   /*
@@ -334,7 +381,13 @@ export default function Assistant({
 
   /** One turn, drawn the same wherever it falls relative to the design. */
   const renderTurn = (turn, i) => (
-          <div key={i} className={`turn turn-${turn.role}`}>
+          <div
+            key={i}
+            className={`turn turn-${turn.role}`}
+            ref={i === turns.length - 1 ? lastTurn : null}
+            /* Said for a screen reader; on screen the side and the colour say it. */
+            aria-label={turn.role === 'user' ? 'You' : turn.role === 'assistant' ? 'Agent' : undefined}
+          >
             {/* Hand edits are events, not speech: "Named scene 4 Solo" is a
                 thing that happened, and prefixing it with the player's name
                 read as words put in their mouth. They keep their role — the

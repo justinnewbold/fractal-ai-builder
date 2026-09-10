@@ -4740,11 +4740,37 @@ ol.action-list li.destructive::marker {
   color: var(--silk-faint);
 }
 
-/* The player's own words are set apart so a long exchange stays readable. */
+/*
+ * Who is talking, without a name on every line.
+ *
+ * "Make the chat more obvious of whether I'm talking or the AI is talking."
+ * A thin rule in the margin was the whole difference, and at a glance a long
+ * exchange read as one column of text. Now the two sides are two shapes: the
+ * player's words sit to the right in an amber-tinted bubble, the agent's to
+ * the left in a bubble on the chassis colour. The shape and the side carry it,
+ * so nothing wears a "You:" — the transcript has been through that once and
+ * it read as words put in the player's mouth.
+ */
+.turn-user {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .turn-user .turn-text {
-  padding-left: var(--s-2);
-  border-left: 2px solid var(--rule);
-  color: var(--silk-dim);
+  max-width: 88%;
+  padding: var(--s-2) var(--s-3);
+  background: color-mix(in srgb, var(--signal) 14%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--signal) 45%, var(--rule));
+  border-radius: var(--r-2) var(--r-2) var(--r-1) var(--r-2);
+  color: var(--silk);
+}
+
+.turn-assistant {
+  max-width: 94%;
+  padding: var(--s-2) var(--s-3);
+  background: var(--chassis);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2) var(--r-2) var(--r-2) var(--r-1);
 }
 
 .turn-assistant .turn-text {
@@ -4939,11 +4965,14 @@ button.send-btn.stopping {
 }
 
 /* A change made by hand: context in the transcript, not a spoken turn. */
+/* Notes — what the app did, what a hand did — are neither side: small,
+   quiet, and down the middle, so they read as events between the bubbles. */
 .turn-system .turn-text,
 .turn-hand .turn-text {
   font-size: var(--f-2);
   color: var(--silk-dim);
   font-style: italic;
+  text-align: center;
 }
 
 /* A hand edit is an event in the conversation: a quiet rule and a mark in
@@ -4951,6 +4980,7 @@ button.send-btn.stopping {
 .turn-hand .turn-text {
   padding-left: var(--s-3);
   border-left: 2px solid var(--silk-faint);
+  text-align: left;
 }
 
 /* Design view no longer takes input — it explains where the input went. */
