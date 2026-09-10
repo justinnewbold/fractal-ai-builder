@@ -35,6 +35,8 @@ export default function TopBar({
   dirty,
   onOpenPresets,
   onOpenSettings,
+  /* Given only when there is an output level to move — see the speaker below. */
+  onOpenVolume,
   link,
   onLinkAction,
   presetsOpen,
@@ -147,6 +149,53 @@ export default function TopBar({
         </span>
 
         <LinkChip compact link={link} onAction={onLinkAction} />
+
+        {/*
+          The volume, behind a speaker rather than across the top of Play.
+
+          "Can we set that to be a slide-up menu? Put a sound button that looks
+          like a speaker in the header, and when it's tapped you can slide the
+          volume left or right or do the plus minus thing."
+
+          It was a permanent row above the preset tile — the control you reach
+          for between songs, taking a strip of the one screen whose currency is
+          scene buttons you can hit without looking. Behind the speaker it costs
+          a tap when it is wanted and nothing when it is not.
+
+          Absent, not disabled, on a preset whose output block the app cannot
+          reach: a speaker that opens an empty sheet is worse than no speaker.
+        */}
+        {onOpenVolume ? (
+          <button className="topbar-volume" onClick={onOpenVolume} aria-label="Volume">
+            {/* Drawn rather than an emoji: this sits beside a 15px version
+                number on a bar that is already tight, and a colour emoji at
+                that size is a smudge. currentColor, so it takes the bar's ink
+                in both themes. */}
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path
+                d="M4 9.5h3.5L12 5.5v13L7.5 14.5H4z"
+                fill="currentColor"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M15.5 9.2a4 4 0 0 1 0 5.6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+              <path
+                d="M18.2 6.6a7.7 7.7 0 0 1 0 10.8"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        ) : null}
 
         {/* Setup is a sheet now, not a fold under the bar. It carries the
             host address, the sign-in, the ports and the diagnostics, so it was

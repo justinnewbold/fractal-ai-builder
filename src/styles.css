@@ -453,6 +453,41 @@ button.topbar-preset:active:not(:disabled) {
  * needed when a screenshot arrives with something wrong in it.
  */
 
+/*
+ * The speaker that opens the volume, beside the gear.
+ *
+ * Same box as the gear so the bar's right-hand end reads as a pair of icons
+ * rather than an icon and an afterthought, and the same touch floor: this is
+ * pressed between songs with one hand.
+ */
+button.topbar-volume {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--silk-dim);
+}
+
+button.topbar-volume svg {
+  width: 22px;
+  height: 22px;
+}
+
+@media (hover: hover) {
+  button.topbar-volume:hover:not(:disabled) {
+    color: var(--silk);
+  }
+}
+
+button.topbar-volume:active:not(:disabled) {
+  color: var(--silk);
+}
+
 button.topbar-gear {
   flex: 0 0 auto;
   display: inline-flex;
