@@ -445,13 +445,13 @@ button.topbar-preset:active:not(:disabled) {
   letter-spacing: 0;
 }
 
-/* On a phone the bar is already tight — the name lost to it once before, so
-   the patch number goes rather than the name. */
-@media (max-width: 620px) {
-  .topbar-version {
-    display: none;
-  }
-}
+/*
+ * On a phone too. It was dropped there to give the preset name the room —
+ * and then asked for back: "Add the app version number to the header." The
+ * name is also on the big preset tile under the bar on Play, so the bar's
+ * copy clipping a little is the cheaper loss; the version is the first thing
+ * needed when a screenshot arrives with something wrong in it.
+ */
 
 button.topbar-gear {
   flex: 0 0 auto;
@@ -2194,8 +2194,9 @@ button.view-tab.current:not(:disabled) {
 /* ---------- gig mode ---------- */
 
 /* Big targets, high contrast, nothing that designs anything. */
+/* Was 26px: "reduce the padding" — the volume row sits right under the bar. */
 .gig {
-  margin-top: 26px;
+  margin-top: var(--s-3);
 }
 
 /* The 24px inset above and below dated from when this box also carried a
@@ -2216,12 +2217,18 @@ button.view-tab.current:not(:disabled) {
   display: grid;
 }
 
+/*
+ * One line: "put the number inline with the name and make the font the same
+ * size as the scenes." The slot number sits before the name at the same
+ * size, in the mono face and dimmer, so it reads as the tile's index the way
+ * a scene's number does — and the name is exactly a scene name's size.
+ */
 button.gig-name {
   display: flex;
-  flex-direction: column;
-  align-items: center;
+  flex-direction: row;
+  align-items: baseline;
   justify-content: center;
-  gap: var(--s-1);
+  gap: var(--s-2);
   width: 100%;
   min-height: var(--gig-tile, 62px);
   padding: var(--s-2) var(--s-3);
@@ -2236,7 +2243,8 @@ button.gig-name {
 }
 
 .gig-name-num {
-  font-size: var(--f-2);
+  flex: 0 0 auto;
+  font-size: var(--f-4);
   color: var(--silk-faint);
 }
 
@@ -2244,6 +2252,7 @@ button.gig-name {
   display: inline-flex;
   align-items: baseline;
   gap: var(--s-2);
+  min-width: 0;
   max-width: 100%;
 }
 
@@ -8184,14 +8193,20 @@ button.view-tab {
  * Screens.jsx already leaves any input its own sideways gesture, so a drag
  * along the track moves the volume and never turns the page.
  */
+/*
+ * "Make the volume slider smaller and reduce the padding." The row keeps its
+ * 44px targets — the track and the two steps are pressed mid-set — and gives
+ * up everything around them: the inset, the gap, half the margin, the width
+ * of the steps and the size of the knob.
+ */
 .gig-volume {
   display: grid;
   /* − · track · + · word over figure */
   grid-template-columns: auto 1fr auto auto;
   align-items: center;
-  gap: var(--s-2);
-  margin-bottom: var(--s-2);
-  padding: 0 var(--s-1);
+  gap: var(--s-1);
+  margin-bottom: var(--s-1);
+  padding: 0;
 }
 
 /*
@@ -8202,7 +8217,7 @@ button.view-tab {
  * pressed mid-set, in the dark, and the size steps are not.
  */
 button.gig-volume-step {
-  width: 44px;
+  width: 36px;
   min-height: 44px;
   padding: 0;
   display: flex;
@@ -8227,7 +8242,7 @@ button.gig-volume-step:disabled {
   flex-direction: column;
   align-items: flex-end;
   gap: var(--s-1);
-  min-width: 8ch;
+  min-width: 6ch;
   line-height: 1;
 }
 
@@ -8273,9 +8288,9 @@ input.gig-volume-slider::-webkit-slider-runnable-track {
 input.gig-volume-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 28px;
-  height: 28px;
-  margin-top: -11px; /* (28 − 6) / 2: centred on the track */
+  width: 22px;
+  height: 22px;
+  margin-top: -8px; /* (22 − 6) / 2: centred on the track */
   border-radius: 50%;
   background: var(--silk);
   border: 2px solid var(--chassis);
@@ -8295,8 +8310,8 @@ input.gig-volume-slider::-moz-range-progress {
 }
 
 input.gig-volume-slider::-moz-range-thumb {
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: var(--silk);
   border: 2px solid var(--chassis);
@@ -8353,14 +8368,16 @@ input.gig-volume-slider::-moz-range-thumb {
  *
  * "Make the connected button just a round green checkmark when it is
  * connected and a red X when it's not, the same size as the settings gear."
- * The button is the gear's box — 44px both ways, no border, nothing behind
- * it — and the mark inside is a 28px disc: green with a tick when the link
- * is up, red with a cross when it is not, amber with dots while it is on
- * its way. The base rule's word styles stay for the sentence form the
- * connect screen still draws.
+ * That was the mark; the rule below is what replaced it. The base rule's
+ * word styles stay for the sentence form the connect screen still draws.
+ */
+/*
+ * And then a word again. "Change the circle connected button to just the
+ * word connected (green), disconnected (red)." The button keeps the gear's
+ * height so it is still a target; the word inside it is the same silkscreen
+ * face as the unit's name, coloured by the state it names.
  */
 button.phone-chip.compact {
-  min-width: 44px;
   min-height: 44px;
   justify-content: center;
   gap: 0;
@@ -8368,31 +8385,26 @@ button.phone-chip.compact {
   border-color: transparent;
 }
 
-.phone-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
+.phone-word {
   font-family: var(--display);
-  font-size: var(--f-4);
   font-weight: 700;
+  font-size: var(--f-1);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   line-height: 1;
-  color: #ffffff;
+  white-space: nowrap;
 }
 
-.phone-mark.ok {
-  background: var(--ok);
+.phone-word.ok {
+  color: var(--ok);
 }
 
-.phone-mark.no {
-  background: var(--fault);
+.phone-word.no {
+  color: var(--fault);
 }
 
-.phone-mark.wait {
-  background: var(--signal);
-  color: var(--on-signal);
+.phone-word.wait {
+  color: var(--signal);
 }
 
 /* The chip's tone colours drew a border under the word; on a bare mark they

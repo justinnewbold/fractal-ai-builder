@@ -3,6 +3,16 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.137.0
+
+**Four Play-screen tweaks.** The version number is in the header on a
+phone as well as a desktop. The round green tick beside the gear is the
+word again: CONNECTED in green, DISCONNECTED in red, CONNECTING in amber
+while it is on its way. The volume row is tighter — smaller knob, narrower
+plus and minus, no inset, half the space around it — without any of its
+targets getting shorter. And the preset tile puts the slot number on the
+same line as the name, both at the size of a scene name.
+
 ## 7.136.0
 
 **A wait that ends, a line that says what it is doing, and a chat that

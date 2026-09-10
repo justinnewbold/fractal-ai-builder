@@ -1237,15 +1237,22 @@ export function run(test) {
      * gear." In the bar the chip is a mark; the sentence stays on the button
      * for a screen reader and in the popover for everyone.
      */
-    assert.match(chip, /const mark = said\.tone === 'good' \? 'ok' : said\.tone === 'busy' \? 'wait' : 'no'/, 'the mark no longer follows the link tone')
-    assert.match(chip, /compact \? \(\s*<span className=\{`phone-mark \$\{mark\}`\} aria-hidden="true">/, 'the bar chip is a word again')
-    assert.match(chip, /aria-label=\{`\$\{said\.sentence\} — phone remote options`\}/, 'the mark has no words for a screen reader')
+    /*
+     * And then: "Change the circle connected button to just the word
+     * connected (green), disconnected (red)." The word follows the same
+     * three states the mark did, in the state's colour, and the button keeps
+     * the gear's height so it is still something a thumb can hit.
+     */
+    assert.match(chip, /const mark = said\.tone === 'good' \? 'ok' : said\.tone === 'busy' \? 'wait' : 'no'/, 'the word no longer follows the link tone')
+    assert.match(chip, /const word = mark === 'ok' \? 'connected' : mark === 'wait' \? 'connecting' : 'disconnected'/, 'the chip does not say connected or disconnected')
+    assert.match(chip, /compact \? \(\s*<span className=\{`phone-word \$\{mark\}`\} aria-hidden="true">\s*\{word\}/, 'the bar chip is a mark again, not the word')
+    assert.match(chip, /aria-label=\{`\$\{said\.sentence\} — phone remote options`\}/, 'the chip has no sentence for a screen reader')
     const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
-    const markCss = css.slice(css.lastIndexOf('The link chip in the bar is a mark'))
-    assert.match(markCss, /button\.phone-chip\.compact \{[^}]*min-width: 44px;\s*min-height: 44px/, 'the mark is not the gear\u2019s size')
-    assert.match(markCss, /\.phone-mark\.ok \{\s*background: var\(--ok\)/, 'connected is not green')
-    assert.match(markCss, /\.phone-mark\.no \{\s*background: var\(--fault\)/, 'not connected is not red')
-    assert.match(markCss, /\.phone-mark \{[^}]*border-radius: 50%/, 'the mark is not round')
+    const wordCss = css.slice(css.lastIndexOf('And then a word again'))
+    assert.match(wordCss, /button\.phone-chip\.compact \{[^}]*min-height: 44px/, 'the word is under the touch floor')
+    assert.match(wordCss, /\.phone-word\.ok \{\s*color: var\(--ok\)/, 'connected is not green')
+    assert.match(wordCss, /\.phone-word\.no \{\s*color: var\(--fault\)/, 'disconnected is not red')
+    assert.ok(!/\.phone-mark \{/.test(css), 'the round mark still has styling, which will dress up whatever gets that class next')
     assert.ok(!/addEventListener\('pointerdown'/.test(chip), 'the link chip keeps a private outside-tap listener')
     const scenes = read('components/Scenes.jsx')
     assert.match(scenes, /e\.key === 'Escape'\) \{\s*e\.stopPropagation\(\)\s*setRenaming\(null\)/, 'Escape does not leave the rename row, or leaves the sheet with it')
@@ -2124,21 +2131,17 @@ export function run(test) {
    * "The app version number is listed only in settings. I like to always know
    * easily what version we are working on."
    *
-   * On the bar, where it can be read without opening anything — and not on a
-   * phone, where the bar has no room to give: a long preset name is already
-   * clipped at 390px, and this measured as costing it nothing only because
-   * there is slack at desktop widths.
+   * On the bar, where it can be read without opening anything. It was kept
+   * off a phone's bar to give the preset name the room, and then asked for
+   * there too: "Add the app version number to the header." So it shows at
+   * every width now.
    */
-  test('the version is on the main screen, and not where the bar is full', () => {
+  test('the version is on the main screen, on a phone as well', () => {
     const bar = readFileSync(new URL('../src/components/TopBar.jsx', import.meta.url), 'utf8')
     assert.match(bar, /className="topbar-version mono"/, 'the version is only in Setup again')
     const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
-    const rule = css.slice(css.indexOf('.topbar-version'))
-    assert.match(
-      rule.slice(0, 400),
-      /max-width: 620px[\s\S]{0,120}\.topbar-version[\s\S]{0,60}display: none/,
-      'the version takes room from the preset name on a phone'
-    )
+    const hidden = [...css.matchAll(/\.topbar-version \{[^}]*display: none/g)]
+    assert.equal(hidden.length, 0, 'the version is hidden somewhere again — a phone is where it was asked for')
   })
 
   /*
@@ -3503,16 +3506,25 @@ export function run(test) {
     assert.ok(!/onSize=/.test(bare(app)), 'App still hands Play a size control')
 
     /*
-     * And the preset is a tile: number on top, name under it, one line, the
-     * height of a scene. "Add the preset number to it as well as the name."
+     * And the preset is a tile the height of a scene, with the number and
+     * the name on one line. "Add the preset number to it as well as the
+     * name", then "put the number inline with the name and make the font the
+     * same size as the scenes."
      */
     assert.match(preset, /className="gig-name-num mono">\{preset\?\.number \?\? '--'\}/, 'the preset tile has no slot number')
     assert.match(preset, /className="gig-name-word">\{presetLabel\(preset\)\}/, 'the preset tile has no name')
-    assert.ok(preset.indexOf('gig-name-num') < preset.indexOf('gig-name-word'), 'the number is not above the name')
+    assert.ok(preset.indexOf('gig-name-num') < preset.indexOf('gig-name-word'), 'the number is not before the name')
     const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
     const tileCss = css.match(/button\.gig-name \{([^}]*)\}/)?.[1] || ''
     assert.match(tileCss, /min-height: var\(--gig-tile, 62px\)/, 'the preset tile is not the height of a scene tile')
-    assert.match(tileCss, /flex-direction: column/, 'the number and the name are not stacked')
+    assert.match(tileCss, /flex-direction: row/, 'the number is stacked over the name again')
+    const numCss = css.match(/\.gig-name-num \{([^}]*)\}/)?.[1] || ''
+    const nameCss = css.match(/\.gig-name-word \{([^}]*)\}/)?.[1] || ''
+    const sceneCss = css.match(/button\.gig-scene\.named \.gig-scene-name \{([^}]*)\}/)?.[1] || ''
+    const size = (r) => r.match(/font-size: (var\(--f-\d\))/)?.[1]
+    assert.ok(size(sceneCss), 'a named scene no longer sets its size')
+    assert.equal(size(nameCss), size(sceneCss), 'the preset name is not the size of a scene name')
+    assert.equal(size(numCss), size(sceneCss), 'the slot number is not the size of the name beside it')
     assert.ok(!/clamp\(30px, 9vw, 52px\)/.test(css), 'the preset name is a headline again')
 
     /*

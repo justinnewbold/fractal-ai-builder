@@ -570,6 +570,9 @@ export default function Gig({
           disabled={!onPickPreset}
           aria-label={`Preset ${preset?.number ?? '--'} — ${presetLabel(preset)} — choose another preset`}
         >
+          {/* Number beside the name, not over it: "put the number inline
+              with the name". Same size as the name, dimmer, the way a scene
+              tile carries its index. */}
           <span className="gig-name-num mono">{preset?.number ?? '--'}</span>
           <span className="gig-name-row">
             <span className="gig-name-word">{presetLabel(preset)}</span>
