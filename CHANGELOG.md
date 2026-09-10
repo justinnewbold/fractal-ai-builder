@@ -3,6 +3,14 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.140.1
+
+**One line less in Setup on a phone.** "through your Mac" is gone: the header
+already says CONNECTED and Phone remote below it names the Mac, so it was the
+third thing in the sheet saying one fact. The address stays on the machine
+with the cable, where it is the thing you change, and the demo still says it
+is a simulation.
+
 ## 7.140.0
 
 **The built presets kept their output block.** "The volume slider disappeared

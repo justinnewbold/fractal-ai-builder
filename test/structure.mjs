@@ -3978,6 +3978,27 @@ export function run(test) {
     assert.match(src, /won't make a sound until the row is joined up/, 'a disconnected chain is reported in jargon, or not at all')
   })
 
+  test('a phone is not told three times which Mac it is talking to', () => {
+    /*
+     * "Remove where it says 'through your Mac'."
+     *
+     * On a phone that line was the third thing in the Setup sheet saying one
+     * fact: the header says CONNECTED, and Phone remote underneath names the
+     * Mac. The address stays where it means something — on the machine with
+     * the cable, where it is the thing you change — and the demo still says
+     * out loud that it is a simulation.
+     */
+    const detail = readFileSync(new URL('../src/components/DeviceDetail.jsx', import.meta.url), 'utf8')
+    /* Comments out first: the line this removed is quoted in the comment that
+       explains why it went, and a comment that can fail a test is a comment
+       nobody can write. */
+    const code = detail.replace(/\/\*[\s\S]*?\*\//g, ' ')
+    const markup = code.slice(code.indexOf('return ('))
+    assert.ok(!markup.includes("'through your Mac'"), 'the phone is told what it is connected through again')
+    assert.match(markup, /\{demo \|\| !remote \?/, 'the address line no longer decides whether it has anything to say')
+    assert.match(markup, /demo \? 'simulated' : getHost\(\)/, 'the demo no longer says it is a simulation, or the Mac has lost its address')
+  })
+
   test('a missing output block is said out loud, not shown as a missing slider', () => {
     /*
      * "The volume slider disappeared and no presets have sound."
