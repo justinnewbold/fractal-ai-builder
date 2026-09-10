@@ -4805,6 +4805,37 @@ test('a heartbeat keeps the long clock, and does not start the short one', async
   assert.equal(beats[2].thinkingMs, 320, 'the wait is not carried to the screen')
 })
 
+test('a heartbeat does not keep the wait alive for ever', async () => {
+  /*
+   * "Stuck thinking for almost 4 minutes, finally had to stop it."
+   *
+   * Every beat restarts the first-word clock, so once beats were arriving
+   * that clock never ran out and the only thing left was the hard cap — per
+   * attempt, and the retry doubled it. The thinking budget counts from the
+   * hello and ignores beats: a model that is alive and still has not begun
+   * is stopped there and told to the player in those words. And it is NOT
+   * asked again unasked, because it was plainly working — asking the same
+   * thing again in silence is what made one long wait into two.
+   */
+  const beats = []
+  for (let at = 40; at <= 400; at += 30) beats.push({ at, chunk: WAITING(at) })
+  const f = scheduledFetch([{ steps: [{ at: 10, chunk: OPEN }, ...beats], end: false }])
+  globalThis.fetch = f.fetch
+  const events = []
+  const t0 = Date.now()
+  await assert.rejects(
+    streamSpec({}, { timing: { stallMs: 60, firstMs: 60, thinkMs: 150, capMs: 2000 }, onEvent: (e) => events.push(e.kind) }),
+    (err) =>
+      err.generationFailure === 'stalled' &&
+      err.alive === true &&
+      /thought about it for \d+ seconds without starting/.test(err.message) &&
+      /Nothing was written to your unit/.test(err.message)
+  )
+  assert.ok(Date.now() - t0 < 1000, 'the wait ran to the hard cap — the thinking budget did nothing')
+  assert.equal(f.calls(), 1, 'a live, thinking model was asked again in silence')
+  assert.ok(!events.includes('retrying'))
+})
+
 test('a heartbeat is not mistaken for the model answering', async () => {
   /*
    * The distinction that matters: after a beat, silence still gets the first-

@@ -1398,6 +1398,8 @@ button.slot.current {
 .thinking-text {
   flex: 1;
   min-width: 0;
+  /* A long unbroken word wraps rather than widening the conversation. */
+  overflow-wrap: anywhere;
 }
 
 /*
@@ -1406,8 +1408,19 @@ button.slot.current {
  * wrapped — which on a phone is always — and a number alone on a third row is
  * how this looked like three status lines in the first place.
  */
+/*
+ * And it wraps. This whole span was held to one line, and the sentence that
+ * follows the time — "nothing has been sent to your unit yet" — is longer than
+ * a phone is wide: it ran off the right edge unfinished and, because a
+ * scrollbox that scrolls up and down also scrolls sideways once something in
+ * it is too wide, a thumb on the chat then slid the whole conversation left.
+ * Only the figure itself stays on one line, so "4m 20s" never breaks in two.
+ */
 .thinking-clock {
   opacity: 0.72;
+}
+
+.thinking-time {
   white-space: nowrap;
 }
 
@@ -4613,6 +4626,14 @@ ol.action-list li.destructive::marker {
 .assistant-log {
   max-height: 340px;
   overflow-y: auto;
+  /*
+   * Up and down only — the same guard the sheet body carries, for the same
+   * reason. Setting overflow-y alone makes overflow-x `auto` as well, so one
+   * line too wide for a phone turned the conversation into something a thumb
+   * could drag sideways. Anything that does not fit wraps or is a bug; it is
+   * never something to scroll to.
+   */
+  overflow-x: hidden;
   margin-bottom: 12px;
 }
 
@@ -4724,6 +4745,8 @@ ol.action-list li.destructive::marker {
   margin: 0;
   font-size: var(--f-3);
   line-height: 1.5;
+  /* A pasted link or a long preset name wraps rather than widening the log. */
+  overflow-wrap: anywhere;
 }
 
 /* A second paragraph of an answer stands off from the first. */

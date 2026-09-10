@@ -1780,8 +1780,16 @@ export default function App() {
              * are the ones worth reading. The attempt still shows, because two
              * ninety-second waits otherwise read as one that never ended.
              */
+            /*
+             * And WHAT it is thinking about. "It just says thinking" — a bare
+             * word for four minutes is a word nobody can act on. Which kind of
+             * run this is has been known since the request was built, so the
+             * line says it: designing a tone from nothing, or adjusting the
+             * one on screen. The attempt still shows, in words rather than a
+             * bracket — "second try" read as a label, not a fact.
+             */
             else if (e.kind === 'open')
-              setProgress(e.attempt ? `${THINKING}… (second try)` : `${THINKING}…`)
+              setProgress(e.attempt ? `${THINKING} — second try, the first got no answer…` : `${THINKING} — ${previous ? 'adjusting the tone' : 'designing your tone'}…`)
             /*
              * The wait is counted out loud — once. <Thinking> keeps a live
              * clock of its own, to the second, from when the request began.
@@ -2894,10 +2902,21 @@ export default function App() {
          * stale spec was refined against a stale empty schema, and the error
          * buried the success.
          */
+        /*
+         * Unless it is a different tone altogether. "Make a full Metallica
+         * preset" with a Killswitch design still on screen went down the
+         * refine path — adjusted the Killswitch tone into something else,
+         * kept its name on the card, and read as the app having lost the
+         * plot. The chat model is asked which it is (see api/command.js:
+         * `flag` on designTone), and a new sound starts over: the old design
+         * is shelved into the log as "Not sent", and the card under the chat
+         * is the tone that was actually asked for.
+         */
+        const startOver = design.flag === true
         if (builtBlocks) {
           setResult(null)
           await generate(design.text || instruction, builtBlocks)
-        } else if (result?.changes?.length) {
+        } else if (result?.changes?.length && !startOver) {
           // Refining means adjusting a design that produced something. A spec
           // whose every change was rejected is not a thing to build on.
           await refine(design.text || instruction)
@@ -3399,6 +3418,12 @@ export default function App() {
             title={result.presetName || 'The tone'}
             note={`${writeCount} change${writeCount === 1 ? '' : 's'}${
               withScenes && sceneWriteCount ? ` · ${sceneWriteCount} scene writes` : ''
+            }${
+              /* Still on screen while an adjustment to it runs — the old tone
+                 stays live in case the new one fails — so say that is what is
+                 happening to it, or the card looks like the app building the
+                 wrong thing. A tone from scratch clears this card instead. */
+              thinking ? ' · being adjusted' : ''
             }`}
             defaultOpen
           >

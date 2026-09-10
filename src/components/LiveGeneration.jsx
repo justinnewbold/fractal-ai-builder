@@ -151,10 +151,19 @@ export function Thinking({ message, active, startedAt, typicalMs = null }) {
   const seconds = startedAt ? Math.max(0, Math.round((now - startedAt) / 1000)) : null
   const text = message || `${THINKING}…`
 
+  /*
+   * The time and the sentence after it are two spans, because they wrap
+   * differently. The figure must never break across a line — "4m" on one row
+   * and "20s" on the next reads as two numbers. The sentence must ALWAYS be
+   * allowed to: held to one line with the figure, "nothing has been sent to
+   * your unit yet" ran off the right edge of a phone and dragged the whole
+   * conversation sideways with it.
+   */
   let clock = null
+  let more = ''
   if (seconds !== null) {
     clock = seconds >= 60 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${seconds}s`
-    clock += aside(seconds, typicalMs)
+    more = aside(seconds, typicalMs)
   }
 
   return (
@@ -167,7 +176,13 @@ export function Thinking({ message, active, startedAt, typicalMs = null }) {
       </span>
       <span className="mono thinking-text">
         {text}
-        {clock ? <span className="thinking-clock"> · {clock}</span> : null}
+        {clock ? (
+          <span className="thinking-clock">
+            {' · '}
+            <span className="thinking-time">{clock}</span>
+            {more}
+          </span>
+        ) : null}
       </span>
     </div>
   )

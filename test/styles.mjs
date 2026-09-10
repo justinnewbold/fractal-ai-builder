@@ -342,6 +342,24 @@ export function run(test) {
     )
   })
 
+  test('the conversation never scrolls sideways', () => {
+    /*
+     * "Chat is moving horizontally when touching it, not staying in the
+     * screen." The log sets overflow-y and nothing else, and CSS answers that
+     * by making overflow-x `auto` too — so the one line too wide for a phone,
+     * the working line's clock held to a single row, turned the whole
+     * conversation into something a thumb could drag left. Two rules hold it:
+     * the log clips sideways, and only the time figure stays on one line.
+     */
+    const log = code.slice(code.indexOf('.assistant-log {'), code.indexOf('}', code.indexOf('.assistant-log {')))
+    assert.match(log, /overflow-x: hidden/, 'the conversation can be dragged sideways again')
+
+    const clock = code.slice(code.indexOf('.thinking-clock {'), code.indexOf('}', code.indexOf('.thinking-clock {')))
+    assert.ok(!/white-space: nowrap/.test(clock), 'the clock and its sentence are held to one line, which runs off a phone')
+    const time = code.slice(code.indexOf('.thinking-time {'), code.indexOf('}', code.indexOf('.thinking-time {')))
+    assert.match(time, /white-space: nowrap/, 'the time figure can break across two lines')
+  })
+
   test('inside a sheet the preset list is not a second scroller', () => {
     /*
      * A 300px window over a 23,000px list, inside a sheet body that scrolls

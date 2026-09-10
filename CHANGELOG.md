@@ -3,6 +3,25 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.136.0
+
+**A wait that ends, a line that says what it is doing, and a chat that
+stays put.** "Stuck thinking for almost 4 minutes, finally had to stop
+it." The AI's heartbeat was keeping the wait alive for as long as the
+heartbeat came, and a second try doubled it. Now a design that has not
+started writing after two minutes stops and says so, with nothing sent to
+the unit, and the app only asks again on its own when the connection went
+dead — not when the AI was plainly still working. The working line says
+what it is thinking about: designing your tone, adjusting the tone, or a
+second try because the first got no answer. Its clock's sentence wraps
+instead of running off the side of a phone, and the conversation no
+longer slides sideways under a thumb. And "make a full Metallica preset"
+with a Killswitch design still waiting on screen no longer reshapes the
+Killswitch tone under its old name: the chat is asked whether you mean an
+adjustment or a new tone, a new tone starts over, and the old design goes
+into the log as not sent. A tone that is being adjusted says so on its
+card.
+
 ## 7.135.0
 
 **The Ask sheet is the whole screen.** On a phone the conversation opened
