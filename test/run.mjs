@@ -5675,9 +5675,17 @@ test('the chain builder places into columns the unit has', async () => {
   // The builder 1-based a 0-based API: the client adds the wire's +1 itself,
   // so placements landed one slot right and the fourth asked an AM4 for
   // column 5, which it refuses — failing the whole plan on the last block.
+  //
+  // The column is now chosen rather than counted — the chain goes in the free
+  // cells between the input and the output instead of over the top of them —
+  // so what is held here is that the column handed to the client is the one
+  // the grid uses, with nothing added to it on the way.
   const { readFileSync } = await import('node:fs')
   const src = readFileSync(new URL('../src/lib/actions.js', import.meta.url), 'utf8')
-  assert.ok(src.includes('d.placeBlock(1, i, block.page'), 'the builder is 1-basing columns again')
+  assert.ok(src.includes('d.placeBlock(1, col, block.page'), 'the builder no longer places by column')
+  const build = src.slice(src.indexOf("case 'buildChain'"), src.indexOf('default:\n'))
+  assert.ok(!/placeBlock\(1, (?:i|col) \+ 1/.test(build), 'the builder is 1-basing columns again')
+  assert.ok(build.includes('free[i]'), 'the chain is placed from column 0 again, over whatever is there')
 })
 
 console.log('\nadd a block')

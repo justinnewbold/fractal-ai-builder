@@ -551,6 +551,22 @@ export default function Gig({
       */}
       <Volume eid={meterEid} preset={preset} onError={onError} />
 
+      {/*
+        And why it isn't there, when it isn't.
+        "The volume slider disappeared and no presets have sound." Both of
+        those are one fact: the slider moves the output block's level, and this
+        preset has no output block — so there is no level to move and nothing
+        reaches the amp either. A control that vanishes without a word turns
+        that into a mystery about the app. A unit whose outputs aren't a block
+        on a grid is not accused of anything.
+      */}
+      {meterEid === null && chain === 'ok' && blocks.length && capabilities?.slotModel !== 'linear' ? (
+        <p className="gig-note">
+          This preset has no Output block, so nothing reaches your amp and there is no volume to
+          move here. Add one at the end of the chain on Edit, or build the preset again.
+        </p>
+      ) : null}
+
       <div className="gig-preset">
         {/*
           A tile, like the scenes under it.

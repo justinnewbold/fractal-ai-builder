@@ -704,19 +704,89 @@ export function validatePlan(plan, blocks, capabilities) {
             if (!chain.length) throw new Error('This unit offers none of those blocks.')
 
             const width = cols || chain.length
-            const fits = chain.slice(0, width)
-            for (const [i, block] of fits.entries()) {
-              /*
-               * Columns are 0-based here — the client converts to the wire's
-               * 1-based convention at the boundary, once. This loop used to
-               * 1-base them too, so every placement landed one slot right and
-               * the last one asked an AM4 for column 5, which it refuses.
-               * GridEditor, which passes readGrid's coordinates straight
-               * through, was the convention's proof all along.
-               */
-              const res = await d.placeBlock(1, i, block.page ?? block.effectId)
+            const linear = capabilities?.slotModel === 'linear'
+
+            /*
+             * WHAT IS ALREADY IN THE ROW, WHICH IS NOT NOTHING.
+             *
+             * A slot this app calls empty is a slot with nothing EDITABLE in
+             * it: the input and the output are filtered out of that count on
+             * purpose, because they are not blocks a player tunes. They are
+             * still cells on the grid — and the chain was being written
+             * straight over the top of them from column 0.
+             *
+             * A preset with no output block cannot make a sound and has no
+             * level for the volume slider to move, which is exactly what came
+             * back from the stage: "the volume slider disappeared and no
+             * presets have sound". The slider is fed by the output block; it
+             * had been built over.
+             *
+             * So the chain goes in the free cells between the two, and
+             * neither of them is touched.
+             */
+            let existing = []
+            if (!linear) {
+              try {
+                existing = await d.presetBlocks()
+              } catch {
+                // A grid that will not read is not a reason to refuse to build
+                // one; it only means placing from the left, as this always did.
+                existing = []
+              }
+            }
+            const onRow = existing.filter((b) => b.row === 1 && Number.isInteger(b.col))
+            const columnOf = (slug) => {
+              const found = onRow.find((b) => b.slug === slug)
+              return found ? found.col : null
+            }
+            const inputCol = columnOf('input')
+            let outputCol = columnOf('output')
+            const held = new Set(onRow.map((b) => b.col))
+            const free = []
+            for (let col = 0; col < width; col++) {
+              if (held.has(col)) continue
+              if (inputCol !== null && col < inputCol) continue
+              if (outputCol !== null && col > outputCol) continue
+              free.push(col)
+            }
+
+            /*
+             * Columns are 0-based here — the client converts to the wire's
+             * 1-based convention at the boundary, once. This loop used to
+             * 1-base them too, so every placement landed one slot right and
+             * the last one asked an AM4 for column 5, which it refuses.
+             * GridEditor, which passes readGrid's coordinates straight
+             * through, was the convention's proof all along.
+             */
+            const cells = linear
+              ? chain.slice(0, width).map((block, i) => [i, block])
+              : chain.slice(0, free.length).map((block, i) => [free[i], block])
+            if (!cells.length) throw new Error('This preset has no free cells to build into.')
+            for (const [col, block] of cells) {
+              const res = await d.placeBlock(1, col, block.page ?? block.effectId)
               if (res?.ok === false) throw new Error(`The unit refused ${block.name}.`)
             }
+            let last = cells[cells.length - 1][0]
+
+            /*
+             * And an output block, if this preset hasn't got one.
+             *
+             * Nothing reaches the jack without it. A unit that doesn't offer
+             * one as a placeable block routes its output some other way and is
+             * left alone.
+             */
+            if (!linear && outputCol === null && !existing.some((b) => b.slug === 'output')) {
+              const out = list.find((b) => b.slug === 'output')
+              const spare = free[cells.length]
+              if (out && spare !== undefined) {
+                const res = await d.placeBlock(1, spare, out.page ?? out.effectId)
+                if (res?.ok !== false) {
+                  outputCol = spare
+                  last = spare
+                }
+              }
+            }
+
             /*
              * And WIRE it, which is the difference between a chain and five
              * blocks that make no sound.
@@ -726,12 +796,16 @@ export function validatePlan(plan, blocks, capabilities) {
              * back, the preset saves, and the player hears nothing. That is
              * exactly what happened to every tone built from an empty slot.
              *
+             * The wire runs to the output block where there is one, and to the
+             * end of the row where there isn't, because that is where the
+             * signal has to get to either way.
+             *
              * A linear unit has no grid and nothing to wire — an AM4's four
              * slots are in the path by being slots.
              */
             let wiring = null
-            if (capabilities?.slotModel !== 'linear') {
-              wiring = await d.wireRow(1, (cols || fits.length) - 1)
+            if (!linear) {
+              wiring = await d.wireRow(1, outputCol ?? Math.max(last, width - 1))
             }
             // Which blocks exist is the thing that just changed.
             d.invalidateSchema()
@@ -742,7 +816,7 @@ export function validatePlan(plan, blocks, capabilities) {
              * one thing that would make the finished preset silent. Throwing
              * here would abandon the design over a wire he can join himself.
              */
-            return { ok: true, placed: fits.length, wiring }
+            return { ok: true, placed: cells.length, wiring }
           }
         })
         break

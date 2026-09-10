@@ -3,6 +3,20 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.140.0
+
+**The built presets kept their output block.** "The volume slider disappeared
+and no presets have sound" turned out to be one fault, not two: the slider
+moves the output block's level, and the chain builder had been writing over
+the output block to get to column 0. A slot this app calls empty is a slot
+with nothing *editable* in it — the input and the output are filtered out of
+that count on purpose — so "empty" was never empty, and building into it took
+the preset's only route to the amp with it. The chain now goes in the free
+cells between the input and the output, neither of them is touched, and a
+preset that has no output block at all is given one at the end of the chain.
+On Play, a preset with no output block says so where the slider would be,
+rather than quietly showing nothing.
+
 ## 7.139.0
 
 **The built presets make a sound now.** A chain built into an empty slot was
