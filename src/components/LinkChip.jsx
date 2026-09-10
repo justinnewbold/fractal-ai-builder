@@ -60,7 +60,13 @@ export default function LinkChip({ link, compact, onAction, busy }) {
    * popover still carries it in words.
    */
   const mark = said.tone === 'good' ? 'ok' : said.tone === 'busy' ? 'wait' : 'no'
-  const glyph = mark === 'ok' ? '✓' : mark === 'wait' ? '…' : '✕'
+  /*
+   * In the bar, one word in the colour of the state. This was a round green
+   * tick or red cross for a while — "the same size as the settings gear" —
+   * and then asked to be the word again: "just the word connected (green),
+   * disconnected (red)". Three states, because a link on its way is neither.
+   */
+  const word = mark === 'ok' ? 'connected' : mark === 'wait' ? 'connecting' : 'disconnected'
 
   return (
     <span className="phone-link" ref={wrap}>
@@ -71,8 +77,8 @@ export default function LinkChip({ link, compact, onAction, busy }) {
         aria-label={`${said.sentence} — phone remote options`}
       >
         {compact ? (
-          <span className={`phone-mark ${mark}`} aria-hidden="true">
-            {glyph}
+          <span className={`phone-word ${mark}`} aria-hidden="true">
+            {word}
           </span>
         ) : (
           <>
