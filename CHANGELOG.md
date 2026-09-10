@@ -3,6 +3,22 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.144.0
+
+**Setlists and stars follow your account.** They lived in browser storage — a
+setlist built at the bench on the Mac simply was not on the phone on the stand.
+Signed in, they are kept with the account now and come back on every machine
+you sign in from: the lists, the stars, and which of them Previous and Next are
+stepping through, per unit, because an FM3's running order is not an AM4's.
+
+Merging is per setlist and per star rather than per device, so a list built on
+the Mac and one built on the phone both survive meeting each other: the later
+edit of a list wins, a delete travels rather than being undone by the other
+device still holding a copy, and the stars go with the later tap so unstarring
+one on the phone actually unstars it. What this phone played tonight stays on
+this phone. The sheet says which of the two is true instead of promising that
+everything stays in the browser.
+
 ## 7.143.0
 
 **A save in flight says Saving, and shows it.** The button read "Waiting…"

@@ -18,6 +18,7 @@ import { blockColor } from '../lib/blockColors'
 import { sceneColor } from '../lib/sceneColors'
 import { shortBlock } from '../lib/shortName'
 import { presetLabel } from '../lib/presetName'
+import { setlistCloudReady } from '../lib/cloudSetlists'
 import { marksFor, CHANGED as MARKS_CHANGED } from '../lib/presetMarks'
 import {
   listsFor,
@@ -795,6 +796,9 @@ export default function Gig({
         favourites={favourites}
         lists={lists}
         source={source}
+        /* Whether what is built here follows the account or stays on this
+           phone — the note at the foot of the sheet says which. */
+        synced={setlistCloudReady()}
       />
 
       {/*

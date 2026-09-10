@@ -4045,6 +4045,47 @@ export function run(test) {
     assert.match(markup, /demo \? 'simulated' : getHost\(\)/, 'the demo no longer says it is a simulation, or the Mac has lost its address')
   })
 
+  test('setlists and stars follow the account when there is one', () => {
+    /*
+     * "This says that setlists stay in this browser. Can we set that up to
+     * save to the database across the cloud if user is signed in?"
+     *
+     * One row per person, like chats, holding every unit's lists, stars,
+     * chosen source and the deletes still worth remembering. Pulled once when
+     * the account arrives and pushed two seconds after any change here — both
+     * local stores already announce their own writes, which is what the stage
+     * screen listens to.
+     */
+    assert.match(src, /import \{ syncSetlists, setlistCloudReady \} from '\.\/lib\/cloudSetlists'/, 'nothing syncs the setlists')
+    const wiring = src.slice(src.indexOf('const syncedLists = useRef'), src.indexOf('const linkAction'))
+    assert.ok(wiring, 'the setlist sync is gone from App')
+    assert.match(wiring, /if \(!link\.account \|\| !setlistCloudReady\(\)\) return undefined/, 'a signed-out browser is asked to sync anyway')
+    assert.match(wiring, /addEventListener\(SETLISTS_CHANGED, later\)/, 'a setlist built here is never pushed up')
+    assert.match(wiring, /addEventListener\(MARKS_CHANGED, later\)/, 'a star tapped here is never pushed up')
+    assert.match(wiring, /setTimeout\(pull, 2000\)/, 'every drag through a running order is its own round trip')
+    assert.match(wiring, /Picked up \$\{parts\.join\(' and '\)\} from/, 'what arrived from the other device is not said')
+
+    /* Recent stays local on purpose: which presets this phone played tonight
+       is about the phone. */
+    const cloud = readFileSync(new URL('../src/lib/cloudSetlists.js', import.meta.url), 'utf8')
+    assert.ok(!/\brecent\b\s*[:,]/.test(cloud), 'the recent list is being synced between devices')
+
+    /* And the sheet says which of the two is true, rather than the old
+       promise that it stays on the phone. */
+    const sheet = readFileSync(new URL('../src/components/Setlists.jsx', import.meta.url), 'utf8')
+    assert.match(sheet, /synced\s*\?\s*\n?\s*'Setlists and stars are kept with your account/, 'the sheet still says setlists stay in this browser when they do not')
+    assert.match(sheet, /Sign in and they follow your account/, 'a signed-out phone is not told what signing in would do')
+
+    /* The table it writes to is in the repo, not only in somebody's dashboard. */
+    const sql = readFileSync(
+      new URL('../supabase/migrations/20260910_stage_lists.sql', import.meta.url),
+      'utf8'
+    )
+    assert.match(sql, /create table if not exists public\.stage_lists/)
+    assert.match(sql, /enable row level security/, 'the table is readable by anyone with a key')
+    assert.equal((sql.match(/auth\.uid\(\)/g) || []).length >= 4, true, 'a policy is not keyed to the account')
+  })
+
   test('a rename that renames nothing is not offered', () => {
     /*
      * "There's a button that says rename, but it always just shows the exact

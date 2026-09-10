@@ -55,7 +55,16 @@ export const cleanSlots = (list) => {
   return out
 }
 
-/** A list as stored, or null when it is not one. */
+/**
+ * A list as stored, or null when it is not one.
+ *
+ * `at` is when this list was last changed HERE, and it is what lets two
+ * devices be merged without asking anyone which copy they meant: the later
+ * edit of a list wins, per list, rather than one whole device's setlists
+ * winning over the other's. A list from before this existed has no time on it
+ * and reads as the beginning of time, which is right — anything with a stamp
+ * has been touched since.
+ */
 const cleanList = (l) => {
   if (!l || typeof l !== 'object') return null
   const id = typeof l.id === 'string' && l.id ? l.id : null
@@ -63,9 +72,32 @@ const cleanList = (l) => {
   return {
     id,
     name: typeof l.name === 'string' && l.name.trim() ? l.name.trim() : 'Setlist',
-    presets: cleanSlots(l.presets)
+    presets: cleanSlots(l.presets),
+    at: Number.isFinite(l.at) ? l.at : 0
   }
 }
+
+/** A tombstone, or null. What a delete leaves behind so it can travel. */
+const cleanGone = (g) =>
+  g && typeof g === 'object' && typeof g.id === 'string' && g.id
+    ? { id: g.id, at: Number.isFinite(g.at) ? g.at : 0 }
+    : null
+
+/**
+ * How long a delete is remembered.
+ *
+ * Long enough that a phone left in a case for a fortnight does not put a
+ * deleted setlist back on the Mac when it wakes up; short enough that the row
+ * does not fill with the names of setlists nobody has thought about since
+ * last summer.
+ */
+export const TOMBSTONE_MS = 60 * 24 * 60 * 60 * 1000
+
+/** The deletes worth still remembering. */
+export const cleanGoneList = (list, now = Date.now()) =>
+  (Array.isArray(list) ? list : [])
+    .map(cleanGone)
+    .filter((g) => g && now - g.at < TOMBSTONE_MS)
 
 /**
  * The slot Previous or Next lands on, walking `list` from `current`.
@@ -193,6 +225,53 @@ export function listsFor(device, storage) {
   return Array.isArray(raw) ? raw.map(cleanList).filter(Boolean) : []
 }
 
+/** The deletes this unit is still remembering, for the merge. */
+export function goneFor(device, storage, now = Date.now()) {
+  return cleanGoneList(bucketOf(readAll(storage), device).removed, now)
+}
+
+/** Every unit this browser holds setlists for. */
+export function devicesWithLists(storage) {
+  return Object.keys(readAll(storage))
+}
+
+/**
+ * One unit's whole setlist state, as the shape that travels.
+ *
+ * `at` is the last time anything here changed, which is what decides the
+ * source — a preference, not a document, so the later choice simply wins.
+ */
+export function unitFor(device, storage, now = Date.now()) {
+  const bucket = bucketOf(readAll(storage), device)
+  return {
+    lists: listsFor(device, storage),
+    source: sourceFor(device, storage),
+    removed: cleanGoneList(bucket.removed, now),
+    at: Number.isFinite(bucket.at) ? bucket.at : 0
+  }
+}
+
+/**
+ * Write one unit's setlist state back, merged copy and all.
+ *
+ * Used by the sync rather than by the sheet: the sheet edits one list at a
+ * time through the functions below, which stamp their own times.
+ */
+export function putUnit(device, unit, storage) {
+  save(
+    device,
+    {
+      lists: (unit?.lists || []).map(cleanList).filter(Boolean),
+      source: unit?.source ?? ALL,
+      removed: cleanGoneList(unit?.removed),
+      at: Number.isFinite(unit?.at) ? unit.at : Date.now()
+    },
+    storage,
+    { stamp: false }
+  )
+  return unitFor(device, storage)
+}
+
 /**
  * Which order the stage buttons walk for one unit. A setlist that no longer
  * exists reads as ALL — see orderFor for why the buttons never go dead.
@@ -204,10 +283,18 @@ export function sourceFor(device, storage) {
   return ALL
 }
 
-const save = (device, patch, storage) => {
+/**
+ * Write a patch into one unit's bucket, stamping when it happened.
+ *
+ * The stamp is what the merge reads. `stamp: false` is for the merge itself
+ * writing a result back — it carries the time it decided on, and stamping it
+ * again would make the copy that just arrived look newer than the device it
+ * came from and bounce back the other way for ever.
+ */
+const save = (device, patch, storage, { stamp = true } = {}) => {
   const all = readAll(storage)
   const key = device || 'unknown'
-  all[key] = { ...bucketOf(all, device), ...patch }
+  all[key] = { ...bucketOf(all, device), ...patch, ...(stamp ? { at: Date.now() } : {}) }
   writeAll(all, storage)
 }
 
@@ -227,14 +314,21 @@ function saveLists(device, lists, storage) {
 export function createList(device, name, storage) {
   const lists = listsFor(device, storage)
   const id = `s${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`
-  const list = { id, name: (name || '').trim() || `Setlist ${lists.length + 1}`, presets: [] }
+  const list = {
+    id,
+    name: (name || '').trim() || `Setlist ${lists.length + 1}`,
+    presets: [],
+    at: Date.now()
+  }
   saveLists(device, [...lists, list], storage)
   return list
 }
 
 /** Change one list's name or presets. Returns the lists as they read back. */
 export function updateList(device, id, patch, storage) {
-  const lists = listsFor(device, storage).map((l) => (l.id === id ? { ...l, ...patch, id } : l))
+  const lists = listsFor(device, storage).map((l) =>
+    l.id === id ? { ...l, ...patch, id, at: Date.now() } : l
+  )
   return saveLists(device, lists, storage)
 }
 
@@ -242,6 +336,15 @@ export function updateList(device, id, patch, storage) {
 export function deleteList(device, id, storage) {
   const lists = listsFor(device, storage).filter((l) => l.id !== id)
   const source = sourceFor(device, storage)
-  save(device, { lists, ...(source === id ? { source: ALL } : {}) }, storage)
+  /*
+   * A delete leaves a mark. Without one, a setlist deleted on the phone comes
+   * straight back from the Mac on the next sync — the Mac still has it, and a
+   * merge that only unions cannot tell "not here yet" from "gone on purpose".
+   */
+  const removed = [
+    ...goneFor(device, storage).filter((g) => g.id !== id),
+    { id, at: Date.now() }
+  ]
+  save(device, { lists, removed, ...(source === id ? { source: ALL } : {}) }, storage)
   return listsFor(device, storage)
 }

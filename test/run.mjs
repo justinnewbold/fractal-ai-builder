@@ -7496,6 +7496,128 @@ test('the report carries the grid in the unit\'s own words', async () => {
   )
 })
 
+console.log('\nsetlists that follow the account')
+
+test('two devices merge per setlist and per star, not per device', async () => {
+  const { mergeUnit, mergeUnits, gained } = await import('../src/lib/cloudSetlists.js')
+
+  // A list built on each device: both survive meeting each other. The device
+  // asking keeps its own order and the other's are appended.
+  const mine = { lists: [{ id: 'a', name: 'Friday', presets: [1, 2], at: 100 }], at: 100 }
+  const theirs = { lists: [{ id: 'b', name: 'Saturday', presets: [7], at: 90 }], at: 90 }
+  const both = mergeUnit(mine, theirs)
+  assert.deepEqual(both.lists.map((l) => l.id), ['a', 'b'], 'a setlist built on the other device was dropped')
+
+  // The same list edited on both: the later edit wins, whole.
+  const edited = mergeUnit(
+    { lists: [{ id: 'a', name: 'Friday', presets: [1], at: 100 }] },
+    { lists: [{ id: 'a', name: 'Friday night', presets: [1, 2, 3], at: 200 }] }
+  )
+  assert.deepEqual(edited.lists[0].presets, [1, 2, 3])
+  assert.equal(edited.lists[0].name, 'Friday night')
+
+  /* A delete travels, and does not resurrect. Real times, because a tombstone
+     is kept for sixty days and then dropped — see TOMBSTONE_MS. */
+  const now = Date.now()
+  const deleted = mergeUnit(
+    { lists: [], removed: [{ id: 'a', at: now - 1000 }] },
+    { lists: [{ id: 'a', name: 'Friday', presets: [1], at: now - 2000 }] }
+  )
+  assert.deepEqual(deleted.lists, [], 'a setlist deleted here came back from the account')
+  assert.equal(deleted.removed.length, 1, 'the delete was forgotten immediately')
+
+  // Unless it was edited on the other device AFTER the delete: then it is a
+  // list somebody is using, not a list somebody threw away.
+  const revived = mergeUnit(
+    { lists: [], removed: [{ id: 'a', at: now - 2000 }] },
+    { lists: [{ id: 'a', name: 'Friday', presets: [1], at: now - 1000 }] }
+  )
+  assert.equal(revived.lists.length, 1, 'an edit made after the delete was thrown away')
+
+  // A delete nobody has thought about in months stops being carried, and stops
+  // holding a setlist off a device that still has it.
+  const old = mergeUnit(
+    { lists: [], removed: [{ id: 'a', at: now - 61 * 24 * 60 * 60 * 1000 }] },
+    { lists: [{ id: 'a', name: 'Friday', presets: [1], at: now - 62 * 24 * 60 * 60 * 1000 }] },
+    now
+  )
+  assert.deepEqual(old.removed, [], 'a two-month-old delete is still being carried')
+
+  // Stars are a toggle, so the later tap wins whole — an unstar has to travel.
+  const stars = mergeUnit(
+    { favourites: [1, 2], starredAt: 500 },
+    { favourites: [1, 2, 3], starredAt: 400 }
+  )
+  assert.deepEqual(stars.favourites, [1, 2], 'an unstar here was undone by the account')
+  const later = mergeUnit(
+    { favourites: [1, 2], starredAt: 400 },
+    { favourites: [9], starredAt: 500 }
+  )
+  assert.deepEqual(later.favourites, [9])
+
+  // Before either side has ever stamped a tap there is nothing to compare, and
+  // both sets of stars should survive their first meeting.
+  const first = mergeUnit({ favourites: [3, 1] }, { favourites: [2] })
+  assert.deepEqual(first.favourites, [1, 2, 3], 'a first sync picked one device\'s stars by a coin toss')
+
+  // The chosen source is a preference: the later choice.
+  assert.equal(mergeUnit({ source: 'a', at: 10 }, { source: 'starred', at: 20 }).source, 'starred')
+  assert.equal(mergeUnit({ source: 'a', at: 30 }, { source: 'starred', at: 20 }).source, 'a')
+
+  // Units are merged one at a time and never mixed: an FM3's setlists are not
+  // an AM4's.
+  const units = mergeUnits(
+    { fm3: { lists: [{ id: 'a', name: 'F', presets: [1], at: 1 }] } },
+    { am4: { lists: [{ id: 'b', name: 'A', presets: [2], at: 1 }] } }
+  )
+  assert.deepEqual(Object.keys(units).sort(), ['am4', 'fm3'])
+  assert.deepEqual(units.fm3.lists.map((l) => l.id), ['a'])
+  assert.deepEqual(units.am4.lists.map((l) => l.id), ['b'])
+
+  // And what arrived is countable, so the app can say what it picked up.
+  assert.deepEqual(gained({ fm3: { lists: [], favourites: [] } }, units.fm3 ? { fm3: units.fm3 } : {}), {
+    lists: 1,
+    stars: 0
+  })
+})
+
+test('a setlist knows when it changed, and a delete leaves a mark', async () => {
+  const {
+    createList,
+    updateList,
+    deleteList,
+    listsFor,
+    goneFor,
+    unitFor,
+    putUnit
+  } = await import('../src/lib/setlists.js')
+
+  // A Map is enough of a storage for this: getItem/setItem and nothing else.
+  const store = {
+    data: new Map(),
+    getItem(k) { return this.data.has(k) ? this.data.get(k) : null },
+    setItem(k, v) { this.data.set(k, v) }
+  }
+
+  const made = createList('fm3', 'Friday', store)
+  assert.ok(made.at > 0, 'a new setlist carries no time, so a merge cannot place it')
+  const before = listsFor('fm3', store)[0].at
+  await new Promise((r) => setTimeout(r, 2))
+  updateList('fm3', made.id, { presets: [4, 5] }, store)
+  assert.ok(listsFor('fm3', store)[0].at > before, 'editing a setlist does not move its time')
+
+  deleteList('fm3', made.id, store)
+  assert.deepEqual(listsFor('fm3', store), [], 'the setlist is still there after a delete')
+  assert.deepEqual(goneFor('fm3', store).map((g) => g.id), [made.id], 'the delete left no mark to travel')
+
+  // And a merged copy can be written back without being re-stamped, or two
+  // devices would keep handing the same lists back and forth for ever.
+  const settled = { lists: [{ id: 'z', name: 'Sunday', presets: [1], at: 42 }], removed: [], source: 'all', at: 42 }
+  putUnit('fm3', settled, store)
+  assert.equal(unitFor('fm3', store).at, 42, 'writing a merged copy back stamped it as new work')
+  assert.deepEqual(listsFor('fm3', store).map((l) => l.name), ['Sunday'])
+})
+
 await settle()
 /*
  * The tally has to say when it is red.
