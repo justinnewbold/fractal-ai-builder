@@ -3,6 +3,23 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.133.0
+
+**Ask can add blocks, and a design adds the blocks it wanted.** "How come
+it said it couldn't place the pitch block? I thought it can change blocks
+out freely." It could never add one: the chat asked the app for the unit's
+block list with a call that was never imported, the error was swallowed,
+and every request went out saying nothing was placeable — on the Mac and
+the phone alike. So "add a whammy" was answered with "this unit has no
+block called whammy". The list is read properly now, remembered per unit
+so a phone whose read fails still has last time's, and a read that fails
+with nothing remembered is said as a failure rather than an empty unit.
+"Whammy", "pitch shifter", "octaver", "overdrive", "noise gate" and the
+like resolve to the unit's own block names. And when a design comes back
+saying the tone wanted a block the preset lacks, the app adds it and
+designs again against the new chain, once, instead of leaving a note
+asking you to add it by hand.
+
 ## 7.132.2
 
 **No more "I couldn't work out what to change" for a question.** "If I

@@ -10,6 +10,7 @@
 //   - /preset/store commits to a slot even when capabilities report supportsSave:false
 
 import { EXCLUDED_BLOCKS, safeParams } from './guardrails.js'
+import { paletteFor } from './palette.js'
 import { withRetry } from './retry.js'
 import { cleanPresetName, isEmptySlotName } from './presetName.js'
 import { zeroBasedChain, wrongSlot } from './slots.js'
@@ -1476,6 +1477,18 @@ export const readGrid = () =>
  */
 export const blockCatalog = () =>
   mock ? tick().then(() => mock.blockCatalog()) : request('/blocks')
+
+/**
+ * The same list, remembered.
+ *
+ * Every caller that needs the palette to DO something — the chat placing a
+ * block, the grid editor, a design adding what it wanted — goes through this:
+ * a good read is kept per unit, and a failed one falls back to the last good
+ * read rather than to nothing. See lib/palette for why that matters on a
+ * phone. Throws only when there is nothing to fall back to.
+ */
+export const placeableBlocks = () =>
+  paletteFor(currentDeviceSlug(), blockCatalog).then((r) => r.list)
 
 
 /**

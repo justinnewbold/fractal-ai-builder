@@ -66,16 +66,82 @@ export function firstFreeCell(blocks, rows, cols) {
   return null
 }
 
+/**
+ * What a player calls a block, against what the unit calls it.
+ *
+ * "Whammy" is a Pitch block with the Whammy type on it; "overdrive" is a
+ * Drive; "octaver" is Pitch again. A design that says it wanted a "pitch
+ * shifter / whammy" and a chat asked to "add a whammy" both have to land on
+ * the one block the unit actually offers, or the answer is "this unit has no
+ * block called whammy" — which is false, and was said. Keys are the player's
+ * words with everything but letters removed, the way `resolvePlaceable`
+ * reads them; values are the unit's slugs, in the order to try.
+ */
+export const BLOCK_ALIASES = {
+  whammy: ['pitch'],
+  pitchshifter: ['pitch'],
+  pitchshift: ['pitch'],
+  shifter: ['pitch'],
+  octaver: ['pitch'],
+  octave: ['pitch'],
+  harmonizer: ['pitch'],
+  harmoniser: ['pitch'],
+  detune: ['pitch'],
+  overdrive: ['drive'],
+  distortion: ['drive'],
+  fuzz: ['drive'],
+  boost: ['drive'],
+  od: ['drive'],
+  dist: ['drive'],
+  comp: ['compressor', 'comp'],
+  compression: ['compressor', 'comp'],
+  noisegate: ['gate'],
+  noise: ['gate'],
+  vibrato: ['chorus'],
+  leslie: ['rotary'],
+  univibe: ['phaser'],
+  vibe: ['phaser'],
+  trem: ['tremolo'],
+  echo: ['delay'],
+  verb: ['reverb'],
+  room: ['reverb'],
+  hall: ['reverb'],
+  spring: ['reverb'],
+  graphiceq: ['geq'],
+  parametriceq: ['peq'],
+  equalizer: ['geq', 'peq', 'eq'],
+  eq: ['geq', 'peq', 'eq'],
+  volume: ['volpan', 'volume'],
+  volpan: ['volpan', 'volume'],
+  loop: ['looper']
+}
+
 /** A placeable entry by name or slug, however the model said it. */
 export function resolvePlaceable(palette, text) {
   if (!text) return null
+  const list = palette || []
   const want = String(text).toLowerCase().replace(/[^a-z]/g, '')
-  return (
-    (palette || []).find((b) => b.slug === want) ||
-    (palette || []).find((b) => (b.name || '').toLowerCase().replace(/[^a-z]/g, '') === want) ||
-    (palette || []).find((b) => b.slug.startsWith(want)) ||
+  if (!want) return null
+  const exact = (w) =>
+    list.find((b) => b.slug === w) ||
+    list.find((b) => (b.name || '').toLowerCase().replace(/[^a-z]/g, '') === w) ||
     null
-  )
+  const direct = exact(want)
+  if (direct) return direct
+  // "pitch shifter / whammy" — each half is tried on its own.
+  for (const part of String(text).toLowerCase().split(/[\/,]|\bor\b/)) {
+    const w = part.replace(/[^a-z]/g, '')
+    if (!w || w === want) continue
+    const hit = exact(w) || (BLOCK_ALIASES[w] || []).map(exact).find(Boolean)
+    if (hit) return hit
+  }
+  const alias = (BLOCK_ALIASES[want] || []).map(exact).find(Boolean)
+  if (alias) return alias
+  // "Delay 1" is the first delay; the unit lists it as delay, page N.
+  const first = list.find((b) => b.slug.startsWith(want))
+  if (first) return first
+  // The other way round: "pitch" for "pitchshifter"-style wording the aliases missed.
+  return list.find((b) => want.startsWith(b.slug) && b.slug.length >= 3) || null
 }
 
 const ORDER = {
@@ -387,8 +453,7 @@ export function validatePlan(plan, blocks, capabilities) {
             const d = await device()
             let typeCode = typeof raw.value === 'number' ? raw.value : null
             if (typeCode === null) {
-              const palette = await d.blockCatalog()
-              const list = Array.isArray(palette) ? palette : palette?.blocks || []
+              const list = await d.placeableBlocks()
               const hit = resolvePlaceable(list, raw.text)
               if (!hit) throw new Error(`This unit has no block called "${raw.text}".`)
               typeCode = hit.page ?? hit.effectId
@@ -632,8 +697,7 @@ export function validatePlan(plan, blocks, capabilities) {
           label: `Build a chain: ${order.join(' → ')}`,
           run: async () => {
             const d = await device()
-            const palette = await d.blockCatalog()
-            const list = Array.isArray(palette) ? palette : palette?.blocks || []
+            const list = await d.placeableBlocks()
             const chain = order
               .map((slug) => list.find((b) => b.slug === slug))
               .filter(Boolean)
