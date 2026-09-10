@@ -7231,6 +7231,9 @@ test('the chat is the player’s Fractal agent, not a command parser', () => {
   assert.match(command, /process\.env\.CHAT_MODEL \|\| process\.env\.GENERATOR_MODEL \|\| 'claude-opus-5'/, 'the chat has no model of its own')
   assert.ok(!/claude-sonnet-4\.5/.test(command), 'the gateway fallback still names a retired model')
   assert.match(handler, /thinking: \{ type: 'adaptive' \}/, 'the model is given no room to think')
+  // Internal names stay internal, and a change is said in the future tense.
+  assert.match(command, /Never say\s+"designTone", "placeBlock"/, 'the model may still name its own action kinds to the player')
+  assert.match(command, /Your\s+actions run AFTER your words are shown/, 'the model is not told its actions have not run yet')
   // A band is known, not looked up; "what would you do" gets a plan.
   assert.match(command, /Never\s+hedge that you "don't have preset details" for a band/, 'the hedge that answered "Eva Under Fire" is still allowed')
   assert.match(command, /a plan is an answer, not a permission/, 'the model is not told to answer "what would you do" with a plan')

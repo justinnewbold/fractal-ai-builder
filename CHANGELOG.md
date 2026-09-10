@@ -3,6 +3,14 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.133.1
+
+**No code words in the chat.** It told a player about "the designTone
+path", which is a name from the code, not a thing anyone should read.
+The agent is told the labels in its instructions and data are its own,
+never the player's, and to say what it is doing rather than what is done,
+since its actions run after its words appear.
+
 ## 7.133.0
 
 **Ask can add blocks, and a design adds the blocks it wanted.** "How come
