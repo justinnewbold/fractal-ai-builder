@@ -27,6 +27,7 @@ import Footswitches from './components/Footswitches'
 import GridEditor from './components/GridEditor'
 import Ports from './components/Ports'
 import LocalLibrary from './components/LocalLibrary'
+import Group from './components/Group'
 import Section from './components/Section'
 import Sheet from './components/Sheet'
 import DeviceDetail from './components/DeviceDetail'
@@ -4709,140 +4710,272 @@ export default function App() {
             and rejoins the session before it reads. */}
         <DeviceDetail status={status} device={device} onRetry={reconnect} busy={busy} />
 
-        {/*
-          The switch that clears the screen for playing.
+        <Group key="screen" title="Screen" note="How Play looks">
+          {/*
+            How big the buttons on Play are.
 
-          First in the sheet, above the connection panels, because it is the
-          one thing here somebody reaches for in a hurry and with the lights
-          down — the rest of this sheet is read once when something is wrong.
-        */}
-        {/*
-          How big the buttons on Play are.
+            "Let's move the sizing to the Settings menu." The two steps sat
+            beside the preset name on Play, on the one row there that was
+            already fighting for width. It is set once and kept, which is what
+            this sheet is for. Same state, same storage — App owns the step
+            because the first paint has to know it before Play mounts.
+          */}
+          <Section key="size" title="Button size" note={SIZES[size].name}>
+            <div className="size-steps" role="group" aria-label="Button size">
+              <button
+                className="size-step"
+                onClick={() => resize(-1)}
+                disabled={size <= 0}
+                aria-label="Smaller buttons"
+              >
+                −
+              </button>
+              <span className="size-name">{SIZES[size].name}</span>
+              <button
+                className="size-step"
+                onClick={() => resize(1)}
+                disabled={size >= SIZES.length - 1}
+                aria-label="Bigger buttons"
+              >
+                +
+              </button>
+            </div>
+            <p className="hint">
+              The scenes, effects and preset tile on Play, bigger or smaller. This device
+              remembers it.
+            </p>
+          </Section>
 
-          "Let's move the sizing to the Settings menu." The two steps sat
-          beside the preset name on Play, on the one row there that was
-          already fighting for width. It is set once and kept, which is what
-          this sheet is for. Same state, same storage — App owns the step
-          because the first paint has to know it before Play mounts.
-        */}
-        <Section key="size" title="Button size" note={SIZES[size].name}>
-          <div className="size-steps" role="group" aria-label="Button size">
-            <button
-              className="size-step"
-              onClick={() => resize(-1)}
-              disabled={size <= 0}
-              aria-label="Smaller buttons"
-            >
-              −
-            </button>
-            <span className="size-name">{SIZES[size].name}</span>
-            <button
-              className="size-step"
-              onClick={() => resize(1)}
-              disabled={size >= SIZES.length - 1}
-              aria-label="Bigger buttons"
-            >
-              +
-            </button>
-          </div>
-          <p className="hint">
-            The scenes, effects and preset tile on Play, bigger or smaller. This device
-            remembers it.
-          </p>
-        </Section>
+          {/*
+            The switch that clears the screen for playing.
 
-        <Section key="playing" title="Playing" note={playing ? 'Ask is hidden' : 'Ask is available'}>
-          <label className="rename-choice">
-            <input
-              type="checkbox"
-              checked={playing}
-              onChange={(e) => {
-                const on = e.target.checked
-                setPlaying(on)
-                savePlayMode(on)
+            In the first group and above the rig, because it is the one thing
+            in this sheet somebody reaches for in a hurry and with the lights
+            down — the rest of it is read once, when something is wrong.
+          */}
+          <Section key="playing" title="Playing" note={playing ? 'Ask is hidden' : 'Ask is available'}>
+            <label className="rename-choice">
+              <input
+                type="checkbox"
+                checked={playing}
+                onChange={(e) => {
+                  const on = e.target.checked
+                  setPlaying(on)
+                  savePlayMode(on)
+                }}
+              />
+              <span>
+                Play mode
+                <span className="hint">
+                  Takes the ✦ Ask button off the Play screen, so nothing on it can start
+                  building a tone. Everything else works the same. This phone remembers it.
+                </span>
+              </span>
+            </label>
+          </Section>
+        </Group>
+
+        <Group key="rig" title="My rig" note="Unit, phone, footswitches">
+          <Section key="connection" title="Connection" note="Which unit this app is talking to">
+            <Ports
+              busy={busy}
+              onError={setError}
+              onChanged={(summary) => {
+                record('port', summary)
+                read()
               }}
             />
-            <span>
-              Play mode
-              <span className="hint">
-                Takes the ✦ Ask button off the Play screen, so nothing on it can start
-                building a tone. Everything else works the same. This phone remembers it.
-              </span>
-            </span>
-          </label>
-        </Section>
-
-        <Section key="phone-remote" title="Phone remote" note={describeLink(link).note}>
-          {/*
-            One panel for both ends. It says which end this is, whether the
-            other end answers, and offers the one thing that state calls for.
-            The four panels it replaces — each written for the person who built
-            the app — are gone, and the words they used with them.
-          */}
-          <PhoneRemote link={link} onAction={linkAction} onError={setError} busy={busy} />
-        </Section>
-
-        {/*
-          Ask the unit about the preset you are on, when it is the preset that
-          is wrong rather than the app.
-
-          "Can we set up a way to read the parameters of the current scene to
-          investigate why there is no sound?" Its own section, high in the
-          sheet rather than under the eleven you scroll past to reach the
-          debug log: the log is what the app did, and this is what the unit
-          holds — a different question, and the one asked when a preset is
-          quiet. It reads on a tap, because it is a dozen round trips down the
-          port that is carrying the audio.
-        */}
-        <Section
-          key="preset-check"
-          title="This preset"
-          note="Read every value in this scene, and what would stop it making a sound"
-        >
-          <PresetReport device={device} link={link} />
-        </Section>
-
-        <Section key="developer" title="Developer" note="See what the AI was given">
-          <TraceSwitch />
-        </Section>
-
-        <Section key="feedback" title="Tell us" note="Something broken, or something you want">
-          {/*
-            Where a person looks when the app has annoyed them: settings,
-            before the technical panels rather than buried under them. It needs
-            no account, because most people driving a unit from their own Mac
-            never sign in and are exactly the ones who find the bugs.
-          */}
-          <Feedback device={device} link={link} platform={platform()} />
-        </Section>
-
-        <Section key="connection" title="Connection" note="Which unit this app is talking to">
-          <Ports
-            busy={busy}
-            onError={setError}
-            onChanged={(summary) => {
-              record('port', summary)
-              read()
-            }}
-          />
-        </Section>
-
-        {/*
-          Only in the Mac app: Updates renders nothing without a bridge to the
-          updater, and a section that is always empty everywhere else is worse
-          than no section.
-        */}
-        {inDesktopApp() ? (
-          <Section key="updates" title="Updates" note="This app, not your unit">
-            <Updates />
           </Section>
-        ) : null}
 
-        {device?.capabilities?.fc?.model !== false ? (
-          <Section key="footswitches" title="Footswitches">
-            <Footswitches onError={setError} />
+          <Section key="phone-remote" title="Phone remote" note={describeLink(link).note}>
+            {/*
+              One panel for both ends. It says which end this is, whether the
+              other end answers, and offers the one thing that state calls for.
+              The four panels it replaces — each written for the person who built
+              the app — are gone, and the words they used with them.
+            */}
+            <PhoneRemote link={link} onAction={linkAction} onError={setError} busy={busy} />
           </Section>
-        ) : null}
+
+          {device?.capabilities?.fc?.model !== false ? (
+            <Section key="footswitches" title="Footswitches">
+              <Footswitches onError={setError} />
+            </Section>
+          ) : null}
+
+          {/*
+            Only in the Mac app: Updates renders nothing without a bridge to the
+            updater, and a section that is always empty everywhere else is worse
+            than no section.
+          */}
+          {inDesktopApp() ? (
+            <Section key="updates" title="Updates" note="This app, not your unit">
+              <Updates />
+            </Section>
+          ) : null}
+        </Group>
+
+        <Group key="wrong" title="Something's wrong" note="Checks, the log, telling us">
+          {/*
+            Ask the unit about the preset you are on, when it is the preset that
+            is wrong rather than the app.
+
+            "Can we set up a way to read the parameters of the current scene to
+            investigate why there is no sound?" First behind the door that says
+            something is wrong, above the log rather than inside it: the log is
+            what the app did, and this is what the unit holds — a different
+            question, and the one asked when a preset is quiet. It reads on a
+            tap, because it is a dozen round trips down the port that is
+            carrying the audio.
+          */}
+          <Section
+            key="preset-check"
+            title="This preset"
+            note="Read every value in this scene, and what would stop it making a sound"
+          >
+            <PresetReport device={device} link={link} />
+          </Section>
+
+          <Section key="feedback" title="Tell us" note="Something broken, or something you want">
+            {/*
+              Where a person looks when the app has annoyed them: behind the
+              same door as the checks and the log, because "it's broken" and
+              "here is what broke" are one errand. It needs no account, because
+              most people driving a unit from their own Mac never sign in and
+              are exactly the ones who find the bugs.
+            */}
+            <Feedback device={device} link={link} platform={platform()} />
+          </Section>
+
+          <Section key="what-s-changed-this-session" title="What's changed this session">
+            <ChangeLog log={log} onClear={() => setLog([])} />
+          </Section>
+
+          <Section key="debug-log" title="Debug log" note="Copy it and paste it into the chat when something goes wrong">
+            {/*
+              One log, one Copy button. "Make a unified debug log with a copy
+              log button to send back to you for debugging in the settings menu.
+              Any debugging info already in menus move to debug log." The AI's
+              timeline, the wire, the app's own changes, every error: one list,
+              in order. The two detailed views under it are the same facts as
+              tables, for reading rather than sending.
+            */}
+            <DebugLog device={device} link={link} />
+            <Diagnostics />
+            <LinkDetails />
+
+            {/*
+              This used to sit under every screen, permanently, including the one
+              you look at on a stage. It is worth saying once and worth being
+              findable — which is here, not there.
+            */}
+            <p className="footnote">
+              Models and parameter ranges are read off the attached unit at generation time, so the
+              designer can only pick models that unit actually has and only set values inside each
+              control&rsquo;s real range. Anything outside it is rejected before a single write goes
+              out. Device access via{' '}
+              <a href="https://github.com/sKuhLight/ForgeFX" target="_blank" rel="noreferrer">
+                ForgeFX
+              </a>
+              , an independent project not affiliated with Fractal Audio Systems.
+            </p>
+          </Section>
+        </Group>
+
+        <Group key="ai" title="What the AI knows" note="What it learned from you">
+          {/*
+            What the app has worked out about you, and the switch to stop it.
+
+            Anything inferred from someone's history has to be visible to them.
+            Without this the first surprising generation has no explanation and
+            no way to check one — and a profile you cannot see or refuse is the
+            kind of thing that reads as the app knowing too much, however
+            ordinary the arithmetic behind it turns out to be.
+          */}
+          <Section key="what-it-has-learned" title="What it has learned from you" note={taste ? `${taste.presets} presets` : 'Nothing yet'}>
+            <p className="hint">{summariseProfile(taste)}</p>
+            {/*
+              Say what actually happens, including the part that is a
+              disclosure. The summary above does travel — it goes to the model
+              with every request, which is the whole mechanism — and writing
+              "nothing leaves your device" here would have been a comfortable
+              sentence that was not true. What is worth saying instead is that
+              nothing is kept: no profile is stored, it is rebuilt from the
+              presets each time, and deleting a preset genuinely un-learns it.
+            */}
+            <p className="hint">
+              This summary &mdash; not your presets &mdash; is sent with each request, so a tone you
+              ask for lands nearer what you usually choose. Nothing is trained and no profile is
+              stored: it is worked out fresh from your own presets each time, so deleting one
+              un-learns it and turning this off stops it being sent at all.
+            </p>
+            {taste ? (
+              <ul className="cloud-list taste-list">
+                {taste.models.length ? (
+                  <li className="hint">Models you pick: {taste.models.map((m) => m.name).join(', ')}</li>
+                ) : null}
+                {taste.controls.length ? (
+                  <li className="hint">
+                    Where you land: {taste.controls.map((c) => `${c.name} ${c.typical}`).join(' · ')}
+                  </li>
+                ) : null}
+                {taste.words.length ? (
+                  <li className="hint">You ask for: {taste.words.map((w) => w.name).join(', ')}</li>
+                ) : null}
+              </ul>
+            ) : null}
+            {/*
+              The other half, and the more useful one.
+
+              What someone keeps says the whole tone was good enough. What they
+              reach over and change says which part was wrong — and it comes with
+              the number they actually wanted. That was being thrown away, so the
+              same correction was needed again on the next generation and the one
+              after. Shown separately from taste because it reads differently: it
+              is a list of the app's own repeated misses, in this player's hands.
+            */}
+            <p className="silk-label">What you keep fixing afterwards</p>
+            <p className="hint">{summariseCorrections(corrections)}</p>
+            {corrections ? (
+              <ul className="cloud-list taste-list">
+                {corrections.controls.map((c) => (
+                  <li className="hint" key={c.name}>
+                    {c.name}: you usually turn it {c.way} ({c.count} of {c.of} times, by about {c.by})
+                  </li>
+                ))}
+                {corrections.words.length ? (
+                  <li className="hint">
+                    You often ask for: {corrections.words.map((w) => w.text).join(', ')}
+                  </li>
+                ) : null}
+              </ul>
+            ) : null}
+            <div className="history-actions">
+              <button
+                className="chip"
+                onClick={() => setTasteOn(setTasteEnabled(!tasteOn))}
+                aria-pressed={tasteOn}
+              >
+                {tasteOn ? 'Stop using my history' : 'Use my history again'}
+              </button>
+              {corrections ? (
+                <button
+                  className="chip"
+                  onClick={() => {
+                    clearCorrections()
+                    setCorrectionKey((n) => n + 1)
+                  }}
+                >
+                  Forget what I keep fixing
+                </button>
+              ) : null}
+            </div>
+          </Section>
+
+          <Section key="developer" title="Developer" note="See what the AI was given">
+            <TraceSwitch />
+          </Section>
+        </Group>
 
         {/*
           The way back to the introduction.
@@ -4869,129 +5002,6 @@ export default function App() {
               Show the introduction
             </button>
           </div>
-        </Section>
-
-        {/*
-          What the app has worked out about you, and the switch to stop it.
-
-          Anything inferred from someone's history has to be visible to them.
-          Without this the first surprising generation has no explanation and
-          no way to check one — and a profile you cannot see or refuse is the
-          kind of thing that reads as the app knowing too much, however
-          ordinary the arithmetic behind it turns out to be.
-        */}
-        <Section key="what-it-has-learned" title="What it has learned from you" note={taste ? `${taste.presets} presets` : 'Nothing yet'}>
-          <p className="hint">{summariseProfile(taste)}</p>
-          {/*
-            Say what actually happens, including the part that is a
-            disclosure. The summary above does travel — it goes to the model
-            with every request, which is the whole mechanism — and writing
-            "nothing leaves your device" here would have been a comfortable
-            sentence that was not true. What is worth saying instead is that
-            nothing is kept: no profile is stored, it is rebuilt from the
-            presets each time, and deleting a preset genuinely un-learns it.
-          */}
-          <p className="hint">
-            This summary &mdash; not your presets &mdash; is sent with each request, so a tone you
-            ask for lands nearer what you usually choose. Nothing is trained and no profile is
-            stored: it is worked out fresh from your own presets each time, so deleting one
-            un-learns it and turning this off stops it being sent at all.
-          </p>
-          {taste ? (
-            <ul className="cloud-list taste-list">
-              {taste.models.length ? (
-                <li className="hint">Models you pick: {taste.models.map((m) => m.name).join(', ')}</li>
-              ) : null}
-              {taste.controls.length ? (
-                <li className="hint">
-                  Where you land: {taste.controls.map((c) => `${c.name} ${c.typical}`).join(' · ')}
-                </li>
-              ) : null}
-              {taste.words.length ? (
-                <li className="hint">You ask for: {taste.words.map((w) => w.name).join(', ')}</li>
-              ) : null}
-            </ul>
-          ) : null}
-          {/*
-            The other half, and the more useful one.
-
-            What someone keeps says the whole tone was good enough. What they
-            reach over and change says which part was wrong — and it comes with
-            the number they actually wanted. That was being thrown away, so the
-            same correction was needed again on the next generation and the one
-            after. Shown separately from taste because it reads differently: it
-            is a list of the app's own repeated misses, in this player's hands.
-          */}
-          <p className="silk-label">What you keep fixing afterwards</p>
-          <p className="hint">{summariseCorrections(corrections)}</p>
-          {corrections ? (
-            <ul className="cloud-list taste-list">
-              {corrections.controls.map((c) => (
-                <li className="hint" key={c.name}>
-                  {c.name}: you usually turn it {c.way} ({c.count} of {c.of} times, by about {c.by})
-                </li>
-              ))}
-              {corrections.words.length ? (
-                <li className="hint">
-                  You often ask for: {corrections.words.map((w) => w.text).join(', ')}
-                </li>
-              ) : null}
-            </ul>
-          ) : null}
-          <div className="history-actions">
-            <button
-              className="chip"
-              onClick={() => setTasteOn(setTasteEnabled(!tasteOn))}
-              aria-pressed={tasteOn}
-            >
-              {tasteOn ? 'Stop using my history' : 'Use my history again'}
-            </button>
-            {corrections ? (
-              <button
-                className="chip"
-                onClick={() => {
-                  clearCorrections()
-                  setCorrectionKey((n) => n + 1)
-                }}
-              >
-                Forget what I keep fixing
-              </button>
-            ) : null}
-          </div>
-        </Section>
-
-        <Section key="what-s-changed-this-session" title="What's changed this session">
-          <ChangeLog log={log} onClear={() => setLog([])} />
-        </Section>
-
-        <Section key="debug-log" title="Debug log" note="Copy it and paste it into the chat when something goes wrong">
-          {/*
-            One log, one Copy button. "Make a unified debug log with a copy
-            log button to send back to you for debugging in the settings menu.
-            Any debugging info already in menus move to debug log." The AI's
-            timeline, the wire, the app's own changes, every error: one list,
-            in order. The two detailed views under it are the same facts as
-            tables, for reading rather than sending.
-          */}
-          <DebugLog device={device} link={link} />
-          <Diagnostics />
-          <LinkDetails />
-
-          {/*
-            This used to sit under every screen, permanently, including the one
-            you look at on a stage. It is worth saying once and worth being
-            findable — which is here, not there.
-          */}
-          <p className="footnote">
-            Models and parameter ranges are read off the attached unit at generation time, so the
-            designer can only pick models that unit actually has and only set values inside each
-            control&rsquo;s real range. Anything outside it is rejected before a single write goes
-            out. Device access via{' '}
-            <a href="https://github.com/sKuhLight/ForgeFX" target="_blank" rel="noreferrer">
-              ForgeFX
-            </a>
-            , an independent project not affiliated with Fractal Audio Systems.
-          </p>
         </Section>
       </Sheet>
 

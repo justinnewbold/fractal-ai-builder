@@ -5321,6 +5321,111 @@ button.view-tab.gig-tab::after {
   }
 }
 
+/* ---------- groups: the four doors of Setup ---------- */
+
+/*
+ * A group is the box; the panels inside it are rows.
+ *
+ * Twelve identical bordered panels in one column is a wall — nothing is bigger,
+ * darker or bolder than anything else, so the eye has nowhere to land and the
+ * whole list has to be read every time. The fix is not smaller text, it is two
+ * levels: four boxed headings at the sheet's own level, and inside each one a
+ * divided list that has visibly given up its border to sit there.
+ */
+.group {
+  margin-top: var(--s-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  background: var(--panel);
+}
+
+.group-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  padding: var(--s-4);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+/* Safari draws its own triangle unless this is spelled out. */
+.group-head::-webkit-details-marker {
+  display: none;
+}
+
+/*
+ * Not a silkscreen label. The panel legends inside are set in caps, which is
+ * right for a legend and wrong for a heading: caps strip the shape out of a
+ * word, so a column of them is read letter by letter. The door is sentence
+ * case and the full-strength colour, which is most of what makes the two
+ * levels tell themselves apart.
+ */
+.group-title {
+  flex: 0 0 auto;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: var(--f-4);
+  color: var(--silk);
+}
+
+.group-note {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--f-2);
+  color: var(--silk-faint);
+}
+
+.group-head::after {
+  content: '';
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+  border-right: 1.5px solid var(--silk-faint);
+  border-bottom: 1.5px solid var(--silk-faint);
+  transform: rotate(45deg) translate(-2px, -2px);
+  transition: transform 0.15s ease;
+}
+
+.group[open] > .group-head::after {
+  transform: rotate(-135deg) translate(-2px, -2px);
+}
+
+@media (hover: hover) {
+  .group-head:hover .group-title {
+    color: var(--silk);
+  }
+}
+
+.group-body {
+  padding: 0 var(--s-4) var(--s-2);
+}
+
+/* The panels inside have given up their box: rows on a rule, indented from the
+   heading above them, so the level is legible without a second border. */
+.group-body > .section,
+.group-body > * > .section {
+  margin-top: 0;
+  border: 0;
+  border-top: 1px solid var(--rule);
+  border-radius: 0;
+  background: transparent;
+}
+
+.group-body > .section:first-of-type {
+  border-top: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .group-head::after {
+    transition: none;
+  }
+}
+
 /* ---------- reorderable, resizable panels ---------- */
 
 .stack-item {

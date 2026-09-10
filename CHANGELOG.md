@@ -3,6 +3,20 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.148.0
+
+**Setup is four things now, not twelve.** It opened on a column of twelve
+identical grey panels — button size the same size, colour and weight as the
+debug log — so nothing on the screen stood out and the whole list had to be
+read every time. They are sorted now, by the reason you opened the sheet:
+**Screen** for how Play looks, **My rig** for the unit and the phone and the
+footswitches, **Something's wrong** for the checks, the log and telling us, and
+**What the AI knows** for what it has picked up from your presets. Four rows
+instead of twelve, with the introduction still loose at the bottom. Nothing was
+removed and nothing moved out of Setup; the headings are in plain sentence case
+rather than the wide capitals the panels use, so the two levels tell themselves
+apart at a glance.
+
 ## 7.147.0
 
 **The header stays put.** It was pinned already — sticky at the top — but the
