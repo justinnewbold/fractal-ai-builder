@@ -2557,6 +2557,32 @@ export default function App() {
        tone that was on screen still on screen, and it would be in the log
        twice. */
     const replacing = shelved()
+
+    /*
+     * OUT OF THE SHEET IT WAS ASKED FOR FROM, AND INTO THE ONE THAT SHOWS IT.
+     *
+     * "Tapping a preset saved to my account doesn't do anything... the one
+     * saved in the browser, you click reload, it looks like it's gonna reload
+     * and then says nothing and does nothing."
+     *
+     * It was doing all of it. A reload re-reads the unit, re-checks the saved
+     * spec against what is loaded now, and puts the result on the tone card —
+     * and the tone card lives inside the Ask sheet, which is not the sheet you
+     * pressed the button in. So the progress, the result, the Send button and
+     * the error banner were all behind the Presets sheet still covering the
+     * screen. The button did everything except show it.
+     *
+     * So the load takes you where it lands, and says so on the way: one line
+     * when it starts, because reading a preset over the relay is not instant,
+     * and one when it arrives, naming what came back and what to press. The
+     * card under it carries the changes and the Send button.
+     */
+    setSheet('chat')
+    setPresetMenu(false)
+    setTurns((prev) => [
+      ...prev,
+      { role: 'system', text: `Loading "${entry.name}" — reading what the unit has now…` }
+    ])
     try {
       setProgress('Reading what the unit has loaded...')
       const schema = await readSchema(
@@ -2577,12 +2603,43 @@ export default function App() {
       setLastDesign(designMemory(validated))
       setSaveName(validated.presetName || entry.name)
       revealResult()
+      const ready = countWrites(validated.changes)
+      const loaded = validated.presetName || entry.name
+      setTurns((prev) => [
+        ...prev,
+        {
+          role: 'system',
+          /*
+           * What the card under it actually offers.
+           *
+           * A saved tone is re-checked against the preset that is loaded NOW,
+           * and everything in it can be dropped — a different amp, a block
+           * that isn't there any more. Promising a Send button in that case
+           * is the same broken promise this whole change is about: the card
+           * says "nothing to apply" and there is no button under it.
+           */
+          text: ready
+            ? `"${loaded}" is loaded — ${ready} change${
+                ready === 1 ? '' : 's'
+              } ready. Nothing has been written yet: send it to the ${
+                device?.short || device?.name || 'unit'
+              } with the button under it.`
+            : `"${loaded}" came back, but none of it fits the preset on the unit right now, so there is nothing to send.${
+                validated.problems?.length ? ` ${validated.problems[0]}` : ''
+              }`
+        }
+      ])
       record('reload', `Loaded saved preset "${entry.name}"`, [
         `${countWrites(validated.changes)} changes proposed`,
         ...validated.problems
       ])
     } catch (err) {
       setError(err.message)
+      /* Where the press was, not only in the banner behind it. */
+      setTurns((prev) => [
+        ...prev,
+        { role: 'system', text: `Couldn't load "${entry.name}" — ${err.message}` }
+      ])
     } finally {
       setProgress(null)
       setBusy(false)
@@ -4443,6 +4500,7 @@ export default function App() {
           />
           <DeviceBackup
             busy={busy}
+            deviceSlots={device?.capabilities?.presets?.count}
             onError={setError}
             onChanged={(summary) => record('backup', summary)}
           />

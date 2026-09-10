@@ -139,7 +139,14 @@ export function Versions({ preset, onError, onChanged, busy, deviceSlots }) {
  * which, on a project that has silently written wrong values more than once, is
  * not a hypothetical.
  */
-export function DeviceBackup({ onError, onChanged, busy }) {
+/*
+ * `deviceSlots` is a PROP, and was being read as if it were one without ever
+ * being declared or passed — so this panel threw a ReferenceError the moment
+ * it rendered, and the Backups section of the Presets sheet was an error
+ * boundary's apology instead of a backup button. Found while chasing why
+ * reloading a saved preset showed nothing: the same sheet, one panel down.
+ */
+export function DeviceBackup({ onError, onChanged, busy, deviceSlots }) {
   const [running, setRunning] = useState(false)
   const [label, setLabel] = useState('')
 

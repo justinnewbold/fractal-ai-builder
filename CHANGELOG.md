@@ -3,6 +3,25 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.142.0
+
+**Reloading a saved preset shows you the preset.** Tapping one kept with your
+account, or pressing Reload on one saved in the browser, was doing the whole
+job — reading the unit, re-checking the saved tone against what is loaded now,
+putting it on the tone card with a Send button — and showing you none of it:
+the card lives in the Ask sheet, and the press happened in the Presets sheet,
+which stayed over the top of it. So did the progress, and so did the error
+banner when a load failed. A load now takes you to the sheet it lands in and
+says what is happening: a line when it starts, a line naming what came back
+and how many changes are ready to send, and a line if it fails — or, when
+nothing in the saved tone fits the preset on the unit, a line saying that
+instead of promising a button that isn't there. The rows kept with your account
+show what each preset is, in text rather than in a tooltip a phone can't show.
+
+**And the Backups panel comes back.** It read a prop nobody declared or passed,
+so it threw the moment it rendered and that section of the Presets sheet was an
+apology from the error boundary.
+
 ## 7.141.0
 
 **Setup can ask the unit why a preset makes no sound.** A new section, *This
