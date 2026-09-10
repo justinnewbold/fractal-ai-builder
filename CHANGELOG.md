@@ -3,6 +3,15 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.145.0
+
+**The volume is behind a speaker in the header.** It was a permanent row across
+the top of Play — the slider, the two steps and the figure — holding a strip of
+the one screen whose currency is scene buttons you can hit without looking, for
+a control wanted twice a night. There is a speaker beside the gear now; tapping
+it slides the same control up on a sheet, unchanged. A preset with no output
+block has no volume to move, so it gets no speaker, and Play says that is why.
+
 ## 7.144.0
 
 **Setlists and stars follow your account.** They lived in browser storage — a

@@ -3830,35 +3830,53 @@ export function run(test) {
     assert.ok(!/git show FETCH_HEAD:package\.json/.test(job), 'the comparison against the moving tip is back')
   })
 
-  test('the Play screen has a volume slider, and it moves the Output level the way the port can take', () => {
+  test('the volume is behind the speaker in the bar, and moves the Output level the way the port can take', () => {
     /*
-     * "Add volume slider to the play screen to quickly turn volume up or down."
+     * "Can we set that to be a slide-up menu? Put a sound button that looks
+     * like a speaker in the header, and when it's tapped you can slide the
+     * volume left or right or do the plus minus thing that's already set up,
+     * but it's not there on the main screen."
      *
-     * Two halves. Gig renders it under the meter, bound to the same Output
-     * block the meter reads, so a unit with no output block gets neither. And
-     * Volume writes through the coalescing writer rather than straight to
-     * setParam on every pixel — the port takes one request at a time, and a
-     * drag that queued sixty writes a second would land long after the thumb
-     * stopped and block the next scene behind it.
+     * It was a permanent row across the top of Play — a strip of the one
+     * screen whose currency is scene buttons you can hit without looking, held
+     * open all night for a control wanted twice. So: a speaker in the bar, the
+     * same control on a sheet behind it, and nothing on the stage screen.
+     *
+     * The other half is unchanged and still holds: Volume writes through the
+     * coalescing writer rather than straight to setParam on every pixel — the
+     * port takes one request at a time, and a drag that queued sixty writes a
+     * second would land long after the thumb stopped and block the next scene
+     * behind it.
      */
     const bare = (x) => x.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ' ')
     const gig = bare(readFileSync(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8'))
-    assert.match(gig, /import Volume from '\.\/Volume'/, 'the Play screen does not import the slider')
+    assert.ok(!/<Volume /.test(gig), 'the volume row is back across the top of the stage screen')
+    assert.ok(!/import Volume/.test(gig), 'Play still pulls in the slider it no longer draws')
+
+    const bareApp = bare(src)
+    assert.match(bareApp, /import Volume from '\.\/components\/Volume'/, 'nothing renders the slider any more')
     assert.match(
-      gig,
-      /<Volume eid=\{meterEid\} preset=\{preset\} onError=\{onError\} \/>/,
-      'the slider is not bound to the Output block the meter reads'
+      bareApp,
+      /<Volume eid=\{outputEid\} preset=\{preset\} onError=\{setError\} \/>/,
+      'the slider is not bound to the Output block'
     )
-    const meter = gig.indexOf('className="gig-signal"')
-    const slider = gig.indexOf('<Volume ')
-    const tile = gig.indexOf('className="gig-preset"')
+    assert.match(bareApp, /open=\{sheet === 'volume'\}/, 'the volume has no sheet to open into')
+    assert.match(
+      bareApp,
+      /onOpenVolume=\{status === 'live' && outputEid !== null \? \(\) => setSheet\('volume'\) : null\}/,
+      'the speaker is offered on a preset with no output level to move'
+    )
+    const barSrc = bare(readFileSync(new URL('../src/components/TopBar.jsx', import.meta.url), 'utf8'))
+    assert.match(barSrc, /className="topbar-volume"/, 'there is no speaker in the bar')
+    assert.match(barSrc, /aria-label="Volume"/, 'the speaker says nothing to a screen reader')
+    assert.match(barSrc, /<svg viewBox="0 0 24 24"/, 'the speaker is not drawn')
+    const barCss = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    assert.match(barCss, /button\.topbar-volume \{[^}]*min-height: 44px/, 'the speaker is under the touch floor')
+
     const nav = gig.indexOf('className="gig-nav"')
-    /* "Move the volume slider above the preset button." First on the
-       screen: before the preset tile, which is before the meter. */
-    assert.ok(slider !== -1 && slider < tile && tile < meter && meter < nav, 'the slider is not first, above the preset tile')
     /* "Move Previous / Next directly above the bottom tap bar." The nav sits
        in the sticky foot with the bar, after the block grid — never back
-       between the volume and the scenes. */
+       between the preset tile and the scenes. */
     const foot = gig.indexOf('className="gig-foot"')
     const barAt = gig.indexOf('className="gig-bar"')
     const grid = gig.indexOf('className="gig-blocks"')
@@ -4176,11 +4194,11 @@ export function run(test) {
      * the app rather than as the preset being broken.
      */
     const gig = readFileSync(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8')
-    const at = gig.indexOf('<Volume eid={meterEid}')
-    assert.notEqual(at, -1, 'the volume slider is gone from Play')
-    const after = gig.slice(at, at + 1400)
-    assert.match(after, /meterEid === null && chain === 'ok'/, 'a preset with no output block says nothing about it')
+    const at = gig.indexOf("meterEid === null && chain === 'ok'")
+    assert.notEqual(at, -1, 'a preset with no output block says nothing about it')
+    const after = gig.slice(at, at + 700)
     assert.match(after, /no Output block/, 'the reason is missing or written in jargon')
+    assert.match(after, /speaker is missing from the bar/, 'nothing connects it to the control that is not there')
     assert.match(after, /slotModel !== 'linear'/, 'a unit whose outputs are not a grid block is accused of missing one')
   })
 

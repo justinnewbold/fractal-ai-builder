@@ -36,7 +36,6 @@ import { useDismiss } from '../lib/dismiss'
 import { Tuner } from './Console'
 import BpmBox from './BpmBox'
 import Sheet from './Sheet'
-import Volume from './Volume'
 import { sizeVars, SIZES } from '../lib/gigSize'
 
 /**
@@ -541,16 +540,14 @@ export default function Gig({
         second list of its own: one preset picker, two ways in.
       */}
       {/*
-        The volume, first.
+        The volume is not here any more; it is behind the speaker in the bar.
 
-        "Move the volume slider above the preset button." It sat under the
-        meter, which reads the same Output block it moves; but the thing you
-        reach for between songs belongs at the top, before the name, not
-        between the name and the scenes. Absent, not disabled, on a unit
-        whose output block has no level the app can reach; Volume.jsx says
-        how a drag becomes writes.
+        "Can we set that to be a slide-up menu? Put a sound button that looks
+        like a speaker in the header." It had been a permanent row above the
+        preset tile, which is a strip of the one screen whose currency is scene
+        buttons you can hit without looking — for a control wanted twice a
+        night. App renders it in a sheet now; TopBar opens it.
       */}
-      <Volume eid={meterEid} preset={preset} onError={onError} />
 
       {/*
         And why it isn't there, when it isn't.
@@ -564,7 +561,8 @@ export default function Gig({
       {meterEid === null && chain === 'ok' && blocks.length && capabilities?.slotModel !== 'linear' ? (
         <p className="gig-note">
           This preset has no Output block, so nothing reaches your amp and there is no volume to
-          move here. Add one at the end of the chain on Edit, or build the preset again.
+          move — which is why the speaker is missing from the bar. Add one at the end of the chain
+          on Edit, or build the preset again.
         </p>
       ) : null}
 

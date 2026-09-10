@@ -3,6 +3,7 @@ import TopBar from './components/TopBar'
 import { Preview } from './components/Generate'
 import { ChangeLog } from './components/ChangeLog'
 import Diagnostics from './components/Diagnostics'
+import Volume from './components/Volume'
 import DebugLog from './components/DebugLog'
 import PresetReport from './components/PresetReport'
 import { installCrashCapture, logDebug } from './lib/debugLog'
@@ -294,6 +295,17 @@ export default function App() {
    */
   const preset = useDevice(ofPreset)
   const blocks = useDevice(ofBlocks)
+  /*
+   * The block the volume moves, which is also the reason there is a speaker in
+   * the bar at all. The output block's Level is the whole preset's volume —
+   * lib/volume.js says why that one is the player's to move — and a preset
+   * that has no output block has no volume, so it gets no speaker rather than
+   * a speaker that opens an empty sheet.
+   */
+  const outputEid = useMemo(
+    () => blocks.find((b) => b.slug === 'output')?.effectId ?? null,
+    [blocks]
+  )
   const [error, setError] = useState(null)
   /*
    * Every error the screen shows is a line in the debug log too, and so is a
@@ -3853,6 +3865,7 @@ export default function App() {
         showPreset={view !== 'play'}
         onOpenPresets={() => setPresetMenu((v) => !v)}
         onOpenSettings={() => setSheet('settings')}
+        onOpenVolume={status === 'live' && outputEid !== null ? () => setSheet('volume') : null}
         menu={
           presetMenu && !narrow ? (
             <div className="preset-menu" ref={presetMenuRef}>
@@ -4645,6 +4658,28 @@ export default function App() {
             setDirty(true)
           }}
         />
+      </Sheet>
+
+      {/*
+        The volume, on a sheet the speaker in the bar opens.
+
+        "Put a sound button that looks like a speaker in the header, and when
+        it's tapped you can slide the volume left or right or do the plus minus
+        thing that's already set up, but it's not there on the main screen."
+
+        The same control, unchanged — the slider, the two steps and the figure —
+        just no longer holding a strip of the stage screen open all night for
+        the two moments it is wanted.
+      */}
+      <Sheet
+        open={sheet === 'volume'}
+        onClose={() => setSheet(null)}
+        title="Volume"
+        note={preset?.name?.trim() || null}
+      >
+        {sheet === 'volume' && outputEid !== null ? (
+          <Volume eid={outputEid} preset={preset} onError={setError} />
+        ) : null}
       </Sheet>
 
       <Sheet
