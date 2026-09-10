@@ -3,6 +3,16 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.146.0
+
+**The last row of effects fits on the screen.** The preset tile was sized to a
+scene tile from when it was shaped like one — a number stacked over a name —
+and it has been one line of text in a 62px box ever since the number moved onto
+the name's line. It takes the 44px every pressable thing gets now, and the gaps
+around the meter, the scenes, the effects and the foot each give up a step: 40
+pixels back, which on a preset with nine effects is the row that was hanging off
+the bottom.
+
 ## 7.145.0
 
 **The volume is behind a speaker in the header.** It was a permanent row across

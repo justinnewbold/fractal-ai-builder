@@ -2288,9 +2288,10 @@ button.view-tab.current:not(:disabled) {
 /* ---------- gig mode ---------- */
 
 /* Big targets, high contrast, nothing that designs anything. */
-/* Was 26px: "reduce the padding" — the volume row sits right under the bar. */
+/* Was 26px: "reduce the padding" — the volume row sat right under the bar, and
+   is a sheet now. A step smaller again so the last row of effects fits. */
 .gig {
-  margin-top: var(--s-3);
+  margin-top: var(--s-2);
 }
 
 /* The 24px inset above and below dated from when this box also carried a
@@ -2334,7 +2335,19 @@ button.gig-name {
   justify-content: center;
   gap: var(--s-2);
   width: 100%;
-  min-height: var(--gig-tile, 62px);
+  /*
+   * The touch floor, not a scene tile's height.
+   *
+   * "Make the preset button a little smaller, so that an extra row of effects
+   * can fit on the screen — right now they're being cut off." It was sized to
+   * a scene tile because it used to BE shaped like one, a number stacked over
+   * a name; the number moved onto the name's line and the second line went
+   * with it, leaving a tile with one line of text in a 62px box. It is pressed
+   * far less often than a scene and holds far less, so it takes the 44px every
+   * pressable thing gets and no more — and the row of effects that was hanging
+   * off the bottom of the screen comes up onto it.
+   */
+  min-height: 44px;
   padding: var(--s-2) var(--s-3);
   margin: 0;
   background: var(--panel);
@@ -2393,7 +2406,9 @@ button.gig-name:disabled .gig-name-caret {
 
 .gig-signal {
   height: 5px;
-  margin-top: 10px;
+  /* Was 10px. See button.gig-name: the whole stack gives up a step so the last
+     row of effects lands on the screen instead of under the foot. */
+  margin-top: var(--s-2);
   background: var(--panel);
   border-radius: var(--r-1);
   overflow: hidden;
@@ -2416,7 +2431,7 @@ button.gig-name:disabled .gig-name-caret {
   position: sticky;
   bottom: 0;
   z-index: 2;
-  margin-top: var(--s-3);
+  margin-top: var(--s-2);
   padding: var(--s-2) 0 max(var(--s-1), env(safe-area-inset-bottom, 0px));
   /* Opaque: the effects scroll underneath it. */
   background: var(--chassis);
@@ -2519,7 +2534,8 @@ button.size-step:disabled {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(var(--gig-col, 110px), 1fr));
   gap: var(--s-2);
-  margin-top: 12px;
+  /* Was 12px — see button.gig-name. */
+  margin-top: var(--s-2);
 }
 
 /* The same size as the effect blocks below them — they were a third taller,
@@ -5375,7 +5391,10 @@ button.view-tab.gig-tab::after {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(var(--gig-col-block, 130px), 1fr));
   gap: var(--s-2);
-  margin-top: 18px;
+  /* Was 18px. The scenes and the effects still read as two grids — they are
+     coloured differently and shaped differently — so the gap between them can
+     be a step rather than a gulf. See button.gig-name. */
+  margin-top: var(--s-3);
 }
 
 /* The tile and the menu it can open share a box, so the menu can be placed
