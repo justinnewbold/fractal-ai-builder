@@ -3,6 +3,18 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.138.1
+
+**Whole effect names, and the preset name in the middle of its tile.** On
+Play the effect names came out with their tops sliced off — a row of
+half-letters where CMP, WAH and PHA should be — because two lines of type
+and 12px of padding came to more than the tile is tall, and the phone
+answered that by cutting the tile rather than growing it. The tile now
+uses the 8px the scene tiles above it always have, and both its lines are
+given a stated height instead of whatever the font felt like, so the
+names read whole at every button size. The preset tile's number and name
+sat against its top edge; they sit in the middle of the box now.
+
 ## 7.138.0
 
 **One debug log, a Save button after a send, and a shorter header.**

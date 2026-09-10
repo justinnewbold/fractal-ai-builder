@@ -2255,10 +2255,20 @@ button.view-tab.current:not(:disabled) {
  * size, in the mono face and dimmer, so it reads as the tile's index the way
  * a scene's number does — and the name is exactly a scene name's size.
  */
+/*
+ * The line sits in the MIDDLE of the tile, not against its top edge.
+ *
+ * Baseline-aligned children of a button pack to the cross start, so with the
+ * number and the name aligned directly in a tile that a scene's height makes
+ * 62px, the whole line rode high with a band of empty tile under it — "center
+ * preset name in button box". The top bar had exactly this bug and exactly
+ * this fix: the button centres ONE line, and the line holds the baseline the
+ * number and the name share.
+ */
 button.gig-name {
   display: flex;
   flex-direction: row;
-  align-items: baseline;
+  align-items: center;
   justify-content: center;
   gap: var(--s-2);
   width: 100%;
@@ -2280,9 +2290,12 @@ button.gig-name {
   color: var(--silk-faint);
 }
 
+/* The slot, the name and the caret on one line, on one baseline. The button
+   above centres this; nothing in here is aligned against the tile itself. */
 .gig-name-row {
   display: inline-flex;
   align-items: baseline;
+  justify-content: center;
   gap: var(--s-2);
   min-width: 0;
   max-width: 100%;
@@ -5328,7 +5341,19 @@ button.gig-block {
   align-items: flex-start;
   gap: var(--s-1);
   min-height: var(--gig-tile, 62px);
-  padding: var(--s-3) var(--s-3);
+  /*
+   * 8px down the sides it is pressed from, not 12.
+   *
+   * Two lines of type and 24px of padding came to more than the tile is tall,
+   * and a browser is allowed to deal with that by clipping the button rather
+   * than growing it — iOS does. The effect names came back from a phone with
+   * their tops sliced off, a row of half-letters where CMP and WAH should be,
+   * while the scene tiles above them — which have always been 8px — were
+   * fine. So the block tile is 8px too, and the two lines below are given a
+   * stated line-height rather than `normal`, which is a different number in
+   * every font and was the last few pixels of the overflow.
+   */
+  padding: var(--s-2) var(--s-3);
   border: 1px solid var(--rule);
   border-radius: var(--r-1);
   background: var(--panel);
@@ -5339,6 +5364,10 @@ button.gig-block {
   font-family: var(--display);
   font-size: var(--f-4);
   font-weight: 600;
+  /* Stated, not `normal`: see the padding above. A line box that depends on
+     the font's own metrics is a line box that differs between this machine
+     and the phone, and the phone is where it has to fit. */
+  line-height: 1.15;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--silk-dim);
@@ -5347,6 +5376,7 @@ button.gig-block {
 .gig-block-state {
   font-family: var(--mono);
   font-size: var(--f-2);
+  line-height: 1.15;
   letter-spacing: 0.08em;
   color: var(--silk-faint);
   display: flex;
@@ -8183,7 +8213,10 @@ button.view-tab {
 .gig[data-compact] button.gig-block {
   height: 52px;
   min-height: 0;
-  padding: var(--s-2);
+  /* 4px top and bottom at this size. The tile is a stated 52px here, so the
+     two lines and their padding have to come in under it or the phone clips
+     the name — the same slice that took the tops off the effect names. */
+  padding: var(--s-1) var(--s-2);
   overflow: hidden;
 }
 

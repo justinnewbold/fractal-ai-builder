@@ -572,9 +572,15 @@ export default function Gig({
         >
           {/* Number beside the name, not over it: "put the number inline
               with the name". Same size as the name, dimmer, the way a scene
-              tile carries its index. */}
-          <span className="gig-name-num mono">{preset?.number ?? '--'}</span>
+              tile carries its index.
+
+              Both inside the line, so the line is the one thing the tile has
+              to place: the number and the name share a baseline with each
+              other, and the button centres the line in the box. Aligned
+              straight against the button they sat at its top edge, with the
+              rest of the tile empty under them. */}
           <span className="gig-name-row">
+            <span className="gig-name-num mono">{preset?.number ?? '--'}</span>
             <span className="gig-name-word">{presetLabel(preset)}</span>
             <span className="gig-name-caret" aria-hidden="true">
               ⌄

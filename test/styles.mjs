@@ -673,6 +673,70 @@ export function run(test) {
     assert.match(rule('.topbar-name'), /font-size: var\(--f-3\)/, 'the preset name in the bar is a headline again')
   })
 
+  test('what is inside an effect tile fits inside the effect tile, at both sizes', () => {
+    /*
+     * "The effects names are all garbled."
+     *
+     * They came back from a phone with the top third of every name cut off in
+     * a straight line — CMP, WAH, PHA, a row of half-letters over a readable
+     * Off. The tile put 12px of padding above and below two lines whose height
+     * was left to the font (`normal`, which is a different number in every
+     * face), and on the phone that came to more than the tile is tall. A
+     * browser is allowed to answer that by clipping a button rather than
+     * growing it, and iOS does — the scene tiles above, on 8px, were fine.
+     *
+     * So the arithmetic is the test, with every number read out of the
+     * stylesheet rather than restated here: two lines, their gap and their
+     * padding have to come in under the tile at the size the tile is drawn.
+     */
+    const px = (t) => Number(code.match(new RegExp(`--${t}: ([0-9.]+)px`))[1])
+    const rule = (sel) => code.slice(code.indexOf(sel + ' {'), code.indexOf('}', code.indexOf(sel + ' {')))
+    const step = (r, prop) => {
+      const raw = r.match(new RegExp(`${prop}: ([^;]+);`))?.[1]
+      assert.ok(raw, `${prop} is gone from the effect tile`)
+      return px(raw.trim().split(/\s+/)[0].match(/--(s-\d|f-\d)/)[1])
+    }
+
+    const tile = rule('button.gig-block')
+    const name = rule('.gig-block-name')
+    const state = rule('.gig-block-state')
+
+    /* Stated, both of them. `normal` is the thing that differed between the
+       machine this passes on and the phone it failed on. */
+    const height = (r, which) => {
+      const lh = Number(r.match(/line-height: ([0-9.]+);/)?.[1])
+      assert.ok(lh, `the ${which} line in an effect tile is back on the font's own line-height`)
+      return step(r, 'font-size') * lh
+    }
+
+    const lines = height(name, 'name') + step(tile, 'gap') + height(state, 'state')
+    /* 2px, because an effect that is off is ringed rather than filled and the
+       ring is the wider of the two borders. */
+    const border = 2 * 2
+
+    const floor = Number(tile.match(/min-height: var\(--gig-tile, (\d+)px\)/)[1])
+    const full = lines + 2 * step(tile, 'padding') + border
+    assert.ok(full <= floor, `an effect tile holds ${full}px of content in ${floor}px`)
+
+    const small = rule('.gig[data-compact] button.gig-block')
+    const stated = Number(small.match(/height: (\d+)px/)[1])
+    const tight = lines + 2 * step(small, 'padding') + border
+    assert.ok(tight <= stated, `at the smallest size an effect tile holds ${tight}px of content in ${stated}px`)
+  })
+
+  test('on Play the preset name sits in the middle of its tile', () => {
+    /*
+     * "Center preset name in button box." Baseline-aligned children of a
+     * button pack to the cross start, so the number and the name sat against
+     * the top edge of a tile a scene's height makes 62px, with a band of empty
+     * tile under them. Same bug and same fix as the bar above it: the button
+     * centres one line, and the line inside holds the shared baseline.
+     */
+    const rule = (sel) => code.slice(code.indexOf(sel + ' {'), code.indexOf('}', code.indexOf(sel + ' {')))
+    assert.match(rule('button.gig-name'), /align-items: center/, 'the preset tile packs its line to the top again')
+    assert.match(rule('.gig-name-row'), /align-items: baseline/, 'the slot and the name no longer share a baseline')
+  })
+
   test('a scene and an effect are different objects, not two tiles with a stripe', () => {
     /*
      * "The scenes and effects look too similar."
