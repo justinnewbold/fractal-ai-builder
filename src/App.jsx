@@ -4211,6 +4211,7 @@ export default function App() {
         onClose={() => setSheet(null)}
         title="Ask"
         note={preset?.name?.trim() || null}
+        tall
       >
         {sheet === 'chat' ? (
           <>

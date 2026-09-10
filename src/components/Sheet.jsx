@@ -56,7 +56,17 @@ const DESK = '(min-width: 1000px)'
 const FOCUSABLE =
   'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
 
-export default function Sheet({ open, onClose, title, note, footer, children }) {
+/**
+ * `tall`: the sheet is the screen.
+ *
+ * A sheet is as tall as what it carries, capped short of the top so the page
+ * shows behind it. Right for a block editor, wrong for a conversation: the
+ * Ask sheet took two thirds of a phone with a blurred page above it, and the
+ * transcript inside was a 260px window. A tall sheet takes the whole height
+ * under the status bar, and its body is a column that hands what is left to
+ * the conversation — the same shape the Ask screen already has on a desktop.
+ */
+export default function Sheet({ open, onClose, title, note, footer, tall = false, children }) {
   const [mounted, setMounted] = useState(open)
   const [shown, setShown] = useState(false)
   const [drag, setDrag] = useState(0)
@@ -274,7 +284,7 @@ export default function Sheet({ open, onClose, title, note, footer, children }) 
       )}
 
       <section
-        className="sheet"
+        className={`sheet ${tall ? 'sheet-tall' : ''}`}
         ref={panel}
         role="dialog"
         aria-modal={rail ? undefined : 'true'}

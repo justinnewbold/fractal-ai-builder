@@ -6528,6 +6528,57 @@ button.sheet-close:active {
   border-top: 1px solid var(--rule);
 }
 
+/*
+ * A sheet that is the screen.
+ *
+ * The Ask sheet was as tall as its contents and no taller than 88% of the
+ * window, with the transcript inside it capped at 260px on a phone: a
+ * conversation in a letterbox, under a strip of blurred page that was doing
+ * nothing. "We should be using all the screen space." So it takes the height
+ * under the status bar, and its body becomes the same column the Ask screen is
+ * on a desktop: the conversation gets what is left, the tone under it keeps
+ * its own height, and past the floor the body scrolls.
+ *
+ * Height, not min-height, for the reason `.shell-chat` gives: a column that
+ * can grow has no reason to scroll, and pushes the composer off the bottom.
+ * The rail's own `height: 100%` is stated later and wins there, as it should.
+ */
+.sheet.sheet-tall {
+  height: calc(100% - env(safe-area-inset-top, 0px) - var(--s-3));
+  max-height: none;
+}
+
+.sheet-tall .sheet-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.sheet-tall .sheet-body > .assistant {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  /* The same floor as .chat-screen, for the same reason: with a tone listed
+     under it, "what is left" can be nothing. */
+  min-height: min(60dvh, 380px);
+}
+
+.sheet-tall .sheet-body > .assistant .assistant-log {
+  display: flex;
+  flex-direction: column;
+  max-height: none;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Short conversations sit against the box you type in — see .chat-screen. */
+.sheet-tall .sheet-body > .assistant .assistant-log > :first-child {
+  margin-top: auto;
+}
+
+.sheet-tall .sheet-body > .tones {
+  flex: 0 0 auto;
+}
+
 /* The sheet IS the surface, so what it carries stops drawing one of its own.
    The block panel's own layout is written for this and needs nothing else. */
 .sheet .block-panel {

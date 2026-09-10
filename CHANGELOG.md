@@ -3,6 +3,16 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.135.0
+
+**The Ask sheet is the whole screen.** On a phone the conversation opened
+in a sheet two thirds of the way up, with a blurred strip of the page above
+it doing nothing and the chat itself in a small window inside. "We should
+be using all the screen space." The sheet now fills the screen under the
+status bar and the conversation takes all of it; a designed tone still
+sits under the box you type in. On a desktop the docked panel gets the
+same room.
+
 ## 7.134.0
 
 **A reply starts in view, and the two sides of the chat look different.**

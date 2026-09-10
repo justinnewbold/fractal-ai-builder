@@ -878,6 +878,24 @@ export function run(test) {
   })
 
   /*
+   * And the same on a phone, where the conversation is a sheet.
+   *
+   * "We should be using all the screen space." The Ask sheet was as tall as
+   * its contents and no taller than 88% of the window, with the transcript
+   * capped at 260px inside it: two thirds of a phone, most of that blurred
+   * page, and the chat in a letterbox at the bottom.
+   */
+  test('the Ask sheet fills the screen and the transcript fills the sheet', () => {
+    const tall = code.slice(code.indexOf('.sheet.sheet-tall {'), code.indexOf('}', code.indexOf('.sheet.sheet-tall {')))
+    assert.match(tall, /height: calc\(100% - env\(safe-area-inset-top/, 'the tall sheet is as short as its contents again')
+    assert.match(tall, /max-height: none/, 'the tall sheet still stops at 88% of the window')
+    assert.match(css, /\.sheet-tall \.sheet-body > \.assistant \.assistant-log \{[^}]*max-height: none/,
+      'the transcript keeps its letterbox cap inside the tall sheet')
+    assert.match(css, /\.sheet-tall \.sheet-body > \.assistant \{[^}]*flex: 1 1 auto/,
+      'the conversation does not take what is left of the sheet')
+  })
+
+  /*
    * And the box you type into gets the width of the row it is in.
    *
    * `.refine-row` was referenced in two components and styled in none, so the
