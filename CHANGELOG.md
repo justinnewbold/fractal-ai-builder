@@ -3,6 +3,18 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.141.0
+
+**Setup can ask the unit why a preset makes no sound.** A new section, *This
+preset*, reads the preset you are standing on — every block, where it sits,
+whether it is on in this scene, which channel it is on, every parameter with
+its value and range, and the routing grid in the unit's own words — and then
+says what in there would keep it quiet: no output block, a block nothing is
+wired into, everything off in this scene, a level sitting on its floor. Copy
+report puts the whole read on the clipboard, the same three ways the debug log
+does, so it can be pasted into the chat. It reads on a tap rather than on a
+timer: it is a dozen round trips down the port that is carrying the audio.
+
 ## 7.140.1
 
 **One line less in Setup on a phone.** "through your Mac" is gone: the header

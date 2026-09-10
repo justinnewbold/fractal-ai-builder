@@ -1699,6 +1699,33 @@ textarea.debug-log-text {
   margin-top: var(--s-2);
 }
 
+/*
+ * The preset report: what the unit says about the preset you are on.
+ *
+ * The faults come first and read as sentences, because they are the answer;
+ * the text under them is the thing that gets pasted into the chat, and it is
+ * a fixed-width dump that has to be allowed to be as wide as it is. Its box
+ * scrolls both ways rather than wrapping a grid dump into soup.
+ */
+.preset-report-faults {
+  margin: var(--s-3) 0 0;
+  padding-left: var(--s-4);
+  font-size: var(--f-2);
+  line-height: 1.5;
+  color: var(--fault);
+}
+
+.preset-report-faults li {
+  margin-bottom: var(--s-1);
+}
+
+pre.preset-report-text {
+  margin: 0;
+  font-size: var(--f-1);
+  line-height: 1.45;
+  white-space: pre;
+}
+
 .preview-sent {
   margin: var(--s-2) 0 0;
 }

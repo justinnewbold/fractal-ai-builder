@@ -4,6 +4,7 @@ import { Preview } from './components/Generate'
 import { ChangeLog } from './components/ChangeLog'
 import Diagnostics from './components/Diagnostics'
 import DebugLog from './components/DebugLog'
+import PresetReport from './components/PresetReport'
 import { installCrashCapture, logDebug } from './lib/debugLog'
 import Cost from './components/Cost'
 import Scenes from './components/Scenes'
@@ -4613,6 +4614,26 @@ export default function App() {
             the app — are gone, and the words they used with them.
           */}
           <PhoneRemote link={link} onAction={linkAction} onError={setError} busy={busy} />
+        </Section>
+
+        {/*
+          Ask the unit about the preset you are on, when it is the preset that
+          is wrong rather than the app.
+
+          "Can we set up a way to read the parameters of the current scene to
+          investigate why there is no sound?" Its own section, high in the
+          sheet rather than under the eleven you scroll past to reach the
+          debug log: the log is what the app did, and this is what the unit
+          holds — a different question, and the one asked when a preset is
+          quiet. It reads on a tap, because it is a dozen round trips down the
+          port that is carrying the audio.
+        */}
+        <Section
+          key="preset-check"
+          title="This preset"
+          note="Read every value in this scene, and what would stop it making a sound"
+        >
+          <PresetReport device={device} link={link} />
         </Section>
 
         <Section key="developer" title="Developer" note="See what the AI was given">

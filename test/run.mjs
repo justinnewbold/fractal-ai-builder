@@ -7387,6 +7387,115 @@ test('the model is told what volume means, and never to answer with silence', ()
   assert.match(command, /"refused" says\s+why not and what would work instead/)
 })
 
+console.log('\nwhy a preset makes no sound')
+
+test('the report names what would keep a preset quiet, in a player\'s words', async () => {
+  const { silenceFaults, atMinimum } = await import('../src/lib/presetReport.js')
+
+  // A preset with no output block: the fault Justin's built presets had, and
+  // the reason the volume slider had nothing to move.
+  const noOut = silenceFaults({
+    blocks: [
+      { slug: 'drive', name: 'Drive 1', effectId: 100, col: 0, fromRows: [1] },
+      { slug: 'amp', name: 'Amp 1', effectId: 106, col: 1, fromRows: [1] }
+    ]
+  })
+  assert.equal(noOut.length, 1)
+  assert.match(noOut[0], /no Output block/i)
+
+  // A block nothing is wired into. The leftmost is fed by the input, not by a
+  // row, so it is never accused; a driver that reports no rows at all is not
+  // either.
+  const orphan = silenceFaults({
+    blocks: [
+      { slug: 'amp', name: 'Amp 1', effectId: 106, col: 0, fromRows: [] },
+      { slug: 'cab', name: 'Cab 1', effectId: 111, col: 1, fromRows: [] },
+      { slug: 'output', name: 'Out 1', effectId: 2, col: 2, fromRows: [1] }
+    ]
+  })
+  assert.equal(orphan.length, 1)
+  assert.match(orphan[0], /Cab 1/)
+  assert.ok(!/Amp 1/.test(orphan[0]), 'the first block in the row is accused of having nothing before it')
+  assert.deepEqual(
+    silenceFaults({
+      blocks: [
+        { slug: 'amp', name: 'Amp 1', effectId: 106, col: 0 },
+        { slug: 'output', name: 'Out 1', effectId: 2, col: 1 }
+      ]
+    }),
+    [],
+    'a unit that does not report its wiring is told it has none'
+  )
+
+  // Everything off in this scene, said with the scene's own name.
+  const off = silenceFaults({
+    blocks: [
+      { slug: 'amp', name: 'Amp 1', effectId: 106, col: 0, fromRows: [1], bypassed: true },
+      { slug: 'cab', name: 'Cab 1', effectId: 111, col: 1, fromRows: [1], bypassed: true },
+      { slug: 'output', name: 'Out 1', effectId: 2, col: 2, fromRows: [1] }
+    ],
+    sceneName: 'KILLING'
+  })
+  assert.equal(off.length, 1)
+  assert.match(off[0], /Every block is off in KILLING/)
+
+  // A level sitting on its floor — a preset that is perfect and inaudible.
+  const down = silenceFaults({
+    blocks: [
+      { slug: 'amp', name: 'Amp 1', effectId: 106, col: 0, fromRows: [1] },
+      { slug: 'output', name: 'Out 1', effectId: 2, col: 1, fromRows: [1] }
+    ],
+    params: {
+      2: [{ id: 1, name: 'Level', value: -80, min: -80, max: 20, unit: 'dB' }],
+      106: [{ id: 2, name: 'Gain 1', value: 0, min: 0, max: 10 }]
+    }
+  })
+  assert.equal(down.length, 1, 'a gain at zero is not silence and a level at -80 is')
+  assert.match(down[0], /Out 1 — Level is all the way down at -80dB/)
+
+  assert.equal(atMinimum({ value: -80, min: -80, max: 20 }), true)
+  assert.equal(atMinimum({ value: -79, min: -80, max: 20 }), false)
+  assert.equal(atMinimum({ value: 5, min: 5, max: 5 }), false, 'a range of nothing is a minimum of nothing')
+
+  // And a preset with nothing wrong says so by saying nothing.
+  assert.deepEqual(
+    silenceFaults({
+      blocks: [
+        { slug: 'amp', name: 'Amp 1', effectId: 106, col: 0, fromRows: [1] },
+        { slug: 'output', name: 'Out 1', effectId: 2, col: 1, fromRows: [1] }
+      ],
+      params: { 2: [{ id: 1, name: 'Level', value: 0, min: -80, max: 20, unit: 'dB' }] }
+    }),
+    []
+  )
+})
+
+test('the report carries the grid in the unit\'s own words', async () => {
+  const { formatPresetReport } = await import('../src/lib/presetReport.js')
+  const text = formatPresetReport({
+    header: { app: 'test' },
+    preset: { number: 492, name: 'RATM Morello Rig' },
+    sceneIndex: 0,
+    sceneName: 'KILLING',
+    blocks: [{ slug: 'amp', name: 'Amp 1', effectId: 106, row: 1, col: 0, channel: 'D', fromRows: [] }],
+    params: { 106: [{ id: 2, name: 'Gain 1', value: 8.5, min: 0, max: 10 }] },
+    grid: { rows: 4, cols: 12, cells: [{ row: 1, col: 0, effectId: 106 }] },
+    faults: ['There is no Output block in this preset.']
+  })
+  assert.match(text, /preset: 492 RATM Morello Rig/)
+  assert.match(text, /scene: 1 KILLING/)
+  assert.match(text, /- There is no Output block/)
+  assert.match(text, /Amp 1 \| row 1 col 0 \| on \| D \| nothing/, 'the blocks table lost where a block is or what feeds it')
+  assert.match(text, /Amp 1 \| Gain 1 \| 8\.5 \| 0–10/, 'the values table lost a value or its range')
+  // Raw, not paraphrased: the shape of this is the thing being investigated.
+  assert.match(text, /\{"rows":4,"cols":12/, 'the grid is summarised instead of quoted')
+  // And a preset with nothing wrong still says that out loud.
+  assert.match(
+    formatPresetReport({ blocks: [], faults: [] }),
+    /Nothing this read can see/
+  )
+})
+
 await settle()
 /*
  * The tally has to say when it is red.
