@@ -3978,6 +3978,32 @@ export function run(test) {
     assert.match(src, /won't make a sound until the row is joined up/, 'a disconnected chain is reported in jargon, or not at all')
   })
 
+  test('Setup can ask the unit why a preset makes no sound', () => {
+    /*
+     * "Can we set up a way to read the parameters of the current scene to
+     * investigate why there is no sound on any of the scenes in this preset?"
+     *
+     * Above the debug log, not inside it: the log is what the app did, this is
+     * what the unit holds. It reads on a tap because it is a dozen round trips
+     * down the port that is carrying the audio, and it copies the same three
+     * ways the log does, because a phone's clipboard can say no.
+     */
+    const setup = sheet('Setup')
+    assert.match(setup, /<PresetReport device=\{device\} link=\{link\} \/>/, 'Setup cannot read the preset')
+    assert.ok(
+      setup.indexOf('<PresetReport') < setup.indexOf('title="Developer"'),
+      'the preset read is buried at the bottom of the sheet again'
+    )
+
+    const panel = readFileSync(new URL('../src/components/PresetReport.jsx', import.meta.url), 'utf8')
+    for (const call of ['presetBlocks()', 'readGrid()', 'blockParams(', 'getScene()']) {
+      assert.ok(panel.includes(call), `the report never asks the unit for ${call}`)
+    }
+    assert.match(panel, /onClick=\{read\}/, 'the report reads on a timer rather than on a tap')
+    assert.match(panel, /navigator\.share/, 'the copy has no fallback for a phone that refuses the clipboard')
+    assert.match(panel, /silenceFaults\(/, 'the report is a dump with no answer in it')
+  })
+
   test('a phone is not told three times which Mac it is talking to', () => {
     /*
      * "Remove where it says 'through your Mac'."
