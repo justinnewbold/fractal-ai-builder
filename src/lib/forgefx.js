@@ -615,6 +615,7 @@ export async function setParamConfirmed(eid, paramId, value, param) {
     wanted: value,
     readBack: checkA.actual,
     landed: checkA.ok,
+    stale: checkA.stale,
     encoding: first,
     attempt: 1,
     deviceOk: a?.ok
@@ -633,6 +634,7 @@ export async function setParamConfirmed(eid, paramId, value, param) {
     wanted: value,
     readBack: checkB.actual,
     landed: checkB.ok,
+    stale: checkB.stale,
     encoding: !first,
     attempt: 2,
     deviceOk: b?.ok
@@ -642,7 +644,13 @@ export async function setParamConfirmed(eid, paramId, value, param) {
     return { ok: true, continuous: !first, retried: true }
   }
 
-  return { ok: false, continuous: null, retried: true }
+  /*
+   * Neither read agreed — but say WHY, because from a phone the likeliest
+   * answer is that neither read could see the hardware. A check that could not
+   * clear the unit's cache proves nothing about the write, and calling that a
+   * write the device ignored is how a working preset gets reported as broken.
+   */
+  return { ok: false, continuous: null, retried: true, unverified: checkA.stale && checkB.stale }
 }
 
 /**
@@ -656,16 +664,35 @@ export async function setParamConfirmed(eid, paramId, value, param) {
  * interest but never believed.
  */
 async function landed(eid, paramId, wanted) {
+  /*
+   * Whether the read that follows can be believed at all.
+   *
+   * Clearing the cache is a local-only route: from a phone ForgeFX answers it
+   * with a refusal, and the read then comes back out of a cache that is one
+   * write behind. That is not a theory — a log from an iPhone has five
+   * parameters in a row reported as not landing, each one reading back the
+   * value of the write BEFORE it, scaled into its own range: Tone read back
+   * the drive's 7, Level read back the tone's 4, Mix read back the level's 6
+   * as 60 out of 100. Every one of them had landed.
+   *
+   * So a check that could not clear the cache is reported as unchecked rather
+   * than as a failure. Saying "did not land" about a write that did is worse
+   * than saying nothing: it sends a player hunting a fault that isn't there,
+   * in the one screen he has to trust.
+   */
+  let stale = false
   try {
     // Without this the read can return the value we just sent from cache,
     // confirming a write that never reached the hardware.
-    await clearDeviceCache().catch(() => {})
+    await clearDeviceCache().catch(() => {
+      stale = true
+    })
     const actual = await readParamValue(eid, paramId)
-    if (typeof actual !== 'number') return { ok: false, actual: null }
+    if (typeof actual !== 'number') return { ok: false, actual: null, stale }
     const tolerance = Math.max(0.05, Math.abs(wanted) * 0.02)
-    return { ok: Math.abs(actual - wanted) <= tolerance, actual }
+    return { ok: Math.abs(actual - wanted) <= tolerance, actual, stale }
   } catch {
-    return { ok: false, actual: null }
+    return { ok: false, actual: null, stale }
   }
 }
 
@@ -699,9 +726,13 @@ function recordCheck(entry) {
     'check',
     `${entry.name || '#' + entry.paramId} wanted ${entry.wanted} read back ${
       entry.readBack === null ? 'unreadable' : entry.readBack
-    } ${entry.landed ? 'landed' : 'DID NOT LAND'}${entry.attempt > 1 ? ' (retry)' : ''}${
-      entry.deviceOk === false ? ' · unit said ok:false' : ''
-    }`
+    } ${
+      entry.landed
+        ? 'landed'
+        : entry.stale
+          ? 'NOT CHECKED — the unit only clears its cache at the Mac, so this read is one write behind'
+          : 'DID NOT LAND'
+    }${entry.attempt > 1 ? ' (retry)' : ''}${entry.deviceOk === false ? ' · unit said ok:false' : ''}`
   )
 }
 
@@ -976,7 +1007,9 @@ export async function applyChanges(changes, onProgress) {
         })
         if (!res.ok) {
           failures.push(
-            `${change.name} · ${param.name} — device ignored both write encodings`
+            res.unverified
+              ? `${change.name} · ${param.name} — sent, but it couldn't be checked from your phone: the unit only clears its cache at the Mac, so the read came back one write behind`
+              : `${change.name} · ${param.name} — device ignored both write encodings`
           )
         }
       } catch (err) {
@@ -1484,6 +1517,46 @@ export const setCable = (srcRow, srcCol, destRow, connect = true) =>
         method: 'POST',
         body: JSON.stringify({ ...toWireCell(srcRow, srcCol), srcRow, srcCol: srcCol + 1, destRow, connect })
       })
+
+/**
+ * Run a wire the whole length of a row: input, every cell, output.
+ *
+ * THIS IS WHY THE BUILT PRESETS MADE NO SOUND. Placing a block puts it in a
+ * cell; it does not join that cell to anything. An empty slot on an FM3 has no
+ * cabling in it at all, so a chain built into one is five blocks sitting beside
+ * a signal path they are not in — the values all land, the unit reads them
+ * back, the preset saves, and nothing comes out of it. Every tone built from an
+ * empty slot was silent for this one reason, and the app never said so because
+ * it never looked.
+ *
+ * A cable joins a cell to a row in the NEXT column, so wiring a row means
+ * asking for one per column: from the input (the column before the first cell)
+ * through to the last column, which is what feeds the output. Empty cells in
+ * between carry the wire, which is exactly how a hand-built preset looks.
+ *
+ * Every answer is collected rather than thrown. A refusal is worth saying out
+ * loud — it means the chain is in and silent — but it must not undo a
+ * placement that worked, and re-asserting a cable that already exists is not an
+ * error either.
+ */
+export async function wireRow(row, lastCol) {
+  const results = []
+  for (let col = -1; col <= lastCol; col++) {
+    try {
+      const res = await setCable(row, col, row)
+      results.push({ col, ok: res?.ok !== false })
+    } catch (err) {
+      results.push({ col, ok: false, error: err?.message || String(err) })
+    }
+  }
+  const refused = results.filter((r) => !r.ok)
+  logDebug(
+    'grid',
+    `Wired row ${row} — ${results.length - refused.length} of ${results.length} cables`,
+    refused.length ? `refused at columns ${refused.map((r) => r.col).join(', ')}` : ''
+  )
+  return { cables: results.length, refused: refused.length }
+}
 
 /** The routing grid as the device reports it, including cabling. */
 export const readGrid = () =>

@@ -23,7 +23,7 @@ export function wireReport() {
       (c) =>
         `${c.name || '#' + c.paramId} | ${c.wanted} | ${
           c.readBack === null ? 'unreadable' : c.readBack
-        } | ${c.landed ? 'yes' : 'NO'} | ${c.encoding ? 'cont' : 'disc'} | ${c.attempt} | ${
+        } | ${c.landed ? 'yes' : c.stale ? 'not checked' : 'NO'} | ${c.encoding ? 'cont' : 'disc'} | ${c.attempt} | ${
           c.deviceOk === undefined ? '—' : c.deviceOk ? 'ok' : 'ok:false'
         }`
     ),
@@ -150,11 +150,14 @@ export default function Diagnostics() {
                 <span>Device said</span>
               </div>
               {checks.map((c, i) => (
-                <div className="diag-row mono" key={`c${i}`} data-extreme={!c.landed}>
+                <div className="diag-row mono" key={`c${i}`} data-extreme={!c.landed && !c.stale}>
                   <span className="diag-name">{c.name || `#${c.paramId}`}</span>
                   <span>{fmt(c.wanted)}</span>
                   <span>{c.readBack === null ? 'unreadable' : fmt(c.readBack)}</span>
-                  <span>{c.landed ? 'yes' : 'NO'}</span>
+                  {/* A read that could not clear the unit's cache — every read
+                      from a phone — is one write behind, so it is reported as
+                      unchecked rather than as a write that failed. */}
+                  <span>{c.landed ? 'yes' : c.stale ? 'not checked' : 'NO'}</span>
                   <span className="diag-range">
                     {c.encoding ? 'cont' : 'disc'}
                     {c.attempt > 1 ? ` · retry` : ''}
