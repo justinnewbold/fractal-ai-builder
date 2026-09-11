@@ -3,6 +3,27 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.149.0
+
+**A level sitting at zero can be raised again.** "Drive 1 / Level: levels can be
+nudged, not reset — 5 is outside 2 to 1.5, so it was skipped." That range has no
+numbers in it. The rule that keeps the AI from turning a block down to silence
+works out two ends — how far a level may move, and how near the bottom it may
+go — and on a control already sitting at the very bottom the two crossed over,
+so no value at all could be written. A level at zero was the one value in the
+app that could never be changed, on exactly the preset that needs it changed.
+Now the window always includes where the control already is, and always reaches
+far enough to lift it clear of the bottom in one go. It still only ever offers a
+raise when a level starts down there — nothing here can make a block quieter
+than you had it.
+
+**The price under each run is right again.** Sonnet's rate carried "promotional
+through 31 Aug 2026, then $3/$15". That date has gone, and the rise it warned
+about was cancelled — $2/$10 is simply the price now — so the line is gone. The
+rates themselves were already correct. A test now fails the day any price note
+outlives the date it names, so the next one cannot sit there quietly being
+wrong.
+
 ## 7.148.0
 
 **Setup is four things now, not twelve.** It opened on a column of twelve

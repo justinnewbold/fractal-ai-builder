@@ -158,12 +158,47 @@ test('a level window is a nudge from where it sits, never near the floor', () =>
   assert.deepEqual(drive, { floor: 3.5, ceiling: 6.5 })
 
   /*
-   * Sitting below the floor already — the player's own doing. The window is
-   * still the bottom fifth upward, so the only move offered is a raise. The
-   * app never drags a level back up on its own; it just will not go down.
+   * Sitting below the floor already — the player's own doing. The window runs
+   * from where it sits up to a nudge above, so the only move offered is a
+   * raise. The app never drags a level back up on its own; it just will not go
+   * down.
    */
   const low = levelLimits({ name: 'Amp 1 Level', value: -70, min: -80, max: 20 })
-  assert.deepEqual(low, { floor: -60, ceiling: -55 })
+  assert.deepEqual(low, { floor: -70, ceiling: -55 })
+
+  /*
+   * "Drive 1 / Level: levels can be nudged, not reset — 5 is outside 2 to 1.5,
+   * so it was skipped."
+   *
+   * A range with no numbers in it, printed to a player mid-session. The two
+   * ends were worked out independently, so a control already at the very bottom
+   * got a floor above its own ceiling and nothing at all could be written —
+   * which made a level sitting at zero the one value in the app that could
+   * never be raised, on exactly the preset that needs it raised.
+   */
+  const floored = levelLimits({ name: 'Drive 1 Level', value: 0, min: 0, max: 10 })
+  assert.deepEqual(floored, { floor: 0, ceiling: 2 })
+
+  /*
+   * And that is a property, not one repaired case: wherever a level sits, that
+   * is a value the window admits. Any window that excludes it is a rejection
+   * with no number that would have been accepted, printed as a range that reads
+   * backwards.
+   */
+  for (const min of [-80, -20, 0, 1]) {
+    for (const max of [-10, 0, 10, 20, 100]) {
+      if (max <= min) continue
+      for (const at of [0, 0.01, 0.05, 0.2, 0.5, 0.8, 1]) {
+        const value = min + (max - min) * at
+        const w = levelLimits({ name: 'Amp 1 Level', value, min, max })
+        assert.ok(
+          w.floor <= value && value <= w.ceiling,
+          `${value} of ${min}-${max} is outside its own window ${w.floor} to ${w.ceiling}`
+        )
+        assert.ok(w.floor >= min && w.ceiling <= max, `the window leaves the parameter's range`)
+      }
+    }
+  }
 
   assert.equal(levelLimits({ name: 'Bass', value: 5, min: 0, max: 10 }), null)
   assert.equal(levelLimits({ name: 'Amp 1 Level', value: 0 }), null, 'no range, no window')
