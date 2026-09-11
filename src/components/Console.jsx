@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useDevice } from '../lib/deviceState'
 import { blockColor } from '../lib/blockColors'
 import { useDismiss } from '../lib/dismiss'
 import { marksFor, toggleFavourite } from '../lib/presetMarks'
@@ -700,6 +701,28 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
   const [loading, setLoading] = useState(false)
   const [local, setLocal] = useState({})
 
+  /*
+   * What makes these parameters a different set of parameters.
+   *
+   * "When I change any parameter the screen basically shakes up and down." It
+   * did, once per knob. This effect depended on `block` — the OBJECT — and
+   * every knob commit ends in a full re-read of the unit, which rebuilds the
+   * whole chain and hands this panel an identical block under a new identity.
+   * So the panel threw its knobs away and read them again for nothing: the
+   * deck collapsed to one line of text, the sheet is as tall as its contents,
+   * and the whole thing jumped up and came back down.
+   *
+   * The three things that genuinely change what a knob here means are which
+   * block it is, which of its channels is live, and which scene is on — a
+   * block's settings are per-scene, so a footswitch on the floor changes every
+   * value on this panel without touching anything in here. Keyed on those, a
+   * re-read happens when it is worth something and not otherwise. The block
+   * object is deliberately read inside rather than depended on, because its
+   * identity is exactly the thing that was lying.
+   */
+  const scene = useDevice((s) => s.sceneIndex)
+  const readKey = `${block?.effectId ?? ''}:${block?.channel ?? ''}:${scene}`
+
   useEffect(() => {
     if (!block) return
     let stop = false
@@ -724,7 +747,8 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
     return () => {
       stop = true
     }
-  }, [block, onError])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readKey, onError])
 
   // The offer belongs to the block it was made on, and dies with the panel.
   useEffect(() => {
@@ -907,15 +931,29 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
        * next generation is told, so the same correction stops being needed.
        * The summary line stays exactly as it was, for the log a person reads.
        */
-      onChanged(`${block.name} · ${p.name} → ${next}`, {
-        block: block.name,
-        slug: block.slug,
-        param: p.name,
-        from: p.value,
-        to: next,
-        min: p.min,
-        max: p.max
-      })
+      onChanged(
+        `${block.name} · ${p.name} → ${next}`,
+        {
+          block: block.name,
+          slug: block.slug,
+          param: p.name,
+          from: p.value,
+          to: next,
+          min: p.min,
+          max: p.max
+        },
+        /*
+         * And nothing about the CHAIN has changed, so nothing needs re-reading.
+         *
+         * Every commit in here ended in a full read of the unit — the preset,
+         * the block list, the scene, its names and the tempo — for a knob that
+         * changed none of them, and whose new value this function has already
+         * read back two lines above. On a phone that is five round trips down
+         * a relay per knob, competing with the writes for the same port. The
+         * switches below DO change the chain and still ask for it.
+         */
+        { chain: false }
+      )
     } catch (err) {
       onError(err.message)
     }
@@ -1097,7 +1135,15 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
       ) : null}
 
       <div className="knob-deck">
-        {loading ? (
+        {/*
+          The knobs stay up while they are being read again.
+          Swapping a deck of six knobs for one line of text takes about 200px
+          out of a sheet that is as tall as its contents, so the sheet lurches
+          down and back up — for a read that is usually over in under a
+          second, on values that are usually the same ones. The line is for
+          the case it is actually for: a panel with nothing in it yet.
+        */}
+        {loading && !shown.length ? (
           <p className="hint pad">Reading {block.name}…</p>
         ) : (
           shown.map((p) => (

@@ -542,6 +542,73 @@ export function run(test) {
     )
   })
 
+  test('the knobs stay put while a parameter is written', () => {
+    /*
+     * "When I change any parameter the screen basically shakes up and down" —
+     * with two screenshots half a second apart, the same sheet at two quite
+     * different heights.
+     *
+     * Every knob commit ends in a full re-read of the unit, which rebuilds the
+     * chain and hands the block panel an identical block under a NEW object
+     * identity. The panel's parameter read depended on that object, so it
+     * threw away six knobs, drew one line of text while it asked the unit for
+     * the values it already had, and put them back. A sheet is as tall as its
+     * contents, so that is about 200px out of the middle of the screen and
+     * back, once per knob.
+     *
+     * Two things hold it shut: what the read is keyed on, and what is on
+     * screen while it runs.
+     */
+    const con = readFileSync(new URL('../src/components/Console.jsx', import.meta.url), 'utf8')
+    const panel = con.slice(con.indexOf('export function BlockPanel('))
+    assert.ok(panel, 'the block panel is gone')
+
+    assert.ok(
+      !/\}, \[block, onError\]\)/.test(panel),
+      'the parameter read depends on the block object again, so every refresh of the chain re-reads it'
+    )
+    assert.match(panel, /\}, \[readKey, onError\]\)/, 'the parameter read is no longer keyed')
+    /*
+     * And keyed on all three things that change what a knob here means. The
+     * scene is the one worth stating: a block's settings are per-scene, so a
+     * footswitch on the floor changes every value on this panel without
+     * touching anything in the app.
+     */
+    assert.match(panel, /const readKey = /)
+    for (const part of ['block\\?\\.effectId', 'block\\?\\.channel', 'scene']) {
+      assert.match(
+        panel.slice(panel.indexOf('const readKey = '), panel.indexOf('const readKey = ') + 120),
+        new RegExp(part),
+        `the parameter read no longer notices a change of ${part}`
+      )
+    }
+    assert.match(panel, /const scene = useDevice\(/, 'the panel is not watching the live scene')
+
+    // A re-read that does happen keeps the knobs up: the line is for a panel
+    // with nothing in it yet, which is the only time it costs no height.
+    assert.match(
+      panel,
+      /\{loading && !shown\.length \? \(/,
+      'a re-read empties the deck again, and the sheet jumps with it'
+    )
+
+    /*
+     * And the thing that handed it a new block in the first place: a knob
+     * commit asked the app to re-read the unit — the preset, the block list,
+     * the scene, its names and the tempo — for a change to none of them, five
+     * round trips down a relay per knob. The switches beside the knobs DO
+     * change the chain and still ask.
+     */
+    assert.match(panel, /\{ chain: false \}/, 'a knob still asks for a full re-read of the unit')
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    assert.match(
+      app,
+      /onChanged=\{\(summary, change, \{ chain = true \} = \{\}\) => \{/,
+      'the block editor cannot say that nothing about the chain moved'
+    )
+    assert.match(app, /if \(chain\) read\(\)/, 'every knob still re-reads the whole unit')
+  })
+
   test('a failure inside a sheet is shown inside that sheet', () => {
     /*
      * "On the chain screen it always says on. When I tap one of the buttons it
@@ -2632,7 +2699,7 @@ export function run(test) {
     // The knob editor hands over the numbers, not just the sentence.
     assert.match(
       console_,
-      /onChanged\(`\$\{block\.name\} · \$\{p\.name\} → \$\{next\}`, \{/,
+      /onChanged\(\s*`\$\{block\.name\} · \$\{p\.name\} → \$\{next\}`,\s*\{\s*block: block\.name/,
       'a hand change reports a sentence and drops the before-and-after that makes it useful'
     )
 

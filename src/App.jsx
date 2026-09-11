@@ -5274,7 +5274,7 @@ export default function App() {
           busy={busy}
           focus={editorFocus}
           onError={setError}
-          onChanged={(summary, change) => {
+          onChanged={(summary, change, { chain = true } = {}) => {
             record('edit', summary)
             /*
              * A knob turned after a generation was written is a correction of
@@ -5291,7 +5291,10 @@ export default function App() {
               if (rememberCorrection(change)) setCorrectionKey((n) => n + 1)
             }
             setDirty(true)
-            read()
+            // A knob is not a change to the chain: the panel has already read
+            // the new value back, and a full re-read of the unit per knob is
+            // what made the sheet jump every time one was turned.
+            if (chain) read()
           }}
         />
 
