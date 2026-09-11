@@ -1842,6 +1842,37 @@ export function cachedPresetNames() {
     .sort((a, b) => a.number - b.number)
 }
 
+/**
+ * The name a slot holds, written down at the one moment it is certain.
+ *
+ * "It says TIGHT MODERN on 98 when it's Three Days Grace. Even if I force
+ * close the app and reopen it, it shows the wrong preset on the phone, even
+ * though the Mac is loaded on the correct preset."
+ *
+ * Saving used to do one thing to this cache: forget the slot, and wait for
+ * somebody to read it again. At the Mac that is nearly free — the unit is a
+ * cable away and the next scan re-learns it. On a phone it is a dead end. An
+ * AM4 will not dump a preset over the relay, so the phone cannot re-read a
+ * name at all; every name it shows came from the Mac's copy, and that copy is
+ * only merged in for slots the phone does not already know. So a slot it knew
+ * under its old name kept it — through a save, through a restart, for good.
+ *
+ * Forgetting was also throwing away the best evidence in the app. Nothing
+ * knows what slot 98 is called better than the save that just put a name in
+ * it, so that is what is written down — the same reasoning as noteSceneNames,
+ * which was doing it for the scene names of the very same save.
+ */
+export function notePresetName(number, name) {
+  if (typeof number !== 'number' || typeof name !== 'string') return
+  restoreNames()
+  const kept = name.trim()
+  if (nameCache.get(number) === kept) return
+  nameCache.set(number, kept)
+  persistNames()
+  // From the Mac, where this is the end with the cable, the phone is told too.
+  publishNames()
+}
+
 export function forgetPresetName(number) {
   restoreNames()
   if (nameCache.delete(number)) {
@@ -1910,20 +1941,34 @@ export function publishNames() {
   }, 5000)
 }
 
-/** Take the host's copy for every slot this browser doesn't know. Returns how many it learned. */
+/**
+ * Take the host's copy. Returns how many entries changed here.
+ *
+ * The Mac is the end with the cable, so where the two disagree about a slot
+ * the Mac is right and this browser is out of date — that is the whole shape
+ * of the fault this fixes. It used to skip any slot this browser already had
+ * a name for, which made a wrong name permanent: the phone had "TIGHT MODERN"
+ * for slot 98, the Mac had learned the name that overwrote it, and the two
+ * never met.
+ *
+ * Only a slot the host actually names is touched. A host copy that is missing
+ * or partial — the Mac has not scanned that far — leaves what is here alone,
+ * because "I have not learned it" is not "it has no name".
+ */
 export async function importHostNames() {
   restoreNames()
   const doc = await readHostDoc(namesDocId())
   if (!doc || typeof doc !== 'object') return 0
-  let added = 0
+  let changed = 0
   for (const [key, name] of Object.entries(doc)) {
     const number = Number(key)
-    if (!Number.isInteger(number) || typeof name !== 'string' || nameCache.has(number)) continue
+    if (!Number.isInteger(number) || typeof name !== 'string') continue
+    if (nameCache.get(number) === name) continue
     nameCache.set(number, name)
-    added++
+    changed++
   }
-  if (added) persistNames()
-  return added
+  if (changed) persistNames()
+  return changed
 }
 
 /** One slot's name: from what's already known, and from the unit when it isn't. */
