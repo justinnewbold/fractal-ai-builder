@@ -854,6 +854,24 @@ export async function runPlan(actions, onProgress) {
   return failures
 }
 
+/**
+ * Which of those actually landed, given what runPlan handed back.
+ *
+ * "Did 2 things — Amp 1 · Treble 1 6 → 5, Amp 1 · Presence 1 5 → 4, Amp 1 ·
+ * Treble 1 6 → 5 — the unit refused it., Amp 1 · Presence 1 5 → 4 — the unit
+ * refused it." Both changes listed as done and then both listed as refused, in
+ * the debug log, which is the one place anybody goes to find out what a session
+ * really did. Nothing was wrong on the unit; the line was written by pasting
+ * every label next to every failure and calling the total a result.
+ *
+ * runPlan reports a failure as the action's own label with a reason on the end,
+ * so a label that appears in no failure is a change that took.
+ */
+export function landedOf(actions, failures) {
+  const said = failures.map((f) => String(f))
+  return actions.filter((a) => !said.some((f) => f.startsWith(`${a.label} — `)))
+}
+
 function inGrid(row, col, rows, cols) {
   return Number.isInteger(row) && Number.isInteger(col) && row >= 1 && row <= rows && col >= 0 && col <= cols
 }

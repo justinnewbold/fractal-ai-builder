@@ -46,6 +46,43 @@ export const LEVEL_MOVE = 0.15
 export const LEVEL_FLOOR = 0.2
 
 /**
+ * The same two numbers for a level measured in decibels, in decibels.
+ *
+ * A fraction of the range is the wrong unit for a dB control and it is not a
+ * near miss — it is off by the whole point of the scale. A block Level on the
+ * FM3 runs -80 to +20 dB, so "a fifth of the way up" lands on -60 dB, which is
+ * not a quiet floor but silence, and "15% of the range" is a 15 dB step, which
+ * is not a nudge but a different arrangement. Both ends were wrong in the same
+ * direction and the result was the log Justin sent: an amp parked at the bottom
+ * being refused five times for asking to come back to normal.
+ */
+export const LEVEL_MOVE_DB = 6
+
+/** Below this a block is out of the mix, whatever the range says. */
+export const LEVEL_FLOOR_DB = -20
+
+/**
+ * Unity: where every one of these controls sits when nothing has touched it.
+ *
+ * It is the value a designed tone asks for more than any other, and no write
+ * that raises a level towards it can make a preset silent — so it is always
+ * inside the window, however far below it the control is parked.
+ */
+export const LEVEL_UNITY_DB = 0
+
+/**
+ * Is this level's range measured in decibels?
+ *
+ * The unit when the schema carries one, and the shape of the range when it does
+ * not: a control that runs from far below zero to at or above it is a dB scale,
+ * and nothing else on a block named Level is.
+ */
+function inDecibels(param, min, max) {
+  if (/^db$/i.test(String(param.unit || '').trim())) return true
+  return min <= -40 && max >= 0
+}
+
+/**
  * The window a level may be written into, or null if this is not a level.
  *
  * Two ends, two jobs. The ceiling keeps a change to a nudge, so a generation
@@ -78,8 +115,14 @@ export function levelLimits(param) {
   const span = max - min
   const now = Number.isFinite(Number(param.value)) ? Number(param.value) : min + span / 2
 
-  const bottom = min + span * LEVEL_FLOOR
-  const nudge = span * LEVEL_MOVE
+  const db = inDecibels(param, min, max)
+  const bottom = db ? LEVEL_FLOOR_DB : min + span * LEVEL_FLOOR
+  const nudge = db ? LEVEL_MOVE_DB : span * LEVEL_MOVE
+  /* On a dB scale the reach is to unity, because that is where a block that was
+     parked at the bottom needs to get back to and no raise can silence
+     anything. On a plain 0-10 control it is the bottom of the safe range, which
+     is the same idea in the only units that control has. */
+  const reach = db ? LEVEL_UNITY_DB : bottom
 
   return {
     /* Never above where the control already is. A level the player has set
@@ -89,7 +132,7 @@ export function levelLimits(param) {
     /* And never below it either — plus enough reach to clear the bottom in one
        write, because climbing out a nudge at a time is four refused requests to
        fix a preset that makes no sound. */
-    ceiling: Math.min(max, Math.max(now, now + nudge, bottom))
+    ceiling: Math.min(max, Math.max(now, now + nudge, reach))
   }
 }
 

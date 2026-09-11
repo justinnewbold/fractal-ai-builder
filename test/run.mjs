@@ -151,8 +151,14 @@ test('a level window is a nudge from where it sits, never near the floor', () =>
    * floor is the one that matters: a preset can be musically perfect and
    * silent, and that failure looks identical to a good one until you play it.
    */
+  /*
+   * In decibels, in decibels. A block Level runs -80 to +20 dB, and a fifth of
+   * that range is -60 dB — silence, not a floor — while 15% of it is a 15 dB
+   * step, which is not a nudge. Both ends are read in dB on a dB control: six
+   * either way from where it sits.
+   */
   const amp = levelLimits({ name: 'Amp 1 Level', value: 0, min: -80, max: 20 })
-  assert.deepEqual(amp, { floor: -15, ceiling: 15 })
+  assert.deepEqual(amp, { floor: -6, ceiling: 6 })
 
   const drive = levelLimits({ name: 'Drive Level', value: 5, min: 0, max: 10 })
   assert.deepEqual(drive, { floor: 3.5, ceiling: 6.5 })
@@ -164,7 +170,35 @@ test('a level window is a nudge from where it sits, never near the floor', () =>
    * down.
    */
   const low = levelLimits({ name: 'Amp 1 Level', value: -70, min: -80, max: 20 })
-  assert.deepEqual(low, { floor: -70, ceiling: -55 })
+  assert.deepEqual(low, { floor: -70, ceiling: 0 })
+
+  /*
+   * "Amp 1 / Amp1 Level: levels can be nudged, not reset — 0 is outside -80 to
+   * -60, so it was skipped." Five of those in one session, across two blocks.
+   *
+   * A level sitting at the very bottom of a dB range is a block that makes no
+   * sound, and the only useful thing to do with it is bring it back to normal.
+   * The old window let it climb to -60 dB, which is still silence, and refused
+   * every value a tone would actually want. So unity is always in reach from
+   * below: no raise towards it can make a preset quiet, which is the one thing
+   * this rule exists to prevent.
+   */
+  for (const at of [-80, -70, -40, -12]) {
+    const w = levelLimits({ name: 'Amp1 Level', value: at, min: -80, max: 20, unit: 'dB' })
+    assert.ok(w.ceiling >= 0, `a level at ${at} dB cannot be brought back to unity: ${w.ceiling}`)
+  }
+
+  /* And it is still a one-way door out of the quiet end: nowhere in the range
+     may a write be offered a step down past -20 dB, which is the point a block
+     leaves the mix. Above that a level may still be trimmed, which is what the
+     control is for. */
+  for (const at of [20, 10, 0, -6, -20, -55, -80]) {
+    const w = levelLimits({ name: 'Amp1 Level', value: at, min: -80, max: 20, unit: 'dB' })
+    assert.ok(
+      w.floor >= Math.min(at, -20),
+      `a level at ${at} dB can be written down to ${w.floor}`
+    )
+  }
 
   /*
    * "Drive 1 / Level: levels can be nudged, not reset — 5 is outside 2 to 1.5,
@@ -7540,6 +7574,53 @@ test('a reply with nothing in it says so, and says what would work', () => {
   const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
   assert.ok(!/'Nothing to change\.'/.test(app), 'the app still says "Nothing to change." on its own')
   assert.match(app, /text: replyFor\(checked\)/, 'the reply is not built by the one tested place')
+})
+
+import { landedOf } from '../src/lib/actions.js'
+
+test('the log says what happened, not everything attempted plus everything refused', () => {
+  /*
+   * "[app] edit: Did 2 things — Amp 1 · Treble 1 6 → 5, Amp 1 · Presence 1 5 →
+   * 4, Amp 1 · Treble 1 6 → 5 — the unit refused it., Amp 1 · Presence 1 5 → 4
+   * — the unit refused it."
+   *
+   * Both changes reported as done and then the same two reported as refused,
+   * in the debug log — which is the one place a session is read back when
+   * something went wrong. Nothing was wrong on the unit; the line was the
+   * whole plan with the failures stapled to the end of it.
+   */
+  const actions = [
+    { label: 'Amp 1 · Treble 1 6 → 5' },
+    { label: 'Amp 1 · Presence 1 5 → 4' },
+    { label: 'Amp 1 · Bass 1 5 → 6' }
+  ]
+  const failures = [
+    'Amp 1 · Treble 1 6 → 5 — the unit refused it.',
+    'Amp 1 · Presence 1 5 → 4 — the link dropped.'
+  ]
+  assert.deepEqual(
+    landedOf(actions, failures).map((a) => a.label),
+    ['Amp 1 · Bass 1 5 → 6']
+  )
+  assert.deepEqual(landedOf(actions, []), actions, 'a clean run loses changes that took')
+  assert.deepEqual(
+    landedOf(actions, actions.map((a) => `${a.label} — the unit refused it.`)),
+    [],
+    'a run where nothing took still claims changes'
+  )
+
+  /* And a label that merely starts the same way is a different change. */
+  assert.deepEqual(
+    landedOf([{ label: 'Amp 1 · Bass 1' }], ['Amp 1 · Bass 11 — the unit refused it.']).length,
+    1
+  )
+
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  assert.match(app, /landedOf\(actions, failures\)/, 'the log line is not built from what landed')
+  assert.ok(
+    !/\[\.\.\.actions\.map\(\(a\) => a\.label\), \.\.\.failures\]/.test(app),
+    'the log still lists every attempt next to every refusal'
+  )
 })
 
 test('Previous and Next step through the slots, the stars, or a setlist', () => {

@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { channelLine } from '../lib/scenePlan'
 export function Preview({
   result,
@@ -36,6 +37,20 @@ export function Preview({
   saveTo = 'unit',
   children
 }) {
+  /*
+   * The handle on the fold, so it can be shut from the far end of itself.
+   *
+   * "If I put show everything that was changed, it displays it all in the chat
+   * window, but there's no way to collapse it again so it's flooding the chat."
+   * There was a way — the same line you opened it with — but after eighty-two
+   * rows it is a long way back up the page, which is the same as not having
+   * one. So the list is bounded and scrolls inside itself, and the bottom of
+   * it carries a button that shuts the fold and puts you back on the line that
+   * opened it.
+   */
+  const fold = useRef(null)
+  const foldHead = useRef(null)
+
   if (!result) return null
 
   const {
@@ -420,11 +435,21 @@ export function Preview({
         were put in front of people deliberately, and a decision behind a fold
         is a decision made for you.
       */}
-      <details className="preview-detail">
-        <summary>
+      <details className="preview-detail" ref={fold}>
+        <summary ref={foldHead}>
           Show every change<span className="hint"> · {detail}</span>
         </summary>
 
+      {/*
+        Bounded, and scrolling inside itself.
+
+        Ten blocks of changes used to add several screens to a page that has a
+        conversation at the top of it: everything below the fold — the cost,
+        the next tone, the chat you were reading — moved miles away the moment
+        it opened. Now the list gets a window of the screen and scrolls in
+        place, so opening it never moves anything else more than that.
+      */}
+      <div className="diff-scroll">
       <div className="diff">
         {changes.map((change) => (
           <div className="diff-block" key={change.eid}>
@@ -460,6 +485,7 @@ export function Preview({
             ))}
           </div>
         ))}
+      </div>
       </div>
 
       {notes ? <p className="notes">{notes}</p> : null}
@@ -501,6 +527,19 @@ export function Preview({
 
         {/* What it cost and what it was working from, for the same reader. */}
         {children}
+
+        <button
+          type="button"
+          className="fold-shut"
+          onClick={() => {
+            if (fold.current) fold.current.open = false
+            /* And back to the line that opened it, rather than wherever the
+               page happens to land once several screens of rows vanish. */
+            foldHead.current?.scrollIntoView({ block: 'center' })
+          }}
+        >
+          Hide these changes
+        </button>
       </details>
     </section>
   )
