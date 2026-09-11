@@ -143,6 +143,7 @@ import { aiUrl } from './lib/ai'
 import { saveCloudPreset, cloudReady, listCloudPresets, deleteCloudPreset } from './lib/cloudPresets'
 import Tour, { tourSeen, markTourSeen } from './components/Tour'
 import Recent from './components/Recent'
+import Past from './components/Past'
 import ConnectScreen from './components/ConnectScreen'
 import PhoneRemote from './components/PhoneRemote'
 import LinkDetails from './components/LinkDetails'
@@ -169,6 +170,16 @@ import {
 import { keepAwake } from './lib/awake'
 import { loadSession, saveSession, interrupted } from './lib/session'
 import { loadCloudChat, saveCloudChat, pickChat, chatCloudReady } from './lib/cloudChat'
+import {
+  archiveChat,
+  deleteChat,
+  listLocalChats,
+  listCloudChats,
+  mergeChats,
+  liftChatsToCloud,
+  newChatId,
+  worthKeeping
+} from './lib/chatLog'
 import { sceneChoices } from '../api/_scenes.js'
 import { pushEntry, replaceEntry } from './lib/nav'
 import { useAsks } from './lib/asks'
@@ -647,6 +658,16 @@ export default function App() {
     const cut = interrupted(restored?.pending)
     return cut ? [...back, cut] : back
   })
+  /*
+   * Which conversation the one on screen IS.
+   *
+   * Null until it has been put on the shelf once. It exists so that archiving
+   * the same chat twice — start a new one, open an old one, start another —
+   * updates the row it already has instead of leaving a second copy of one
+   * conversation down the list. Kept with the session, so a phone that was put
+   * in a pocket comes back still knowing which chat it is in.
+   */
+  const [chatId, setChatId] = useState(restored?.chatId || null)
   const [remote, setRemote] = useState(false)
   // A slot write asked for from the phone: what it's waiting on there, and
   // what has arrived here.
@@ -800,6 +821,21 @@ export default function App() {
    * one would take the inner one's entry with it.
    */
   const [sheet, setSheet] = useState(null)
+  /*
+   * Which sheet the block editor was opened FROM.
+   *
+   * Only one sheet is open at a time — `sheet` is a single name — so tapping a
+   * block inside the chain sheet replaces it with the block editor. Closing
+   * that editor with nothing remembered would drop you on the Play screen,
+   * two taps from the chain you were working through. This is the way back.
+   */
+  const [sheetBack, setSheetBack] = useState(null)
+  /* Open a block's knobs, and remember what to return to. */
+  const openBlockFrom = useCallback((id, from = null) => {
+    setSelectedBlock(id)
+    setSheetBack(from)
+    setSheet('block')
+  }, [])
 
   /*
    * The preset menu is a menu, not a sheet.
@@ -1197,6 +1233,7 @@ export default function App() {
   useEffect(() => {
     saveSession({
       turns,
+      chatId,
       result,
       withScenes,
       renamePreset,
@@ -1204,7 +1241,7 @@ export default function App() {
       lastPrompt,
       pending: pending.current
     })
-  }, [turns, result, withScenes, renamePreset, saveName, lastPrompt, thinking])
+  }, [turns, chatId, result, withScenes, renamePreset, saveName, lastPrompt, thinking])
 
   /*
    * And up to the account, so the conversation is the same on the next device.
@@ -1218,14 +1255,31 @@ export default function App() {
    * does not immediately push an empty chat over the one on the Mac.
    */
   useEffect(() => {
-    if (!chatCloudReady() || !turns.length) return undefined
+    if (!turns.length) return undefined
     const timer = setTimeout(() => {
-      saveCloudChat(turns).catch(() => {
-        // Offline. The local copy is whole and the next change tries again.
-      })
+      if (chatCloudReady()) {
+        saveCloudChat(turns).catch(() => {
+          // Offline. The local copy is whole and the next change tries again.
+        })
+      }
+      /*
+       * And onto the shelf, under this conversation's own id.
+       *
+       * Not only when New chat is pressed. A phone that is killed by iOS, a
+       * browser that is closed, a tab that crashes — none of those press
+       * anything, and a history that only holds conversations somebody
+       * deliberately ended is a history missing most of them. Signed in this
+       * is a row on the account; signed out it is this browser, which is the
+       * rule everywhere in here.
+       */
+      if (chatId) {
+        archiveChat(turns, chatId).catch(() => {
+          // Same reasoning: the next change tries again.
+        })
+      }
     }, 2000)
     return () => clearTimeout(timer)
-  }, [turns])
+  }, [turns, chatId])
 
   /*
    * What the account was holding, once there is an account to ask.
@@ -1253,6 +1307,97 @@ export default function App() {
       live = false
     }
   }, [link.account, turns, restored, record])
+
+  /*
+   * The shelf of finished conversations, and how many of them there are.
+   *
+   * Read once when the account settles and again whenever a chat is put down
+   * or picked up, rather than on a timer: this list only changes when
+   * something in this app changes it.
+   */
+  const [chatLog, setChatLog] = useState(() => listLocalChats())
+  const [chatLogKey, setChatLogKey] = useState(0)
+  useEffect(() => {
+    let live = true
+    ;(async () => {
+      /*
+       * Signed in means the account, so anything this browser was holding goes
+       * up before the list is read — otherwise a week of chats started signed
+       * out stays stranded on one machine for ever. Ids survive the lift, so
+       * running it again does nothing.
+       */
+      if (link.account && chatCloudReady()) await liftChatsToCloud()
+      const cloud = link.account && chatCloudReady() ? await listCloudChats() : []
+      if (!live) return
+      setChatLog(mergeChats(cloud, listLocalChats()))
+    })()
+    return () => {
+      live = false
+    }
+  }, [link.account, chatLogKey])
+
+  /*
+   * Put this conversation down and start an empty one.
+   *
+   * "The current chat is getting along in the app. Can we create a way to
+   * create a fresh chat?" — and the reason a fresh one is safe to start is
+   * that the old one lands on the shelf first, whole.
+   *
+   * The tone on screen and the last design go with it. They are the context
+   * the next request would have been answered against, and a fresh chat that
+   * still remembered the last tone would not be a fresh chat — it would be the
+   * same conversation with its transcript hidden.
+   */
+  const newChat = useCallback(async () => {
+    if (worthKeeping(turns)) {
+      await archiveChat(turns, chatId)
+      setChatLogKey((k) => k + 1)
+    }
+    setChatId(null)
+    setTurns([])
+    setResult(null)
+    setLastDesign(null)
+    setLastPrompt('')
+    pending.current = null
+  }, [turns, chatId])
+
+  /*
+   * Pick an old conversation back up.
+   *
+   * The one on screen is shelved first, under its own id, so nothing is lost
+   * by looking — and the one being opened keeps its id, so saying one more
+   * thing in it updates that row rather than laying down a copy.
+   */
+  const openChat = useCallback(
+    async (entry) => {
+      if (!entry?.id) return
+      if (worthKeeping(turns) && entry.id !== chatId) await archiveChat(turns, chatId)
+      setChatId(entry.id)
+      setTurns(Array.isArray(entry.turns) ? entry.turns : [])
+      setResult(null)
+      setLastDesign(null)
+      setLastPrompt('')
+      pending.current = null
+      setChatLogKey((k) => k + 1)
+      record('chat', `Opened an earlier chat: ${entry.title || 'Untitled chat'}`)
+    },
+    [turns, chatId, record]
+  )
+
+  const forgetChat = useCallback(async (entry) => {
+    await deleteChat(entry)
+    setChatLogKey((k) => k + 1)
+  }, [])
+
+  /*
+   * A conversation that has never been shelved still gets an id the moment it
+   * has something in it, so the debounced cloud write below and the shelf agree
+   * on which chat this is even if the page dies before New chat is ever tapped.
+   */
+  useEffect(() => {
+    if (chatId || !worthKeeping(turns)) return
+    setChatId(newChatId())
+  }, [turns, chatId])
 
   /*
    * The setlists and the stars, with the account.
@@ -2232,7 +2377,7 @@ export default function App() {
      * already reported — leaves nothing behind to apologise for.
      */
     pending.current = { description, at: Date.now() }
-    saveSession({ turns, result, withScenes, renamePreset, saveName, lastPrompt, pending: pending.current })
+    saveSession({ turns, chatId, result, withScenes, renamePreset, saveName, lastPrompt, pending: pending.current })
     try {
       setProgress('Reading what the unit has loaded...')
       const schema = await readSchema(
@@ -3876,6 +4021,7 @@ export default function App() {
          scrolls with each tick, which is the one thing Assistant needs it for. */
       progress={progress}
       suggestions={suggestionsFrom(taste)}
+      onNew={newChat}
       onStop={
         genStarted
           ? () => {
@@ -4395,6 +4541,17 @@ export default function App() {
           /* Absent, not disabled, when play mode is on: the bar closes up to
              two buttons rather than keeping a dead third. */
           onAsk={askShows ? () => setSheet('chat') : null}
+          /*
+           * On a phone this opens the chain in a sheet, because the Edit
+           * screen is not reachable there on purpose. On a screen wide enough
+           * to have that screen it simply goes there, rather than opening a
+           * second copy of the same editor in the rail beside it.
+           */
+          onChain={
+            askShows
+              ? () => (views.includes('shape') ? changeView('shape') : setSheet('chain'))
+              : null
+          }
         />
       ) : null}
 
@@ -4413,10 +4570,7 @@ export default function App() {
           <Chain
             blocks={blocks}
             selected={selectedBlock}
-            onSelect={(id) => {
-              setSelectedBlock(id)
-              setSheet('block')
-            }}
+            onSelect={(id) => openBlockFrom(id)}
             onToggle={toggleBlock}
           />
 
@@ -4463,8 +4617,7 @@ export default function App() {
             blocks={blocks}
             onError={setError}
             onPick={(eid, paramId) => {
-              setSelectedBlock(eid)
-              setSheet('block')
+              openBlockFrom(eid)
               setEditorFocus({ eid, paramId, nonce: Date.now() })
             }}
           />
@@ -4534,9 +4687,128 @@ export default function App() {
           Sheets. Things you open, act on and dismiss — not places you go.
           --------------------------------------------------------------- */}
 
+      {/*
+        Everything you have made, in one sheet, whichever store it landed in.
+
+        "Create a dedicated button in the settings menu for history where you
+        can view previous chats and reload them as well as the history of
+        previously generated presets."
+
+        Deliberately not the Presets sheet. That one answers "where is this
+        kept" and has a panel per store, because moving a library between them
+        is a real job. This answers "what have I made", which has no business
+        knowing about stores — so the presets arrive as one merged list, the
+        same one Earlier generations is drawn from, and where things live is
+        one line at the top rather than three headings.
+      */}
+      <Sheet
+        open={sheet === 'history'}
+        onClose={() => setSheet(null)}
+        title="History"
+        note={link.account ? link.account.email : 'Saved in this browser'}
+      >
+        {sheet === 'history' ? (
+          <Past
+            chats={chatLog}
+            presets={library}
+            chatId={chatId}
+            busy={busy}
+            signedIn={!!link.account}
+            onOpenChat={async (entry) => {
+              await openChat(entry)
+              /* Out of the sheet and into the conversation it just loaded —
+                 the same lesson the preset reload learned: a thing that opens
+                 behind the sheet you pressed the button in looks like a button
+                 that did nothing. */
+              setSheet(views.includes('ask') ? null : 'chat')
+              if (views.includes('ask')) changeView('ask')
+            }}
+            onDeleteChat={forgetChat}
+            onRestore={reload}
+            onDelete={forget}
+          />
+        ) : null}
+      </Sheet>
+
+      {/*
+        The chain, and everything that changes it, on a phone.
+
+        "On the PWA we need to be able to see what chain was written or what
+        chain is currently on a setting."
+
+        The Edit screen where this lives is deliberately unreachable on a phone
+        — see BENCH in components/Screens.jsx, and the same rule the phone apps
+        in mobile/ have always had: a generate button within reach of a stage
+        tap is a hazard. That rule is about what a SWIPE lands on in the dark,
+        not about what the app is capable of showing. Nothing here is one
+        gesture from the stage screen; it is behind the gear, which is where
+        somebody goes when they have stopped playing and want to look at
+        something.
+
+        The same contents as the Edit screen, in a sheet, so there is one chain
+        editor in this app rather than a second one written for a small screen.
+      */}
+      <Sheet
+        open={sheet === 'chain'}
+        onClose={() => setSheet(null)}
+        title="Chain"
+        note={
+          hasScenes
+            ? `Scene ${scene + 1}${sceneNames[scene] ? ` · ${sceneNames[scene]}` : ''}`
+            : preset?.name || null
+        }
+      >
+        {sheet === 'chain' ? (
+          <>
+            {/* What is in the preset, in signal order. Tapping one opens its
+                knobs and closing them comes back here. */}
+            <Chain
+              blocks={blocks}
+              selected={selectedBlock}
+              onSelect={(id) => openBlockFrom(id, 'chain')}
+              onToggle={toggleBlock}
+            />
+
+            <ParamSearch
+              blocks={blocks}
+              onError={setError}
+              onPick={(eid, paramId) => {
+                openBlockFrom(eid, 'chain')
+                setEditorFocus({ eid, paramId, nonce: Date.now() })
+              }}
+            />
+
+            <Section key="chain-blocks" title="Add, remove and move blocks">
+              <GridEditor
+                blocks={blocks}
+                capabilities={device?.capabilities}
+                busy={busy}
+                onError={setError}
+                onChanged={(summary) => {
+                  record('grid', summary)
+                  read()
+                }}
+              />
+            </Section>
+
+            <Section key="chain-modifiers" title="Modifiers" note="Let a pedal or the volume knob move a control">
+              <Modifiers
+                blocks={blocks}
+                busy={busy}
+                onError={setError}
+                onChanged={(summary) => record('modifier', `Modifier bound: ${summary}`)}
+              />
+            </Section>
+          </>
+        ) : null}
+      </Sheet>
+
       <Sheet
         open={sheet === 'block' && !!openBlock}
-        onClose={() => setSheet(null)}
+        onClose={() => {
+          setSheet(sheetBack)
+          setSheetBack(null)
+        }}
         title={openBlock?.name || 'Block'}
         /* Where these knobs land. A block's settings are per-scene, so an
            editor that doesn't name the scene is an editor you have to
@@ -5231,6 +5503,47 @@ export default function App() {
           bandmate. This is the only route back, so it is a plain button
           rather than a link inside a paragraph.
         */}
+        {/*
+          Everything you have made, in one place.
+
+          "Create a dedicated button in the settings menu for history where you
+          can view previous chats and reload them as well as the history of
+          previously generated presets."
+
+          Loose here, beside the gear list and the introduction, for the reason
+          those two are loose: it is a door out to something you read, not a
+          setting to change. It is first of the three because it is the one
+          somebody comes looking for.
+
+          Its own sheet rather than a fold, because it is two lists that grow
+          without limit, and a list that long inside a panel inside a sheet is
+          two scrolls fighting for one thumb.
+        */}
+        <Section
+          key="history"
+          title="History"
+          note={
+            chatLog.length || library.length
+              ? `${chatLog.length} ${chatLog.length === 1 ? 'chat' : 'chats'} · ${library.length} ${
+                  library.length === 1 ? 'preset' : 'presets'
+                }`
+              : 'Nothing yet'
+          }
+        >
+          <p className="hint">
+            Every conversation you have had and every tone you have designed, sent or not. Open
+            one to pick it back up.{' '}
+            {link.account
+              ? 'All of it is kept with your account.'
+              : 'All of it is in this browser until you sign in.'}
+          </p>
+          <div className="history-actions">
+            <button className="chip" onClick={() => setSheet('history')}>
+              Open history
+            </button>
+          </div>
+        </Section>
+
         {/*
           What every model on the unit really is.
 

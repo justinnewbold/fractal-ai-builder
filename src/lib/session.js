@@ -50,6 +50,9 @@ export function saveSession(state, store = safeStore()) {
         v: 1,
         at: Date.now(),
         turns,
+        /* Which conversation this is, so the shelf gets one row for it rather
+           than a fresh one every time the phone is put in a pocket. */
+        chatId: state?.chatId || null,
         result: state?.result ?? null,
         withScenes: !!state?.withScenes,
         renamePreset: state?.renamePreset !== false,

@@ -3,6 +3,47 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.161.0
+
+**You can start a fresh chat, and the old one is still there when you want
+it.** There was one conversation and no way to put it down — a chat that had
+been going for days meant scrolling past days to read the last thing said. New
+chat, above the transcript, clears the box and shelves what was in it. The tone
+on screen and the last design go with it, because a fresh chat that still
+remembered the last tone would just be the same conversation with its
+transcript hidden.
+
+**And yes, it was reading the conversation all along.** Every request already
+carries the last two dozen turns, labelled so the model knows which were yours,
+which were its own, and which were notes the app wrote — which is why "a bit
+more" and "put that back" have always worked. Nothing about that changed; what
+changed is that a conversation can now be ended deliberately instead of running
+for ever.
+
+**History, behind the gear.** Every chat you have had and every tone you have
+designed, in one sheet, with one list of presets rather than a panel per place
+they are stored. Signed in it is all kept with your account; signed out it is
+all in this browser, and the sheet says which in one line at the top. The
+Presets sheet still has its three panels, because "where is this kept" is a
+real question when you are moving a library — it is just not the question you
+are asking when you want the tone back that you made on Tuesday.
+
+**The chain is reachable from a phone.** Chain, on the bottom bar beside Ask:
+every block in the preset in order, with its knobs, the block list to add and
+remove from, and the modifiers. The Edit screen it comes from is still not one
+swipe from the stage screen — that rule is about what a thumb lands on in the
+dark — but there was no way to it at all before, so a phone could see which
+blocks were on and never what any of them was set to.
+
+**A chain built into an empty preset gets an input block.** It already got an
+output, because a preset without one makes no sound and leaves the volume
+slider with nothing to move. It never got an input, which is the same silence
+from the other end of the row: the guitar reaches nothing, every value lands,
+the unit reads them all back, the preset saves. Both the assistant's chain
+builder and the Starter chain button put in whatever is missing and step around
+whatever is already there, and the preset check in Setup names a missing input
+the way it already named a missing output.
+
 ## 7.155.0
 
 **The watcher now writes down the misses too, which is the only way it can

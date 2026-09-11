@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { placeBlock, clearCell, readGrid, blockCatalog, wireRow } from '../lib/forgefx'
+import { chainPlan } from '../lib/actions'
 
 /**
  * A workable starting chain, by block family rather than by number.
@@ -237,15 +238,44 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
     setIssue(null)
     try {
       const chain = STARTER_ORDER.map((slug) => palette.find((b) => b.slug === slug)).filter(Boolean)
-      const fits = chain.slice(0, cols)
-      for (const [i, block] of fits.entries()) await placeBlock(1, i, block.page)
+      /*
+       * Between the input and the output, and putting them there when they are
+       * missing — the same planner the assistant's own chain builder uses.
+       *
+       * This used to place from column 0 and count upwards, which wrote over
+       * whichever of them was already on the row, and left a preset that had
+       * neither with a drive that nothing feeds and nothing that reaches the
+       * jack. Both are silent, and both look perfect on screen.
+       */
+      const onRow = (blocks || []).filter((b) => b.row === 1)
+      const has = (slug) => palette.some((b) => b.slug === slug)
+      const plan = chainPlan({
+        onRow,
+        width: cols || chain.length,
+        count: chain.length,
+        canInput: !linear && has('input') && !onRow.some((b) => b.slug === 'input'),
+        canOutput: !linear && has('output') && !onRow.some((b) => b.slug === 'output')
+      })
+      const fits = linear ? chain.slice(0, cols) : chain.slice(0, plan.cols.length)
+
+      if (plan.input !== null && !onRow.some((b) => b.slug === 'input')) {
+        const into = palette.find((b) => b.slug === 'input')
+        if (into) await placeBlock(1, plan.input, into.page)
+      }
+      for (const [i, block] of fits.entries()) {
+        await placeBlock(1, linear ? i : plan.cols[i], block.page)
+      }
+      if (plan.output !== null && !onRow.some((b) => b.slug === 'output')) {
+        const out = palette.find((b) => b.slug === 'output')
+        if (out) await placeBlock(1, plan.output, out.page)
+      }
       /*
        * And join the row up, or the starter chain is five blocks that make no
        * sound. Placing a block fills a cell; it does not connect that cell to
        * anything, and an empty preset has no cabling of its own to inherit.
        * A linear unit has no grid and nothing to wire.
        */
-      const wiring = linear ? null : await wireRow(1, (cols || fits.length) - 1)
+      const wiring = linear ? null : await wireRow(1, plan.wireTo)
       onChanged(`Built a starter chain — ${fits.map((b) => b.name).join(', ')}`)
       if (wiring?.refused) {
         setIssue(

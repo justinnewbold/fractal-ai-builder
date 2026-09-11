@@ -4943,6 +4943,20 @@ ol.action-list li.destructive::marker {
 }
 
 /*
+ * The row above the transcript, which holds the way out of it.
+ *
+ * Right-aligned and small: New chat is the least-used control on this panel
+ * and it sits over the most-read one, so it takes a corner rather than a line.
+ * Outside `.assistant-log` on purpose — inside, it would scroll away with the
+ * first reply and be unreachable for the rest of the conversation.
+ */
+.assistant-top {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--s-2);
+}
+
+/*
  * The transcript's own scroll, and how tall it is allowed to be.
  *
  * 340px was a letterbox: a conversation happening in a small window with the
@@ -8127,6 +8141,116 @@ button.recent-del:focus-visible {
 }
 
 .recent-when {
+  flex: 0 0 auto;
+  font-size: var(--f-1);
+  color: var(--silk-faint);
+}
+
+/* ---------- history: everything you have made ---------- */
+
+/*
+ * The same row shape as Earlier generations, because it is the same kind of
+ * list: a thing you made, when you made it, and a quiet way to throw it away.
+ * Its own class rather than reusing `.recent-*` so that the short list under
+ * the chat box and the full one in the sheet can drift apart later without one
+ * of them breaking the other.
+ */
+.past-where {
+  margin: 0 0 var(--s-4);
+}
+
+.past-group {
+  margin-bottom: var(--s-5);
+}
+
+.past-head {
+  font-family: var(--display);
+  font-size: var(--f-1);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--silk-faint);
+  margin: 0 0 var(--s-2);
+}
+
+.past-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--rule);
+}
+
+/* A list item is not a flex container by default, and without this the × wraps
+   onto its own line under every row — the lesson `.recent-list li` learned. */
+.past-list li {
+  display: flex;
+  align-items: stretch;
+  gap: var(--s-2);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* The conversation you are actually in, marked rather than hidden: it is the
+   one row in the list you must not be able to lose track of. */
+.past-list li.past-now button.past-row {
+  color: var(--signal);
+}
+
+button.past-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  padding: var(--s-2) 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  text-align: left;
+  color: var(--silk);
+}
+
+@media (hover: hover) {
+  button.past-row:hover:not(:disabled) {
+    color: var(--signal);
+  }
+}
+
+/* Quiet until you go looking for it, and it asks "Sure?" first. */
+button.past-del {
+  flex: 0 0 auto;
+  min-width: 56px;
+  min-height: 44px;
+  padding: 0 var(--s-2);
+  background: none;
+  border: 0;
+  border-radius: var(--r-2);
+  color: var(--silk-faint);
+  font-size: var(--f-2);
+  line-height: 1;
+}
+
+@media (hover: hover) {
+  button.past-del:hover:not(:disabled) {
+    color: var(--fault);
+  }
+}
+
+button.past-del:focus-visible {
+  color: var(--fault);
+}
+
+/* The name takes the room; the time takes what it needs. */
+.past-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.past-when {
   flex: 0 0 auto;
   font-size: var(--f-1);
   color: var(--silk-faint);
