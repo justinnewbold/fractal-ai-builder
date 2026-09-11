@@ -715,6 +715,58 @@ export function run(test) {
     assert.ok(!/fetch\(|localStorage|document\.|window\./.test(lib), 'the matcher reaches outside itself')
   })
 
+  test('the preset list opens on the one you are standing on, and keeps trying', () => {
+    /*
+     * "When opening the preset menu, have it scrolled to where the current
+     * preset is in the middle so that you can see which ones are before and
+     * after it."
+     *
+     * The centring was already written and did not always take. It looked
+     * exactly once, on the render that mounted the list, and returned for good
+     * if it found no row or nothing to scroll — and there are two perfectly
+     * ordinary reasons for that instant to be the wrong one: the sheet takes
+     * about a third of a second to arrive, and on iOS a scrollTop written to a
+     * box inside a transform that is still animating is quietly dropped. Both
+     * look identical to success from inside a single look, and both leave a
+     * list of 512 at 000 with the loaded preset four hundred rows below.
+     *
+     * So it retries across frames, holds the position while the sheet lands,
+     * and stands down the moment something else moves the list — because being
+     * dragged back to the middle while you are already reading is worse than
+     * opening at the top.
+     */
+    const list = readFileSync(new URL('../src/components/Console.jsx', import.meta.url), 'utf8')
+    const at = list.indexOf('Open where you already are')
+    assert.notEqual(at, -1, 'nothing opens the preset list where the player already is')
+    const centring = list.slice(at, list.indexOf('return (', at))
+
+    assert.match(centring, /requestAnimationFrame\(place\)/, 'the centring still takes a single look')
+    assert.match(centring, /frames < LOOKS/, 'the centring gives up after one try again')
+    assert.match(
+      centring,
+      /if \(!row \|\| !box \|\| !box\.clientHeight\)/,
+      'a scrollbox that has no height yet is treated as no scrollbox at all'
+    )
+    /* The row goes to the middle, not the top: the whole point is seeing what
+       is on either side of it. */
+    assert.match(
+      centring,
+      /\(box\.clientHeight - row\.offsetHeight\) \/ 2/,
+      'the current preset is put at the top of the list rather than the middle'
+    )
+    /* And a thumb wins. */
+    assert.match(
+      centring,
+      /Math\.abs\(box\.scrollTop - mine\) > 2/,
+      'the list fights whoever scrolls it while the sheet is still arriving'
+    )
+    assert.match(list, /const LOOKS = 40/, 'the retry window is gone or unbounded')
+
+    /* A filter is the one time the top of the list is the right place: the
+       matches are what was asked for. */
+    assert.match(centring, /if \(needle \|\|/, 'a filtered list is yanked away from its matches')
+  })
+
   test('a stale app finds out quickly, and Reload actually fetches the page', () => {
     /*
      * "Doesn't look like the push went through somehow, the PWA has not
