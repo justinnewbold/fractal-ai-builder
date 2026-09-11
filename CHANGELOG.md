@@ -3,6 +3,52 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.167.0
+
+**A block you switch off and a link that has gone are two different things,
+and the chain screen was showing neither.** From a log on stage: every write
+to the unit coming back `port not open` — the Fractal app on the Mac had lost
+its serial port — and the chain sheet sitting there with all four blocks
+reading On, tap after tap, saying nothing at all. "When I tap one of the
+buttons it will turn it off on the unit, but there's no way to turn it back
+on, and the buttons always say on."
+
+Four things were wrong with that, all of them silent:
+
+- **The explanation was drawn under the sheet.** The app raises every failure
+  into one notice on the page, and a sheet is a surface over that page with
+  the page made inert behind it. So the reason was there — in a place nobody
+  could see or reach. Sheets that write to the unit show their own failures
+  now, at the top, where the tap was.
+- **The same failure twice looked like nothing happening.** The message was
+  kept as text, so tapping again set the identical string and the screen had
+  no reason to redraw. It is stamped with when it was raised now, so a repeat
+  re-announces rather than sitting silent.
+- **"port not open" is not a sentence anybody can act on.** It now reads: the
+  Fractal app on your Mac has lost its connection to the unit, nothing sent
+  from here is reaching it, check the unit is on and its cable is in. The
+  server's own words are still written to the debug log, where they belong.
+- **The app kept drawing a chain it could no longer stand behind.** A Mac with
+  no port to the unit means nothing on screen is known to be true, so the app
+  leaves that screen for the fault notice — the one screen with a Try again on
+  it — with copy that says which end of the room to go to, rather than blaming
+  a link that is working fine.
+
+**A refused toggle asks the unit what it actually has.** The chain screen used
+to trust its own roll-back: the button goes back the way it was and the strip
+carries on. But a write that comes back as a failure can still have landed —
+the frame goes out and it is the answer that gets lost — and then the strip is
+showing the opposite of the truth, so the next tap sends the same thing again
+and the block can never come back on. It re-reads instead, which is what the
+stage screen has always done.
+
+**And a dead link is asked once, not five times.** A chain read that fails is
+asked again up to five times from a phone, because a busy port is the usual
+reason and trying again is the whole fix. A port that is gone answers the same
+way instantly, so one tap spent five relay round trips proving it — the log
+from that stage is pages of exactly that. A read that fails because there is no
+port stops there; a busy one keeps every retry it had.
+
 ## 7.166.0
 
 **The chain shows its two ends now.** They were always there on the unit and

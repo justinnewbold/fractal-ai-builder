@@ -337,7 +337,7 @@ export default function Gig({
       // The new scene brings its own on/off states with it.
       await refreshBlocks()
     } catch (err) {
-      onError(err.message)
+      onError(err)
     }
   }
 
@@ -357,7 +357,10 @@ export default function Gig({
       await writeBypass(eid, wanted)
       await refreshBlocks()
     } catch (err) {
-      onError(err.message)
+      // The error itself: the app reads `unitGone` off it to tell a refused
+      // write from a Mac that has lost the unit altogether, and a flattened
+      // message cannot carry that.
+      onError(err)
       await refreshBlocks()
     } finally {
       setToggling(null)

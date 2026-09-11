@@ -66,7 +66,26 @@ const FOCUSABLE =
  * under the status bar, and its body is a column that hands what is left to
  * the conversation — the same shape the Ask screen already has on a desktop.
  */
-export default function Sheet({ open, onClose, title, note, footer, tall = false, children }) {
+export default function Sheet({
+  open,
+  onClose,
+  title,
+  note,
+  /*
+   * What just went wrong in here, shown in here.
+   *
+   * The app raises every failure into one notice on the page, which was the
+   * right call while the app was pages — but a sheet is drawn over the page
+   * and the page under it is made inert, so a write refused from inside a
+   * sheet put its explanation somewhere nobody could see or reach. Tapping a
+   * block's On button on a Mac that had lost the unit failed in total
+   * silence, over and over.
+   */
+  alert,
+  footer,
+  tall = false,
+  children
+}) {
   const [mounted, setMounted] = useState(open)
   const [shown, setShown] = useState(false)
   const [drag, setDrag] = useState(0)
@@ -305,7 +324,17 @@ export default function Sheet({ open, onClose, title, note, footer, tall = false
 
         {/* Its own scroller, and its own overscroll: a sheet scrolled to the
             end must not hand the gesture to the page underneath it. */}
-        <div className="sheet-body">{children}</div>
+        <div className="sheet-body">
+          {/* Above the contents, because it is about the tap that was just
+              made in them — and keyed on the text so the same failure twice
+              re-announces rather than sitting there looking unchanged. */}
+          {alert ? (
+            <p className="notice sheet-alert" data-kind="fault" role="alert">
+              {alert}
+            </p>
+          ) : null}
+          {children}
+        </div>
 
         {footer ? <div className="sheet-foot">{footer}</div> : null}
       </section>

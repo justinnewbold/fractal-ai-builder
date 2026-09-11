@@ -251,7 +251,29 @@ export function whySafari({ secure, userAgent }) {
  * known it means nothing yet, and nothing is what to say — the old notice
  * told every phone to open an app on "this Mac" and try Chrome.
  */
-export function faultCopy({ role, device, secure = false, userAgent = '' }) {
+export function faultCopy({ role, device, secure = false, userAgent = '', unitGone = false }) {
+  /*
+   * The unit was there a minute ago and now nothing reaches it.
+   *
+   * First, because it is the most specific thing anyone knows: the Mac is
+   * answering (its refusal is what raised this), so every branch below that
+   * talks about reaching the Mac would send someone to check the wrong end of
+   * the room. What used to happen instead was nothing at all — the app kept
+   * the chain on screen with every block reading On, and each tap failed in
+   * silence behind the sheet it was tapped in.
+   */
+  if (unitGone) {
+    if (role === 'remote' || role === 'wifi') {
+      return {
+        title: 'Your Mac has lost the unit',
+        body: 'The Fractal app on your Mac is running, but nothing it sends is reaching your unit, so what was on screen can no longer be trusted. At the Mac: check the unit is switched on and its cable is in, and that nothing else has taken it — another editor, or a second copy of the Fractal app. Then tap Try again.'
+      }
+    }
+    return {
+      title: 'Lost the unit',
+      body: 'The Fractal app is running but nothing it sends is reaching the unit. Check the unit is switched on and its cable is in, and that nothing else is using it, then tap Try again.'
+    }
+  }
   if (device && device.connected === false) {
     /*
      * The one a phone actually sees, and the one that was lying.

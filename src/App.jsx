@@ -335,14 +335,56 @@ export default function App() {
     (eid) => blocks.find((b) => b.effectId === eid)?.name || null,
     [blocks]
   )
-  const [error, setError] = useState(null)
+  const [error, setErrorText] = useState(null)
+  /*
+   * WHEN the message on screen was raised, as well as what it says.
+   *
+   * "I tap one of the buttons and nothing happens." The second tap of a button
+   * that has already failed once set the same string into the same state, React
+   * saw no change, and nothing re-rendered and nothing was logged — so a
+   * failure that is happening over and over looks exactly like a button that
+   * is doing nothing at all. This is what makes a repeat count as news: the
+   * notice is keyed on it and remounts, which is also what makes a screen
+   * reader say it again.
+   */
+  const [errorAt, setErrorAt] = useState(0)
+  /*
+   * Whether the unit itself has gone, as opposed to one write being refused.
+   *
+   * Set when a call comes back saying the Mac has no port to the unit any
+   * more. It decides which fault notice is shown, and it is cleared by the
+   * next read that works.
+   */
+  const [lostUnit, setLostUnit] = useState(false)
+  /*
+   * Which sheet was over the screen when the message was raised, so the sheet
+   * can show its own failures and none of anybody else's. A ref, updated in
+   * render, because the one way in below is built once and would otherwise
+   * close over whichever sheet was open at mount — which is none of them.
+   */
+  const sheetNow = useRef(null)
+  const [errorSheet, setErrorSheet] = useState(null)
+  /*
+   * One way in for everything that failed, taking the error itself or a
+   * sentence. The error is worth having whole: only the object carries
+   * `unitGone`, and that is the difference between "that write was refused"
+   * and "nothing on this screen is true any more".
+   */
+  const setError = useCallback((value) => {
+    const text =
+      value == null ? null : typeof value === 'string' ? value : value.message || String(value)
+    setErrorText(text)
+    setErrorAt(text ? Date.now() : 0)
+    setErrorSheet(text ? sheetNow.current : null)
+    if (value && typeof value !== 'string' && value.unitGone) setLostUnit(true)
+  }, [])
   /*
    * Every error the screen shows is a line in the debug log too, and so is a
    * crash the screen never got to show. One place, so a report has both.
    */
   useEffect(() => {
-    if (error) logDebug('error', typeof error === 'string' ? error : error?.message || String(error))
-  }, [error])
+    if (error) logDebug('error', error)
+  }, [error, errorAt])
   useEffect(() => installCrashCapture(), [])
   const [busy, setBusy] = useState(false)
   /*
@@ -735,6 +777,7 @@ export default function App() {
       ? faultCopy({
           role: link.role,
           device,
+          unitGone: lostUnit,
           secure: typeof window !== 'undefined' && window.location.protocol === 'https:',
           userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : ''
         })
@@ -830,6 +873,31 @@ export default function App() {
    * two taps from the chain you were working through. This is the way back.
    */
   const [sheetBack, setSheetBack] = useState(null)
+  /*
+   * The failure this sheet is responsible for showing.
+   *
+   * The message belongs to the tap that caused it: one raised on the Play
+   * screen ten minutes ago is not something to greet somebody with when they
+   * open the chain. Matched on the sheet that was open when it was raised
+   * rather than on a clock, so there is no frame in which an old message is
+   * still on the way out of a sheet that has just arrived.
+   */
+  sheetNow.current = sheet
+  const sheetAlert = sheet && error && errorSheet === sheet ? error : null
+  /*
+   * A unit that has gone takes the sheet with it.
+   *
+   * A sheet is a surface over an inert page, so the notice explaining the
+   * failure was being drawn underneath a chain sheet that could not be
+   * reached, behind blocks still reading On. There is nothing to edit in a
+   * preset the app cannot reach: close it, and let the fault notice — the one
+   * screen in the app with a way back on it — actually be on screen.
+   */
+  useEffect(() => {
+    if (!lostUnit) return
+    setStatus('fault')
+    setSheet(null)
+  }, [lostUnit])
   /* Open a block's knobs, and remember what to return to. */
   const openBlockFrom = useCallback((id, from = null) => {
     setSelectedBlock(id)
@@ -1032,7 +1100,29 @@ export default function App() {
       await writeBypass(block.effectId, wanted)
       record('edit', `${block.name || block.slug} ${wanted ? 'bypassed' : 'engaged'}`)
     } catch (err) {
-      setError(err.message)
+      /*
+       * Whole, not flattened to its sentence.
+       *
+       * "When I tap one of the buttons it will turn it off on the unit, but
+       * there's no way to turn it back on, and the buttons always say on."
+       * Every write was failing with the Mac's port shut, the store put the
+       * block back the way it found it, and the message went to a notice
+       * behind the sheet. So the strip sat there claiming everything was on,
+       * tap after tap, with nothing anywhere saying otherwise.
+       */
+      setError(err)
+      /*
+       * And ask the unit what it actually has, rather than trusting the way
+       * the store put it back.
+       *
+       * A write that came back as a failure may still have landed — the frame
+       * goes out and the answer is what got lost — and then the strip is
+       * showing the opposite of the truth, so the next tap sends the same
+       * thing again and the block can never come back on. The gig screen has
+       * always re-read after a refused toggle; this one never did. Skipped
+       * when the unit is gone, because there is nobody to ask.
+       */
+      if (!err?.unitGone) refreshBlocks()
     }
   }
 
@@ -1097,6 +1187,8 @@ export default function App() {
       const list = Array.isArray(b) ? b : []
       setBlocks(list)
       setStatus('live')
+      // The unit answered, so whatever was lost is back.
+      setLostUnit(false)
       // Returned as well as stored: a caller that reads and then acts in the
       // same tick still has the old array in its closure, and state won't have
       // caught up yet.
@@ -1158,10 +1250,12 @@ export default function App() {
        * top of this pass and was live before it, the chain on screen is still
        * the truth: say what failed and leave it up.
        */
-      if (answered && liveRef.current) setError(err.message)
+      // The error itself, not its sentence: `unitGone` is the part that decides
+      // which notice this becomes, and a string cannot carry it.
+      if (answered && liveRef.current) setError(err)
       else {
         setStatus('fault')
-        setError(err.message)
+        setError(err)
       }
     } finally {
       setBusy(false)
@@ -4446,7 +4540,9 @@ export default function App() {
       ) : null}
 
       {status === 'live' && error ? (
-        <div className="notice" data-kind="fault" role="alert">
+        /* Keyed on when it was raised, so the same failure happening again
+           remounts the notice rather than looking like nothing happened. */
+        <div className="notice" data-kind="fault" role="alert" key={errorAt}>
           <h2>Didn&rsquo;t work</h2>
           <p>{error}</p>
           {/*
@@ -4848,6 +4944,7 @@ export default function App() {
         open={sheet === 'chain'}
         onClose={() => setSheet(null)}
         title="Chain"
+        alert={sheetAlert}
         note={
           hasScenes
             ? `Scene ${scene + 1}${sceneNames[scene] ? ` · ${sceneNames[scene]}` : ''}`
@@ -4906,6 +5003,7 @@ export default function App() {
           setSheetBack(null)
         }}
         title={openBlock?.name || 'Block'}
+        alert={sheetAlert}
         /* Where these knobs land. A block's settings are per-scene, so an
            editor that doesn't name the scene is an editor you have to
            remember the context for. */
