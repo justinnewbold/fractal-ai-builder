@@ -3,6 +3,36 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.171.0
+
+**A saved preset is called what you saved it as, in the list too.** Slot 98
+held "3DG Verse-Rhythm-Lead" on the unit and on the Play screen, and the
+Choose a preset list still said TIGHT MODERN — the name the slot had before
+you overwrote it. Force-quitting the app and opening it again changed nothing.
+
+Saving used to do one thing to the list: forget that slot's name and wait for
+somebody to read it again. At the Mac that costs nothing, because the unit is
+a cable away. On the phone it is a dead end — an AM4 won't hand over a preset
+over the relay, so every name the phone shows came from the Mac, and the Mac's
+copy was only ever merged in for slots the phone didn't already know about. A
+slot it knew under the old name kept it, for good.
+
+It was also throwing away the best evidence in the app. Nothing knows what
+slot 98 is called better than the save that just put a name in it. So that is
+what gets written down now, on all three routes — saving at the Mac, the Mac
+carrying out a save you asked for from the phone, and the phone hearing back
+that it landed — along with that preset's scene names, which the phone had the
+same problem reading.
+
+**And where the phone and the Mac disagree about a slot, the Mac now wins.**
+The Mac is the end with the cable; the phone only knows what the Mac told it.
+Until now a name that had gone wrong on the phone could never be corrected,
+because the merge skipped any slot the phone already had a name for. A slot
+the Mac hasn't learned yet is still left alone — "I haven't read it" is not
+"it has no name" — so a half-scanned list can't empty the one on your phone.
+
+---
+
 ## 7.170.0
 
 **Saving a preset no longer ends on "the Mac can't see your unit".** The red
