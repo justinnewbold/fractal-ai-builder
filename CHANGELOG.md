@@ -3,7 +3,7 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
-## 7.168.0
+## 7.169.0
 
 **A block you switch off and a link that has gone are two different things,
 and the chain screen was showing neither.** From a log on stage: every write
@@ -48,6 +48,61 @@ reason and trying again is the whole fix. A port that is gone answers the same
 way instantly, so one tap spent five relay round trips proving it — the log
 from that stage is pages of exactly that. A read that fails because there is no
 port stops there; a busy one keeps every retry it had.
+
+**Try again now does what force-quitting the app does.** "I have to force close
+the app completely and then reopen it for it to connect again." Closing the app
+has one power: it rebuilds every piece. The connection to the Mac was the one
+piece a reconnect kept — the phone still called the socket joined, so the button
+was handed it back unchanged and read the unit down the same dead line as the
+time before. A socket this end believes in and the server has let go of cannot
+be told apart from a working one from inside the app, so the button stops trying
+to tell and asks for a new one. The automatic check every few seconds still
+keeps a good connection; only pressing the button pays for a fresh one.
+
+**And that screen stops stating two things it doesn't know.** "Your Mac
+answered, but the unit didn't" is what it said when the MAC was the end that had
+gone quiet — nothing had asked the unit anything at that point, and the notice
+was reading a leftover from the last good connection. That case now says the Mac
+has gone quiet, and says Try again builds the connection again.
+
+"It asked five times over a few seconds" was written into the sentence. Five is
+what a phone does when it was not already connected; a unit that WAS answering a
+moment ago is asked three times, and the app at the Mac asks once — and all
+three were reported as five. It counts now and says the number it actually
+asked. Where there is no specific explanation for a fault, the last thing that
+came back is printed underneath it, because that screen has been photographed
+twice with the one useful fact missing.
+
+## 7.168.0
+
+**Ask for a band and the scenes get named after their songs.** "Make me a Three
+Days Grace preset" came back with three scenes called Verse, Rhythm and Lead —
+a preset that could have been anybody's. The band's name reached the AI and
+none of it reached your footswitch.
+
+Now the name of the band is the point of the build. Name a band, an artist, an
+album or an era and every scene is one of THEIR songs — named for it, and
+dialled for it, with the amp and the gain and the effects that record actually
+used. The summary says which song each scene is. Name one song instead and the
+scenes are the parts of that song: intro, verse, chorus, solo. Describe a plain
+sound with nobody's name on it and the scenes are still Clean, Rhythm and Lead,
+because that is what they are.
+
+A long title is shortened on purpose rather than chopped: the unit keeps 16
+characters, so "Animal I Have Become" goes on as "Animal I" and still reads as
+itself from the front panel.
+
+The preset name follows the same idea — a Three Days Grace build is called
+Three Days Grace, not "3DG Verse-Rhythm-Lead".
+
+And Ask stopped losing the band on the way to the designer. Typing "make me a
+three days grace full preset" was being rewritten into "modern alt-metal rhythm
+crunch, cleaner verse tone and a cutting lead" before the tone was designed —
+a description of nobody in particular that also asked, in so many words, for
+exactly the three generic scene names that came back. Whatever you name is
+carried through word for word now.
+
+---
 
 ## 7.167.0
 
