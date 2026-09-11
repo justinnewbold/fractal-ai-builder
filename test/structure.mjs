@@ -751,7 +751,10 @@ export function run(test) {
       ['screen', ['size', 'playing']],
       ['rig', ['connection', 'phone-remote', 'footswitches', 'updates']],
       ['wrong', ['preset-check', 'feedback', 'what-s-changed-this-session', 'debug-log']],
-      ['ai', ['what-it-has-learned', 'developer']]
+      /* Token usage first behind this door: it is the panel with a question
+         attached — "it's actually spending a lot more than what the app says"
+         — and the other two are things you read once. */
+      ['ai', ['token-usage', 'what-it-has-learned', 'developer']]
     ]) {
       assert.deepEqual(behind(door), panels, `the ${door} door holds ${behind(door).join(', ')}`)
     }
@@ -2462,17 +2465,32 @@ export function run(test) {
     assert.match(folded, /className="diff"/, 'the diff is not what is folded')
 
     /*
-     * And the cost and the trace ride inside it rather than stacking beside it.
-     * Every card, not the first one found: there is more than one <Preview> in
-     * App now — the live tone and each one kept in the conversation — and a
-     * card that stacks its cost beside itself is the same regression whichever
-     * of them does it.
+     * The trace rides inside the fold. The price does not, any more.
+     *
+     * Both arrived together and were folded away together, and only one of them
+     * belonged there. The trace is for when a tone surprises you — occasional,
+     * and worth a scroll. The price is checked on every single run: "right now
+     * I have to click Show, and then scroll all the way to the bottom to see
+     * it." So it sits on the face of the card, under the change count, and the
+     * trace stays where the rest of the detail is.
+     *
+     * Neither may become a panel of its own beside the tone, which is what all
+     * of this replaced. Every card, not the first one found: there is more than
+     * one <Preview> in App — the live tone and each one kept in the
+     * conversation — and stacking is the same regression whichever does it.
      */
+    assert.match(card, /\{cost\}/, 'the price is not on the face of the card')
+    assert.ok(
+      !/<Cost\b/.test(folded),
+      'the price is behind the fold again — two taps and a scroll past the whole diff'
+    )
+    assert.match(folded, /\{children\}/, 'the trace is no longer inside the fold')
+
     const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
     const cards = app.split('<Preview').slice(1).map((part) => part.slice(0, part.indexOf('</Preview>')))
     assert.ok(cards.length >= 2, 'the tones kept in the conversation are not drawn as cards')
     for (const card of cards) {
-      assert.match(card, /<Cost\b/, 'the cost is a panel of its own beside the tone again')
+      assert.match(card, /cost=\{<Cost\b/, 'the cost is a panel of its own beside the tone again')
       assert.match(card, /<DevTrace\b/, 'the trace is a panel of its own beside the tone again')
     }
   })

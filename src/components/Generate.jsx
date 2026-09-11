@@ -35,6 +35,16 @@ export function Preview({
    */
   onSave = null,
   saveTo = 'unit',
+  /*
+   * What it cost, on the card rather than at the bottom of the fold.
+   *
+   * It rode in with the trace, behind "Show every change" and under eighty rows
+   * of diff: "right now I have to click Show, and then scroll all the way to
+   * the bottom to see it." That is the wrong place for the one number somebody
+   * checks on every single run — and it was there because it arrived at the
+   * same time as the trace, not because it belongs with it.
+   */
+  cost = null,
   children
 }) {
   /*
@@ -168,6 +178,7 @@ export function Preview({
           <h2 className="preset-name">{presetName || 'UNTITLED'}</h2>
           {summary ? <p className="summary">{summary}</p> : null}
           <p className="preview-count mono">{detail}</p>
+          {cost}
           {/*
             A rejection is never folded away silently.
             The list of them is long and belongs with the rest of the detail,

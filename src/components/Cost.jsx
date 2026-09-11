@@ -1,4 +1,5 @@
 import { costOf, uncachedCostOf, formatCost, formatTokens, rateFor, splitUsage } from '../lib/cost'
+import { today } from '../lib/ledger'
 
 /**
  * What the last run cost, and what the session has cost.
@@ -24,6 +25,9 @@ export default function Cost({ usage, sessionTotal, runs }) {
   const full = uncachedCostOf(usage, usage.model)
   const rate = rateFor(usage.model)
   const saved = full !== null && dollars !== null ? full - dollars : null
+  /* Read at render, which is when it is looked at: the panel is drawn once per
+     tone and this is a handful of rows out of localStorage. */
+  const day = today()
 
   return (
     <div className="cost">
@@ -43,6 +47,19 @@ export default function Cost({ usage, sessionTotal, runs }) {
       {runs > 1 ? (
         <div className="cost-detail mono">
           Session: {formatCost(sessionTotal)} over {runs} runs
+        </div>
+      ) : null}
+
+      {/*
+        And the day, which is the figure that can actually be checked.
+        A session total resets when the page reloads and matches nothing on the
+        bill. The ledger's day is UTC, the same as the console's columns, so
+        this is the one number on screen with something to be compared against.
+      */}
+      {day && day.calls > 1 ? (
+        <div className="cost-detail mono">
+          Today: {formatCost(day.cost)} over {day.calls} call{day.calls === 1 ? '' : 's'} (UTC)
+          {day.unknown ? ` · ${day.unknown} uncounted` : ''}
         </div>
       ) : null}
 
