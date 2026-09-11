@@ -53,7 +53,7 @@ import ParamSearch from './components/ParamSearch'
 import Assistant from './components/Assistant'
 import UpdateNotice from './components/UpdateNotice'
 import Updates, { UpdateReadyNotice } from './components/Updates'
-import { validatePlan, replyFor, runPlan, resolvePlaceable } from './lib/actions'
+import { validatePlan, replyFor, runPlan, resolvePlaceable, landedOf } from './lib/actions'
 import { listPresets, newestFirst } from './lib/history'
 import {
   profileFrom,
@@ -3284,10 +3284,20 @@ export default function App() {
       const failures = await runPlan(actions, (done, total, label) =>
         setProgress(`${done} of ${total} - ${label}`)
       )
+      /*
+       * What happened, not everything that was attempted plus everything that
+       * wasn't. The count and the list used to be the whole plan with the
+       * refusals stapled on, so two changes the unit turned down read as "Did 2
+       * things" followed by those same two changes twice — once as done, once
+       * as refused. In the debug log, which is where a session is read back.
+       */
+      const landed = landedOf(actions, failures)
       record(
         'edit',
-        `Did ${actions.length} things`,
-        [...actions.map((a) => a.label), ...failures],
+        landed.length === actions.length
+          ? `Did ${actions.length} things`
+          : `Did ${landed.length} of ${actions.length} things`,
+        [...landed.map((a) => a.label), ...failures],
         true
       )
       if (failures.length) {

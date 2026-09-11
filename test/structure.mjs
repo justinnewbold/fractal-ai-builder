@@ -2410,7 +2410,9 @@ export function run(test) {
    */
   test('a tone answers as a card with its detail folded', () => {
     const gen = readFileSync(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
-    assert.match(gen, /<details className="preview-detail">/, 'the whole tone is on the page again')
+    // The tag, not the whole line: the element carries a ref now so the fold can
+    // be shut from the button at the bottom of it.
+    assert.match(gen, /<details className="preview-detail"/, 'the whole tone is on the page again')
     assert.match(gen, /className="preview-count mono"/, 'the card does not say how much it changes')
     // A rejection is never folded away without a word on the card.
     assert.match(gen, /className="preview-refused"/, 'settings can be rejected and never mentioned')
@@ -2426,7 +2428,7 @@ export function run(test) {
      */
     const card = gen.slice(
       gen.indexOf('<div className="preview-head">'),
-      gen.indexOf('<details className="preview-detail">')
+      gen.indexOf('<details className="preview-detail"')
     )
     assert.match(card, /preset-name/, 'the name is behind the fold')
     assert.match(card, /preview-actions/, 'the buttons are behind the fold')
@@ -2435,7 +2437,7 @@ export function run(test) {
     assert.match(card, /scene-plan/, 'what gets written over is behind the fold')
 
     // And what is folded is the bulk, not the decisions.
-    const folded = gen.slice(gen.indexOf('<details className="preview-detail">'))
+    const folded = gen.slice(gen.indexOf('<details className="preview-detail"'))
     assert.match(folded, /className="diff"/, 'the diff is not what is folded')
 
     /*
@@ -2751,6 +2753,47 @@ export function run(test) {
     )
   })
 
+  /*
+   * Opening the change list must not move the rest of the page out of reach.
+   *
+   * "After writing to the unit, if I put show everything that was changed, it
+   * displays it all in the chat window, but there's no way to collapse it
+   * again so it's flooding the chat. It also makes the next generation I do
+   * show up above that so I have to do a lot of scrolling to get back to see
+   * what's happening with the new generation."
+   *
+   * Eighty-two rows in one column on a phone is several screens, and this fold
+   * sits under a conversation. Two things hold: the list is bounded and
+   * scrolls inside itself, so nothing below it ever moves by more than that
+   * box; and the far end of it carries a way out, because by then the line
+   * that opened it is a long way back up.
+   */
+  test('a long change list is a window, and can be shut from the bottom of it', () => {
+    const gen = readFileSync(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+
+    assert.match(gen, /className="diff-scroll"/, 'the change list can still grow the page without limit')
+
+    const box = css.slice(css.indexOf('.diff-scroll {'), css.indexOf('}', css.indexOf('.diff-scroll {')))
+    assert.ok(box.includes('max-height'), 'the change list has no height to be bounded by')
+    assert.match(box, /overflow-y:\s*auto/, 'the change list is bounded but cannot be scrolled')
+
+    // And the way out is inside the fold, past the diff, not beside it.
+    const folded = gen.slice(gen.indexOf('<details className="preview-detail"'))
+    assert.match(folded, /className="fold-shut"/, 'nothing at the bottom of the list shuts it')
+    assert.ok(
+      folded.indexOf('fold-shut') > folded.indexOf('diff-scroll'),
+      'the way out is above the list it is meant to end'
+    )
+    assert.ok(
+      /fold\.current\.open = false/.test(gen),
+      'the button does not actually close the fold'
+    )
+    // Shutting it several screens down would otherwise leave you in blank
+    // space where the rows used to be.
+    assert.match(gen, /foldHead\.current\?\.scrollIntoView/, 'shutting the fold leaves you nowhere')
+  })
+
   test('a switch says where the thing it switches on will appear', () => {
     /*
      * "Where do I view the generation from the AI from the Developer tab?"
@@ -2768,8 +2811,8 @@ export function run(test) {
     const gen = readFileSync(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
     const trace = readFileSync(new URL('../src/components/DevTrace.jsx', import.meta.url), 'utf8')
 
-    const summary = gen.slice(gen.indexOf('<details className="preview-detail">'))
-    const label = summary.slice(summary.indexOf('<summary>') + 9, summary.indexOf('<span')).trim()
+    const summary = gen.slice(gen.indexOf('<details className="preview-detail"'))
+    const label = summary.slice(summary.indexOf('>', summary.indexOf('<summary')) + 1, summary.indexOf('<span')).trim()
     assert.ok(label.length > 6, `the fold has no words on it to point at: ${JSON.stringify(label)}`)
 
     const hint = trace.slice(trace.indexOf('<p className="hint">'), trace.indexOf('</p>', trace.indexOf('<p className="hint">')))
@@ -2780,7 +2823,7 @@ export function run(test) {
     /* And it is genuinely inside that fold rather than beside it — the other
        half of the same claim, held by the tone-card test above. */
     assert.ok(
-      gen.indexOf('{children}') > gen.indexOf('<details className="preview-detail">'),
+      gen.indexOf('{children}') > gen.indexOf('<details className="preview-detail"'),
       'the trace is outside the fold the switch points at'
     )
   })

@@ -1194,6 +1194,52 @@ button.chip {
   max-width: 58ch;
 }
 
+/*
+ * The window the change list lives in.
+ *
+ * Eighty-two rows in one column is several screens, and this fold sits on a
+ * page whose top half is a conversation: opening it pushed the chat, the cost
+ * and the next tone out of reach, and shutting it again meant finding a
+ * summary line that was now a long scroll above you. A bounded box with its
+ * own scrollbar costs nothing to read and never moves the page by more than
+ * its own height.
+ */
+.diff-scroll {
+  max-height: 58vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* -webkit-overflow-scrolling for the momentum iOS gives a real scroller. */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Room for the bar, so a value never sits underneath it. */
+.diff-scroll > .diff {
+  padding-right: var(--s-2);
+}
+
+/*
+ * The way out, at the far end.
+ *
+ * Same job as the summary above it and deliberately not the same shape: this
+ * one is reached by scrolling to the bottom of the list, which is where you
+ * are when you have finished reading it.
+ */
+button.fold-shut {
+  margin-top: var(--s-3);
+  min-height: 44px;
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  color: var(--silk-dim);
+  font-size: var(--f-2);
+  cursor: pointer;
+}
+
+button.fold-shut:hover {
+  color: var(--silk);
+}
+
 .diff {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
