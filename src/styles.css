@@ -1905,6 +1905,71 @@ pre.preset-report-text {
 
 /* ---------- cost ---------- */
 
+/*
+ * On the face of the card now, so it needs less room above it.
+ *
+ * Twenty pixels was the gap it needed at the bottom of a fold, after a diff.
+ * Sitting under the change count it is part of the head, and a card that has
+ * to fit on a phone cannot spend a fifth of a line on air.
+ */
+.preview-head .cost {
+  margin-top: 10px;
+  padding: var(--s-2) var(--s-3);
+}
+
+.preview-head .cost-figure {
+  font-size: var(--f-3);
+}
+
+/* ---------- what it has cost, day by day ---------- */
+
+.token-log {
+  margin-top: var(--s-2);
+}
+
+.token-days {
+  margin-top: var(--s-3);
+}
+
+.token-day {
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--rule);
+}
+
+/* The day being added to, marked so it is not read as a closed total. */
+.token-day.today {
+  border-left: 2px solid var(--live);
+  padding-left: var(--s-3);
+}
+
+.token-day-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.token-date {
+  color: var(--silk);
+  font-size: var(--f-2);
+}
+
+.token-cost {
+  color: var(--live);
+  font-size: var(--f-3);
+}
+
+.token-line {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+/* The gap the console will show and this cannot. Said in the warning colour
+   because it is the number that explains a disagreement. */
+.token-unknown {
+  color: var(--warn, var(--live));
+}
+
 .cost {
   margin-top: 20px;
   padding: var(--s-3) var(--s-4);

@@ -18,6 +18,8 @@ import CloudPresets from './components/CloudPresets'
 import { LiveGeneration, Thinking, THINKING } from './components/LiveGeneration'
 import { progressFor } from './lib/liveProgress'
 import { streamSpec } from './lib/stream'
+import { recordUsage } from './lib/ledger'
+import TokenLog from './components/TokenLog'
 import { askPlan } from './lib/command'
 import { Modifiers, SceneMatrix } from './components/Modifiers'
 import Feedback from './components/Feedback'
@@ -112,7 +114,7 @@ import {
   placeableBlocks
 } from './lib/forgefx'
 import { savePreset, buildEntry, deletePreset, typicalMs, notOnAccount } from './lib/history'
-import { costOf } from './lib/cost'
+import { costOf, formatCost, formatTokens } from './lib/cost'
 import { isDemo, setDemo, resetCacheClear } from './lib/forgefx'
 import {
   detect,
@@ -445,6 +447,33 @@ export default function App() {
   const [saveError, setSaveError] = useState(null)
   const [log, setLog] = useState([])
   const [spend, setSpend] = useState({ total: 0, runs: 0 })
+  /*
+   * One place every model call is counted, and it counts all of them.
+   *
+   * The session total only ever added up DESIGNS. Every message on the Ask
+   * screen came back with its own token count attached and went into a field
+   * nothing read — and those are not small, because a chat turn carries the
+   * whole model roster and the transcript so far. So the screen could show a
+   * few cents while most of the money went somewhere it never mentioned.
+   *
+   * A failed call goes in too, with nothing in it where the numbers should be.
+   * It spent something; what it cannot say is how much, and a row saying that
+   * is what turns a gap against the bill into an explanation.
+   */
+  const noteSpend = useCallback((kind, usage, extra = {}) => {
+    setLastCall(recordUsage(kind, usage, extra))
+    const runCost = usage ? costOf(usage, usage.model) : null
+    if (runCost !== null) setSpend((p) => ({ total: p.total + runCost, runs: p.runs + 1 }))
+  }, [])
+  /*
+   * The last call, so a failure can still say what it spent.
+   *
+   * "When there's errors and it doesn't write, it doesn't show me any tokens
+   * that were used." The tone card is where that number lives and a failed run
+   * has no card — so the error says it instead, including when the honest
+   * answer is that nothing was reported.
+   */
+  const [lastCall, setLastCall] = useState(null)
   const [lastPrompt, setLastPrompt] = useState(restored?.lastPrompt || '')
   /*
    * A failed generation, kept so it can be asked again with one tap.
@@ -2284,10 +2313,7 @@ export default function App() {
 
       setSaveName(validated.presetName || preset?.name?.trim() || '')
 
-      const runCost = costOf(validated.usage, validated.usage?.model)
-      if (runCost !== null) {
-        setSpend((prev) => ({ total: prev.total + runCost, runs: prev.runs + 1 }))
-      }
+      noteSpend('design', validated.usage)
       record('generate', `Designed "${validated.presetName || 'untitled'}" from: ${description}`, [
         `${countWrites(validated.changes)} changes proposed`,
         ...validated.problems
@@ -2296,6 +2322,10 @@ export default function App() {
       // A run that failed leaves no half chain on screen beside its error.
       setPartial(null)
       setError(err.message)
+      /* And it goes in the ledger anyway. The model was asked, it thought, and
+         in some of these it answered — all of that was paid for, and until now
+         the error replaced the count along with everything else. */
+      noteSpend('design', err?.usage || null, { failed: err.message })
       // Nothing reached the unit, so asking again is safe to offer.
       setRetryAsk({ description, against, opts })
     } finally {
@@ -2816,8 +2846,7 @@ export default function App() {
       setSaveName(validated.presetName || preset?.name?.trim() || '')
       revealResult()
 
-      const runCost = costOf(validated.usage, validated.usage?.model)
-      if (runCost !== null) setSpend((p) => ({ total: p.total + runCost, runs: p.runs + 1 }))
+      noteSpend('refine', validated.usage)
 
       record('refine', `Adjusted: ${instruction}`, [
         `${countWrites(validated.changes)} changes proposed`,
@@ -2827,6 +2856,7 @@ export default function App() {
       // A run that failed leaves no half chain on screen beside its error.
       setPartial(null)
       setError(err.message)
+      noteSpend('refine', err?.usage || null, { failed: err.message })
     } finally {
       setProgress(null)
       setBusy(false)
@@ -2889,6 +2919,9 @@ export default function App() {
     setBusy(true)
     setError(null)
     setTurns((prev) => [...prev, { role: 'user', text: instruction }])
+    /* Whether this turn's tokens have already gone in the ledger. Anything that
+       throws AFTER the answer landed must not be written down a second time. */
+    let counted = false
 
     // Parameters are cached between turns, which is what makes conversation
     // quick. The cache cannot see a knob turned on the unit itself, so asking
@@ -3042,6 +3075,17 @@ export default function App() {
           }
         }
       )
+
+      /*
+       * Counted the moment it lands, before anything branches on what it says.
+       *
+       * Every chat turn has always come back with its own token count and the
+       * app read it into a field nothing looked at — so the money spent on the
+       * conversation was invisible, and a turn that went on to ask for a design
+       * would have lost the count at the next return even if something had.
+       */
+      noteSpend('chat', body?._usage || null)
+      counted = true
 
       /*
        * A tone description is not a list of changes. It gets designed and shown
@@ -3288,6 +3332,10 @@ export default function App() {
     } catch (err) {
       setError(err.message)
       setTurns((prev) => [...prev, { role: 'assistant', text: `That didn't work: ${err.message}` }])
+      /* A chat turn that died after the model had answered was still paid for,
+         and a turn that died before it started still spent the thinking. Both
+         go down, with no count where there is none to report. */
+      if (!counted) noteSpend('chat', null, { failed: err.message })
     } finally {
       setProgress(null)
       setBusy(false)
@@ -3767,15 +3815,17 @@ export default function App() {
             keep(shelved())
             setResult(null)
           }}
+          /*
+            What it cost, at the top where it is read.
+            It used to ride in with the trace, behind the fold and under the
+            whole diff. The trace is for when a tone surprises you; the price is
+            checked every run, and burying it made a number people wanted into
+            two taps and a long scroll.
+          */
+          cost={<Cost usage={result?.usage} sessionTotal={spend.total} runs={spend.runs} />}
         >
-          {/*
-            What it cost, and why it came out the way it did.
-            Both belong with the tone rather than beside it — and both belong
-            behind the same fold as the rest of the detail, because a chat that
-            answers a request with four stacked panels is the thing being fixed.
-          */}
-          <Cost usage={result?.usage} sessionTotal={spend.total} runs={spend.runs} />
-
+          {/* And why it came out the way it did, which does belong with the
+              detail rather than on the face of the card. */}
           {result?._trace || result?.spec ? (
             <DevTrace trace={result._trace} spec={result.spec} problems={result.problems} />
           ) : null}
@@ -3800,8 +3850,8 @@ export default function App() {
               sceneCount={entry.sceneCount}
               scene={entry.scene}
               outcome={entry.outcome}
+              cost={<Cost usage={entry.result.usage} />}
             >
-              <Cost usage={entry.result.usage} />
               {entry.result._trace || entry.result.spec ? (
                 <DevTrace
                   trace={entry.result._trace}
@@ -4157,6 +4207,25 @@ export default function App() {
         <div className="notice" data-kind="fault" role="alert">
           <h2>Didn&rsquo;t work</h2>
           <p>{error}</p>
+          {/*
+            What the run that just failed cost, because it cost something.
+            A model that was asked and thought about it has been paid for
+            whether or not a tone came back, and an error that says nothing
+            about it is the reason the app's own total kept coming in under the
+            bill. Where there is genuinely no count, it says that instead of
+            leaving a blank that reads as zero.
+          */}
+          {lastCall?.failed ? (
+            <p className="mono hint">
+              {lastCall.total === null || lastCall.total === undefined
+                ? 'No token count came back for that one — it is in Setup › Token usage as an uncounted call.'
+                : `That run used ${formatTokens(lastCall.fresh)} in · ${formatTokens(
+                    lastCall.output
+                  )} out${
+                    lastCall.cost === null ? '' : ` · ${formatCost(lastCall.cost)}`
+                  } — kept in Setup › Token usage.`}
+            </p>
+          ) : null}
           <div className="history-actions">
             {/*
               Asking again, without typing it again.
@@ -5039,6 +5108,26 @@ export default function App() {
         </Group>
 
         <Group key="ai" title="What the AI knows" note="What it learned from you">
+          {/*
+            What it has cost, kept across sessions and grouped the way the bill
+            is grouped.
+
+            "It's actually spending a lot more than what the app says." It was:
+            the session total counted designs and nothing else, so every message
+            on the Ask screen — the expensive ones, carrying the roster and the
+            whole transcript — spent money the screen never mentioned. A number
+            on a card that vanishes on reload cannot be checked against
+            anything; a ledger kept by UTC day can be put next to the console
+            and read straight across.
+          */}
+          <Section
+            key="token-usage"
+            title="Token usage"
+            note="Every call, by day — compare with your bill"
+          >
+            <TokenLog />
+          </Section>
+
           {/*
             What the app has worked out about you, and the switch to stop it.
 

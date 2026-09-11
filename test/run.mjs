@@ -7626,6 +7626,93 @@ test('the working line says what the model is deciding, not how much of it there
   )
 })
 
+import { recordUsage, readLedger, byDay, clearLedger, ledgerText, utcDay, MAX_ROWS } from '../src/lib/ledger.js'
+
+test('every call to the model is written down, and kept', () => {
+  /*
+   * "It's actually spending a lot more than what the app says."
+   *
+   * Two holes, and only one of them was arithmetic. The session total counted
+   * DESIGNS: every message on the Ask screen came back with its own token count
+   * and the app read it into a field nothing looked at — and those are the
+   * expensive ones, carrying the model roster AND the whole transcript, growing
+   * as the conversation runs. The other hole is a run that failed: the model
+   * was asked, it thought, and the error replaced the count along with
+   * everything else.
+   *
+   * So one row per call, kept across sessions, totalled by UTC day because that
+   * is how the console groups it — two columns that can be read straight
+   * across is the only way to find out whether the app's arithmetic is right,
+   * and it has been wrong twice already.
+   */
+  const store = fakeStore()
+  const sonnet = { inputTokens: 10000, outputTokens: 2000, cachedInputTokens: 6000, cacheWriteTokens: 1000, model: 'claude-sonnet-5' }
+
+  recordUsage('design', sonnet, {}, store)
+  recordUsage('chat', { ...sonnet, inputTokens: 4000, cachedInputTokens: 0, cacheWriteTokens: 0 }, {}, store)
+  const rows = readLedger(store)
+  assert.equal(rows.length, 2, 'a call went unrecorded')
+  assert.equal(rows[0].kind, 'design')
+  assert.equal(rows[1].kind, 'chat')
+  /* The buckets add up, same as the panel: fresh + cached + written is total. */
+  assert.equal(rows[0].fresh + rows[0].cached + rows[0].written, rows[0].total)
+  assert.ok(rows[0].cost > 0, 'a recorded call has no cost against it')
+
+  /*
+   * A failed call is still a row, with nothing where the numbers should be.
+   * It spent something; what it cannot say is how much, and a row saying so is
+   * what turns a gap against the bill into an explanation rather than a
+   * mystery.
+   */
+  recordUsage('design', null, { failed: 'Load failed' }, store)
+  const [day] = byDay(readLedger(store))
+  assert.equal(day.calls, 3)
+  assert.equal(day.unknown, 1, 'a call that reported nothing is counted as if it were free')
+  assert.equal(day.day, utcDay(), 'the day is not the UTC day the console groups by')
+  assert.deepEqual(day.kinds, { design: 2, chat: 1 })
+  assert.ok(day.models['claude-sonnet-5'].calls === 2, 'the per-model split is wrong')
+
+  /* And the day's totals never count the uncounted call as zero tokens. */
+  assert.equal(day.fresh, 3000 + 4000)
+  assert.equal(day.output, 4000)
+
+  /* Kept across sessions: a fresh read of the same store has all of it. */
+  assert.equal(readLedger(store).length, 3, 'the ledger does not survive a reload')
+  clearLedger(store)
+  assert.deepEqual(readLedger(store), [], 'clearing leaves rows behind')
+
+  /* Bounded, because localStorage is a few megabytes for the whole origin. */
+  for (let i = 0; i < MAX_ROWS + 40; i++) recordUsage('chat', sonnet, {}, store)
+  assert.equal(readLedger(store).length, MAX_ROWS, 'the ledger grows without limit')
+
+  /* Storage that says no is not worth failing a generation over. */
+  const refuses = { getItem: () => { throw new Error('blocked') }, setItem: () => { throw new Error('blocked') }, removeItem: () => {} }
+  assert.deepEqual(readLedger(refuses), [])
+  assert.ok(recordUsage('design', sonnet, {}, refuses).cost > 0, 'a blocked store loses the row entirely')
+
+  /* Copyable, and it says which clock the days are on. */
+  const text = ledgerText([
+    { at: Date.parse('2026-09-10T12:00:00Z'), kind: 'design', model: 'claude-sonnet-5', fresh: 1, cached: 2, written: 3, output: 4, total: 6, cost: 0.01 }
+  ])
+  assert.match(text, /UTC/, 'the copied usage does not say which day boundary it uses')
+  assert.match(text, /2026-09-10/)
+
+  /* And the app counts all three kinds, not designs alone. */
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  for (const kind of ['design', 'refine', 'chat']) {
+    assert.ok(
+      app.includes(`noteSpend('${kind}'`),
+      `${kind} calls are spent and never counted, which is how the app came in under the bill`
+    )
+  }
+  assert.ok(
+    !/setSpend\(\(prev\) => \(\{ total: prev\.total \+ runCost/.test(app),
+    'a run is still added to the total somewhere other than the one place that records it'
+  )
+  /* A chat turn that throws after the answer landed must not be written twice. */
+  assert.match(app, /if \(!counted\) noteSpend\('chat', null/, 'a failed chat turn is double-counted or not counted')
+})
+
 import { landedOf } from '../src/lib/actions.js'
 
 test('the log says what happened, not everything attempted plus everything refused', () => {
