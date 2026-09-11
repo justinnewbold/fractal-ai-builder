@@ -359,6 +359,14 @@ export default function App() {
    */
   const [lostUnit, setLostUnit] = useState(false)
   /*
+   * Whether the Mac itself stopped answering, and how many times the unit was
+   * asked before this was called a fault. Both are things the notice claimed
+   * to know and did not: it blamed the unit for a Mac that had gone quiet, and
+   * said "five times" over three asks and over one.
+   */
+  const [macSilent, setMacSilent] = useState(false)
+  const [asks, setAsks] = useState(0)
+  /*
    * Which sheet was over the screen when the message was raised, so the sheet
    * can show its own failures and none of anybody else's. A ref, updated in
    * render, because the one way in below is built once and would otherwise
@@ -787,10 +795,24 @@ export default function App() {
           role: link.role,
           device,
           unitGone: lostUnit,
+          macSilent,
+          asks,
           secure: typeof window !== 'undefined' && window.location.protocol === 'https:',
           userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : ''
         })
       : null
+  /*
+   * What came back, when the notice above has nothing specific to say.
+   *
+   * The three named cases — the unit gone, the Mac gone quiet, a Mac with
+   * nothing plugged into it — explain themselves, and repeating the message
+   * underneath them is noise. Everything else lands on the generic copy, and
+   * that is exactly where the one useful fact was being dropped: a screenshot
+   * of "your Mac answered, but the unit didn't" with no way to tell whether it
+   * was a timeout, a refusal, or something the Mac said.
+   */
+  const faultWhy =
+    status === 'fault' && !lostUnit && !macSilent && device?.connected !== false ? error : null
   // Where "Leave gig" returns to. Gig takes the screen over, so coming back out
   // should land where you were rather than at a fixed default.
   const [runningPlan, setRunningPlan] = useState(false)
@@ -1162,23 +1184,42 @@ export default function App() {
        * at six seconds.
        */
       if (remoteActive() && !remoteHostSeen() && !(await hostResponds())) {
+        /*
+         * Nobody has asked the unit anything, so nothing may be said about it.
+         *
+         * This used to set the fault and leave `device` holding whatever the
+         * last good detect found — which the notice reads as "the Mac answered
+         * and the unit didn't". The Mac did not answer. It is the other end of
+         * the room, and pointing at the wrong one costs a set.
+         */
+        setDevice(null)
+        setMacSilent(true)
+        setAsks(0)
         setStatus('fault')
         return null
       }
+      setMacSilent(false)
       /*
        * A no from a unit that was answering a moment ago is confirmed before
        * it is believed. Next tells the unit to load a preset and reads back
        * immediately; on real hardware that read lands while the unit is still
        * busy, and the answer is "no unit". See confirmedDetect.
        */
+      let asked = 0
       const info = await confirmedDetect({
         detect,
         wait: (ms) => new Promise((go) => setTimeout(go, ms)),
         wasLive: liveRef.current,
         /* A phone's first no is the least trustworthy answer in the app —
            the handshake races the Mac's own polling. See RELAY_TRIES. */
-        remote: remoteActive()
+        remote: remoteActive(),
+        // Counted rather than assumed, because the notice says the number out
+        // loud and it is not always five.
+        onAsk: (n) => {
+          asked = n
+        }
       })
+      setAsks(asked)
       setDevice(info)
       if (!info?.connected) {
         setStatus('fault')
@@ -1311,7 +1352,19 @@ export default function App() {
        * try again did nothing. Refreshing browser reconnect." A reload worked
        * because a reload rebuilds the channel BEFORE reading.
        */
-      if (linkState().role === 'remote') await reconnectPhone()
+      /*
+       * On a NEW socket, not the one that is already there.
+       *
+       * "I have to force close the app completely and then reopen it for it to
+       * connect again." A force-quit's only power is that it rebuilds every
+       * piece, and the channel was the piece a reconnect kept: realtime-js
+       * still called it joined, so it was handed back unchanged and this read
+       * went down the same dead line as the last one. A socket the phone
+       * believes in and the server has let go of cannot be told from a working
+       * one from in here — so the button stops trying to tell and just asks
+       * for a new one.
+       */
+      if (linkState().role === 'remote') await reconnectPhone({ fresh: true })
     } catch {
       // A rejoin that failed still leaves the read below to say so plainly.
     }
@@ -4502,6 +4555,7 @@ export default function App() {
         <div className="notice" data-kind="fault">
           <h2>{fault.title}</h2>
           <p>{fault.body}</p>
+          {faultWhy ? <p className="hint">What came back: {faultWhy}</p> : null}
           <p>
             {/*
               The label moves, because this button takes several seconds and

@@ -251,7 +251,27 @@ export function whySafari({ secure, userAgent }) {
  * known it means nothing yet, and nothing is what to say — the old notice
  * told every phone to open an app on "this Mac" and try Chrome.
  */
-export function faultCopy({ role, device, secure = false, userAgent = '', unitGone = false }) {
+/**
+ * A count in words, because "It asked 5 times" is a receipt, not a sentence.
+ *
+ * Only as far as a phone can count to here — five asks is the most anything
+ * makes — and anything outside that falls back to the number itself rather
+ * than inventing a word for it.
+ */
+const TIMES = ['', 'once', 'twice', 'three times', 'four times', 'five times']
+
+export const timesWord = (n) => (Number.isInteger(n) && n > 0 ? TIMES[n] || `${n} times` : '')
+
+export function faultCopy({
+  role,
+  device,
+  secure = false,
+  userAgent = '',
+  unitGone = false,
+  macSilent = false,
+  /* How many times the unit was actually asked, so the notice can say. */
+  asks = 0
+}) {
   /*
    * The unit was there a minute ago and now nothing reaches it.
    *
@@ -274,6 +294,23 @@ export function faultCopy({ role, device, secure = false, userAgent = '', unitGo
       body: 'The Fractal app is running but nothing it sends is reaching the unit. Check the unit is switched on and its cable is in, and that nothing else is using it, then tap Try again.'
     }
   }
+  /*
+   * The Mac stopped answering, and the notice blamed the unit for it.
+   *
+   * The health probe at the top of a read is the one that catches this: the
+   * phone is still on the channel, the chip is still green from the last
+   * answer, and the Fractal app at the other end has gone quiet — asleep,
+   * closed, or on a socket the server let go of. With no answer there is
+   * nothing that can be said about the unit at all, and what was said was
+   * "your Mac answered, but the unit didn't" — the wrong end of the room, in
+   * so many words.
+   */
+  if (macSilent) {
+    return {
+      title: 'Your Mac has gone quiet',
+      body: 'The phone is still on the line but the Fractal app on your Mac has stopped answering it. Check the Mac is awake and the app is still open, then tap Try again — that now builds the connection again from scratch, which is what closing and reopening this app used to be for.'
+    }
+  }
   if (device && device.connected === false) {
     /*
      * The one a phone actually sees, and the one that was lying.
@@ -290,9 +327,12 @@ export function faultCopy({ role, device, secure = false, userAgent = '', unitGo
      * cable.
      */
     if (role === 'remote') {
+      const said = timesWord(asks)
       return {
         title: 'The Mac can’t see your unit',
-        body: 'It asked five times over a few seconds and got no answer. At the Mac: check the unit is on and plugged in, and that nothing else is talking to it — another editor, or a second copy of the Fractal app.'
+        body: `${
+          said ? `It asked ${said} over a few seconds and got no answer.` : 'It asked and got no answer.'
+        } At the Mac: check the unit is on and plugged in, and that nothing else is talking to it — another editor, or a second copy of the Fractal app.`
       }
     }
     return {
@@ -415,12 +455,12 @@ let booted = false
 const device = () => import('./forgefx.js')
 
 /** Join the Mac's channel and find out whether it is there. */
-async function join() {
+async function join({ fresh = false } = {}) {
   if (joining) return
   joining = true
   refresh()
   try {
-    await remoteConnect()
+    await remoteConnect({ fresh })
     await hostResponds()
   } catch {
     // The far end may simply be off. The loop below keeps asking; this is
@@ -741,15 +781,25 @@ export async function connectPhone({ email, password }) {
   return state
 }
 
-/** Connect again with the sign-in already here. */
-export async function reconnectPhone() {
+/**
+ * Connect again with the sign-in already here.
+ *
+ * `fresh` throws the socket away and joins on a new one, which is what Try
+ * again asks for: "I have to force close the app completely and then reopen it
+ * for it to connect again." A force-quit's only power is that it rebuilds
+ * everything, and the channel was the one piece a reconnect kept — it looked
+ * joined, so it was handed back unchanged, and the button re-read the unit
+ * down the same dead line every time. The automatic keepalive still reuses a
+ * good channel; only a person pressing the button pays for a new one.
+ */
+export async function reconnectPhone({ fresh = false } = {}) {
   setAutoConnect(true)
   if (!state.account) {
     const config = loadRemoteConfig()
     await restoreSession({ url: config?.url, anonKey: config?.anonKey })
     set({ account: await currentAccount() })
   }
-  await join()
+  await join({ fresh })
   schedule(state.link === 'connected' ? KEEPALIVE : PROBE_FIRST)
   return state
 }

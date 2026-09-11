@@ -4149,9 +4149,52 @@ test('Try again rejoins before it reads, which is all a reload ever did', () => 
    */
   const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
   const fn = app.slice(app.indexOf('const reconnect = useCallback'), app.indexOf('const linkAction = useCallback'))
-  assert.match(fn, /await reconnectPhone\(\)/, 'the button asks for a rejoin it does not wait for')
-  assert.ok(fn.indexOf('await reconnectPhone()') < fn.indexOf('await read()'), 'the read still runs before the rejoin')
+  assert.match(fn, /await reconnectPhone\(\{ fresh: true \}\)/, 'the button asks for a rejoin it does not wait for')
+  assert.ok(
+    fn.indexOf('await reconnectPhone({ fresh: true })') < fn.indexOf('await read()'),
+    'the read still runs before the rejoin'
+  )
   assert.ok(!/pokeLink\(\)/.test(fn), 'a scheduled poke is not a reconnection')
+})
+
+test('Try again asks for a new socket, which is the rest of what a force-quit did', async () => {
+  /*
+   * "I have to force close the app completely and then reopen it for it to
+   * connect again." Rejoining before the read fixed the case where the socket
+   * had visibly closed. This is the other one: a socket realtime-js still
+   * calls joined that the server let go of long ago. Nothing in here can tell
+   * that from a working link — the phone sends into it and simply hears
+   * nothing — so a reconnect that reuses "a channel that looks fine" reads
+   * down the same dead line every time, and only killing the app ever helped.
+   *
+   * The keepalive still reuses a good channel: it runs every few seconds and
+   * a teardown on each turn would be a link that never settles.
+   */
+  const remoteMod = await import('../src/lib/remote.js')
+  const chan = { state: 'joined' }
+  const client = {}
+  assert.equal(remoteMod.canReuseChannel(chan, { client }, client), true, 'a joined channel stopped being reusable')
+
+  const remoteSrc = readSrc(new URL('../src/lib/remote.js', import.meta.url), 'utf8')
+  assert.match(
+    remoteSrc,
+    /export async function remoteConnect\(\{ fresh = false \} = \{\}\)/,
+    'connect cannot be asked for a new socket'
+  )
+  assert.match(
+    remoteSrc,
+    /if \(!fresh && canReuseChannel\(channel, session, client\)\) return userId/,
+    'a forced rejoin is still handed the channel it was trying to replace'
+  )
+
+  const linkSrc = readSrc(new URL('../src/lib/link.js', import.meta.url), 'utf8')
+  assert.match(linkSrc, /async function join\(\{ fresh = false \} = \{\}\)/)
+  assert.match(linkSrc, /await remoteConnect\(\{ fresh \}\)/, 'the flag stops at the door')
+  const at = linkSrc.indexOf('async function tick()')
+  assert.notEqual(at, -1, 'the keepalive loop is gone, so nothing here is being checked')
+  const loop = linkSrc.slice(at, at + 900)
+  assert.match(loop, /await join\(\)/, 'the loop no longer joins at all')
+  assert.ok(!/join\(\{/.test(loop), 'the keepalive tears the link down every few seconds')
 })
 
 test('a poke asks now, not in three seconds', () => {
@@ -5128,9 +5171,24 @@ test('the fault notice speaks to the end it is on', () => {
   for (const role of ['mac', 'wifi']) {
     assert.equal(link.faultCopy({ role, device: { connected: false } }).title, 'No unit found')
   }
-  const noUnit = link.faultCopy({ role: 'remote', device: { connected: false } })
+  const noUnit = link.faultCopy({ role: 'remote', device: { connected: false }, asks: 5 })
   assert.match(noUnit.title, /can’t see your unit/, 'a phone is still told to check a cable it cannot reach')
-  assert.match(noUnit.body, /five times/, 'a phone is not told the asking already happened')
+  assert.match(noUnit.body, /asked five times/, 'a phone is not told the asking already happened')
+  /*
+   * And the number is the number it actually asked. Five is what a phone that
+   * was not already live does; a unit that WAS answering a moment ago gets
+   * three, and a screen at the Mac gets one — so the same "five times" was
+   * being shown over two asks that never happened.
+   */
+  assert.match(
+    link.faultCopy({ role: 'remote', device: { connected: false }, asks: 3 }).body,
+    /asked three times/
+  )
+  assert.match(link.faultCopy({ role: 'remote', device: { connected: false }, asks: 1 }).body, /asked once/)
+  assert.ok(
+    !/times/.test(link.faultCopy({ role: 'remote', device: { connected: false } }).body),
+    'a count nobody counted is still stated as fact'
+  )
   assert.ok(
     !/tap Try again/.test(noUnit.body),
     'Try again is offered as the fix for the thing that just failed five times'
@@ -5152,6 +5210,22 @@ test('a Mac that has lost the unit says so, rather than blaming the link', () =>
   assert.ok(
     !/Mac is off|open the Fractal app on your Mac/i.test(phone.body),
     'the Mac answering is what raised this — it cannot also be the thing to fix'
+  )
+
+  /*
+   * And the Mac going quiet is not the unit going quiet. The health probe at
+   * the top of a read catches this one: nothing has asked the unit anything,
+   * so nothing may be said about it.
+   */
+  const quiet = link.faultCopy({ role: 'remote', macSilent: true })
+  assert.match(quiet.title, /Mac has gone quiet/)
+  assert.match(quiet.body, /Try again/)
+  assert.ok(!/the unit didn’t|no Fractal/.test(quiet.body), 'a unit nobody asked was blamed anyway')
+  // It wins over the stale device the last good read left behind, which is
+  // what used to put "your Mac answered" on a screen the Mac never answered.
+  assert.match(
+    link.faultCopy({ role: 'remote', device: { connected: true }, macSilent: true }).title,
+    /gone quiet/
   )
 
   const here = link.faultCopy({ role: 'mac', unitGone: true })

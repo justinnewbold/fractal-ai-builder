@@ -238,7 +238,18 @@ export async function confirmedDetect({
   remote = false,
   tries = SETTLE_TRIES,
   relayTries = RELAY_TRIES,
-  gap = SETTLE_MS
+  gap = SETTLE_MS,
+  /*
+   * How many times it has now asked, as it asks.
+   *
+   * The notice a phone gets says the unit was asked five times, because five
+   * is what a phone that was not already live does. A unit that WAS answering
+   * a moment ago gets three, and a screen at the Mac gets one — so the same
+   * sentence was being shown over two asks it never made. Counted rather than
+   * assumed, and reported as it goes so a failure on the third ask still knows
+   * it was the third.
+   */
+  onAsk
 }) {
   const attempts = wasLive ? Math.max(1, tries) : remote ? Math.max(1, relayTries) : 1
   let info = null
@@ -246,6 +257,7 @@ export async function confirmedDetect({
 
   for (let i = 0; i < attempts; i++) {
     if (i) await wait(gap)
+    onAsk?.(i + 1)
     try {
       info = await detect()
       failure = null

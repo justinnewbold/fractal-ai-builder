@@ -1509,11 +1509,18 @@ export function run(test) {
     assert.match(remote, /autoConnect !== false/, 'a sign-in no longer means "stay connected" by default')
 
     // The six-second bound before a dead relay is allowed to hang read().
-    assert.match(
-      src,
-      /if \(remoteActive\(\) && !remoteHostSeen\(\) && !\(await hostResponds\(\)\)\) \{\s*\n\s*setStatus\('fault'\)/,
-      'read() no longer bounds a dead relay — every call waits out 20–45 s before admitting the fault'
-    )
+    const bound = src.indexOf('if (remoteActive() && !remoteHostSeen() && !(await hostResponds()))')
+    assert.notEqual(bound, -1, 'read() no longer bounds a dead relay — every call waits out 20–45 s before admitting the fault')
+    const admits = src.slice(bound, bound + 900)
+    assert.match(admits, /setStatus\('fault'\)/, 'a relay that answers nothing no longer ends in a fault')
+    /*
+     * And it says which end went quiet. With no answer from the Mac there is
+     * nothing to be said about the unit, and the notice was saying "your Mac
+     * answered, but the unit didn't" off a `device` left over from the last
+     * good read.
+     */
+    assert.match(admits, /setDevice\(null\)/, 'the notice still speaks from a stale device')
+    assert.match(admits, /setMacSilent\(true\)/, 'nothing tells the notice which end stopped answering')
 
     // The phone gets a connect screen, not an error; the Mac keeps the notice.
     assert.match(src, /const showConnect =\s*\n\s*link\.role === 'remote' &&/, 'the connect screen is no longer keyed to the phone role')
