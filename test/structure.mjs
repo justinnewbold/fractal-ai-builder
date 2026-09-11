@@ -681,6 +681,35 @@ export function run(test) {
     assert.ok(!/text-transform/.test(rule), 'the group headings are uppercased in CSS instead')
   })
 
+  test('no price note outlives the date it promises', () => {
+    /*
+     * "Recheck current pricing for sonnet 5 as August 31st is gone."
+     *
+     * The rates table carried `note: 'promotional through 31 Aug 2026, then
+     * $3/$15'`, printed under every cost figure in the app. The date passed —
+     * and the rise it warned about was then cancelled, so the sentence was
+     * wrong twice over while still being shown to a player.
+     *
+     * A note that names a date is a note with an expiry on it. This is the
+     * alarm clock: it starts failing the day the date does, whether the price
+     * changed or not, which is the day somebody has to go and look.
+     */
+    const cost = readFileSync(new URL('../src/lib/cost.js', import.meta.url), 'utf8')
+    const table = cost.slice(cost.indexOf('const RATES = {'), cost.indexOf('}', cost.indexOf('const RATES = {')))
+    assert.ok(table.includes("'claude-sonnet-5'"), 'the rates table has moved')
+
+    const months =
+      'jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec'
+    const stale = []
+    for (const [, note] of table.matchAll(/note: '([^']*)'/g)) {
+      const dated = note.match(new RegExp(`(\\d{1,2})\\s+(${months})[a-z]*\\s+(\\d{4})`, 'i'))
+      if (!dated) continue
+      const when = new Date(`${dated[1]} ${dated[2]} ${dated[3]} 23:59:59 UTC`)
+      if (when < new Date()) stale.push(`${note} — that date has passed`)
+    }
+    assert.deepEqual(stale, [], `price notes past their date:\n  ${stale.join('\n  ')}`)
+  })
+
   test('every panel and every sheet is closed', () => {
     // SectionStack is gone with the drag-to-reorder it existed for; what is
     // left is the pairing, which a bad splice still breaks.

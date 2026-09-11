@@ -59,6 +59,20 @@ export const LEVEL_FLOOR = 0.2
  * Measured from where the control sits now rather than from the middle of its
  * range, because "a bit louder" means a bit louder than this, and a level that
  * has been set low on purpose should not be dragged back to the centre.
+ *
+ * The two ends used to be worked out independently, and on a control already at
+ * the very bottom of its range they crossed over: a Drive Level sitting at 0 of
+ * 0-10 produced a floor of 2 and a ceiling of 1.5, so nothing at all could be
+ * written and the rejection read "5 is outside 2 to 1.5" — a range with no
+ * numbers in it. Worse than the nonsense sentence was what it meant: a level at
+ * the bottom is exactly the one a preset needs raised, and this was the rule
+ * that made it the one value that could never move.
+ *
+ * So the window always contains where the control already sits, and it always
+ * reaches at least far enough to lift a level clear of the bottom in one go.
+ * Both ends still only ever bound a raise when a level starts down there; there
+ * is no value of anything here that lets a write make a block quieter than the
+ * player already had it.
  */
 export function levelLimits(param) {
   if (!param || !isLevelParam(param.name)) return null
@@ -67,9 +81,19 @@ export function levelLimits(param) {
   if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return null
   const span = max - min
   const now = Number.isFinite(Number(param.value)) ? Number(param.value) : min + span / 2
+
+  const bottom = min + span * LEVEL_FLOOR
+  const nudge = span * LEVEL_MOVE
+
   return {
-    floor: Math.max(min + span * LEVEL_FLOOR, now - span * LEVEL_MOVE),
-    ceiling: Math.min(max, now + span * LEVEL_MOVE)
+    /* Never above where the control already is. A level the player has set
+       below the bottom is theirs to keep; the window simply stops offering
+       anything lower. */
+    floor: Math.min(Math.max(bottom, now - nudge), now),
+    /* And never below it either — plus enough reach to clear the bottom in one
+       write, because climbing out a nudge at a time is four refused requests to
+       fix a preset that makes no sound. */
+    ceiling: Math.min(max, Math.max(now, now + nudge, bottom))
   }
 }
 

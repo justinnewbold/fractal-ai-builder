@@ -6,11 +6,16 @@
  * the preset. That makes cost per generation much less obvious than it looks.
  *
  * Rates are per million tokens, input/output. Verified against published
- * Anthropic pricing, August 2026.
+ * Anthropic pricing, September 2026.
+ *
+ * Sonnet's $2/$10 launched as an introductory rate due to end on 31 Aug 2026
+ * and rise to $3/$15. It did not: Anthropic made $2/$10 the standard price and
+ * cancelled the increase. The line that promised the rise is gone rather than
+ * re-dated — there is no rise to warn about.
  */
 
 const RATES = {
-  'claude-sonnet-5': { in: 2, out: 10, note: 'promotional through 31 Aug 2026, then $3/$15' },
+  'claude-sonnet-5': { in: 2, out: 10 },
   'claude-opus-5': { in: 5, out: 25 },
   'claude-haiku-4-5': { in: 1, out: 5 },
   'claude-fable-5': { in: 10, out: 50 },
