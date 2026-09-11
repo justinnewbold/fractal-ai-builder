@@ -165,7 +165,8 @@ import {
   signOutHere,
   recheckHosts,
   chooseHost,
-  faultCopy
+  faultCopy,
+  nextDelay
 } from './lib/link'
 import { keepAwake } from './lib/awake'
 import { loadSession, saveSession, interrupted } from './lib/session'
@@ -303,6 +304,20 @@ const HAND_EDIT_KINDS = new Set([
 
 export default function App() {
   const [status, setStatus] = useState('idle')
+  /*
+   * Which of the ways a read can fail this one was.
+   *
+   * 'no-unit' — the Mac answered and nothing is plugged into it.
+   * 'no-answer' — the question never came back.
+   * 'unreadable' — the Mac answered and the read failed anyway.
+   *
+   * The screen used to work this out from `device`, which cannot tell the
+   * first from the other two: a question that never came back leaves `device`
+   * exactly as it was, and before the first answer of the session that is
+   * null — the same null a fresh phone starts with. So a Mac that had gone
+   * quiet was described as a Mac that had answered. See faultCopy.
+   */
+  const [faultReason, setFaultReason] = useState(null)
   const [device, setDevice] = useState(null)
   /*
    * The unit's own state comes from the store, not from here.
@@ -359,12 +374,13 @@ export default function App() {
    */
   const [lostUnit, setLostUnit] = useState(false)
   /*
-   * Whether the Mac itself stopped answering, and how many times the unit was
-   * asked before this was called a fault. Both are things the notice claimed
-   * to know and did not: it blamed the unit for a Mac that had gone quiet, and
-   * said "five times" over three asks and over one.
+   * How many times the unit was actually asked before this was called a fault.
+   *
+   * The notice said "five times" whatever happened. Five is what a phone that
+   * was not already live does; a unit that WAS answering a moment ago is asked
+   * three times and a screen at the Mac once, so the same sentence was being
+   * shown over two asks that never happened. See faultCopy.
    */
-  const [macSilent, setMacSilent] = useState(false)
   const [asks, setAsks] = useState(0)
   /*
    * Which sheet was over the screen when the message was raised, so the sheet
@@ -794,8 +810,7 @@ export default function App() {
       ? faultCopy({
           role: link.role,
           device,
-          unitGone: lostUnit,
-          macSilent,
+          reason: faultReason,
           asks,
           secure: typeof window !== 'undefined' && window.location.protocol === 'https:',
           userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : ''
@@ -812,7 +827,7 @@ export default function App() {
    * was a timeout, a refusal, or something the Mac said.
    */
   const faultWhy =
-    status === 'fault' && !lostUnit && !macSilent && device?.connected !== false ? error : null
+    status === 'fault' && (faultReason === null || faultReason === 'unreadable') ? error : null
   // Where "Leave gig" returns to. Gig takes the screen over, so coming back out
   // should land where you were rather than at a fixed default.
   const [runningPlan, setRunningPlan] = useState(false)
@@ -926,6 +941,7 @@ export default function App() {
    */
   useEffect(() => {
     if (!lostUnit) return
+    setFaultReason('unit-gone')
     setStatus('fault')
     setSheet(null)
   }, [lostUnit])
@@ -1184,21 +1200,13 @@ export default function App() {
        * at six seconds.
        */
       if (remoteActive() && !remoteHostSeen() && !(await hostResponds())) {
-        /*
-         * Nobody has asked the unit anything, so nothing may be said about it.
-         *
-         * This used to set the fault and leave `device` holding whatever the
-         * last good detect found — which the notice reads as "the Mac answered
-         * and the unit didn't". The Mac did not answer. It is the other end of
-         * the room, and pointing at the wrong one costs a set.
-         */
-        setDevice(null)
-        setMacSilent(true)
-        setAsks(0)
+        setFaultReason('no-answer')
         setStatus('fault')
+        // Nothing has asked the unit anything, so the notice must not say how
+        // many times it did.
+        setAsks(0)
         return null
       }
-      setMacSilent(false)
       /*
        * A no from a unit that was answering a moment ago is confirmed before
        * it is believed. Next tells the unit to load a preset and reads back
@@ -1222,6 +1230,7 @@ export default function App() {
       setAsks(asked)
       setDevice(info)
       if (!info?.connected) {
+        setFaultReason('no-unit')
         setStatus('fault')
         setError('Your Mac is connected, but no Fractal is plugged into it.')
         return
@@ -1236,6 +1245,7 @@ export default function App() {
       setPreset(p)
       const list = Array.isArray(b) ? b : []
       setBlocks(list)
+      setFaultReason(null)
       setStatus('live')
       // The unit answered, so whatever was lost is back.
       setLostUnit(false)
@@ -1304,6 +1314,23 @@ export default function App() {
       // which notice this becomes, and a string cannot carry it.
       if (answered && liveRef.current) setError(err)
       else {
+        /*
+         * A relay that dropped is not a unit that went. `linkDown` is set by
+         * remote.js on every failure that never left the phone, and that is
+         * the whole difference between "your Mac stopped answering" and "the
+         * unit wouldn't read" — two sentences that send someone to two
+         * different rooms.
+         */
+        setFaultReason(
+          // A Mac with no port to the unit says so outright, and that is more
+          // specific than either of the two below: not "the read failed" but
+          // "there is nothing at the other end of the cable to read".
+          err?.unitGone
+            ? 'unit-gone'
+            : err?.linkDown || /didn’t answer|didn't answer/i.test(err?.message || '')
+              ? 'no-answer'
+              : 'unreadable'
+        )
         setStatus('fault')
         setError(err)
       }
@@ -2039,8 +2066,59 @@ export default function App() {
    * the Mac answering sets it live again.
    */
   useEffect(() => {
-    if (showConnect && status === 'live') setStatus('fault')
+    if (showConnect && status === 'live') {
+      // The connect screen is only up while the Mac is not answering, so that
+      // is what this fault is — not a unit that went missing.
+      setFaultReason('no-answer')
+      setStatus('fault')
+    }
   }, [showConnect, status])
+
+  /*
+   * A fault keeps looking, instead of waiting to be tapped.
+   *
+   * "This keeps saying I'm not connected, but yet the Mac app says I am
+   * connected to the remote." It kept saying it because nothing ever asked
+   * again. One read runs when the Mac first answers, and if that read loses a
+   * race — the port busy with the Mac's own polling, a preset still loading,
+   * one relay message that went astray — the red notice is where the phone
+   * stays. The link is up, so the effect above never fires again; the only way
+   * out is the Try again button, and the reason that button "works on the
+   * fifth or sixth tap" is that tapping is the only thing still asking.
+   *
+   * So the asking carries on by itself, backing off the way the Mac probe
+   * does: three seconds, then six, then twelve, up to every thirty. A rig that
+   * comes good comes back on its own, with nothing in anyone's hand.
+   *
+   * Not while the connect screen is up (that screen does its own asking and
+   * says so), and not in the demo, which has nothing to ask.
+   */
+  useEffect(() => {
+    if (isDemo() || status !== 'fault' || showConnect) return undefined
+    let live = true
+    let timer = null
+    let delay = 0
+    const again = () => {
+      delay = nextDelay(delay)
+      timer = setTimeout(async () => {
+        if (!live) return
+        try {
+          await read()
+        } catch {
+          // read() reports through status and error; a throw here is nothing
+          // extra to say, and must not stop the next attempt.
+        }
+        // A read that worked left status 'live' and this effect is already
+        // torn down; getting here means it did not.
+        if (live) again()
+      }, delay)
+    }
+    again()
+    return () => {
+      live = false
+      clearTimeout(timer)
+    }
+  }, [status, showConnect, read])
 
   /*
    * A relay that comes and goes, followed rather than assumed.
@@ -4487,6 +4565,7 @@ export default function App() {
       <TopBar
         status={status}
         device={device}
+        faultReason={faultReason}
         preset={preset}
         dirty={dirty}
         presetsOpen={presetMenu}
@@ -4584,6 +4663,13 @@ export default function App() {
               Try the demo
             </button>
           </p>
+          {/*
+            Said, because it is now true and nobody could tell. The screen goes
+            on asking every few seconds and comes back by itself; without this
+            line it looks like the same dead red notice it was when the only
+            thing still asking was a thumb.
+          */}
+          <p className="notice-note">Still checking every few seconds — this comes back on its own.</p>
         </div>
       ) : null}
 

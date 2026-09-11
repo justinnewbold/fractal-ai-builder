@@ -5265,50 +5265,73 @@ test('the fault notice speaks to the end it is on', () => {
   )
 })
 
-test('a Mac that has lost the unit says so, rather than blaming the link', () => {
+test('a Mac that answered and has no port to the unit says exactly that', () => {
   /*
    * "When I tap one of the buttons it will turn it off on the unit, but
    * there's no way to turn it back on, and the buttons always say on." The
-   * Mac was answering fine — it was the Mac's own port to the unit that had
-   * gone, so every notice about reaching the Mac would have sent him to check
-   * the one thing that was working.
+   * Mac was answering fine — every call came back, and what came back was
+   * `port not open`. So it is neither a Mac that went quiet nor a read that
+   * lost a race: there is nothing at the end of the cable to read, and it is
+   * the one fault that means what is on screen can no longer be trusted.
    */
-  const phone = link.faultCopy({ role: 'remote', unitGone: true })
+  const phone = link.faultCopy({ role: 'remote', reason: 'unit-gone' })
   assert.match(phone.title, /lost the unit/i)
   assert.match(phone.body, /At the Mac/, 'the phone was not told which end to go to')
-  assert.match(phone.body, /Try again/)
   assert.ok(
-    !/Mac is off|open the Fractal app on your Mac/i.test(phone.body),
+    !/stopped answering|hasn’t gone to sleep/i.test(phone.body),
     'the Mac answering is what raised this — it cannot also be the thing to fix'
   )
 
-  /*
-   * And the Mac going quiet is not the unit going quiet. The health probe at
-   * the top of a read catches this one: nothing has asked the unit anything,
-   * so nothing may be said about it.
-   */
-  const quiet = link.faultCopy({ role: 'remote', macSilent: true })
-  assert.match(quiet.title, /Mac has gone quiet/)
-  assert.match(quiet.body, /Try again/)
-  assert.ok(!/the unit didn’t|no Fractal/.test(quiet.body), 'a unit nobody asked was blamed anyway')
-  // It wins over the stale device the last good read left behind, which is
-  // what used to put "your Mac answered" on a screen the Mac never answered.
-  assert.match(
-    link.faultCopy({ role: 'remote', device: { connected: true }, macSilent: true }).title,
-    /gone quiet/
-  )
-
-  const here = link.faultCopy({ role: 'mac', unitGone: true })
+  const here = link.faultCopy({ role: 'mac', reason: 'unit-gone' })
   assert.match(here.title, /Lost the unit/)
   assert.ok(!/At the Mac/.test(here.body), 'the Mac was told to go to the Mac it is already at')
 
-  // It wins over the unit's own "not connected", which is the same fault
-  // caught a moment later, and never fires on its own.
-  assert.equal(
-    link.faultCopy({ role: 'remote', device: { connected: false }, unitGone: true }).title,
-    'Your Mac has lost the unit'
+  // It wins over a stale device, the same way every other reason does.
+  assert.match(
+    link.faultCopy({ role: 'remote', reason: 'unit-gone', device: { connected: true, short: 'AM4' } }).title,
+    /lost the unit/i
   )
-  assert.match(link.faultCopy({ role: 'remote', device: { connected: false } }).title, /can’t see your unit/)
+})
+
+/*
+ * "This keeps saying I'm not connected, but yet the Mac app says I am
+ * connected to the remote." Both screens were drawn from one fault with three
+ * quite different things behind it, and only one of them is about the rig.
+ */
+test('a question that never came back is not blamed on the unit', () => {
+  const gone = link.faultCopy({ role: 'remote', reason: 'no-answer' })
+  assert.match(gone.title, /stopped answering/, 'a silent Mac is still described as a Mac that answered')
+  assert.ok(
+    !/plugged in|cable|unit is on/i.test(gone.body),
+    'a phone is sent to check a cable when it was the Mac that went quiet'
+  )
+
+  const unread = link.faultCopy({ role: 'remote', reason: 'unreadable' })
+  assert.match(unread.title, /wouldn’t read/)
+  assert.match(unread.body, /holding the port|another editor/, 'the likely cause is not named')
+
+  /*
+   * The reason wins over a stale `device`, which is the whole bug: the object
+   * left over from the last good answer said "connected", and the notice read
+   * it as proof this answer had happened too.
+   */
+  const stale = link.faultCopy({ role: 'remote', reason: 'no-answer', device: { connected: true, short: 'AM4' } })
+  assert.match(stale.title, /stopped answering/)
+
+  // And a Mac that really did answer "nothing here" still says so.
+  assert.match(
+    link.faultCopy({ role: 'remote', reason: 'no-unit', device: { connected: false } }).title,
+    /can’t see your unit/
+  )
+})
+
+test('the bar names what is missing, not always the unit', () => {
+  const bar = (reason) =>
+    link.describeUnit({ role: 'remote', link: 'connected', status: 'fault', reason }).unit
+  assert.equal(bar('no-answer'), 'No answer', 'a silent Mac reads as an empty rig')
+  assert.equal(bar('unreadable'), 'Can’t read')
+  assert.equal(bar('no-unit'), 'No unit')
+  assert.equal(bar(null), 'No unit', 'the old reading stands where no reason was given')
 })
 
 test('a phone restoring its sign-in reads as connecting, never as signed out', () => {

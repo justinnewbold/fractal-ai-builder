@@ -212,13 +212,26 @@ export function describeLink(state) {
  * no unit — "No unit", in red, because there is a red notice under it saying
  * the same and a cable the player can go and check.
  */
-export function describeUnit({ demo, role, status, device, link }) {
+export function describeUnit({ demo, role, status, device, link, reason = null }) {
   const remote = role === 'remote'
   const linkUp = link === 'connected'
   const named = device?.short || device?.name || 'Connected'
 
   if (remote && status !== 'live') {
-    const unit = linkUp ? (status === 'fault' ? 'No unit' : 'Looking…') : 'Not connected'
+    /*
+     * "No unit" is a claim about the rig, and the bar was making it about a
+     * question that never got an answer.
+     *
+     * A phone reads "NO UNIT" in red while the Mac in the next room has the
+     * AM4 on screen and says CONNECTED. Both were drawn from the same fault,
+     * and the fault had two quite different causes behind it: the Mac
+     * answering "nothing is plugged in", and the Mac not answering the
+     * question at all. Only the first is about the unit. The second is about
+     * the line to the Mac, and saying "No unit" about it sends someone to
+     * check a cable that was never the problem.
+     */
+    const missing = reason === 'no-answer' ? 'No answer' : reason === 'unreadable' ? 'Can’t read' : 'No unit'
+    const unit = linkUp ? (status === 'fault' ? missing : 'Looking…') : 'Not connected'
     return { unit, lamp: demo ? 'demo' : linkUp ? status : 'idle' }
   }
   const unit = status === 'live' ? named : status === 'fault' ? 'No device' : 'Looking…'
@@ -265,50 +278,58 @@ export const timesWord = (n) => (Number.isInteger(n) && n > 0 ? TIMES[n] || `${n
 export function faultCopy({
   role,
   device,
+  reason = null,
   secure = false,
   userAgent = '',
-  unitGone = false,
-  macSilent = false,
   /* How many times the unit was actually asked, so the notice can say. */
   asks = 0
 }) {
   /*
-   * The unit was there a minute ago and now nothing reaches it.
+   * The reason comes first, because the two failures it separates were being
+   * told apart by a variable that cannot tell them apart.
    *
-   * First, because it is the most specific thing anyone knows: the Mac is
-   * answering (its refusal is what raised this), so every branch below that
-   * talks about reaching the Mac would send someone to check the wrong end of
-   * the room. What used to happen instead was nothing at all — the app kept
-   * the chain on screen with every block reading On, and each tap failed in
-   * silence behind the sheet it was tapped in.
+   * "This keeps saying I'm not connected, but yet the Mac app says I am
+   * connected to the remote." The Mac was right: it had the AM4 open and
+   * answering. The phone had asked about the unit and got nothing back — a
+   * question that timed out on the way, or a Mac that stopped answering
+   * between one breath and the next — and `device` was simply still null from
+   * before the question. Null is also what it is before the first question of
+   * the session, so the notice fell through to the role's own words: your Mac
+   * answered, but the unit didn't. It hadn't answered. Nothing had.
+   *
+   * So the caller says which of the three happened and this says the matching
+   * thing:
+   *
+   *   'no-unit'    — the Mac answered, and said nothing is plugged into it.
+   *   'no-answer'  — the question never came back. About the line, not the rig.
+   *   'unreadable' — the Mac answered, but the read failed: a busy port, an
+   *                  editor holding it, a unit mid-preset-load.
+   *   'unit-gone'  — the Mac answered and said it has no port to the unit at
+   *                  all. The most specific of the four, and the only one that
+   *                  means nothing on screen is still known to be true.
    */
-  if (unitGone) {
+  if (reason === 'unit-gone') {
     if (role === 'remote' || role === 'wifi') {
       return {
         title: 'Your Mac has lost the unit',
-        body: 'The Fractal app on your Mac is running, but nothing it sends is reaching your unit, so what was on screen can no longer be trusted. At the Mac: check the unit is switched on and its cable is in, and that nothing else has taken it — another editor, or a second copy of the Fractal app. Then tap Try again.'
+        body: 'The Fractal app on your Mac is running, but nothing it sends is reaching your unit, so what was on screen can no longer be trusted. At the Mac: check the unit is switched on and its cable is in, and that nothing else has taken it — another editor, or a second copy of the Fractal app.'
       }
     }
     return {
       title: 'Lost the unit',
-      body: 'The Fractal app is running but nothing it sends is reaching the unit. Check the unit is switched on and its cable is in, and that nothing else is using it, then tap Try again.'
+      body: 'The Fractal app is running but nothing it sends is reaching the unit. Check the unit is switched on and its cable is in, and that nothing else is using it.'
     }
   }
-  /*
-   * The Mac stopped answering, and the notice blamed the unit for it.
-   *
-   * The health probe at the top of a read is the one that catches this: the
-   * phone is still on the channel, the chip is still green from the last
-   * answer, and the Fractal app at the other end has gone quiet — asleep,
-   * closed, or on a socket the server let go of. With no answer there is
-   * nothing that can be said about the unit at all, and what was said was
-   * "your Mac answered, but the unit didn't" — the wrong end of the room, in
-   * so many words.
-   */
-  if (macSilent) {
+  if (role === 'remote' && reason === 'no-answer') {
     return {
-      title: 'Your Mac has gone quiet',
-      body: 'The phone is still on the line but the Fractal app on your Mac has stopped answering it. Check the Mac is awake and the app is still open, then tap Try again — that now builds the connection again from scratch, which is what closing and reopening this app used to be for.'
+      title: 'Your Mac stopped answering',
+      body: 'The phone is on the line but the Mac is not replying. Check the Fractal app is still open on the Mac and that it hasn’t gone to sleep — nothing needs unplugging at the unit.'
+    }
+  }
+  if (role === 'remote' && reason === 'unreadable') {
+    return {
+      title: 'Your Mac answered, but the unit wouldn’t read',
+      body: 'The Mac is there and replying; the unit didn’t finish answering it. Usually something else is holding the port — another editor, or a second copy of the Fractal app.'
     }
   }
   if (device && device.connected === false) {

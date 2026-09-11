@@ -3,7 +3,7 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
-## 7.169.0
+## 7.170.0
 
 **A block you switch off and a link that has gone are two different things,
 and the chain screen was showing neither.** From a log on stage: every write
@@ -61,11 +61,11 @@ notice and the one on the connect screen, which is where you land when the Mac
 stops answering. The automatic check every few seconds still keeps a good
 connection; only pressing the button pays for a fresh one.
 
-**And that screen stops stating two things it doesn't know.** "Your Mac
-answered, but the unit didn't" is what it said when the MAC was the end that had
-gone quiet — nothing had asked the unit anything at that point, and the notice
-was reading a leftover from the last good connection. That case now says the Mac
-has gone quiet, and says Try again builds the connection again.
+**And that screen stops stating two things it doesn't know.** 7.169.0 taught it
+to tell a Mac that went quiet from a unit that isn't there; this adds the fourth
+case, which is the one from the log above — a Mac that answered perfectly well
+and said it has no port to the unit at all. "Your Mac has lost the unit", and
+what is on screen can no longer be trusted.
 
 "It asked five times over a few seconds" was written into the sentence. Five is
 what a phone does when it was not already connected; a unit that WAS answering a
@@ -74,6 +74,50 @@ three were reported as five. It counts now and says the number it actually
 asked. Where there is no specific explanation for a fault, the last thing that
 came back is printed underneath it, because that screen has been photographed
 twice with the one useful fact missing.
+
+## 7.169.0
+
+**A phone that says "no unit" while the Mac says it is connected now tells you
+which of the two is actually true, and keeps looking on its own.**
+
+The phone was showing NO UNIT in red, over a notice reading "Your Mac
+answered, but the unit didn't", while the Mac in the same room had the AM4 on
+screen and answering. The Mac was right. What had happened on the phone was
+that one question about the unit went out and nothing came back — the Mac's
+own screen is polling that same port several times a second, and a question
+that lands in the middle of that gets no reply. The phone had no way to say
+so. It described the failure from the last thing it knew about the unit, which
+before the first good answer of a session is nothing at all, and nothing fell
+through to the wrong sentence: the Mac answered. It hadn't. Nothing had.
+
+Now the phone says which of three things happened, and the three read
+differently:
+
+- **Your Mac stopped answering** — the question never came back. Nothing to
+  check at the unit; check the Fractal app is still open on the Mac and that
+  the Mac is awake.
+- **Your Mac answered, but the unit wouldn't read** — the Mac is there, the
+  unit didn't finish answering it. Usually something else is holding the
+  port: another editor, or a second copy of the Fractal app.
+- **The Mac can't see your unit** — the Mac answered and said nothing is
+  plugged into it. This is the only one that is about a cable.
+
+The word beside the lamp at the top left follows the same rule. It said NO
+UNIT for all three; it now says NO ANSWER when it was the Mac that went quiet,
+and keeps NO UNIT for the one case that is genuinely about the rig.
+
+**And the red screen is no longer the end of it.** Once a read failed, nothing
+ever asked again — the link was up, so the app had no reason to think anything
+had changed, and the only thing still asking was your thumb on Try again. That
+is the whole of why it "connects on the fifth or sixth tap". The app now asks
+again by itself, three seconds later, then six, then twelve, up to every
+thirty for as long as the screen is showing the fault. A rig that comes good
+comes back on its own, with nothing in your hand. The notice says so, so a
+screen that is working does not look like a screen that has given up.
+
+The same loop runs at the Mac: plug a unit into a Mac that was showing "no
+device" and the app finds it within half a minute instead of waiting for a
+reload.
 
 ## 7.168.0
 

@@ -1509,24 +1509,45 @@ export function run(test) {
     assert.match(remote, /autoConnect !== false/, 'a sign-in no longer means "stay connected" by default')
 
     // The six-second bound before a dead relay is allowed to hang read().
-    const bound = src.indexOf('if (remoteActive() && !remoteHostSeen() && !(await hostResponds()))')
-    assert.notEqual(bound, -1, 'read() no longer bounds a dead relay — every call waits out 20–45 s before admitting the fault')
-    const admits = src.slice(bound, bound + 900)
-    assert.match(admits, /setStatus\('fault'\)/, 'a relay that answers nothing no longer ends in a fault')
-    /*
-     * And it says which end went quiet. With no answer from the Mac there is
-     * nothing to be said about the unit, and the notice was saying "your Mac
-     * answered, but the unit didn't" off a `device` left over from the last
-     * good read.
-     */
-    assert.match(admits, /setDevice\(null\)/, 'the notice still speaks from a stale device')
-    assert.match(admits, /setMacSilent\(true\)/, 'nothing tells the notice which end stopped answering')
+    assert.match(
+      src,
+      /if \(remoteActive\(\) && !remoteHostSeen\(\) && !\(await hostResponds\(\)\)\) \{\s*\n\s*setFaultReason\('no-answer'\)\s*\n\s*setStatus\('fault'\)/,
+      'read() no longer bounds a dead relay — every call waits out 20–45 s before admitting the fault'
+    )
 
     // The phone gets a connect screen, not an error; the Mac keeps the notice.
     assert.match(src, /const showConnect =\s*\n\s*link\.role === 'remote' &&/, 'the connect screen is no longer keyed to the phone role')
     assert.match(src, /\{showConnect \? \(\s*\n\s*<ConnectScreen/, 'the connect screen is no longer the phone’s screen when not connected')
-    assert.match(src, /if \(showConnect && status === 'live'\) setStatus\('fault'\)/, 'Play is rendered under the connect screen again')
+    assert.match(
+      src,
+      /if \(showConnect && status === 'live'\) \{\s*\n[^}]*setStatus\('fault'\)/,
+      'Play is rendered under the connect screen again'
+    )
     assert.ok(!/onAnotherDevice/.test(src), 'the user-agent guess is back; the role decides now')
+
+    /*
+     * A fault that nothing asks about again is a fault that stays on screen.
+     *
+     * "This keeps saying I'm not connected, but yet the Mac app says I am
+     * connected to the remote." The link was up, so the effect that reads on
+     * connect never fired twice, and the only thing left asking was a thumb on
+     * Try again.
+     */
+    const retry = src.indexOf("if (isDemo() || status !== 'fault' || showConnect) return undefined")
+    assert.ok(retry !== -1, 'a phone stuck on a fault waits to be tapped again — nothing asks on its own')
+    const loop = src.slice(retry, retry + 900)
+    assert.ok(loop.includes('nextDelay(delay)'), 'the retry no longer backs off — a busy port gets hammered')
+    assert.ok(loop.includes('await read()'), 'the retry asks nothing')
+
+    /*
+     * Which kind of fault it was, recorded where it happens. Worked out from
+     * `device` instead, a Mac that went quiet was described as a Mac that
+     * answered — see faultCopy.
+     */
+    for (const reason of ["setFaultReason('no-answer')", "setFaultReason('no-unit')", "setFaultReason(null)"]) {
+      assert.ok(src.includes(reason), `read() never records ${reason}`)
+    }
+    assert.match(src, /reason: faultReason/, 'the notice is back to guessing the reason from the device object')
 
     // The bar draws the link from state, never from the module at render.
     const topbar = readFileSync(new URL('../src/components/TopBar.jsx', import.meta.url), 'utf8')
