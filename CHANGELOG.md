@@ -3,7 +3,7 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
-## 7.168.0
+## 7.169.0
 
 **A phone that says "no unit" while the Mac says it is connected now tells you
 which of the two is actually true, and keeps looking on its own.**
@@ -46,6 +46,37 @@ screen that is working does not look like a screen that has given up.
 The same loop runs at the Mac: plug a unit into a Mac that was showing "no
 device" and the app finds it within half a minute instead of waiting for a
 reload.
+
+## 7.168.0
+
+**Ask for a band and the scenes get named after their songs.** "Make me a Three
+Days Grace preset" came back with three scenes called Verse, Rhythm and Lead —
+a preset that could have been anybody's. The band's name reached the AI and
+none of it reached your footswitch.
+
+Now the name of the band is the point of the build. Name a band, an artist, an
+album or an era and every scene is one of THEIR songs — named for it, and
+dialled for it, with the amp and the gain and the effects that record actually
+used. The summary says which song each scene is. Name one song instead and the
+scenes are the parts of that song: intro, verse, chorus, solo. Describe a plain
+sound with nobody's name on it and the scenes are still Clean, Rhythm and Lead,
+because that is what they are.
+
+A long title is shortened on purpose rather than chopped: the unit keeps 16
+characters, so "Animal I Have Become" goes on as "Animal I" and still reads as
+itself from the front panel.
+
+The preset name follows the same idea — a Three Days Grace build is called
+Three Days Grace, not "3DG Verse-Rhythm-Lead".
+
+And Ask stopped losing the band on the way to the designer. Typing "make me a
+three days grace full preset" was being rewritten into "modern alt-metal rhythm
+crunch, cleaner verse tone and a cutting lead" before the tone was designed —
+a description of nobody in particular that also asked, in so many words, for
+exactly the three generic scene names that came back. Whatever you name is
+carried through word for word now.
+
+---
 
 ## 7.167.0
 
