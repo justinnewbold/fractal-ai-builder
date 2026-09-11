@@ -1599,9 +1599,33 @@ export const setCable = (srcRow, srcCol, destRow, connect = true) =>
  * placement that worked, and re-asserting a cable that already exists is not an
  * error either.
  */
+/**
+ * The last column a cable can start from.
+ *
+ * A cable joins a column to the next one, and the FM3's grid is fourteen wide,
+ * so the thirteenth is the last that has a next. In this app's columns, which
+ * count from zero, that is twelve.
+ */
+const LAST_CABLE_COL = 12
+
 export async function wireRow(row, lastCol) {
   const results = []
-  for (let col = -1; col <= lastCol; col++) {
+  /*
+   * From the first column, not from before it.
+   *
+   * This used to ask for a cable out of column -1 — the input — and the unit
+   * threw it out every single time: "POST /preset/grid/cable failed —
+   * buildSetGridRouting: srcCol out of range (1..13): 0", and every build in
+   * the log ended "Wired row 1 — 6 of 7 cables — refused at columns -1".
+   *
+   * There is no such cable to ask for. The FM3 stores thirteen sets of links,
+   * one between each pair of columns; the input feeds the first column on its
+   * own and nothing joins to it. So the request was impossible rather than
+   * refused, it cost a round trip to the Mac on every chain built, and it left
+   * a line in the log that reads like the chain came out broken when it did
+   * not.
+   */
+  for (let col = 0; col <= Math.min(lastCol, LAST_CABLE_COL); col++) {
     try {
       const res = await setCable(row, col, row)
       results.push({ col, ok: res?.ok !== false })

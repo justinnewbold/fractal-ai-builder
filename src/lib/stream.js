@@ -100,6 +100,15 @@ function note(event, detail = {}) {
   logDebug('ai', event, detail)
 }
 
+/*
+ * The same timeline, written from elsewhere.
+ *
+ * The chat route has clocks and failures of its own now, and they belong in
+ * order with the design's — "what was it doing for three minutes" is the same
+ * question whichever route was asked.
+ */
+export const noteAi = note
+
 export const getGenerationLog = () => genLog.slice()
 export const clearGenerationLog = () => genLog.splice(0, genLog.length)
 

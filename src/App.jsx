@@ -16,7 +16,9 @@ import SaveBar from './components/SaveBar'
 import SaveSheet, { SaveFooter } from './components/SaveSheet'
 import CloudPresets from './components/CloudPresets'
 import { LiveGeneration, Thinking, THINKING } from './components/LiveGeneration'
+import { progressFor } from './lib/liveProgress'
 import { streamSpec } from './lib/stream'
+import { askPlan } from './lib/command'
 import { Modifiers, SceneMatrix } from './components/Modifiers'
 import Feedback from './components/Feedback'
 import DevTrace, { TraceSwitch } from './components/DevTrace'
@@ -307,6 +309,17 @@ export default function App() {
    */
   const outputEid = useMemo(
     () => blocks.find((b) => b.slug === 'output')?.effectId ?? null,
+    [blocks]
+  )
+  /*
+   * An effect id turned back into the name on the unit.
+   *
+   * The model answers in ids, because that is what it was given. "eid 58" is
+   * the unit's word for Amp 1 and nobody else's, and it was being printed
+   * straight onto the screen while a tone was building.
+   */
+  const blockNameFor = useCallback(
+    (eid) => blocks.find((b) => b.effectId === eid)?.name || null,
     [blocks]
   )
   const [error, setError] = useState(null)
@@ -1834,7 +1847,19 @@ export default function App() {
           ...extra
         },
         {
-          onPartial: setPartial,
+          /*
+           * And say what it is, not how many of it there are.
+           *
+           * "Just a little bit more information on what's happening, like
+           * choosing an amp or deciding on delay, what song it's designing at
+           * the moment." Every one of those is in the partial already; the
+           * line was counting blocks and throwing the rest away.
+           */
+          onPartial: (p) => {
+            setPartial(p)
+            const line = progressFor(p, blockNameFor)
+            if (line) setProgress(line)
+          },
           signal: control.signal,
           host: getHost(),
           /*
@@ -1898,12 +1923,11 @@ export default function App() {
              */
             else if (e.kind === 'waiting')
               setProgress((was) => (was && was.startsWith(THINKING) ? was : `${THINKING}…`))
+            /* The partial itself already wrote the line — onPartial runs first
+               and says what the model is deciding, which beats a count of how
+               many things it has decided. */
             else if (e.kind === 'partial') {
-              setProgress(
-                e.blocks
-                  ? `Building your chain — ${e.blocks} block${e.blocks === 1 ? '' : 's'} so far`
-                  : 'Building your chain…'
-              )
+              setProgress((was) => was || 'Building your chain…')
             } else if (e.kind === 'fallback') setProgress('Trying another way…')
             else if (e.kind === 'retrying') setProgress('No answer yet — asking again…')
           }
@@ -2975,10 +2999,18 @@ export default function App() {
         }: ${err?.message || 'no answer'}.`
       }
 
-      const res = await fetch(aiUrl('/api/command', getHost()), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      /*
+       * Streamed, so a long think is a wait rather than a dropped call.
+       *
+       * This was a plain fetch on a route that says nothing until it has the
+       * whole answer, and a request that made the model think for two and a
+       * half minutes came back as "That didn't work: Load failed" — the phone
+       * hanging up on a silent connection. askPlan reads the same answer off a
+       * line the server keeps alive, gives up on our clock rather than the
+       * browser's, and asks once more if the line really did die.
+       */
+      const body = await askPlan(
+        {
           instruction,
           device,
           grid: { ...(device?.capabilities?.grid || {}), palette },
@@ -2999,10 +3031,17 @@ export default function App() {
           taste: describeProfile(taste),
           corrections: tasteOn ? describeCorrections(corrections) : '',
           history: turns.map((t) => ({ role: t.role, text: t.text }))
-        })
-      })
-      const body = await res.json()
-      if (!res.ok) throw new Error(body.error || 'That request failed.')
+        },
+        {
+          host: getHost(),
+          /* The same one line the designer uses, so a chat turn that is thinking
+             for a minute says so instead of sitting blank. */
+          onEvent: (e) => {
+            if (e.kind === 'retrying') setProgress('The line dropped — asking again')
+            else if (e.kind === 'waiting') setProgress(`${THINKING}…`)
+          }
+        }
+      )
 
       /*
        * A tone description is not a list of changes. It gets designed and shown
@@ -3815,12 +3854,21 @@ export default function App() {
         active={thinking}
         startedAt={genStarted}
         typicalMs={typicalMs(past)}
+        /* Tappable only once the model has actually written something, so the
+           control never opens an empty panel. */
+        live={!!partial}
+        open={liveOpen}
+        onToggle={() => setLiveOpen((was) => !was)}
       />
 
       <LiveGeneration
         partial={partial}
         open={liveOpen}
         onToggle={() => setLiveOpen(!liveOpen)}
+        /* While the run is live the line above is the way in; afterwards the
+           chip is, because that line is gone by then. */
+        chip={!thinking}
+        nameOf={blockNameFor}
       />
 
 
