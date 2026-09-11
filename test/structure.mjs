@@ -715,6 +715,47 @@ export function run(test) {
     assert.ok(!/fetch\(|localStorage|document\.|window\./.test(lib), 'the matcher reaches outside itself')
   })
 
+  test('a saved tone reloaded onto an empty slot builds its own chain', () => {
+    /*
+     * "After loading a scene from history and saving I tapped chain and it
+     * doesn't show me the chain."
+     *
+     * It was showing it. The debug log says exactly what happened: slot 478
+     * was empty, the saved design proposed 9 changes, all 9 were dropped for
+     * naming blocks that were not there, 0 were written, and the empty preset
+     * was saved back to 478.
+     *
+     * Asking for a tone on an empty preset has built a chain first since
+     * 7.140. Reloading a tone you already made is the same sentence and never
+     * learned it — it checked the spec against nothing and told the player to
+     * go and type "add an amp and a cab" themselves.
+     */
+    const reload = src.slice(src.indexOf('const reload = async'), src.indexOf('const forget = ') > src.indexOf('const reload = async') ? src.indexOf('const forget = ') : undefined)
+    const body = reload.slice(0, reload.indexOf('\n  }\n'))
+    assert.match(body, /EXCLUDED_BLOCKS\.includes\(b\.slug\)/, 'a reload cannot tell an empty preset from a full one')
+    assert.match(body, /kind: 'buildChain'/, 'a saved tone reloaded onto an empty slot still has nothing to land on')
+    /* The design's own blocks, not a generic starter chain: what gets placed
+       is what this tone actually needs. */
+    assert.match(body, /entry\.blockNames \|\| \[\]/, 'the chain is built from something other than the design itself')
+    /* Built BEFORE the spec is checked, or the check is against nothing again. */
+    assert.ok(
+      body.indexOf("kind: 'buildChain'") < body.indexOf('validateSpec('),
+      'the chain is built after the spec has already been checked against an empty preset'
+    )
+    /* And a copy of the slot before the first structural write, the same
+       precaution the design path takes. */
+    assert.match(body, /backupPreset\(preset\.number\)/, 'a structural write goes in with no copy of what was there')
+
+    /* And an empty chain says so rather than drawing two arrows and a gap. */
+    const console_ = readFileSync(new URL('../src/components/Console.jsx', import.meta.url), 'utf8')
+    const strip = console_.slice(console_.indexOf('export function Chain('))
+    assert.match(
+      strip.slice(0, strip.indexOf('chain-strip')),
+      /chain\.length === 0/,
+      'a preset with nothing in it draws an empty strip and explains nothing'
+    )
+  })
+
   test('the preset list opens on the one you are standing on, and keeps trying', () => {
     /*
      * "When opening the preset menu, have it scrolled to where the current
@@ -754,12 +795,28 @@ export function run(test) {
       /\(box\.clientHeight - row\.offsetHeight\) \/ 2/,
       'the current preset is put at the top of the list rather than the middle'
     )
-    /* And a thumb wins. */
+    /*
+     * A thumb wins, and it is recognised by a gesture rather than by reading
+     * scrollTop back. Comparing the value written against the value read
+     * cannot tell a thumb from the engine on iOS, where they routinely differ
+     * — and a guard that fires on its own is worse than none, because it stops
+     * the retry that exists for that exact platform.
+     */
     assert.match(
       centring,
-      /Math\.abs\(box\.scrollTop - mine\) > 2/,
+      /addEventListener\('pointerdown', theirs, \{ passive: true \}\)/,
       'the list fights whoever scrolls it while the sheet is still arriving'
     )
+    assert.ok(
+      !/box\.scrollTop - mine/.test(centring),
+      'a thumb is inferred from scrollTop again, which on iOS is not a thumb'
+    )
+    /* And the target is clamped to the scroll that exists, so a preset near
+       either end is not judged against a position the box cannot reach. */
+    assert.match(centring, /Math\.min\(box\.scrollHeight - box\.clientHeight, want\)/)
+    /* One line in the log the player already knows how to send, because this
+       has now been reported twice with nothing to read but a screenshot. */
+    assert.match(centring, /logDebug\('presets'/, 'a list that fails to open in the right place says nothing')
     assert.match(list, /const LOOKS = 40/, 'the retry window is gone or unbounded')
 
     /* A filter is the one time the top of the list is the right place: the
@@ -3890,17 +3947,49 @@ export function run(test) {
     )
 
     /*
-     * Never scrollIntoView here. It moves every scrollable ancestor including
-     * the page, which is the bug the conversation log already had and wrote
-     * down in Assistant.jsx. Which ancestor actually scrolls is not fixed
-     * either: the desktop panel scrolls itself, and inside a sheet that
-     * max-height is deliberately removed so the sheet body is what moves.
+     * scrollIntoView is the fallback, never the first move — and never without
+     * putting the page's scroll back.
+     *
+     * It moves every scrollable ancestor including the page, which is the bug
+     * the conversation log already had and wrote down in Assistant.jsx, and
+     * which ancestor actually scrolls is not fixed either: the desktop panel
+     * scrolls itself, and inside a sheet that max-height is deliberately
+     * removed so the sheet body is what moves. So the box is still found and
+     * moved directly.
+     *
+     * What changed is what happens when that does not work. A scrollTop
+     * written to a box that owns its own compositor layer is dropped on iOS
+     * often enough that the write cannot be assumed to have landed — the
+     * assignment succeeds and the list does not move — and the list opening at
+     * 000 was reported twice against code that did the right thing everywhere
+     * it could be driven here. So the engine gets asked, and the page is put
+     * back where it was.
      */
-    assert.ok(
-      !/scrollIntoView/.test(list),
-      'the preset list scrolls with scrollIntoView, which drags the page with it'
-    )
     assert.match(list, /function scrollerOf|scrollerOf\(/, 'nothing works out which ancestor scrolls')
+    assert.match(
+      list,
+      /box\.scrollTop = target/,
+      'the box is no longer moved directly, so the page is dragged around for every opening'
+    )
+    for (const call of [...list.matchAll(/scrollIntoView/g)]) {
+      const after = list.slice(call.index, call.index + 400)
+      assert.match(
+        after,
+        /window\.scrollTo\(px, py\)/,
+        'scrollIntoView is used without putting the page back where it was'
+      )
+    }
+    /*
+     * And it is genuinely a fallback: the first scrollIntoView in the file is
+     * the one reached only after the retries are spent without ever finding a
+     * scrollbox, and it sits inside that branch rather than in front of it.
+     */
+    const firstAsk = list.indexOf('scrollIntoView')
+    const spent = list.lastIndexOf('frames < LOOKS', firstAsk)
+    assert.ok(
+      spent !== -1 && firstAsk - spent < 500,
+      'the browser is asked before the box this component went to the trouble of finding'
+    )
 
     // And it stands down while a filter is being typed: then the matches are
     // the point, and they are at the top.

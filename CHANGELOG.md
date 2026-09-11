@@ -3,6 +3,59 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.165.0
+
+**A saved tone reloaded onto an empty slot now builds its own chain.** Asking
+for a tone on an empty preset has put a chain in first since 7.140, because
+that is plainly what you meant. Reloading a tone you already made is the same
+sentence and never learned it: the saved design was checked against a preset
+with nothing in it, every change was dropped for naming a block that was not
+there, and the app told you to go and type "add an amp and a cab" yourself.
+
+From a real log: slot 478 empty, nine changes proposed, nine dropped, none
+written, and the empty preset saved back to 478 — then Chain, correctly,
+showing an empty chain. The blocks now come from the design's own record of
+what it was made of, so what gets placed is what that tone actually needs
+rather than a generic starter chain, and a copy of the slot is taken first the
+same way the design path takes one.
+
+**And an empty chain says so.** It was two signal arrows with a gap between
+them, which reads as a panel that failed to load rather than as a preset with
+nothing in it yet.
+
+**Blocks are resolved by name as well as by slug when a chain is built.** The
+model says "drive"; a saved design says "Amp 1", "Cab 1", "Vol/Pan 1" — those
+are the names it recorded when it was made, and putting them back has to work.
+Two names that mean the same block now place it once rather than twice.
+
+## 7.164.0
+
+**The preset list, a third time, and this time it does not depend on the thing
+that was failing.** Twice now the list has opened at 000 with the loaded preset
+four hundred rows below it, against code that lands it in the middle in every
+browser this can be driven in. The retry added last time did not help, which
+rules out the two timing explanations and points at the write itself: a
+scrollTop set on a box that owns its own compositor layer is dropped on iOS
+often enough that it cannot be assumed to have worked — the assignment succeeds,
+the list does not move, and from inside that is indistinguishable from success.
+
+So the list now sets an absolute position rather than nudging a relative one,
+checks whether that actually took, and if it did not, asks the browser to put
+the row on screen itself and puts the page's own scroll back afterwards. If it
+cannot even find a scrollbox after two thirds of a second of looking, it asks
+the browser anyway rather than giving up. The target is clamped to the scroll
+that exists, so a preset near either end of the list is judged against a
+position the box can actually reach.
+
+A thumb still wins, and is now recognised by an actual gesture rather than by
+reading the scroll position back — on iOS the value read after a write is
+routinely not the value written, so the old guard could fire on its own and
+switch off the very retry that platform needs.
+
+**And it writes down what it did.** One line in the debug log each time the list
+opens, naming where it put the row or why it could not. This has been reported
+twice with nothing to go on afterwards but a screenshot.
+
 ## 7.163.0
 
 **The preset list opens where you are standing, and this time it holds.** It

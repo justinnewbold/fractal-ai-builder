@@ -8146,6 +8146,12 @@ button.recent-del:focus-visible {
   color: var(--silk-faint);
 }
 
+/* The sentence an empty chain needs, above the two arrows that are all a strip
+   with nothing in it can draw. */
+.chain-empty {
+  margin: 0 0 var(--s-2);
+}
+
 /* ---------- history: everything you have made ---------- */
 
 /*
