@@ -58,6 +58,22 @@ export function silenceFaults({ blocks = [], params = {}, sceneName = '' } = {})
   }
 
   /*
+   * And the same question from the other end.
+   *
+   * The output half of this was here from the start; the input half was not,
+   * and it is the fault that makes a chain built into a genuinely empty preset
+   * silent — the blocks are all there, all set, and the guitar never reaches
+   * the first one. Only asked of a grid unit: a block list with no Input in it
+   * on a four-slot unit means that unit takes its signal in some other way,
+   * not that the preset is broken.
+   */
+  if (list.some((b) => isNumber(b.col)) && !list.some((b) => b.slug === 'input')) {
+    faults.push(
+      'There is no Input block in this preset, so your guitar never reaches the chain.'
+    )
+  }
+
+  /*
    * A block with nothing feeding it.
    *
    * `fromRows` is what the unit reports as wired INTO a block. The leftmost

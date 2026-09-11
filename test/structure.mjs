@@ -3108,7 +3108,16 @@ export function run(test) {
     const grid = readFileSync(new URL('../src/components/GridEditor.jsx', import.meta.url), 'utf8')
     assert.ok(!/linear \? \(i % cols\) \+ 1/.test(grid), 'a linear unit gets a second column increment again')
     assert.match(grid, /const label = \(col\) => col \+ 1/, 'the only place that counts from one should be the label')
-    assert.match(grid, /placeBlock\(1, i, block\.page\)/, 'the starter chain starts one column late')
+    /*
+     * The starter chain places into the columns chainPlan hands back, and a
+     * linear unit — which has no grid and no input or output block to step
+     * around — into its own slots, counted from zero. Neither adds one.
+     */
+    assert.match(
+      grid,
+      /placeBlock\(1, linear \? i : plan\.cols\[i\], block\.page\)/,
+      'the starter chain starts one column late'
+    )
   })
 
   test('the chain fits a phone, and answers where it was tapped', () => {
@@ -4299,9 +4308,34 @@ export function run(test) {
      * and the input and the output are filtered out of that count. A preset
      * with no output block makes no sound and has no level to move.
      */
-    assert.match(build, /columnOf\('input'\)/, 'the builder no longer looks for the input before writing over it')
-    assert.match(build, /columnOf\('output'\)/, 'the builder no longer looks for the output before writing over it')
+    /*
+     * Where they go is worked out by chainPlan, apart from the action that
+     * runs it, because both halves of this have been wrong in production and
+     * both were silent. The case block asks it; the planner does the arithmetic
+     * and is tested against real rows in run.mjs.
+     */
+    const planner = actions.slice(actions.indexOf('export function chainPlan'))
+    const plan = planner.slice(0, planner.indexOf('\n}\n'))
+    assert.match(plan, /columnOf\('input'\)/, 'the builder no longer looks for the input before writing over it')
+    assert.match(plan, /columnOf\('output'\)/, 'the builder no longer looks for the output before writing over it')
+    assert.match(build, /chainPlan\(\{/, 'the builder chooses its own columns again, away from the tested planner')
     assert.match(build, /list\.find\(\(b\) => b\.slug === 'output'\)/, 'a preset left with no output block is not given one')
+
+    /*
+     * And the same from the other end.
+     *
+     * "Does it know that it needs to put an input and an output in the block
+     * chain?" It knew about the output and not the input — so a chain built
+     * into a genuinely empty preset had a drive in the first column with
+     * nothing feeding it, which is the same silence from the other side of the
+     * row. The input goes in before the chain, because the chain starts to the
+     * right of it.
+     */
+    assert.match(build, /list\.find\(\(b\) => b\.slug === 'input'\)/, 'a preset left with no input block is not given one')
+    assert.ok(
+      build.indexOf("b.slug === 'input'") < build.indexOf('for (const [col, block] of cells)'),
+      'the input goes in after the chain that is supposed to start to the right of it'
+    )
 
     const grid = readFileSync(new URL('../src/components/GridEditor.jsx', import.meta.url), 'utf8')
     const starter = grid.slice(grid.indexOf('const buildStarter'))

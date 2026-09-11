@@ -4943,6 +4943,20 @@ ol.action-list li.destructive::marker {
 }
 
 /*
+ * The row above the transcript, which holds the way out of it.
+ *
+ * Right-aligned and small: New chat is the least-used control on this panel
+ * and it sits over the most-read one, so it takes a corner rather than a line.
+ * Outside `.assistant-log` on purpose — inside, it would scroll away with the
+ * first reply and be unreachable for the rest of the conversation.
+ */
+.assistant-top {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--s-2);
+}
+
+/*
  * The transcript's own scroll, and how tall it is allowed to be.
  *
  * 340px was a letterbox: a conversation happening in a small window with the

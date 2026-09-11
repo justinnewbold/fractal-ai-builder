@@ -67,6 +67,56 @@ export function firstFreeCell(blocks, rows, cols) {
 }
 
 /**
+ * Where a chain, its input and its output go on a row that already has things
+ * on it.
+ *
+ * Pure, and apart from the action that runs it, because getting this wrong is
+ * silent: every value lands, the unit reads them back, the preset saves, and
+ * the player hears nothing. That has happened twice — once by building over
+ * the output block, and once by building a chain into a genuinely empty preset
+ * with no Input block in it, so the guitar never reached the first pedal.
+ *
+ * Columns are 0-based, the convention the whole app uses inside itself; the
+ * client adds the wire's +1 at the boundary.
+ *
+ * `onRow` is what is already there. `canInput` and `canOutput` say whether the
+ * unit offers those as blocks to place at all — a unit that routes its signal
+ * some other way gets neither invented for it.
+ */
+export function chainPlan({ onRow = [], width = 12, count = 0, canInput = false, canOutput = false } = {}) {
+  const placed = onRow.filter((b) => Number.isInteger(b?.col))
+  const columnOf = (slug) => {
+    const found = placed.find((b) => b.slug === slug)
+    return found ? found.col : null
+  }
+  const inputCol = columnOf('input')
+  const outputCol = columnOf('output')
+  const held = new Set(placed.map((b) => b.col))
+
+  /* Between the two, never over either. */
+  const free = []
+  for (let col = 0; col < width; col++) {
+    if (held.has(col)) continue
+    if (inputCol !== null && col < inputCol) continue
+    if (outputCol !== null && col > outputCol) continue
+    free.push(col)
+  }
+
+  /* The input first, because the chain starts to its right. */
+  let input = inputCol
+  if (input === null && canInput && free.length) input = free.shift()
+
+  const cols = free.slice(0, count)
+  let output = outputCol
+  if (output === null && canOutput && free.length > cols.length) output = free[cols.length]
+
+  /* Where the cabling has to reach: the output where there is one, the end of
+     what was placed where there isn't — the signal has to get there either way. */
+  const last = cols.length ? cols[cols.length - 1] : input ?? 0
+  return { input, cols, output, wireTo: output ?? Math.max(last, width - 1) }
+}
+
+/**
  * What a player calls a block, against what the unit calls it.
  *
  * "Whammy" is a Pitch block with the Whammy type on it; "overdrive" is a
@@ -734,21 +784,28 @@ export function validatePlan(plan, blocks, capabilities) {
                 existing = []
               }
             }
-            const onRow = existing.filter((b) => b.row === 1 && Number.isInteger(b.col))
-            const columnOf = (slug) => {
-              const found = onRow.find((b) => b.slug === slug)
-              return found ? found.col : null
-            }
-            const inputCol = columnOf('input')
-            let outputCol = columnOf('output')
-            const held = new Set(onRow.map((b) => b.col))
-            const free = []
-            for (let col = 0; col < width; col++) {
-              if (held.has(col)) continue
-              if (inputCol !== null && col < inputCol) continue
-              if (outputCol !== null && col > outputCol) continue
-              free.push(col)
-            }
+            const onRow = existing.filter((b) => b.row === 1)
+
+            /*
+             * WHAT IS ALREADY IN THE ROW, WHICH IS NOT NOTHING — and what is
+             * missing from it, which on an empty preset is everything.
+             *
+             * A slot this app calls empty is a slot with nothing EDITABLE in
+             * it: the input and the output are filtered out of that count on
+             * purpose, because they are not blocks a player tunes. They are
+             * still cells on the grid. Where they go, and where the chain goes
+             * between them, is worked out by chainPlan — pure, tested, and in
+             * one place, because both halves of this have been wrong in
+             * production and both were silent.
+             */
+            const has = (slug) => list.some((b) => b.slug === slug)
+            const plan = chainPlan({
+              onRow,
+              width,
+              count: linear ? Math.min(chain.length, width) : chain.length,
+              canInput: !linear && has('input') && !existing.some((b) => b.slug === 'input'),
+              canOutput: !linear && has('output') && !existing.some((b) => b.slug === 'output')
+            })
 
             /*
              * Columns are 0-based here — the client converts to the wire's
@@ -760,13 +817,37 @@ export function validatePlan(plan, blocks, capabilities) {
              */
             const cells = linear
               ? chain.slice(0, width).map((block, i) => [i, block])
-              : chain.slice(0, free.length).map((block, i) => [free[i], block])
+              : chain.slice(0, plan.cols.length).map((block, i) => [plan.cols[i], block])
             if (!cells.length) throw new Error('This preset has no free cells to build into.')
+
+            /*
+             * THE INPUT GOES IN FIRST, IF THIS PRESET HASN'T GOT ONE.
+             *
+             * The output half of this was already here, because a preset with
+             * no output makes no sound and the volume slider has nothing to
+             * move. The input half was missing and it is the same fault from
+             * the other end: on the FM3 the guitar arrives through an Input
+             * block that sits on the grid, so a preset that had been genuinely
+             * cleared — every cell empty, which is what a brand new preset
+             * often is — got a drive in column 0 with nothing feeding it.
+             *
+             * A refused placement is not fatal: the chain is still worth
+             * building, and the wiring report below is what tells the player
+             * the row has a gap in it.
+             */
+            let inputAt = plan.input
+            if (!linear && plan.input !== null && !onRow.some((b) => b.slug === 'input')) {
+              const into = list.find((b) => b.slug === 'input')
+              if (into) {
+                const res = await d.placeBlock(1, plan.input, into.page ?? into.effectId)
+                if (res?.ok === false) inputAt = null
+              }
+            }
+
             for (const [col, block] of cells) {
               const res = await d.placeBlock(1, col, block.page ?? block.effectId)
               if (res?.ok === false) throw new Error(`The unit refused ${block.name}.`)
             }
-            let last = cells[cells.length - 1][0]
 
             /*
              * And an output block, if this preset hasn't got one.
@@ -775,15 +856,12 @@ export function validatePlan(plan, blocks, capabilities) {
              * one as a placeable block routes its output some other way and is
              * left alone.
              */
-            if (!linear && outputCol === null && !existing.some((b) => b.slug === 'output')) {
+            let outputAt = plan.output
+            if (!linear && plan.output !== null && !onRow.some((b) => b.slug === 'output')) {
               const out = list.find((b) => b.slug === 'output')
-              const spare = free[cells.length]
-              if (out && spare !== undefined) {
-                const res = await d.placeBlock(1, spare, out.page ?? out.effectId)
-                if (res?.ok !== false) {
-                  outputCol = spare
-                  last = spare
-                }
+              if (out) {
+                const res = await d.placeBlock(1, plan.output, out.page ?? out.effectId)
+                if (res?.ok === false) outputAt = null
               }
             }
 
@@ -796,16 +874,12 @@ export function validatePlan(plan, blocks, capabilities) {
              * back, the preset saves, and the player hears nothing. That is
              * exactly what happened to every tone built from an empty slot.
              *
-             * The wire runs to the output block where there is one, and to the
-             * end of the row where there isn't, because that is where the
-             * signal has to get to either way.
-             *
              * A linear unit has no grid and nothing to wire — an AM4's four
              * slots are in the path by being slots.
              */
             let wiring = null
             if (!linear) {
-              wiring = await d.wireRow(1, outputCol ?? Math.max(last, width - 1))
+              wiring = await d.wireRow(1, outputAt ?? plan.wireTo)
             }
             // Which blocks exist is the thing that just changed.
             d.invalidateSchema()
@@ -816,7 +890,7 @@ export function validatePlan(plan, blocks, capabilities) {
              * one thing that would make the finished preset silent. Throwing
              * here would abandon the design over a wire he can join himself.
              */
-            return { ok: true, placed: cells.length, wiring }
+            return { ok: true, placed: cells.length, wiring, input: inputAt, output: outputAt }
           }
         })
         break

@@ -4654,7 +4654,13 @@ test('the conversation is restored before the first frame, and written on every 
   // Written on change rather than on a timer: a timer loses whatever happened
   // in the last tick, which on iOS is exactly when the page is taken away.
   const save = app.slice(app.indexOf('    saveSession({\n      turns,'))
-  assert.match(save.slice(0, 400), /\}, \[turns, result, withScenes, renamePreset, saveName, lastPrompt, thinking\]\)/)
+  assert.match(
+    save.slice(0, 460),
+    /\}, \[turns, chatId, result, withScenes, renamePreset, saveName, lastPrompt, thinking\]\)/
+  )
+  // Which conversation this is goes down with it. Without that, a phone coming
+  // back from the background would shelve the chat it was in as a new one.
+  assert.match(save.slice(0, 460), /^\s+chatId,$/m)
 
   // The in-flight ask is on disk before the first round trip and cleared when
   // it settles, so finding it set on load is the signal the page died.
@@ -4666,8 +4672,15 @@ test('the account copy is pulled once and pushed on a debounce', () => {
   const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
   // A reply lands as several state changes in a row; each would otherwise be
   // its own round trip.
-  assert.match(app, /if \(!chatCloudReady\(\) \|\| !turns\.length\) return undefined/, 'an empty chat is pushed over the one on the Mac')
-  assert.match(app, /saveCloudChat\(turns\)[\s\S]{0,200}\}, 2000\)/)
+  assert.match(app, /if \(!turns\.length\) return undefined/, 'an empty chat is pushed over the one on the Mac')
+  // Signed out the same debounce still runs — it is what puts the conversation
+  // on the browser's own shelf — so the cloud write carries its own guard
+  // rather than the effect returning early for everyone.
+  assert.match(app, /if \(chatCloudReady\(\)\) \{\s*\n\s*saveCloudChat\(turns\)/)
+  assert.match(app, /saveCloudChat\(turns\)[\s\S]{0,900}\}, 2000\)/)
+  // And onto the shelf under this conversation's own id, so a tab that is
+  // closed without anyone pressing New chat still leaves the chat behind.
+  assert.match(app, /archiveChat\(turns, chatId\)[\s\S]{0,300}\}, 2000\)/)
   // Pulled after the link has an account: supabaseClient() is null until
   // restoreSession has run, so asking on mount would always answer signed out.
   assert.match(app, /if \(pulledChat\.current \|\| !link\.account \|\| !chatCloudReady\(\)\) return/)
@@ -6134,7 +6147,79 @@ test('the chain builder places into columns the unit has', async () => {
   assert.ok(src.includes('d.placeBlock(1, col, block.page'), 'the builder no longer places by column')
   const build = src.slice(src.indexOf("case 'buildChain'"), src.indexOf('default:\n'))
   assert.ok(!/placeBlock\(1, (?:i|col) \+ 1/.test(build), 'the builder is 1-basing columns again')
-  assert.ok(build.includes('free[i]'), 'the chain is placed from column 0 again, over whatever is there')
+  assert.ok(
+    build.includes('plan.cols[i]'),
+    'the chain is placed from column 0 again, over whatever is there'
+  )
+})
+
+test('a chain built into an empty preset gets an input and an output', async () => {
+  const { chainPlan } = await import('../src/lib/actions.js')
+
+  /*
+   * The whole of "what happens when you create a new preset on an empty
+   * preset". Nothing on the row at all: the input takes column 0, the chain
+   * follows it, and the output lands after the chain — so the guitar reaches
+   * the first pedal and the last one reaches the jack.
+   *
+   * Getting this wrong is silent. Every value lands, the unit reads them back,
+   * the preset saves, and the player hears nothing.
+   */
+  const empty = chainPlan({ onRow: [], width: 12, count: 3, canInput: true, canOutput: true })
+  assert.equal(empty.input, 0)
+  assert.deepEqual(empty.cols, [1, 2, 3])
+  assert.equal(empty.output, 4)
+  assert.equal(empty.wireTo, 4, 'the cabling stops short of the output block')
+
+  // A preset that already has both is not given a second of either, and the
+  // chain goes in the free cells BETWEEN them rather than over the top.
+  const furnished = chainPlan({
+    onRow: [
+      { slug: 'input', col: 0 },
+      { slug: 'output', col: 5 }
+    ],
+    width: 12,
+    count: 2,
+    canInput: false,
+    canOutput: false
+  })
+  assert.equal(furnished.input, 0)
+  assert.deepEqual(furnished.cols, [1, 2])
+  assert.equal(furnished.output, 5)
+
+  // Half furnished: the output is there, the input is not — which is exactly
+  // the shape that made a built chain silent.
+  const noIn = chainPlan({
+    onRow: [{ slug: 'output', col: 6 }],
+    width: 12,
+    count: 2,
+    canInput: true,
+    canOutput: false
+  })
+  assert.equal(noIn.input, 0)
+  assert.deepEqual(noIn.cols, [1, 2])
+  assert.equal(noIn.output, 6)
+
+  // A unit that offers neither as a block routes its signal some other way and
+  // has nothing invented for it — and the cabling then runs to the end of the
+  // row, because that is where the signal has to get to either way.
+  const linearish = chainPlan({ onRow: [], width: 4, count: 4, canInput: false, canOutput: false })
+  assert.equal(linearish.input, null)
+  assert.equal(linearish.output, null)
+  assert.deepEqual(linearish.cols, [0, 1, 2, 3])
+  assert.equal(linearish.wireTo, 3)
+
+  // An existing block that is neither is stepped around, not written over.
+  const occupied = chainPlan({
+    onRow: [{ slug: 'amp', col: 2 }],
+    width: 6,
+    count: 2,
+    canInput: true,
+    canOutput: true
+  })
+  assert.equal(occupied.input, 0)
+  assert.deepEqual(occupied.cols, [1, 3])
+  assert.equal(occupied.output, 4)
 })
 
 console.log('\nadd a block')
@@ -8058,21 +8143,48 @@ test('the report names what would keep a preset quiet, in a player\'s words', as
   // the reason the volume slider had nothing to move.
   const noOut = silenceFaults({
     blocks: [
-      { slug: 'drive', name: 'Drive 1', effectId: 100, col: 0, fromRows: [1] },
-      { slug: 'amp', name: 'Amp 1', effectId: 106, col: 1, fromRows: [1] }
+      { slug: 'input', name: 'Input 1', effectId: 37, col: 0, fromRows: [] },
+      { slug: 'drive', name: 'Drive 1', effectId: 100, col: 1, fromRows: [1] },
+      { slug: 'amp', name: 'Amp 1', effectId: 106, col: 2, fromRows: [1] }
     ]
   })
   assert.equal(noOut.length, 1)
   assert.match(noOut[0], /no Output block/i)
+
+  // And the same fault from the other end, which is the one a chain built into
+  // a genuinely empty preset used to have: every block there, every value set,
+  // and the guitar never reaching the first of them.
+  const noIn = silenceFaults({
+    blocks: [
+      { slug: 'drive', name: 'Drive 1', effectId: 100, col: 0, fromRows: [] },
+      { slug: 'amp', name: 'Amp 1', effectId: 106, col: 1, fromRows: [1] },
+      { slug: 'output', name: 'Out 1', effectId: 2, col: 2, fromRows: [1] }
+    ]
+  })
+  assert.equal(noIn.length, 1)
+  assert.match(noIn[0], /no Input block/i)
+
+  // A unit with no grid takes its signal in some other way; a four-slot block
+  // list with no Input in it is not a broken preset.
+  assert.deepEqual(
+    silenceFaults({
+      blocks: [
+        { slug: 'amp', name: 'Amp 1', effectId: 106 },
+        { slug: 'output', name: 'Out 1', effectId: 2 }
+      ]
+    }),
+    []
+  )
 
   // A block nothing is wired into. The leftmost is fed by the input, not by a
   // row, so it is never accused; a driver that reports no rows at all is not
   // either.
   const orphan = silenceFaults({
     blocks: [
-      { slug: 'amp', name: 'Amp 1', effectId: 106, col: 0, fromRows: [] },
-      { slug: 'cab', name: 'Cab 1', effectId: 111, col: 1, fromRows: [] },
-      { slug: 'output', name: 'Out 1', effectId: 2, col: 2, fromRows: [1] }
+      { slug: 'input', name: 'Input 1', effectId: 37, col: 0, fromRows: [] },
+      { slug: 'amp', name: 'Amp 1', effectId: 106, col: 1, fromRows: [1] },
+      { slug: 'cab', name: 'Cab 1', effectId: 111, col: 2, fromRows: [] },
+      { slug: 'output', name: 'Out 1', effectId: 2, col: 3, fromRows: [1] }
     ]
   })
   assert.equal(orphan.length, 1)
@@ -8081,8 +8193,9 @@ test('the report names what would keep a preset quiet, in a player\'s words', as
   assert.deepEqual(
     silenceFaults({
       blocks: [
-        { slug: 'amp', name: 'Amp 1', effectId: 106, col: 0 },
-        { slug: 'output', name: 'Out 1', effectId: 2, col: 1 }
+        { slug: 'input', name: 'Input 1', effectId: 37, col: 0 },
+        { slug: 'amp', name: 'Amp 1', effectId: 106, col: 1 },
+        { slug: 'output', name: 'Out 1', effectId: 2, col: 2 }
       ]
     }),
     [],
@@ -8092,9 +8205,10 @@ test('the report names what would keep a preset quiet, in a player\'s words', as
   // Everything off in this scene, said with the scene's own name.
   const off = silenceFaults({
     blocks: [
-      { slug: 'amp', name: 'Amp 1', effectId: 106, col: 0, fromRows: [1], bypassed: true },
-      { slug: 'cab', name: 'Cab 1', effectId: 111, col: 1, fromRows: [1], bypassed: true },
-      { slug: 'output', name: 'Out 1', effectId: 2, col: 2, fromRows: [1] }
+      { slug: 'input', name: 'Input 1', effectId: 37, col: 0, fromRows: [] },
+      { slug: 'amp', name: 'Amp 1', effectId: 106, col: 1, fromRows: [1], bypassed: true },
+      { slug: 'cab', name: 'Cab 1', effectId: 111, col: 2, fromRows: [1], bypassed: true },
+      { slug: 'output', name: 'Out 1', effectId: 2, col: 3, fromRows: [1] }
     ],
     sceneName: 'KILLING'
   })
@@ -8104,8 +8218,9 @@ test('the report names what would keep a preset quiet, in a player\'s words', as
   // A level sitting on its floor — a preset that is perfect and inaudible.
   const down = silenceFaults({
     blocks: [
-      { slug: 'amp', name: 'Amp 1', effectId: 106, col: 0, fromRows: [1] },
-      { slug: 'output', name: 'Out 1', effectId: 2, col: 1, fromRows: [1] }
+      { slug: 'input', name: 'Input 1', effectId: 37, col: 0, fromRows: [] },
+      { slug: 'amp', name: 'Amp 1', effectId: 106, col: 1, fromRows: [1] },
+      { slug: 'output', name: 'Out 1', effectId: 2, col: 2, fromRows: [1] }
     ],
     params: {
       2: [{ id: 1, name: 'Level', value: -80, min: -80, max: 20, unit: 'dB' }],
@@ -8123,8 +8238,9 @@ test('the report names what would keep a preset quiet, in a player\'s words', as
   assert.deepEqual(
     silenceFaults({
       blocks: [
-        { slug: 'amp', name: 'Amp 1', effectId: 106, col: 0, fromRows: [1] },
-        { slug: 'output', name: 'Out 1', effectId: 2, col: 1, fromRows: [1] }
+        { slug: 'input', name: 'Input 1', effectId: 37, col: 0, fromRows: [] },
+        { slug: 'amp', name: 'Amp 1', effectId: 106, col: 1, fromRows: [1] },
+        { slug: 'output', name: 'Out 1', effectId: 2, col: 2, fromRows: [1] }
       ],
       params: { 2: [{ id: 1, name: 'Level', value: 0, min: -80, max: 20, unit: 'dB' }] }
     }),

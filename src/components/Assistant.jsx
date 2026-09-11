@@ -173,6 +173,14 @@ export default function Assistant({
    */
   suggestions = [],
   /*
+   * Put this conversation down and start an empty one.
+   *
+   * Given only when there is something to put down — a New chat button over an
+   * empty chat is a button that does nothing, sitting above the one line that
+   * tells a new player what to say.
+   */
+  onNew,
+  /*
    * What is happening now: the working line, the chain arriving, and what a
    * write did. Rendered after everything said, because that is when it is
    * happening — the tone itself is no longer among them.
@@ -454,6 +462,25 @@ export default function Assistant({
 
   return (
     <section className="assistant">
+      {/*
+        The way out of a conversation that has run its course.
+
+        Above the transcript rather than below it: the log scrolls and its
+        bottom is where the live turn and the box are, so a control down there
+        moves under the thumb every time the model says anything. The top of
+        the log does not move.
+
+        Nothing is thrown away by pressing it — the conversation goes on the
+        shelf and History opens it again.
+      */}
+      {onNew && turns.length ? (
+        <div className="assistant-top">
+          <button className="chip" onClick={onNew} disabled={busy}>
+            New chat
+          </button>
+        </div>
+      ) : null}
+
       <div className="assistant-log" role="log" aria-live="polite">
         {turns.length === 0 ? (
           <p className="hint assistant-empty">
