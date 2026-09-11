@@ -2910,7 +2910,7 @@ export default function App() {
           (entry.params || []).map((param) => ({ block: entry, param }))
         )
         const would =
-          matchRename(instruction) ||
+          matchRename(instruction, { sceneCount: device?.capabilities?.sceneCount ?? 8 }) ||
           matchLocal(instruction, {
             blocks: withPositions,
             controls,
@@ -2922,14 +2922,28 @@ export default function App() {
               corrections?.controls?.find((c) => c.name === name)?.by ?? null
           })
         localSeen.current += 1
-        if (would) {
-          localHits.current += 1
-          logDebug(
-            'local',
-            `would have handled this here: ${would.why}`,
-            `"${instruction}" → ${would.kind} · ${localHits.current} of ${localSeen.current} this session`
-          )
-        }
+        if (would) localHits.current += 1
+        /*
+          Both outcomes, and the miss is the one that was missing.
+          
+          The first version logged only hits, which cannot measure anything: a
+          session with no line in it reads identically whether the matcher
+          caught nothing or was never asked. A real log came back with two chat
+          requests and no local lines at all, and the only way to tell which
+          had happened was to read the "ask" entries beside them and try the
+          words by hand. Both had missed, and both for reasons worth fixing —
+          "change X to channel B" and "rename scene 2 to Lithium" — which is
+          exactly what watching is for and exactly what it failed to say.
+          
+          One line per request, either way, with the tally on both. Chat turns
+          are a handful a session, so this is a rounding error in a log that
+          already carries a line per parameter written.
+        */
+        logDebug(
+          'local',
+          would ? `would have handled this here: ${would.why}` : 'left to the model',
+          `"${instruction}"${would ? ` → ${would.kind}` : ''} · ${localHits.current} of ${localSeen.current} this session`
+        )
       } catch (err) {
         /* A matcher that throws is a matcher that did not match, and it must
            not be able to stop a request that was going to the model anyway. */

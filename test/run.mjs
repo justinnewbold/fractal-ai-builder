@@ -3822,6 +3822,31 @@ test('the plain requests never needed a model, and the rest still do', async () 
   // A preset holding only Delay 1 must not answer "delay 2" with it.
   assert.equal(hit('bypass delay 2'), null, 'a block that is not there was bypassed anyway')
 
+  /*
+   * The two a watch-only run actually caught going to the model, and the
+   * reasons they did: "change" was not among the verbs the channel rule knew,
+   * and renaming a scene was never implemented at all. Both are here so the
+   * same six lines of regex cannot go missing twice.
+   */
+  assert.equal(hit('Change amp to channel b')?.text, 'B', 'a change of channel went to the model again')
+  const renamed = matchRename('Rename scene 2 to Lithium', { sceneCount: 8 })
+  assert.deepEqual(renamed, {
+    kind: 'renameScene',
+    scene: 1,
+    text: 'Lithium',
+    why: 'Scene 2 renamed to Lithium.'
+  })
+  assert.equal(matchRename('call scene 1 Clean', { sceneCount: 8 })?.scene, 0)
+  assert.equal(matchRename('rename scene 3 as Solo', { sceneCount: 8 })?.text, 'Solo')
+  // A scene the unit does not have is the model's to explain, not ours to write.
+  assert.equal(matchRename('rename scene 99 to Nope', { sceneCount: 8 }), null)
+  /*
+   * And the scene shape is tried first on purpose: the preset rule would read
+   * "rename scene 2 to Lithium" as a request to call the PRESET
+   * "scene 2 to Lithium", which is a confidently wrong name on a saved slot.
+   */
+  assert.notEqual(matchRename('rename scene 2 to Lithium', { sceneCount: 8 })?.kind, 'renamePreset')
+
   // Nothing at all, and something far too long, are both misses rather than throws.
   assert.equal(hit(''), null)
   assert.equal(hit('   '), null)
