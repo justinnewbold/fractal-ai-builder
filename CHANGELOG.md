@@ -3,6 +3,78 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.172.0
+
+**A block you switch off and a link that has gone are two different things,
+and the chain screen was showing neither.** From a log on stage: every write
+to the unit coming back `port not open` — the Fractal app on the Mac had lost
+its serial port — and the chain sheet sitting there with all four blocks
+reading On, tap after tap, saying nothing at all. "When I tap one of the
+buttons it will turn it off on the unit, but there's no way to turn it back
+on, and the buttons always say on."
+
+Four things were wrong with that, all of them silent:
+
+- **The explanation was drawn under the sheet.** The app raises every failure
+  into one notice on the page, and a sheet is a surface over that page with
+  the page made inert behind it. So the reason was there — in a place nobody
+  could see or reach. Sheets that write to the unit show their own failures
+  now, at the top, where the tap was.
+- **The same failure twice looked like nothing happening.** The message was
+  kept as text, so tapping again set the identical string and the screen had
+  no reason to redraw. It is stamped with when it was raised now, so a repeat
+  re-announces rather than sitting silent.
+- **"port not open" is not a sentence anybody can act on.** It now reads: the
+  Fractal app on your Mac has lost its connection to the unit, nothing sent
+  from here is reaching it, check the unit is on and its cable is in. The
+  server's own words are still written to the debug log, where they belong.
+- **The app kept drawing a chain it could no longer stand behind.** A Mac with
+  no port to the unit means nothing on screen is known to be true, so the app
+  leaves that screen for the fault notice — the one screen with a Try again on
+  it — with copy that says which end of the room to go to, rather than blaming
+  a link that is working fine.
+
+**A refused toggle asks the unit what it actually has.** The chain screen used
+to trust its own roll-back: the button goes back the way it was and the strip
+carries on. But a write that comes back as a failure can still have landed —
+the frame goes out and it is the answer that gets lost — and then the strip is
+showing the opposite of the truth, so the next tap sends the same thing again
+and the block can never come back on. It re-reads instead, which is what the
+stage screen has always done.
+
+**And a dead link is asked once, not five times.** A chain read that fails is
+asked again up to five times from a phone, because a busy port is the usual
+reason and trying again is the whole fix. A port that is gone answers the same
+way instantly, so one tap spent five relay round trips proving it — the log
+from that stage is pages of exactly that. A read that fails because there is no
+port stops there; a busy one keeps every retry it had.
+
+**Try again now does what force-quitting the app does.** "I have to force close
+the app completely and then reopen it for it to connect again." Closing the app
+has one power: it rebuilds every piece. The connection to the Mac was the one
+piece a reconnect kept — the phone still called the socket joined, so the button
+was handed it back unchanged and read the unit down the same dead line as the
+time before. A socket this end believes in and the server has let go of cannot
+be told apart from a working one from inside the app, so the button stops trying
+to tell and asks for a new one. Both Try agains do it — the one on the fault
+notice and the one on the connect screen, which is where you land when the Mac
+stops answering. The automatic check every few seconds still keeps a good
+connection; only pressing the button pays for a fresh one.
+
+**And that screen stops stating two things it doesn't know.** 7.169.0 taught it
+to tell a Mac that went quiet from a unit that isn't there; this adds the fourth
+case, which is the one from the log above — a Mac that answered perfectly well
+and said it has no port to the unit at all. "Your Mac has lost the unit", and
+what is on screen can no longer be trusted.
+
+"It asked five times over a few seconds" was written into the sentence. Five is
+what a phone does when it was not already connected; a unit that WAS answering a
+moment ago is asked three times, and the app at the Mac asks once — and all
+three were reported as five. It counts now and says the number it actually
+asked. Where there is no specific explanation for a fault, the last thing that
+came back is printed underneath it, because that screen has been photographed
+twice with the one useful fact missing.
+
 ## 7.171.0
 
 **A saved preset is called what you saved it as, in the list too.** Slot 98

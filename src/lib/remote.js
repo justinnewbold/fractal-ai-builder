@@ -708,7 +708,7 @@ export async function remoteSignIn({ url, anonKey, email, password }) {
  * remote is watching, so joining with a presence track is what makes live
  * updates arrive rather than an optional nicety.
  */
-export async function remoteConnect() {
+export async function remoteConnect({ fresh = false } = {}) {
   if (!client || !userId) throw new Error('Sign in first.')
 
   /*
@@ -718,8 +718,16 @@ export async function remoteConnect() {
    * again, which builds a new client — a channel wired to the old one. Connect
    * returned instantly, the app said it was connected, and every request sat
    * there until it timed out. Anything else gets torn down and rebuilt.
+   *
+   * `fresh` refuses even a channel that looks perfect, and exists because of
+   * the one state this cannot see: a socket the phone believes is joined and
+   * the server has long since let go of. Nothing local can tell that from a
+   * working one — the phone sends into it and hears nothing back — so the only
+   * cure is a new socket, which until now meant force-quitting the app. That
+   * is what Try again asks for. Nothing automatic passes it: the keepalive
+   * runs every few seconds and must not tear down a link that is fine.
    */
-  if (canReuseChannel(channel, session, client)) return userId
+  if (!fresh && canReuseChannel(channel, session, client)) return userId
   connecting = true
   try {
     return await joinChannel()

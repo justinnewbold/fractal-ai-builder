@@ -7166,6 +7166,20 @@ button.sheet-close:active {
   -webkit-overflow-scrolling: touch;
 }
 
+/*
+ * What just failed, inside the surface it failed in.
+ *
+ * The page's own notice is drawn under the sheet and the page is inert while
+ * one is open, so this is the only place a refused write can say anything at
+ * all. Flush with the top of the body — it is about what was just tapped, not
+ * a section of its own.
+ */
+.sheet-body > .notice.sheet-alert {
+  margin: 0 0 var(--s-3);
+  color: var(--silk-dim);
+  font-size: var(--f-3);
+}
+
 .sheet-foot {
   flex: 0 0 auto;
   padding: var(--s-3) var(--s-4);

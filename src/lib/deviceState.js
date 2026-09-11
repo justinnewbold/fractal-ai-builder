@@ -262,7 +262,17 @@ export async function confirmedDetect({
   tries = SETTLE_TRIES,
   relayTries = RELAY_TRIES,
   gap = SETTLE_MS,
-  least = 1
+  least = 1,
+  /*
+   * How many times it has now asked, as it asks.
+   *
+   * The notice a phone gets said the unit was asked five times whatever
+   * happened, and how many asks this makes depends on every reason to be
+   * patient that applies — so the only honest way to say it is to count.
+   * Reported as it goes, so a failure on the third ask still knows it was
+   * the third.
+   */
+  onAsk
 }) {
   /*
    * Every reason to keep asking, and the most patient one wins.
@@ -287,6 +297,7 @@ export async function confirmedDetect({
 
   for (let i = 0; i < attempts; i++) {
     if (i) await wait(gap)
+    onAsk?.(i + 1)
     try {
       info = await detect()
       failure = null
@@ -302,16 +313,30 @@ export async function confirmedDetect({
   return info
 }
 
+/**
+ * Why the last chain read failed, or null if it didn't.
+ *
+ * The read itself answers with a list or a null, which is all a caller needs
+ * to draw something — but "the port was busy for a moment" and "there is no
+ * port any more" are the same null, and they deserve opposite treatment. One
+ * is worth asking again five times; the other is worth stopping.
+ */
+let lastReadFailure = null
+
+export const chainReadFailure = () => lastReadFailure
+
 export async function refreshBlocks() {
   if (!driver?.presetBlocks) return null
+  lastReadFailure = null
   try {
     const list = await driver.presetBlocks()
     if (!Array.isArray(list)) return null
     set({ blocks: list })
     return list
-  } catch {
+  } catch (err) {
     // The last known chain stays on screen: better than emptying it because
     // one poll lost a race for the port.
+    lastReadFailure = err
     return null
   }
 }
@@ -345,13 +370,24 @@ export async function confirmedChain({
   remote = false,
   tries = SETTLE_TRIES,
   relayTries = RELAY_TRIES,
-  gap = SETTLE_MS
+  gap = SETTLE_MS,
+  /*
+   * Whether the last read failed because the unit is not reachable at all.
+   *
+   * Asking again is for a port that was busy. A Mac that has lost its port
+   * answers every ask the same way, instantly, and on a phone each one is a
+   * round trip down the relay — so a single tap on a dead link spent five of
+   * them before showing anything, and the debug log from a stage is pages of
+   * exactly that. Injected so the policy is testable without a port.
+   */
+  gone = () => chainReadFailure()?.unitGone === true
 }) {
   const attempts = remote ? Math.max(1, relayTries) : Math.max(1, tries)
   for (let i = 0; i < attempts; i++) {
     if (i) await wait(gap)
     const list = await read()
     if (Array.isArray(list)) return list
+    if (gone()) return null
   }
   return null
 }
@@ -483,6 +519,7 @@ export function put(patch) {
 /** Back to blank. Tests use it; so does losing the device. */
 export function reset() {
   recent.clear()
+  lastReadFailure = null
   stopListening()
   state = BLANK
   for (const listener of [...listeners]) listener()

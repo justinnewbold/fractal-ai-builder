@@ -386,14 +386,65 @@ export default function App() {
     (eid) => blocks.find((b) => b.effectId === eid)?.name || null,
     [blocks]
   )
-  const [error, setError] = useState(null)
+  const [error, setErrorText] = useState(null)
+  /*
+   * WHEN the message on screen was raised, as well as what it says.
+   *
+   * "I tap one of the buttons and nothing happens." The second tap of a button
+   * that has already failed once set the same string into the same state, React
+   * saw no change, and nothing re-rendered and nothing was logged — so a
+   * failure that is happening over and over looks exactly like a button that
+   * is doing nothing at all. This is what makes a repeat count as news: the
+   * notice is keyed on it and remounts, which is also what makes a screen
+   * reader say it again.
+   */
+  const [errorAt, setErrorAt] = useState(0)
+  /*
+   * Whether the unit itself has gone, as opposed to one write being refused.
+   *
+   * Set when a call comes back saying the Mac has no port to the unit any
+   * more. It decides which fault notice is shown, and it is cleared by the
+   * next read that works.
+   */
+  const [lostUnit, setLostUnit] = useState(false)
+  /*
+   * How many times the unit was actually asked before this was called a fault.
+   *
+   * The notice said "five times" whatever happened. Five is what a phone that
+   * was not already live does; a unit that WAS answering a moment ago is asked
+   * three times and a screen at the Mac once, so the same sentence was being
+   * shown over two asks that never happened. See faultCopy.
+   */
+  const [asks, setAsks] = useState(0)
+  /*
+   * Which sheet was over the screen when the message was raised, so the sheet
+   * can show its own failures and none of anybody else's. A ref, updated in
+   * render, because the one way in below is built once and would otherwise
+   * close over whichever sheet was open at mount — which is none of them.
+   */
+  const sheetNow = useRef(null)
+  const [errorSheet, setErrorSheet] = useState(null)
+  /*
+   * One way in for everything that failed, taking the error itself or a
+   * sentence. The error is worth having whole: only the object carries
+   * `unitGone`, and that is the difference between "that write was refused"
+   * and "nothing on this screen is true any more".
+   */
+  const setError = useCallback((value) => {
+    const text =
+      value == null ? null : typeof value === 'string' ? value : value.message || String(value)
+    setErrorText(text)
+    setErrorAt(text ? Date.now() : 0)
+    setErrorSheet(text ? sheetNow.current : null)
+    if (value && typeof value !== 'string' && value.unitGone) setLostUnit(true)
+  }, [])
   /*
    * Every error the screen shows is a line in the debug log too, and so is a
    * crash the screen never got to show. One place, so a report has both.
    */
   useEffect(() => {
-    if (error) logDebug('error', typeof error === 'string' ? error : error?.message || String(error))
-  }, [error])
+    if (error) logDebug('error', error)
+  }, [error, errorAt])
   useEffect(() => installCrashCapture(), [])
   const [busy, setBusy] = useState(false)
   /*
@@ -794,10 +845,23 @@ export default function App() {
           role: link.role,
           device,
           reason: faultReason,
+          asks,
           secure: typeof window !== 'undefined' && window.location.protocol === 'https:',
           userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : ''
         })
       : null
+  /*
+   * What came back, when the notice above has nothing specific to say.
+   *
+   * The three named cases — the unit gone, the Mac gone quiet, a Mac with
+   * nothing plugged into it — explain themselves, and repeating the message
+   * underneath them is noise. Everything else lands on the generic copy, and
+   * that is exactly where the one useful fact was being dropped: a screenshot
+   * of "your Mac answered, but the unit didn't" with no way to tell whether it
+   * was a timeout, a refusal, or something the Mac said.
+   */
+  const faultWhy =
+    status === 'fault' && (faultReason === null || faultReason === 'unreadable') ? error : null
   // Where "Leave gig" returns to. Gig takes the screen over, so coming back out
   // should land where you were rather than at a fixed default.
   const [runningPlan, setRunningPlan] = useState(false)
@@ -889,6 +953,32 @@ export default function App() {
    * two taps from the chain you were working through. This is the way back.
    */
   const [sheetBack, setSheetBack] = useState(null)
+  /*
+   * The failure this sheet is responsible for showing.
+   *
+   * The message belongs to the tap that caused it: one raised on the Play
+   * screen ten minutes ago is not something to greet somebody with when they
+   * open the chain. Matched on the sheet that was open when it was raised
+   * rather than on a clock, so there is no frame in which an old message is
+   * still on the way out of a sheet that has just arrived.
+   */
+  sheetNow.current = sheet
+  const sheetAlert = sheet && error && errorSheet === sheet ? error : null
+  /*
+   * A unit that has gone takes the sheet with it.
+   *
+   * A sheet is a surface over an inert page, so the notice explaining the
+   * failure was being drawn underneath a chain sheet that could not be
+   * reached, behind blocks still reading On. There is nothing to edit in a
+   * preset the app cannot reach: close it, and let the fault notice — the one
+   * screen in the app with a way back on it — actually be on screen.
+   */
+  useEffect(() => {
+    if (!lostUnit) return
+    setFaultReason('unit-gone')
+    setStatus('fault')
+    setSheet(null)
+  }, [lostUnit])
   /* Open a block's knobs, and remember what to return to. */
   const openBlockFrom = useCallback((id, from = null) => {
     setSelectedBlock(id)
@@ -1091,7 +1181,29 @@ export default function App() {
       await writeBypass(block.effectId, wanted)
       record('edit', `${block.name || block.slug} ${wanted ? 'bypassed' : 'engaged'}`)
     } catch (err) {
-      setError(err.message)
+      /*
+       * Whole, not flattened to its sentence.
+       *
+       * "When I tap one of the buttons it will turn it off on the unit, but
+       * there's no way to turn it back on, and the buttons always say on."
+       * Every write was failing with the Mac's port shut, the store put the
+       * block back the way it found it, and the message went to a notice
+       * behind the sheet. So the strip sat there claiming everything was on,
+       * tap after tap, with nothing anywhere saying otherwise.
+       */
+      setError(err)
+      /*
+       * And ask the unit what it actually has, rather than trusting the way
+       * the store put it back.
+       *
+       * A write that came back as a failure may still have landed — the frame
+       * goes out and the answer is what got lost — and then the strip is
+       * showing the opposite of the truth, so the next tap sends the same
+       * thing again and the block can never come back on. The gig screen has
+       * always re-read after a refused toggle; this one never did. Skipped
+       * when the unit is gone, because there is nobody to ask.
+       */
+      if (!err?.unitGone) refreshBlocks()
     }
   }
 
@@ -1135,6 +1247,9 @@ export default function App() {
       if (remoteActive() && !remoteHostSeen() && !(await hostResponds())) {
         setFaultReason('no-answer')
         setStatus('fault')
+        // Nothing has asked the unit anything, so the notice must not say how
+        // many times it did.
+        setAsks(0)
         return null
       }
       /*
@@ -1143,6 +1258,7 @@ export default function App() {
        * immediately; on real hardware that read lands while the unit is still
        * busy, and the answer is "no unit". See confirmedDetect.
        */
+      let asked = 0
       const info = await confirmedDetect({
         detect,
         wait: (ms) => new Promise((go) => setTimeout(go, ms)),
@@ -1150,8 +1266,15 @@ export default function App() {
         /* A phone's first no is the least trustworthy answer in the app —
            the handshake races the Mac's own polling. See RELAY_TRIES. */
         remote: remoteActive(),
+        // Counted rather than assumed, because the notice says the number out
+        // loud and how many asks this makes depends on every reason to be
+        // patient that applies to this read.
+        onAsk: (n) => {
+          asked = n
+        },
         ...(settling ? { least: SETTLING_TRIES, gap: SETTLING_MS } : {})
       })
+      setAsks(asked)
       setDevice(info)
       if (!info?.connected) {
         setFaultReason('no-unit')
@@ -1171,6 +1294,8 @@ export default function App() {
       setBlocks(list)
       setFaultReason(null)
       setStatus('live')
+      // The unit answered, so whatever was lost is back.
+      setLostUnit(false)
       // Returned as well as stored: a caller that reads and then acts in the
       // same tick still has the old array in its closure, and state won't have
       // caught up yet.
@@ -1232,7 +1357,9 @@ export default function App() {
        * top of this pass and was live before it, the chain on screen is still
        * the truth: say what failed and leave it up.
        */
-      if (answered && liveRef.current) setError(err.message)
+      // The error itself, not its sentence: `unitGone` is the part that decides
+      // which notice this becomes, and a string cannot carry it.
+      if (answered && liveRef.current) setError(err)
       else {
         /*
          * A relay that dropped is not a unit that went. `linkDown` is set by
@@ -1241,9 +1368,18 @@ export default function App() {
          * unit wouldn't read" — two sentences that send someone to two
          * different rooms.
          */
-        setFaultReason(err?.linkDown || /didn’t answer|didn't answer/i.test(err?.message || '') ? 'no-answer' : 'unreadable')
+        setFaultReason(
+          // A Mac with no port to the unit says so outright, and that is more
+          // specific than either of the two below: not "the read failed" but
+          // "there is nothing at the other end of the cable to read".
+          err?.unitGone
+            ? 'unit-gone'
+            : err?.linkDown || /didn’t answer|didn't answer/i.test(err?.message || '')
+              ? 'no-answer'
+              : 'unreadable'
+        )
         setStatus('fault')
-        setError(err.message)
+        setError(err)
       }
     } finally {
       setBusy(false)
@@ -1290,7 +1426,19 @@ export default function App() {
        * try again did nothing. Refreshing browser reconnect." A reload worked
        * because a reload rebuilds the channel BEFORE reading.
        */
-      if (linkState().role === 'remote') await reconnectPhone()
+      /*
+       * On a NEW socket, not the one that is already there.
+       *
+       * "I have to force close the app completely and then reopen it for it to
+       * connect again." A force-quit's only power is that it rebuilds every
+       * piece, and the channel was the piece a reconnect kept: realtime-js
+       * still called it joined, so it was handed back unchanged and this read
+       * went down the same dead line as the last one. A socket the phone
+       * believes in and the server has let go of cannot be told from a working
+       * one from in here — so the button stops trying to tell and just asks
+       * for a new one.
+       */
+      if (linkState().role === 'remote') await reconnectPhone({ fresh: true })
     } catch {
       // A rejoin that failed still leaves the read below to say so plainly.
     }
@@ -1553,8 +1701,15 @@ export default function App() {
           await pairMac()
           record('remote', 'Phone remote set up — paired, no account')
         } else if (kind === 'retry') {
+          /*
+           * The connect screen's Try again, and the same new socket the fault
+           * screen's asks for. This is the screen someone reaches when the Mac
+           * has stopped answering, which is exactly when the channel is most
+           * likely to be one realtime-js still calls joined and the server has
+           * long since dropped — the state that used to need a force-quit.
+           */
           pokeLink()
-          await reconnectPhone()
+          await reconnectPhone({ fresh: true })
         } else if (kind === 'disconnect') {
           await disconnectPhone()
           record('remote', 'Disconnected from the Mac')
@@ -4553,6 +4708,7 @@ export default function App() {
         <div className="notice" data-kind="fault">
           <h2>{fault.title}</h2>
           <p>{fault.body}</p>
+          {faultWhy ? <p className="hint">What came back: {faultWhy}</p> : null}
           <p>
             {/*
               The label moves, because this button takes several seconds and
@@ -4635,7 +4791,9 @@ export default function App() {
       ) : null}
 
       {status === 'live' && error ? (
-        <div className="notice" data-kind="fault" role="alert">
+        /* Keyed on when it was raised, so the same failure happening again
+           remounts the notice rather than looking like nothing happened. */
+        <div className="notice" data-kind="fault" role="alert" key={errorAt}>
           <h2>Didn&rsquo;t work</h2>
           <p>{error}</p>
           {/*
@@ -5038,6 +5196,7 @@ export default function App() {
         open={sheet === 'chain'}
         onClose={() => setSheet(null)}
         title="Chain"
+        alert={sheetAlert}
         note={
           hasScenes
             ? `Scene ${scene + 1}${sceneNames[scene] ? ` · ${sceneNames[scene]}` : ''}`
@@ -5096,6 +5255,7 @@ export default function App() {
           setSheetBack(null)
         }}
         title={openBlock?.name || 'Block'}
+        alert={sheetAlert}
         /* Where these knobs land. A block's settings are per-scene, so an
            editor that doesn't name the scene is an editor you have to
            remember the context for. */

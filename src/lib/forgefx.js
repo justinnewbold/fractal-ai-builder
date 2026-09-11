@@ -112,12 +112,45 @@ export function setHost(host) {
   localStorage.setItem('forgefx.host', host.replace(/\/+$/, ''))
 }
 
+/**
+ * ForgeFX's own words for "there is no cable any more".
+ *
+ * When the Mac loses its serial port to the unit — the cable pulled, the unit
+ * switched off, another editor grabbing it, the server's port handle going
+ * stale — every call after that comes back with `port not open`, and that is
+ * what the app put on screen. Nobody knows what that means, and nobody can act
+ * on it: the log from a phone is eighty lines of it.
+ *
+ * The important part is not the wording, it's the FLAG. A refusal ("you can't
+ * rename from a phone") means the unit is fine and the old state still stands.
+ * This means nothing sent from here is reaching the unit at all, the chain on
+ * screen is no longer known to be true, and the app has to say so rather than
+ * carry on drawing switches that do nothing.
+ */
+const PORT_GONE = /\bport\s+(is\s+)?(not|isn['’]?t)\s+open\b|\bport\s+closed\b|\bno\s+port\s+open\b/i
+
+export const unitUnreachable = (message) => PORT_GONE.test(String(message || ''))
+
+const UNIT_GONE_SAYS =
+  'The Fractal app on your Mac has lost its connection to the unit — nothing sent from here is reaching it. Check the unit is on and its cable is in, then tap Try again.'
+
 class ForgeError extends Error {
   constructor(message, { status, cause } = {}) {
-    super(message)
+    const gone = unitUnreachable(message) || cause?.unitGone === true
+    super(gone ? UNIT_GONE_SAYS : message)
     this.name = 'ForgeError'
     this.status = status
     this.cause = cause
+    /*
+     * The unit cannot be reached at all, as opposed to having refused this one
+     * write. Read by the app to leave a screen it can no longer stand behind.
+     * `detail` keeps what the server actually said, for the debug log — the
+     * sentence above is for the player, the original is for the report.
+     */
+    if (gone) {
+      this.unitGone = true
+      this.detail = cause?.detail || String(message || '')
+    }
     /*
      * What the relay knew about this failure, kept rather than flattened.
      *
@@ -138,6 +171,18 @@ class ForgeError extends Error {
   }
 }
 
+/**
+ * What a failure is written down as.
+ *
+ * The player's sentence on screen, the server's own words kept beside it in
+ * the log: "port not open" is exactly what a bug report needs and exactly what
+ * a guitarist cannot act on, so the log gets both rather than choosing.
+ */
+const whyItFailed = (err) =>
+  err?.detail && err.detail !== err.message
+    ? `${err.message} (${err.detail})`
+    : err?.message || String(err)
+
 async function request(path, options = {}) {
   /*
    * A dump that arrived garbled is asked for again before anyone sees it.
@@ -150,7 +195,7 @@ async function request(path, options = {}) {
       // Every request the app makes comes through here, so this is the one
       // place a failed one is written to the debug log — after the retry has
       // had its say, so a garbled read that was asked again is not a failure.
-      logDebug('unit', `${options.method || 'GET'} ${path} failed`, err?.message || String(err))
+      logDebug('unit', `${options.method || 'GET'} ${path} failed`, whyItFailed(err))
       throw err
     }
   )

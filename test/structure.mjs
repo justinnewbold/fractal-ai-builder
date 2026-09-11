@@ -542,6 +542,55 @@ export function run(test) {
     )
   })
 
+  test('a failure inside a sheet is shown inside that sheet', () => {
+    /*
+     * "On the chain screen it always says on. When I tap one of the buttons it
+     * will turn it off on the unit, but there's no way to turn it back on."
+     *
+     * The Mac had lost its port to the unit, so every write came back refused,
+     * the store put each block back the way it found it, and the explanation
+     * went into the app's one notice — which is drawn on the page, under the
+     * sheet, on a page a sheet makes inert. A whole set of taps, each one
+     * failing, and not one word on screen about any of it.
+     *
+     * Three things hold that shut, and each one was the bug on its own:
+     * the sheet can show a failure; the app hands it the one raised since the
+     * sheet opened; and a unit that has gone closes the sheet altogether,
+     * because there is nothing to edit in a preset nothing can reach.
+     */
+    const sheet = readFileSync(new URL('../src/components/Sheet.jsx', import.meta.url), 'utf8')
+    const body = sheet.indexOf('<div className="sheet-body">')
+    assert.notEqual(body, -1, 'the sheet body is gone')
+    const alert = sheet.indexOf('sheet-alert')
+    assert.ok(alert > body, 'a failure is drawn outside the body, where the sheet does not scroll to it')
+    assert.match(sheet, /role="alert"/, 'the message is not announced')
+
+    assert.ok(
+      (src.match(/alert=\{sheetAlert\}/g) || []).length >= 2,
+      'the chain and the block editor are the two sheets that write to the unit'
+    )
+    assert.match(
+      src,
+      /const sheetAlert = sheet && error && errorSheet === sheet \? error : null/,
+      'a sheet shows an error raised somewhere else, or before it was opened'
+    )
+    assert.match(src, /setErrorSheet\(text \? sheetNow\.current : null\)/, 'nothing records where a failure happened')
+
+    // The error itself, not its sentence: only the object carries unitGone.
+    const toggle = src.slice(src.indexOf('const toggleBlock'), src.indexOf('const toggleBlock') + 2200)
+    assert.ok(!/setError\(err\.message\)/.test(toggle), 'the chain toggle flattens the error and loses why it failed')
+    assert.match(toggle, /setError\(err\)/)
+    assert.match(
+      toggle,
+      /if \(!err\?\.unitGone\) refreshBlocks\(\)/,
+      'a refused toggle trusts its own roll-back instead of asking the unit'
+    )
+
+    const lost = src.slice(src.indexOf('if (!lostUnit) return'), src.indexOf('if (!lostUnit) return') + 200)
+    assert.match(lost, /setStatus\('fault'\)/, 'a unit that has gone leaves the app looking live')
+    assert.match(lost, /setSheet\(null\)/, 'the notice is drawn under a sheet that is still over it')
+  })
+
   test('every class this app scrolls to exists somewhere that renders it', () => {
     /*
      * `.local-library` didn't. The stylesheet had a rule for it, the assistant

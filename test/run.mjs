@@ -4065,6 +4065,61 @@ test('a write nobody could check is not written again on a guess', async () => {
   }
 })
 
+test('“port not open” becomes something a guitarist can act on', async () => {
+  /*
+   * Eighty lines of one debug log, all of them this:
+   *
+   *   POST /preset/blocks/58/bypass failed — port not open
+   *
+   * That is the device server saying it has no serial port to the unit any
+   * more. What reached the screen was those four words, and only when the
+   * screen showing them was not covered by a sheet — so tapping a block's On
+   * button did nothing, said nothing, and put the button back the way it was.
+   *
+   * Two things are fixed here and both are asserted: the sentence a player
+   * reads, and the flag the app needs to know the difference between "that
+   * write was refused" and "nothing reaches the unit any more".
+   */
+  const store = { 'forgefx.host': 'http://unit.test' }
+  globalThis.localStorage = {
+    getItem: (k) => (k in store ? store[k] : null),
+    setItem: (k, v) => {
+      store[k] = String(v)
+    },
+    removeItem: (k) => {
+      delete store[k]
+    }
+  }
+  globalThis.fetch = async () => ({
+    ok: false,
+    status: 500,
+    statusText: 'Internal Server Error',
+    text: async () => JSON.stringify({ error: 'port not open' })
+  })
+
+  try {
+    const fx = await import('../src/lib/forgefx.js')
+    const err = await fx.setBypass(58, true).then(
+      () => null,
+      (e) => e
+    )
+    assert.ok(err, 'a write to a unit that is not there came back a success')
+    assert.equal(err.unitGone, true, 'the app cannot tell this from a write the unit refused')
+    assert.ok(!/port/i.test(err.message), 'the server’s own words went to the screen: ' + err.message)
+    assert.match(err.message, /lost its connection to the unit/)
+    assert.match(err.message, /Try again/, 'it says what is wrong and not what to do about it')
+    assert.equal(err.detail, 'port not open', 'the debug log lost what the server actually said')
+
+    // A refusal is not this. The old state still stands and the screen must
+    // keep it rather than tearing itself down.
+    assert.equal(fx.unitUnreachable("You can't do that from a distance"), false)
+    assert.equal(fx.unitUnreachable('Port is not open'), true, 'the same fault in the serial layer’s words')
+  } finally {
+    delete globalThis.fetch
+    delete globalThis.localStorage
+  }
+})
+
 test('a dropped link stops the send instead of failing every write after it', () => {
   const forge = readSrc(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
   assert.match(forge, /function relayGone\(err, done, total, what\)/)
@@ -4094,9 +4149,64 @@ test('Try again rejoins before it reads, which is all a reload ever did', () => 
    */
   const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
   const fn = app.slice(app.indexOf('const reconnect = useCallback'), app.indexOf('const linkAction = useCallback'))
-  assert.match(fn, /await reconnectPhone\(\)/, 'the button asks for a rejoin it does not wait for')
-  assert.ok(fn.indexOf('await reconnectPhone()') < fn.indexOf('await read()'), 'the read still runs before the rejoin')
+  assert.match(fn, /await reconnectPhone\(\{ fresh: true \}\)/, 'the button asks for a rejoin it does not wait for')
+  assert.ok(
+    fn.indexOf('await reconnectPhone({ fresh: true })') < fn.indexOf('await read()'),
+    'the read still runs before the rejoin'
+  )
   assert.ok(!/pokeLink\(\)/.test(fn), 'a scheduled poke is not a reconnection')
+})
+
+test('Try again asks for a new socket, which is the rest of what a force-quit did', async () => {
+  /*
+   * "I have to force close the app completely and then reopen it for it to
+   * connect again." Rejoining before the read fixed the case where the socket
+   * had visibly closed. This is the other one: a socket realtime-js still
+   * calls joined that the server let go of long ago. Nothing in here can tell
+   * that from a working link — the phone sends into it and simply hears
+   * nothing — so a reconnect that reuses "a channel that looks fine" reads
+   * down the same dead line every time, and only killing the app ever helped.
+   *
+   * The keepalive still reuses a good channel: it runs every few seconds and
+   * a teardown on each turn would be a link that never settles.
+   */
+  const remoteMod = await import('../src/lib/remote.js')
+  const chan = { state: 'joined' }
+  const client = {}
+  assert.equal(remoteMod.canReuseChannel(chan, { client }, client), true, 'a joined channel stopped being reusable')
+
+  const remoteSrc = readSrc(new URL('../src/lib/remote.js', import.meta.url), 'utf8')
+  assert.match(
+    remoteSrc,
+    /export async function remoteConnect\(\{ fresh = false \} = \{\}\)/,
+    'connect cannot be asked for a new socket'
+  )
+  assert.match(
+    remoteSrc,
+    /if \(!fresh && canReuseChannel\(channel, session, client\)\) return userId/,
+    'a forced rejoin is still handed the channel it was trying to replace'
+  )
+
+  const linkSrc = readSrc(new URL('../src/lib/link.js', import.meta.url), 'utf8')
+  assert.match(linkSrc, /async function join\(\{ fresh = false \} = \{\}\)/)
+  assert.match(linkSrc, /await remoteConnect\(\{ fresh \}\)/, 'the flag stops at the door')
+  /*
+   * Both Try agains, not just the one on the fault screen. The connect screen
+   * is where someone lands when the Mac has stopped answering, which is
+   * exactly when the channel is most likely to be the zombie this is about.
+   */
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  assert.equal(
+    (app.match(/reconnectPhone\(\{ fresh: true \}\)/g) || []).length,
+    2,
+    'one of the two Try agains still reuses the socket it is trying to replace'
+  )
+
+  const at = linkSrc.indexOf('async function tick()')
+  assert.notEqual(at, -1, 'the keepalive loop is gone, so nothing here is being checked')
+  const loop = linkSrc.slice(at, at + 900)
+  assert.match(loop, /await join\(\)/, 'the loop no longer joins at all')
+  assert.ok(!/join\(\{/.test(loop), 'the keepalive tears the link down every few seconds')
 })
 
 test('a poke asks now, not in three seconds', () => {
@@ -5218,12 +5328,55 @@ test('the fault notice speaks to the end it is on', () => {
   for (const role of ['mac', 'wifi']) {
     assert.equal(link.faultCopy({ role, device: { connected: false } }).title, 'No unit found')
   }
-  const noUnit = link.faultCopy({ role: 'remote', device: { connected: false } })
+  const noUnit = link.faultCopy({ role: 'remote', device: { connected: false }, asks: 5 })
   assert.match(noUnit.title, /can’t see your unit/, 'a phone is still told to check a cable it cannot reach')
-  assert.match(noUnit.body, /five times/, 'a phone is not told the asking already happened')
+  assert.match(noUnit.body, /asked five times/, 'a phone is not told the asking already happened')
+  /*
+   * And the number is the number it actually asked. Five is what a phone that
+   * was not already live does; a unit that WAS answering a moment ago gets
+   * three, and a screen at the Mac gets one — so the same "five times" was
+   * being shown over two asks that never happened.
+   */
+  assert.match(
+    link.faultCopy({ role: 'remote', device: { connected: false }, asks: 3 }).body,
+    /asked three times/
+  )
+  assert.match(link.faultCopy({ role: 'remote', device: { connected: false }, asks: 1 }).body, /asked once/)
+  assert.ok(
+    !/times/.test(link.faultCopy({ role: 'remote', device: { connected: false } }).body),
+    'a count nobody counted is still stated as fact'
+  )
   assert.ok(
     !/tap Try again/.test(noUnit.body),
     'Try again is offered as the fix for the thing that just failed five times'
+  )
+})
+
+test('a Mac that answered and has no port to the unit says exactly that', () => {
+  /*
+   * "When I tap one of the buttons it will turn it off on the unit, but
+   * there's no way to turn it back on, and the buttons always say on." The
+   * Mac was answering fine — every call came back, and what came back was
+   * `port not open`. So it is neither a Mac that went quiet nor a read that
+   * lost a race: there is nothing at the end of the cable to read, and it is
+   * the one fault that means what is on screen can no longer be trusted.
+   */
+  const phone = link.faultCopy({ role: 'remote', reason: 'unit-gone' })
+  assert.match(phone.title, /lost the unit/i)
+  assert.match(phone.body, /At the Mac/, 'the phone was not told which end to go to')
+  assert.ok(
+    !/stopped answering|hasn’t gone to sleep/i.test(phone.body),
+    'the Mac answering is what raised this — it cannot also be the thing to fix'
+  )
+
+  const here = link.faultCopy({ role: 'mac', reason: 'unit-gone' })
+  assert.match(here.title, /Lost the unit/)
+  assert.ok(!/At the Mac/.test(here.body), 'the Mac was told to go to the Mac it is already at')
+
+  // It wins over a stale device, the same way every other reason does.
+  assert.match(
+    link.faultCopy({ role: 'remote', reason: 'unit-gone', device: { connected: true, short: 'AM4' } }).title,
+    /lost the unit/i
   )
 })
 
@@ -6732,6 +6885,46 @@ test('a chain read that fails says so and keeps the last chain', async () => {
   ds.set({ blocks: chain })
   assert.equal(await ds.refreshBlocks(), null, 'a failed read reported success')
   assert.equal(ds.getSnapshot().blocks, chain, 'a failed read emptied the chain on screen')
+})
+
+test('a chain read that fails because the unit has gone is asked once, not five times', async () => {
+  /*
+   * From an iPhone log on a Mac whose port had shut: one tap on a block's On
+   * button, and then "GET /preset/blocks failed — port not open" five times
+   * over four seconds, every one of them a round trip down the relay to a Mac
+   * that had already said there was no port. Seventy-nine lines of the log are
+   * that, over and over, and the screen never said a word.
+   *
+   * Asking again is for a port that was busy for a moment. A port that is gone
+   * gives the same answer instantly, so the first one is the answer.
+   */
+  const gone = Object.assign(new Error('The Mac has lost the unit'), { unitGone: true })
+  fresh(fakeUnit({ presetBlocks: () => Promise.reject(gone) }))
+  let asks = 0
+  const list = await ds.confirmedChain({
+    read: async () => {
+      asks++
+      return ds.refreshBlocks()
+    },
+    wait: async () => {},
+    remote: true
+  })
+  assert.equal(list, null, 'a unit that cannot be reached was passed off as read')
+  assert.equal(asks, 1, 'a dead link was asked ' + asks + ' times')
+  assert.equal(ds.chainReadFailure(), gone, 'why the read failed was thrown away')
+
+  // And an ordinary busy port still gets every ask it ever did.
+  fresh(fakeUnit({ presetBlocks: () => Promise.reject(new Error('timeout')) }))
+  let busy = 0
+  await ds.confirmedChain({
+    read: async () => {
+      busy++
+      return ds.refreshBlocks()
+    },
+    wait: async () => {},
+    remote: true
+  })
+  assert.equal(busy, ds.RELAY_TRIES, 'a busy port lost the retries it needs')
 })
 
 test('a reading with the tuner off is not a reading', () => {
