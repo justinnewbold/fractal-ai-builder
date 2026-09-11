@@ -653,9 +653,33 @@ export function run(test) {
       'a refused toggle trusts its own roll-back instead of asking the unit'
     )
 
-    const lost = src.slice(src.indexOf('if (!lostUnit) return'), src.indexOf('if (!lostUnit) return') + 200)
-    assert.match(lost, /setStatus\('fault'\)/, 'a unit that has gone leaves the app looking live')
-    assert.match(lost, /setSheet\(null\)/, 'the notice is drawn under a sheet that is still over it')
+    const lost = src.slice(src.indexOf('if (!lostUnit) return'), src.indexOf('if (!lostUnit) return') + 300)
+    /*
+     * And it is a READ that decides, not one failed write. A single call can
+     * come back with the port shut while the next is answered perfectly — the
+     * Mac's own screen is asking that same port several times a second — and
+     * "my Mac is connected just fine, the phone says it has lost the unit" is
+     * what tearing the app down over one of those looks like.
+     */
+    assert.match(lost, /read\(\)\.then/, 'one failed write still tears the whole screen down')
+    assert.match(lost, /if \(live && !fresh\) setSheet\(null\)/, 'a read that worked still closes what was open')
+    assert.ok(
+      !/setStatus\('fault'\)/.test(lost),
+      'the fault is declared without asking the unit, so a read that would have answered is never made'
+    )
+
+    /*
+     * And when the notice does come up, it carries what the far end actually
+     * said. The sentence on screen is this app's translation; "port not open"
+     * is the server's own four words, and the difference between a screenshot
+     * that raises a question and one that answers it.
+     */
+    assert.match(src, /setErrorDetail\(value && typeof value !== 'string' \? value\.detail \|\| null : null\)/)
+    assert.match(
+      src,
+      /errorDetail \|\| \(faultReason === null \|\| faultReason === 'unreadable' \? error : null\)/,
+      'the fault notice drops the one line that says what came back'
+    )
   })
 
   test('every class this app scrolls to exists somewhere that renders it', () => {
@@ -1954,7 +1978,21 @@ export function run(test) {
      * the gear's height so it is still something a thumb can hit.
      */
     assert.match(chip, /const mark = said\.tone === 'good' \? 'ok' : said\.tone === 'busy' \? 'wait' : 'no'/, 'the word no longer follows the link tone')
-    assert.match(chip, /const word = mark === 'ok' \? 'connected' : mark === 'wait' \? 'connecting' : 'disconnected'/, 'the chip does not say connected or disconnected')
+    assert.match(chip, /const state = mark === 'ok' \? 'connected' : mark === 'wait' \? 'connecting' : 'disconnected'/, 'the chip does not say connected or disconnected')
+    /*
+     * And it names what it is about while something is wrong. "The phone app
+     * says it has lost the unit, but also says it's connected in the right
+     * hand corner." The left of that bar is the unit and this is the Mac;
+     * neither said so, and two states at opposite ends of one bar read as the
+     * app disagreeing with itself.
+     */
+    assert.match(chip, /const word = sayMac \? `Mac \$\{state\}` : state/, 'the word never says which thing it is about')
+    const bar = readFileSync(new URL('../src/components/TopBar.jsx', import.meta.url), 'utf8')
+    assert.match(
+      bar,
+      /sayMac=\{remote && status !== 'live'\}/,
+      'the Mac is named when the unit is answering too, where there is no confusion and no room'
+    )
     assert.match(chip, /compact \? \(\s*<span className=\{`phone-word \$\{mark\}`\} aria-hidden="true">\s*\{word\}/, 'the bar chip is a mark again, not the word')
     assert.match(chip, /aria-label=\{`\$\{said\.sentence\} — phone remote options`\}/, 'the chip has no sentence for a screen reader')
     const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')

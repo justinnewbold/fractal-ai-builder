@@ -399,6 +399,8 @@ export default function App() {
    * reader say it again.
    */
   const [errorAt, setErrorAt] = useState(0)
+  /* The far end's own words for the last failure, where it had any. See setError. */
+  const [errorDetail, setErrorDetail] = useState(null)
   /*
    * Whether the unit itself has gone, as opposed to one write being refused.
    *
@@ -434,6 +436,16 @@ export default function App() {
     const text =
       value == null ? null : typeof value === 'string' ? value : value.message || String(value)
     setErrorText(text)
+    /*
+     * What the far end actually said, kept beside the sentence a player reads.
+     *
+     * Only the errors that carry one — today that is the port being shut, where
+     * the sentence on screen is this app's translation and "port not open" is
+     * the server's own four words. Nobody can act on those four words, which is
+     * why they are not the notice; they are the difference between a screenshot
+     * that raises a question and one that answers it.
+     */
+    setErrorDetail(value && typeof value !== 'string' ? value.detail || null : null)
     setErrorAt(text ? Date.now() : 0)
     setErrorSheet(text ? sheetNow.current : null)
     if (value && typeof value !== 'string' && value.unitGone) setLostUnit(true)
@@ -861,7 +873,9 @@ export default function App() {
    * was a timeout, a refusal, or something the Mac said.
    */
   const faultWhy =
-    status === 'fault' && (faultReason === null || faultReason === 'unreadable') ? error : null
+    status !== 'fault'
+      ? null
+      : errorDetail || (faultReason === null || faultReason === 'unreadable' ? error : null)
   // Where "Leave gig" returns to. Gig takes the screen over, so coming back out
   // should land where you were rather than at a fixed default.
   const [runningPlan, setRunningPlan] = useState(false)
@@ -965,20 +979,36 @@ export default function App() {
   sheetNow.current = sheet
   const sheetAlert = sheet && error && errorSheet === sheet ? error : null
   /*
-   * A unit that has gone takes the sheet with it.
+   * A unit that has gone takes the sheet with it — once a READ says so too.
    *
    * A sheet is a surface over an inert page, so the notice explaining the
    * failure was being drawn underneath a chain sheet that could not be
    * reached, behind blocks still reading On. There is nothing to edit in a
    * preset the app cannot reach: close it, and let the fault notice — the one
    * screen in the app with a way back on it — actually be on screen.
+   *
+   * But one write is not evidence. "My Mac is connected just fine. The phone
+   * app says it has lost the unit." A single call can come back with the port
+   * shut while the next one is answered perfectly — the Mac's own screen is
+   * asking that same port several times a second — and tearing the whole app
+   * down to a red screen over one of those is how a working rig ends up
+   * looking like a broken one. So the claim is checked before it is acted on:
+   * a read, which sets the screen live again on its own if the unit answers,
+   * and only a read that fails too closes what is open. The re-reading loop
+   * below keeps asking after that, so a unit that comes back comes back.
    */
   useEffect(() => {
-    if (!lostUnit) return
-    setFaultReason('unit-gone')
-    setStatus('fault')
-    setSheet(null)
-  }, [lostUnit])
+    if (!lostUnit) return undefined
+    let live = true
+    read().then((fresh) => {
+      // read() has already set the screen: live if the unit answered, the
+      // fault notice if it did not. What is left is the sheet over it.
+      if (live && !fresh) setSheet(null)
+    })
+    return () => {
+      live = false
+    }
+  }, [lostUnit, read])
   /* Open a block's knobs, and remember what to return to. */
   const openBlockFrom = useCallback((id, from = null) => {
     setSelectedBlock(id)
