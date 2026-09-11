@@ -7576,6 +7576,56 @@ test('a reply with nothing in it says so, and says what would work', () => {
   assert.match(app, /text: replyFor\(checked\)/, 'the reply is not built by the one tested place')
 })
 
+import { progressFor } from '../src/lib/liveProgress.js'
+
+test('the working line says what the model is deciding, not how much of it there is', () => {
+  /*
+   * "Could it say which song it's designing that off of while it's doing it,
+   * or something like that — just a little bit more information on what's
+   * happening, like choosing an amp or deciding on delay."
+   *
+   * All of it was already arriving and being counted instead of read: the line
+   * said "Building your chain — 4 blocks so far" while the partial in hand
+   * named the amp model, the control being set and the scene being voiced. The
+   * fields stream in the order the schema declares them, so the last thing in
+   * the partial is the thing being decided now.
+   */
+  const named = (eid) => ({ 58: 'Amp 1', 118: 'Drive 1', 70: 'Delay 1' })[eid] || null
+
+  assert.equal(progressFor(null), null, 'an empty run claims to be doing something')
+  assert.equal(progressFor({}), null, 'a partial with nothing in it claims to be doing something')
+  assert.match(progressFor({ presetName: 'Last Resort' }), /Last Resort/)
+  assert.equal(progressFor({ presetName: 'x', summary: 'drop D' }), 'Working out the chain…')
+
+  assert.equal(
+    progressFor({ blocks: [{ eid: 58, typeName: '5153 100W Blue' }] }, named),
+    'Choosing Amp 1 — 5153 100W Blue'
+  )
+  assert.equal(
+    progressFor({ blocks: [{ eid: 58, params: [{ id: 1, name: 'Bass' }, { id: 2, name: 'Presence' }] }] }, named),
+    'Dialling Amp 1 — Presence'
+  )
+
+  /* And the scenes, which on the build this came from are the songs: "eight
+     scenes, choose eight of their most popular songs to model each scene on". */
+  assert.equal(
+    progressFor({ blocks: [{ eid: 58 }], scenes: [{ index: 0, name: 'Last Resort' }, { index: 1, name: 'Scars' }] }, named),
+    'Scene 2 — Scars'
+  )
+
+  /* Without the preset's own names it still says something true rather than
+     the unit's word for it, which nobody outside the app speaks. */
+  assert.match(progressFor({ blocks: [{ eid: 58, typeName: 'Brit 800' }] }), /eid 58/)
+
+  /* And App reads it rather than counting blocks. */
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  assert.match(app, /progressFor\(p, blockNameFor\)/, 'the partial is stored and never read for what it says')
+  assert.ok(
+    !/block\$\{e\.blocks === 1/.test(app),
+    'the working line still counts blocks over the top of what the model is doing'
+  )
+})
+
 import { landedOf } from '../src/lib/actions.js'
 
 test('the log says what happened, not everything attempted plus everything refused', () => {
@@ -7782,7 +7832,7 @@ test('the chat is the player’s Fractal agent, not a command parser', () => {
 
   // And the app sends them.
   const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
-  const send = app.slice(app.indexOf("aiUrl('/api/command'"), app.indexOf("aiUrl('/api/command'") + 1600)
+  const send = app.slice(app.indexOf('await askPlan('), app.indexOf('await askPlan(') + 1600)
   assert.match(send, /design: lastDesign/, 'the app never sends the last design')
   assert.match(send, /taste: describeProfile\(taste\)/, 'the chat gets no taste profile')
   assert.match(send, /corrections: tasteOn \? describeCorrections\(corrections\)/, 'the chat gets no corrections')
@@ -7854,9 +7904,9 @@ test('the chat can add blocks: the list reaches it, a failed read is said, a des
   assert.equal((actions.match(/await d\.placeableBlocks\(\)/g) || []).length, 2, 'placing and building do not read the remembered list')
 
   // A failure is said, not emptied.
-  const askFor = app.slice(app.indexOf('const askFor = async'), app.indexOf("aiUrl('/api/command'"))
+  const askFor = app.slice(app.indexOf('const askFor = async'), app.indexOf('await askPlan('))
   assert.match(askFor, /placeableProblem = `The block list could not be read/, 'a failed block list is still an empty list')
-  const send = app.slice(app.indexOf("aiUrl('/api/command'"), app.indexOf("aiUrl('/api/command'") + 1800)
+  const send = app.slice(app.indexOf('await askPlan('), app.indexOf('await askPlan(') + 1800)
   assert.match(send, /placeableProblem,/, 'the reason never reaches the route')
   assert.match(command, /placeableProblem: typeof placeableProblem === 'string'/, 'the route drops the reason')
   assert.match(command, /\nADDING BLOCKS\n/, 'the model is not told how adding works')

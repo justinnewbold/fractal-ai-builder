@@ -597,6 +597,50 @@ export default async function handler(req, res) {
    * and a person reading the logs can tell "the account has no Opus" from
    * "the chat is set to Sonnet".
    */
+  /*
+   * Held open while it thinks, or the phone hangs up on it.
+   *
+   * This route answers with one JSON body and says nothing until it has one.
+   * That is fine for a knob tweak and fatal for the rest: a request that made
+   * the model think for two and a half minutes came back to the phone as
+   * "That didn't work: Load failed" — iOS Safari closing a connection that
+   * had sent nothing for that long. The work was very probably finished or
+   * nearly finished; nobody will ever know, because the browser hung up.
+   *
+   * /api/generate solved this a while ago by streaming, and the fix here is the
+   * same one in miniature: say hello straight away, send a beat every ten
+   * seconds while the model is working, then send the answer as the last frame.
+   * Nothing about the answer changes — the plain JSON route is still there, and
+   * still what the phone app and anything older calls.
+   */
+  const streaming = req.query?.stream === '1' || req.headers?.['x-stream'] === '1'
+  let beating = null
+  const send = (frame) => {
+    res.write(JSON.stringify(frame) + '\n')
+    if (typeof res.flush === 'function') res.flush()
+  }
+  const stopBeating = () => {
+    if (beating) clearInterval(beating)
+    beating = null
+  }
+  if (streaming) {
+    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8')
+    res.setHeader('Cache-Control', 'no-store')
+    res.setHeader('X-Accel-Buffering', 'no')
+    send({ type: 'open' })
+    const startedAt = Date.now()
+    beating = setInterval(() => send({ type: 'waiting', ms: Date.now() - startedAt }), 10000)
+  }
+  const answer = (status, payload) => {
+    stopBeating()
+    if (!streaming) {
+      res.status(status).json(payload)
+      return
+    }
+    send(status === 200 ? { type: 'done', object: payload } : { type: 'error', error: payload.error })
+    res.end()
+  }
+
   let last = null
   let fellBackFrom = null
   for (const attempt of attempts) {
@@ -607,7 +651,7 @@ export default async function handler(req, res) {
         ;({ object, usage } = await ask(attempt, NUDGE))
       }
       const used = attempt.model
-      res.status(200).json({
+      answer(200, {
         ...object,
         _usage: {
           inputTokens: usage?.inputTokens ?? null,
@@ -629,5 +673,5 @@ export default async function handler(req, res) {
       console.warn(`command: ${fellBackFrom} refused — ${String(err?.message || err).slice(0, 300)}`)
     }
   }
-  res.status(502).json({ error: `Could not work that out: ${last?.message || 'no answer'}` })
+  answer(502, { error: `Could not work that out: ${last?.message || 'no answer'}` })
 }

@@ -1508,6 +1508,41 @@ button.slot.current {
   white-space: nowrap;
 }
 
+/*
+ * The same line, once it is also the door to the live feed.
+ *
+ * A button, because that is what it does — but it must not become one to look
+ * at: this sits in a conversation and reads as a status, and a status that
+ * grows a border and a background in the middle of a wait is a second thing
+ * happening. So the chrome is stripped and only the word on the end says it
+ * can be pressed.
+ */
+button.thinking {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  /* The touch floor, since this is now tapped mid-wait, often one-handed. */
+  min-height: 44px;
+  align-items: center;
+}
+
+.thinking-more {
+  flex: 0 0 auto;
+  font-size: var(--f-1);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--silk-dim);
+  border-bottom: 1px solid var(--rule);
+}
+
+button.thinking:hover .thinking-more {
+  color: var(--signal);
+}
+
 .thinking-bars {
   display: inline-flex;
   align-items: flex-end;
@@ -3143,6 +3178,45 @@ button.save-now:disabled {
   color: var(--silk-dim);
   padding-left: var(--s-3);
   margin-top: 2px;
+}
+
+/*
+ * The scenes, which on a build like "eight scenes, one per song" are the songs.
+ * Listed as they arrive, so the feed answers "which one is it on now" without
+ * anybody having to ask.
+ */
+.live-scenes {
+  margin-top: 10px;
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--rule);
+}
+
+.live-scene {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  font-size: var(--f-1);
+  color: var(--silk);
+  margin-top: 3px;
+}
+
+.live-scene-n {
+  flex: 0 0 auto;
+  min-width: 1.4em;
+  color: var(--signal);
+}
+
+.live-scene-on {
+  color: var(--silk-faint);
+  overflow-wrap: anywhere;
+}
+
+/* The feed is read on a phone while a tone builds, so it gets more of the
+   screen there than a 260-pixel letterbox. */
+@media (max-width: 620px) {
+  .live-body {
+    max-height: 44vh;
+  }
 }
 
 /* ==================================================================

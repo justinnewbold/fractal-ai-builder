@@ -77,6 +77,56 @@ export function run(test) {
       thinkMs < capMs,
       'the thinking budget is not shorter than the hard cap, so a live model that never starts runs to the cap'
     )
+
+    /*
+     * And the chat route's clocks, which are the same invariant on the other
+     * half of the app. It answered without streaming at all, so the only clock
+     * on it was the phone's: a two-and-a-half-minute think came back as
+     * "That didn't work: Load failed" and there was nothing in the app that
+     * could have said anything better.
+     */
+    const chat = read('src/lib/command.js')
+    const chatCap = Number(chat.match(/COMMAND_CAP_MS = (\d+)/)?.[1])
+    const chatQuiet = Number(chat.match(/COMMAND_QUIET_MS = (\d+)/)?.[1])
+    assert.ok(Number.isFinite(chatCap) && Number.isFinite(chatQuiet), 'the chat caps moved')
+    assert.ok(
+      seconds * 1000 >= chatCap,
+      `the function is cut off at ${seconds}s but the chat waits ${chatCap / 1000}s`
+    )
+    assert.ok(chatQuiet < chatCap, 'the quiet clock never fires before the chat cap does')
+  })
+
+  test('the chat route is held open while it thinks', () => {
+    /*
+     * "It created the rig, but when I said write it, it said it failed."
+     *
+     * `[error] Load failed`, two minutes and forty-six seconds after the ask.
+     * That is iOS Safari hanging up on a connection that had sent nothing since
+     * it opened — not the model failing, and not anything the app could see.
+     * /api/generate had already learnt this: say hello at once, beat every ten
+     * seconds, and the connection stays a connection.
+     *
+     * The hello has to come before the model is asked, or it says exactly as
+     * little as sending nothing did.
+     */
+    const api = read('api/command.js')
+    const hello = api.indexOf("send({ type: 'open' })")
+    assert.notEqual(hello, -1, 'the chat route never opens a stream')
+    assert.ok(
+      hello < api.indexOf('for (const attempt of attempts)'),
+      'the hello is written after the model is asked, which reaches the browser no sooner than the answer'
+    )
+    assert.match(api, /setInterval\(\(\) => send\(\{ type: 'waiting'/, 'nothing proves the model is still there')
+
+    /* And the plain body still works, because the phone app and anything older
+       ask for it. */
+    assert.match(api, /if \(!streaming\) \{[\s\S]{0,40}?res\.status\(status\)\.json\(payload\)/, 'the unstreamed answer is gone')
+
+    /* The app reads it, and says something a player can act on when the line
+       really does die — never the browser's own words for it. */
+    const client = read('src/lib/command.js')
+    assert.match(client, /load failed\|failed to fetch/i, 'a dropped connection still reaches the screen as "Load failed"')
+    assert.match(client, /askPlan/, 'nothing asks again when the line drops')
   })
 
   test('the server says hello before it asks the model anything', () => {

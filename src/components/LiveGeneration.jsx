@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { blockName, progressFor } from '../lib/liveProgress'
 
 /**
  * What the line says when there is nothing true to say yet.
@@ -20,6 +21,10 @@ import { useEffect, useRef, useState } from 'react'
  */
 export const THINKING = 'Thinking'
 
+/* Lives in lib so the test runner can import it — this file is JSX and node
+   cannot read that. Re-exported because it is read as part of this screen. */
+export { progressFor }
+
 /**
  * What the model is producing, as it produces it.
  *
@@ -27,7 +32,7 @@ export const THINKING = 'Thinking'
  * block by block. Collapsed by default — most of the time the summary line is
  * enough, and the detail is for when a result surprises you.
  */
-export function LiveGeneration({ partial, open, onToggle }) {
+export function LiveGeneration({ partial, open, onToggle, chip = true, nameOf = null }) {
   const scroller = useRef(null)
 
   useEffect(() => {
@@ -37,12 +42,17 @@ export function LiveGeneration({ partial, open, onToggle }) {
   if (!partial) return null
 
   const blocks = partial.blocks || []
+  const scenes = partial.scenes || []
 
   return (
     <div className="live-gen">
-      <button className="chip" onClick={onToggle} aria-expanded={open}>
-        {open ? 'Hide live output' : `Live output · ${blocks.length} block${blocks.length === 1 ? '' : 's'}`}
-      </button>
+      {/* Hidden while the run is live: the working line above owns the toggle
+          then, and two controls for one panel is one too many. */}
+      {chip ? (
+        <button className="chip" onClick={onToggle} aria-expanded={open}>
+          {open ? 'Hide live output' : `Live output · ${blocks.length} block${blocks.length === 1 ? '' : 's'}`}
+        </button>
+      ) : null}
 
       {open ? (
         <div className="live-body" ref={scroller}>
@@ -57,7 +67,9 @@ export function LiveGeneration({ partial, open, onToggle }) {
           {blocks.map((block, i) => (
             <div className="live-block" key={block?.eid ?? i}>
               <div className="live-block-head mono">
-                <span>eid {block?.eid ?? '…'}</span>
+                {/* The block's own name where the preset has one. "eid 58" is
+                    the unit's word for it and nobody else's. */}
+                <span>{blockName(block?.eid, nameOf)}</span>
                 {block?.typeName ? <span className="live-model">{block.typeName}</span> : null}
                 {block?.bypassed === true ? <span className="tag off">bypass</span> : null}
               </div>
@@ -69,6 +81,30 @@ export function LiveGeneration({ partial, open, onToggle }) {
               ))}
             </div>
           ))}
+
+          {/*
+            And the scenes, which is where the songs are.
+
+            "If it's designing a tone model after each song, could it say which
+            song it's creating that off of while it's doing it." It can: an
+            eight-scene build names each scene after the song it is voicing, so
+            the scene list IS that answer — as it arrives, one at a time.
+          */}
+          {scenes.length ? (
+            <div className="live-scenes">
+              {scenes.map((scene, i) => (
+                <div className="live-scene mono" key={scene?.index ?? i}>
+                  <span className="live-scene-n">{(scene?.index ?? i) + 1}</span>
+                  <span>{scene?.name || '…'}</span>
+                  {(scene?.engaged || []).length ? (
+                    <span className="live-scene-on">
+                      {scene.engaged.map((eid) => blockName(eid, nameOf)).join(' · ')}
+                    </span>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           {partial.notes ? <p className="live-summary">{partial.notes}</p> : null}
         </div>
@@ -136,7 +172,25 @@ function aside(seconds, typicalMs) {
   return ''
 }
 
-export function Thinking({ message, active, startedAt, typicalMs = null }) {
+export function Thinking({
+  message,
+  active,
+  startedAt,
+  typicalMs = null,
+  /*
+   * The way into the live feed, on the line people are already staring at.
+   *
+   * "Would be nice if tapping on thinking shows actually more of the output
+   * while it's happening, like a live feed of everything." The feed already
+   * existed and hid behind a separate chip below this line, which is one more
+   * thing to notice while waiting. So the line becomes the control the moment
+   * there is anything to show — and stays a plain line before that, because a
+   * button that opens nothing is worse than no button.
+   */
+  live = false,
+  open = false,
+  onToggle = null
+}) {
   const [now, setNow] = useState(Date.now())
   const running = !!(active || message)
 
@@ -166,8 +220,8 @@ export function Thinking({ message, active, startedAt, typicalMs = null }) {
     more = aside(seconds, typicalMs)
   }
 
-  return (
-    <div className="thinking" role="status" aria-live="polite">
+  const body = (
+    <>
       <span className="thinking-bars" aria-hidden="true">
         <i />
         <i />
@@ -184,6 +238,30 @@ export function Thinking({ message, active, startedAt, typicalMs = null }) {
           </span>
         ) : null}
       </span>
+      {live ? (
+        <span className="thinking-more">{open ? 'Hide' : 'Watch it'}</span>
+      ) : null}
+    </>
+  )
+
+  if (live && onToggle) {
+    return (
+      <button
+        type="button"
+        className="thinking thinking-tap"
+        onClick={onToggle}
+        aria-expanded={open}
+        role="status"
+        aria-live="polite"
+      >
+        {body}
+      </button>
+    )
+  }
+
+  return (
+    <div className="thinking" role="status" aria-live="polite">
+      {body}
     </div>
   )
 }

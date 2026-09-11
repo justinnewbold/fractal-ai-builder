@@ -692,7 +692,7 @@ export function run(test) {
      */
     const threw = src.indexOf('the local matcher threw and was ignored', at)
     assert.notEqual(threw, -1, 'the watching block no longer has its own catch')
-    const between = src.slice(threw, src.indexOf("aiUrl('/api/command'", threw))
+    const between = src.slice(threw, src.indexOf('await askPlan(', threw))
     assert.ok(!between.includes('would'), 'what the matcher decided is read after the watching block')
 
     /*
@@ -1190,7 +1190,7 @@ export function run(test) {
      * came back with "I only have indexes" — and a plan aimed at scene 2 was
      * checked without knowing scene 3 was live, so it wrote to scene 3.
      */
-    const at = src.indexOf("aiUrl('/api/command'")
+    const at = src.indexOf('await askPlan(')
     assert.notEqual(at, -1)
     const body = src.slice(at, at + 900)
     assert.match(body, /\n\s*scene,\s*\n\s*sceneNames,\s*\n\s*sceneCount/, 'the chat request no longer carries the scene names')
@@ -1937,11 +1937,32 @@ export function run(test) {
       !/className="thinking-bars"/.test(src),
       'App draws its own copy of the working line - the bars belong to <Thinking>, and a second set of them is a second line saying the same thing'
     )
-    assert.match(
-      src.replace(/\s+/g, ' '),
-      /<Thinking message=\{progress\} active=\{thinking\} startedAt=\{genStarted\} typicalMs=\{typicalMs\(past\)\} \/>/,
-      'the one working line has lost the elapsed clock, which was the only thing the third line knew that the other two did not'
-    )
+    /* The element, not the word. The comments around here name <Thinking> as
+       well, and the first hit was one of them. */
+    const drawn = src.indexOf('<Thinking\n')
+    assert.notEqual(drawn, -1, 'the working line is no longer drawn')
+    const line = src.slice(drawn, src.indexOf('/>', drawn))
+    for (const prop of ['message={progress}', 'active={thinking}', 'startedAt={genStarted}', 'typicalMs={typicalMs(past)}']) {
+      assert.ok(
+        line.includes(prop),
+        `the one working line has lost ${prop} — the clock was the only thing the third line knew that the other two did not`
+      )
+    }
+
+    /*
+     * And it is the way into the live feed, once there is one.
+     *
+     * "Would be nice if tapping on thinking shows actually more of the output
+     * while it's happening, like a live feed of everything." The feed was
+     * behind a separate chip under this line, which is one more thing to spot
+     * while waiting on a wait.
+     */
+    assert.ok(line.includes('live={!!partial}'), 'the working line cannot be tapped to watch the output')
+    assert.ok(line.includes('onToggle='), 'the working line is tappable and does nothing')
+    const shown = src.indexOf('<LiveGeneration\n')
+    assert.notEqual(shown, -1, 'the live feed is no longer drawn')
+    const feed = src.slice(shown, src.indexOf('/>', shown))
+    assert.ok(feed.includes('chip={!thinking}'), 'two controls open the same panel while a tone is building')
 
     /*
      * And it says which of the two waits is running. The server sends a hello
@@ -4215,17 +4236,29 @@ export function run(test) {
      * read every one of them back, the preset saved — and none of it was in
      * the signal path. Nothing in the app looked, so nothing said so.
      *
-     * Both places that build a chain wire the row afterwards now, and the
-     * wire starts at the column BEFORE the first block, which is the input.
-     * A row joined from block to block but never fed is just as silent.
+     * Both places that build a chain wire the row afterwards now.
+     *
+     * It used to start one column BEFORE the first block, on the belief that
+     * the input needed joining to the chain like anything else. The unit never
+     * once accepted it — "srcCol out of range (1..13): 0" on every build, and
+     * every log line reading "6 of 7 cables — refused at columns -1". There is
+     * no such cable: the FM3 stores one set of links between each pair of its
+     * fourteen columns, the input feeds the first column by itself, and the
+     * thirteenth is the last that has a next one to reach.
      */
     const fx = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
     const wire = fx.slice(fx.indexOf('export async function wireRow'))
     assert.ok(wire, 'nothing wires a row of the grid')
+    const loop = wire.slice(wire.indexOf('for (let col'), wire.indexOf('const refused'))
+    assert.match(loop, /for \(let col = 0;/, 'the wire skips the first block, or asks for a cable the unit has no place for')
     assert.match(
-      wire.slice(0, wire.indexOf('}\n')),
-      /for \(let col = -1;/,
-      'the wire starts at the first block rather than at the input, so nothing feeds the chain'
+      loop,
+      /Math\.min\(lastCol, LAST_CABLE_COL\)/,
+      'the wire runs past the last column that can start a cable, which the unit throws out'
+    )
+    assert.ok(
+      !/col = -1/.test(wire),
+      'the wire still asks the unit for a cable out of the input, which it has always refused'
     )
 
     const actions = readFileSync(new URL('../src/lib/actions.js', import.meta.url), 'utf8')
