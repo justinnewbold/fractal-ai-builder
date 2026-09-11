@@ -110,7 +110,7 @@ import {
 } from './lib/forgefx'
 import { savePreset, buildEntry, deletePreset, typicalMs, notOnAccount } from './lib/history'
 import { costOf } from './lib/cost'
-import { isDemo, setDemo } from './lib/forgefx'
+import { isDemo, setDemo, resetCacheClear } from './lib/forgefx'
 import {
   detect,
   currentPreset,
@@ -1106,6 +1106,16 @@ export default function App() {
   const reconnect = useCallback(async () => {
     setBusy(true)
     setError(null)
+    /*
+     * Ask this Mac again whether it takes a cache clear.
+     *
+     * Whether a write can be verified from a phone depends on the device
+     * server at the OTHER end, which is the one thing a reconnect can change —
+     * a Mac that refused it an hour ago may have taken the update since. The
+     * answer is remembered per session precisely so it is not asked before
+     * every write, and this is the moment it is worth asking again.
+     */
+    resetCacheClear()
     try {
       /*
        * The rejoin is AWAITED, which is the whole difference between this

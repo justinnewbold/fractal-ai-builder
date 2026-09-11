@@ -1380,22 +1380,39 @@ const CACHE_IS_LOCAL = 'the unit only clears its cache at the Mac'
  * Called before any read whose accuracy decides something: verifying a write,
  * or building the schema a generation will be computed against.
  */
+/*
+ * Whether this Mac's device server will take the clear at all.
+ *
+ * It travels the relay now — the pinned fork gives remoteAllowed() a DELETE
+ * branch for exactly this path — but a Mac that has not taken the update yet
+ * refuses it, every time, and this is called before every verified write. One
+ * iPhone log carried thirty copies of that refusal with six real errors from
+ * the unit buried among them.
+ *
+ * So the answer is learned once and kept: asked on the first write of a
+ * session, and if that Mac says no, not asked again until the app is pointed
+ * at a different one. The cost of being wrong in either direction is one round
+ * trip, and the alternative — assuming the answer from the app's own version —
+ * would be wrong on exactly the pairing that matters, a new phone driving an
+ * old Mac.
+ */
+let cacheClearRefused = false
+
+/** A different Mac answers differently. Called wherever the link changes. */
+export function resetCacheClear() {
+  cacheClearRefused = false
+}
+
 export const clearDeviceCache = () => {
   if (mock) return tick().then(() => ({ ok: true }))
-  /*
-   * From a phone this is a question we already know the answer to.
-   *
-   * The route is local-only — the host's own remoteAllowed() has no DELETE at
-   * all, and shared/relay-rules.mjs matches it — so the request never left the
-   * handset anyway. What it did do was write a line to the debug log every
-   * time, and this is called before every verified write: a 110-line log from
-   * an iPhone carried thirty copies of the same refusal, and six real errors
-   * from the unit were buried in among them.
-   *
-   * So it is refused here, in one line, without pretending to have asked.
-   */
-  if (remoteActive()) return Promise.reject(new ForgeError(CACHE_IS_LOCAL))
-  return request('/device/cache', { method: 'DELETE' })
+  if (cacheClearRefused) return Promise.reject(new ForgeError(CACHE_IS_LOCAL))
+  return request('/device/cache', { method: 'DELETE' }).catch((err) => {
+    /* A refusal is about this host and will not change while it is the host.
+       Anything else — a timeout, a dropped relay — is about this moment, and
+       asking again next write is right. */
+    if (err?.status === 403 || err?.remoteBlocked) cacheClearRefused = true
+    throw err
+  })
 }
 
 /**

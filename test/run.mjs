@@ -3201,7 +3201,16 @@ test('the relay refuses what the host refuses', () => {
   // Version moves are host-refused too; the mirror used to allow them, so the
   // request died as a raw relay error instead of an explanation.
   assert.ok(forbiddenRemotely('POST', '/version/3/restore'))
-  assert.ok(forbiddenRemotely('DELETE', '/device/cache'))
+  /*
+   * The cache clear travels now — the pinned fork gives remoteAllowed() a
+   * DELETE branch for this one path. Without it nothing a phone wrote could be
+   * verified, because verifying means clearing this cache and reading back.
+   */
+  assert.equal(forbiddenRemotely('DELETE', '/device/cache'), null)
+  // And DELETE opened for that path and nothing else.
+  assert.ok(forbiddenRemotely('DELETE', '/store/config/layouts'))
+  assert.ok(forbiddenRemotely('DELETE', '/preset/blocks/58/params/1'))
+  assert.ok(forbiddenRemotely('DELETE', '/device'))
 })
 
 test('live performance edits travel fine', () => {
@@ -3268,6 +3277,10 @@ test('the mirror agrees with the host about every route this app calls', () => {
         ].includes(p) ||
         /^\/am4\/(bypass|scene|preset)$/.test(p)
       )
+    // Added to the host on the pinned fork — see desktop/forgefx.lock.json.
+    // A read-side hint: it stores no value and reaches no slot, and without it
+    // a remote client cannot verify a single write.
+    if (method === 'DELETE') return p === '/device/cache'
     return false
   }
 
@@ -3779,6 +3792,7 @@ test('a write nobody could check is not written again on a guess', async () => {
 
   try {
     const fx = await import('../src/lib/forgefx.js')
+    fx.resetCacheClear()
     const res = await fx.setParamConfirmed(9, 3, 5, { name: 'Tone', min: 0, max: 10 })
 
     assert.equal(res.ok, false, 'a check that proved nothing was reported as a success')
@@ -3790,7 +3804,38 @@ test('a write nobody could check is not written again on a guess', async () => {
 
     const reads = seen.filter((c) => c.startsWith('GET ') && c.includes('/params'))
     assert.deepEqual(reads, [], 'a read whose answer may not be believed still cost a round trip')
+
+    /*
+     * And a Mac that refuses it is asked once, not once per write.
+     *
+     * The clear travels the relay now — the pinned fork allows it — but a Mac
+     * that has not taken that update refuses every time, and this runs before
+     * every verified write. One iPhone log carried thirty copies of the same
+     * refusal with six real errors from the unit buried among them. So the
+     * answer is learned and kept until the link changes.
+     */
+    const askedFirst = seen.filter((c) => c === 'DELETE /device/cache').length
+    assert.equal(askedFirst, 1, 'the first write asked ' + askedFirst + ' times')
+    seen.length = 0
+    await fx.setParamConfirmed(9, 4, 5, { name: 'Level', min: 0, max: 10 })
+    assert.deepEqual(
+      seen.filter((c) => c === 'DELETE /device/cache'),
+      [],
+      'a refusal it had already been given was asked for again'
+    )
+
+    // Until the link changes, which is the one thing that can change the answer.
+    fx.resetCacheClear()
+    seen.length = 0
+    await fx.setParamConfirmed(9, 5, 5, { name: 'Mix', min: 0, max: 100 })
+    assert.equal(
+      seen.filter((c) => c === 'DELETE /device/cache').length,
+      1,
+      'reconnecting to a Mac that may have been updated still never asks it'
+    )
   } finally {
+    const fx = await import('../src/lib/forgefx.js')
+    fx.resetCacheClear()
     delete globalThis.fetch
     delete globalThis.localStorage
   }
