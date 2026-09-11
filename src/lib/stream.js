@@ -74,12 +74,24 @@ const HARD_CAP_MS = 240000
  * doubled it: "stuck thinking for almost 4 minutes, finally had to stop it",
  * with the screen saying Thinking the whole way.
  *
- * So this one counts from the hello and is not restarted by a beat. Two
- * minutes is longer than any tone should need before its first line, and
- * past it the honest thing is to stop and say so, rather than prove for
- * another two minutes that the model is still there.
+ * So this one counts from the hello and is not restarted by a beat. Past it the
+ * honest thing is to stop and say so, rather than prove for another two minutes
+ * that the model is still there.
+ *
+ * Two minutes was that line, and the biggest ask this app takes walked
+ * straight through it: "create a full rig, 8 scenes, Papa Roach, choose eight
+ * of their most popular songs to model each scene to each song" — a whole
+ * preset, every scene, eight distinct voicings and a band's catalogue to pick
+ * from. The log says it plainly: thinking at every beat for 120 seconds, then
+ * stopped by this clock with nothing written. A request that size is a couple
+ * of minutes of thought before the first word, and being cut off at two of
+ * them is the app refusing the thing it is for.
+ *
+ * Three, then, which still leaves a minute of the hard cap for the writing
+ * itself. The wait is not silent while it runs: the line says what it is doing
+ * and counts the seconds, and Stop is there throughout.
  */
-const THINK_MS = 120000
+const THINK_MS = 180000
 
 /**
  * What happened, in order, on the last few generations.
@@ -376,7 +388,7 @@ async function attemptOnce(
         throw fail(
           `The AI had your request and thought about it for ${Math.round(
             thinkMs / 1000
-          )} seconds without starting to write the tone, so we stopped waiting. Nothing was written to your unit. A whole preset takes longer than a tweak — ask again, or ask for it in fewer words.`,
+          )} seconds without starting to write the tone, so we stopped waiting. Nothing was written to your unit. A whole rig with every scene is the biggest ask there is — try building the chain first, then asking for the scenes.`,
           'stalled',
           true
         )
