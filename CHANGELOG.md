@@ -3,6 +3,31 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.165.0
+
+**A saved tone reloaded onto an empty slot now builds its own chain.** Asking
+for a tone on an empty preset has put a chain in first since 7.140, because
+that is plainly what you meant. Reloading a tone you already made is the same
+sentence and never learned it: the saved design was checked against a preset
+with nothing in it, every change was dropped for naming a block that was not
+there, and the app told you to go and type "add an amp and a cab" yourself.
+
+From a real log: slot 478 empty, nine changes proposed, nine dropped, none
+written, and the empty preset saved back to 478 — then Chain, correctly,
+showing an empty chain. The blocks now come from the design's own record of
+what it was made of, so what gets placed is what that tone actually needs
+rather than a generic starter chain, and a copy of the slot is taken first the
+same way the design path takes one.
+
+**And an empty chain says so.** It was two signal arrows with a gap between
+them, which reads as a panel that failed to load rather than as a preset with
+nothing in it yet.
+
+**Blocks are resolved by name as well as by slug when a chain is built.** The
+model says "drive"; a saved design says "Amp 1", "Cab 1", "Vol/Pan 1" — those
+are the names it recorded when it was made, and putting them back has to work.
+Two names that mean the same block now place it once rather than twice.
+
 ## 7.164.0
 
 **The preset list, a third time, and this time it does not depend on the thing

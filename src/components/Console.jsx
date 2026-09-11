@@ -94,6 +94,22 @@ export function Chain({ blocks, selected, onSelect, onToggle }) {
       {/* No heading. A row of coloured, three-letter tiles between two signal
           arrows is not something anyone needs told is the effects chain, and
           on a phone that word cost more vertical space than a tile. */}
+      {/*
+        An empty preset says so.
+
+        "I tapped chain and it doesn't show me the chain." It was showing it:
+        the preset had nothing in it, so the strip was two signal arrows with a
+        gap between them — which reads as a panel that failed to load rather
+        than as a preset with nothing in it yet. The strip is a row of tiles
+        and cannot say anything on its own; this is the sentence that can.
+      */}
+      {chain.length === 0 ? (
+        <p className="hint chain-empty">
+          Nothing in this preset yet — no blocks to show. Open <strong>Add, remove and move
+          blocks</strong> below to put some in, or ask for a tone and they will be placed for you.
+        </p>
+      ) : null}
+
       <div className="chain-strip" ref={strip}>
         <span className="io-arrow" aria-hidden="true">
           ▶

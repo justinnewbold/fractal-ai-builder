@@ -748,9 +748,31 @@ export function validatePlan(plan, blocks, capabilities) {
           run: async () => {
             const d = await device()
             const list = await d.placeableBlocks()
-            const chain = order
-              .map((slug) => list.find((b) => b.slug === slug))
-              .filter(Boolean)
+            /*
+             * Resolved the way every other placement in this file resolves a
+             * block, rather than by an exact slug match.
+             *
+             * The model says "drive"; a saved design says "Amp 1", "Cab 1",
+             * "Vol/Pan 1" — those are the names it recorded when it was made,
+             * and reloading one into an empty preset has to be able to put
+             * them back. resolvePlaceable already knows that "Amp 1" is the
+             * first amp and that a player's word may be an alias; an equality
+             * test against a slug knows neither.
+             *
+             * Deduplicated by the block the unit would place, because two
+             * names that resolve to the same one are one block, not two — and
+             * placing it twice is a write nobody asked for.
+             */
+            const seen = new Set()
+            const chain = []
+            for (const word of order) {
+              const found = resolvePlaceable(list, word)
+              if (!found) continue
+              const id = found.page ?? found.effectId
+              if (seen.has(id)) continue
+              seen.add(id)
+              chain.push(found)
+            }
             if (!chain.length) throw new Error('This unit offers none of those blocks.')
 
             const width = cols || chain.length

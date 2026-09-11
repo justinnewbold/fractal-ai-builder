@@ -715,6 +715,47 @@ export function run(test) {
     assert.ok(!/fetch\(|localStorage|document\.|window\./.test(lib), 'the matcher reaches outside itself')
   })
 
+  test('a saved tone reloaded onto an empty slot builds its own chain', () => {
+    /*
+     * "After loading a scene from history and saving I tapped chain and it
+     * doesn't show me the chain."
+     *
+     * It was showing it. The debug log says exactly what happened: slot 478
+     * was empty, the saved design proposed 9 changes, all 9 were dropped for
+     * naming blocks that were not there, 0 were written, and the empty preset
+     * was saved back to 478.
+     *
+     * Asking for a tone on an empty preset has built a chain first since
+     * 7.140. Reloading a tone you already made is the same sentence and never
+     * learned it — it checked the spec against nothing and told the player to
+     * go and type "add an amp and a cab" themselves.
+     */
+    const reload = src.slice(src.indexOf('const reload = async'), src.indexOf('const forget = ') > src.indexOf('const reload = async') ? src.indexOf('const forget = ') : undefined)
+    const body = reload.slice(0, reload.indexOf('\n  }\n'))
+    assert.match(body, /EXCLUDED_BLOCKS\.includes\(b\.slug\)/, 'a reload cannot tell an empty preset from a full one')
+    assert.match(body, /kind: 'buildChain'/, 'a saved tone reloaded onto an empty slot still has nothing to land on')
+    /* The design's own blocks, not a generic starter chain: what gets placed
+       is what this tone actually needs. */
+    assert.match(body, /entry\.blockNames \|\| \[\]/, 'the chain is built from something other than the design itself')
+    /* Built BEFORE the spec is checked, or the check is against nothing again. */
+    assert.ok(
+      body.indexOf("kind: 'buildChain'") < body.indexOf('validateSpec('),
+      'the chain is built after the spec has already been checked against an empty preset'
+    )
+    /* And a copy of the slot before the first structural write, the same
+       precaution the design path takes. */
+    assert.match(body, /backupPreset\(preset\.number\)/, 'a structural write goes in with no copy of what was there')
+
+    /* And an empty chain says so rather than drawing two arrows and a gap. */
+    const console_ = readFileSync(new URL('../src/components/Console.jsx', import.meta.url), 'utf8')
+    const strip = console_.slice(console_.indexOf('export function Chain('))
+    assert.match(
+      strip.slice(0, strip.indexOf('chain-strip')),
+      /chain\.length === 0/,
+      'a preset with nothing in it draws an empty strip and explains nothing'
+    )
+  })
+
   test('the preset list opens on the one you are standing on, and keeps trying', () => {
     /*
      * "When opening the preset menu, have it scrolled to where the current

@@ -2867,8 +2867,104 @@ export default function App() {
     ])
     try {
       setProgress('Reading what the unit has loaded...')
+
+      /*
+       * A SAVED TONE LANDING ON AN EMPTY SLOT BUILDS ITS OWN CHAIN.
+       *
+       * Asking for a tone on an empty preset has built one first since 7.140 —
+       * "ask for a tone on an empty preset and the chain gets built first,
+       * because that is plainly what you meant". Reloading a tone you already
+       * made is the same sentence and never learned it: the spec was checked
+       * against a preset with nothing in it, every change was dropped for
+       * naming a block that was not there, and the app told the player to go
+       * and type "add an amp and a cab" themselves.
+       *
+       * That is what happened here, verbatim: 9 changes proposed, 9 dropped,
+       * 0 written, and a preset saved to slot 478 with nothing in it — then
+       * Chain, correctly, showing an empty chain.
+       *
+       * The blocks come from the design's own record of what it was made of,
+       * so what gets placed is what this tone actually needs rather than a
+       * generic starter chain.
+       */
+      /*
+       * Judged from the store rather than a fresh read, the same way the
+       * design path judges it. The store is what the chain strip and the Play
+       * screen are already drawn from; asking the unit again here would put a
+       * round trip over the relay in front of every reload to answer a
+       * question the app can already answer.
+       *
+       * "Empty" means nothing you can EDIT, not nothing at all — an empty slot
+       * still reports its input and output rows, and counting those was the
+       * gap that made both of the earlier hardware failures.
+       */
+      const editable = (blocks || []).filter((b) => !EXCLUDED_BLOCKS.includes(b.slug))
+      let ground = blocks
+      if (!editable.length) {
+        /*
+         * A verbatim copy before the first structural write, the same
+         * precaution the design path takes for the same reason: "empty" is
+         * this app's own read, and this is a path that changes what blocks
+         * exist. Best effort — a phone is refused the dump, and the unsaved
+         * buffer can still be thrown away by reloading the preset.
+         */
+        if (!safety && typeof preset?.number === 'number') {
+          try {
+            const dump = await backupPreset(preset.number)
+            if (dump?.bytes?.length) {
+              setSafety({ number: preset.number, name: preset.name, bytes: dump.bytes })
+            }
+          } catch {
+            // Not every device, and never from a phone. See above.
+          }
+        }
+
+        setProgress('Empty slot — putting the chain in first...')
+        setTurns((prev) => [
+          ...prev,
+          { role: 'system', text: `Empty slot — putting "${entry.name}"'s blocks in first.` }
+        ])
+        const built = validatePlan(
+          {
+            actions: [
+              {
+                kind: 'buildChain',
+                /* The design's own blocks, in the order it recorded them.
+                   Empty falls through to the default chain, which is better
+                   than refusing. */
+                text: (entry.blockNames || []).join(', ') || null,
+                why: 'empty preset'
+              }
+            ]
+          },
+          [],
+          { ...(device?.capabilities || {}), remote: remoteActive() }
+        )
+        const failures = await runPlan(built.actions, (done, total, label) =>
+          setProgress(`${done} of ${total} - ${label}`)
+        )
+        if (failures.length) throw new Error(failures.join(' · '))
+        record('grid', `Built "${entry.name}"'s chain into the empty slot`, [], true)
+        /* Taken from read's return rather than state, which has not caught up
+           — and busy goes back on, because read hands it back on its way out
+           and the rest of this is still running. */
+        ground = (await read()) || blocks
+        setBusy(true)
+        const landed = (ground || []).filter((b) => !EXCLUDED_BLOCKS.includes(b.slug))
+        if (landed.length) {
+          setTurns((prev) => [
+            ...prev,
+            {
+              role: 'system',
+              text: `Chain in: ${landed.map((b) => `${b.name || b.slug} (${b.effectId})`).join(', ')}`
+            }
+          ])
+        }
+      }
+
+      setProgress('Reading what the unit has loaded...')
       const schema = await readSchema(
-        blocks,
+        ground,
         (done, total, name) => setProgress(`Reading ${name} - ${done} of ${total}`),
         // Designing or rebuilding a whole preset starts from the unit, not from
         // what we last wrote to it.
