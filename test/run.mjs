@@ -3664,6 +3664,115 @@ test('the health probe asks for no grace, because it is what decides the grace',
   assert.match(probe.slice(0, 900), /graceMs: 0/, 'the probe that tests the link would wait out the link’s own grace period')
 })
 
+test('the plain requests never needed a model, and the rest still do', async () => {
+  /*
+   * "Scene 3." "Bypass the delay." "Tempo 120." Every one of those went to
+   * Sonnet 5, cost real money and took a round trip, for a sentence with one
+   * reading and no judgement in it.
+   *
+   * The cost of the two mistakes is not symmetric, and the whole design turns
+   * on that: a miss costs nothing — the request goes to the model exactly as
+   * it does today — and a wrong match writes something to a unit somebody is
+   * about to play. So most of what is asserted here is what must NOT match.
+   */
+  const { matchLocal, matchRename } = await import('../src/lib/localCommands.js')
+
+  const amp = { eid: 100, name: 'Amp 1', slug: 'amp' }
+  const delay1 = { eid: 101, name: 'Delay 1', slug: 'delay' }
+  const reverb = { eid: 102, name: 'Reverb 1', slug: 'reverb' }
+  const drive = { eid: 103, name: 'Drive 1', slug: 'drive' }
+  const delay2 = { eid: 104, name: 'Delay 2', slug: 'delay' }
+
+  const ctl = (block, id, name, value, min, max, unit) => ({
+    block,
+    param: { id, name, value, min, max, ...(unit ? { unit } : {}) }
+  })
+  const simple = {
+    sceneCount: 8,
+    blocks: [amp, delay1, reverb, drive],
+    controls: [
+      ctl(amp, 1, 'Gain 1', 5, 0, 10),
+      ctl(amp, 2, 'Treble 1', 5, 0, 10),
+      ctl(delay1, 3, 'Mix', 20, 0, 100),
+      ctl(amp, 4, 'Master Volume', 5, 0, 10)
+    ]
+  }
+
+  const hit = (text, ctx = simple) => matchLocal(text, ctx)
+
+  // ── the ones worth catching ───────────────────────────────────────────
+  assert.deepEqual(hit('scene 3'), { kind: 'setScene', value: 2, why: 'Scene 3.' })
+  assert.equal(hit('go to scene 2 please')?.value, 1, 'politeness sent it to the model')
+  assert.equal(hit('tempo 120')?.value, 120)
+  assert.equal(hit('set the tempo to 88')?.value, 88)
+  assert.equal(hit('140 bpm')?.value, 140)
+  assert.equal(hit('bypass the delay')?.eid, delay1.eid)
+  assert.equal(hit('turn the reverb off')?.flag, true)
+  assert.equal(hit('can you turn the delay on')?.flag, false)
+  assert.equal(hit('amp to channel B')?.text, 'B')
+  assert.equal(hit('set the treble to 7')?.value, 7)
+  assert.equal(hit('master volume to 6')?.paramId, 4, 'a two-word control name')
+  assert.equal(matchRename('name it Black Album')?.text, 'Black Album', 'the capitals were lost')
+
+  // A nudge lands on the control, in the right direction, from where it is.
+  const up = hit('more treble')
+  assert.equal(up?.paramId, 2)
+  assert.ok(up.value > 5, 'more went down')
+  assert.equal(hit('turn the treble down a bit')?.value, 5 - (10 - 0) * 0.08)
+
+  /*
+   * The player's own habit beats the fallback fraction. corrections.js has
+   * been watching which controls get reached for after a generation and by how
+   * much, and a median of somebody's own past moves is a better answer to "a
+   * bit more treble" than a share of the range.
+   */
+  const learned = hit('more treble', { ...simple, learnedStep: (n) => (n === 'Treble 1' ? 1.5 : null) })
+  assert.equal(learned.value, 6.5, 'the learned step was ignored')
+
+  // ── the ones that must fall through ───────────────────────────────────
+  const through = [
+    'make it brighter',                      // judgement: which control?
+    'give me a black album tone',            // a design, not a change
+    'bypass the delay and make it brighter', // half a request is worse than none
+    'why did you pick that amp',             // a question
+    'scene 9',                               // no such scene
+    'tempo 5000',                            // not a tempo
+    'set the treble to 40',                  // outside the control's range
+    'channel b',                             // which block?
+    'turn it off',                           // which block?
+    'a bit more of that thing'               // nothing named
+  ]
+  for (const text of through) {
+    assert.equal(hit(text), null, `matched "${text}", which needs the model`)
+  }
+
+  // ── ambiguity is a miss, however it arises ────────────────────────────
+  const crowded = {
+    sceneCount: 8,
+    blocks: [amp, delay1, delay2, drive],
+    controls: [ctl(amp, 1, 'Gain 1', 5, 0, 10), ctl(drive, 9, 'Gain', 4, 0, 10)]
+  }
+  for (const text of ['bypass the delay', 'gain to 8', 'more gain']) {
+    assert.equal(hit(text, crowded), null, `"${text}" was answered on a preset where it is ambiguous`)
+  }
+  /*
+   * And the instance number is the player's to supply. With one, it IS the
+   * disambiguation; without one, "Gain 1" and "Gain" are the same word in two
+   * places and picking the unsuffixed one would be a confident wrong answer.
+   */
+  assert.equal(hit('bypass delay 2', crowded)?.eid, delay2.eid)
+  assert.equal(hit('amp gain to 8', crowded)?.eid, amp.eid)
+  assert.equal(hit('drive gain to 8', crowded)?.eid, drive.eid)
+  // A preset holding only Delay 1 must not answer "delay 2" with it.
+  assert.equal(hit('bypass delay 2'), null, 'a block that is not there was bypassed anyway')
+
+  // Nothing at all, and something far too long, are both misses rather than throws.
+  assert.equal(hit(''), null)
+  assert.equal(hit('   '), null)
+  assert.equal(hit('x'.repeat(400)), null)
+  assert.equal(matchRename('call it ' + 'x'.repeat(40)), null, 'a name the unit cannot hold')
+})
+
 test('every model on the unit can be looked up by what it really is', async () => {
   /*
    * "Add an info page like this to settings listing the real life equivalents

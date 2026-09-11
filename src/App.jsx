@@ -72,6 +72,7 @@ import {
   rememberNote,
   summariseCorrections
 } from './lib/corrections'
+import { matchLocal, matchRename } from './lib/localCommands'
 import { countFromRefusal, slotCount, slotOutside, timeLeft } from './lib/slots'
 import { inDesktopApp } from './lib/desktop'
 import { createNameScan } from './lib/nameScan'
@@ -2854,6 +2855,12 @@ export default function App() {
    * The schema read is the same one generation uses — the model can only act on
    * ids and ranges the device actually reported.
    */
+  /* How often the local matcher could have answered, this session. Refs, not
+     state: nothing renders from them and a re-render per chat turn would be a
+     re-render for a number only the debug log reads. */
+  const localSeen = useRef(0)
+  const localHits = useRef(0)
+
   const askFor = async (instruction) => {
     setBusy(true)
     setError(null)
@@ -2878,6 +2885,56 @@ export default function App() {
         const placed = blocks.find((b) => b.effectId === entry.eid)
         return { ...entry, row: placed?.row, col: placed?.col }
       })
+
+      /*
+        Watching, and doing nothing about it.
+
+        "Scene 3." "Bypass the delay." "Tempo 120." Every one of those goes to
+        the model, costs real money and takes a round trip, for a sentence with
+        one reading and no judgement in it. lib/localCommands.js can answer
+        them without asking anybody — but how MANY of the things this player
+        actually types are that shape is not something either of us can guess,
+        and a matcher switched on against a guess is one that writes to a unit
+        on the strength of a guess.
+
+        So it runs and reports and never acts. Every line it writes is a
+        request it would have handled: read a week of them and the hit rate is
+        measured rather than estimated, and any match that reads wrong is found
+        while it is still only a line in a log.
+
+        Free to run — readSchema above has already been paid for, so the
+        controls it needs are to hand, and a miss is a few microseconds.
+      */
+      try {
+        const controls = withPositions.flatMap((entry) =>
+          (entry.params || []).map((param) => ({ block: entry, param }))
+        )
+        const would =
+          matchRename(instruction) ||
+          matchLocal(instruction, {
+            blocks: withPositions,
+            controls,
+            sceneCount: device?.capabilities?.sceneCount ?? 8,
+            /* The player's own usual move on that control, when there is one —
+               a median of what they have reached for before beats a share of
+               the range for "a bit more treble". */
+            learnedStep: (name) =>
+              corrections?.controls?.find((c) => c.name === name)?.by ?? null
+          })
+        localSeen.current += 1
+        if (would) {
+          localHits.current += 1
+          logDebug(
+            'local',
+            `would have handled this here: ${would.why}`,
+            `"${instruction}" → ${would.kind} · ${localHits.current} of ${localSeen.current} this session`
+          )
+        }
+      } catch (err) {
+        /* A matcher that throws is a matcher that did not match, and it must
+           not be able to stop a request that was going to the model anyway. */
+        logDebug('local', 'the local matcher threw and was ignored', err?.message)
+      }
 
       setProgress(`${THINKING}…`)
       /*

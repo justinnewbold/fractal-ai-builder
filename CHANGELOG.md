@@ -3,6 +3,32 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.153.0
+
+**The app is now watching for the questions it never needed the AI for.**
+"Scene 3." "Bypass the delay." "Tempo 120." "More treble." Every one of those
+goes to the AI today — costs money, takes a round trip — for a sentence with one
+reading and no judgement in it. There is now a matcher that can answer them
+without asking anybody.
+
+**It is not switched on.** It runs, works out what it would have done, writes
+that to the debug log, and then does nothing: your request goes to the AI
+exactly as before. Nobody can guess what share of the things you actually type
+are the plain kind, and a matcher switched on against a guess is one that writes
+to your unit on the strength of a guess. So it reports first. A few sessions of
+that and the real hit rate is a number instead of an estimate — and any match
+that reads wrong is caught while it is still only a line in a log.
+
+It is deliberately timid. It answers only when the whole sentence is understood,
+exactly one block or control matches, and the value is one the control can
+actually hold. Two delays and "bypass the delay" is ambiguous, so it misses. An
+amp Gain and a drive Gain and "more gain" is ambiguous, so it misses. Anything
+with judgement in it — "make it brighter" — was never its to answer. A miss
+costs nothing; that is the whole design.
+
+Where it does answer a nudge, it uses your own numbers: what it has watched you
+reach for on that control, rather than a share of the range.
+
 ## 7.152.0
 
 **Writes from your phone can be checked again.** After writing a value the app
