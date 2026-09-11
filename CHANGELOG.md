@@ -3,6 +3,27 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.151.0
+
+**Setup can tell you what every amp and pedal really is.** Fractal can't print
+"Marshall JCM800" on a menu, so your unit says "Brit 800 2204 High" — and until
+now the app would only translate the one model you already had open in the
+editor. There's a new row at the bottom of Setup, **Amp and pedal names**, that
+opens the whole list: 426 models, every amp and drive on the unit plus the wahs,
+compressors and delays, each with the real thing it was modelled on underneath.
+
+**And you can search it by the real name**, which is the part that makes it
+useful. Type "tube screamer" — words that appear nowhere in the unit's own
+"T808 OD" — and all five come back. Search the unit's word for it and that works
+too. The tab counts follow the search, so looking for a pedal while the Amps tab
+is open tells you the answers are in Drives rather than saying nothing.
+
+Nothing here is invented. Every line comes from the same catalog the model
+picker already quotes, sourced from Yek's guide and Fractal's own blocks guide,
+and models Fractal designed themselves say so rather than borrowing somebody's
+amp. Cabinets aren't listed at all: nothing is recorded for any of the 45 of
+them, and a tab of blanks is worse than no tab.
+
 ## 7.150.0
 
 **Sending from your phone stops writing everything twice.** After each write
