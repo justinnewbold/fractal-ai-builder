@@ -3,6 +3,7 @@ import { blockColor } from '../lib/blockColors'
 import { useDismiss } from '../lib/dismiss'
 import { marksFor, toggleFavourite } from '../lib/presetMarks'
 import { jumpsFor } from '../lib/presetJumps'
+import { logDebug } from '../lib/debugLog'
 
 const SHORT = {
   wah: 'WAH',
@@ -294,75 +295,141 @@ export function PresetList({
 
     let stop = false
     let frames = 0
-    /* The scrollTop this last set, so anything that moves it afterwards is
-       recognisably not us. */
-    let mine = null
+    let watching = null
+
+    const done = (how, detail) => {
+      stop = true
+      centredOn.current = current
+      watching?.removeEventListener('pointerdown', theirs)
+      watching?.removeEventListener('wheel', theirs)
+      /*
+       * One line, in the log the player already knows how to send.
+       *
+       * This has been reported as still broken twice, on a phone, against code
+       * that does the right thing in every browser it can be driven in here —
+       * and there was nothing to read afterwards but the screenshot. A single
+       * line naming what was found and where it ended up turns the next report
+       * into an answer instead of another guess.
+       */
+      logDebug('presets', `Opened the list at ${current} — ${how}`, detail)
+    }
+
+    /*
+     * A real gesture, not a guess at one.
+     *
+     * Comparing scrollTop against the value just written cannot tell a thumb
+     * from the engine on iOS, where the value read back after a write is
+     * routinely not the one written. A touch or a wheel is unambiguous, and it
+     * is the only thing that should stop this early: being dragged back to the
+     * middle while you are already reading is worse than opening at the top.
+     */
+    const theirs = () => done('a thumb took it over')
+
+    /*
+     * pointerdown rather than touchstart, deliberately.
+     *
+     * One listener covers a thumb, a mouse on the scrollbar and a trackpad,
+     * and none of the reasons this app is careful about touchstart apply: that
+     * rule is about binding a NON-passive one to opt out of the click, and
+     * this listener is passive and only ever reads. See test/touch.mjs.
+     */
 
     const place = () => {
       if (stop) return
       const row = rows.current?.querySelector('.preset-row.current')
       const box = row && scrollerOf(row)
 
-      /*
-       * NOT YET IS NOT NO.
-       *
-       * This used to look exactly once, on the render that mounted the list,
-       * and give up for good if it found nothing to move — so any reason the
-       * list was not ready in that single instant left it at 000 with the
-       * loaded preset four hundred rows below, permanently. "Have it scrolled
-       * to where the current preset is so you don't have to scroll all the way
-       * down."
-       *
-       * There are two such reasons and they are both ordinary: the sheet takes
-       * about a third of a second to arrive, and the names arrive off the unit
-       * for as long as the scan runs. So it looks again on each frame until
-       * there is a row and a scrollbox with real height.
-       */
       if (!row || !box || !box.clientHeight) {
-        if (++frames < LOOKS) requestAnimationFrame(place)
+        /*
+         * NOT YET IS NOT NO.
+         *
+         * This used to look once, on the render that mounted the list, and
+         * give up for good if it found nothing to move. The sheet takes about
+         * a third of a second to arrive and names arrive off the unit for as
+         * long as the scan runs, so that one instant is easily the wrong one.
+         */
+        if (++frames < LOOKS) {
+          requestAnimationFrame(place)
+          return
+        }
+        /*
+         * Out of looks, and still nothing this code recognises as a scrollbox.
+         * Hand it to the engine, which does not need to be told which element
+         * scrolls — the reason that was avoided is that it moves the page too,
+         * so the page is put back. Better a scroll the app did not choose the
+         * mechanics of than a list that opens at 000 for ever.
+         */
+        if (row) {
+          const px = window.scrollX
+          const py = window.scrollY
+          row.scrollIntoView({ block: 'center', inline: 'nearest' })
+          if (window.scrollX !== px || window.scrollY !== py) window.scrollTo(px, py)
+          done('no scrollbox found, asked the browser instead')
+          return
+        }
+        done('the loaded preset is not a row in this list')
         return
       }
 
-      /*
-       * Somebody else moved it, so it is theirs now.
-       *
-       * A thumb that flicks the list while the sheet is still arriving must
-       * win — being dragged back to the middle half a second after you started
-       * reading is worse than opening at the top. The same test stands down
-       * when the browser adjusts the scroll itself because rows arrived above
-       * the view.
-       */
-      if (mine !== null && Math.abs(box.scrollTop - mine) > 2) {
-        centredOn.current = current
-        return
+      if (watching !== box) {
+        watching?.removeEventListener('pointerdown', theirs)
+        watching?.removeEventListener('wheel', theirs)
+        watching = box
+        box.addEventListener('pointerdown', theirs, { passive: true })
+        box.addEventListener('wheel', theirs, { passive: true })
       }
 
-      const off =
-        row.getBoundingClientRect().top -
-        box.getBoundingClientRect().top -
-        (box.clientHeight - row.offsetHeight) / 2
-      if (Math.abs(off) > 1) box.scrollTop += off
-      mine = box.scrollTop
-
       /*
-       * And hold it there while the sheet finishes arriving. On iOS a
-       * scrollTop written to a box inside a transform that is still animating
-       * is quietly dropped — the assignment succeeds and the list does not
-       * move — which is exactly what a single look cannot tell from success.
+       * Where the row has to end up, as an absolute position rather than a
+       * nudge. Clamped to what the box can actually do, so a preset near
+       * either end of the list is judged against the scroll that exists rather
+       * than one that does not — without that, a list that had already gone as
+       * far as it could looked like a list that had refused to move.
        */
+      const gap = row.getBoundingClientRect().top - box.getBoundingClientRect().top
+      const want = box.scrollTop + gap - (box.clientHeight - row.offsetHeight) / 2
+      const target = Math.max(0, Math.min(box.scrollHeight - box.clientHeight, want))
+
+      if (Math.abs(box.scrollTop - target) > 2) {
+        box.scrollTop = target
+        /*
+         * And if that did nothing, ask the engine to do it.
+         *
+         * A scrollTop written to a box that owns its own compositor layer is
+         * dropped on iOS often enough that this cannot be assumed to have
+         * worked — the assignment succeeds and the list does not move, which
+         * from inside is indistinguishable from success. scrollIntoView is the
+         * same intent expressed as something the engine performs itself.
+         */
+        if (Math.abs(box.scrollTop - target) > 2) {
+          const px = window.scrollX
+          const py = window.scrollY
+          row.scrollIntoView({ block: 'center', inline: 'nearest' })
+          if (window.scrollX !== px || window.scrollY !== py) window.scrollTo(px, py)
+        }
+      }
+
+      if (Math.abs(box.scrollTop - target) <= 2) {
+        done('landed', { row: current, at: Math.round(box.scrollTop), of: box.scrollHeight - box.clientHeight })
+        return
+      }
       if (++frames < LOOKS) {
         requestAnimationFrame(place)
         return
       }
-      centredOn.current = current
+      done('gave up after trying', {
+        wanted: Math.round(target),
+        at: Math.round(box.scrollTop),
+        box: box.className || box.tagName,
+        rows: box.querySelectorAll('.preset-row').length
+      })
     }
 
     requestAnimationFrame(place)
     return () => {
       stop = true
-      /* Placed at least once: a name arriving mid-scan must not start it over
-         and yank a list somebody is already reading. */
-      if (mine !== null) centredOn.current = current
+      watching?.removeEventListener('pointerdown', theirs)
+      watching?.removeEventListener('wheel', theirs)
     }
   }, [needle, current, shown.length])
 

@@ -3,6 +3,34 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.164.0
+
+**The preset list, a third time, and this time it does not depend on the thing
+that was failing.** Twice now the list has opened at 000 with the loaded preset
+four hundred rows below it, against code that lands it in the middle in every
+browser this can be driven in. The retry added last time did not help, which
+rules out the two timing explanations and points at the write itself: a
+scrollTop set on a box that owns its own compositor layer is dropped on iOS
+often enough that it cannot be assumed to have worked — the assignment succeeds,
+the list does not move, and from inside that is indistinguishable from success.
+
+So the list now sets an absolute position rather than nudging a relative one,
+checks whether that actually took, and if it did not, asks the browser to put
+the row on screen itself and puts the page's own scroll back afterwards. If it
+cannot even find a scrollbox after two thirds of a second of looking, it asks
+the browser anyway rather than giving up. The target is clamped to the scroll
+that exists, so a preset near either end of the list is judged against a
+position the box can actually reach.
+
+A thumb still wins, and is now recognised by an actual gesture rather than by
+reading the scroll position back — on iOS the value read after a write is
+routinely not the value written, so the old guard could fire on its own and
+switch off the very retry that platform needs.
+
+**And it writes down what it did.** One line in the debug log each time the list
+opens, naming where it put the row or why it could not. This has been reported
+twice with nothing to go on afterwards but a screenshot.
+
 ## 7.163.0
 
 **The preset list opens where you are standing, and this time it holds.** It

@@ -754,12 +754,28 @@ export function run(test) {
       /\(box\.clientHeight - row\.offsetHeight\) \/ 2/,
       'the current preset is put at the top of the list rather than the middle'
     )
-    /* And a thumb wins. */
+    /*
+     * A thumb wins, and it is recognised by a gesture rather than by reading
+     * scrollTop back. Comparing the value written against the value read
+     * cannot tell a thumb from the engine on iOS, where they routinely differ
+     * — and a guard that fires on its own is worse than none, because it stops
+     * the retry that exists for that exact platform.
+     */
     assert.match(
       centring,
-      /Math\.abs\(box\.scrollTop - mine\) > 2/,
+      /addEventListener\('pointerdown', theirs, \{ passive: true \}\)/,
       'the list fights whoever scrolls it while the sheet is still arriving'
     )
+    assert.ok(
+      !/box\.scrollTop - mine/.test(centring),
+      'a thumb is inferred from scrollTop again, which on iOS is not a thumb'
+    )
+    /* And the target is clamped to the scroll that exists, so a preset near
+       either end is not judged against a position the box cannot reach. */
+    assert.match(centring, /Math\.min\(box\.scrollHeight - box\.clientHeight, want\)/)
+    /* One line in the log the player already knows how to send, because this
+       has now been reported twice with nothing to read but a screenshot. */
+    assert.match(centring, /logDebug\('presets'/, 'a list that fails to open in the right place says nothing')
     assert.match(list, /const LOOKS = 40/, 'the retry window is gone or unbounded')
 
     /* A filter is the one time the top of the list is the right place: the
@@ -3890,17 +3906,49 @@ export function run(test) {
     )
 
     /*
-     * Never scrollIntoView here. It moves every scrollable ancestor including
-     * the page, which is the bug the conversation log already had and wrote
-     * down in Assistant.jsx. Which ancestor actually scrolls is not fixed
-     * either: the desktop panel scrolls itself, and inside a sheet that
-     * max-height is deliberately removed so the sheet body is what moves.
+     * scrollIntoView is the fallback, never the first move — and never without
+     * putting the page's scroll back.
+     *
+     * It moves every scrollable ancestor including the page, which is the bug
+     * the conversation log already had and wrote down in Assistant.jsx, and
+     * which ancestor actually scrolls is not fixed either: the desktop panel
+     * scrolls itself, and inside a sheet that max-height is deliberately
+     * removed so the sheet body is what moves. So the box is still found and
+     * moved directly.
+     *
+     * What changed is what happens when that does not work. A scrollTop
+     * written to a box that owns its own compositor layer is dropped on iOS
+     * often enough that the write cannot be assumed to have landed — the
+     * assignment succeeds and the list does not move — and the list opening at
+     * 000 was reported twice against code that did the right thing everywhere
+     * it could be driven here. So the engine gets asked, and the page is put
+     * back where it was.
      */
-    assert.ok(
-      !/scrollIntoView/.test(list),
-      'the preset list scrolls with scrollIntoView, which drags the page with it'
-    )
     assert.match(list, /function scrollerOf|scrollerOf\(/, 'nothing works out which ancestor scrolls')
+    assert.match(
+      list,
+      /box\.scrollTop = target/,
+      'the box is no longer moved directly, so the page is dragged around for every opening'
+    )
+    for (const call of [...list.matchAll(/scrollIntoView/g)]) {
+      const after = list.slice(call.index, call.index + 400)
+      assert.match(
+        after,
+        /window\.scrollTo\(px, py\)/,
+        'scrollIntoView is used without putting the page back where it was'
+      )
+    }
+    /*
+     * And it is genuinely a fallback: the first scrollIntoView in the file is
+     * the one reached only after the retries are spent without ever finding a
+     * scrollbox, and it sits inside that branch rather than in front of it.
+     */
+    const firstAsk = list.indexOf('scrollIntoView')
+    const spent = list.lastIndexOf('frames < LOOKS', firstAsk)
+    assert.ok(
+      spent !== -1 && firstAsk - spent < 500,
+      'the browser is asked before the box this component went to the trouble of finding'
+    )
 
     // And it stands down while a filter is being typed: then the matches are
     // the point, and they are at the top.
