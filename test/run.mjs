@@ -5082,6 +5082,47 @@ test('the fault notice speaks to the end it is on', () => {
   )
 })
 
+/*
+ * "This keeps saying I'm not connected, but yet the Mac app says I am
+ * connected to the remote." Both screens were drawn from one fault with three
+ * quite different things behind it, and only one of them is about the rig.
+ */
+test('a question that never came back is not blamed on the unit', () => {
+  const gone = link.faultCopy({ role: 'remote', reason: 'no-answer' })
+  assert.match(gone.title, /stopped answering/, 'a silent Mac is still described as a Mac that answered')
+  assert.ok(
+    !/plugged in|cable|unit is on/i.test(gone.body),
+    'a phone is sent to check a cable when it was the Mac that went quiet'
+  )
+
+  const unread = link.faultCopy({ role: 'remote', reason: 'unreadable' })
+  assert.match(unread.title, /wouldn’t read/)
+  assert.match(unread.body, /holding the port|another editor/, 'the likely cause is not named')
+
+  /*
+   * The reason wins over a stale `device`, which is the whole bug: the object
+   * left over from the last good answer said "connected", and the notice read
+   * it as proof this answer had happened too.
+   */
+  const stale = link.faultCopy({ role: 'remote', reason: 'no-answer', device: { connected: true, short: 'AM4' } })
+  assert.match(stale.title, /stopped answering/)
+
+  // And a Mac that really did answer "nothing here" still says so.
+  assert.match(
+    link.faultCopy({ role: 'remote', reason: 'no-unit', device: { connected: false } }).title,
+    /can’t see your unit/
+  )
+})
+
+test('the bar names what is missing, not always the unit', () => {
+  const bar = (reason) =>
+    link.describeUnit({ role: 'remote', link: 'connected', status: 'fault', reason }).unit
+  assert.equal(bar('no-answer'), 'No answer', 'a silent Mac reads as an empty rig')
+  assert.equal(bar('unreadable'), 'Can’t read')
+  assert.equal(bar('no-unit'), 'No unit')
+  assert.equal(bar(null), 'No unit', 'the old reading stands where no reason was given')
+})
+
 test('a phone restoring its sign-in reads as connecting, never as signed out', () => {
   const linkSrc = readSrc(new URL('../src/lib/link.js', import.meta.url), 'utf8')
   const boot = linkSrc.slice(linkSrc.indexOf('export async function bootLink'))
