@@ -4190,6 +4190,18 @@ test('Try again asks for a new socket, which is the rest of what a force-quit di
   const linkSrc = readSrc(new URL('../src/lib/link.js', import.meta.url), 'utf8')
   assert.match(linkSrc, /async function join\(\{ fresh = false \} = \{\}\)/)
   assert.match(linkSrc, /await remoteConnect\(\{ fresh \}\)/, 'the flag stops at the door')
+  /*
+   * Both Try agains, not just the one on the fault screen. The connect screen
+   * is where someone lands when the Mac has stopped answering, which is
+   * exactly when the channel is most likely to be the zombie this is about.
+   */
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  assert.equal(
+    (app.match(/reconnectPhone\(\{ fresh: true \}\)/g) || []).length,
+    2,
+    'one of the two Try agains still reuses the socket it is trying to replace'
+  )
+
   const at = linkSrc.indexOf('async function tick()')
   assert.notEqual(at, -1, 'the keepalive loop is gone, so nothing here is being checked')
   const loop = linkSrc.slice(at, at + 900)

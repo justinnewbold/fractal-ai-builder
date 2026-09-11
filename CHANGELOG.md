@@ -56,8 +56,10 @@ piece a reconnect kept — the phone still called the socket joined, so the butt
 was handed it back unchanged and read the unit down the same dead line as the
 time before. A socket this end believes in and the server has let go of cannot
 be told apart from a working one from inside the app, so the button stops trying
-to tell and asks for a new one. The automatic check every few seconds still
-keeps a good connection; only pressing the button pays for a fresh one.
+to tell and asks for a new one. Both Try agains do it — the one on the fault
+notice and the one on the connect screen, which is where you land when the Mac
+stops answering. The automatic check every few seconds still keeps a good
+connection; only pressing the button pays for a fresh one.
 
 **And that screen stops stating two things it doesn't know.** "Your Mac
 answered, but the unit didn't" is what it said when the MAC was the end that had

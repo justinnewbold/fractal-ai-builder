@@ -1627,8 +1627,15 @@ export default function App() {
           await pairMac()
           record('remote', 'Phone remote set up — paired, no account')
         } else if (kind === 'retry') {
+          /*
+           * The connect screen's Try again, and the same new socket the fault
+           * screen's asks for. This is the screen someone reaches when the Mac
+           * has stopped answering, which is exactly when the channel is most
+           * likely to be one realtime-js still calls joined and the server has
+           * long since dropped — the state that used to need a force-quit.
+           */
           pokeLink()
-          await reconnectPhone()
+          await reconnectPhone({ fresh: true })
         } else if (kind === 'disconnect') {
           await disconnectPhone()
           record('remote', 'Disconnected from the Mac')
