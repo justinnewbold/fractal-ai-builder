@@ -3,6 +3,24 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.162.0
+
+**History is a button at the top of Setup now, not a fold at the bottom.** It
+sits in the first row the gear opens onto, beside Demo mode and Read the unit
+again — one tap, no scrolling, and no panel to open first.
+
+**And a stale app finds out about a new one within a minute.** The check ran
+every ten minutes and only noticed an app coming back through one of the three
+ways iOS brings one back, so a deploy that was live and correct could sit
+unannounced for a quarter of an hour — which from the outside is
+indistinguishable from a deploy that never happened. It now looks every minute
+and on every way an app returns to the front.
+
+Reload had the same problem in a worse form: on an app installed to the home
+screen, `reload()` is entitled to hand back the copy already in the browser's
+cache — a button that looks like it worked and leaves you on the same old
+version. It fetches the page from the network and replaces that copy first now.
+
 ## 7.161.0
 
 **You can start a fresh chat, and the old one is still there when you want

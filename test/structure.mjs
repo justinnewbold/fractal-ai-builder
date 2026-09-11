@@ -715,6 +715,41 @@ export function run(test) {
     assert.ok(!/fetch\(|localStorage|document\.|window\./.test(lib), 'the matcher reaches outside itself')
   })
 
+  test('a stale app finds out quickly, and Reload actually fetches the page', () => {
+    /*
+     * "Doesn't look like the push went through somehow, the PWA has not
+     * updated yet, still on version 7.160.0" — about a deploy that was live
+     * and correct. Two faults, both of which make a working deploy look like a
+     * missing one.
+     *
+     * The check ran every ten minutes, and only on visibilitychange. An app
+     * reopened from the home screen on iOS may come back through pageshow
+     * instead, and a window brought forward on a Mac through focus — so the
+     * one moment this exists for could pass unnoticed.
+     *
+     * And Reload called location.reload(), which on an installed app is
+     * entitled to hand back the copy in the HTTP cache: a button that looks
+     * like it worked and changes nothing. Fetching with cache: 'reload' goes
+     * to the network and replaces that copy first.
+     */
+    const notice = readFileSync(new URL('../src/components/UpdateNotice.jsx', import.meta.url), 'utf8')
+    assert.match(notice, /const CHECK_EVERY = 60 \* 1000/, 'a stale app waits ten minutes to be told again')
+    for (const moment of ['visibilitychange', 'pageshow', 'focus']) {
+      assert.ok(notice.includes(`'${moment}'`), `an app coming back through ${moment} is never checked`)
+    }
+    assert.match(
+      notice,
+      /fetch\(window\.location\.pathname, \{ cache: 'reload' \}\)/,
+      'Reload can hand back the same stale page it was pressed to replace'
+    )
+    assert.ok(
+      notice.indexOf("cache: 'reload'") < notice.indexOf('window.location.reload()'),
+      'the page is reloaded before the cached copy is replaced'
+    )
+    /* The check itself must not read the cache it exists to defeat. */
+    assert.match(notice, /cache: 'no-store'/, 'the staleness check is served from the cache')
+  })
+
   test('a chat can be put down, and the one you put down is still there', () => {
     /*
      * "The current chat is getting along in the app. Can we create a way to
@@ -778,11 +813,29 @@ export function run(test) {
       'the merged list grew a heading per store again'
     )
 
-    /* And the way in is a door in Setup, loose beside the other two things
-       that are read rather than changed. */
+    /*
+     * And the way in is a plain button in the first row the gear opens onto,
+     * beside Demo mode and Read the unit again.
+     *
+     * "I want a button, not a drop-down menu. And I want it at the top of the
+     * screen just like demo and read unit again so it's easily accessible
+     * quickly without scrolling down." It was a fold near the bottom of Setup,
+     * which is both of the things that sentence rules out.
+     */
     const setup = sheet('Setup')
-    assert.match(setup, /<Section\s+key="history"/, 'Setup has no way to reach history')
-    assert.match(setup, /setSheet\('history'\)/, 'the history door opens nothing')
+    assert.match(setup, /onHistory=\{\(\) => setSheet\('history'\)\}/, 'Setup has no way to reach history')
+    assert.ok(
+      !/<Section\s+key="history"/.test(setup),
+      'history is a fold again, which is the drop-down this replaced'
+    )
+
+    const detail = readFileSync(new URL('../src/components/DeviceDetail.jsx', import.meta.url), 'utf8')
+    const row = detail.slice(detail.indexOf('device-detail-row'))
+    assert.match(row, /onHistory \? <button onClick=\{onHistory\}>History<\/button>/, 'the history button is gone')
+    assert.ok(
+      row.indexOf('onHistory ?') < row.indexOf('toggleDemo'),
+      'history sits behind the connection controls rather than in front of them'
+    )
   })
 
   test('a phone can reach the chain, from the bar rather than by a swipe', () => {
@@ -852,19 +905,14 @@ export function run(test) {
     /* The groups are contiguous, so everything from the first to the last is
        the grouped region and what is left is what stayed loose. */
     /*
-     * Three are loose on purpose, and they are the three that are not
-     * settings: everything the player has made, the sheet naming what every
-     * model really is, and the way back to the introduction. All three are
-     * doors out to something you read. Anything else loose here is a panel
-     * that missed its group.
+     * Two are loose on purpose, and they are the two that are not settings:
+     * the way back to the introduction, and the sheet naming what every model
+     * really is. Both are doors out to something you read. Anything else
+     * loose here is a panel that missed its group.
      */
     const loose = [...setup.replace(/<Group[\s\S]*<\/Group>/, '').matchAll(/<Section\s+key="([^"]+)"/g)]
       .map((m) => m[1])
-    assert.deepEqual(
-      loose,
-      ['history', 'gear-names', 'how-this-works'],
-      `panels loose in Setup again: ${loose.join(', ')}`
-    )
+    assert.deepEqual(loose, ['gear-names', 'how-this-works'], `panels loose in Setup again: ${loose.join(', ')}`)
 
     const behind = (key) => {
       const at = setup.indexOf(`<Group key="${key}"`)
