@@ -7812,8 +7812,34 @@ test('the chat is the player’s Fractal agent, not a command parser', () => {
   assert.match(command, /That\s+summary IS the reasoning behind the choices/, 'the model is not told where the why lives')
   assert.match(handler, /historyTurns\(history\)/, 'the transcript is not passed through the one labelled reader')
 
-  // Its own model setting, defaulting to the most capable general model.
-  assert.match(command, /process\.env\.CHAT_MODEL \|\| process\.env\.GENERATOR_MODEL \|\| 'claude-opus-5'/, 'the chat has no model of its own')
+  /*
+   * Its own model setting, defaulting to the one this app runs on.
+   *
+   * It defaulted to Opus for a while, on the reasoning that the chat makes the
+   * harder judgements and costs less per call. The first half is arguable and
+   * the second half is wrong: a chat turn carries the model roster AND the
+   * whole transcript, so it grows as the conversation does, and Opus is two and
+   * a half times the price either way. It was found on the bill rather than in
+   * the app — "it should only be using Sonnet 5" — on a day the chat cost twice
+   * what every tone built that day did.
+   */
+  assert.match(command, /process\.env\.CHAT_MODEL \|\| process\.env\.GENERATOR_MODEL \|\| 'claude-sonnet-5'/, 'the chat has no model of its own')
+
+  /*
+   * And nothing else reaches for a pricier one by default.
+   *
+   * An env var nobody sets is the default, so a default is what the app runs
+   * on — this is the check that every route agrees on which model that is.
+   */
+  for (const route of ['api/command.js', 'api/generate.js']) {
+    const code = readSrc(new URL(`../${route}`, import.meta.url), 'utf8')
+    for (const m of code.matchAll(/process\.env\.\w+\s*\|\|\s*'([^']*claude[^']*)'/g)) {
+      assert.ok(
+        !/opus/i.test(m[1]),
+        `${route} falls back to ${m[1]} when nothing is configured — the app is meant to run on Sonnet, and a default is what it runs on`
+      )
+    }
+  }
   assert.ok(!/claude-sonnet-4\.5/.test(command), 'the gateway fallback still names a retired model')
   assert.match(handler, /thinking: \{ type: 'adaptive' \}/, 'the model is given no room to think')
   // Internal names stay internal, and a change is said in the future tense.
@@ -7827,6 +7853,9 @@ test('the chat is the player’s Fractal agent, not a command parser', () => {
   assert.match(handler, /await ask\(attempt, NUDGE\)/, 'the retry does not tell the model what was wrong')
   // And a refused model is not a dead chat: one retry on the designer's model.
   assert.match(command, /const FALLBACK_MODEL = process\.env\.GENERATOR_MODEL \|\| 'claude-sonnet-5'/, 'no fallback model')
+  /* With both on Sonnet by default there is nothing to fall back TO, and the
+     guard says so rather than asking the same refused model twice. The branch
+     still matters: CHAT_MODEL can put something else in front of it. */
   assert.match(handler, /if \(FALLBACK_MODEL !== MODEL_NAME\) attempts\.push\(\{ model: resolveModel\(FALLBACK_MODEL\) \}\)/, 'the fallback is never tried')
   assert.match(handler, /for \(const attempt of attempts\)/, 'the attempts are not walked')
 

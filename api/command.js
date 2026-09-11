@@ -29,13 +29,25 @@ import { cors } from './_cors.js'
 /*
  * Which model talks.
  *
- * Its own setting, apart from the designer's: a conversation that explains a
- * tone, answers a question about a Marshall, and decides whether "make it
- * heavier" is a nudge or a redesign is the harder judgement in this app, and
- * it runs on far fewer tokens per call than a design does. CHAT_MODEL wins,
- * then the shared GENERATOR_MODEL, then the default.
+ * Sonnet, the same as the designer, and this is the second time that has had to
+ * be written down.
+ *
+ * The reasoning for Opus was real: a conversation that explains a tone, answers
+ * a question about a Marshall, and decides whether "make it heavier" is a nudge
+ * or a whole redesign is the harder judgement in this app, and it was thought to
+ * run on far fewer tokens per call than a design does. That last part is where
+ * it went wrong. A chat turn carries the model roster AND the whole transcript,
+ * so the turns get bigger as the conversation goes on, and Opus is two and a
+ * half times the price of Sonnet in and out. It showed up on the bill before it
+ * showed up anywhere else: "for some reason it's been using Opus 5 sometimes as
+ * well as Sonnet 5 — it should only be using Sonnet 5", against a day where the
+ * chat cost twice what every tone built that day did.
+ *
+ * So the default is the one model this app is meant to run on. CHAT_MODEL is
+ * still there and still wins, for putting something else behind the chat
+ * deliberately — which is different from getting it by not setting anything.
  */
-const MODEL_NAME = process.env.CHAT_MODEL || process.env.GENERATOR_MODEL || 'claude-opus-5'
+const MODEL_NAME = process.env.CHAT_MODEL || process.env.GENERATOR_MODEL || 'claude-sonnet-5'
 /*
  * Where to land if that model is refused. The designer's own model is one that
  * is known to answer on this deployment, because designs come back. A chat
