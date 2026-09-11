@@ -50,6 +50,8 @@ import {
   writeScene,
   writeTempo,
   confirmedDetect,
+  SETTLING_TRIES,
+  SETTLING_MS,
   writeBypass,
   writeTuner
 } from './lib/deviceState'
@@ -1073,7 +1075,18 @@ export default function App() {
     liveRef.current = status === 'live'
   }, [status])
 
-  const read = useCallback(async () => {
+  /*
+   * `settling` is for a read that follows an order this app gave the unit —
+   * a save, which takes it away for seconds while the preset goes to flash.
+   * It keeps asking rather than believing the first "no unit" from a port
+   * that is busy doing what it was just told to do. See SETTLING_TRIES.
+   *
+   * An options object, because `read` is also handed straight to children as
+   * an onChanged callback and is called with whatever they pass; anything
+   * that is not this flag reads as absent.
+   */
+  const read = useCallback(async (opts) => {
+    const settling = opts?.settling === true
     setBusy(true)
     setError(null)
     let fresh = null
@@ -1104,7 +1117,8 @@ export default function App() {
         wasLive: liveRef.current,
         /* A phone's first no is the least trustworthy answer in the app —
            the handshake races the Mac's own polling. See RELAY_TRIES. */
-        remote: remoteActive()
+        remote: remoteActive(),
+        ...(settling ? { least: SETTLING_TRIES, gap: SETTLING_MS } : {})
       })
       setDevice(info)
       if (!info?.connected) {
@@ -1620,7 +1634,8 @@ export default function App() {
         setDirty(false)
         setSavedAt(Date.now())
         record('save', `Saved "${name || preset?.name}" to slot ${req.slot}, asked for from the phone`)
-        await read()
+        // And here, where the Mac carries out the phone's save.
+        await read({ settling: true })
       } catch (err) {
         /*
          * The unit's own complaint often states its size — "must be integer
@@ -1789,7 +1804,8 @@ export default function App() {
         setDirty(false)
         setSavedAt(Date.now())
         record('save', `The Mac saved it to slot ${res.slot}`)
-        read()
+        // The unit is still writing that preset to flash. See SETTLING_TRIES.
+        read({ settling: true })
       } else {
         setSaveError(res.error || 'The Mac could not save it.')
       }
@@ -2814,7 +2830,8 @@ export default function App() {
       record('save', `Saved "${name || preset?.name}" to slot ${number}`)
       setDirty(false)
       setSavedAt(Date.now())
-      await read()
+      // Same here: the write has been taken, and the unit is still doing it.
+      await read({ settling: true })
     } catch (err) {
       // Shown on the save bar itself as well as the banner. A refusal that
       // appears only at the top of a page you aren't looking at reads as a

@@ -3,6 +3,35 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.170.0
+
+**Saving a preset no longer ends on "the Mac can't see your unit".** The red
+screen came up mid-save, with the unit plugged in and the Mac happily writing
+to it.
+
+The app was blaming the rig for its own request. A save takes the unit away
+for a few seconds — the whole preset goes to flash and it answers nothing
+while it does — and the app re-reads the moment the save reports done. That
+read lands on a port still busy with the very thing it was told to do, the
+answer comes back "nothing plugged in", and a working screen was replaced by a
+cable to go and check. All three routes did it: saving at the Mac, the Mac
+carrying out a save asked for from the phone, and the phone hearing back that
+it landed.
+
+A read that follows an order the app itself gave now keeps asking for about
+five seconds before it believes a no. A unit that really was unplugged is
+still named as one — it just takes those few seconds to say so, and only right
+after a save.
+
+**And the phone was being given the fewest chances exactly when it needed the
+most.** There were two reasons to ask again — the unit was answering a moment
+ago, and the question went over the relay — and they were written as either /
+or, so a phone with both reasons got three asks where a phone with one got
+five. Backwards, and the one with both is the one mid-gig. It now takes
+whichever is the more patient.
+
+---
+
 ## 7.169.0
 
 **A phone that says "no unit" while the Mac says it is connected now tells you

@@ -7264,6 +7264,100 @@ test('a phone gives up eventually rather than asking for ever', async () => {
   assert.ok(waited > 0, 'it asked again with no pause, which asks the same busy port')
 })
 
+test('a phone that was live gets the relay asks, not the fewest of the two', async () => {
+  /*
+   * The two reasons to keep asking were written as alternatives — wasLive OR
+   * remote — so the case with both reasons got the smaller budget. A phone
+   * whose unit was answering a moment ago asked three times over a second and
+   * a half, while a phone that had never seen the unit asked five. Backwards,
+   * and it is the live one that is mid-gig.
+   */
+  let n = 0
+  const info = await ds.confirmedDetect({
+    detect: async () => ({ connected: ++n >= ds.RELAY_TRIES }),
+    wait: async () => {},
+    wasLive: true,
+    remote: true
+  })
+  assert.equal(info.connected, true, 'a live phone gave up before the relay budget was spent')
+  assert.equal(n, ds.RELAY_TRIES)
+})
+
+test('a read that follows an order this app gave keeps asking through it', async () => {
+  /*
+   * "The screen popped up while it was saving a preset" — THE MAC CAN'T SEE
+   * YOUR UNIT, over a save that was going through. A save takes the unit away
+   * for seconds while the preset goes to flash, and both ends re-read the
+   * moment it reports done: that read is aimed at a port still busy with the
+   * very thing it was asked to do.
+   */
+  let n = 0
+  let waited = 0
+  const info = await ds.confirmedDetect({
+    detect: async () => ({ connected: ++n >= ds.SETTLING_TRIES }),
+    wait: async (ms) => {
+      waited += ms
+    },
+    wasLive: true,
+    remote: true,
+    least: ds.SETTLING_TRIES,
+    gap: ds.SETTLING_MS
+  })
+  assert.equal(info.connected, true, 'the save still ended on a "no unit" screen')
+  assert.equal(n, ds.SETTLING_TRIES)
+  assert.equal(waited, ds.SETTLING_MS * (ds.SETTLING_TRIES - 1), 'the asks are not spread across the save')
+  // Long enough to cover a save, and no longer than that.
+  assert.ok(ds.SETTLING_MS * (ds.SETTLING_TRIES - 1) >= 4000)
+  assert.ok(ds.SETTLING_MS * (ds.SETTLING_TRIES - 1) <= 8000)
+})
+
+test('a unit that really is gone is still reported after a save', async () => {
+  // The other half: the patience is bounded, so an unplugged unit is still
+  // named as one rather than asked about for ever.
+  let n = 0
+  const info = await ds.confirmedDetect({
+    detect: async () => {
+      n++
+      return { connected: false }
+    },
+    wait: async () => {},
+    wasLive: true,
+    remote: true,
+    least: ds.SETTLING_TRIES
+  })
+  assert.equal(info.connected, false)
+  assert.equal(n, ds.SETTLING_TRIES)
+})
+
+test('every read after a save asks with the longer patience', () => {
+  /*
+   * Three places re-read the moment a save lands — the Mac from its own
+   * write, the Mac carrying out a save the phone asked for, and the phone
+   * hearing back that it landed — and any one of them left on the short
+   * budget is the same red screen on a different route.
+   */
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  assert.match(app, /const settling = opts\?\.settling === true/, 'read() has no settling read again')
+  assert.match(
+    app,
+    /\.\.\.\(settling \? \{ least: SETTLING_TRIES, gap: SETTLING_MS \} : \{\}\)/,
+    'the flag no longer reaches confirmedDetect'
+  )
+  assert.equal(
+    (app.match(/read\(\{ settling: true \}\)/g) || []).length,
+    3,
+    'one of the three reads that follow a save is back on the short budget'
+  )
+  // Each of the three sits under the record() line for the save it follows.
+  for (const after of [
+    /Saved "\$\{name \|\| preset\?\.name\}" to slot \$\{req\.slot\}[\s\S]{0,200}?read\(\{ settling: true \}\)/,
+    /The Mac saved it to slot \$\{res\.slot\}[\s\S]{0,200}?read\(\{ settling: true \}\)/,
+    /Saved "\$\{name \|\| preset\?\.name\}" to slot \$\{number\}[\s\S]{0,300}?read\(\{ settling: true \}\)/
+  ]) {
+    assert.match(app, after)
+  }
+})
+
 test('at the Mac the first no still stands', async () => {
   /*
    * The other half. There is no relay and no second client on the port, so a

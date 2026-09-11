@@ -205,6 +205,29 @@ export const SETTLE_MS = 700
 export const RELAY_TRIES = 5
 
 /**
+ * The asking a read is worth when the app itself just told the unit to do
+ * something slow, and how long between asks.
+ *
+ * "The screen popped up while it was saving a preset" — THE MAC CAN'T SEE
+ * YOUR UNIT, over a save that was going through.
+ *
+ * A save is the one thing the app asks for that takes the unit away for
+ * seconds rather than milliseconds: the whole preset goes to flash and
+ * nothing is answered while it does. Both ends re-read the moment the save
+ * reports done — the Mac from its own write, the phone from the Mac's word
+ * that it landed — so that read is aimed at a port that is still busy with
+ * the very thing it was asked to do. The answer is "no unit", and the app
+ * was replacing a working screen with a cable to go and check.
+ *
+ * A unit the app was talking to a second ago has not been unplugged in the
+ * meantime. So a read that follows an order the app gave keeps asking for
+ * several seconds before it believes a no — five and a bit, here, which is a
+ * long time to wait only in the case where the unit really did go.
+ */
+export const SETTLING_TRIES = 6
+export const SETTLING_MS = 900
+
+/**
  * Ask whether the unit is there, and do not take the first no for an answer.
  *
  * "I'm on the FM3. As soon as I hit next or select a scene, it goes to the
@@ -238,9 +261,27 @@ export async function confirmedDetect({
   remote = false,
   tries = SETTLE_TRIES,
   relayTries = RELAY_TRIES,
-  gap = SETTLE_MS
+  gap = SETTLE_MS,
+  least = 1
 }) {
-  const attempts = wasLive ? Math.max(1, tries) : remote ? Math.max(1, relayTries) : 1
+  /*
+   * Every reason to keep asking, and the most patient one wins.
+   *
+   * This used to read `wasLive ? tries : remote ? relayTries : 1`, which hands
+   * the fewest asks to the case that needs the most: a phone, on a unit that
+   * was answering a moment ago, got three asks over a second and a half —
+   * while a phone that had never seen the unit at all got five. The two
+   * reasons are not alternatives. A live unit deserves confirming AND a
+   * relayed ask is the least trustworthy answer in the app, so a read that is
+   * both takes the larger budget, and `least` raises the floor again for a
+   * read that follows an order the app itself gave.
+   */
+  const attempts = Math.max(
+    1,
+    Math.floor(least) || 1,
+    wasLive ? Math.max(1, tries) : 1,
+    remote ? Math.max(1, relayTries) : 1
+  )
   let info = null
   let failure = null
 
