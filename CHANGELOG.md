@@ -3,6 +3,41 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.167.0
+
+**An FM3 preset loaded onto an AM4 now asks which sounds you want.** The AM4
+holds four scenes and the FM3 holds eight, so half the library was written
+with more sounds in it than the unit in front of you has room for. Loading one
+went ahead anyway: the first four scenes came across, the rest were thrown out,
+and the only word about it was four lines in the "Rejected during checking"
+panel at the bottom of the tone card.
+
+Nothing was lost — the tone is still in your library, still eight scenes, and
+still loads whole onto the FM3. What was wrong is that the four which survived
+were picked by their numbering rather than by you, and on a set laid out clean,
+verse, chorus, lead, solo, harmony, ambient, outro, the four that matter are
+not the first four.
+
+So the app asks first. Tap a tone the unit has no room for and a sheet lists
+every sound in it by its own name, with a tick against the ones coming across
+and the scene number each one will land on. Untick one, tick another. The
+button says how many are coming; you cannot tick more than the unit holds.
+There is also "Load the sound only" — every block and every setting, no scenes
+written — for when the sounds you came for are the ones that do not fit.
+
+What you pick is renumbered on the way in. Pick scenes 1, 3, 6 and 8 off an
+FM3 tone and they arrive on the AM4 as scenes 1, 2, 3 and 4, in that order,
+keeping their names — so the footswitch under scene 2 plays what was scene 6
+and is still called what it was called.
+
+None of this names a unit. The count comes off whatever is plugged in, so the
+same question covers an Axe-Fx III tone on a VP4 and anything else the two
+generations disagree about. A tone that fits is never asked about at all.
+
+And the History list now says which unit a tone was made on, under its name,
+when it was not the one you are on — so "made on the FM3" is something you can
+see before you tap it rather than something you find out afterwards.
+
 ## 7.166.0
 
 **The chain shows its two ends now.** They were always there on the unit and
