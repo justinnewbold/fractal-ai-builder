@@ -3,6 +3,27 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.163.0
+
+**The preset list opens where you are standing, and this time it holds.** It
+was already supposed to — the code has been there since 7.155 — but it took
+exactly one look, on the instant the list appeared, and gave up for good if it
+found nothing to scroll. Two perfectly ordinary things make that instant the
+wrong one: the sheet takes about a third of a second to arrive, and on iOS a
+scroll written to a box inside a panel that is still sliding into place is
+quietly thrown away. Both look exactly like success from inside a single look,
+and both leave a list of 512 sitting at 000 with the loaded preset four hundred
+rows below it.
+
+It now keeps looking for about two thirds of a second, holds the position while
+the sheet lands, and puts the loaded preset in the MIDDLE of the screen so the
+ones either side of it are there to read. The moment anything else moves the
+list — a thumb, most of all — it stands down: being dragged back to the middle
+while you are already reading is worse than opening at the top.
+
+Typing in the filter still goes to the top, because then the matches are the
+thing you asked for.
+
 ## 7.162.0
 
 **History is a button at the top of Setup now, not a fold at the bottom.** It

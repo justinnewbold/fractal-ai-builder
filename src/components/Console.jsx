@@ -151,6 +151,13 @@ export function Chain({ blocks, selected, onSelect, onToggle }) {
  * the same thumb the sheet did — so the SHEET body is the thing that moves.
  * Asking the DOM beats hard-coding either one.
  */
+/*
+ * How many frames to keep trying for. About two thirds of a second at 60Hz,
+ * which covers the sheet's 320ms arrival twice over and the odd dropped frame
+ * on a phone that is also servicing a serial connection.
+ */
+const LOOKS = 40
+
 function scrollerOf(el) {
   for (let n = el?.parentElement; n; n = n.parentElement) {
     const oy = getComputedStyle(n).overflowY
@@ -282,15 +289,81 @@ export function PresetList({
    * that arrives mid-scan.
    */
   useEffect(() => {
-    if (needle || current === undefined || current === null) return
-    if (centredOn.current === current) return
-    const row = rows.current?.querySelector('.preset-row.current')
-    if (!row) return
-    const box = scrollerOf(row)
-    if (!box) return
-    const gap = row.getBoundingClientRect().top - box.getBoundingClientRect().top
-    box.scrollTop += gap - (box.clientHeight - row.offsetHeight) / 2
-    centredOn.current = current
+    if (needle || current === undefined || current === null) return undefined
+    if (centredOn.current === current) return undefined
+
+    let stop = false
+    let frames = 0
+    /* The scrollTop this last set, so anything that moves it afterwards is
+       recognisably not us. */
+    let mine = null
+
+    const place = () => {
+      if (stop) return
+      const row = rows.current?.querySelector('.preset-row.current')
+      const box = row && scrollerOf(row)
+
+      /*
+       * NOT YET IS NOT NO.
+       *
+       * This used to look exactly once, on the render that mounted the list,
+       * and give up for good if it found nothing to move — so any reason the
+       * list was not ready in that single instant left it at 000 with the
+       * loaded preset four hundred rows below, permanently. "Have it scrolled
+       * to where the current preset is so you don't have to scroll all the way
+       * down."
+       *
+       * There are two such reasons and they are both ordinary: the sheet takes
+       * about a third of a second to arrive, and the names arrive off the unit
+       * for as long as the scan runs. So it looks again on each frame until
+       * there is a row and a scrollbox with real height.
+       */
+      if (!row || !box || !box.clientHeight) {
+        if (++frames < LOOKS) requestAnimationFrame(place)
+        return
+      }
+
+      /*
+       * Somebody else moved it, so it is theirs now.
+       *
+       * A thumb that flicks the list while the sheet is still arriving must
+       * win — being dragged back to the middle half a second after you started
+       * reading is worse than opening at the top. The same test stands down
+       * when the browser adjusts the scroll itself because rows arrived above
+       * the view.
+       */
+      if (mine !== null && Math.abs(box.scrollTop - mine) > 2) {
+        centredOn.current = current
+        return
+      }
+
+      const off =
+        row.getBoundingClientRect().top -
+        box.getBoundingClientRect().top -
+        (box.clientHeight - row.offsetHeight) / 2
+      if (Math.abs(off) > 1) box.scrollTop += off
+      mine = box.scrollTop
+
+      /*
+       * And hold it there while the sheet finishes arriving. On iOS a
+       * scrollTop written to a box inside a transform that is still animating
+       * is quietly dropped — the assignment succeeds and the list does not
+       * move — which is exactly what a single look cannot tell from success.
+       */
+      if (++frames < LOOKS) {
+        requestAnimationFrame(place)
+        return
+      }
+      centredOn.current = current
+    }
+
+    requestAnimationFrame(place)
+    return () => {
+      stop = true
+      /* Placed at least once: a name arriving mid-scan must not start it over
+         and yank a list somebody is already reading. */
+      if (mine !== null) centredOn.current = current
+    }
   }, [needle, current, shown.length])
 
   return (
