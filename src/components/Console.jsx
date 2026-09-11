@@ -66,6 +66,32 @@ import { slotLabel, startsBank } from '../lib/slots'
  */
 export function Chain({ blocks, selected, onSelect, onToggle }) {
   const chain = blocks.filter((b) => !['input', 'output'].includes(b.slug))
+  /*
+   * The two ends of the signal path, which this used to draw as arrows.
+   *
+   * "Does it just ignore the input and output so they're actually there but
+   * just not showing on the chain? We obviously don't need those on the
+   * pedalboard at all, but when we're actually viewing the chain, it might be
+   * helpful to see that those are there and which input and output they're
+   * coming from."
+   *
+   * Exactly right, and the distinction is the useful part: the stage screen
+   * draws its own tiles and filters these out by EXCLUDED_BLOCKS, because
+   * nobody kicks an input block between two bars. This strip is the other
+   * thing — it is the chain being LOOKED at, and a chain that silently drops
+   * two of its blocks is a diagram that disagrees with the unit.
+   *
+   * They are drawn quieter than the blocks between them and carry no on/off,
+   * because neither is a thing to switch: a preset with its output bypassed is
+   * a preset nobody can hear. Tapping one opens it, which is how you find out
+   * what the input gate is doing or where the output level sits.
+   *
+   * Where there is no block the arrow stays, and now means something — an
+   * empty preset really has no way in or out until one is placed.
+   */
+  const ends = (slug) => blocks.find((b) => b.slug === slug) || null
+  const input = ends('input')
+  const output = ends('output')
   const lastTap = useRef({ id: null, at: 0 })
   const strip = useRef(null)
 
@@ -76,7 +102,41 @@ export function Chain({ blocks, selected, onSelect, onToggle }) {
    * CSS; this is the one fact it needs, kept current on resize and scroll —
    * and shared with the grid, which has the same problem at every width.
    */
-  useOverflow(strip, [chain.length])
+  /* The two ends count: a preset that gains an output block is a strip one
+     tile wider, and the fade that says there is more to the right has to know. */
+  useOverflow(strip, [chain.length, !!input, !!output])
+
+  /**
+   * One end of the signal path: the block if the preset has one, the arrow it
+   * has always drawn if it does not.
+   *
+   * The name goes under the tile, in the row the on/off pill occupies for
+   * everything else — that is the half of the question that was actually being
+   * asked. "Input 1" and "Output 1" are what the unit calls them, so a preset
+   * running out of Output 2 says so rather than looking like every other one.
+   */
+  const io = (block, side) => {
+    if (!block) {
+      return (
+        <span className={`io-arrow io-${side}`} aria-hidden="true">
+          ▶
+        </span>
+      )
+    }
+    return (
+      <div className="fx-cell io-cell" key={block.effectId}>
+        <button
+          className={`fx-tile io-tile ${selected === block.effectId ? 'selected' : ''}`}
+          onClick={() => onSelect(block.effectId)}
+          title={block.name}
+          aria-label={`${block.name || block.slug} — open it`}
+        >
+          <span className="fx-abbr">{shortName(block.slug)}</span>
+        </button>
+        <span className="io-name mono">{block.name || block.slug}</span>
+      </div>
+    )
+  }
 
   const tap = (block) => {
     const now = Date.now()
@@ -91,9 +151,9 @@ export function Chain({ blocks, selected, onSelect, onToggle }) {
 
   return (
     <div className="fx-panel">
-      {/* No heading. A row of coloured, three-letter tiles between two signal
-          arrows is not something anyone needs told is the effects chain, and
-          on a phone that word cost more vertical space than a tile. */}
+      {/* No heading. A row of coloured, three-letter tiles running from IN to
+          OUT is not something anyone needs told is the effects chain, and on a
+          phone that word cost more vertical space than a tile. */}
       {/*
         An empty preset says so.
 
@@ -111,9 +171,7 @@ export function Chain({ blocks, selected, onSelect, onToggle }) {
       ) : null}
 
       <div className="chain-strip" ref={strip}>
-        <span className="io-arrow" aria-hidden="true">
-          ▶
-        </span>
+        {io(input, 'in')}
         {chain.map((block) => (
           <div className="fx-cell" key={block.effectId}>
             <button
@@ -139,9 +197,7 @@ export function Chain({ blocks, selected, onSelect, onToggle }) {
             ) : null}
           </div>
         ))}
-        <span className="io-arrow" aria-hidden="true">
-          ▶
-        </span>
+        {io(output, 'out')}
       </div>
     </div>
   )

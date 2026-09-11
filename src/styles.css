@@ -3679,6 +3679,42 @@ button.preset-row.current .preset-id {
   font-size: var(--f-3);
 }
 
+/*
+ * The two ends of the chain, drawn as blocks rather than as arrows.
+ *
+ * Quieter than everything between them on purpose: they are the plumbing, not
+ * the tone, and a preset's Input and Output competing for attention with its
+ * amp would be the wrong reading of a strip you scan left to right. Outlined
+ * rather than filled, and no on/off under them — neither is a thing to switch.
+ */
+button.fx-tile.io-tile {
+  background: none;
+  border: 1px solid var(--rule);
+  color: var(--silk-dim);
+}
+
+button.fx-tile.io-tile.selected {
+  border-color: var(--signal);
+  color: var(--signal);
+}
+
+/*
+ * Which input and which output, in the row the on/off pill takes for
+ * everything else — so the strip keeps one baseline and the answer is where
+ * the question was asked.
+ */
+.io-name {
+  display: block;
+  width: 62px;
+  font-size: var(--f-1);
+  line-height: 1.2;
+  text-align: center;
+  color: var(--silk-faint);
+  /* "Output 1" fits; a driver that calls it something longer wraps rather than
+     widening the cell and pushing the chain sideways. */
+  overflow-wrap: anywhere;
+}
+
 button.fx-tile {
   position: relative;
   display: flex;
@@ -4877,6 +4913,22 @@ ol.action-list li.destructive::marker {
 [data-theme='light'] button.fx-tile {
   background: linear-gradient(180deg, var(--tile), color-mix(in srgb, var(--tile) 82%, black));
   color: #fff;
+}
+
+/*
+ * And the same restatement for the two ends of the chain, for the same reason
+ * and by the same tie: the rule above matches with equal weight and wins on
+ * order, so without this the Input and Output tiles get a block's white
+ * lettering on a face that is no longer painted — white on off-white, which is
+ * exactly as readable as it sounds.
+ */
+[data-theme='light'] button.fx-tile.io-tile {
+  background: none;
+  color: var(--silk-dim);
+}
+
+[data-theme='light'] button.fx-tile.io-tile.selected {
+  color: var(--signal);
 }
 
 /* This rule outranks the shared .bypassed one by order, so restate it here:
