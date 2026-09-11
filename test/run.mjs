@@ -4483,13 +4483,100 @@ test('a generated scene plan writes its names down too', () => {
   // moment the answer is certain, and the moment the report was about.
   const saveAt = app.indexOf('await storePreset(number)')
   const save = app.slice(saveAt, app.indexOf('setApplied((prev) => ({ ...prev, savedTo: number })', saveAt))
-  assert.match(save, /noteSceneNames\(number, new Map\(sceneNames\.map\(\(n, i\) => \[i, \(n \|\| ''\)\.trim\(\)\]\)\)\)/)
-  assert.match(save, /sceneNames\.some\(\(n\) => \(n \|\| ''\)\.trim\(\)\)/, 'an unnamed buffer stamps blanks over what the slot had')
+  assert.match(save, /keepSavedScenes\(number, sceneNames\)/)
+
+  /* One helper now, because three routes end in a save and each one wrote its
+     own version of this — see "a save writes down what the slot is called". */
+  const helper = app.slice(app.indexOf('function keepSavedScenes('), app.indexOf('function designMemory('))
+  assert.match(helper, /noteSceneNames\(number, new Map\(names\.map\(\(n, i\) => \[i, \(n \|\| ''\)\.trim\(\)\]\)\)\)/)
+  assert.match(helper, /names\.some\(\(n\) => \(n \|\| ''\)\.trim\(\)\)/, 'an unnamed buffer stamps blanks over what the slot had')
 
   // The rename path no longer throws the names away.
   const scenes = readSrc(new URL('../src/components/Scenes.jsx', import.meta.url), 'utf8')
   assert.match(scenes, /noteSceneName\(preset\?\.number, index, name, names\)/)
   assert.ok(!/forgetSceneNames\(/.test(scenes), 'the rename still forgets the name it just set')
+})
+
+test('a save writes down what the slot is called, on every route to one', () => {
+  /*
+   * "The preset screens keep showing the wrong preset. It says TIGHT MODERN on
+   * 98 when it's Three Days Grace. Even if I force close the app and reopen
+   * it, it shows the wrong preset on the phone, even though the Mac is loaded
+   * on the correct preset."
+   *
+   * Three routes end in a preset landing in a slot — a save at the Mac, the
+   * Mac carrying out one the phone asked for, and the phone hearing back that
+   * it landed — and every one of them answered it the same way: forget that
+   * slot's name, and let somebody read it again. On a phone nobody can. An AM4
+   * will not dump a preset over the relay, so the name the phone already had
+   * was the name it kept, through a restart and for good.
+   */
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  const fx = readSrc(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+
+  // The name that just went into the slot is written down rather than dropped.
+  assert.match(fx, /export function notePresetName\(number, name\)/)
+  const note = fx.slice(fx.indexOf('export function notePresetName('), fx.indexOf('export function forgetPresetName('))
+  assert.match(note, /nameCache\.set\(number, kept\)/)
+  assert.match(note, /persistNames\(\)/, 'the name is gone again on the next launch')
+  assert.match(note, /publishNames\(\)/, 'the Mac keeps the new name to itself')
+
+  // All three routes, and each one says which name it is asserting.
+  assert.equal(
+    (app.match(/keepSavedName\(/g) || []).length,
+    4,
+    'one of the three saves still forgets the slot instead of naming it — or the helper went'
+  )
+  for (const route of [
+    /await storePreset\(number\)[\s\S]{0,400}?keepSavedName\(number, name \|\| preset\?\.name\)/,
+    /await storePreset\(req\.slot\)[\s\S]{0,400}?keepSavedName\(req\.slot, name \|\| preset\?\.name\)/,
+    /keepSavedName\(res\.slot, queuedSave\.name\)[\s\S]{0,300}?The Mac saved it to slot/
+  ]) {
+    assert.match(app, route)
+  }
+
+  /*
+   * A buffer with no name of its own is the one case with nothing to state,
+   * and asserting an empty name would be worse than forgetting.
+   */
+  const helper = app.slice(app.indexOf('function keepSavedName('), app.indexOf('function keepSavedScenes('))
+  assert.match(helper, /if \(kept\) notePresetName\(number, kept\)/)
+  assert.match(helper, /else forgetPresetName\(number\)/)
+
+  /*
+   * And the phone carries the name and the scenes with the request, because
+   * when the Mac says it landed, that is the only description of the slot the
+   * phone will ever have.
+   */
+  const park = app.slice(app.indexOf('setQueuedSave({'), app.indexOf('record(\'save\', `Asked the Mac to save'))
+  assert.match(park, /name: saveName\.trim\(\) \|\| preset\?\.name \|\| ''/)
+  assert.match(park, /scenes: Array\.isArray\(sceneNames\) \? \[\.\.\.sceneNames\] : \[\]/)
+
+  // The list on screen is rebuilt from the cache, so the new name shows now
+  // rather than after the next scan.
+  assert.ok(
+    !/setSlots\(\(prev\) => prev\.filter\(\(s\) => s\.number !== (number|req\.slot)\)\)/.test(app),
+    'a saved slot is still dropped from the list instead of renamed in it'
+  )
+})
+
+test('the Mac wins where the two disagree about a slot', () => {
+  /*
+   * The other half, and what heals a phone that already has a wrong name in
+   * it. The Mac is the end with the cable; the phone only ever knows what the
+   * Mac told it. Importing used to skip any slot this browser already had a
+   * name for, so a name that went wrong stayed wrong — the phone had TIGHT
+   * MODERN for 98, the Mac had the name that overwrote it, and the two never
+   * met.
+   *
+   * Only a slot the host actually names is touched: a partial host copy — the
+   * Mac has not scanned that far — must not empty the list on the phone.
+   */
+  const fx = readSrc(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+  const imp = fx.slice(fx.indexOf('export async function importHostNames'), fx.indexOf('/** One slot\'s name'))
+  assert.ok(!/nameCache\.has\(number\)/.test(imp), 'a name this browser already has still wins over the Mac\'s')
+  assert.match(imp, /if \(nameCache\.get\(number\) === name\) continue/, 'every import counts every slot as changed')
+  assert.match(imp, /if \(!doc \|\| typeof doc !== 'object'\) return 0/, 'a missing host copy is treated as an answer')
 })
 
 console.log('\nwriting one amp on three channels')

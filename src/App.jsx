@@ -109,6 +109,7 @@ import {
   reportSave,
   readSaveResult,
   forgetPresetName,
+  notePresetName,
   noteSceneNames,
   readSceneNames,
   currentDeviceSlug,
@@ -248,6 +249,37 @@ const ofTunerOn = (s) => s.tunerOn
 const ofTuning = (s) => s.tuning
 
 const PREVIEW_ABOVE = 4
+
+/**
+ * Write down what a slot is called, the moment a save puts a name in it.
+ *
+ * Three routes end in a preset landing in a slot — a save at the Mac, the Mac
+ * carrying out a save the phone asked for, and the phone hearing back that it
+ * landed — and all three used to do the same thing to the list: forget that
+ * slot's name and wait for somebody to read it again. On a phone nobody can:
+ * an AM4 will not dump a preset over the relay, so the old name simply stayed,
+ * through a restart and for good. "It says TIGHT MODERN on 98 when it's Three
+ * Days Grace."
+ *
+ * A buffer with no name of its own is the one case with nothing to state, and
+ * that one is still forgotten rather than asserted as empty.
+ */
+function keepSavedName(number, name) {
+  const kept = (name || '').trim()
+  if (kept) notePresetName(number, kept)
+  else forgetPresetName(number)
+}
+
+/**
+ * And the scenes that went with it, from the buffer that became that slot.
+ *
+ * Every index, including the blank ones: the buffer is the truth for this slot
+ * now, so a scene left unnamed here really is unnamed there.
+ */
+function keepSavedScenes(number, names) {
+  if (!Array.isArray(names) || !names.some((n) => (n || '').trim())) return
+  noteSceneNames(number, new Map(names.map((n, i) => [i, (n || '').trim()])))
+}
 
 /**
  * What a remote session cannot do.
@@ -1780,8 +1812,11 @@ export default function App() {
         const name = (req.name || '').trim()
         if (name && name !== preset?.name?.trim()) await setPresetName(name)
         await storePreset(req.slot)
-        forgetPresetName(req.slot)
-        setSlots((prev) => prev.filter((s) => s.number !== req.slot))
+        // What that slot is called is now known exactly, and the phone that
+        // asked for this reads it back off the host. See notePresetName.
+        keepSavedName(req.slot, name || preset?.name)
+        keepSavedScenes(req.slot, sceneNames)
+        setSlots(cachedPresetNames())
         await clearParkedSave()
         // The phone is watching for this; without it, "asked" never becomes
         // "done" over there and the only honest thing it could say is nothing.
@@ -1833,7 +1868,7 @@ export default function App() {
         setBusy(false)
       }
     },
-    [preset?.name, read, record, device?.capabilities, markHandled]
+    [preset?.name, sceneNames, read, record, device?.capabilities, markHandled]
   )
 
   /*
@@ -1958,6 +1993,13 @@ export default function App() {
       if (res.ok) {
         setDirty(false)
         setSavedAt(Date.now())
+        /*
+         * The list on this phone still has that slot under its old name, and
+         * nothing here can re-read it. See keepSavedName.
+         */
+        keepSavedName(res.slot, queuedSave.name)
+        keepSavedScenes(res.slot, queuedSave.scenes)
+        setSlots(cachedPresetNames())
         record('save', `The Mac saved it to slot ${res.slot}`)
         // The unit is still writing that preset to flash. See SETTLING_TRIES.
         read({ settling: true })
@@ -2950,7 +2992,18 @@ export default function App() {
           fromSlot: preset?.number ?? null,
           fromName: preset?.name ?? null
         })
-        setQueuedSave({ id, slot: number })
+        /*
+         * What the slot will be called, and what its scenes are, carried with
+         * the request rather than read back later: an AM4 will not dump a
+         * preset over the relay, so when the Mac says this landed, THIS is the
+         * only description of slot ${number} the phone will ever have.
+         */
+        setQueuedSave({
+          id,
+          slot: number,
+          name: saveName.trim() || preset?.name || '',
+          scenes: Array.isArray(sceneNames) ? [...sceneNames] : []
+        })
         record('save', `Asked the Mac to save "${saveName.trim() || preset?.name}" to slot ${number}`)
         return
       }
@@ -2962,8 +3015,9 @@ export default function App() {
         await setPresetName(name)
       }
       await storePreset(number)
-      // The list is holding that slot's old name, and it just stopped being true.
-      forgetPresetName(number)
+      // The list is holding that slot's old name, and this is the name that
+      // just replaced it — better evidence than any read. See notePresetName.
+      keepSavedName(number, name || preset?.name)
       /*
        * And the slot now holds this buffer's scenes, so its names are these.
        *
@@ -2973,14 +3027,9 @@ export default function App() {
        * only come from what somebody wrote down: dumps do not travel the relay.
        * Nothing wrote anything down at the one moment the answer was certain —
        * the moment the buffer became that slot.
-       *
-       * Every index, including the blank ones: the buffer is the truth for this
-       * slot now, so a scene left unnamed here really is unnamed there.
        */
-      if (Array.isArray(sceneNames) && sceneNames.some((n) => (n || '').trim())) {
-        noteSceneNames(number, new Map(sceneNames.map((n, i) => [i, (n || '').trim()])))
-      }
-      setSlots((prev) => prev.filter((s) => s.number !== number))
+      keepSavedScenes(number, sceneNames)
+      setSlots(cachedPresetNames())
       setApplied((prev) => ({ ...prev, savedTo: number }))
       record('save', `Saved "${name || preset?.name}" to slot ${number}`)
       setDirty(false)
