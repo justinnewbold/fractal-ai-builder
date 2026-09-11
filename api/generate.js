@@ -90,7 +90,9 @@ const buildPresetSpec = (eids = []) =>
     .string()
     .describe(
       'Name for the preset, 31 characters or fewer. Mixed case is fine. Make it descriptive of ' +
-        'the sound rather than generic — a player scrolling a list of 512 should know what this is.'
+        'the sound rather than generic — a player scrolling a list of 512 should know what this ' +
+        'is. When the request names a band, a record or a song, the name says so: "Three Days ' +
+        'Grace", not "Verse-Rhythm-Lead".'
     ),
   summary: z.string().describe('One sentence on the approach taken.'),
   /*
@@ -157,7 +159,13 @@ const buildPresetSpec = (eids = []) =>
           .describe('Scene number, zero-based. 0 is scene 1 on the unit front panel.'),
         name: z
           .string()
-          .describe('Short name for this scene — "Clean", "Rhythm", "Lead". Eight characters or fewer reads best on the unit.'),
+          .describe(
+            'Name for this scene, 16 characters at most — longer is cut on the way to the unit, ' +
+              'so shorten a long title yourself. When the request names a band, an artist or a ' +
+              'record, this is the SONG this scene is voiced for — "Animal I", "Riot". When it ' +
+              'names one song, it is the part of that song — "Intro", "Chorus", "Solo". Only ' +
+              'when it names neither is it the job — "Clean", "Rhythm", "Lead".'
+          ),
         engaged: onlyWhenPlaced(
           eids,
           z.array(eidField(eids, 'An effect id that is ON in this scene.')),
@@ -250,6 +258,24 @@ switched by footswitch without a gap.
 12. Name every scene you return. The name is written to the unit and is what
     the player reads on the front panel and on their footswitch — an unnamed
     scene keeps whatever name was there before, which is somebody else's.
+13. Name scenes after the music when the request names music, not after the job
+    the scene does:
+    - A BAND, an artist, an album or an era: every scene is one of THEIR songs.
+      Name it for that song and voice it for that song — the amp, the gain and
+      the effects that record actually used. Pick songs a fan of theirs would
+      name, and pick ones that genuinely sound different from each other. Say
+      in the summary which song each scene is.
+    - ONE SONG: every scene is a part of THAT song — its intro, verse, chorus,
+      bridge, solo, outro — named for the part it plays.
+    - NEITHER, just a description of a sound: the job is the right name.
+      "Clean", "Rhythm", "Lead" say what they are and nothing else would.
+    Scenes called Rhythm and Lead under a band's name is the failure this rule
+    exists to stop. A player who asked for Three Days Grace and got Verse,
+    Rhythm, Lead was handed a preset that could have been anybody's.
+14. Scene names are cut to 16 characters on the way to the unit, so shorten a
+    long title yourself rather than letting it be chopped mid-word: "Animal I
+    Have Become" goes on as "Animal I", "Master of Puppets" as "Puppets" —
+    keep the words that make the song recognisable and drop the rest.
 
 TONE JUDGEMENT
 
