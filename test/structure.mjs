@@ -660,6 +660,52 @@ export function run(test) {
     assert.match(setup, /onClick=\{\(\) => setSheet\('gear'\)\}/, 'the way in does not open the sheet')
   })
 
+  test('the local matcher watches and cannot act', () => {
+    /*
+     * It is switched on to be measured, not to be used. How many of the things
+     * this player actually types are the plain kind is not something anybody
+     * can guess, and a matcher switched on against a guess is one that writes
+     * to a unit on the strength of a guess.
+     *
+     * So the only thing it may do is write a line to the debug log, and that
+     * is what this holds: the request still goes to the model, every time,
+     * whatever the matcher thought.
+     */
+    const at = src.indexOf('const would =')
+    assert.notEqual(at, -1, 'the local matcher is not run at all')
+    const block = src.slice(src.lastIndexOf('try {', at), src.indexOf('THINKING', at))
+
+    assert.match(block, /logDebug\(\s*'local'/, 'a match is not recorded anywhere')
+    for (const escape of ['return', 'setTurns', 'runActions', 'applyChanges', 'setParam', 'await ']) {
+      assert.ok(
+        !block.includes(escape),
+        'the watching block contains "' + escape + '" — it is doing something other than watching'
+      )
+    }
+
+    /*
+     * And what it decided never leaves that block. `would` is read to write a
+     * log line and then forgotten — if the name appears anywhere between here
+     * and the request, something downstream can branch on it, and a request
+     * the matcher can skip is a matcher that acts whatever the block above it
+     * looks like.
+     */
+    const threw = src.indexOf('the local matcher threw and was ignored', at)
+    assert.notEqual(threw, -1, 'the watching block no longer has its own catch')
+    const between = src.slice(threw, src.indexOf("aiUrl('/api/command'", threw))
+    assert.ok(!between.includes('would'), 'what the matcher decided is read after the watching block')
+
+    /*
+     * The matcher itself reaches nothing. Pure text in, a plan or null out —
+     * that is what lets it run before the request rather than after, and what
+     * makes every rule in it testable against no hardware.
+     */
+    const lib = readFileSync(new URL('../src/lib/localCommands.js', import.meta.url), 'utf8')
+    const imports = [...lib.matchAll(/^import .*$/gm)].map((m) => m[0])
+    assert.deepEqual(imports, [], 'the matcher imports something — it can no longer be pure')
+    assert.ok(!/fetch\(|localStorage|document\.|window\./.test(lib), 'the matcher reaches outside itself')
+  })
+
   test('Setup is four doors, not twelve panels in a column', () => {
     /*
      * "It seems overwhelming and confusing with how many options there are."
