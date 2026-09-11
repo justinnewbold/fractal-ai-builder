@@ -4850,7 +4850,7 @@ export function run(test) {
      * one line when it starts, one naming what came back and what to press,
      * one when it fails.
      */
-    const reload = src.slice(src.indexOf('const reload = async (entry)'), src.indexOf('const refine = async'))
+    const reload = src.slice(src.indexOf('const reload = async (entry'), src.indexOf('const refine = async'))
     assert.ok(reload, 'the reload handler is gone')
     assert.match(reload, /setSheet\('chat'\)/, 'a reloaded preset still lands behind whatever sheet asked for it')
     assert.ok(
@@ -4869,6 +4869,37 @@ export function run(test) {
     assert.ok(!/title=\{entry\.summary/.test(cloud), 'the description is back in a tooltip')
     assert.match(cloud, /preset-row-desc/, 'the account rows no longer say what the preset is')
     assert.match(cloud, /Tap one to load it/, 'nothing says what tapping a row does')
+  })
+
+  test('a tone with more scenes than the unit holds asks before it loads', () => {
+    /*
+     * "I am currently on the AM4, which only allows four scenes per preset. But
+     * most of these presets were created on the FM3."
+     *
+     * The validator dropped the ones that did not fit and listed them under
+     * "Rejected during checking" — so which four survived was decided by
+     * numbering, and the only notice was the most technical panel on the
+     * screen. The question is the player's, and it is asked before the load
+     * rather than reported after it: both halves are known from the spec and
+     * the device, so nothing has to be read off the hardware to ask it.
+     */
+    const reload = src.slice(src.indexOf('const reload = async (entry'), src.indexOf('const refine = async'))
+    assert.match(reload, /scenesOverflowing\(entry\?\.spec, sceneCount\)/, 'nothing checks whether the tone fits')
+    assert.ok(
+      reload.indexOf('setSceneFit(entry)') < reload.indexOf('setBusy(true)'),
+      'the question is asked after the load has already started'
+    )
+    assert.match(reload, /fitScenes\(entry\.spec, picked, sceneCount\)/, 'the chosen scenes are never renumbered to fit')
+    assert.match(
+      reload,
+      /validateSpec\(spec, schema, sceneCount, channelNames\)/,
+      'the original spec is still what gets checked, so the picking was for nothing'
+    )
+
+    /* And the sheet that asks is outside the swipe surface, like every other
+       one — a sheet inside it travels with the page. */
+    const app = src.slice(src.indexOf('open={!!sceneFit}'))
+    assert.match(app.slice(0, 600), /<SceneFit/, 'the scene picker sheet holds nothing')
   })
 
   test('the backup panel declares the prop it reads', () => {

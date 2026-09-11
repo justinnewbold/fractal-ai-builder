@@ -181,6 +181,8 @@ import {
   worthKeeping
 } from './lib/chatLog'
 import { sceneChoices } from '../api/_scenes.js'
+import SceneFit from './components/SceneFit'
+import { scenesOverflowing, fitScenes, describeFit } from './lib/sceneFit'
 import { pushEntry, replaceEntry } from './lib/nav'
 import { useAsks } from './lib/asks'
 import { useDismiss } from './lib/dismiss'
@@ -435,6 +437,13 @@ export default function App() {
    * answer would cost a second generation.
    */
   const [sceneAsk, setSceneAsk] = useState(null)
+  /*
+   * A saved tone waiting on the same kind of question, asked the other way
+   * round. A tone made on an eight-scene unit holds scenes the unit in front
+   * of you may not have, and which of them come across is the player's call —
+   * see lib/sceneFit.js. Null whenever the tone fits, which is most of them.
+   */
+  const [sceneFit, setSceneFit] = useState(null)
   const [progress, setProgress] = useState(null)
   const [applied, setApplied] = useState(null)
   /*
@@ -2831,7 +2840,26 @@ export default function App() {
     requestAnimationFrame(() => requestAnimationFrame(run))
   }
 
-  const reload = async (entry) => {
+  const reload = async (entry, picked = null) => {
+    /*
+     * MORE SOUNDS THAN THE UNIT HOLDS, ASKED ABOUT BEFORE ANYTHING IS READ.
+     *
+     * "I am currently on the AM4, which only allows four scenes per preset.
+     * But most of these presets were created on the FM3."
+     *
+     * The load used to go ahead and let the validator throw the extra scenes
+     * out — first four kept, rest listed in the rejected panel, no say in it.
+     * Both halves of the spec are known here without touching the hardware, so
+     * the question is asked first and costs nothing when the answer is no
+     * question at all, which it is for every tone that fits. See lib/sceneFit.
+     */
+    if (!picked && scenesOverflowing(entry?.spec, sceneCount)) {
+      setSceneFit(entry)
+      return
+    }
+    const fit = picked ? fitScenes(entry.spec, picked, sceneCount) : null
+    const spec = fit ? fit.spec : entry.spec
+
     setBusy(true)
     setError(null)
     setApplied(null)
@@ -2971,8 +2999,8 @@ export default function App() {
         { force: true }
       )
 
-      const validated = validateSpec(entry.spec, schema, sceneCount, channelNames)
-      validated.spec = entry.spec
+      const validated = validateSpec(spec, schema, sceneCount, channelNames)
+      validated.spec = spec
       validated.description = entry.description
       if (!validated.presetName) validated.presetName = entry.name
 
@@ -2983,6 +3011,14 @@ export default function App() {
       revealResult()
       const ready = countWrites(validated.changes)
       const loaded = validated.presetName || entry.name
+      /* Said in the conversation as well as in the picker, because the picker
+         is gone by the time the tone is on screen. */
+      if (fit) {
+        setTurns((prev) => [
+          ...prev,
+          { role: 'system', text: describeFit(fit, sceneCount) }
+        ])
+      }
       setTurns((prev) => [
         ...prev,
         {
@@ -3009,6 +3045,7 @@ export default function App() {
       ])
       record('reload', `Loaded saved preset "${entry.name}"`, [
         `${countWrites(validated.changes)} changes proposed`,
+        ...(fit ? [describeFit(fit, sceneCount)] : []),
         ...validated.problems
       ])
     } catch (err) {
@@ -4810,6 +4847,7 @@ export default function App() {
             chatId={chatId}
             busy={busy}
             signedIn={!!link.account}
+            unit={device?.short || device?.name}
             onOpenChat={async (entry) => {
               await openChat(entry)
               /* Out of the sheet and into the conversation it just loaded —
@@ -5219,6 +5257,35 @@ export default function App() {
             </button>
           ))}
         </div>
+      </Sheet>
+
+      {/*
+        The other scene question: a tone with more sounds in it than the unit
+        in front of you has scenes.
+
+        Asked before the load rather than reported after it, and asked exactly
+        once — a tone that fits, which is every tone made on this unit and most
+        tones with no scene plan at all, never sees this sheet.
+      */}
+      <Sheet
+        open={!!sceneFit}
+        onClose={() => setSceneFit(null)}
+        title="Which sounds?"
+        note={`This ${device?.short || device?.name || 'unit'} holds ${sceneCount}`}
+      >
+        {sceneFit ? (
+          <SceneFit
+            entry={sceneFit}
+            sceneCount={sceneCount}
+            unit={device?.short || device?.name || 'unit'}
+            onLoad={(keep) => {
+              const entry = sceneFit
+              setSceneFit(null)
+              reload(entry, keep)
+            }}
+            onCancel={() => setSceneFit(null)}
+          />
+        ) : null}
       </Sheet>
 
       <Sheet
