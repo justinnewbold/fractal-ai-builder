@@ -5205,7 +5205,13 @@ export default function App() {
             button did, and it is why refreshing the page was the only thing
             that worked when a relay went quiet. This one drops a dead relay
             and rejoins the session before it reads. */}
-        <DeviceDetail status={status} device={device} onRetry={reconnect} busy={busy} />
+        <DeviceDetail
+          status={status}
+          device={device}
+          onRetry={reconnect}
+          busy={busy}
+          onHistory={() => setSheet('history')}
+        />
 
         <Group key="screen" title="Screen" note="How Play looks">
           {/*
@@ -5503,47 +5509,6 @@ export default function App() {
           bandmate. This is the only route back, so it is a plain button
           rather than a link inside a paragraph.
         */}
-        {/*
-          Everything you have made, in one place.
-
-          "Create a dedicated button in the settings menu for history where you
-          can view previous chats and reload them as well as the history of
-          previously generated presets."
-
-          Loose here, beside the gear list and the introduction, for the reason
-          those two are loose: it is a door out to something you read, not a
-          setting to change. It is first of the three because it is the one
-          somebody comes looking for.
-
-          Its own sheet rather than a fold, because it is two lists that grow
-          without limit, and a list that long inside a panel inside a sheet is
-          two scrolls fighting for one thumb.
-        */}
-        <Section
-          key="history"
-          title="History"
-          note={
-            chatLog.length || library.length
-              ? `${chatLog.length} ${chatLog.length === 1 ? 'chat' : 'chats'} · ${library.length} ${
-                  library.length === 1 ? 'preset' : 'presets'
-                }`
-              : 'Nothing yet'
-          }
-        >
-          <p className="hint">
-            Every conversation you have had and every tone you have designed, sent or not. Open
-            one to pick it back up.{' '}
-            {link.account
-              ? 'All of it is kept with your account.'
-              : 'All of it is in this browser until you sign in.'}
-          </p>
-          <div className="history-actions">
-            <button className="chip" onClick={() => setSheet('history')}>
-              Open history
-            </button>
-          </div>
-        </Section>
-
         {/*
           What every model on the unit really is.
 

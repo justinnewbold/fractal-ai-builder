@@ -15,7 +15,25 @@ import { FULL } from '../lib/version'
  * This was DeviceBar, whose collapsed summary the top bar carries. What
  * survives is the fold, opened by the gear.
  */
-export default function DeviceDetail({ status, device, onRetry, busy }) {
+export default function DeviceDetail({
+  status,
+  device,
+  onRetry,
+  busy,
+  /*
+   * Everything the player has made, one tap in.
+   *
+   * It was a fold near the bottom of this sheet: "I want a button, not a
+   * drop-down menu. And I want it at the top of the screen just like demo and
+   * read unit again so it's easily accessible quickly without scrolling down."
+   * So it is a plain button in this row, which is the first thing the gear
+   * opens onto and needs no scrolling to reach.
+   *
+   * First in the run, because it is the one here anybody opens on purpose —
+   * the rest of this row is the connection, touched about once a month.
+   */
+  onHistory
+}) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(getHost())
 
@@ -91,6 +109,7 @@ export default function DeviceDetail({ status, device, onRetry, busy }) {
             {demo || !remote ? (
               <span className="device-meta mono">{demo ? 'simulated' : getHost()}</span>
             ) : null}
+            {onHistory ? <button onClick={onHistory}>History</button> : null}
             <button onClick={toggleDemo}>{demo ? 'Use real device' : 'Demo mode'}</button>
             {!demo && !remote ? (
               <button onClick={() => setEditing(true)}>Change address</button>
