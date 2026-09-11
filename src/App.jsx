@@ -143,6 +143,7 @@ import { aiUrl } from './lib/ai'
 import { saveCloudPreset, cloudReady, listCloudPresets, deleteCloudPreset } from './lib/cloudPresets'
 import Tour, { tourSeen, markTourSeen } from './components/Tour'
 import Recent from './components/Recent'
+import Past from './components/Past'
 import ConnectScreen from './components/ConnectScreen'
 import PhoneRemote from './components/PhoneRemote'
 import LinkDetails from './components/LinkDetails'
@@ -820,6 +821,21 @@ export default function App() {
    * one would take the inner one's entry with it.
    */
   const [sheet, setSheet] = useState(null)
+  /*
+   * Which sheet the block editor was opened FROM.
+   *
+   * Only one sheet is open at a time — `sheet` is a single name — so tapping a
+   * block inside the chain sheet replaces it with the block editor. Closing
+   * that editor with nothing remembered would drop you on the Play screen,
+   * two taps from the chain you were working through. This is the way back.
+   */
+  const [sheetBack, setSheetBack] = useState(null)
+  /* Open a block's knobs, and remember what to return to. */
+  const openBlockFrom = useCallback((id, from = null) => {
+    setSelectedBlock(id)
+    setSheetBack(from)
+    setSheet('block')
+  }, [])
 
   /*
    * The preset menu is a menu, not a sheet.
@@ -4525,6 +4541,17 @@ export default function App() {
           /* Absent, not disabled, when play mode is on: the bar closes up to
              two buttons rather than keeping a dead third. */
           onAsk={askShows ? () => setSheet('chat') : null}
+          /*
+           * On a phone this opens the chain in a sheet, because the Edit
+           * screen is not reachable there on purpose. On a screen wide enough
+           * to have that screen it simply goes there, rather than opening a
+           * second copy of the same editor in the rail beside it.
+           */
+          onChain={
+            askShows
+              ? () => (views.includes('shape') ? changeView('shape') : setSheet('chain'))
+              : null
+          }
         />
       ) : null}
 
@@ -4543,10 +4570,7 @@ export default function App() {
           <Chain
             blocks={blocks}
             selected={selectedBlock}
-            onSelect={(id) => {
-              setSelectedBlock(id)
-              setSheet('block')
-            }}
+            onSelect={(id) => openBlockFrom(id)}
             onToggle={toggleBlock}
           />
 
@@ -4593,8 +4617,7 @@ export default function App() {
             blocks={blocks}
             onError={setError}
             onPick={(eid, paramId) => {
-              setSelectedBlock(eid)
-              setSheet('block')
+              openBlockFrom(eid)
               setEditorFocus({ eid, paramId, nonce: Date.now() })
             }}
           />
@@ -4664,9 +4687,128 @@ export default function App() {
           Sheets. Things you open, act on and dismiss — not places you go.
           --------------------------------------------------------------- */}
 
+      {/*
+        Everything you have made, in one sheet, whichever store it landed in.
+
+        "Create a dedicated button in the settings menu for history where you
+        can view previous chats and reload them as well as the history of
+        previously generated presets."
+
+        Deliberately not the Presets sheet. That one answers "where is this
+        kept" and has a panel per store, because moving a library between them
+        is a real job. This answers "what have I made", which has no business
+        knowing about stores — so the presets arrive as one merged list, the
+        same one Earlier generations is drawn from, and where things live is
+        one line at the top rather than three headings.
+      */}
+      <Sheet
+        open={sheet === 'history'}
+        onClose={() => setSheet(null)}
+        title="History"
+        note={link.account ? link.account.email : 'Saved in this browser'}
+      >
+        {sheet === 'history' ? (
+          <Past
+            chats={chatLog}
+            presets={library}
+            chatId={chatId}
+            busy={busy}
+            signedIn={!!link.account}
+            onOpenChat={async (entry) => {
+              await openChat(entry)
+              /* Out of the sheet and into the conversation it just loaded —
+                 the same lesson the preset reload learned: a thing that opens
+                 behind the sheet you pressed the button in looks like a button
+                 that did nothing. */
+              setSheet(views.includes('ask') ? null : 'chat')
+              if (views.includes('ask')) changeView('ask')
+            }}
+            onDeleteChat={forgetChat}
+            onRestore={reload}
+            onDelete={forget}
+          />
+        ) : null}
+      </Sheet>
+
+      {/*
+        The chain, and everything that changes it, on a phone.
+
+        "On the PWA we need to be able to see what chain was written or what
+        chain is currently on a setting."
+
+        The Edit screen where this lives is deliberately unreachable on a phone
+        — see BENCH in components/Screens.jsx, and the same rule the phone apps
+        in mobile/ have always had: a generate button within reach of a stage
+        tap is a hazard. That rule is about what a SWIPE lands on in the dark,
+        not about what the app is capable of showing. Nothing here is one
+        gesture from the stage screen; it is behind the gear, which is where
+        somebody goes when they have stopped playing and want to look at
+        something.
+
+        The same contents as the Edit screen, in a sheet, so there is one chain
+        editor in this app rather than a second one written for a small screen.
+      */}
+      <Sheet
+        open={sheet === 'chain'}
+        onClose={() => setSheet(null)}
+        title="Chain"
+        note={
+          hasScenes
+            ? `Scene ${scene + 1}${sceneNames[scene] ? ` · ${sceneNames[scene]}` : ''}`
+            : preset?.name || null
+        }
+      >
+        {sheet === 'chain' ? (
+          <>
+            {/* What is in the preset, in signal order. Tapping one opens its
+                knobs and closing them comes back here. */}
+            <Chain
+              blocks={blocks}
+              selected={selectedBlock}
+              onSelect={(id) => openBlockFrom(id, 'chain')}
+              onToggle={toggleBlock}
+            />
+
+            <ParamSearch
+              blocks={blocks}
+              onError={setError}
+              onPick={(eid, paramId) => {
+                openBlockFrom(eid, 'chain')
+                setEditorFocus({ eid, paramId, nonce: Date.now() })
+              }}
+            />
+
+            <Section key="chain-blocks" title="Add, remove and move blocks">
+              <GridEditor
+                blocks={blocks}
+                capabilities={device?.capabilities}
+                busy={busy}
+                onError={setError}
+                onChanged={(summary) => {
+                  record('grid', summary)
+                  read()
+                }}
+              />
+            </Section>
+
+            <Section key="chain-modifiers" title="Modifiers" note="Let a pedal or the volume knob move a control">
+              <Modifiers
+                blocks={blocks}
+                busy={busy}
+                onError={setError}
+                onChanged={(summary) => record('modifier', `Modifier bound: ${summary}`)}
+              />
+            </Section>
+          </>
+        ) : null}
+      </Sheet>
+
       <Sheet
         open={sheet === 'block' && !!openBlock}
-        onClose={() => setSheet(null)}
+        onClose={() => {
+          setSheet(sheetBack)
+          setSheetBack(null)
+        }}
         title={openBlock?.name || 'Block'}
         /* Where these knobs land. A block's settings are per-scene, so an
            editor that doesn't name the scene is an editor you have to
@@ -5361,6 +5503,47 @@ export default function App() {
           bandmate. This is the only route back, so it is a plain button
           rather than a link inside a paragraph.
         */}
+        {/*
+          Everything you have made, in one place.
+
+          "Create a dedicated button in the settings menu for history where you
+          can view previous chats and reload them as well as the history of
+          previously generated presets."
+
+          Loose here, beside the gear list and the introduction, for the reason
+          those two are loose: it is a door out to something you read, not a
+          setting to change. It is first of the three because it is the one
+          somebody comes looking for.
+
+          Its own sheet rather than a fold, because it is two lists that grow
+          without limit, and a list that long inside a panel inside a sheet is
+          two scrolls fighting for one thumb.
+        */}
+        <Section
+          key="history"
+          title="History"
+          note={
+            chatLog.length || library.length
+              ? `${chatLog.length} ${chatLog.length === 1 ? 'chat' : 'chats'} · ${library.length} ${
+                  library.length === 1 ? 'preset' : 'presets'
+                }`
+              : 'Nothing yet'
+          }
+        >
+          <p className="hint">
+            Every conversation you have had and every tone you have designed, sent or not. Open
+            one to pick it back up.{' '}
+            {link.account
+              ? 'All of it is kept with your account.'
+              : 'All of it is in this browser until you sign in.'}
+          </p>
+          <div className="history-actions">
+            <button className="chip" onClick={() => setSheet('history')}>
+              Open history
+            </button>
+          </div>
+        </Section>
+
         {/*
           What every model on the unit really is.
 

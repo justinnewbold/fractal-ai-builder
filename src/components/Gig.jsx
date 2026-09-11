@@ -67,7 +67,17 @@ export default function Gig({
   onError,
   onChanged,
   onPickPreset,
-  onAsk
+  onAsk,
+  /*
+   * The way to the chain and its knobs.
+   *
+   * Given on the same terms as onAsk — absent, not disabled, when play mode is
+   * on — because it is the same kind of thing: work you do between songs, not
+   * during one. On a phone this is the ONLY way in, since the Edit screen is
+   * deliberately unreachable there (see BENCH in Screens.jsx); on a wide screen
+   * it goes to that screen instead of opening a second copy of it.
+   */
+  onChain
 }) {
   /*
    * How big the buttons are is decided in the tab bar, a row this screen does
@@ -900,6 +910,20 @@ export default function Gig({
           <button className="gig-bar-btn gig-ask" onClick={onAsk} aria-label="Ask for a change">
             <span aria-hidden="true">✦</span>
             <span>Ask</span>
+          </button>
+        ) : null}
+        {/*
+          And what is actually in the preset, which until now a phone could not
+          see at all.
+
+          "We need to be able to see what chain was written or what chain is
+          currently on a setting." The tiles above this bar say which blocks
+          are on and off; they do not say what order they are in, what is wired
+          to what, or what any knob is set to. This opens the chain itself.
+        */}
+        {onChain ? (
+          <button className="gig-bar-btn" onClick={onChain} aria-label="See the chain and its controls">
+            Chain
           </button>
         ) : null}
       </div>

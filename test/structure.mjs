@@ -492,12 +492,21 @@ export function run(test) {
      * whole reason the sheet exists. Nesting is the guarantee: a BlockPanel
      * rendered as a sibling of the chain again is the old bug returning.
      */
-    const open = src.indexOf('<Sheet')
+    const panel = src.indexOf('<BlockPanel')
+    assert.notEqual(panel, -1, 'the block editor is gone')
+    /*
+     * The sheet it is in, not the first sheet in the file: there are several
+     * now, and which one comes first in App is a layout detail. What is held
+     * here is that the nearest <Sheet above BlockPanel has not been closed
+     * before reaching it — which is exactly "BlockPanel is nested in a sheet",
+     * and stays true however the sheets are reordered.
+     */
+    const open = src.lastIndexOf('<Sheet', panel)
     assert.notEqual(open, -1, 'nothing opens as a sheet')
-    const shut = src.indexOf('</Sheet>', open)
-    assert.notEqual(shut, -1, 'the sheet is never closed')
-    const inside = src.slice(open, shut)
-    assert.ok(inside.includes('<BlockPanel'), 'the block editor is not inside a sheet')
+    assert.ok(
+      !src.slice(open, panel).includes('</Sheet>'),
+      'the block editor is not inside a sheet'
+    )
     assert.equal(
       (src.match(/<BlockPanel/g) || []).length,
       1,
@@ -706,6 +715,117 @@ export function run(test) {
     assert.ok(!/fetch\(|localStorage|document\.|window\./.test(lib), 'the matcher reaches outside itself')
   })
 
+  test('a chat can be put down, and the one you put down is still there', () => {
+    /*
+     * "The current chat is getting along in the app. Can we create a way to
+     * create a fresh chat?"
+     *
+     * New chat is only safe to press because the conversation it clears goes
+     * on the shelf first — so what is held here is that App shelves before it
+     * empties, and that the tone and the last design go with it. A fresh chat
+     * that still remembered the last tone is the same conversation with its
+     * transcript hidden.
+     */
+    const fresh = src.slice(src.indexOf('const newChat = useCallback'))
+    const body = fresh.slice(0, fresh.indexOf('\n  }, ['))
+    assert.match(body, /archiveChat\(turns, chatId\)/, 'New chat throws the conversation away')
+    assert.ok(
+      body.indexOf('archiveChat') < body.indexOf('setTurns([])'),
+      'the conversation is emptied before it is shelved'
+    )
+    for (const gone of ['setResult(null)', 'setLastDesign(null)', "setLastPrompt('')"]) {
+      assert.ok(body.includes(gone), `a fresh chat still carries ${gone.split('(')[0]}`)
+    }
+    /* And nothing is shelved from an empty box: pressing it twice must not
+       leave a row behind. */
+    assert.match(body, /if \(worthKeeping\(turns\)\)/, 'an empty chat is shelved as a conversation')
+
+    /* The button itself lives above the transcript, not below it: the log
+       scrolls and its bottom moves under the thumb on every reply. */
+    const assistant = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
+    assert.match(assistant, /className="assistant-top"/, 'nothing offers a new chat')
+    assert.ok(
+      assistant.indexOf('assistant-top') < assistant.indexOf('className="assistant-log"'),
+      'New chat sits inside the transcript and scrolls away with it'
+    )
+    assert.match(assistant, /onNew && turns\.length/, 'New chat is offered over an empty conversation')
+    assert.match(src, /onNew=\{newChat\}/, 'the conversation is not given a way to be put down')
+  })
+
+  test('history is one list of what you made, not one list per store', () => {
+    /*
+     * "Combine the previously generated presets into one menu, don't separate
+     * them from what's saved in the browser compared to what's saved in the
+     * cloud."
+     *
+     * The Presets sheet keeps its panel per store, because moving a library
+     * between them is a real job. History is the other question — what have I
+     * made — and it is handed the already-merged list that Earlier generations
+     * draws from, so it cannot grow a heading per store.
+     */
+    const past = sheet('History')
+    assert.match(past, /<Past/, 'the history sheet shows nothing')
+    assert.match(past, /presets=\{library\}/, 'history is drawn from a store rather than from the merged list')
+    assert.match(past, /chats=\{chatLog\}/, 'history does not list past conversations')
+    assert.match(past, /signedIn=\{!!link\.account\}/, 'history cannot say where any of it is kept')
+
+    const panel = readFileSync(new URL('../src/components/Past.jsx', import.meta.url), 'utf8')
+    /* Where things live is said once, as a fact rather than a choice — signed
+       in it is the account, signed out it is this browser. */
+    assert.match(panel, /Sign in and everything here is kept with your account/)
+    assert.ok(
+      !/Browser|Cloud|Folder/.test(panel.replace(/\/\*[\s\S]*?\*\//g, '')),
+      'the merged list grew a heading per store again'
+    )
+
+    /* And the way in is a door in Setup, loose beside the other two things
+       that are read rather than changed. */
+    const setup = sheet('Setup')
+    assert.match(setup, /<Section\s+key="history"/, 'Setup has no way to reach history')
+    assert.match(setup, /setSheet\('history'\)/, 'the history door opens nothing')
+  })
+
+  test('a phone can reach the chain, from the bar rather than by a swipe', () => {
+    /*
+     * "On the PWA we need to be able to see what chain was written or what
+     * chain is currently on a setting … a button to view the studio or edit
+     * screen where parameters can be viewed and changed."
+     *
+     * The Edit screen stays off a phone's swipe — BENCH in Screens.jsx, and
+     * the rule the phone apps have always had: a bench screen within reach of
+     * a stage tap is a hazard. That rule is about what a thumb lands on in the
+     * dark, not about what the app may show, so the way in is a button on the
+     * bar that already carries Ask, under the same play-mode rule.
+     */
+    /* Found by what opens it, not by its title: the Edit screen has a panel
+       called Chain too, and it is the same editor — which is the point. */
+    const at = src.indexOf("open={sheet === 'chain'}")
+    assert.notEqual(at, -1, 'nothing opens the chain as a sheet')
+    const chain = src.slice(src.lastIndexOf('<Sheet', at), src.indexOf('</Sheet>', at))
+    for (const part of ['<Chain', '<ParamSearch', '<GridEditor', '<Modifiers']) {
+      assert.ok(chain.includes(part), `the chain sheet is missing ${part}`)
+    }
+    assert.match(chain, /openBlockFrom\(id, 'chain'\)/, 'a block opened from the chain sheet has no way back')
+
+    /* Closing the block editor returns to whatever opened it. One sheet is
+       open at a time, so without this a block tapped in the chain sheet drops
+       you on the stage screen when you close it. */
+    assert.match(src, /setSheet\(sheetBack\)/, 'the block editor forgets where it was opened from')
+    assert.match(src, /onChain=\{\s*\n?\s*askShows/, 'the chain is reachable with play mode on')
+    assert.match(
+      src,
+      /views\.includes\('shape'\) \? changeView\('shape'\) : setSheet\('chain'\)/,
+      'a wide screen opens a second copy of the editor beside the one it already has'
+    )
+
+    const gig = readFileSync(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8')
+    assert.match(gig, /\{onChain \?/, 'the stage screen has no way to the chain')
+    assert.ok(
+      gig.indexOf('onAsk ?') < gig.indexOf('onChain ?'),
+      'the chain button jumped in front of Ask on the bar'
+    )
+  })
+
   test('Setup is four doors, not twelve panels in a column', () => {
     /*
      * "It seems overwhelming and confusing with how many options there are."
@@ -732,14 +852,19 @@ export function run(test) {
     /* The groups are contiguous, so everything from the first to the last is
        the grouped region and what is left is what stayed loose. */
     /*
-     * Two are loose on purpose, and they are the two that are not settings:
-     * the way back to the introduction, and the sheet naming what every model
-     * really is. Both are doors out to something you read. Anything else
-     * loose here is a panel that missed its group.
+     * Three are loose on purpose, and they are the three that are not
+     * settings: everything the player has made, the sheet naming what every
+     * model really is, and the way back to the introduction. All three are
+     * doors out to something you read. Anything else loose here is a panel
+     * that missed its group.
      */
     const loose = [...setup.replace(/<Group[\s\S]*<\/Group>/, '').matchAll(/<Section\s+key="([^"]+)"/g)]
       .map((m) => m[1])
-    assert.deepEqual(loose, ['gear-names', 'how-this-works'], `panels loose in Setup again: ${loose.join(', ')}`)
+    assert.deepEqual(
+      loose,
+      ['history', 'gear-names', 'how-this-works'],
+      `panels loose in Setup again: ${loose.join(', ')}`
+    )
 
     const behind = (key) => {
       const at = setup.indexOf(`<Group key="${key}"`)

@@ -4689,6 +4689,66 @@ test('the account copy is pulled once and pushed on a debounce', () => {
   assert.match(app, /if \(winner\.from !== 'cloud'\) return/)
 })
 
+test('a conversation is named by the first thing the player actually said', async () => {
+  const { titleFor, worthKeeping } = await import('../src/lib/chatLog.js')
+
+  // App notes and hand edits are true sentences about a chat that say nothing
+  // about which chat it was — "Chain in: Amp (3), Cab (4)" is not a title.
+  assert.equal(
+    titleFor([
+      { role: 'system', text: 'Chain in: Amp (3), Cab (4)' },
+      { role: 'hand', text: 'Named scene 4 Solo' },
+      { role: 'user', text: 'tight modern metal rhythm in drop A' },
+      { role: 'user', text: 'brighter' }
+    ]),
+    'tight modern metal rhythm in drop A'
+  )
+  assert.equal(titleFor([]), 'Untitled chat')
+  assert.equal(titleFor([{ role: 'assistant', text: 'Done.' }]), 'Untitled chat')
+  assert.equal(titleFor(null), 'Untitled chat')
+  // Long enough to recognise, short enough for one line.
+  const long = titleFor([{ role: 'user', text: 'x'.repeat(200) }])
+  assert.ok(long.length <= 70, `a title ${long.length} characters long is not a list row`)
+  assert.ok(long.endsWith('\u2026'), 'a trimmed title does not say it was trimmed')
+  // Whitespace is not a sentence.
+  assert.equal(titleFor([{ role: 'user', text: '   \n  ' }]), 'Untitled chat')
+
+  /* A conversation worth shelving is one somebody said something in. Pressing
+     New chat on an empty box must not leave a row behind. */
+  assert.equal(worthKeeping([]), false)
+  assert.equal(worthKeeping([{ role: 'system', text: 'Reconnected' }]), false)
+  assert.equal(worthKeeping([{ role: 'user', text: 'hello' }]), true)
+})
+
+test('both shelves of chats read as one list, newest first, each one once', async () => {
+  const { mergeChats } = await import('../src/lib/chatLog.js')
+
+  /*
+   * Signing in lifts this browser's chats to the account, so for a while the
+   * same conversation really is in both places. It is one row in the list, and
+   * the account's copy is the one that survives — it is the copy that follows
+   * you to the next machine.
+   */
+  const cloud = [
+    { id: 'b', title: 'from the account', at: 20, where: 'cloud' },
+    { id: 'a', title: 'also on the account', at: 5, where: 'cloud' }
+  ]
+  const local = [
+    { id: 'a', title: 'the browser copy', at: 5, where: 'browser' },
+    { id: 'c', title: 'only here', at: 10, where: 'browser' }
+  ]
+  const merged = mergeChats(cloud, local)
+  assert.deepEqual(merged.map((c) => c.id), ['b', 'c', 'a'], 'the list is not newest first')
+  assert.equal(merged.find((c) => c.id === 'a').where, 'cloud', 'the browser copy won a tie')
+  assert.equal(merged.length, 3, 'one conversation is listed twice')
+
+  // Signed out, or an account with nothing on it, is not an error.
+  assert.deepEqual(mergeChats([], local).map((c) => c.id), ['c', 'a'])
+  assert.deepEqual(mergeChats(), [])
+  // A row with no id cannot be opened or deleted, so it is not listed.
+  assert.deepEqual(mergeChats([{ title: 'nameless', at: 99 }], []), [])
+})
+
 test('the account chat is readable only by the account that wrote it', () => {
   const sql = readSrc(new URL('../supabase/migrations/20260906_chats.sql', import.meta.url), 'utf8')
   assert.match(sql, /alter table public\.chats enable row level security/)
@@ -4699,6 +4759,21 @@ test('the account chat is readable only by the account that wrote it', () => {
   // One row per person: the app has one running conversation, and a table
   // shaped that way cannot drift into meaning a filing system.
   assert.match(sql, /user_id uuid primary key/)
+})
+
+test('a shelved conversation is readable only by the account that wrote it', () => {
+  const sql = readSrc(new URL('../supabase/migrations/20260911_chat_logs.sql', import.meta.url), 'utf8')
+  assert.match(sql, /alter table public\.chat_logs enable row level security/)
+  assert.match(sql, /for select using \(user_id = auth\.uid\(\)\)/, 'reads are not keyed to the signed-in user')
+  assert.match(sql, /for insert with check \(user_id = auth\.uid\(\)\)/, 'writes are not keyed to the signed-in user')
+  assert.match(sql, /for update using \(user_id = auth\.uid\(\)\) with check \(user_id = auth\.uid\(\)\)/)
+  /* Unlike `chats`, this one deletes: it is a list somebody browses, and a
+     list you cannot throw anything out of fills up. */
+  assert.match(sql, /for delete using \(user_id = auth\.uid\(\)\)/, 'a past chat cannot be thrown away')
+  /* One row per conversation, not one per person — the opposite of `chats`,
+     deliberately, and the id comes from the client so a chat keeps its
+     identity when it moves from this browser to the account. */
+  assert.match(sql, /id text primary key/)
 })
 
 console.log('\nhow many scenes')
