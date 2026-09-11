@@ -3,6 +3,24 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.150.0
+
+**Sending from your phone stops writing everything twice.** After each write
+the app reads the value back to check it landed, and to do that it has to clear
+the unit's cache first — which only works at the Mac. From a phone that clear
+is refused, so the read proves nothing, which the app already said. What it
+did anyway was treat "couldn't check" as "the unit ignored it" and send the
+same value again in a different format. A log from an iPhone had Drive, Tone,
+Level, Mix and Treble each written twice for no reason. It now sends once and
+says plainly that it can't be checked from here.
+
+**And it stops asking a question it knows the answer to.** That cache clear was
+attempted before every single write, and refused every single time, putting a
+line in the debug log each time. In a 110-line log, thirty lines were that one
+refusal — and six real errors from the unit were buried underneath them. It is
+no longer asked from a phone, and the pointless read that followed it is no
+longer made, so sending a preset from your phone is meaningfully quicker.
+
 ## 7.149.0
 
 **A level sitting at zero can be raised again.** "Drive 1 / Level: levels can be

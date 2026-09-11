@@ -3651,6 +3651,68 @@ test('the health probe asks for no grace, because it is what decides the grace',
   assert.match(probe.slice(0, 900), /graceMs: 0/, 'the probe that tests the link would wait out the link’s own grace period')
 })
 
+test('a write nobody could check is not written again on a guess', async () => {
+  /*
+   * From a debug log off an iPhone: Drive 1, Tone, Level, Mix and Treble each
+   * written twice, the second time in the opposite encoding, every one of them
+   * reported "NOT CHECKED".
+   *
+   * The retry is for one fault — the device silently ignoring an encoding it
+   * does not take — and the evidence for it is a read that came back wrong. A
+   * read that could not be MADE is not that evidence. Clearing the unit's
+   * cache is a local-only route, so from a phone every check goes stale, and
+   * every write was being followed by a second write to the hardware chosen on
+   * the strength of nothing at all.
+   *
+   * Three things are asserted, and each one was costing a round trip over the
+   * relay on every parameter of every send.
+   */
+  const store = { 'forgefx.host': 'http://unit.test' }
+  globalThis.localStorage = {
+    getItem: (k) => (k in store ? store[k] : null),
+    setItem: (k, v) => {
+      store[k] = String(v)
+    },
+    removeItem: (k) => {
+      delete store[k]
+    }
+  }
+  const seen = []
+  globalThis.fetch = async (url, options = {}) => {
+    const method = options.method || 'GET'
+    const path = String(url).replace('http://unit.test', '')
+    seen.push(method + ' ' + path)
+    // What a phone gets: the cache clear refused, everything else fine.
+    if (path === '/device/cache') {
+      return {
+        ok: false,
+        status: 403,
+        statusText: 'Forbidden',
+        text: async () => JSON.stringify({ error: "You can't do that from a distance" })
+      }
+    }
+    return { ok: true, status: 200, statusText: 'OK', text: async () => JSON.stringify({ ok: true }) }
+  }
+
+  try {
+    const fx = await import('../src/lib/forgefx.js')
+    const res = await fx.setParamConfirmed(9, 3, 5, { name: 'Tone', min: 0, max: 10 })
+
+    assert.equal(res.ok, false, 'a check that proved nothing was reported as a success')
+    assert.equal(res.unverified, true, 'the caller cannot tell "unchecked" from "the unit ignored it"')
+    assert.equal(res.retried, false, 'it retried on a check that proved nothing')
+
+    const writes = seen.filter((c) => c.startsWith('PUT '))
+    assert.equal(writes.length, 1, 'the value went to the hardware ' + writes.length + ' times')
+
+    const reads = seen.filter((c) => c.startsWith('GET ') && c.includes('/params'))
+    assert.deepEqual(reads, [], 'a read whose answer may not be believed still cost a round trip')
+  } finally {
+    delete globalThis.fetch
+    delete globalThis.localStorage
+  }
+})
+
 test('a dropped link stops the send instead of failing every write after it', () => {
   const forge = readSrc(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
   assert.match(forge, /function relayGone\(err, done, total, what\)/)

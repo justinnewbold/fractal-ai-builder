@@ -625,6 +625,21 @@ export async function setParamConfirmed(eid, paramId, value, param) {
     return { ok: true, continuous: first, retried: false }
   }
 
+  /*
+   * A check that proved nothing is not a reason to write again.
+   *
+   * The retry exists for one fault: the device silently ignoring an encoding
+   * it doesn't take. The evidence for that is a read that came back wrong.
+   * A read that could not be made is not that evidence — and the retry sends
+   * the value again in the OTHER encoding, which is a second write to the
+   * hardware chosen on the strength of nothing.
+   *
+   * From a phone that fired on every write whose check went stale: one log
+   * showed Drive, Tone, Level, Mix and Treble each written twice, the second
+   * time in an encoding nothing had suggested was needed.
+   */
+  if (checkA.stale) return { ok: false, continuous: null, retried: false, unverified: true }
+
   const b = await setParam(eid, paramId, value, param, !first)
   const checkB = await landed(eid, paramId, value)
   recordCheck({
@@ -687,6 +702,16 @@ async function landed(eid, paramId, wanted) {
     await clearDeviceCache().catch(() => {
       stale = true
     })
+    /*
+     * And if it could not be cleared, don't read at all.
+     *
+     * The read was still being made and its answer still thrown away, which
+     * cost a round trip over the relay on every single write — the slowest
+     * thing in the loop, for a number that is not allowed to mean anything.
+     * Worse, it put that meaningless number in the log next to the value
+     * asked for, where it reads exactly like a write that came back wrong.
+     */
+    if (stale) return { ok: false, actual: null, stale }
     const actual = await readParamValue(eid, paramId)
     if (typeof actual !== 'number') return { ok: false, actual: null, stale }
     const tolerance = Math.max(0.05, Math.abs(wanted) * 0.02)
@@ -724,15 +749,15 @@ function recordCheck(entry) {
   if (checkLog.length > 120) checkLog.length = 120
   logDebug(
     'check',
-    `${entry.name || '#' + entry.paramId} wanted ${entry.wanted} read back ${
-      entry.readBack === null ? 'unreadable' : entry.readBack
-    } ${
-      entry.landed
-        ? 'landed'
-        : entry.stale
-          ? 'NOT CHECKED — the unit only clears its cache at the Mac, so this read is one write behind'
-          : 'DID NOT LAND'
-    }${entry.attempt > 1 ? ' (retry)' : ''}${entry.deviceOk === false ? ' · unit said ok:false' : ''}`
+    entry.stale
+      ? /* No read was made, so there is no number to report — say that, rather
+           than printing one the reader is then told to ignore. */
+        `${entry.name || '#' + entry.paramId} wanted ${entry.wanted} NOT CHECKED — ${CACHE_IS_LOCAL}, so a read from here would prove nothing`
+      : `${entry.name || '#' + entry.paramId} wanted ${entry.wanted} read back ${
+          entry.readBack === null ? 'unreadable' : entry.readBack
+        } ${entry.landed ? 'landed' : 'DID NOT LAND'}${
+          entry.attempt > 1 ? ' (retry)' : ''
+        }${entry.deviceOk === false ? ' · unit said ok:false' : ''}`
   )
 }
 
@@ -1008,7 +1033,7 @@ export async function applyChanges(changes, onProgress) {
         if (!res.ok) {
           failures.push(
             res.unverified
-              ? `${change.name} · ${param.name} — sent, but it couldn't be checked from your phone: the unit only clears its cache at the Mac, so the read came back one write behind`
+              ? `${change.name} · ${param.name} — sent, but it couldn't be checked from your phone: ${CACHE_IS_LOCAL}, so nothing here can confirm it. Check it at the Mac if it matters.`
               : `${change.name} · ${param.name} — device ignored both write encodings`
           )
         }
@@ -1341,6 +1366,9 @@ export const getCab = (eid) => request(`/preset/blocks/${eid}/cab`)
 export const listIrs = () => request('/cab/irs')
 
 
+/** Why a read after a write cannot be trusted from a phone. */
+const CACHE_IS_LOCAL = 'the unit only clears its cache at the Mac'
+
 /**
  * Clear ForgeFX's parameter cache.
  *
@@ -1352,8 +1380,23 @@ export const listIrs = () => request('/cab/irs')
  * Called before any read whose accuracy decides something: verifying a write,
  * or building the schema a generation will be computed against.
  */
-export const clearDeviceCache = () =>
-  mock ? tick().then(() => ({ ok: true })) : request('/device/cache', { method: 'DELETE' })
+export const clearDeviceCache = () => {
+  if (mock) return tick().then(() => ({ ok: true }))
+  /*
+   * From a phone this is a question we already know the answer to.
+   *
+   * The route is local-only — the host's own remoteAllowed() has no DELETE at
+   * all, and shared/relay-rules.mjs matches it — so the request never left the
+   * handset anyway. What it did do was write a line to the debug log every
+   * time, and this is called before every verified write: a 110-line log from
+   * an iPhone carried thirty copies of the same refusal, and six real errors
+   * from the unit were buried in among them.
+   *
+   * So it is refused here, in one line, without pretending to have asked.
+   */
+  if (remoteActive()) return Promise.reject(new ForgeError(CACHE_IS_LOCAL))
+  return request('/device/cache', { method: 'DELETE' })
+}
 
 /**
  * One stored version's exact bytes, as a plain array.
