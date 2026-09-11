@@ -3,6 +3,22 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.154.0
+
+**The cost under each run was overstating itself by about 42%.** The token count
+the app reads back is the *total* — it already includes the tokens written to
+the cache. The app was taking the cached-read tokens back out of it but not the
+written ones, so every written token was charged twice: once at full price
+inside the total, and again at the write premium on top. A real run reported as
+20.5¢ actually cost 14.4¢.
+
+The line under the figure now adds up too. It used to print the total input
+beside the cache write, which reads as though they were separate — that is what
+made a run look like 78k tokens when it was 48.6k. It now shows what was
+actually charged at full price, so fresh plus cached plus written is the total.
+
+Nothing about what gets sent has changed; the meter was wrong, not the usage.
+
 ## 7.153.0
 
 **The app is now watching for the questions it never needed the AI for.**

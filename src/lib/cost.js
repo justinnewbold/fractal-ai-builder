@@ -27,6 +27,39 @@ const RATES = {
 const CACHE_READ_MULTIPLIER = 0.1
 const CACHE_WRITE_MULTIPLIER = 1.25
 
+/**
+ * The buckets a run is billed in, disentangled — and the one thing about this
+ * worth writing down.
+ *
+ * `usage.inputTokens` is the TOTAL. The AI SDK's Anthropic provider builds it
+ * as `input_tokens + cacheCreationTokens + cacheReadTokens`, so the tokens
+ * written to the cache are already inside it. Reads were being taken back out
+ * and writes were not, which billed every written token twice: once at full
+ * price inside the total, and again at the write premium on top.
+ *
+ * On a first run that is not a rounding error. A real one — 48.6k total, 30.2k
+ * of it the write — was reported as 20.5¢ and actually cost 14.4¢: the app was
+ * overstating its own price by forty-two per cent, on exactly the screen
+ * somebody reads while deciding whether to run it again.
+ *
+ * One function, so the figure on screen and the figure in the arithmetic can
+ * never disagree about what the four numbers mean.
+ */
+export function splitUsage(usage) {
+  if (!usage) return null
+  const total = usage.inputTokens ?? 0
+  const cached = usage.cachedInputTokens ?? 0
+  const written = usage.cacheWriteTokens ?? 0
+  return {
+    total,
+    // What was charged at full price: the total, less both cached portions.
+    fresh: Math.max(0, total - cached - written),
+    cached,
+    written,
+    output: usage.outputTokens ?? 0
+  }
+}
+
 /** Strip a gateway prefix and any date suffix so 'anthropic/claude-sonnet-5' matches. */
 function normalizeModel(model) {
   if (!model) return ''
@@ -48,12 +81,7 @@ export function costOf(usage, model) {
   const rate = rateFor(model)
   if (!rate || !usage) return null
 
-  const input = usage.inputTokens ?? 0
-  const output = usage.outputTokens ?? 0
-  const cached = usage.cachedInputTokens ?? 0
-  const written = usage.cacheWriteTokens ?? 0
-
-  const fresh = Math.max(0, input - cached)
+  const { fresh, cached, written, output } = splitUsage(usage)
 
   return (
     (fresh / 1e6) * rate.in +
@@ -67,9 +95,10 @@ export function costOf(usage, model) {
 export function uncachedCostOf(usage, model) {
   const rate = rateFor(model)
   if (!rate || !usage) return null
-  const billable =
-    (usage.inputTokens ?? 0) + (usage.cachedInputTokens ?? 0) + (usage.cacheWriteTokens ?? 0)
-  return (billable / 1e6) * rate.in + ((usage.outputTokens ?? 0) / 1e6) * rate.out
+  /* The total already holds every input token this run was charged for, cached
+     or not — adding the two cached buckets to it counted them three times. */
+  const { total, output } = splitUsage(usage)
+  return (total / 1e6) * rate.in + (output / 1e6) * rate.out
 }
 
 /** Cents below a dollar, dollars above — reading $0.0431 takes a beat too long. */
