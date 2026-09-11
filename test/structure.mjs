@@ -542,6 +542,73 @@ export function run(test) {
     )
   })
 
+  test('the knobs stay put while a parameter is written', () => {
+    /*
+     * "When I change any parameter the screen basically shakes up and down" —
+     * with two screenshots half a second apart, the same sheet at two quite
+     * different heights.
+     *
+     * Every knob commit ends in a full re-read of the unit, which rebuilds the
+     * chain and hands the block panel an identical block under a NEW object
+     * identity. The panel's parameter read depended on that object, so it
+     * threw away six knobs, drew one line of text while it asked the unit for
+     * the values it already had, and put them back. A sheet is as tall as its
+     * contents, so that is about 200px out of the middle of the screen and
+     * back, once per knob.
+     *
+     * Two things hold it shut: what the read is keyed on, and what is on
+     * screen while it runs.
+     */
+    const con = readFileSync(new URL('../src/components/Console.jsx', import.meta.url), 'utf8')
+    const panel = con.slice(con.indexOf('export function BlockPanel('))
+    assert.ok(panel, 'the block panel is gone')
+
+    assert.ok(
+      !/\}, \[block, onError\]\)/.test(panel),
+      'the parameter read depends on the block object again, so every refresh of the chain re-reads it'
+    )
+    assert.match(panel, /\}, \[readKey, onError\]\)/, 'the parameter read is no longer keyed')
+    /*
+     * And keyed on all three things that change what a knob here means. The
+     * scene is the one worth stating: a block's settings are per-scene, so a
+     * footswitch on the floor changes every value on this panel without
+     * touching anything in the app.
+     */
+    assert.match(panel, /const readKey = /)
+    for (const part of ['block\\?\\.effectId', 'block\\?\\.channel', 'scene']) {
+      assert.match(
+        panel.slice(panel.indexOf('const readKey = '), panel.indexOf('const readKey = ') + 120),
+        new RegExp(part),
+        `the parameter read no longer notices a change of ${part}`
+      )
+    }
+    assert.match(panel, /const scene = useDevice\(/, 'the panel is not watching the live scene')
+
+    // A re-read that does happen keeps the knobs up: the line is for a panel
+    // with nothing in it yet, which is the only time it costs no height.
+    assert.match(
+      panel,
+      /\{loading && !shown\.length \? \(/,
+      'a re-read empties the deck again, and the sheet jumps with it'
+    )
+
+    /*
+     * And the thing that handed it a new block in the first place: a knob
+     * commit asked the app to re-read the unit — the preset, the block list,
+     * the scene, its names and the tempo — for a change to none of them, five
+     * round trips down a relay per knob. The switches beside the knobs DO
+     * change the chain and still ask.
+     */
+    assert.match(panel, /\{ chain: false \}/, 'a knob still asks for a full re-read of the unit')
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    assert.match(
+      app,
+      /onChanged=\{\(summary, change, \{ chain = true \} = \{\}\) => \{/,
+      'the block editor cannot say that nothing about the chain moved'
+    )
+    assert.match(app, /if \(chain\) read\(\)/, 'every knob still re-reads the whole unit')
+  })
+
   test('a failure inside a sheet is shown inside that sheet', () => {
     /*
      * "On the chain screen it always says on. When I tap one of the buttons it
@@ -586,9 +653,33 @@ export function run(test) {
       'a refused toggle trusts its own roll-back instead of asking the unit'
     )
 
-    const lost = src.slice(src.indexOf('if (!lostUnit) return'), src.indexOf('if (!lostUnit) return') + 200)
-    assert.match(lost, /setStatus\('fault'\)/, 'a unit that has gone leaves the app looking live')
-    assert.match(lost, /setSheet\(null\)/, 'the notice is drawn under a sheet that is still over it')
+    const lost = src.slice(src.indexOf('if (!lostUnit) return'), src.indexOf('if (!lostUnit) return') + 300)
+    /*
+     * And it is a READ that decides, not one failed write. A single call can
+     * come back with the port shut while the next is answered perfectly — the
+     * Mac's own screen is asking that same port several times a second — and
+     * "my Mac is connected just fine, the phone says it has lost the unit" is
+     * what tearing the app down over one of those looks like.
+     */
+    assert.match(lost, /read\(\)\.then/, 'one failed write still tears the whole screen down')
+    assert.match(lost, /if \(live && !fresh\) setSheet\(null\)/, 'a read that worked still closes what was open')
+    assert.ok(
+      !/setStatus\('fault'\)/.test(lost),
+      'the fault is declared without asking the unit, so a read that would have answered is never made'
+    )
+
+    /*
+     * And when the notice does come up, it carries what the far end actually
+     * said. The sentence on screen is this app's translation; "port not open"
+     * is the server's own four words, and the difference between a screenshot
+     * that raises a question and one that answers it.
+     */
+    assert.match(src, /setErrorDetail\(value && typeof value !== 'string' \? value\.detail \|\| null : null\)/)
+    assert.match(
+      src,
+      /errorDetail \|\| \(faultReason === null \|\| faultReason === 'unreadable' \? error : null\)/,
+      'the fault notice drops the one line that says what came back'
+    )
   })
 
   test('every class this app scrolls to exists somewhere that renders it', () => {
@@ -1887,7 +1978,21 @@ export function run(test) {
      * the gear's height so it is still something a thumb can hit.
      */
     assert.match(chip, /const mark = said\.tone === 'good' \? 'ok' : said\.tone === 'busy' \? 'wait' : 'no'/, 'the word no longer follows the link tone')
-    assert.match(chip, /const word = mark === 'ok' \? 'connected' : mark === 'wait' \? 'connecting' : 'disconnected'/, 'the chip does not say connected or disconnected')
+    assert.match(chip, /const state = mark === 'ok' \? 'connected' : mark === 'wait' \? 'connecting' : 'disconnected'/, 'the chip does not say connected or disconnected')
+    /*
+     * And it names what it is about while something is wrong. "The phone app
+     * says it has lost the unit, but also says it's connected in the right
+     * hand corner." The left of that bar is the unit and this is the Mac;
+     * neither said so, and two states at opposite ends of one bar read as the
+     * app disagreeing with itself.
+     */
+    assert.match(chip, /const word = sayMac \? `Mac \$\{state\}` : state/, 'the word never says which thing it is about')
+    const bar = readFileSync(new URL('../src/components/TopBar.jsx', import.meta.url), 'utf8')
+    assert.match(
+      bar,
+      /sayMac=\{remote && status !== 'live'\}/,
+      'the Mac is named when the unit is answering too, where there is no confusion and no room'
+    )
     assert.match(chip, /compact \? \(\s*<span className=\{`phone-word \$\{mark\}`\} aria-hidden="true">\s*\{word\}/, 'the bar chip is a mark again, not the word')
     assert.match(chip, /aria-label=\{`\$\{said\.sentence\} — phone remote options`\}/, 'the chip has no sentence for a screen reader')
     const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
@@ -2632,7 +2737,7 @@ export function run(test) {
     // The knob editor hands over the numbers, not just the sentence.
     assert.match(
       console_,
-      /onChanged\(`\$\{block\.name\} · \$\{p\.name\} → \$\{next\}`, \{/,
+      /onChanged\(\s*`\$\{block\.name\} · \$\{p\.name\} → \$\{next\}`,\s*\{\s*block: block\.name/,
       'a hand change reports a sentence and drops the before-and-after that makes it useful'
     )
 

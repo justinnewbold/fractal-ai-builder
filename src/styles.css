@@ -994,6 +994,24 @@ input[type='text']:focus-visible {
     white-space: nowrap;
   }
 
+  /*
+   * A word that is not a name gets the room to be a word.
+   *
+   * "It's cutting off the word, can you make it show the whole word no unit,
+   * and when it's loading it just says LOOKi…" Both true: nine characters of a
+   * tracked, capitalised display face is about five letters, so NO UNIT read
+   * "NO UN…" and Looking… read "LOOKI…" — and a cut-off word is worse than no
+   * word, because the half that survives says nothing.
+   *
+   * The cap is there for the unit's NAME while it is answering, where an
+   * "Axe-Fx III" would spend the preset's eight characters. When it is not
+   * answering there is no preset in this bar at all — it is drawn only at
+   * status live — so the middle of the bar is empty and the word can have it.
+   */
+  .topbar:not([data-status='live']):not([data-status='demo']) .topbar-unit {
+    max-width: none;
+  }
+
   button.save-options.compact {
     padding-left: var(--s-2);
     padding-right: var(--s-2);

@@ -152,7 +152,15 @@ export default function TopBar({
           v{VERSION}
         </span>
 
-        <LinkChip compact link={link} onAction={onLinkAction} />
+        {/* Named while something is wrong: at the other end of this same bar
+            the word is about the UNIT, and two states with nothing saying
+            which is which read as one app disagreeing with itself. */}
+        <LinkChip
+          compact
+          link={link}
+          onAction={onLinkAction}
+          sayMac={remote && status !== 'live'}
+        />
 
         {/*
           The volume, behind a speaker rather than across the top of Play.

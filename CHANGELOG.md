@@ -3,6 +3,55 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.173.0
+
+**The word beside the lamp is a whole word again.** "NO UN…", and "LOOKI…"
+while it looks for the unit. Nine characters of a tracked, capitalised display
+face is about five letters, and half a word says nothing at all. The cap is
+there so a long unit name — "Axe-Fx III" — cannot spend the preset's eight
+characters, and it stays for exactly that: while the unit is answering. When it
+is not, the bar carries no preset at all, so the word gets the empty middle of
+the bar and says NO UNIT, LOOKING…, NO ANSWER in full.
+
+**And the two ends of that bar stop looking like they disagree.** "The phone
+app says it has lost the unit, but also says it's connected in the right hand
+corner." Both were true: the left of the bar is the UNIT and the right is the
+MAC, and neither said so. While something is wrong — which is the only time the
+two can be read as contradicting, and the only time there is room — the right
+one says "Mac connected".
+
+**A screen is no longer torn down over one failed write.** The red "your Mac
+has lost the unit" notice was raised the moment any single call came back with
+the port shut. One call can fail that way while the next is answered perfectly
+— the Mac's own screen is asking that same port several times a second — so a
+working rig could end up looking broken. The claim is now checked with a read
+before anything is acted on: if the unit answers, the screen simply carries on;
+only a read that fails too closes what is open. And when the notice does come
+up it carries the far end's own words underneath — "port not open" is nothing a
+player can act on, but it is the line that tells us which end to look at.
+
+**The block editor stops jumping every time you turn a knob.** Two screenshots
+half a second apart, the same sheet at two completely different heights: "when
+I change any parameter the screen basically shakes up and down."
+
+Turning a knob wrote the value and then asked the unit to read everything back
+— the preset, the whole chain, the scene, its names, the tempo — five round
+trips down the line to the Mac for a change to none of them. That re-read
+handed the editor what looked like a different block, so it threw its six knobs
+away, drew "Reading amp…" while it asked for values it had just read one line
+earlier, and put them back. The sheet is as tall as what is in it, so that is
+about two hundred pixels out of the middle of the screen and back, once per
+knob.
+
+Now the parameters are read again only when something actually changes what a
+knob on that panel means: a different block, a different channel on it, or a
+different scene — a block's settings are per-scene, so a footswitch on the
+floor still brings the right values up. When a read does happen the knobs stay
+on screen while it runs; "Reading…" is kept for a panel with nothing in it yet,
+which is the one time it costs no height. And a knob no longer asks for the
+chain at all. The switches beside it — channel, engaged, the model — do change
+the chain, and those still ask.
+
 ## 7.172.0
 
 **A block you switch off and a link that has gone are two different things,

@@ -14,7 +14,25 @@ import { useDismiss } from '../lib/dismiss'
  * The colour says whether things are good; the word says which state; the
  * popover carries the sentence and the one action that state calls for.
  */
-export default function LinkChip({ link, compact, onAction, busy }) {
+export default function LinkChip({
+  link,
+  compact,
+  onAction,
+  busy,
+  /*
+   * Whether the word needs to name what it is about.
+   *
+   * "The phone app says it has lost the unit, but also says it's connected in
+   * the right hand corner." Both were true and neither said which thing it
+   * meant: the left of the bar is the UNIT, this is the MAC, and read together
+   * at opposite ends of one bar they look like the app contradicting itself.
+   *
+   * Only while something is wrong, which is the only time the two can be read
+   * as disagreeing — and also the only time there is room, because the bar
+   * carries no preset unless the unit is answering.
+   */
+  sayMac
+}) {
   const [open, setOpen] = useState(false)
   const wrap = useRef(null)
 
@@ -66,7 +84,8 @@ export default function LinkChip({ link, compact, onAction, busy }) {
    * and then asked to be the word again: "just the word connected (green),
    * disconnected (red)". Three states, because a link on its way is neither.
    */
-  const word = mark === 'ok' ? 'connected' : mark === 'wait' ? 'connecting' : 'disconnected'
+  const state = mark === 'ok' ? 'connected' : mark === 'wait' ? 'connecting' : 'disconnected'
+  const word = sayMac ? `Mac ${state}` : state
 
   return (
     <span className="phone-link" ref={wrap}>
