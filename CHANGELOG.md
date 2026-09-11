@@ -3,6 +3,24 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.166.0
+
+**The chain shows its two ends now.** They were always there on the unit and
+the strip quietly dropped them, drawing a plain arrow at each end instead — so
+a preset running out of Output 2, or one with no input block at all, looked
+exactly like every other one. Input and Output are tiles at each end of the
+strip now, with the unit's own name for them underneath: "Input 1", "Output 1".
+
+Drawn quieter than the blocks between them, because they are the plumbing
+rather than the tone, and with no on/off under them — a preset with its output
+bypassed is one nobody can hear, and that is not a switch to put under a thumb.
+Tapping one opens it, which is how you see what the input gate is doing or
+where the output level sits. Where a preset genuinely has no block at one end,
+the arrow still stands in, and now means something.
+
+The stage screen is untouched: nobody kicks an input block between two bars,
+and it still filters both out.
+
 ## 7.165.0
 
 **A saved tone reloaded onto an empty slot now builds its own chain.** Asking

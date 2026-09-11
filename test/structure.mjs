@@ -715,6 +715,52 @@ export function run(test) {
     assert.ok(!/fetch\(|localStorage|document\.|window\./.test(lib), 'the matcher reaches outside itself')
   })
 
+  test('the chain shows its two ends, and the stage screen still does not', () => {
+    /*
+     * "Does it just ignore the input and output so they're actually there but
+     * just not showing on the chain? We obviously don't need those on the
+     * pedalboard at all, but when we're actually viewing the chain, it might
+     * be helpful to see that those are there and which input and output
+     * they're coming from."
+     *
+     * Both halves of that, and the distinction is the point. The stage screen
+     * draws its own tiles and filters these out by EXCLUDED_BLOCKS, because
+     * nobody kicks an input block between two bars. The strip is the chain
+     * being LOOKED at, and one that silently drops two of its blocks is a
+     * diagram that disagrees with the unit.
+     */
+    const con = readFileSync(new URL('../src/components/Console.jsx', import.meta.url), 'utf8')
+    const chain = con.slice(con.indexOf('export function Chain('), con.indexOf('export function PresetList('))
+    assert.match(chain, /ends\('input'\)/, 'the chain no longer looks for the input block')
+    assert.match(chain, /ends\('output'\)/, 'the chain no longer looks for the output block')
+    /* Which one, not just that there is one — that is the half being asked
+       about, and it is the block's own name from the unit. */
+    assert.match(chain, /className="io-name mono"/, 'the chain draws the ends without saying which they are')
+    assert.match(chain, /\{block\.name \|\| block\.slug\}/)
+    /* No on/off under them: a preset with its output bypassed is one nobody
+       can hear, and it is not a switch anybody wants under a thumb. */
+    const io = chain.slice(chain.indexOf('const io = (block, side)'), chain.indexOf('const tap = (block)'))
+    assert.ok(io, 'nothing draws the ends of the chain')
+    assert.ok(!/fx-power/.test(io), 'the input and output grew an on/off pill')
+    /* And the arrow still stands in where there is no block, which on an empty
+       preset is the honest drawing. */
+    assert.match(io, /if \(!block\)/, 'a preset with no input block draws nothing at all')
+
+    /* A face that is no longer painted needs lettering that is not white. The
+       light theme restates the tile rule at equal weight and wins on order, so
+       the io tiles have to be restated with it or they are white on off-white. */
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    assert.match(css, /\[data-theme='light'\] button\.fx-tile\.io-tile \{/, 'the io tiles are white on off-white in the light theme')
+
+    /* The stage screen is untouched: those blocks are still filtered out of it. */
+    const gig = readFileSync(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8')
+    assert.match(
+      gig,
+      /EXCLUDED_BLOCKS\.includes\(b\.slug\)/,
+      'the stage screen now carries input and output tiles nobody can use there'
+    )
+  })
+
   test('a saved tone reloaded onto an empty slot builds its own chain', () => {
     /*
      * "After loading a scene from history and saving I tapped chain and it
@@ -1855,7 +1901,14 @@ export function run(test) {
       !/grid-scroll|className="grid(?:"| editable)|gridTemplateColumns/.test(grid),
       'the fixed-width grid canvas is back in the chain editor'
     )
-    assert.match(read('Console.jsx'), /useOverflow\(strip, \[chain\.length\]\)/, 'the chain strip keeps a private observer')
+    /* The two ends count too: a preset that gains an output block is a strip
+       one tile wider, and the fade that says there is more to the right has to
+       be told. */
+    assert.match(
+      read('Console.jsx'),
+      /useOverflow\(strip, \[chain\.length, !!input, !!output\]\)/,
+      'the chain strip keeps a private observer'
+    )
   })
 
   test('the model picker says its name, and Modifiers says what it needs', () => {
