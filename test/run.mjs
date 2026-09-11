@@ -3664,6 +3664,62 @@ test('the health probe asks for no grace, because it is what decides the grace',
   assert.match(probe.slice(0, 900), /graceMs: 0/, 'the probe that tests the link would wait out the link’s own grace period')
 })
 
+test('a run is never billed for the same token twice', async () => {
+  /*
+   * `usage.inputTokens` is the TOTAL. The AI SDK's Anthropic provider builds
+   * it as `input_tokens + cacheCreationTokens + cacheReadTokens`, so the
+   * tokens written to the cache are already inside it. Reads were taken back
+   * out and writes were not, which billed every written token twice — once at
+   * full price inside the total, and again at the write premium on top.
+   *
+   * The numbers here are a real run off a phone: 48.6k total, 30.2k of it the
+   * write, 3.2k out, on Sonnet 5. It was reported as 20.5¢ and cost 14.4¢.
+   */
+  const { costOf, uncachedCostOf, splitUsage } = await import('../src/lib/cost.js')
+  const run = {
+    inputTokens: 48600,
+    outputTokens: 3200,
+    cachedInputTokens: 0,
+    cacheWriteTokens: 30200,
+    model: 'claude-sonnet-5'
+  }
+
+  const split = splitUsage(run)
+  assert.equal(split.fresh, 18400, 'the written tokens are still counted as fresh')
+  assert.equal(
+    split.fresh + split.cached + split.written,
+    split.total,
+    'the buckets do not add up to the total, so one of them is being double counted'
+  )
+
+  // 18.4k × $2 + 30.2k × $2.50 + 3.2k × $10, per million.
+  const cents = (n) => Math.round(n * 1000) / 10
+  assert.equal(cents(costOf(run, run.model)), 14.4, 'the old 20.5¢ is back')
+
+  /*
+   * And "what this would have cost with no cache" is the total at full price —
+   * not the total plus the cached buckets, which counted them a third time.
+   * On a first run it is genuinely LESS than the cached price: priming costs a
+   * premium, which the panel already explains rather than printing a negative
+   * saving.
+   */
+  assert.equal(cents(uncachedCostOf(run, run.model)), 12.9)
+  assert.ok(uncachedCostOf(run, run.model) < costOf(run, run.model), 'priming is no longer a premium')
+
+  // A warm run: the same prefix read back at a tenth, and a real saving.
+  const warm = { ...run, cachedInputTokens: 30200, cacheWriteTokens: 0 }
+  assert.equal(splitUsage(warm).fresh, 18400)
+  assert.equal(cents(costOf(warm, warm.model)), 7.5)
+  assert.ok(
+    uncachedCostOf(warm, warm.model) > costOf(warm, warm.model),
+    'a warm run does not come out cheaper than sending it uncached'
+  )
+
+  // Nothing reported is nothing charged, rather than NaN on screen.
+  assert.equal(costOf({ model: 'claude-sonnet-5' }, 'claude-sonnet-5'), 0)
+  assert.equal(splitUsage(null), null)
+})
+
 test('the plain requests never needed a model, and the rest still do', async () => {
   /*
    * "Scene 3." "Bypass the delay." "Tempo 120." Every one of those went to

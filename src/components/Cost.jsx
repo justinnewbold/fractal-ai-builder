@@ -1,4 +1,4 @@
-import { costOf, uncachedCostOf, formatCost, formatTokens, rateFor } from '../lib/cost'
+import { costOf, uncachedCostOf, formatCost, formatTokens, rateFor, splitUsage } from '../lib/cost'
 
 /**
  * What the last run cost, and what the session has cost.
@@ -11,6 +11,15 @@ import { costOf, uncachedCostOf, formatCost, formatTokens, rateFor } from '../li
 export default function Cost({ usage, sessionTotal, runs }) {
   if (!usage) return null
 
+  /*
+    The four numbers on the line below have to add up, which the old one did
+    not: it printed the TOTAL input beside the cache write, and the write is
+    already inside that total. Reading the two as separate is what made a run
+    look like 78k tokens when it was 48.6k — and it is the same
+    misunderstanding that was overcharging the figure above by forty-two per
+    cent. Fresh plus written plus cached IS the total; now it says so.
+  */
+  const split = splitUsage(usage)
   const dollars = costOf(usage, usage.model)
   const full = uncachedCostOf(usage, usage.model)
   const rate = rateFor(usage.model)
@@ -24,9 +33,9 @@ export default function Cost({ usage, sessionTotal, runs }) {
       </div>
 
       <div className="cost-detail mono">
-        {formatTokens(usage.inputTokens)} in · {formatTokens(usage.outputTokens)} out
-        {usage.cachedInputTokens ? ` · ${formatTokens(usage.cachedInputTokens)} cached` : ''}
-        {usage.cacheWriteTokens ? ` · ${formatTokens(usage.cacheWriteTokens)} cache write` : ''}
+        {formatTokens(split.fresh)} in · {formatTokens(split.output)} out
+        {split.cached ? ` · ${formatTokens(split.cached)} cached` : ''}
+        {split.written ? ` · ${formatTokens(split.written)} cache write` : ''}
         {' · '}
         {String(usage.model || '').split('/').pop()}
       </div>
