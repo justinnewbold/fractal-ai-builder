@@ -165,7 +165,8 @@ import {
   signOutHere,
   recheckHosts,
   chooseHost,
-  faultCopy
+  faultCopy,
+  nextDelay
 } from './lib/link'
 import { keepAwake } from './lib/awake'
 import { loadSession, saveSession, interrupted } from './lib/session'
@@ -303,6 +304,20 @@ const HAND_EDIT_KINDS = new Set([
 
 export default function App() {
   const [status, setStatus] = useState('idle')
+  /*
+   * Which of the ways a read can fail this one was.
+   *
+   * 'no-unit' — the Mac answered and nothing is plugged into it.
+   * 'no-answer' — the question never came back.
+   * 'unreadable' — the Mac answered and the read failed anyway.
+   *
+   * The screen used to work this out from `device`, which cannot tell the
+   * first from the other two: a question that never came back leaves `device`
+   * exactly as it was, and before the first answer of the session that is
+   * null — the same null a fresh phone starts with. So a Mac that had gone
+   * quiet was described as a Mac that had answered. See faultCopy.
+   */
+  const [faultReason, setFaultReason] = useState(null)
   const [device, setDevice] = useState(null)
   /*
    * The unit's own state comes from the store, not from here.
@@ -744,6 +759,7 @@ export default function App() {
       ? faultCopy({
           role: link.role,
           device,
+          reason: faultReason,
           secure: typeof window !== 'undefined' && window.location.protocol === 'https:',
           userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : ''
         })
@@ -1072,6 +1088,7 @@ export default function App() {
        * at six seconds.
        */
       if (remoteActive() && !remoteHostSeen() && !(await hostResponds())) {
+        setFaultReason('no-answer')
         setStatus('fault')
         return null
       }
@@ -1091,6 +1108,7 @@ export default function App() {
       })
       setDevice(info)
       if (!info?.connected) {
+        setFaultReason('no-unit')
         setStatus('fault')
         setError('Your Mac is connected, but no Fractal is plugged into it.')
         return
@@ -1105,6 +1123,7 @@ export default function App() {
       setPreset(p)
       const list = Array.isArray(b) ? b : []
       setBlocks(list)
+      setFaultReason(null)
       setStatus('live')
       // Returned as well as stored: a caller that reads and then acts in the
       // same tick still has the old array in its closure, and state won't have
@@ -1169,6 +1188,14 @@ export default function App() {
        */
       if (answered && liveRef.current) setError(err.message)
       else {
+        /*
+         * A relay that dropped is not a unit that went. `linkDown` is set by
+         * remote.js on every failure that never left the phone, and that is
+         * the whole difference between "your Mac stopped answering" and "the
+         * unit wouldn't read" — two sentences that send someone to two
+         * different rooms.
+         */
+        setFaultReason(err?.linkDown || /didn’t answer|didn't answer/i.test(err?.message || '') ? 'no-answer' : 'unreadable')
         setStatus('fault')
         setError(err.message)
       }
@@ -1885,8 +1912,59 @@ export default function App() {
    * the Mac answering sets it live again.
    */
   useEffect(() => {
-    if (showConnect && status === 'live') setStatus('fault')
+    if (showConnect && status === 'live') {
+      // The connect screen is only up while the Mac is not answering, so that
+      // is what this fault is — not a unit that went missing.
+      setFaultReason('no-answer')
+      setStatus('fault')
+    }
   }, [showConnect, status])
+
+  /*
+   * A fault keeps looking, instead of waiting to be tapped.
+   *
+   * "This keeps saying I'm not connected, but yet the Mac app says I am
+   * connected to the remote." It kept saying it because nothing ever asked
+   * again. One read runs when the Mac first answers, and if that read loses a
+   * race — the port busy with the Mac's own polling, a preset still loading,
+   * one relay message that went astray — the red notice is where the phone
+   * stays. The link is up, so the effect above never fires again; the only way
+   * out is the Try again button, and the reason that button "works on the
+   * fifth or sixth tap" is that tapping is the only thing still asking.
+   *
+   * So the asking carries on by itself, backing off the way the Mac probe
+   * does: three seconds, then six, then twelve, up to every thirty. A rig that
+   * comes good comes back on its own, with nothing in anyone's hand.
+   *
+   * Not while the connect screen is up (that screen does its own asking and
+   * says so), and not in the demo, which has nothing to ask.
+   */
+  useEffect(() => {
+    if (isDemo() || status !== 'fault' || showConnect) return undefined
+    let live = true
+    let timer = null
+    let delay = 0
+    const again = () => {
+      delay = nextDelay(delay)
+      timer = setTimeout(async () => {
+        if (!live) return
+        try {
+          await read()
+        } catch {
+          // read() reports through status and error; a throw here is nothing
+          // extra to say, and must not stop the next attempt.
+        }
+        // A read that worked left status 'live' and this effect is already
+        // torn down; getting here means it did not.
+        if (live) again()
+      }, delay)
+    }
+    again()
+    return () => {
+      live = false
+      clearTimeout(timer)
+    }
+  }, [status, showConnect, read])
 
   /*
    * A relay that comes and goes, followed rather than assumed.
@@ -4333,6 +4411,7 @@ export default function App() {
       <TopBar
         status={status}
         device={device}
+        faultReason={faultReason}
         preset={preset}
         dirty={dirty}
         presetsOpen={presetMenu}
@@ -4429,6 +4508,13 @@ export default function App() {
               Try the demo
             </button>
           </p>
+          {/*
+            Said, because it is now true and nobody could tell. The screen goes
+            on asking every few seconds and comes back by itself; without this
+            line it looks like the same dead red notice it was when the only
+            thing still asking was a thumb.
+          */}
+          <p className="notice-note">Still checking every few seconds — this comes back on its own.</p>
         </div>
       ) : null}
 

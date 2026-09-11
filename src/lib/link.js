@@ -212,13 +212,26 @@ export function describeLink(state) {
  * no unit — "No unit", in red, because there is a red notice under it saying
  * the same and a cable the player can go and check.
  */
-export function describeUnit({ demo, role, status, device, link }) {
+export function describeUnit({ demo, role, status, device, link, reason = null }) {
   const remote = role === 'remote'
   const linkUp = link === 'connected'
   const named = device?.short || device?.name || 'Connected'
 
   if (remote && status !== 'live') {
-    const unit = linkUp ? (status === 'fault' ? 'No unit' : 'Looking…') : 'Not connected'
+    /*
+     * "No unit" is a claim about the rig, and the bar was making it about a
+     * question that never got an answer.
+     *
+     * A phone reads "NO UNIT" in red while the Mac in the next room has the
+     * AM4 on screen and says CONNECTED. Both were drawn from the same fault,
+     * and the fault had two quite different causes behind it: the Mac
+     * answering "nothing is plugged in", and the Mac not answering the
+     * question at all. Only the first is about the unit. The second is about
+     * the line to the Mac, and saying "No unit" about it sends someone to
+     * check a cable that was never the problem.
+     */
+    const missing = reason === 'no-answer' ? 'No answer' : reason === 'unreadable' ? 'Can’t read' : 'No unit'
+    const unit = linkUp ? (status === 'fault' ? missing : 'Looking…') : 'Not connected'
     return { unit, lamp: demo ? 'demo' : linkUp ? status : 'idle' }
   }
   const unit = status === 'live' ? named : status === 'fault' ? 'No device' : 'Looking…'
@@ -251,7 +264,40 @@ export function whySafari({ secure, userAgent }) {
  * known it means nothing yet, and nothing is what to say — the old notice
  * told every phone to open an app on "this Mac" and try Chrome.
  */
-export function faultCopy({ role, device, secure = false, userAgent = '' }) {
+export function faultCopy({ role, device, reason = null, secure = false, userAgent = '' }) {
+  /*
+   * The reason comes first, because the two failures it separates were being
+   * told apart by a variable that cannot tell them apart.
+   *
+   * "This keeps saying I'm not connected, but yet the Mac app says I am
+   * connected to the remote." The Mac was right: it had the AM4 open and
+   * answering. The phone had asked about the unit and got nothing back — a
+   * question that timed out on the way, or a Mac that stopped answering
+   * between one breath and the next — and `device` was simply still null from
+   * before the question. Null is also what it is before the first question of
+   * the session, so the notice fell through to the role's own words: your Mac
+   * answered, but the unit didn't. It hadn't answered. Nothing had.
+   *
+   * So the caller says which of the three happened and this says the matching
+   * thing:
+   *
+   *   'no-unit'    — the Mac answered, and said nothing is plugged into it.
+   *   'no-answer'  — the question never came back. About the line, not the rig.
+   *   'unreadable' — the Mac answered, but the read failed: a busy port, an
+   *                  editor holding it, a unit mid-preset-load.
+   */
+  if (role === 'remote' && reason === 'no-answer') {
+    return {
+      title: 'Your Mac stopped answering',
+      body: 'The phone is on the line but the Mac is not replying. Check the Fractal app is still open on the Mac and that it hasn’t gone to sleep — nothing needs unplugging at the unit.'
+    }
+  }
+  if (role === 'remote' && reason === 'unreadable') {
+    return {
+      title: 'Your Mac answered, but the unit wouldn’t read',
+      body: 'The Mac is there and replying; the unit didn’t finish answering it. Usually something else is holding the port — another editor, or a second copy of the Fractal app.'
+    }
+  }
   if (device && device.connected === false) {
     /*
      * The one a phone actually sees, and the one that was lying.

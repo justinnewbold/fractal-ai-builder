@@ -31,6 +31,9 @@ import LinkChip from './LinkChip'
 export default function TopBar({
   status,
   device,
+  /* Which kind of fault this is, so the word beside the lamp is about the
+     thing that is actually missing. See describeUnit. */
+  faultReason = null,
   preset,
   dirty,
   onOpenPresets,
@@ -70,7 +73,8 @@ export default function TopBar({
     role: link?.role,
     status,
     device,
-    link: link?.link
+    link: link?.link,
+    reason: faultReason
   })
 
   /*
