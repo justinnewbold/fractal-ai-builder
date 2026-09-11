@@ -3651,6 +3651,89 @@ test('the health probe asks for no grace, because it is what decides the grace',
   assert.match(probe.slice(0, 900), /graceMs: 0/, 'the probe that tests the link would wait out the link’s own grace period')
 })
 
+test('every model on the unit can be looked up by what it really is', async () => {
+  /*
+   * "Add an info page like this to settings listing the real life equivalents
+   * of each amp and effects pedals."
+   *
+   * The catalog has been in the repo since the model picker learned to print a
+   * lineage; what it could not do was answer "what have I got", because every
+   * route into lineage.js needs a model name you already know.
+   */
+  const { GEAR_GROUPS, GEAR_TOTAL, searchGear } = await import('../src/lib/gearCatalog.js')
+
+  const byKey = Object.fromEntries(GEAR_GROUPS.map((g) => [g.key, g]))
+  assert.ok(byKey.amp && byKey.drive, 'the two lists anybody came here for are missing')
+
+  /*
+   * Cabinets are the absence that has to stay an absence. All 45 carry a blank
+   * lineage, so a Cabs tab would be 45 rows of nothing — and the rule this
+   * inherits from lineage.js is silence over a plausible guess.
+   */
+  assert.ok(!byKey.cab, 'a cab list is offered, and every row of it would be blank')
+
+  // Every amp names a real amp. That is the state of the data and the thing
+  // most worth noticing if it ever stops being true.
+  const ampsNamed = byKey.amp.entries.filter((e) => e.gear).length
+  assert.equal(ampsNamed, byKey.amp.entries.length, ampsNamed + ' of ' + byKey.amp.entries.length + ' amps name their real amp')
+  assert.ok(byKey.amp.entries.length > 300, 'the amp list came back short: ' + byKey.amp.entries.length)
+  assert.ok(GEAR_TOTAL > 400, 'only ' + GEAR_TOTAL + ' models can be named')
+
+  // Fractal's own designs say so rather than borrowing somebody's amp.
+  const fas = byKey.amp.entries.find((e) => e.name === 'FAS Modern')
+  assert.match(fas?.gear || '', /custom model/i, 'a FAS original claims a real amp')
+
+  // No model is listed twice — the same amp sits at more than one value on
+  // some units, and a reference sheet that repeats itself reads as a bug.
+  const names = byKey.amp.entries.map((e) => e.name)
+  assert.equal(names.length, new Set(names).size, 'the amp list repeats itself')
+
+  // Sorted, because 331 rows in catalog order is a list you scroll past.
+  const sorted = [...names].sort((a, b) => a.localeCompare(b))
+  assert.deepEqual(names, sorted, 'the list is not in an order anybody can scan')
+  /*
+   * Plain alphabetical, not numeric collation: that reads "5F1 Tweed" as 5 and
+   * "59 Bassguy" as 59, and files every 5F, 5E and 5C amp ahead of the Bassman.
+   */
+  assert.ok(
+    names.indexOf('59 Bassguy Bright') < names.indexOf('5F1 Tweed'),
+    'the Bassman is filed after the amps whose names merely start with 5'
+  )
+
+  /*
+   * The search has to read BOTH columns. What a person types is the REAL name
+   * — "tube screamer" — which appears nowhere in the unit's own "T808 OD". A
+   * search over the model names alone answers nothing for every query anyone
+   * actually has, which is the whole reason the sheet exists.
+   */
+  const ts = searchGear(byKey.drive.entries, 'tube screamer')
+  assert.ok(ts.length >= 2, 'searching the real name found ' + ts.length + ' of the Tube Screamers')
+  assert.ok(ts.every((e) => !/tube screamer/i.test(e.name)), 'that search matched on the model name, so it proves nothing')
+
+  // And still by the unit's own word for it.
+  assert.ok(searchGear(byKey.amp.entries, 'brit 800').length, 'the unit’s own name finds nothing')
+
+  // Every word has to match, so a second word narrows rather than widens.
+  const marshall = searchGear(byKey.amp.entries, 'marshall')
+  const plexi = searchGear(byKey.amp.entries, 'marshall plexi')
+  assert.ok(plexi.length && plexi.length < marshall.length, 'a second word did not narrow the search')
+
+  // An empty query is the whole list, not nothing.
+  assert.equal(searchGear(byKey.amp.entries, '  ').length, byKey.amp.entries.length)
+
+  /*
+   * And a search says where its answers are. Somebody types "tube screamer"
+   * with Amps open — the tab they land on by default — and every hit is in
+   * Drives. Tabs still reading their full contents give no hint of that, so
+   * the counts follow the search and the empty state names the tab.
+   */
+  const { searchAll } = await import('../src/lib/gearCatalog.js')
+  const steer = searchAll('tube screamer')
+  assert.equal(steer.find((g) => g.key === 'amp').hits.length, 0, 'the amps claim to hold a Tube Screamer')
+  assert.ok(steer.find((g) => g.key === 'drive').hits.length >= 2, 'the drives lost them')
+  assert.equal(steer.length, GEAR_GROUPS.length, 'searching all of them skipped one')
+})
+
 test('a write nobody could check is not written again on a guess', async () => {
   /*
    * From a debug log off an iPhone: Drive 1, Tone, Level, Mix and Treble each

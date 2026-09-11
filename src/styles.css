@@ -6530,6 +6530,71 @@ button.gig-bar-btn:disabled {
   font-size: var(--f-3);
 }
 
+/* ---------- what every model really is ---------- */
+
+.gear-names {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.gear-search {
+  width: 100%;
+  padding: var(--s-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  background: var(--panel);
+  color: var(--silk);
+  font-family: var(--body);
+  font-size: var(--f-input); /* iOS zooms anything smaller on focus */
+}
+
+/*
+ * The tabs wrap rather than scroll sideways. Five of them do not fit one phone
+ * line, and a row that scrolls horizontally inside a sheet that scrolls
+ * vertically is two gestures fighting over the same thumb.
+ */
+.gear-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.gear-count {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--silk-faint);
+}
+
+.chip.active .gear-count {
+  color: inherit;
+  opacity: 0.7;
+}
+
+.gear-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  background: var(--panel);
+}
+
+/*
+ * Not a .type-row: that one is a button with a 44px floor because it is a
+ * choice you make with a thumb. These are lines to read, so they take the room
+ * two lines of text need and no more — a 44px floor on 400 of them is four
+ * thousand pixels of air between the reader and the model they are looking for.
+ */
+.gear-row {
+  padding: var(--s-2) var(--s-3);
+  border-bottom: 1px solid var(--rule);
+}
+
+.gear-row:last-child {
+  border-bottom: 0;
+}
+
 /* ---------- find a control ---------- */
 
 .param-search input[type='search'] {

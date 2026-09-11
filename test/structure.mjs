@@ -622,6 +622,44 @@ export function run(test) {
     assert.equal(keys.length, new Set(keys).size, 'duplicate Section keys')
   })
 
+  test('the gear sheet is a thing to read, not a menu to pick from', () => {
+    /*
+     * "Add an info page like this to settings listing the real life
+     * equivalents of each amp and effects pedals."
+     *
+     * Its own sheet rather than a fold inside Setup: four hundred rows with a
+     * search over them, and a list that long inside a panel inside a sheet is
+     * two scrolls fighting over one thumb.
+     */
+    const gear = sheet('Amp and pedal names')
+    assert.ok(components(gear).includes('GearNames'), 'the gear sheet holds nothing')
+    assert.match(gear, /tall/, 'a four-hundred-row list is in a sheet sized to its contents')
+    // Mounted only while open — that much DOM should not sit behind a closed sheet.
+    assert.match(gear, /\{sheet === 'gear' \? <GearNames \/> : null\}/, 'the list is built whether or not anyone opened it')
+
+    const panel = readFileSync(new URL('../src/components/GearNames.jsx', import.meta.url), 'utf8')
+    const code = panel.slice(panel.indexOf('export default')).replace(/\{?\/\*[\s\S]*?\*\/\}?/g, '')
+
+    /*
+     * The rows are not buttons. There is nothing to choose here, and a row
+     * that depresses under a thumb promises an action it does not have —
+     * picking a model is the editor's job, on a row that really is a button.
+     */
+    const rows = code.slice(code.indexOf('gear-list'))
+    assert.ok(!/<button/.test(rows), 'the reference rows became buttons that do nothing')
+    assert.match(rows, /<li className="gear-row"/, 'the list is not a list')
+
+    // The search field clears the iOS zoom floor like every other one.
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    const rule = css.slice(css.indexOf('.gear-search {'), css.indexOf('}', css.indexOf('.gear-search {')))
+    assert.match(rule, /font-size: var\(--f-input\)/, 'tapping the search box will zoom the page on iOS')
+
+    // And Setup's row opens it rather than unfolding four hundred rows in place.
+    const setup = sheet('Setup')
+    assert.match(setup, /key="gear-names"/, 'Setup has no way into the gear sheet')
+    assert.match(setup, /onClick=\{\(\) => setSheet\('gear'\)\}/, 'the way in does not open the sheet')
+  })
+
   test('Setup is four doors, not twelve panels in a column', () => {
     /*
      * "It seems overwhelming and confusing with how many options there are."
@@ -647,9 +685,15 @@ export function run(test) {
 
     /* The groups are contiguous, so everything from the first to the last is
        the grouped region and what is left is what stayed loose. */
+    /*
+     * Two are loose on purpose, and they are the two that are not settings:
+     * the way back to the introduction, and the sheet naming what every model
+     * really is. Both are doors out to something you read. Anything else
+     * loose here is a panel that missed its group.
+     */
     const loose = [...setup.replace(/<Group[\s\S]*<\/Group>/, '').matchAll(/<Section\s+key="([^"]+)"/g)]
       .map((m) => m[1])
-    assert.deepEqual(loose, ['how-this-works'], `panels loose in Setup again: ${loose.join(', ')}`)
+    assert.deepEqual(loose, ['gear-names', 'how-this-works'], `panels loose in Setup again: ${loose.join(', ')}`)
 
     const behind = (key) => {
       const at = setup.indexOf(`<Group key="${key}"`)

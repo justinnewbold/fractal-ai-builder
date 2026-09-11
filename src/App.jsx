@@ -27,6 +27,7 @@ import Footswitches from './components/Footswitches'
 import GridEditor from './components/GridEditor'
 import Ports from './components/Ports'
 import LocalLibrary from './components/LocalLibrary'
+import GearNames from './components/GearNames'
 import Group from './components/Group'
 import Section from './components/Section'
 import Sheet from './components/Sheet'
@@ -4698,6 +4699,22 @@ export default function App() {
         ) : null}
       </Sheet>
 
+      {/*
+        Tall, and mounted only while it is open. Four hundred rows is a real
+        amount of DOM to keep alive behind a sheet nobody has open, and the
+        search box inside starts empty every time it is opened, which is what
+        somebody coming back to look up a second amp wants anyway.
+      */}
+      <Sheet
+        open={sheet === 'gear'}
+        onClose={() => setSheet(null)}
+        title="Amp and pedal names"
+        note={device?.short || device?.name || null}
+        tall
+      >
+        {sheet === 'gear' ? <GearNames /> : null}
+      </Sheet>
+
       <Sheet
         open={sheet === 'settings'}
         onClose={() => setSheet(null)}
@@ -4986,6 +5003,41 @@ export default function App() {
           bandmate. This is the only route back, so it is a plain button
           rather than a link inside a paragraph.
         */}
+        {/*
+          What every model on the unit really is.
+
+          "Add an info page like this to settings listing the real life
+          equivalents of each amp and effects pedals."
+
+          Beside the introduction rather than inside one of the four doors,
+          for the same reason that one is loose: it is a thing to read, not a
+          setting to change, and neither belongs under "Something's wrong".
+
+          Its own sheet rather than a fold, because it is four hundred rows
+          with a search over them — a list that long inside a panel inside a
+          sheet is two scrolls fighting for one thumb.
+        */}
+        <Section key="gear-names" title="Amp and pedal names" note="What each model on your unit really is">
+          <p className="hint">
+            Fractal can&rsquo;t print &ldquo;Marshall JCM800&rdquo; on a menu, so your unit says
+            &ldquo;Brit 800 2204 High&rdquo;. This is the translation, for every amp and pedal on
+            it &mdash; and you can search it by the real name.
+          </p>
+          <div className="history-actions">
+            <button
+              className="chip"
+              /* Straight from one sheet to the other. Sheet's own ledger is
+                 built for this handoff: the settings sheet pops the entry it
+                 pushed as it tears down, and the gear sheet, already listening
+                 by then, swallows that pop instead of reading it as a back
+                 gesture. */
+              onClick={() => setSheet('gear')}
+            >
+              Open the list
+            </button>
+          </div>
+        </Section>
+
         <Section key="how-this-works" title="How this works" note="A short introduction">
           <p className="hint">
             Four cards: what the three screens are for, how to ask for a sound, where a change
