@@ -3,6 +3,22 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.155.0
+
+**The watcher now writes down the misses too, which is the only way it can
+measure anything.** It was only recording what it caught — so a session with no
+lines in it read exactly the same whether it had caught nothing or was never
+asked. A real log came back with two chat requests and no lines at all, and the
+only way to tell which had happened was to read the entries beside them and try
+the words by hand.
+
+**Both had missed, and both for reasons worth fixing.** "Change amp to channel
+b" missed because "change" was not among the words it knew for that; renaming a
+scene missed because it was never built. Both work now, along with "rename scene
+3 as Solo" and "call scene 1 Clean".
+
+It still acts on none of it.
+
 ## 7.154.0
 
 **The cost under each run was overstating itself by about 42%.** The token count

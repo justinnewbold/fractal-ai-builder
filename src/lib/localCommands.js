@@ -219,7 +219,7 @@ const RULES = [
 
   /* A channel, on a block that was named. "Channel B" alone names no block. */
   (t, ctx) => {
-    const m = /^(?:put |set |switch |move )?(?:the )?(.+?) (?:to |on |onto |to be )?channel ([a-d])$/.exec(t)
+    const m = /^(?:put |set |switch |move |change |make )?(?:the )?(.+?) (?:to |on |onto |to be )?channel ([a-d])$/.exec(t)
     if (!m) return null
     const block = findBlock(m[1], ctx.blocks || [])
     if (!block) return null
@@ -307,13 +307,38 @@ export function matchLocal(instruction, ctx = {}) {
 /**
  * Renaming, kept apart because it is the one thing whose argument is not
  * lowercase. "Call it Black Album" has to keep the capitals the player typed,
- * so this reads the original string rather than the stripped one.
+ * so these read the original string rather than the stripped one.
+ *
+ * Both shapes are here because both are things people say, and the scene one
+ * was missing entirely — a watch-only run caught "Rename scene 2 to Lithium"
+ * going to the model for want of six lines of regex.
  */
-export function matchRename(instruction) {
+export function matchRename(instruction, ctx = {}) {
   const raw = String(instruction ?? '').trim()
+
+  /* A scene first: "rename scene 2 to Lithium" also matches the preset shape
+     below if the preset rule is tried first, and would name the PRESET
+     "scene 2 to Lithium". */
+  const scene = /^(?:please\s+)?(?:re)?name\s+scene\s+(\d+)\s+(?:to|as)\s+(.+?)[.!]?$/i.exec(raw) ||
+    /^(?:please\s+)?call\s+scene\s+(\d+)\s+(.+?)[.!]?$/i.exec(raw)
+  if (scene) {
+    const index = Number(scene[1]) - 1
+    const count = ctx.sceneCount ?? 8
+    if (!Number.isInteger(index) || index < 0 || index >= count) return null
+    const name = tidy(scene[2])
+    if (!name) return null
+    return { kind: 'renameScene', scene: index, text: name, why: `Scene ${index + 1} renamed to ${name}.` }
+  }
+
   const m = /^(?:please\s+)?(?:name|call|rename)\s+(?:it|this|the preset)\s+(.+?)[.!]?$/i.exec(raw)
   if (!m) return null
-  const name = m[1].trim().replace(/^["']|["']$/g, '')
-  if (!name || name.length > 31) return null
+  const name = tidy(m[1])
+  if (!name) return null
   return { kind: 'renamePreset', text: name, why: `Renamed to ${name}.` }
+}
+
+/** A name the unit can hold: quotes off, trimmed, and short enough to store. */
+function tidy(text) {
+  const name = String(text ?? '').trim().replace(/^["']|["']$/g, '').trim()
+  return name && name.length <= 31 ? name : null
 }
