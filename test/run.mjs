@@ -4832,7 +4832,7 @@ test('a number the player chose overrides the rule that says three or four', () 
   assert.match(all, /rule 11 does not apply/, 'the instruction and the rule are left to fight')
   assert.match(all, /numbered 0 to 7/, 'nothing says the indices must be contiguous')
   // The real failure of asking for a full set: eight near-copies of one tone.
-  assert.match(all, /rather than 8 near-copies/)
+  assert.match(all, /never 8 near-copies/)
 
   // Asked for a set but not for a number: exactly what it always said.
   const few = sceneInstruction({ wantScenes: true, sceneCount: 8 })
@@ -4848,6 +4848,64 @@ test('a number the player chose overrides the rule that says three or four', () 
 
   // And a budget past the unit's count is spoken in the unit's terms.
   assert.match(sceneInstruction({ wantScenes: true, sceneBudget: 8, sceneCount: 4 }), /EXACTLY 4 SCENES/)
+})
+
+test('a band asked for gets its own songs on the scenes, not Clean / Rhythm / Lead', () => {
+  /*
+   * "This generation should've created song names for each scene and it did
+   * not, it created generic names." The ask was a full Three Days Grace preset
+   * and the scenes came back Verse, Rhythm, Lead — a preset that could have
+   * been anybody's, with the band's name reaching the model and none of it
+   * reaching the footswitch.
+   *
+   * Three places decided that between them, so all three are checked here: the
+   * rule, the field the name is written into, and the sentence the scene count
+   * adds on top of both.
+   */
+  const { sceneInstruction } = scenesMod
+  const api = readSrc(new URL('../api/generate.js', import.meta.url), 'utf8')
+
+  // The rule itself: band means their songs, one song means its parts, and a
+  // plain description keeps the job names it always had.
+  assert.match(api, /13\. Name scenes after the music/, 'the naming rule is gone')
+  assert.match(api, /every scene is one of THEIR songs/)
+  assert.match(api, /ONE SONG: every scene is a part of THAT song/)
+  assert.match(api, /"Clean", "Rhythm", "Lead" say what they are/, 'a plain tone lost its job names')
+  // And the cut the unit makes, so a title is shortened on purpose rather than
+  // chopped mid-word at 16 characters by the validator.
+  assert.match(api, /cut to 16 characters/)
+
+  // The field the model writes the name into no longer suggests the generic
+  // three by itself — it was the last thing read before the name was chosen.
+  const nameField = api.slice(api.indexOf('name: z'), api.indexOf('engaged: onlyWhenPlaced'))
+  assert.match(nameField, /this is the SONG this scene is voiced for/)
+  assert.ok(
+    !/Short name for this scene — "Clean", "Rhythm", "Lead"/.test(api),
+    'the scene name field still opens by naming the three generic ones'
+  )
+
+  // Both scene answers carry it: a set of the model's judging, and a number.
+  assert.match(sceneInstruction({ wantScenes: true, sceneCount: 4 }), /one of THEIR songs per scene/)
+  const eight = sceneInstruction({ wantScenes: true, sceneBudget: 8, sceneCount: 8 })
+  assert.match(eight, /8 of THEIR songs/, 'eight scenes off a band is eight of their songs')
+  assert.match(eight, /8 parts of it/, 'eight scenes off one song is eight parts of it')
+
+  // The preset's own name is the same failure one size up: "3DG
+  // Verse-Rhythm-Lead" for a band anybody could name.
+  assert.match(api, /When the request names a band, a record or a song, the name says so/)
+})
+
+test('the chat hands the band name on instead of paraphrasing it away', () => {
+  /*
+   * The designer can only name scenes after a band's songs if the band's name
+   * reaches it. This one arrived as "modern alt-metal rhythm crunch, cleaner
+   * verse tone, and a cutting lead" — the chat's own words, which describe
+   * nobody in particular and ask for exactly the three scene names that came
+   * back.
+   */
+  const command = readSrc(new URL('../api/command.js', import.meta.url), 'utf8')
+  assert.match(command, /carried through ' \+\n\s*'word for word/, 'the description may still lose the band')
+  assert.match(command, /Do not invent a verse \/ rhythm \/ lead\nbreakdown the player did not ask for/)
 })
 
 test('the question and the instruction share one idea of "all of them"', () => {

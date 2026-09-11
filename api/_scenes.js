@@ -99,6 +99,12 @@ export function sceneChoices(sceneCount = 8) {
  * explanation. It also says what to do when the description does not obviously
  * carry that many sounds, because that is the real failure mode of asking for a
  * full set: eight scenes named Lead 1 through Lead 8.
+ *
+ * It also carries rule 13 into the count, because the two decide the same
+ * thing from different ends. "Make me a Three Days Grace preset" with a set
+ * asked for came back as Verse, Rhythm and Lead — the band's name reached the
+ * model and none of it reached the footswitch. A number of scenes asked for
+ * against a band's name is a number of that band's SONGS.
  */
 export function sceneInstruction({ wantScenes, sceneBudget, sceneCount = 8 } = {}) {
   if (wantScenes === false) {
@@ -111,7 +117,9 @@ export function sceneInstruction({ wantScenes, sceneBudget, sceneCount = 8 } = {
     return (
       '\n\nThe player has asked for a SET OF SCENES across this preset. Return three or four ' +
       'scenes, each named, covering the sounds this description implies. Do not return an ' +
-      'empty scenes array.'
+      'empty scenes array. Rule 13 decides the names: a band or a record named in the ' +
+      'description means one of THEIR songs per scene, voiced for that song, not Clean, ' +
+      'Rhythm and Lead under their name.'
     )
   }
 
@@ -119,8 +127,10 @@ export function sceneInstruction({ wantScenes, sceneBudget, sceneCount = 8 } = {
     `\n\nThe player has asked for EXACTLY ${n} SCENES across this preset. They chose that ` +
     `number themselves, so rule 11 does not apply — return ${n}, numbered 0 to ${n - 1}, each ` +
     `named, and do not return fewer. Every one of them must be a sound somebody would actually ` +
-    `reach for: if the description does not obviously carry ${n} sounds, fill the rest with the ` +
-    `ones that belong beside it — a clean, a rhythm, a lead, a solo boost, an ambient or a ` +
-    `verse-and-chorus pair — rather than ${n} near-copies of the same tone under different names.`
+    `reach for. Where the description names a band or a record, that is ${n} of THEIR songs, ` +
+    `one per scene, each named and voiced for its own song — rule 13. Where it names one song, ` +
+    `that is ${n} parts of it. Only where it names neither does the rest get filled by job — a ` +
+    `clean, a rhythm, a lead, a solo boost, an ambient or a verse-and-chorus pair — and never ` +
+    `${n} near-copies of the same tone under different names.`
   )
 }

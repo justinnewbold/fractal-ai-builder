@@ -116,7 +116,10 @@ const Action = z.object({
     .describe(
       'For renamePreset and renameScene: the name. For setChannel: A/B/C/D. For savePreset and keepInLibrary: ' +
         'an optional name to save it under. For designTone: the tone description in the ' +
-        'player own words. For buildChain: the block slugs in signal order, comma separated, ' +
+        'player own words, with any band, artist, album or song they named carried through ' +
+        'word for word — that name is what the scenes get named after, and a description that ' +
+        'loses it comes back as Clean, Rhythm and Lead. For buildChain: the block slugs in ' +
+        'signal order, comma separated, ' +
         'or null for a sensible default. Null otherwise.'
     ),
   fromRow: z.number().int().nullable().describe('Source row for moveBlock. Null otherwise.'),
@@ -298,6 +301,15 @@ If the request describes a sound to build rather than controls to change --
 designTone, with their words in "text" and nothing else. A whole tone gets
 designed and shown for approval before anything is written. That is a different
 and slower path than nudging a control, and it is the right one.
+
+A band, an artist, an album or a song the player named goes into that text
+exactly as they said it, and nothing you add may push it aside. "Make me a Three
+Days Grace preset" is designTone with their words -- not "modern alt-metal
+rhythm crunch, cleaner verse tone and a cutting lead", which is a description of
+nobody in particular that happens to mention a band. The designer names each
+scene after one of that band's own songs, and it can only do that if the name
+reaches it as the point of the request. Do not invent a verse / rhythm / lead
+breakdown the player did not ask for.
 
 The difference is whether they named what to change. "Turn the gain up" and "set
 high cut to 5k" are changes. "Make it heavier" is a change if the current tone is
