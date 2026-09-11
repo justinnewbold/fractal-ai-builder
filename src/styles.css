@@ -7672,6 +7672,88 @@ button.topbar-preset.open .topbar-caret {
 }
 
 /*
+ * Which sounds come across, when a tone holds more of them than the unit does.
+ * A tick list rather than two buttons, because the answer is a set and not a
+ * number: which four of the eight, not how many.
+ */
+.scene-fit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.scene-fit-list {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.scene-fit-list li {
+  border-bottom: 1px solid var(--rule);
+}
+
+/* A whole row is the target, not the 20px box in it — this gets tapped on a
+   phone, in a hurry, standing up. */
+.scene-fit-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: 44px;
+  padding: var(--s-2) 0;
+  cursor: pointer;
+}
+
+.scene-fit-row input[type='checkbox'] {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  accent-color: var(--signal);
+}
+
+.scene-fit-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--silk-dim);
+}
+
+.scene-fit-row.on .scene-fit-name {
+  color: var(--silk);
+}
+
+/* Where it lands, in the unit's own numbering — the number under the
+   footswitch, not the one it had on the unit it was written on. */
+.scene-fit-where {
+  flex: 0 0 auto;
+  font-size: var(--f-1);
+  color: var(--silk-faint);
+}
+
+.scene-fit-acts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.scene-fit-acts button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-1);
+  width: 100%;
+  text-align: left;
+  padding: var(--s-3) var(--s-4);
+}
+
+.scene-fit-acts button .hint {
+  font-weight: 400;
+}
+
+/*
  * What the write does to the scenes already there, in their own names. Sits
  * between the checkbox and the list, because it is the sentence that decides
  * whether the checkbox gets ticked.
@@ -8313,13 +8395,28 @@ button.past-del:focus-visible {
   color: var(--fault);
 }
 
-/* The name takes the room; the time takes what it needs. */
+/* The name takes the room; the time takes what it needs. The name is a column
+   rather than a line because a tone made on another unit says so underneath —
+   so the ellipsis moves down onto the title, which is the part that is long. */
 .past-name {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.past-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Which unit a tone was made on, when it was not this one. Quiet: it is a fact
+   about the row, not a warning — everything still loads. */
+.past-made {
+  font-size: var(--f-1);
+  color: var(--silk-faint);
 }
 
 .past-when {

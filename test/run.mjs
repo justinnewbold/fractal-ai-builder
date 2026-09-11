@@ -8596,6 +8596,113 @@ test('a setlist knows when it changed, and a delete leaves a mark', async () => 
   assert.deepEqual(listsFor('fm3', store).map((l) => l.name), ['Sunday'])
 })
 
+console.log('\na tone with more scenes than the unit holds')
+
+test('a tone made on the unit it is loaded onto is never asked about', async () => {
+  const { scenesOverflowing } = await import('../src/lib/sceneFit.js')
+  const fm3 = { scenes: [{ index: 0 }, { index: 1 }, { index: 2 }, { index: 3 }] }
+  assert.equal(scenesOverflowing(fm3, 8), 0, 'a four-scene tone on an eight-scene unit stops the load')
+  assert.equal(scenesOverflowing(fm3, 4), 0, 'a four-scene tone on a four-scene unit stops the load')
+  assert.equal(scenesOverflowing({ scenes: [] }, 4), 0, 'a tone with no scene plan stops the load')
+  assert.equal(scenesOverflowing(null, 4), 0, 'a tone with no spec at all throws instead of answering')
+})
+
+test('an eight-scene tone on a four-scene unit is four scenes over', async () => {
+  const { scenesOverflowing } = await import('../src/lib/sceneFit.js')
+  const eight = { scenes: Array.from({ length: 8 }, (_, i) => ({ index: i })) }
+  assert.equal(scenesOverflowing(eight, 4), 4)
+})
+
+test('the scenes picked are renumbered into the ones the unit has', async () => {
+  const { fitScenes } = await import('../src/lib/sceneFit.js')
+  /*
+   * The case the whole thing exists for: a set laid out across an FM3, four of
+   * which are wanted on an AM4 — and not the first four. Scene 6 has to arrive
+   * as scene 2 or the footswitch under it plays nothing.
+   */
+  const spec = {
+    presetName: 'Black Album Rig',
+    blocks: [{ eid: 106 }],
+    scenes: [
+      { index: 0, name: 'Clean', engaged: [106] },
+      { index: 2, name: 'Verse', engaged: [106] },
+      { index: 5, name: 'Chorus', engaged: [106] },
+      { index: 7, name: 'Solo', engaged: [106] }
+    ]
+  }
+  const fit = fitScenes(spec, [0, 2, 5, 7], 4)
+  assert.deepEqual(fit.spec.scenes.map((s) => s.index), [0, 1, 2, 3])
+  assert.deepEqual(fit.spec.scenes.map((s) => s.name), ['Clean', 'Verse', 'Chorus', 'Solo'])
+  assert.deepEqual(fit.spec.scenes[3].engaged, [106], 'the scene arrived without what it switches on')
+  assert.deepEqual(fit.spec.blocks, spec.blocks, 'the blocks were touched — only the scenes did not fit')
+  assert.equal(fit.dropped.length, 0)
+  assert.deepEqual(fit.moved.map((m) => `${m.name}→${m.to + 1}`), ['Verse→2', 'Chorus→3', 'Solo→4'])
+})
+
+test('what was left behind is named, by its own name', async () => {
+  const { fitScenes, describeFit } = await import('../src/lib/sceneFit.js')
+  const spec = {
+    scenes: [
+      { index: 0, name: 'Clean' },
+      { index: 1, name: 'Crunch' },
+      { index: 2, name: 'Lead' },
+      { index: 3, name: 'Ambient' },
+      { index: 4, name: 'Outro' }
+    ]
+  }
+  const fit = fitScenes(spec, [0, 1, 2, 3], 4)
+  assert.deepEqual(fit.dropped, ['Outro'])
+  assert.match(describeFit(fit, 4), /Kept 4 of 5 scenes/)
+  assert.match(describeFit(fit, 4), /left behind Outro/)
+  assert.match(describeFit(fit, 4), /This unit has 4\./)
+})
+
+test('a scene with no name of its own is still something you can point at', async () => {
+  const { sceneLabel, sceneRows } = await import('../src/lib/sceneFit.js')
+  const rows = sceneRows({ scenes: [{ index: 3 }] })
+  assert.equal(sceneLabel(rows[0]), 'Scene 4', 'an unnamed scene reads as undefined in the picker')
+})
+
+test('picking more than the unit holds cannot be smuggled past the fit', async () => {
+  const { fitScenes } = await import('../src/lib/sceneFit.js')
+  const spec = { scenes: Array.from({ length: 8 }, (_, i) => ({ index: i, name: `S${i + 1}` })) }
+  const fit = fitScenes(spec, [0, 1, 2, 3, 4, 5], 4)
+  assert.equal(fit.spec.scenes.length, 4, 'six scenes went to a unit with four')
+  assert.deepEqual(fit.dropped, ['S5', 'S6', 'S7', 'S8'])
+})
+
+test('the sound with no scene plan at all is a real answer', async () => {
+  const { fitScenes } = await import('../src/lib/sceneFit.js')
+  /* "Load the sound only" — every block and every setting, no scenes written.
+     The spec still has to be a spec, not a spec missing its scenes key. */
+  const spec = { blocks: [{ eid: 106 }], scenes: [{ index: 0, name: 'Clean' }] }
+  const fit = fitScenes(spec, [], 4)
+  assert.deepEqual(fit.spec.scenes, [])
+  assert.deepEqual(fit.spec.blocks, spec.blocks)
+  assert.deepEqual(fit.dropped, ['Clean'])
+})
+
+test('the picker opens on the ones that already fit', async () => {
+  const { defaultKeep } = await import('../src/lib/sceneFit.js')
+  const spec = { scenes: Array.from({ length: 8 }, (_, i) => ({ index: i })) }
+  assert.deepEqual(defaultKeep(spec, 4), [0, 1, 2, 3])
+  assert.deepEqual(defaultKeep(spec, 8), [0, 1, 2, 3, 4, 5, 6, 7])
+})
+
+test('a spec that lists its scenes out of order still fits in playing order', async () => {
+  const { fitScenes, defaultKeep } = await import('../src/lib/sceneFit.js')
+  const spec = {
+    scenes: [
+      { index: 5, name: 'Solo' },
+      { index: 0, name: 'Clean' },
+      { index: 2, name: 'Verse' }
+    ]
+  }
+  assert.deepEqual(defaultKeep(spec, 4), [0, 2, 5], 'the picker offers them in the order the spec happened to write them')
+  const fit = fitScenes(spec, [0, 2, 5], 4)
+  assert.deepEqual(fit.spec.scenes.map((s) => s.name), ['Clean', 'Verse', 'Solo'])
+})
+
 await settle()
 /*
  * The tally has to say when it is red.
