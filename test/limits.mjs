@@ -77,6 +77,18 @@ export function run(test) {
       thinkMs < capMs,
       'the thinking budget is not shorter than the hard cap, so a live model that never starts runs to the cap'
     )
+    /*
+     * And it leaves room for the tone to actually be written after it.
+     *
+     * The budget is the wait BEFORE the first word; the writing follows inside
+     * the same cap. Set too close to the cap and a model that starts at the
+     * last moment is cut off mid-chain — a failure with partials, which is the
+     * one kind this app cannot simply ask again for.
+     */
+    assert.ok(
+      capMs - thinkMs >= 45000,
+      `only ${(capMs - thinkMs) / 1000}s is left for writing the tone once the model starts`
+    )
 
     /*
      * And the chat route's clocks, which are the same invariant on the other
