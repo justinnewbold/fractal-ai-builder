@@ -54,19 +54,22 @@
     "",
     "And two commits come back from the mirror's main, for a fault a player could hear: the audio cut out for as long as the app was open and stopped the moment it was closed. The Play screen asked for every block's monitors twice a second, which the host can only answer by fetching the whole grid -- and gen3.ts liveMonitors() already warned what that costs, a full ~24KB preset dump on every tick, serialised ahead of every other read on a port that takes one request at a time. The client half is fixed in the app; these are the server half. GRID_TTL_MS goes from 500 ms to 15 s so one dump serves more than one caller, and storedPresetName reads a slot's name over fn 0x0D without loading the preset at all -- which matters because the app walks all 512 slots four seconds after connecting, and until this every one of those names cost a dump. Both were written on main and neither had reached this branch, which is the whole hazard this file exists to record.",
     "",
-    "And the last of it, for the same fault. The telemetry supervisor starts on its FIRST event listener -- subscribe() calls startMeters() unconditionally -- and at the balanced default each 100ms tick is four back-to-back output-meter round trips, roughly forty SysEx transactions a second at the control processor of a unit that is also making sound. A phone opening the app supplies that listener through the relay bridge and closing it removes the last one, which is exactly the shape of what was reported: the sound cutting out while the app was open and settling the moment it was closed. Those meters draw one bar. POST /telemetry/meters lets a client say it is not drawing it, and the loop then keeps only the front-panel scene and channel watches -- a footswitch press still lands -- at 800ms instead of 100ms. Measured over the same 900ms window on ForgeFX's own suite: 35 frames against 2. Defaults on, so a client that has never heard of the route keeps its bars."
+    "And the last of it, for the same fault. The telemetry supervisor starts on its FIRST event listener -- subscribe() calls startMeters() unconditionally -- and at the balanced default each 100ms tick is four back-to-back output-meter round trips, roughly forty SysEx transactions a second at the control processor of a unit that is also making sound. A phone opening the app supplies that listener through the relay bridge and closing it removes the last one, which is exactly the shape of what was reported: the sound cutting out while the app was open and settling the moment it was closed. Those meters draw one bar. POST /telemetry/meters lets a client say it is not drawing it, and the loop then keeps only the front-panel scene and channel watches -- a footswitch press still lands -- at 800ms instead of 100ms. Measured over the same 900ms window on ForgeFX's own suite: 35 frames against 2. Defaults on, so a client that has never heard of the route keeps its bars.",
+    "And the last two, for a phone. Verifying a write means clearing the parameter cache and reading the value back, and remoteAllowed() had no DELETE branch at all -- so from a phone the clear was refused, the read came out of a cache one write behind, and NOTHING a remote client wrote could be verified. A log from an iPhone showed five parameters in a row reported unverifiable, each reading back the value of the write before it; every one had landed. DELETE /device/cache is a read-side hint that stores no value, touches no preset and reaches no slot, which is why it sat outside the rule rather than inside the list of things never remotely reachable. GRID_TTL_MS going from 500ms to 15s made it matter more: a cache that lives thirty times longer needs the one client that cannot reach the machine to be able to drop it.",
+    "The codec moves with it, and the +suffix on its ref says why. buildTree() in the gen-3 preset Huffman decoder recursed for ever on an empty or truncated bitstream -- BitReader answers 0 past the end of its buffer and a 0 bit means 'internal node, read two more subtrees' -- so every slot whose raw_patch header reports compSize 0 answered GET /presets/{n}/summary with \"RangeError: Maximum call stack size exceeded\". Six slots of one FM3 did exactly that. vendor-forgefx.mjs cross-checks ForgeFX's stack.lock.json against the tag below and refuses a pair upstream never released together, so both had to move together."
   ],
   "forgefx": {
     "repo": "justinnewbold/forgefx",
     "upstream": "sKuhLight/forgefx",
-    "tag": "v0.7.5-beta+rename+host+tuner+dumphdr+presetloc+dumpcache+meterGate",
-    "commit": "d7b17a305c1f4c783d2ae5cdf83d26d9dd8a47bd",
+    "tag": "v0.7.5-beta+rename+host+tuner+dumphdr+presetloc+dumpcache+meterGate+cacheclear",
+    "commit": "a582f3eedad7dfe45b71a3cdcd9ed57a73045454",
     "branch": "claude/address-one-host"
   },
   "forgefx-midi": {
     "repo": "justinnewbold/forgefx-midi",
     "upstream": "sKuhLight/forgefx-midi",
-    "tag": "v0.5.0",
-    "commit": "553d24b7409302908d5c7e46a71b45e07dffdc05"
+    "tag": "v0.5.0+huffmanguard",
+    "commit": "5cdce337ccfaf627a09f9784baeeaf3429f6a30f",
+    "branch": "claude/huffman-guard"
   }
 }

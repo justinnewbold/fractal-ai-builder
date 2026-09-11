@@ -58,6 +58,17 @@ export function hostAllows(method, p) {
       p === '/scene/name' ||
       /^\/am4\/(bypass|scene|preset)$/.test(p)
     )
+  /*
+   * Dropping the unit's parameter cache. Added to the host on the pinned fork
+   * — see desktop/forgefx.lock.json.
+   *
+   * A read-side hint and nothing else: it stores no value, touches no preset
+   * and reaches no slot, it only says "forget what you last read". Its absence
+   * fell on the one client that cannot work around it — verifying a write
+   * means clearing this cache and reading the value back, so with the clear
+   * refused nothing a phone wrote could be confirmed, ever.
+   */
+  if (method === 'DELETE') return p === '/device/cache'
   return false
 }
 

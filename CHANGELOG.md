@@ -3,6 +3,21 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.152.0
+
+**Writes from your phone can be checked again.** After writing a value the app
+reads it back to confirm it stuck, and to read honestly it first has to clear
+the unit's memory of the old value — which only ever worked at the Mac, so from
+a phone nothing could be confirmed at all. The device server the app carries now
+lets that clear travel, so a preset sent from your phone is verified the same
+way one sent from the Mac is. A Mac still on an older build refuses it; the app
+asks once, takes the answer, and stops asking until you reconnect.
+
+**And six of your presets get their names back.** Slots 488 to 494 showed blank
+in the preset list because reading them crashed the decoder — an empty slot made
+it read a compressed body that wasn't there and loop until it ran out of room.
+Empty slots now come back empty instead of taking the reader down with them.
+
 ## 7.151.0
 
 **Setup can tell you what every amp and pedal really is.** Fractal can't print
