@@ -3,6 +3,32 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.188.0
+
+**The preset list can be read off the unit again.** "Unit is showing the
+wrong preset name compared to what's actually on the device compared to what
+it shows in the preset menu. It's stale and stays that way for days." The
+header said 98 · 3DG Verse-Rhythm-Lead is loaded; the list underneath said
+098 TIGHT MODERN.
+
+The app writes a slot's name down at the moments it can see — a save it made,
+a slot it read — and nothing else ever touched the copy. A preset stored from
+AM4-Edit, or renamed at the front panel, kept its old name in the list for as
+long as the list lived, which is for ever. ⟳ could not fix it: it reads the
+slots that have never been read, and a wrong name has been.
+
+So the picker has a new chip under the list, beside "101 of 104 named": Read
+them again. It forgets every name and reads the whole unit again, from the
+phone over the relay as well as at the Mac. A scan already running is stopped
+and started over rather than left to finish a walk that would never come back
+for slot 98.
+
+And the one name the app can always be sure of is now written down without
+being asked: the slot the unit says it is on, under the name it says it has,
+in one answer, on every read. The row for the loaded preset can no longer
+disagree with the header above it. Not while this app has edited the buffer
+— the name on an edited buffer may not be the name in the slot.
+
 ## 7.187.0
 
 **The Mac finds the unit again after losing it.** From a log on stage: the

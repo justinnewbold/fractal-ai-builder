@@ -4817,6 +4817,59 @@ test('a save writes down what the slot is called, on every route to one', () => 
   )
 })
 
+test('the list can be read off the unit again from nothing, and the loaded slot is always right', () => {
+  /*
+   * "Unit is showing the wrong preset name compared to what's actually on
+   * the device compared to what it shows in the preset menu. I think we need
+   * an option to manually refresh the preset menu from the device as it's
+   * stale and stays that way for days sometimes."
+   *
+   * Two things. The app writes a name down at the moments it can see — a
+   * save it made, a slot it read — and nothing else ever touched the copy,
+   * so a preset stored from AM4-Edit kept its old name here for good. ⟳ could
+   * not help: it reads what has not been read, and a wrong name has been.
+   * So there is a way to forget the lot and read it all again. And the one
+   * name the app can always be sure of — the slot the unit says it is on,
+   * under the name it says it has, in one answer — is written down on every
+   * read, so the row for the loaded preset never disagrees with the header.
+   */
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  const fx = readSrc(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+  const con = readSrc(new URL('../src/components/Console.jsx', import.meta.url), 'utf8')
+
+  // Forgetting everything: the cache, its copy on disk, the route flags, and the host's copy.
+  assert.match(fx, /export function forgetAllPresetNames\(\)/)
+  const all = fx.slice(fx.indexOf('export function forgetAllPresetNames('), fx.indexOf('/** Whether this slot'))
+  assert.match(all, /nameCache = new Map\(\)/)
+  assert.match(all, /resetNameRoutes\(\)/, 'a re-read still trusts what the last unit taught it about the routes')
+  assert.match(all, /persistNames\(\)/, 'the old names would be back on the next launch')
+  assert.match(all, /publishNames\(\)/, 'a phone would take the old names straight back off the Mac')
+
+  // The app forgets, then reads eagerly — and a scan already running is restarted, not joined.
+  const again = app.slice(app.indexOf('const rereadNames = '), app.indexOf('useEffect(() => {', app.indexOf('const rereadNames = ')))
+  assert.match(again, /forgetAllPresetNames\(\)/)
+  assert.match(again, /namesHeld\.current = false/, '■ would still be holding the scan')
+  assert.match(again, /if \(scan\?\.running\) \{[\s\S]*?namesAgain\.current = true[\s\S]*?scan\.stop\(\)/)
+  assert.match(again, /readNames\(true\)/)
+  const done = app.slice(app.indexOf('onDone: () => {'), app.indexOf('scan.setHold('))
+  assert.match(done, /if \(namesAgain\.current\) \{[\s\S]*?readNames\(true\)/, 'a stopped scan never starts over')
+
+  // Both pickers offer it, and the list draws it.
+  for (const site of [...app.matchAll(/<PresetList/g)]) {
+    const props = app.slice(site.index, app.indexOf('/>', site.index))
+    assert.match(props, /onReread=\{rereadNames\}/, 'a picker cannot ask for the names again')
+  }
+  const list = con.slice(con.indexOf('export function PresetList'), con.indexOf('export function BlockPanel'))
+  assert.match(list, /onReread && !scanning \?[\s\S]*?onClick=\{onReread\}[\s\S]*?Read them again/)
+
+  // The loaded slot's name is written down on every read — unless this app edited the buffer.
+  assert.match(app, /function noteLoadedName\(p\)/)
+  const note = app.slice(app.indexOf('function noteLoadedName('), app.indexOf('function keepSavedScenes('))
+  assert.match(note, /if \(kept\) notePresetName\(p\.number, kept\)/)
+  assert.doesNotMatch(note, /forgetPresetName/, 'an unnamed buffer must not erase what the slot is called')
+  assert.match(app, /setPreset\(p\)\n[\s\S]{0,900}?if \(!dirtyRef\.current\) noteLoadedName\(p\)/)
+})
+
 test('the Mac wins where the two disagree about a slot', () => {
   /*
    * The other half, and what heals a phone that already has a wrong name in
