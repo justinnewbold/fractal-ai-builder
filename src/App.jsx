@@ -2482,6 +2482,30 @@ export default function App() {
               setProgress((was) => was || 'Building your chain…')
             } else if (e.kind === 'fallback') setProgress('Trying another way…')
             else if (e.kind === 'retrying') setProgress('No answer yet — asking again…')
+            /*
+             * The rig lookup, which happens before the model is asked anything
+             * and used to happen before the stream opened at all — a minute of
+             * blank screen that nothing accounted for, ending in a tone built
+             * from memory that nothing said had been built from memory.
+             *
+             * Said in the conversation when it does not land, not only in the
+             * log: a tone designed without the lookup is a tone worth knowing
+             * was designed without it.
+             */
+            else if (e.kind === 'rig') {
+              if (e.state === 'looking') setProgress('Looking up the band and the songs…')
+              else if (e.state === 'found') setProgress('Got the rig — designing…')
+              else if (e.state === 'timeout' || e.state === 'failed') {
+                setProgress(`${THINKING}…`)
+                setTurns((prev) => [
+                  ...prev,
+                  {
+                    role: 'system',
+                    text: `${e.note}. The tone below is built on what the model already knew rather than on anything looked up, so check the amp against the real one before you keep it.`
+                  }
+                ])
+              }
+            }
           }
         }
       )

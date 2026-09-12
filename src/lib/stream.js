@@ -336,6 +336,25 @@ async function attemptOnce(
           onEvent?.({ kind: 'waiting', ms: since(), thinkingMs: frame.ms })
           continue
         }
+        /*
+         * The rig lookup, before the model is asked anything.
+         *
+         * Handled here with the heartbeat and not below it, for the same
+         * reason: `answering` swaps the watchdog from the ninety-second
+         * first-token budget to the forty-five-second dead-stream one, and the
+         * lookup is the part of the wait that has not started answering yet.
+         *
+         * Written down either way. A lookup that runs out of time leaves a
+         * tone designed from memory, and on the run that found this the log
+         * could not tell that apart from a lookup that never ran — the tone
+         * came back on a Peavey calling itself the band's own amp, with
+         * nothing anywhere saying the search had been killed at sixty seconds.
+         */
+        if (frame.type === 'rig') {
+          note('rig', { ms: since(), state: frame.state, tookMs: frame.ms })
+          onEvent?.({ kind: 'rig', ms: since(), state: frame.state, note: frame.note })
+          continue
+        }
         answering = true
         if (frame.type === 'partial') {
           partials += 1

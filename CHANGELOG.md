@@ -3,6 +3,26 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.184.0
+
+**The rig lookup was running out of time and nothing said so.** On a real Three
+Days Grace build it searched for sixty seconds, hit its own sixty-second
+timeout, was cut off, and the design went ahead on what the model already knew
+— coming back on a Peavey 6505 with a summary calling it "Barry Stock's actual
+5150/6505 tone". No source says that. The band play Diezel VH4s and modded
+Marshall JMP-1s. And from the log, a lookup killed mid-search looked exactly
+like a lookup that had never run.
+
+Three things were wrong and all three are fixed. The lookup now gets two
+minutes rather than one, which is what eight songs actually take. It runs
+inside the stream instead of before it, so the phone gets proof of life and a
+line saying what is being waited on rather than a blank minute. And it says how
+it went — "Looked up the rig after 21s", or "The rig lookup ran out of time
+after 120s — designed from memory instead", in the log and in the conversation.
+
+A tone built without the lookup is still a tone worth having. It is not a tone
+worth mistaking for a researched one, which is what happened here.
+
 ## 7.183.0
 
 **The songs get looked up too, not just the band.** The lookup added last

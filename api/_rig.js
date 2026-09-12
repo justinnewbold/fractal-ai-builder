@@ -49,10 +49,19 @@
  */
 
 /**
- * Long enough to look up a band and then each song it picked, short enough
- * that a lookup which is not going to answer does not hold up the design.
+ * Long enough to look up a band and then each song it picked.
+ *
+ * Sixty seconds was not, and the failure was invisible: on a real run this
+ * aborted at exactly sixty seconds, returned null, and the design went ahead
+ * on memory — coming back on a Peavey 6505 with a summary confidently calling
+ * it "Barry Stock's actual 5150/6505 tone", which is not a thing any source
+ * says. From the log that looked identical to a lookup that had never run.
+ *
+ * Eight songs is eight lookups and then a summary; two minutes is the budget
+ * that fits, inside the route's own 300-second ceiling and the client's 240.
+ * See `why` below — whatever this costs, what it did is now said out loud.
  */
-const RIG_TIMEOUT_MS = 60000
+const RIG_TIMEOUT_MS = 120000
 
 /** What comes back is a briefing for a prompt, not a document. */
 const MAX_CHARS = 8000
@@ -148,12 +157,19 @@ export async function researchRig({
   webSearch,
   signal
 } = {}) {
+  const began = Date.now()
   const asked = typeof description === 'string' ? description.trim() : ''
-  if (!asked || !model || typeof generateText !== 'function' || !webSearch) return null
+  if (!asked || !model || typeof generateText !== 'function' || !webSearch) {
+    return { rig: null, why: 'off', ms: 0 }
+  }
   const wanted = Number.isInteger(songs) && songs > 0 ? Math.min(songs, 8) : 0
 
   const control = new AbortController()
-  const timer = setTimeout(() => control.abort(), RIG_TIMEOUT_MS)
+  let ranOut = false
+  const timer = setTimeout(() => {
+    ranOut = true
+    control.abort()
+  }, RIG_TIMEOUT_MS)
   const stop = () => control.abort()
   signal?.addEventListener?.('abort', stop)
 
@@ -173,15 +189,38 @@ export async function researchRig({
       abortSignal: control.signal,
       messages: [{ role: 'user', content: asked }]
     })
-    return cleanRig(res?.text)
+    const rig = cleanRig(res?.text)
+    return { rig, why: rig ? 'found' : 'none', ms: Date.now() - began }
   } catch {
-    // Offline, no credit, a search that would not answer, or simply slow. The
-    // design goes ahead without it, which is what it did before this existed.
-    return null
+    /*
+     * Offline, no credit, a search that would not answer, or simply slow. The
+     * design goes ahead without it, which is what it did before this existed —
+     * but it no longer goes ahead in silence. A timed-out lookup and a lookup
+     * that never ran produced the same empty log line, and the difference
+     * between them is the difference between "raise the budget" and "check the
+     * key": one real run cost a whole round trip to tell apart.
+     */
+    return { rig: null, why: ranOut ? 'timeout' : 'failed', ms: Date.now() - began }
   } finally {
     clearTimeout(timer)
     signal?.removeEventListener?.('abort', stop)
   }
+}
+
+/**
+ * What the lookup did, in words, for the log and for the progress line.
+ *
+ * Deliberately says the timeout out loud rather than folding it in with the
+ * other empty answers: a tone built from memory because a search was killed
+ * mid-way is a tone somebody should know was built from memory.
+ */
+export function rigOutcome({ why, ms } = {}) {
+  const secs = Number.isFinite(ms) && ms > 0 ? ` after ${Math.round(ms / 1000)}s` : ''
+  if (why === 'found') return `Looked up the rig${secs}`
+  if (why === 'none') return 'Nothing named to look up'
+  if (why === 'timeout') return `The rig lookup ran out of time${secs} — designed from memory instead`
+  if (why === 'failed') return `The rig lookup failed${secs} — designed from memory instead`
+  return 'The rig lookup is not configured here'
 }
 
 /**

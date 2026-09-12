@@ -5379,7 +5379,7 @@ test('a request that names no music costs nothing, and a rig that comes back is 
    * Grace came back built on a Peavey and a Mesa, from a band who play Diezels
    * and modded Marshalls into ENGLs, all three of which this unit models.
    */
-  const { cleanRig, rigInstruction, researchRig } = rigMod
+  const { cleanRig, rigInstruction, researchRig, rigOutcome } = rigMod
 
   /* NONE means nothing, and a model that says NONE and then explains itself
      must not have the explanation read as a rig. */
@@ -5402,8 +5402,19 @@ test('a request that names no music costs nothing, and a rig that comes back is 
   /* Never costs anything for a request with no music in it, and never fails a
      generation: a search that throws is a tone designed the old way, not a
      tone nobody gets. */
-  assert.equal(await researchRig({}), null, 'an empty request went looking')
-  assert.equal(await researchRig({ description: 'warm blues lead' }), null, 'no model, no search')
+  assert.deepEqual(await researchRig({}), { rig: null, why: 'off', ms: 0 })
+  assert.equal((await researchRig({ description: 'warm blues lead' })).rig, null, 'no model, no search')
+
+  /*
+   * What it did, said out loud.
+   *
+   * A lookup that was killed at its own timeout and a lookup that never ran
+   * produced the same empty log line — and on a real run the first one
+   * happened, the design fell back to memory, and the tone came back on a
+   * Peavey calling itself the band's own amp with nothing anywhere saying the
+   * search had been cut off. The difference between those two is the
+   * difference between raising a budget and checking a key.
+   */
   const thrown = await researchRig({
     description: 'three days grace',
     model: {},
@@ -5412,7 +5423,14 @@ test('a request that names no music costs nothing, and a rig that comes back is 
       throw new Error('no credit')
     }
   })
-  assert.equal(thrown, null, 'a failed lookup took the generation down with it')
+  assert.equal(thrown.rig, null, 'a failed lookup took the generation down with it')
+  assert.equal(thrown.why, 'failed')
+  assert.match(rigOutcome(thrown), /designed from memory/)
+  assert.match(rigOutcome({ why: 'timeout', ms: 120000 }), /ran out of time/)
+  assert.match(rigOutcome({ why: 'timeout', ms: 120000 }), /120s/)
+  assert.match(rigOutcome({ why: 'found', ms: 21000 }), /Looked up the rig after 21s/)
+  assert.match(rigOutcome({ why: 'none' }), /Nothing named/)
+  assert.match(rigOutcome({ why: 'off' }), /not configured/)
 
   let sawTool = false
   let sawSystem = ''
@@ -5429,7 +5447,9 @@ test('a request that names no music costs nothing, and a rig that comes back is 
     }
   })
   assert.ok(sawTool, 'the lookup ran without a search tool, which is just memory again')
-  assert.match(found, /Diezel VH4/)
+  assert.equal(found.why, 'found')
+  assert.match(found.rig, /Diezel VH4/)
+  assert.ok(Number.isFinite(found.ms), 'how long it took is not recorded')
 
   /*
    * The songs are looked up, not left to the designer's memory.
@@ -5469,6 +5489,49 @@ test('a request that names no music costs nothing, and a rig that comes back is 
   const asScenes = rigInstruction('SONGS\n  SONG: Riot')
   assert.match(asScenes, /those are your scenes/)
   assert.match(asScenes, /Voice each\s+one from ITS OWN lines/)
+})
+
+test('the lookup happens inside the stream, under the heartbeat, and says how it went', () => {
+  /*
+   * It used to be awaited before the stream opened. On a real run it spent
+   * sixty seconds, hit its own timeout, returned nothing and the design went
+   * ahead on memory — and the phone saw not one byte for the whole minute,
+   * because the hello comes after. first-output at 60464ms against a 60000ms
+   * cap is the whole story, and nothing else in the log told it.
+   */
+  const route = readSrc(new URL('../api/generate.js', import.meta.url), 'utf8')
+
+  // Deferred, not awaited where it used to be.
+  assert.match(route, /const lookUpRig = \(\) =>/)
+  assert.ok(
+    route.indexOf("send({ type: 'open' })") < route.indexOf('await lookUpRig()'),
+    'the lookup runs before the hello, so the wait is a dead pipe again'
+  )
+  assert.ok(
+    route.indexOf('let beating = setInterval') < route.indexOf('await lookUpRig()'),
+    'the lookup runs outside the heartbeat, so nothing proves the far end is alive'
+  )
+  // Announced both ways: what is being waited on, and how it went.
+  assert.match(route, /send\(\{ type: 'rig', state: 'looking' \}\)/)
+  assert.match(route, /send\(\{ type: 'rig', state: found\.why[\s\S]{0,80}rigOutcome\(found\)/)
+  // And the prompt is built from what came back, not from a value fixed earlier.
+  assert.match(route, /const args = argsWith\(found\.rig\)/)
+
+  /* The client must read that frame above `answering`: below it, the frame
+     would swap the ninety-second first-token budget for the forty-five-second
+     dead-stream one while the lookup is still running. */
+  const client = readSrc(new URL('../src/lib/stream.js', import.meta.url), 'utf8')
+  assert.ok(
+    client.indexOf("frame.type === 'rig'") < client.indexOf('answering = true'),
+    'a rig frame counts as the model answering, which halves the clock it needs'
+  )
+  assert.match(client, /note\('rig', \{ ms: since\(\), state: frame\.state/)
+
+  /* And a tone built from memory says so where the person is looking, not
+     only in the log. */
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  assert.match(app, /e\.state === 'timeout' \|\| e\.state === 'failed'/)
+  assert.match(app, /built on what the model already knew/)
 })
 
 test('the songs looked up and the scenes built are the same number', async () => {
