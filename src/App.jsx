@@ -188,7 +188,7 @@ import {
   newChatId,
   worthKeeping
 } from './lib/chatLog'
-import { sceneChoices, scenesAskedFor, songsWanted } from '../api/_scenes.js'
+import { keepsName, sceneChoices, sceneNumbers, scenesAskedFor, songsWanted } from '../api/_scenes.js'
 import SceneFit from './components/SceneFit'
 import { scenesOverflowing, fitScenes, describeFit } from './lib/sceneFit'
 import { pushEntry, replaceEntry } from './lib/nav'
@@ -2440,6 +2440,8 @@ export default function App() {
           device,
           blocks: schema,
           sceneNames,
+          // So one scene asked for lands where the player is standing.
+          activeScene: scene,
           previous: previous || null,
           mode: previous ? 'refine' : 'design',
           // Only when someone has asked to see it — see lib/devtrace.js.
@@ -2835,11 +2837,21 @@ export default function App() {
       const named = scenesAskedFor(description, sceneCount)
       if (named) opts = { ...opts, ...named }
     }
+    /* "Do not create a preset name" — read from the words, so the rename box
+       starts unticked rather than ticked with a name nobody asked for. */
+    if (opts.keepName === undefined && keepsName(description)) opts = { ...opts, keepName: true }
     /*
      * Ask once, before the model runs. Asking afterwards would mean paying for
      * a second generation to act on the answer.
+     *
+     * Asked whenever the words did not say. This used to ask only on a preset
+     * with nothing laid out, and on every other preset the count was left to
+     * the model — which is how "a full Tool rig" came back with four scenes
+     * and nobody was consulted. "If it doesn't understand how many scenes to
+     * create, it can pull up a question box and ask." One tap, and a number
+     * in the request skips it entirely.
      */
-    if (opts.wantScenes === undefined && sceneCount > 1 && nothingLaidOut()) {
+    if (opts.wantScenes === undefined && sceneCount > 1) {
       setSceneAsk({ description, against })
       return
     }
@@ -2851,7 +2863,7 @@ export default function App() {
     keep(shelved())
     setResult(null)
     setWithScenes(false)
-    setRenamePreset(true)
+    setRenamePreset(!opts.keepName)
     setApplied(null)
     /*
      * Reading a whole preset over the relay is as long as writing one and just
@@ -4096,7 +4108,10 @@ export default function App() {
          * rather than from the chat model's retelling of it — a count that
          * survives one rewrite may not survive the next.
          */
-        const scenesWanted = scenesAskedFor(instruction, sceneCount) || {}
+        const scenesWanted = {
+          ...(scenesAskedFor(instruction, sceneCount) || {}),
+          ...(keepsName(instruction) ? { keepName: true } : {})
+        }
         if (builtBlocks) {
           setResult(null)
           await generate(design.text || instruction, builtBlocks, scenesWanted)
@@ -5869,13 +5884,15 @@ export default function App() {
       <Sheet
         open={!!sceneAsk}
         onClose={() => setSceneAsk(null)}
-        title="How many sounds?"
-        note="Nothing in this preset is named yet"
+        title="How many scenes?"
+        note={`This ${device?.short || device?.name || 'unit'} holds ${sceneCount}`}
       >
         <div className="scene-ask">
           <p className="hint">
-            This preset has no scenes set up, so there is nothing here to write over. What are you
-            building?
+            {nothingLaidOut()
+              ? 'This preset has no scenes set up, so there is nothing here to write over. '
+              : 'The request did not say how many, so nothing has been assumed. '}
+            What are you building? Say a number in the request next time and this is not asked.
           </p>
           {/*
             The options come from the unit, not from this file. A set used to
@@ -5903,6 +5920,26 @@ export default function App() {
               <span className="hint">{choice.hint}</span>
             </button>
           ))}
+          {/* Every number in between, one tap each. "Anywhere from 1 to 8
+              depending on what the user asked for." */}
+          {sceneNumbers(sceneCount).length ? (
+            <div className="scene-ask-numbers">
+              <span className="hint">Or exactly</span>
+              {sceneNumbers(sceneCount).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => {
+                    const ask = sceneAsk
+                    setSceneAsk(null)
+                    generate(ask.description, ask.against, { wantScenes: true, sceneBudget: n })
+                  }}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       </Sheet>
 

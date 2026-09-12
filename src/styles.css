@@ -7758,6 +7758,23 @@ button.topbar-preset.open .topbar-caret {
   opacity: 0.75;
 }
 
+/* The exact counts, in a row: small square buttons after the three big ones. */
+.scene-ask-numbers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.scene-ask .scene-ask-numbers button {
+  width: auto;
+  min-width: 44px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s-2) var(--s-3);
+}
+
 /*
  * Which sounds come across, when a tone holds more of them than the unit does.
  * A tick list rather than two buttons, because the answer is a set and not a

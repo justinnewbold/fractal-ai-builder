@@ -5918,8 +5918,8 @@ test('a number asked for is clamped to the scenes the unit actually has', () => 
   // only spends a generation on scenes that cannot exist.
   assert.equal(sceneBudgetFor(8, 4), 4, 'an AM4 was asked for eight scenes')
   assert.equal(sceneBudgetFor(3, 8), 3)
-  // A set of one is not a set — that answer is the other button.
-  assert.equal(sceneBudgetFor(1, 8), null)
+  // One is a number: "a single scene" is one named scene, not nothing asked.
+  assert.equal(sceneBudgetFor(1, 8), 1)
   assert.equal(sceneBudgetFor(0, 8), null)
   assert.equal(sceneBudgetFor(-2, 8), null)
   assert.equal(sceneBudgetFor(null, 8), null)
@@ -5929,7 +5929,7 @@ test('a number asked for is clamped to the scenes the unit actually has', () => 
 })
 
 test('a number the player chose overrides the rule that says three or four', () => {
-  const { sceneInstruction } = scenesMod
+  const { sceneInstruction, songsWanted } = scenesMod
 
   /*
    * Rule 11 — "three or four well-judged scenes beat eight" — is a good
@@ -5957,6 +5957,51 @@ test('a number the player chose overrides the rule that says three or four', () 
 
   // And a budget past the unit's count is spoken in the unit's terms.
   assert.match(sceneInstruction({ wantScenes: true, sceneBudget: 8, sceneCount: 4 }), /EXACTLY 4 SCENES/)
+
+  /*
+   * One scene, named, where the player is standing. "Make a single scene
+   * modeled after Master of Puppets" came back with four; one was refused as
+   * "not a set" and the request fell through to the model's own judgement.
+   */
+  const one = sceneInstruction({ wantScenes: true, sceneBudget: 1, sceneCount: 8, activeScene: 2 })
+  assert.match(one, /EXACTLY ONE SCENE/)
+  assert.match(one, /at index 2/, 'one scene does not land on the scene the player is in')
+  assert.match(one, /do not return an empty scenes array/, 'one scene is confused with one sound')
+  assert.match(sceneInstruction({ wantScenes: true, sceneBudget: 1, sceneCount: 8 }), /at index 0/)
+  assert.equal(songsWanted({ wantScenes: true, sceneBudget: 1, sceneCount: 8 }), 1)
+})
+
+test('the question offers every count in between, and the words can say no rename', () => {
+  const { sceneNumbers, keepsName, scenesAskedFor } = scenesMod
+  // One is the first button, eight is the third; everything between is a tap.
+  assert.deepEqual(sceneNumbers(8), [2, 3, 4, 5, 6, 7])
+  // An AM4 offers no "All 4" button, so four is offered here instead.
+  assert.deepEqual(sceneNumbers(4), [2, 3, 4])
+  assert.deepEqual(sceneNumbers(1), [])
+
+  // The two requests from the screenshot.
+  assert.deepEqual(
+    scenesAskedFor('Make a single scene modeled after Master of Puppets by Metallica. Do not create a preset name.', 8),
+    { wantScenes: true, sceneBudget: 1 }
+  )
+  assert.ok(keepsName('Make a single scene modeled after Master of Puppets by Metallica. Do not create a preset name.'))
+  assert.deepEqual(scenesAskedFor('Make a full “Tool” rig', 8), { wantScenes: true, sceneBudget: 8 })
+  assert.deepEqual(scenesAskedFor('Make a full “Tool” rig', 4), { wantScenes: true, sceneBudget: 4 })
+  assert.deepEqual(scenesAskedFor('max out the scenes', 8), { wantScenes: true, sceneBudget: 8 })
+
+  // One scene is named; one sound is not.
+  assert.deepEqual(scenesAskedFor('one scene for Creeping Death', 8), { wantScenes: true, sceneBudget: 1 })
+  assert.equal(scenesAskedFor('just one sound', 8).wantScenes, false)
+  assert.equal(scenesAskedFor('a single sound', 8).wantScenes, false)
+
+  assert.ok(keepsName("don't rename the preset"))
+  assert.ok(keepsName('keep the preset name'))
+  assert.ok(keepsName('leave the name alone'))
+  assert.ok(keepsName('no new preset name'))
+  assert.ok(!keepsName('name it Puppets'))
+  assert.ok(!keepsName('a Master of Puppets tone'))
+  assert.ok(!keepsName(''))
+  assert.ok(!keepsName(null))
 })
 
 test('a number of scenes in the request itself is read, not asked for or guessed', () => {
@@ -5999,8 +6044,10 @@ test('a number of scenes in the request itself is read, not asked for or guessed
 
   // One is the other button.
   assert.equal(scenesAskedFor('one sound', 8).wantScenes, false)
-  assert.equal(scenesAskedFor('just one scene', 8).wantScenes, false)
-  assert.equal(scenesAskedFor('a single scene', 8).wantScenes, false)
+  // One scene is one named scene, not the "one sound" button.
+  assert.deepEqual(scenesAskedFor('just one scene', 8), { wantScenes: true, sceneBudget: 1 })
+  assert.deepEqual(scenesAskedFor('a single scene', 8), { wantScenes: true, sceneBudget: 1 })
+  assert.deepEqual(scenesAskedFor('1 scene', 8), { wantScenes: true, sceneBudget: 1 })
 
   // Naming a scene is not naming a count; neither is a plain tone.
   assert.equal(scenesAskedFor('make the lead scene brighter', 8), null)
@@ -6076,7 +6123,7 @@ test('the question and the instruction share one idea of "all of them"', () => {
    * imported by both.
    */
   const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
-  assert.match(app, /import \{ sceneChoices, scenesAskedFor, songsWanted \} from '\.\.\/api\/_scenes\.js'/)
+  assert.match(app, /import \{ keepsName, sceneChoices, sceneNumbers, scenesAskedFor, songsWanted \} from '\.\.\/api\/_scenes\.js'/)
   assert.match(app, /sceneChoices\(sceneCount\)\.map/, 'the sheet hardcodes its own options again')
   assert.ok(
     !/A set of scenes/.test(app),
