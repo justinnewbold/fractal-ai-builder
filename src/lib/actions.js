@@ -259,16 +259,18 @@ export function validatePlan(plan, blocks, capabilities) {
    * Whether the unit is being driven over the relay rather than from the Mac
    * it is plugged into.
    *
-   * Two of the actions below reach routes the host refuses from a distance —
-   * see REMOTE_FORBIDDEN in shared/relay-rules.mjs. Proposing one anyway meant
-   * a plan that applied a whole tone and then failed on the step that would
-   * have kept it, reported afterwards as one line among the successes. A tone
-   * you can hear and did not keep reads as "it worked", right up until the
-   * next preset change takes it away.
+   * One action below reaches a route the host refuses from a distance — see
+   * REMOTE_FORBIDDEN in shared/relay-rules.mjs. Proposing it anyway meant a
+   * plan that applied a whole tone and then failed on the step that would have
+   * kept it, reported afterwards as one line among the successes. A tone you
+   * can hear and did not keep reads as "it worked", right up until the next
+   * preset change takes it away.
    *
-   * So they are refused while the plan is still a proposal, in words, before
-   * anything is written. The save the manual button does over the relay is a
-   * different mechanism (parkSave — the Mac carries it out) and is untouched.
+   * So it is refused while the plan is still a proposal, in words, before
+   * anything is written. Saving to a slot used to be refused here too and is
+   * not any more: it goes the way the manual button has always gone over the
+   * relay — parkSave, and the Mac carries it out. Backing up to a file is the
+   * one left, and it writes a file onto whichever machine asked for it.
    */
   const remote = capabilities?.remote === true
 
@@ -624,19 +626,47 @@ export function validatePlan(plan, blocks, capabilities) {
       case 'savePreset': {
         const number = raw.value
         if (!need(Number.isInteger(number) && number >= 0, `${number} isn't a slot number.`)) break
-        if (
-          !need(
-            !remote,
-            `Saving to a slot only works at the Mac, so slot ${number} was left alone.`
-          )
-        )
-          break
         const name = (raw.text || '').trim().slice(0, 31)
+        /*
+         * From the phone, the Mac does the writing.
+         *
+         * The host refuses a slot write over the relay and that refusal is
+         * worth keeping — but the Save button has never been stopped by it: it
+         * parks the request in the host's document store, which the relay does
+         * allow, and the page at the Mac carries it out where writing was
+         * always permitted. Asking for the same thing in words was refused
+         * outright, which is the app telling somebody it cannot do a thing it
+         * does by hand on the next screen along. "Please make it so that
+         * anything can be saved from the phone. It's kind of the whole purpose
+         * of this."
+         *
+         * So this is the button's own mechanism, reached by saying it.
+         */
+        if (remote) {
+          const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+          actions.push({
+            ...raw,
+            label: name
+              ? `Ask the Mac to save "${name}" to slot ${number}`
+              : `Ask the Mac to save to slot ${number}`,
+            // Overwrites whatever is in that slot, so it asks first — the Mac
+            // being the one holding the pen changes nothing about that.
+            destructive: true,
+            /*
+             * What the Mac was asked for, so the caller can watch for the
+             * answer. Parking is the whole of this action; whether it landed
+             * is decided minutes later on another machine, and without
+             * something to watch, "asked" would never become "done" here. See
+             * queuedSave in App.
+             */
+            parksSave: { id, slot: number, name },
+            run: async () => (await device()).parkSave({ id, slot: number, name })
+          })
+          break
+        }
         actions.push({
           ...raw,
-          label: name
-            ? `Save "${name}" to slot ${number}`
-            : `Save to slot ${number}`,
+          label: name ? `Save "${name}" to slot ${number}` : `Save to slot ${number}`,
           // Overwrites whatever is in that slot, so it asks first.
           destructive: true,
           run: async () => {
@@ -698,6 +728,16 @@ export function validatePlan(plan, blocks, capabilities) {
        * folder is not a loss.
        */
       case 'keepInLibrary': {
+        /*
+         * Same refusal as backupPreset, and for the same two reasons at once:
+         * it asks the unit for a dump, which the host will not send over the
+         * relay, and it writes into a folder chosen with the picker, which a
+         * phone does not have. Proposed anyway, it failed at the end of a plan
+         * that had already applied everything else — the one shape this guard
+         * exists to stop.
+         */
+        if (!need(!remote, 'Keeping a preset as a file only works at the Mac, where the folder is.'))
+          break
         const name = (raw.text || '').trim().slice(0, 60)
         actions.push({
           ...raw,

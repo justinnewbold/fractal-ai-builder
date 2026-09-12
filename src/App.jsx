@@ -3946,8 +3946,9 @@ export default function App() {
         ...(device?.capabilities || {}),
         activeScene: scene,
         sceneNames,
-        // Over the relay the host refuses a slot write and a backup, so the
-        // plan must not propose either. See validatePlan's `remote`.
+        // Over the relay the host refuses a backup, so the plan must not
+        // propose one — and a slot write goes the way the Save button's does,
+        // parked for the Mac to carry out. See validatePlan's `remote`.
         remote: remoteActive()
       })
       record(
@@ -4059,6 +4060,28 @@ export default function App() {
        * as refused. In the debug log, which is where a session is read back.
        */
       const landed = landedOf(actions, failures)
+      /*
+       * A save the Mac was asked to carry out, now that it has been asked.
+       *
+       * Parking is all the action itself can do — whether it landed is decided
+       * on another machine a few seconds later. This is the same watcher the
+       * Save button's parked save uses, so "asked the Mac" becomes "the Mac
+       * saved it" in the one place either route would say it.
+       */
+      const parked = landed.find((a) => a.parksSave)?.parksSave
+      if (parked) {
+        setQueuedSave({
+          id: parked.id,
+          slot: parked.slot,
+          name: parked.name || preset?.name || '',
+          /*
+           * Carried with the request rather than read back later: an AM4 will
+           * not dump a preset over the relay, so when the Mac says this landed
+           * this is the only description of that slot the phone will have.
+           */
+          scenes: Array.isArray(sceneNames) ? [...sceneNames] : []
+        })
+      }
       record(
         'edit',
         landed.length === actions.length
