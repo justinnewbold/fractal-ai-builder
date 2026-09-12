@@ -200,7 +200,7 @@ export function validateSpec(spec, schema, sceneCount = 8, channelNames = ['A', 
      * tone missed because this preset has no delay in it".
      */
     wanted: wantedBlocks(spec.wanted),
-    scenes: validateScenes(spec.scenes, schema, problems, sceneCount, channelNames),
+    scenes: validateScenes(spec.scenes, schema, problems, sceneCount, channelNames, changes),
     problems,
     repairs
   }
@@ -237,11 +237,41 @@ function wantedBlocks(list) {
  * of what is on and the hardware is told what is off — the inversion is the
  * part worth doing once, here, rather than at every call site.
  */
-function validateScenes(scenes, schema, problems, sceneCount = 8, channelNames = ['A', 'B', 'C', 'D']) {
+function validateScenes(
+  scenes,
+  schema,
+  problems,
+  sceneCount = 8,
+  channelNames = ['A', 'B', 'C', 'D'],
+  changes = []
+) {
   if (!Array.isArray(scenes) || !scenes.length) return []
   const placed = schema.map((b) => b.eid)
   const known = new Set(placed)
   const byEid = new Map(schema.map((b) => [b.eid, b]))
+  /*
+   * Which channels of each block this build dials, for the blocks it dials any
+   * channel of at all.
+   *
+   * A scene does not carry a sound — it points at one. A build that puts the
+   * rhythm on channel A and the lead on B, and then sends two of its four
+   * scenes to C and D, has pointed those scenes at channels it never wrote:
+   * they play whatever was lying on that channel in the preset underneath,
+   * which is nothing anybody designed and can be nothing at all. "Two of the
+   * four generated scenes had no sound whatsoever."
+   *
+   * Only for blocks this build moves. A preset can have channels dialled by
+   * hand months ago and this cannot see them — reading a block reads the
+   * channel it is on and no other — so a scene naming a channel of a block
+   * this build leaves alone is the only word on the subject and is taken at it.
+   * The contradiction is worth acting on; the silence is not.
+   */
+  const dialled = new Map()
+  for (const change of changes) {
+    if (change?.channel === undefined) continue
+    if (!dialled.has(change.eid)) dialled.set(change.eid, new Set())
+    dialled.get(change.eid).add(change.channel)
+  }
   const out = []
   const seen = new Set()
 
@@ -297,6 +327,25 @@ function validateScenes(scenes, schema, problems, sceneCount = 8, channelNames =
       }
       if (!channelNames.includes(wanted)) {
         problems.push(`Scene ${index + 1}: no channel "${entry.channel}" on this unit — ignored.`)
+        continue
+      }
+      /*
+       * A channel this build dialled nothing on, on a block it dialled others
+       * of. The scene is put on one it did build instead — the channel the
+       * block is already on when that is one of them, so the scene lands on
+       * the sound the preset is written around rather than on whatever was
+       * lying where it pointed. Said out loud either way: a scene playing the
+       * wrong sound is a complaint, and a scene playing nothing is a gig.
+       */
+      const built = dialled.get(block.eid)
+      if (built && !built.has(wanted)) {
+        const home = String(block.channel || '').trim().toUpperCase()
+        const instead = built.has(home) ? home : [...built][0]
+        problems.push(
+          `Scene ${index + 1}: ${block.name || block.slug} was sent to channel ${wanted}, ` +
+            `which this tone never dialled — it plays channel ${instead} instead.`
+        )
+        channelFor.set(block.eid, instead)
         continue
       }
       channelFor.set(block.eid, wanted)

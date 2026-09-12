@@ -2297,6 +2297,63 @@ test('a scene carries the channel it plays, block by block', () => {
   )
 })
 
+test('a scene cannot be sent to a channel this tone never dialled', () => {
+  /*
+   * "Two of the four generated scenes had no sound whatsoever."
+   *
+   * A scene does not carry a sound, it points at one. A build that dials the
+   * rhythm on channel A and the lead on B, and then sends two of its four
+   * scenes to C and D, has pointed them at channels it never wrote — they play
+   * whatever was lying there in the preset underneath, which is nothing
+   * anybody designed and can be nothing at all.
+   */
+  const r = validateSpec(
+    {
+      blocks: [
+        { eid: 58, channel: 'A', params: [] },
+        { eid: 58, channel: 'B', params: [] }
+      ],
+      scenes: [
+        { index: 0, name: 'Verse', engaged: [58, 106], channels: [{ eid: 58, channel: 'A' }] },
+        { index: 1, name: 'Lead', engaged: [58, 106], channels: [{ eid: 58, channel: 'B' }] },
+        { index: 2, name: 'Solo', engaged: [58, 106], channels: [{ eid: 58, channel: 'C' }] }
+      ]
+    },
+    sceneSchema,
+    8
+  )
+  const amp = (i) => r.scenes[i].blocks.find((b) => b.eid === 58)
+  assert.equal(amp(0).channel, 'A', 'a channel this tone dialled is played')
+  assert.equal(amp(1).channel, 'B')
+  assert.equal(amp(2).channel, 'A', 'the scene was left on a channel nobody built')
+  assert.match(r.problems.join(' '), /never dialled/)
+
+  /*
+   * Only for a block this build moves. A preset can have channels dialled by
+   * hand months ago and this cannot see them — reading a block reads the
+   * channel it is on and no other — so a scene naming a channel of a block
+   * this build leaves alone is the only word on the subject and is taken at it.
+   */
+  const untouched = scened([
+    { index: 0, name: 'Rhythm', engaged: [58, 106], channels: [{ eid: 58, channel: 'A' }] },
+    { index: 1, name: 'Lead', engaged: [58, 106], channels: [{ eid: 58, channel: 'D' }] }
+  ])
+  assert.equal(untouched.scenes[1].blocks.find((b) => b.eid === 58).channel, 'D')
+  assert.deepEqual(untouched.problems, [])
+
+  /* When the channel a block sits on is not one this build dialled either, the
+     scene goes to one that was — never to the one nobody wrote. */
+  const away = validateSpec(
+    {
+      blocks: [{ eid: 58, channel: 'B', params: [] }],
+      scenes: [{ index: 0, name: 'Lead', engaged: [58, 106], channels: [{ eid: 58, channel: 'C' }] }]
+    },
+    sceneSchema,
+    8
+  )
+  assert.equal(away.scenes[0].blocks.find((b) => b.eid === 58).channel, 'B')
+})
+
 test('a scene channel the unit cannot honour is dropped, not sent', () => {
   const r = scened([
     {
@@ -4478,6 +4535,21 @@ test('a generated scene plan writes its names down too', () => {
   const call = app.slice(app.indexOf('await applyScenes('), app.indexOf('failures.push(...sceneFailures)'))
   assert.match(call, /result\.scenes,/)
   assert.match(call, /preset\?\.number \?\? null/, 'the slot never reaches the thing that writes the names down')
+
+  /*
+   * And the scenes go on LAST.
+   *
+   * Which channel a block is on is part of the scene, not of the block, and
+   * verifyChanges ends by putting every block back on the channel the write
+   * pass left it on. Run after the scenes, that landed in whichever scene the
+   * player was returned to and overwrote what the plan had just written for it
+   * — one scene came out with every block on the last channel dialled rather
+   * than the one it was designed to play.
+   */
+  assert.ok(
+    app.indexOf('const mismatches = await verifyChanges(') < app.indexOf('await applyScenes('),
+    'the check runs after the scenes and moves blocks off the channels they play'
+  )
 
   // And a save records them under the slot the buffer just became — the one
   // moment the answer is certain, and the moment the report was about.
