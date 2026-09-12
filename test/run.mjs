@@ -1948,6 +1948,48 @@ test('a server that never comes up does not take the launcher with it', async ()
   assert.equal(unit.calls.length, 3)
 })
 
+test('the debug report carries the Mac’s own account of its port', async () => {
+  /*
+   * "port not open" on the phone, live tuner readings at the same time, a
+   * preset change that reached the unit — and nothing to read on the Mac,
+   * whose server's stdout goes nowhere when the app is opened from the
+   * Finder. The Copy log button now asks the Mac's server how it is (its
+   * /diag: port open or not, the last ten times it lost the port and why,
+   * its last lines) and puts that under the log.
+   */
+  const { formatMacDiag } = await import('../src/lib/debugLog.js')
+  const out = formatMacDiag({
+    transportOpen: false,
+    transportLabel: '/dev/cu.usbmodem1019',
+    resolved: { transport: 'serial', id: '/dev/cu.usbmodem1019' },
+    ports: { serial: [{ id: '/dev/cu.usbmodem1019', fractal: true }, { id: '/dev/cu.Bluetooth', fractal: false }] },
+    detected: true,
+    profile: { key: 'fm3' },
+    telemetryMode: 'reduced',
+    uptime: 601,
+    traffic: { txMsgs: 40, rxMsgs: 38, since: '2026-09-12T15:00:00.000Z' },
+    reopens: [{ at: '2026-09-12T15:34:10.000Z', label: '/dev/cu.usbmodem1019', reason: 'the device went away (Disconnected)' }],
+    recent: ['2026-09-12T15:34:10.000Z warn [forgefx] serial /dev/cu.usbmodem1019 closed — the device went away (Disconnected)']
+  })
+  assert.match(out, /^MAC'S DEVICE SERVER/)
+  assert.match(out, /port to the unit: NOT OPEN · \/dev\/cu\.usbmodem1019/)
+  assert.match(out, /serial ports: \/dev\/cu\.usbmodem1019 \(Fractal\), \/dev\/cu\.Bluetooth/)
+  assert.match(out, /server up: 10 min/)
+  assert.match(out, /traffic: 40 sent, 38 received/)
+  assert.match(out, /port lost and reopened: 1 time\n  2026-09-12T15:34:10\.000Z \/dev\/cu\.usbmodem1019 — the device went away/)
+  assert.match(out, /server log, last 1 lines:\n2026-09-12T15:34:10\.000Z warn/)
+  // Nothing to say is nothing, not a heading over an empty list.
+  assert.equal(formatMacDiag(null), '')
+  assert.match(formatMacDiag({}), /port to the unit: NOT OPEN\nresolved: no unit found\nserial ports: none/)
+
+  const panel = readSrc(new URL('../src/components/DebugLog.jsx', import.meta.url), 'utf8')
+  assert.match(panel, /const t = text\(await macReport\(\)\)/, 'Copy log does not ask the Mac')
+  assert.match(panel, /formatMacDiag\(await serverDiag\(\)\)/)
+  assert.match(panel, /could not be asked/, 'a Mac that does not answer is not said so')
+  const fx = readSrc(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+  assert.match(fx, /export const serverDiag = \(\) => request\('\/diag'/, 'the diag has to travel the relay like every other GET, so a phone can ask')
+})
+
 test('the Mac app says which version it is, where the phone already looks', async () => {
   /*
    * A phone on today's web build against a Mac still running last week's
