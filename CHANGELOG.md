@@ -3,6 +3,18 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.179.1
+
+**The phone can tell the unit it isn't drawing meter bars again.** A player
+reported the audio cutting out for as long as the app was open and coming back
+the moment it was closed. Most of that was fixed a while ago, and the last
+piece was a route the Mac added specifically so a phone could say "I'm not
+showing a meter, stop reading them" — which this app then refused to send,
+because its own copy of the list of what may cross the relay had never been
+told about it. Every remote session since has logged "POST /telemetry/meters
+failed". The unit was doing four meter reads every tenth of a second, while
+making sound, for a bar nobody was looking at.
+
 ## 7.179.0
 
 **"Save this to slot 499" works from the phone now.** Asking for it in the chat

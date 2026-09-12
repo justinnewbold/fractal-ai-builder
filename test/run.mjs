@@ -3401,6 +3401,10 @@ test('the mirror agrees with the host about every route this app calls', () => {
           '/tuner',
           '/mod/bind',
           // Added to the host in the pinned fork — see desktop/forgefx.lock.json.
+          // Whether this client draws meter bars. Touches no preset and reaches
+          // no slot; it is what stops a phone costing the unit forty SysEx
+          // transactions a second while it is also making sound.
+          '/telemetry/meters',
           // Edit-buffer writes; putting anything in a slot is still refused.
           '/preset/name',
           '/scene/name'
@@ -3444,6 +3448,7 @@ test('the mirror agrees with the host about every route this app calls', () => {
     ['POST', '/scene'],
     ['POST', '/scene/name'],
     ['POST', '/tempo'],
+    ['POST', '/telemetry/meters'],
     ['POST', '/tempo/tap'],
     ['POST', '/tuner'],
     ['POST', '/version/1/load'],

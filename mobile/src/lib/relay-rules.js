@@ -53,6 +53,21 @@ export function hostAllows(method, p) {
       p === '/tempo' ||
       p === '/tempo/tap' ||
       p === '/tuner' ||
+      /*
+       * Whether this client is drawing meter bars.
+       *
+       * Added to the host on the pinned fork for a phone, and then missing
+       * from this mirror, so the one client it was built for was the one
+       * client refused it — "POST /telemetry/meters failed" on every remote
+       * session since. The supervisor starts its meter loop on the first
+       * listener and a phone opening the app is one, which at the balanced
+       * default is four output-meter round trips every 100ms at a unit that
+       * is also making sound: the audio cutting out for as long as the app is
+       * open and settling the moment it is closed. Saying "not drawing it"
+       * takes that to two reads every 800ms. It touches no preset and reaches
+       * no slot.
+       */
+      p === '/telemetry/meters' ||
       p === '/mod/bind' ||
       p === '/preset/name' ||
       p === '/scene/name' ||
