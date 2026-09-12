@@ -978,37 +978,6 @@ export default function App() {
    */
   sheetNow.current = sheet
   const sheetAlert = sheet && error && errorSheet === sheet ? error : null
-  /*
-   * A unit that has gone takes the sheet with it — once a READ says so too.
-   *
-   * A sheet is a surface over an inert page, so the notice explaining the
-   * failure was being drawn underneath a chain sheet that could not be
-   * reached, behind blocks still reading On. There is nothing to edit in a
-   * preset the app cannot reach: close it, and let the fault notice — the one
-   * screen in the app with a way back on it — actually be on screen.
-   *
-   * But one write is not evidence. "My Mac is connected just fine. The phone
-   * app says it has lost the unit." A single call can come back with the port
-   * shut while the next one is answered perfectly — the Mac's own screen is
-   * asking that same port several times a second — and tearing the whole app
-   * down to a red screen over one of those is how a working rig ends up
-   * looking like a broken one. So the claim is checked before it is acted on:
-   * a read, which sets the screen live again on its own if the unit answers,
-   * and only a read that fails too closes what is open. The re-reading loop
-   * below keeps asking after that, so a unit that comes back comes back.
-   */
-  useEffect(() => {
-    if (!lostUnit) return undefined
-    let live = true
-    read().then((fresh) => {
-      // read() has already set the screen: live if the unit answered, the
-      // fault notice if it did not. What is left is the sheet over it.
-      if (live && !fresh) setSheet(null)
-    })
-    return () => {
-      live = false
-    }
-  }, [lostUnit, read])
   /* Open a block's knobs, and remember what to return to. */
   const openBlockFrom = useCallback((id, from = null) => {
     setSelectedBlock(id)
@@ -1416,6 +1385,47 @@ export default function App() {
     }
     return fresh
   }, [])
+
+  /*
+   * Below read(), and that is not a matter of taste.
+   *
+   * A dependency array is evaluated DURING RENDER, so an effect that names
+   * `read` while `read` is a const declared further down the component throws
+   * on its temporal dead zone — before anything is drawn. Minified, that read
+   * as "Cannot access 'we' before initialization" over a blank page.
+   * Console.jsx carries the same warning about the same trap.
+   */
+  /*
+   * A unit that has gone takes the sheet with it — once a READ says so too.
+   *
+   * A sheet is a surface over an inert page, so the notice explaining the
+   * failure was being drawn underneath a chain sheet that could not be
+   * reached, behind blocks still reading On. There is nothing to edit in a
+   * preset the app cannot reach: close it, and let the fault notice — the one
+   * screen in the app with a way back on it — actually be on screen.
+   *
+   * But one write is not evidence. "My Mac is connected just fine. The phone
+   * app says it has lost the unit." A single call can come back with the port
+   * shut while the next one is answered perfectly — the Mac's own screen is
+   * asking that same port several times a second — and tearing the whole app
+   * down to a red screen over one of those is how a working rig ends up
+   * looking like a broken one. So the claim is checked before it is acted on:
+   * a read, which sets the screen live again on its own if the unit answers,
+   * and only a read that fails too closes what is open. The re-reading loop
+   * below keeps asking after that, so a unit that comes back comes back.
+   */
+  useEffect(() => {
+    if (!lostUnit) return undefined
+    let live = true
+    read().then((fresh) => {
+      // read() has already set the screen: live if the unit answered, the
+      // fault notice if it did not. What is left is the sheet over it.
+      if (live && !fresh) setSheet(null)
+    })
+    return () => {
+      live = false
+    }
+  }, [lostUnit, read])
 
   /**
    * What a reload does, without the reload.

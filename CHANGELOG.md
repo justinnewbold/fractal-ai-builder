@@ -3,6 +3,19 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.174.0
+
+**Fixes a blank page.** 7.173.0 shipped an app that could not draw at all: "The
+app couldn't draw — Cannot access 'we' before initialization", and nothing else
+on the screen.
+
+The check added in 7.173.0 — the one that asks the unit before believing a
+single failed write — listed `read` among the things it watches, and `read` is
+defined further down the same file. A watch list is read while the screen is
+being drawn, so it reached for something that did not exist yet and the whole
+app stopped there. The check now sits below the thing it watches. Nothing else
+changed.
+
 ## 7.173.0
 
 **The word beside the lamp is a whole word again.** "NO UN…", and "LOOKI…"
