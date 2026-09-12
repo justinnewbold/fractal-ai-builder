@@ -1928,6 +1928,32 @@ export function forgetPresetName(number) {
   }
 }
 
+/**
+ * Every name this unit was known by, dropped, so the next scan reads them all
+ * off the unit again. Returns how many were dropped.
+ *
+ * The list is only as right as the last time somebody looked. The app writes
+ * a name down at the moments it can see — a save it made, a slot it read —
+ * and nothing else ever touches the copy, so a preset stored from AM4-Edit
+ * or renamed at the front panel keeps its old name here for as long as the
+ * cache lives, which is for ever. "It's stale and stays that way for days."
+ * This is the way to say: what you have is wrong, go and look again.
+ *
+ * The short-route flags go too: they were learned against the same unit and
+ * a re-read should start from nothing, the way a first scan does.
+ */
+export function forgetAllPresetNames() {
+  restoreNames()
+  const had = nameCache.size
+  nameCache = new Map()
+  resetNameRoutes()
+  persistNames()
+  // The host copy is emptied as well, so a phone does not take the old names
+  // back off the Mac before the Mac has read the new ones.
+  publishNames()
+  return had
+}
+
 /** Whether this slot's name has been learned (a learned "empty" counts). */
 export function knowsName(number) {
   restoreNames()

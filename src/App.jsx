@@ -110,6 +110,7 @@ import {
   reportSave,
   readSaveResult,
   forgetPresetName,
+  forgetAllPresetNames,
   notePresetName,
   noteSceneNames,
   readSceneNames,
@@ -270,6 +271,16 @@ function keepSavedName(number, name) {
   const kept = (name || '').trim()
   if (kept) notePresetName(number, kept)
   else forgetPresetName(number)
+}
+
+/**
+ * The slot the unit says it is on, under the name it says it has. A buffer
+ * with no name is not evidence of anything and leaves the row alone.
+ */
+function noteLoadedName(p) {
+  if (typeof p?.number !== 'number') return
+  const kept = (p.name || '').trim()
+  if (kept) notePresetName(p.number, kept)
 }
 
 /**
@@ -924,6 +935,9 @@ export default function App() {
   // is what lets the app say "this is not saved yet" instead of leaving someone
   // to wonder whether they just overwrote a preset.
   const [dirty, setDirty] = useState(false)
+  // Read inside read(), which is built once and never sees state change.
+  const dirtyRef = useRef(false)
+  dirtyRef.current = dirty
   /*
    * Whether this preset has actually been saved from here.
    *
@@ -1302,6 +1316,16 @@ export default function App() {
       answered = true
       const [p, b] = await Promise.all([currentPreset(), presetBlocks()])
       setPreset(p)
+      /*
+       * The unit has just said which slot it is on and what that slot is
+       * called, in one answer. That is the one name in the list this app can
+       * be sure of, so it is written down — unless the buffer has been edited
+       * here, when the name on it may not be the name in the slot. Nothing
+       * else corrects a row for a preset stored from AM4-Edit or renamed at
+       * the front panel: "98 · 3DG Verse-Rhythm-Lead is loaded" over a list
+       * still reading 098 TIGHT MODERN, for days.
+       */
+      if (!dirtyRef.current) noteLoadedName(p)
       const list = Array.isArray(b) ? b : []
       setBlocks(list)
       setFaultReason(null)
@@ -4427,6 +4451,29 @@ export default function App() {
     readNames(true)
   }
 
+  /**
+   * Every name off the unit again, from nothing.
+   *
+   * ⟳ reads what has not been read; it cannot fix a name that was read and
+   * has since changed under it — a preset stored from AM4-Edit, a rename at
+   * the front panel. A running scan is stopped first and restarted from its
+   * end, because a run that has already walked past slot 98 would not come
+   * back for it.
+   */
+  const namesAgain = useRef(false)
+  const rereadNames = () => {
+    forgetAllPresetNames()
+    setSlots(cachedPresetNames())
+    namesHeld.current = false
+    const scan = nameScan.current
+    if (scan?.running) {
+      namesAgain.current = true
+      scan.stop()
+      return
+    }
+    readNames(true)
+  }
+
   useEffect(() => {
     if (status !== 'live') return undefined
     let gone = false
@@ -4466,6 +4513,11 @@ export default function App() {
         setScanProgress(null)
         setSlots(cachedPresetNames())
         publishNames()
+        // Stopped only to start over — see rereadNames.
+        if (namesAgain.current) {
+          namesAgain.current = false
+          readNames(true)
+        }
       }
     })
     scan.setHold(() => {
@@ -4780,6 +4832,7 @@ export default function App() {
         progress={scanProgress}
         onStop={stopNames}
         onScan={scanPresets}
+        onReread={rereadNames}
         onSelect={(n) => {
           jumpTo(n)
           setPresetMenu(false)
@@ -5648,6 +5701,7 @@ export default function App() {
           progress={scanProgress}
           onStop={stopNames}
           onScan={scanPresets}
+          onReread={rereadNames}
           onSelect={(n) => {
             jumpTo(n)
             setSheet(null)

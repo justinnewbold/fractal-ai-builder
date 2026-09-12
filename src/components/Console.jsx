@@ -246,6 +246,7 @@ export function PresetList({
   onSelect,
   onScan,
   onStop,
+  onReread,
   scanning,
   progress,
   deviceSlots,
@@ -671,6 +672,24 @@ export function PresetList({
       {deviceSlots && named.length ? (
         <p className="hint pad">
           {named.length} of {deviceSlots} named
+          {/*
+            The list is only as right as the last time it looked. ⟳ reads
+            what has never been read; this forgets the lot and reads it all
+            again, for a slot stored from AM4-Edit or renamed at the front
+            panel that the list has been wrong about for days.
+          */}
+          {onReread && !scanning ? (
+            <>
+              {' '}
+              <button
+                className="chip"
+                onClick={onReread}
+                title="Forget these names and read every slot off the unit again"
+              >
+                Read them again
+              </button>
+            </>
+          ) : null}
         </p>
       ) : null}
     </div>
