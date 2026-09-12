@@ -790,6 +790,17 @@ export default function App() {
    * in a pocket comes back still knowing which chat it is in.
    */
   const [chatId, setChatId] = useState(restored?.chatId || null)
+  /*
+   * When a chat was last put down on this device.
+   *
+   * "When I hit new chat, it just shows the same chat." New chat empties the
+   * box here and the account a couple of seconds later, and a phone loses the
+   * page inside those seconds all the time — so the account was still holding
+   * the conversation that had just been discarded, and the empty box filled
+   * back up with it on the next load. This is the moment that says which of
+   * the two is the stale one. See cloudChat.pickChat.
+   */
+  const [chatClearedAt, setChatClearedAt] = useState(restored?.clearedAt || 0)
   const [remote, setRemote] = useState(false)
   // A slot write asked for from the phone: what it's waiting on there, and
   // what has arrived here.
@@ -1510,6 +1521,7 @@ export default function App() {
     saveSession({
       turns,
       chatId,
+      clearedAt: chatClearedAt,
       result,
       withScenes,
       renamePreset,
@@ -1517,7 +1529,7 @@ export default function App() {
       lastPrompt,
       pending: pending.current
     })
-  }, [turns, chatId, result, withScenes, renamePreset, saveName, lastPrompt, thinking])
+  }, [turns, chatId, chatClearedAt, result, withScenes, renamePreset, saveName, lastPrompt, thinking])
 
   /*
    * And up to the account, so the conversation is the same on the next device.
@@ -1527,11 +1539,24 @@ export default function App() {
    * would otherwise be its own round trip. Two seconds after the last of them
    * is still well inside the time it takes to pick up another device.
    *
-   * Skipped entirely until a transcript exists, so opening the app signed in
-   * does not immediately push an empty chat over the one on the Mac.
+   * Skipped until this device has had a conversation of its own, so opening
+   * the app signed in does not immediately push an empty chat over the one on
+   * the Mac. See saidSomething — an empty box after a conversation is a
+   * different thing entirely, and it does go up.
    */
+  /*
+   * Whether this device has had a conversation to push at all.
+   *
+   * An empty box at boot is a device that has nothing to say, and pushing it
+   * would wipe the chat on the Mac. An empty box AFTER one is New chat, and
+   * that has to go up or the conversation is still sitting on the account
+   * waiting to come back. A session that was cleared and then lost the page
+   * counts too — the account may never have heard about it.
+   */
+  const saidSomething = useRef(!!restored?.clearedAt)
   useEffect(() => {
-    if (!turns.length) return undefined
+    if (turns.length) saidSomething.current = true
+    if (!turns.length && !saidSomething.current) return undefined
     const timer = setTimeout(() => {
       if (chatCloudReady()) {
         saveCloudChat(turns).catch(() => {
@@ -1571,7 +1596,7 @@ export default function App() {
     let live = true
     loadCloudChat().then((cloud) => {
       if (!live || !cloud) return
-      const here = { turns, at: restored?.at || 0 }
+      const here = { turns, at: restored?.at || 0, clearedAt: chatClearedAt }
       const winner = pickChat(here, cloud)
       // Only when it is actually the other copy. Setting the same turns again
       // would push them back up and restart this on the other device.
@@ -1582,7 +1607,7 @@ export default function App() {
     return () => {
       live = false
     }
-  }, [link.account, turns, restored, record])
+  }, [link.account, turns, restored, chatClearedAt, record])
 
   /*
    * The shelf of finished conversations, and how many of them there are.
@@ -1629,6 +1654,13 @@ export default function App() {
       await archiveChat(turns, chatId)
       setChatLogKey((k) => k + 1)
     }
+    /*
+     * Written down before anything else, and before the account hears about
+     * it. The empty transcript goes up on the next debounce; if the phone
+     * loses the page first, this is the only record that the conversation
+     * still on the account is one that was deliberately put down.
+     */
+    setChatClearedAt(Date.now())
     setChatId(null)
     setTurns([])
     setResult(null)
@@ -2723,7 +2755,17 @@ export default function App() {
      * already reported — leaves nothing behind to apologise for.
      */
     pending.current = { description, at: Date.now() }
-    saveSession({ turns, chatId, result, withScenes, renamePreset, saveName, lastPrompt, pending: pending.current })
+    saveSession({
+      turns,
+      chatId,
+      clearedAt: chatClearedAt,
+      result,
+      withScenes,
+      renamePreset,
+      saveName,
+      lastPrompt,
+      pending: pending.current
+    })
     try {
       setProgress('Reading what the unit has loaded...')
       const schema = await readSchema(

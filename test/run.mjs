@@ -4774,6 +4774,12 @@ test('a reloaded page comes back knowing which conversation it is in', () => {
     null,
     'an id that is not an id is not an id'
   )
+
+  /* And when a chat was last put down here, which is what stops New chat
+     filling back up from the account. */
+  saveSession({ turns: [], chatId: null, clearedAt: 1234 }, store)
+  assert.equal(loadSession(store).clearedAt, 1234, 'the page forgot that a chat was put down')
+  assert.equal(loadSession(fakeStore({ 'fab.session.v1': JSON.stringify({ v: 1, turns: [] }) })).clearedAt, 0)
 })
 
 test('a transcript that cannot be read is no transcript, not a crash', () => {
@@ -4843,6 +4849,33 @@ test('the later transcript wins, and an empty one never wins', () => {
   // that contains the other.
   assert.equal(pickChat({ turns: here, at: 5 }, { turns: there, at: 9 }).from, 'cloud')
   assert.equal(pickChat({ turns: here, at: 9 }, { turns: there, at: 5 }).from, 'here')
+  /*
+   * "When I hit new chat, it just shows the same chat."
+   *
+   * New chat empties the box here and the account a couple of seconds later.
+   * A phone that loses the page inside those seconds came back to an empty box
+   * and an account still holding the discarded conversation, which reads as a
+   * device that has not caught up — so it came straight back. A cloud copy
+   * older than the moment this device put a chat down is the stale one.
+   */
+  assert.deepEqual(
+    pickChat({ turns: [], at: 30, clearedAt: 30 }, { turns: there, at: 20 }),
+    { turns: [], from: 'here' },
+    'New chat filled straight back up from the account'
+  )
+  // Written at the same moment counts as the discarded one: the clear is what
+  // happened last.
+  assert.equal(pickChat({ turns: [], at: 20, clearedAt: 20 }, { turns: there, at: 20 }).from, 'here')
+  // Something said on the Mac AFTER the phone put its chat down is a real
+  // conversation waiting to be picked up, and it still arrives.
+  assert.deepEqual(
+    pickChat({ turns: [], at: 20, clearedAt: 20 }, { turns: there, at: 40 }),
+    { turns: there, from: 'cloud' },
+    'a chat started elsewhere after the clear was thrown away'
+  )
+  // A device that has never pressed New chat is unaffected.
+  assert.equal(pickChat({ turns: [], at: 0, clearedAt: 0 }, { turns: there, at: 9 }).from, 'cloud')
+
   // A tie keeps what is on screen rather than replacing it with the same thing.
   assert.equal(pickChat({ turns: here, at: 5 }, { turns: there, at: 5 }).from, 'here')
   assert.deepEqual(pickChat(null, null), { turns: [], from: 'here' })
@@ -4876,11 +4909,14 @@ test('the conversation is restored before the first frame, and written on every 
   const save = app.slice(app.indexOf('    saveSession({\n      turns,'))
   assert.match(
     save.slice(0, 460),
-    /\}, \[turns, chatId, result, withScenes, renamePreset, saveName, lastPrompt, thinking\]\)/
+    /\}, \[turns, chatId, chatClearedAt, result, withScenes, renamePreset, saveName, lastPrompt, thinking\]\)/
   )
   // Which conversation this is goes down with it. Without that, a phone coming
   // back from the background would shelve the chat it was in as a new one.
   assert.match(save.slice(0, 460), /^\s+chatId,$/m)
+  // And the moment a chat was put down here, so a reload inside the couple of
+  // seconds before the account hears about it does not bring it back.
+  assert.match(save.slice(0, 460), /^\s+clearedAt: chatClearedAt,$/m)
 
   // The in-flight ask is on disk before the first round trip and cleared when
   // it settles, so finding it set on load is the signal the page died.
@@ -4892,7 +4928,19 @@ test('the account copy is pulled once and pushed on a debounce', () => {
   const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
   // A reply lands as several state changes in a row; each would otherwise be
   // its own round trip.
-  assert.match(app, /if \(!turns\.length\) return undefined/, 'an empty chat is pushed over the one on the Mac')
+  // An empty box at boot is a device with nothing to say and must not wipe the
+  // chat on the Mac. An empty box after a conversation is New chat, and that
+  // has to go up or the chat comes back on the next load.
+  assert.match(
+    app,
+    /if \(!turns\.length && !saidSomething\.current\) return undefined/,
+    'an empty chat is pushed over the one on the Mac at boot'
+  )
+  assert.match(app, /if \(turns\.length\) saidSomething\.current = true/)
+  assert.match(app, /const saidSomething = useRef\(!!restored\?\.clearedAt\)/)
+  // New chat writes down the moment before the account hears about it.
+  assert.match(app, /setChatClearedAt\(Date\.now\(\)\)[\s\S]{0,120}setTurns\(\[\]\)/)
+  assert.match(app, /const here = \{ turns, at: restored\?\.at \|\| 0, clearedAt: chatClearedAt \}/)
   // Signed out the same debounce still runs — it is what puts the conversation
   // on the browser's own shelf — so the cloud write carries its own guard
   // rather than the effect returning early for everyone.

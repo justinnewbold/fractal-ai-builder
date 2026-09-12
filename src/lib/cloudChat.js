@@ -103,14 +103,30 @@ export async function saveCloudChat(turns, device = deviceName()) {
  * conversation somebody is in the middle of, and "no row yet" carries a
  * timestamp of zero anyway. Beyond that it is the later write, which for an
  * append-only transcript is the one that contains the other.
+ *
+ * ## An empty box is not always a device with nothing to say
+ *
+ * "When I hit new chat, it just shows the same chat."
+ *
+ * New chat empties the box here and the account a moment later. If the page
+ * goes away in between — and on a phone it does, constantly — the account is
+ * still holding the conversation that was just put down, and an empty local
+ * box would read as a device that has not caught up yet. So it comes straight
+ * back, and New chat looks like a button that does nothing.
+ *
+ * `clearedAt` is when this device last put a chat down. A cloud copy written
+ * before that moment is the chat that was discarded, not one waiting to be
+ * picked up, and it is not brought back.
  */
 export function pickChat(local, cloud) {
   const localTurns = local?.turns?.length ? local.turns : []
   const cloudTurns = cloud?.turns?.length ? cloud.turns : []
   if (!cloudTurns.length) return { turns: localTurns, from: 'here' }
-  if (!localTurns.length) return { turns: cloudTurns, from: 'cloud' }
   const localAt = Number(local?.at) || 0
   const cloudAt = Number(cloud?.at) || 0
+  const clearedAt = Number(local?.clearedAt) || 0
+  if (clearedAt && cloudAt <= clearedAt) return { turns: localTurns, from: 'here' }
+  if (!localTurns.length) return { turns: cloudTurns, from: 'cloud' }
   return cloudAt > localAt ? { turns: cloudTurns, from: 'cloud' } : { turns: localTurns, from: 'here' }
 }
 
