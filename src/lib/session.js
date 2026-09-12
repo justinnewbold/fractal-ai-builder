@@ -84,6 +84,13 @@ export function loadSession(store = safeStore()) {
     return {
       at: Number(saved.at) || 0,
       turns: saved.turns.slice(-MAX_TURNS),
+      /*
+       * Which conversation this is. Read back, not just written: without it a
+       * reload restores the transcript, finds no id, and gives the same
+       * conversation a fresh one — so the shelf took a new row every time the
+       * phone reloaded the page, and one chat appeared on it ten times.
+       */
+      chatId: typeof saved.chatId === 'string' && saved.chatId ? saved.chatId : null,
       result: saved.result ?? null,
       withScenes: !!saved.withScenes,
       renamePreset: saved.renamePreset !== false,
