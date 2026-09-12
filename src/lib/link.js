@@ -17,6 +17,7 @@
  *   account — who is signed in here, or null
  *   hostOn  — mac role: the Mac is listening for a phone
  *   macName — remote role: what the phone shows once the Mac has answered
+ *   macVersion — remote role: which Mac app answered, for the debug report
  *   since   — when `link` last changed, so a screen can wait out a blip
  *
  * The pure parts — which role this is, what state that makes, what to say
@@ -425,6 +426,7 @@ let state = {
   account: null,
   hostOn: false,
   macName: null,
+  macVersion: null,
   since: Date.now(),
   /*
    * Whether this browser could be the machine with the cable in it. False on
@@ -579,7 +581,7 @@ async function readMacName() {
   try {
     const { readHostDoc } = await device()
     const doc = await readHostDoc('host.name')
-    if (doc?.name) set({ macName: String(doc.name) })
+    if (doc?.name) set({ macName: String(doc.name), macVersion: doc.version ? String(doc.version) : null })
   } catch {
     // "your Mac" is a fine name.
   }
@@ -685,7 +687,12 @@ async function readMac() {
     }
   }
   const named = await readHostDoc('host.name')
-  refresh({ cloud, hostOn, macName: named?.name ? String(named.name) : state.macName })
+  refresh({
+    cloud,
+    hostOn,
+    macName: named?.name ? String(named.name) : state.macName,
+    macVersion: named?.name ? (named.version ? String(named.version) : null) : state.macVersion
+  })
 }
 
 /* ------------------------------------------------------------------
@@ -1008,6 +1015,6 @@ export function _resetLink() {
   joining = false
   restoring = false
   booted = false
-  state = { role: 'unknown', link: 'off', account: null, hostOn: false, macName: null, since: Date.now(), cloud: null, clash: null, hosts: [], chosenHost: null, pairError: null }
+  state = { role: 'unknown', link: 'off', account: null, hostOn: false, macName: null, macVersion: null, since: Date.now(), cloud: null, clash: null, hosts: [], chosenHost: null, pairError: null }
   watchers.clear()
 }

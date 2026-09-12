@@ -195,6 +195,14 @@ export async function armHost({
   port = DEFAULT_PORT,
   fetch = globalThis.fetch,
   hostname = prettyHostname(),
+  /*
+   * Which Mac app this is, for the phone's debug report. A phone on today's
+   * web build against a Mac still running last week's app is the shape of
+   * every "the fix didn't work" — and the report said only the Mac's name,
+   * so there was no telling. Written beside the name, where the phone
+   * already looks.
+   */
+  version = null,
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
   attempts = 90,
   log = () => {}
@@ -235,7 +243,10 @@ export async function armHost({
 
     // 2. The name the phone will show.
     try {
-      await json('PUT', '/store/config/host.name', { data: { name: hostname }, origin: 'fractal' })
+      await json('PUT', '/store/config/host.name', {
+        data: version ? { name: hostname, version: String(version) } : { name: hostname },
+        origin: 'fractal'
+      })
     } catch {
       // A name is a nicety; the phone says "your Mac" without one.
     }

@@ -206,7 +206,7 @@ async function start() {
    * Not awaited: the window and tray should not wait on the account service,
    * and the line in the menu updates when the answer lands.
    */
-  armHost({ port })
+  armHost({ port, version: app.getVersion() })
     .then((result) => {
       phone = result
       if (tray) buildTray()

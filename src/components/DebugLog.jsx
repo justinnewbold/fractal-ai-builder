@@ -43,7 +43,20 @@ export default function DebugLog({ device, link }) {
         app: `${FULL} — built ${BUILT_AT} UTC`,
         unit: device?.short || device?.name || 'none',
         model: device?.model,
-        link: link?.role ? `${link.role} · ${describeLink(link).note || ''}` : undefined,
+        /*
+         * Over the relay the report also says WHICH Mac app answered. The
+         * phone runs today's web build the moment it reloads; the Mac runs
+         * whatever was installed, and a fix that lives in the Mac app is not
+         * on until that app has been restarted into it — which the report
+         * could not show, so "still broken" and "not updated yet" read alike.
+         */
+        link: link?.role
+          ? `${link.role} · ${describeLink(link).note || ''}${
+              link.role === 'remote' && link.link === 'connected'
+                ? ` · Mac app ${link.macVersion ? `v${link.macVersion}` : 'older than 7.190.0 (does not say)'}`
+                : ''
+            }`
+          : undefined,
         platform: platform(),
         screen: typeof window !== 'undefined' ? `${window.innerWidth}x${window.innerHeight}` : undefined,
         browser: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,

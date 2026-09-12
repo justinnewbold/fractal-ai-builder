@@ -1948,6 +1948,27 @@ test('a server that never comes up does not take the launcher with it', async ()
   assert.equal(unit.calls.length, 3)
 })
 
+test('the Mac app says which version it is, where the phone already looks', async () => {
+  /*
+   * A phone on today's web build against a Mac still running last week's
+   * app is the shape of every "the fix didn't work", and the debug report
+   * said only the Mac's name. The version rides beside it; a launcher that
+   * gives none (the dev server) writes the doc exactly as before.
+   */
+  const unit = fakeForgeFX()
+  await arm(unit, { version: '7.190.0' })
+  assert.ok(
+    unit.calls.includes('PUT /store/config/host.name {"data":{"name":"Studio Mac","version":"7.190.0"},"origin":"fractal"}'),
+    'the version did not reach the host doc'
+  )
+  const main = readSrc(new URL('../desktop/main.js', import.meta.url), 'utf8')
+  assert.match(main, /armHost\(\{ port, version: app\.getVersion\(\) \}\)/, 'the Mac app does not say which version it is')
+  const link = readSrc(new URL('../src/lib/link.js', import.meta.url), 'utf8')
+  assert.match(link, /macVersion: doc\.version \? String\(doc\.version\) : null/, 'the phone does not read the version back')
+  const report = readSrc(new URL('../src/components/DebugLog.jsx', import.meta.url), 'utf8')
+  assert.match(report, /Mac app \$\{link\.macVersion \? `v\$\{link\.macVersion\}` : 'older than 7\.190\.0/, 'the report does not say which Mac app answered')
+})
+
 test('the name is written even when there is nobody to host for', async () => {
   // The phone shows this name; a Mac that is signed out today may be signed
   // in tomorrow, and the name should already be there.
