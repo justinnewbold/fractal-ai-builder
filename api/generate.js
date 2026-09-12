@@ -17,7 +17,7 @@ import { createAnthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 import { cors } from './_cors.js'
 import { sceneInstruction, songsWanted } from './_scenes.js'
-import { researchRig, rigInstruction } from './_rig.js'
+import { researchRig, rigInstruction, rigOutcome } from './_rig.js'
 
 /**
  * Two ways in, because they fail differently.
@@ -483,24 +483,38 @@ export default async function handler(req, res) {
    * key, and for every failure. See ./_rig.js: it is worth a few seconds and
    * it is never worth a generation.
    */
-  const rig = searchTool
-    ? await researchRig({
-        description,
-        /*
-         * How many songs to look up, which is how many scenes are coming.
-         *
-         * The two have to be the same number or the chain breaks at the join:
-         * research four songs and build eight scenes and half of them are
-         * voiced from memory again. "One sound" asks for no songs at all — the
-         * rig alone is what that request needs.
-         */
-        songs: songsWanted({ wantScenes, sceneBudget, sceneCount: state.sceneCount }),
-        model,
-        generateText,
-        webSearch: searchTool,
-        signal: req.signal
-      })
-    : null
+  /*
+   * The lookup, deferred rather than run here.
+   *
+   * It used to be awaited at this point, which is before the stream opens —
+   * so on a real run it spent sixty seconds, hit its own timeout, returned
+   * nothing, and the phone saw no byte at all for the whole of it. The design
+   * then built from memory and called a Peavey "Barry Stock's actual 5150/6505
+   * tone", which no source says. The wait was invisible and so was the reason.
+   *
+   * Run inside the stream instead, after the hello and under the heartbeat, so
+   * the phone knows the route is open, knows what is being waited on, and is
+   * told plainly when the lookup does not make it.
+   */
+  const lookUpRig = () =>
+    searchTool
+      ? researchRig({
+          description,
+          /*
+           * How many songs to look up, which is how many scenes are coming.
+           *
+           * The two have to be the same number or the chain breaks at the join:
+           * research four songs and build eight scenes and half of them are
+           * voiced from memory again. "One sound" asks for no songs at all —
+           * the rig alone is what that request needs.
+           */
+          songs: songsWanted({ wantScenes, sceneBudget, sceneCount: state.sceneCount }),
+          model,
+          generateText,
+          webSearch: searchTool,
+          signal: req.signal
+        })
+      : Promise.resolve({ rig: null, why: 'off', ms: 0 })
 
   /*
    * What this player has tended to keep, when the browser has enough history
@@ -570,7 +584,8 @@ export default async function handler(req, res) {
    * the model could have picked the thing you wanted; the full roster is
    * already on screen in the block pickers.
    */
-  const traced = trace
+  const traceWith = (rig) =>
+    trace
     ? {
         model: MODEL_NAME,
         system: SYSTEM,
@@ -595,7 +610,7 @@ export default async function handler(req, res) {
       }
     : null
 
-  const args = {
+  const argsWith = (rig) => ({
     model,
     maxOutputTokens: 16000,
     /*
@@ -657,7 +672,7 @@ export default async function handler(req, res) {
         ]
       }
     ]
-  }
+  })
 
   // Streaming exists so the wait isn't a black box. The model decides blocks in
   // order, so partials arrive as a chain being built — which is worth watching,
@@ -726,6 +741,20 @@ export default async function handler(req, res) {
     }
 
     try {
+      /*
+       * The rig lookup, here rather than before the stream opened.
+       *
+       * Under the heartbeat, so the phone is not staring at a dead pipe while
+       * it runs, and announced both ways — before, so the wait has a name, and
+       * after, so a lookup that ran out of time says so instead of leaving a
+       * tone built from memory looking exactly like a tone built from sources.
+       */
+      send({ type: 'rig', state: 'looking' })
+      const found = await lookUpRig()
+      send({ type: 'rig', state: found.why, ms: found.ms, note: rigOutcome(found) })
+      const args = argsWith(found.rig)
+      const traced = traceWith(found.rig)
+
       const result = streamObject(args)
       for await (const partial of result.partialObjectStream) {
         // The model has started; the wait this covers is over.
@@ -785,6 +814,12 @@ export default async function handler(req, res) {
    * protect. Building the arguments once is why that cannot happen again.
    */
   try {
+    // Same lookup on the plain path, with nowhere to announce it — a caller
+    // that did not ask to stream has nothing to show a progress line on.
+    const found = await lookUpRig()
+    const args = argsWith(found.rig)
+    const traced = traceWith(found.rig)
+
     const { object, usage, providerMetadata } = await generateObject(args)
 
     const anthropicMeta = providerMetadata?.anthropic || {}
