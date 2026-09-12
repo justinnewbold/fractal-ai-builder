@@ -3,6 +3,19 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.175.0
+
+**A test that would have caught tonight's blank page.** The suite reads the code
+rather than running it, which is what let a hook watching something defined
+further down the same file get all the way to the app: 640 tests passed and the
+screen was a sentence on an empty page.
+
+That hazard is visible in the ORDER of the file, which is exactly what these
+tests are good at reading. Every hook's watch list is now checked against where
+the things it names are declared, in App.jsx and in every component, and a hook
+that reaches into a dead zone fails the suite by name and line. Console.jsx has
+carried a comment warning about this trap for months; a comment is not a test.
+
 ## 7.174.0
 
 **Fixes a blank page.** 7.173.0 shipped an app that could not draw at all: "The

@@ -195,6 +195,88 @@ export function run(test) {
     }
   })
 
+  test('no hook watches something declared further down its own function', () => {
+    /*
+     * The blank page. "The app couldn't draw — Cannot access 'we' before
+     * initialization", and nothing else on the screen, on every device at
+     * once.
+     *
+     * A dependency array is evaluated DURING RENDER. An effect written near
+     * the top of a component that lists a `const` defined further down reaches
+     * into that const's temporal dead zone and throws before anything is
+     * drawn — and it throws in the one place nothing catches usefully, so the
+     * whole app is a sentence on an empty page. Minified, the name in that
+     * sentence is two letters and says nothing about where to look.
+     *
+     * Console.jsx has carried a comment about this trap for months, learned
+     * the same way, and it happened again anyway — in App.jsx, four hundred
+     * lines apart, with 640 passing tests. Nothing here runs the app, so
+     * nothing here could catch it. This can: the hazard is visible in the
+     * order of the file, which is exactly what these tests read.
+     *
+     * Function declarations are hoisted and are not a hazard, so they are not
+     * listed. Each top-level function is scanned as its own scope, because a
+     * name declared in one component says nothing about a name used in
+     * another.
+     */
+    const scopes = (text) => {
+      const starts = [...text.matchAll(/\n(?:export default |export )?function [A-Za-z_$][\w$]*\s*\(/g)].map(
+        (m) => m.index
+      )
+      if (!starts.length) return [{ at: 0, text }]
+      return starts.map((at, i) => ({ at, text: text.slice(at, starts[i + 1] ?? text.length) }))
+    }
+
+    /* Where a name's dead zone ends, or null when nothing here declares it —
+       a prop, an import, or something from an enclosing scope. */
+    const declaredAt = (text, name) => {
+      const n = name.replace(/\$/g, '\\$')
+      const patterns = [
+        `\\n\\s*const ${n}\\b\\s*=`,
+        `\\n\\s*let ${n}\\b\\s*=`,
+        `\\n\\s*const \\[\\s*${n}\\b`,
+        `\\n\\s*const \\[[^\\]]*,\\s*${n}\\s*\\]`,
+        `\\n\\s*const \\{[^}]*\\b${n}\\b[^}]*\\}\\s*=`
+      ]
+      let first = null
+      for (const p of patterns) {
+        const m = text.match(new RegExp(p))
+        if (m && (first === null || m.index < first)) first = m.index
+      }
+      return first
+    }
+
+    const files = [
+      ['App.jsx', src],
+      ...readdirSync(new URL('../src/components/', import.meta.url))
+        .filter((f) => f.endsWith('.jsx'))
+        .map((f) => [
+          `components/${f}`,
+          readFileSync(new URL(`../src/components/${f}`, import.meta.url), 'utf8')
+        ])
+    ]
+
+    const found = []
+    for (const [name, text] of files) {
+      for (const scope of scopes(text)) {
+        for (const arr of scope.text.matchAll(/\},\s*\[([^\]]*)\]\)/g)) {
+          const deps = arr[1]
+            .split(',')
+            .map((d) => d.trim().split(/[.?[(]/)[0].trim())
+            .filter((d) => /^[A-Za-z_$][\w$]*$/.test(d))
+          for (const dep of new Set(deps)) {
+            const at = declaredAt(scope.text, dep)
+            if (at === null || at < arr.index) continue
+            const line = text.slice(0, scope.at + arr.index).split('\n').length
+            found.push(`${name}:${line} watches \`${dep}\`, which is declared below it`)
+          }
+        }
+      }
+    }
+
+    assert.deepEqual(found, [], `a hook reaches into a dead zone and the app will not draw:\n${found.join('\n')}`)
+  })
+
   test('every component rendered is one this file can actually see', () => {
     /*
      * `<DeviceDetail>` moved from the top bar into a sheet in App and was not
