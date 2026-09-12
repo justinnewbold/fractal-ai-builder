@@ -16,7 +16,7 @@ import { generateObject, generateText, streamObject } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 import { cors } from './_cors.js'
-import { sceneInstruction } from './_scenes.js'
+import { sceneInstruction, songsWanted } from './_scenes.js'
 import { researchRig, rigInstruction } from './_rig.js'
 
 /**
@@ -55,9 +55,16 @@ function resolveModel() {
 function resolveSearch() {
   if (!process.env.ANTHROPIC_API_KEY) return null
   const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  // Five is a handful of pages on one band. The step is a lookup, not a
-  // literature review, and every search is time the player is waiting.
-  return anthropic.tools.webSearch_20260209({ maxUses: 5 })
+  /*
+   * Enough for the band and then each song it picks.
+   *
+   * Five covered a band and nothing else, which is exactly how the first
+   * version came back with the right amp and eight scenes voiced from the same
+   * general sound. A song is at least one search of its own. Still a ceiling
+   * rather than a target — every search is time somebody is waiting — and the
+   * step gives up at sixty seconds whatever it has reached.
+   */
+  return anthropic.tools.webSearch_20260209({ maxUses: 14 })
 }
 
 /**
@@ -479,6 +486,15 @@ export default async function handler(req, res) {
   const rig = searchTool
     ? await researchRig({
         description,
+        /*
+         * How many songs to look up, which is how many scenes are coming.
+         *
+         * The two have to be the same number or the chain breaks at the join:
+         * research four songs and build eight scenes and half of them are
+         * voiced from memory again. "One sound" asks for no songs at all — the
+         * rig alone is what that request needs.
+         */
+        songs: songsWanted({ wantScenes, sceneBudget, sceneCount: state.sceneCount }),
         model,
         generateText,
         webSearch: searchTool,

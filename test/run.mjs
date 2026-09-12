@@ -5390,7 +5390,7 @@ test('a request that names no music costs nothing, and a rig that comes back is 
   assert.equal(cleanRig('  AMPS: Diezel VH4  '), 'AMPS: Diezel VH4')
   // Bounded: this goes into a prompt, and an unbounded one makes every
   // generation expensive.
-  assert.ok(cleanRig('x'.repeat(9000)).length <= 4000)
+  assert.ok(cleanRig('x'.repeat(20000)).length <= 8000)
 
   // Nothing found is nothing said — the designer must not learn that this ran.
   assert.equal(rigInstruction(null), '')
@@ -5415,18 +5415,88 @@ test('a request that names no music costs nothing, and a rig that comes back is 
   assert.equal(thrown, null, 'a failed lookup took the generation down with it')
 
   let sawTool = false
+  let sawSystem = ''
   const found = await researchRig({
     description: 'three days grace',
+    songs: 6,
     model: {},
     webSearch: { kind: 'search' },
     generateText: async (args) => {
       sawTool = !!args?.tools?.web_search
+      sawSystem = args.system
       assert.equal(args.messages[0].content, 'three days grace')
       return { text: 'AMPS: Diezel VH4, modded Marshall JMP-1 into ENGL power amps.' }
     }
   })
   assert.ok(sawTool, 'the lookup ran without a search tool, which is just memory again')
   assert.match(found, /Diezel VH4/)
+
+  /*
+   * The songs are looked up, not left to the designer's memory.
+   *
+   * First time round the rig went in and the designer picked the songs
+   * afterwards out of its own head — so nothing ever established what "Chalk
+   * Outline" sounds like as against "Home", and eight scenes came back over
+   * three voicings. The lookup picks them and reads each one.
+   */
+  assert.match(sawSystem, /pick exactly 6 songs/, 'the lookup was not told how many songs')
+  assert.match(sawSystem, /look each one up in turn/)
+  assert.match(sawSystem, /genuinely sound different from one another/)
+  // The per-song shape the designer needs to voice a scene from.
+  for (const field of ['AMP:', 'DRIVE:', 'DELAY:', 'TUNING:', 'ALBUM/YEAR:']) {
+    assert.ok(sawSystem.includes(field), `the song briefing carries no ${field}`)
+  }
+
+  /* One sound asks for no songs: the rig is all that request needs, and
+     searching for eight songs to build one scene is wasted time on a
+     generation somebody is waiting for. */
+  let noSongs = ''
+  await researchRig({
+    description: 'three days grace',
+    songs: 0,
+    model: {},
+    webSearch: {},
+    generateText: async (args) => {
+      noSongs = args.system
+      return { text: 'AMPS: Diezel VH4' }
+    }
+  })
+  assert.ok(!/pick exactly/.test(noSongs), 'a one-sound request went looking for songs')
+  assert.match(noSongs, /AMPS:/, 'a one-sound request stopped looking up the rig too')
+
+  /* And the songs reach the designer AS the scenes — without this the lookup
+     is a briefing nobody acts on. */
+  const asScenes = rigInstruction('SONGS\n  SONG: Riot')
+  assert.match(asScenes, /those are your scenes/)
+  assert.match(asScenes, /Voice each\s+one from ITS OWN lines/)
+})
+
+test('the songs looked up and the scenes built are the same number', async () => {
+  /*
+   * The join. Research four songs, build eight scenes, and half of them are
+   * voiced from memory again — which is the shape of the original complaint.
+   * sceneInstruction answers this for the designer; songsWanted answers the
+   * same question for the step that runs before it, from the same inputs.
+   */
+  const { songsWanted, A_FEW } = scenesMod
+
+  assert.equal(songsWanted({ wantScenes: false, sceneCount: 8 }), 0, 'one sound went song hunting')
+  assert.equal(songsWanted({ wantScenes: true, sceneBudget: 8, sceneCount: 8 }), 8)
+  // No number named is rule 11's three or four, so both ends agree on "a set".
+  assert.equal(songsWanted({ wantScenes: true, sceneCount: 8 }), A_FEW)
+  assert.equal(songsWanted({ sceneCount: 8 }), A_FEW)
+  // The unit's count is the ceiling at both ends, as it is for the budget.
+  assert.equal(songsWanted({ wantScenes: true, sceneBudget: 99, sceneCount: 4 }), 4)
+  assert.equal(songsWanted({ wantScenes: true, sceneCount: 2 }), 2)
+  assert.equal(songsWanted(), A_FEW, 'nothing known is not nothing researched')
+
+  /* Whatever the player asked for, the two numbers match — that is the whole
+     point of there being one function per end rather than two literals. */
+  for (const budget of [2, 3, 5, 8]) {
+    const asked = scenesMod.sceneInstruction({ wantScenes: true, sceneBudget: budget, sceneCount: 8 })
+    assert.match(asked, new RegExp(`EXACTLY ${budget} SCENES`))
+    assert.equal(songsWanted({ wantScenes: true, sceneBudget: budget, sceneCount: 8 }), budget)
+  }
 })
 
 console.log('\nhow many scenes')
@@ -5575,7 +5645,7 @@ test('the question and the instruction share one idea of "all of them"', () => {
     'the old binary question is still in the sheet'
   )
   const api = readSrc(new URL('../api/generate.js', import.meta.url), 'utf8')
-  assert.match(api, /import \{ sceneInstruction \} from '\.\/_scenes\.js'/)
+  assert.match(api, /import \{ sceneInstruction, songsWanted \} from '\.\/_scenes\.js'/)
 })
 
 test('the answer names a budget only when a budget was chosen', () => {

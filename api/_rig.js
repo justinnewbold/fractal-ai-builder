@@ -18,10 +18,20 @@
  * ENGLs. Everything needed was in the request except the one fact that decides
  * which of them to pick.
  *
- * So the fact is fetched. One short search-backed call before the design, whose
- * whole job is to come back with the rig: the amps, the pedals, the tuning, and
- * anything per-song worth knowing. The designer then matches that against
- * "basedOn" the way it was always told to, with something true to match against.
+ * So the fact is fetched. One search-backed call before the design, in the order
+ * a person would do it: find the band, find what they played, then pick the
+ * songs the scenes will be — songs a fan would name AND songs that genuinely
+ * sound different from each other — and look up each one's own tone in turn.
+ * The designer then matches that against "basedOn" the way it was always told
+ * to, with something true to match against, and voices each scene from its own
+ * song's line rather than from the band's general sound.
+ *
+ * The song half is the part that was missing first time round. The rig went in,
+ * the designer picked the songs afterwards out of its own memory, and nothing
+ * ever looked up what "Chalk Outline" sounds like as against "Home". Eight
+ * scenes came back named after eight songs over three amp voicings, one drive
+ * setting and one delay setting, which is what prompted: "so that way we're
+ * getting accurate tones on every scene".
  *
  * ## Never fails the generation
  *
@@ -38,11 +48,17 @@
  * nothing the designer never knows it ran.
  */
 
-/** Long enough for a search and a read, short enough not to double the wait. */
-const RIG_TIMEOUT_MS = 30000
+/**
+ * Long enough to look up a band and then each song it picked, short enough
+ * that a lookup which is not going to answer does not hold up the design.
+ */
+const RIG_TIMEOUT_MS = 60000
 
-/** What comes back is a paragraph for a prompt, not a document. */
-const MAX_CHARS = 4000
+/** What comes back is a briefing for a prompt, not a document. */
+const MAX_CHARS = 8000
+
+/** Songs to cover when the player has not said how many scenes they want. */
+const SONGS_BY_DEFAULT = 4
 
 /**
  * The exact words that decide whether this costs anything at all.
@@ -53,27 +69,57 @@ const MAX_CHARS = 4000
  * just a description of a sound. "A tight modern metal rhythm tone" must not
  * send anybody searching.
  */
-const RIG_SYSTEM = `You research guitar rigs for a preset designer.
+function rigSystem(songs) {
+  const wantsSongs = Number.isInteger(songs) && songs > 0
+  return `You research guitar rigs for a preset designer.
 
 You are given one request a guitarist typed. Decide first whether it names real
 music — a band, an artist, an album, an era, or a song. If it does not, reply
 with exactly NONE and nothing else. A description of a sound with nobody's name
 on it ("tight modern metal", "warm blues lead", "eighties clean") is NONE.
 
-If it does name music, search for what actually made those sounds and report it.
-Cover, as far as the sources support:
+If it does name music, search and report what actually made those sounds.
+
+RIG
 
 - AMPS: the specific heads or preamps, by make and model. Name the ones the
   records were made on and the ones used live if they differ.
 - DRIVE AND EFFECTS: overdrive or distortion pedals in front, and the delays,
   reverbs, modulation actually used. Name models.
 - TUNING: how the guitars are tuned, and say if it changed between records.
-- PER SONG: where a named song is voiced differently from the band's usual
-  sound — a cleaner verse, a different amp, a particular delay — say which song
-  and how.
 - ERAS: where the rig changed over the band's career, say which records each
   belongs to.
+${
+  wantsSongs
+    ? `
+SONGS
 
+Then pick exactly ${songs} songs and look each one up in turn.
+
+Pick them on two counts at once: songs a fan of theirs would name, AND songs
+that genuinely sound different from one another. ${songs} of their biggest
+singles that are all the same drop-tuned rhythm tone is a worse answer than
+their four biggest plus the one clean song everybody knows. Spread across
+eras where the rig changed.
+
+Search for each song's own tone rather than answering from the band's general
+sound, and give, as far as the sources support:
+
+  SONG: <title>
+  ALBUM/YEAR: <record and year, so the era's rig is the right one>
+  TUNING: <if it differs from the band's usual>
+  AMP: <which of the amps above, which channel, roughly how much gain>
+  DRIVE: <pedal in front, or none>
+  DELAY: <roughly how long, how much feedback, how loud in the mix, or none>
+  REVERB/MOD: <what is audible, or none>
+  CHARACTER: <one line a guitarist would recognise — "clean verse into a wall
+  of gain on the chorus", "dry tight chug, no delay", "wide delayed lead">
+
+Where a song's own tone is not documented, say so on its line rather than
+inventing one, and say what it most likely shares with the band's usual rig.
+`
+    : ''
+}
 Rules:
 
 - Report what the sources say. Where they disagree or say nothing, say so — a
@@ -84,6 +130,7 @@ Rules:
 - No preamble and no sign-off. Plain lines, no markdown headers.
 - Write for somebody choosing between amp models by their real-world
   counterparts, so always give makes and models rather than adjectives.`
+}
 
 /**
  * The rig behind a request, as text for the designer's prompt, or null.
@@ -93,9 +140,17 @@ Rules:
  * Anthropic key, where the server-side search tool is not reachable, simply
  * passes null and skips this.
  */
-export async function researchRig({ description, model, generateText, webSearch, signal } = {}) {
+export async function researchRig({
+  description,
+  songs = SONGS_BY_DEFAULT,
+  model,
+  generateText,
+  webSearch,
+  signal
+} = {}) {
   const asked = typeof description === 'string' ? description.trim() : ''
   if (!asked || !model || typeof generateText !== 'function' || !webSearch) return null
+  const wanted = Number.isInteger(songs) && songs > 0 ? Math.min(songs, 8) : 0
 
   const control = new AbortController()
   const timer = setTimeout(() => control.abort(), RIG_TIMEOUT_MS)
@@ -105,7 +160,7 @@ export async function researchRig({ description, model, generateText, webSearch,
   try {
     const res = await generateText({
       model,
-      system: RIG_SYSTEM,
+      system: rigSystem(wanted),
       /*
        * Low effort on purpose. This is a lookup and a summary, not a judgement
        * — the judgement is the designer's job, on a bigger prompt, afterwards —
@@ -113,7 +168,7 @@ export async function researchRig({ description, model, generateText, webSearch,
        * than doubling a generation that already takes a minute.
        */
       providerOptions: { anthropic: { effort: 'low' } },
-      maxOutputTokens: 1500,
+      maxOutputTokens: 4000,
       tools: { web_search: webSearch },
       abortSignal: control.signal,
       messages: [{ role: 'user', content: asked }]
@@ -162,9 +217,18 @@ your own memory disagree, this wins.
 
 ${rig}
 
-Match it against the roster through "basedOn": the amp named here is the amp
-whose model you pick, and the pedal named here is the drive you place. Where
-this unit has no counterpart for something named, pick the nearest and say in
-the summary what it is not. Where this says a named song is voiced differently,
-that is what its scene should sound like.`
+Match the RIG against the roster through "basedOn": the amp named here is the
+amp whose model you pick, and the pedal named here is the drive you place.
+Where this unit has no counterpart for something named, pick the nearest and
+say in the summary what it is not.
+
+Where SONGS are listed, those are your scenes — one scene per song, in the
+order given, named for that song under rule 14's sixteen characters. Voice each
+one from ITS OWN lines, not from the band's general sound: its amp and gain
+decide which channel that scene plays, its drive decides whether the drive
+block is on in that scene and on which channel, and its delay decides the delay
+block's time, feedback and mix. Two songs whose lines differ must not come back
+as two scenes playing the same channels — that is the failure this lookup
+exists to end. A song whose own tone the lookup could not establish is the one
+place to fall back on the band's usual rig, and say so in the summary.`
 }
