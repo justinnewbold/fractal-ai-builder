@@ -3,6 +3,24 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.179.0
+
+**"Save this to slot 499" works from the phone now.** Asking for it in the chat
+came back with "Saving to a slot only works at the Mac, so slot 499 was left
+alone" — while the Save button two screens away had been saving from the phone
+all along. It does it by parking the request where the Mac can see it and
+letting the Mac do the writing, which is the one thing the relay has always
+allowed. Saying it out loud now goes the same way: the chat asks the Mac, the
+Mac saves it, and the answer comes back to the conversation that asked. It
+still stops to ask before overwriting a slot.
+
+**And two things that genuinely can't be done from the phone say so up front.**
+Backing up a preset to a file, and keeping one in the folder on the Mac, both
+need a dump the relay won't carry and a folder a phone doesn't have. They were
+proposed anyway and failed at the end of a plan that had already applied
+everything else — which reads as "it worked" right up until the next preset
+change takes it away.
+
 ## 7.178.0
 
 **A scene can no longer be sent to a sound that was never built.** Two of four

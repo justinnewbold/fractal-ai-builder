@@ -2858,17 +2858,17 @@ test('backing up a preset needs no confirmation', () => {
   assert.ok(!r.actions[0].destructive)
 })
 
-test('a plan over the relay does not propose what the Mac alone can do', () => {
+test('a slot save asked for from the phone is parked for the Mac, not refused', () => {
   /*
-   * The host refuses a slot write and a backup from a distance — deliberately,
-   * and REMOTE_FORBIDDEN in shared/relay-rules.mjs says so in words. The plan
-   * used to propose them anyway: every other action applied, the unit made the
-   * sound asked for, and the one step that would have kept it failed at the
-   * end as a single line among the successes. A tone you can hear and did not
-   * keep reads as "it worked" until the next preset change takes it away.
+   * "Please make it so that anything can be saved from the phone. It's kind of
+   * the whole purpose of this."
    *
-   * So the refusal moves to where a plan is still a proposal. Said before
-   * anything is written, not reported after everything else was.
+   * The host refuses a slot write over the relay and that refusal stands. The
+   * Save button has never been stopped by it: it parks the request in the
+   * host's document store, which the relay does allow, and the page at the Mac
+   * carries it out. Saying the same thing in words was refused outright — the
+   * app telling somebody it cannot do a thing it does by hand on the next
+   * screen along.
    */
   const away = { ...caps, remote: true }
 
@@ -2877,10 +2877,20 @@ test('a plan over the relay does not propose what the Mac alone can do', () => {
     cmdBlocks,
     away
   )
-  assert.deepEqual(save.actions, [], 'a slot write was proposed over the relay')
-  assert.match(save.problems[0] || '', /only works at the Mac/, save.problems.join(' | '))
-  assert.match(save.problems[0] || '', /67/, 'the refusal does not say which slot was left alone')
+  assert.equal(save.actions.length, 1, 'a slot save was refused over the relay')
+  assert.deepEqual(save.problems, [], save.problems.join(' | '))
+  const asked = save.actions[0]
+  assert.match(asked.label, /Ask the Mac/, 'the label does not say who is holding the pen')
+  assert.match(asked.label, /67/)
+  assert.equal(asked.destructive, true, 'overwriting a slot stopped asking first')
+  // What the caller watches for. Parking is all this action can do; whether it
+  // landed is decided on another machine seconds later.
+  assert.equal(asked.parksSave.slot, 67)
+  assert.equal(asked.parksSave.name, 'Dimebag')
+  assert.ok(asked.parksSave.id, 'the Mac answer could never be matched to the ask')
 
+  // Backing up writes a file onto whichever machine asked for it, and the host
+  // refuses the dump from a distance. Still said before anything is written.
   const backup = validatePlan(
     { actions: [{ kind: 'backupPreset', value: 3, why: '' }] },
     cmdBlocks,
@@ -2889,13 +2899,24 @@ test('a plan over the relay does not propose what the Mac alone can do', () => {
   assert.deepEqual(backup.actions, [], 'a backup was proposed over the relay')
   assert.match(backup.problems[0] || '', /only works at the Mac/, backup.problems.join(' | '))
 
-  // Everything else still travels: the tone is applied over the relay exactly
-  // as it was, and only the two steps the host refuses are held back.
+  // Keeping a preset as a file asks the unit for a dump the host will not send
+  // over the relay AND writes into a folder a phone does not have. Refused
+  // while it is still a proposal, not at the end of a plan that already ran.
+  const keep = validatePlan(
+    { actions: [{ kind: 'keepInLibrary', value: 3, text: 'Dimebag', why: '' }] },
+    cmdBlocks,
+    away
+  )
+  assert.deepEqual(keep.actions, [], 'a file write was proposed over the relay')
+  assert.match(keep.problems[0] || '', /only works at the Mac/, keep.problems.join(' | '))
+
+  // Everything else travels as it did, and the save goes last — the order is
+  // the whole point of "load 12, drop the gain and save it back".
   const mixed = validatePlan(
     {
       actions: [
-        { kind: 'setParam', eid: 58, paramId: 7, value: 6, why: '' },
-        { kind: 'savePreset', value: 67, why: '' }
+        { kind: 'savePreset', value: 67, why: '' },
+        { kind: 'setParam', eid: 58, paramId: 7, value: 6, why: '' }
       ]
     },
     cmdBlocks,
@@ -2903,11 +2924,11 @@ test('a plan over the relay does not propose what the Mac alone can do', () => {
   )
   assert.deepEqual(
     mixed.actions.map((a) => a.kind),
-    ['setParam'],
-    'the relay plan lost an action it could have carried out'
+    ['setParam', 'savePreset'],
+    'the tone was kept before it was dialled'
   )
 
-  // And at the Mac both are proposed as they always were.
+  // And at the Mac, where writing was always permitted, nothing is parked.
   const home = validatePlan(
     {
       actions: [
@@ -2920,6 +2941,24 @@ test('a plan over the relay does not propose what the Mac alone can do', () => {
   )
   assert.deepEqual(home.actions.map((a) => a.kind), ['backupPreset', 'savePreset'])
   assert.deepEqual(home.problems, [], home.problems.join(' | '))
+  assert.equal(
+    home.actions.find((a) => a.kind === 'savePreset').parksSave,
+    undefined,
+    'the Mac asked itself to do what it was already doing'
+  )
+})
+
+test('the Mac answer to a parked save reaches the chat that asked for it', () => {
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  /*
+   * Parking is all the action can do. Without picking the request back up
+   * here, "asked the Mac" would never become "the Mac saved it" — the chat
+   * would report a save it had no way of knowing the outcome of.
+   */
+  const run = app.slice(app.indexOf('const landed = landedOf(actions, failures)'))
+  assert.match(run.slice(0, 1200), /const parked = landed\.find\(\(a\) => a\.parksSave\)\?\.parksSave/)
+  assert.match(run.slice(0, 1200), /setQueuedSave\(\{/, 'nothing watches for the Mac answer')
+  assert.match(run.slice(0, 1200), /scenes: Array\.isArray\(sceneNames\)/)
 })
 
 test('the stage screen is sized by whoever is holding it', () => {
