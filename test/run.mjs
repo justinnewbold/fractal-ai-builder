@@ -7827,6 +7827,77 @@ test('connected means the Mac answered, never merely that a channel was joined',
   )
 })
 
+test('connected means answered recently, not answered once', () => {
+  /*
+   * "This is lying saying that a Mac is connected. My Mac is turned off
+   * completely so it can't be connected."
+   *
+   * `hostSeen` is a latch: something answered once and it stays true until a
+   * request fails and flips it. While nothing is being asked — which on this
+   * screen is most of the time — the word is a memory, and it can be minutes
+   * old with the machine it names switched off at the wall.
+   */
+  const base = { role: 'remote', hasSession: true, joining: false, channelUp: true, hostSeen: true }
+  assert.equal(link.deriveLink({ ...base, answeredAgo: 0 }), 'connected')
+  assert.equal(
+    link.deriveLink({ ...base, answeredAgo: link.STALE_MS + 1 }),
+    'no-answer',
+    'a Mac that has said nothing for twenty seconds is still being called connected'
+  )
+  // The keepalive asks every eight seconds and gives up after six, so anything
+  // inside that plus slack has genuinely been answered and must not flicker.
+  assert.equal(link.deriveLink({ ...base, answeredAgo: link.KEEPALIVE + 5000 }), 'connected')
+  assert.ok(link.STALE_MS > link.KEEPALIVE + 6000, 'the window is tighter than one unanswered question')
+})
+
+test('a Mac that never heard the question is asked once, not five times', async () => {
+  /*
+   * Five attempts at twenty seconds each is a hundred seconds in which the
+   * screen can say nothing true — it goes on showing the last thing it knew,
+   * which is how a green "connected" survives the Mac being switched off.
+   *
+   * The asking is for a unit that answers "no" while it loads a preset. A Mac
+   * that is off does not answer at all, and one attempt is enough to learn it.
+   */
+  const silent = Object.assign(new Error('Your Mac didn’t answer.'), {})
+  assert.equal(ds.macSilent(silent), true, 'a question that was never answered reads as the unit refusing')
+  assert.equal(ds.macSilent(Object.assign(new Error('nope'), { linkDown: true })), true)
+  assert.equal(ds.macSilent(new Error('port not open')), false, 'a unit that answered is treated as a dead line')
+
+  let asked = 0
+  await assert.rejects(
+    () =>
+      ds.confirmedDetect({
+        detect: async () => {
+          asked++
+          throw silent
+        },
+        wait: async () => {},
+        wasLive: true,
+        remote: true
+      }),
+    /didn’t answer/
+  )
+  assert.equal(asked, 1, `a dead line was asked ${asked} times`)
+
+  // And a unit that is merely busy still gets every ask it ever had.
+  let busy = 0
+  await assert.rejects(
+    () =>
+      ds.confirmedDetect({
+        detect: async () => {
+          busy++
+          throw new Error('timeout')
+        },
+        wait: async () => {},
+        wasLive: false,
+        remote: true
+      }),
+    /timeout/
+  )
+  assert.equal(busy, ds.RELAY_TRIES, 'a busy port lost the asking it needs')
+})
+
 test('the Mac is connected when it is listening, and wifi always is', () => {
   assert.equal(link.deriveLink({ role: 'mac', cloudUser: null, hostOn: true }), 'signed-out')
   assert.equal(link.deriveLink({ role: 'mac', cloudUser: { email: 'j@x' }, hostOn: false }), 'off')

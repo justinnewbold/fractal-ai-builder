@@ -80,24 +80,6 @@ export function detectRole({ demo, served, hostname, helperAlive }) {
  * A joined channel with nothing on the other end is `no-answer`, not
  * connected — that is the whole correction.
  */
-export function deriveLink({ role, hasSession, wantsAuto = true, joining, channelUp, hostSeen, hostOn, cloudUser }) {
-  if (role === 'wifi') return 'connected'
-  if (role === 'mac') {
-    if (!cloudUser) return 'signed-out'
-    return hostOn ? 'connected' : 'off'
-  }
-  if (role === 'remote') {
-    if (!hasSession) return 'signed-out'
-    // Disconnect was tapped. Signed in, not connected, and not trying — a
-    // different thing from a Mac that is not answering, and it must not be
-    // dressed as one.
-    if (wantsAuto === false) return 'off'
-    if (joining) return 'joining'
-    return channelUp && hostSeen ? 'connected' : 'no-answer'
-  }
-  return 'off'
-}
-
 /**
  * How long to wait before asking the Mac again.
  *
@@ -115,6 +97,56 @@ export const PROBE_CAP = 30000
  * is lying.
  */
 export const KEEPALIVE = 8000
+
+/*
+ * How old the last answer from the Mac may be before "connected" is a claim
+ * this app can no longer make.
+ *
+ * "This is lying saying that a Mac is connected. My Mac is turned off
+ * completely." `hostSeen` is a latch: something answered once, and it stays
+ * true until a request fails and flips it. Everything about that is fine until
+ * nothing is being asked — and then the word on screen is a memory rather than
+ * a fact, and it can be minutes old with the machine it names switched off at
+ * the wall.
+ *
+ * A keepalive question goes out every KEEPALIVE and gives up after six
+ * seconds, so anything fresher than the two of them plus a little slack has
+ * genuinely been answered. Past that, the honest word is the one the app
+ * already has for it: no answer.
+ */
+export const STALE_MS = KEEPALIVE + 6000 + 6000
+
+export function deriveLink({
+  role,
+  hasSession,
+  wantsAuto = true,
+  joining,
+  channelUp,
+  hostSeen,
+  /* How long ago the Mac last answered anything, in ms. See STALE_MS. */
+  answeredAgo = 0,
+  hostOn,
+  cloudUser
+}) {
+  if (role === 'wifi') return 'connected'
+  if (role === 'mac') {
+    if (!cloudUser) return 'signed-out'
+    return hostOn ? 'connected' : 'off'
+  }
+  if (role === 'remote') {
+    if (!hasSession) return 'signed-out'
+    // Disconnect was tapped. Signed in, not connected, and not trying — a
+    // different thing from a Mac that is not answering, and it must not be
+    // dressed as one.
+    if (wantsAuto === false) return 'off'
+    if (joining) return 'joining'
+    if (!channelUp || !hostSeen) return 'no-answer'
+    // Answered, but how long ago? A latch says something answered once; this
+    // says the app still has grounds to call it connected.
+    return answeredAgo <= STALE_MS ? 'connected' : 'no-answer'
+  }
+  return 'off'
+}
 
 export function nextDelay(previous) {
   if (!previous || previous < PROBE_FIRST) return PROBE_FIRST
@@ -459,6 +491,7 @@ function refresh(patch = {}) {
     joining: joining || restoring,
     channelUp: remoteActive(),
     hostSeen: remoteHostSeen(),
+    answeredAgo: lastAnswerAt() ? Date.now() - lastAnswerAt() : Number.MAX_SAFE_INTEGER,
     hostOn: merged.hostOn,
     cloudUser: merged.cloud?.user || null
   })
@@ -581,6 +614,15 @@ async function tick() {
     await hostResponds()
     refresh()
   }
+  /*
+   * Re-derive on the clock, not only after a probe.
+   *
+   * "Connected" now means answered recently rather than answered once, and a
+   * claim that goes stale with nothing happening has to be able to fall over
+   * on its own — which needs somebody to look at the clock. This is the thing
+   * that already wakes up every few seconds.
+   */
+  refresh()
   delay = state.link === 'connected' ? KEEPALIVE : nextDelay(delay)
   schedule(delay)
 }
