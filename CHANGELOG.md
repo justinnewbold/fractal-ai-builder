@@ -3,6 +3,20 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.190.0
+
+**The phone's debug report says which Mac app it is talking to.** A phone
+runs today's web build the moment it reloads. The Mac runs whatever was
+installed, and a fix that lives inside the Mac app — the device server, the
+network name — is not on until that app has been restarted into it. The
+report said only the Mac's name, so "still broken" and "not updated yet" read
+exactly alike, and today they were confused for each other.
+
+The Mac app now writes its version beside its name, where the phone already
+looks, and the report's link line reads "remote · Connected to Justins
+MacBook Pro · Mac app v7.190.0". A Mac app older than this one does not say,
+and the report says that instead.
+
 ## 7.189.0
 
 **The Mac stops renaming itself.** "This computer's local hostname
