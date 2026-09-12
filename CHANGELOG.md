@@ -3,6 +3,28 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.191.0
+
+**Copy log now carries the Mac's own account of its port to the unit.** From
+a phone every failure at the unit is one sentence — "the Fractal app on your
+Mac has lost its connection to the unit" — and today that sentence sat next to
+live tuner readings and a preset change that plainly reached the unit. The
+Mac's device server knew exactly what was happening and said so, to nowhere:
+an app opened from the Finder keeps none of what its server prints.
+
+So the server now keeps the last ten times it found its port to the unit
+closed and opened it again — when, which port, and why (whether the unit went
+away) — and the last eighty lines it said. Copy log on the phone asks the Mac
+for all of that and pastes it under the usual log, with whether the port is
+open right now, which port it is, the serial ports the Mac can see, and how
+long the server has been up. A port lost once is a cable. A port lost every
+few seconds is something else, and now the two can be told apart from the
+far end.
+
+This is in the device server the Mac app carries (desktop/forgefx.lock.json
+moves to it), so the section fills in once the Mac app is on this version; an
+older Mac app answers without it.
+
 ## 7.190.0
 
 **The phone's debug report says which Mac app it is talking to.** A phone

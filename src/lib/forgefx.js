@@ -2458,5 +2458,16 @@ export const cloudLogout = () => directRequest('/cloud/logout', { method: 'POST'
 
 export const remoteStatus = () => directRequest('/remote/status')
 
+/**
+ * The Mac's device server, in its own words — for the debug report.
+ *
+ * Whether its port to the unit is open, which port, the last ten times it
+ * lost that port and why, and the last lines it said. Its stdout goes
+ * nowhere on a Mac app opened from the Finder, so until this the whole of
+ * that was invisible, and from a phone every failure at the unit read as
+ * the one sentence "port not open". Travels the relay like any other GET.
+ */
+export const serverDiag = () => request('/diag', { timeoutMs: 5000 })
+
 export const remoteEnable = (on) =>
   directRequest('/remote/enable', { method: 'POST', body: JSON.stringify({ on }) })

@@ -99,6 +99,40 @@ export function formatDebugLog(header = {}, extra = '') {
 }
 
 /**
+ * What the Mac's device server said about itself, as lines for the report.
+ *
+ * The shape is ForgeFX's /diag: whether its port to the unit is open and
+ * which, what it resolved, the serial ports it can see, the last ten times
+ * it found its port closed and opened it again (`reopens`), and the last
+ * lines it said (`recent`). A port lost once is a cable; a port lost every
+ * few seconds is something else; and the phone's own log shows both as
+ * "port not open".
+ */
+export function formatMacDiag(d) {
+  if (!d || typeof d !== 'object') return ''
+  const serial = Array.isArray(d.ports?.serial) ? d.ports.serial : []
+  const ports = serial.map((p) => `${p.id}${p.fractal ? ' (Fractal)' : ''}`).join(', ') || 'none'
+  const reopens = Array.isArray(d.reopens) ? d.reopens : []
+  const recent = Array.isArray(d.recent) ? d.recent : []
+  const traffic = d.traffic
+  return [
+    "MAC'S DEVICE SERVER",
+    `port to the unit: ${d.transportOpen ? 'open' : 'NOT OPEN'}${d.transportLabel ? ` · ${d.transportLabel}` : ''}`,
+    `resolved: ${d.resolved ? `${d.resolved.transport} ${d.resolved.id}` : 'no unit found'}`,
+    `serial ports: ${ports}`,
+    `detected: ${d.detected ? 'yes' : 'no'} · profile ${d.profile?.key || '?'} · telemetry ${d.telemetryMode || '?'}`,
+    typeof d.uptime === 'number' ? `server up: ${Math.round(d.uptime / 60)} min` : null,
+    traffic ? `traffic: ${traffic.txMsgs ?? '?'} sent, ${traffic.rxMsgs ?? '?'} received since ${traffic.since || '?'}` : null,
+    d.listError ? `port listing error: ${d.listError}` : null,
+    `port lost and reopened: ${reopens.length} time${reopens.length === 1 ? '' : 's'}`,
+    ...reopens.map((r) => `  ${r.at} ${r.label} — ${r.reason}`),
+    ...(recent.length ? ['', `server log, last ${recent.length} lines:`, ...recent] : [])
+  ]
+    .filter((l) => l !== null)
+    .join('\n')
+}
+
+/**
  * Things that never reached any log before: a script error, a promise nobody
  * caught. On a phone these went to a console nobody can open. Installed once
  * by the app; harmless where there is no window.

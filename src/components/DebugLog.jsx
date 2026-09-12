@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { clearDebugLog, formatDebugLog, formatLine, getDebugLog, onDebugLog } from '../lib/debugLog'
+import { clearDebugLog, formatDebugLog, formatLine, formatMacDiag, getDebugLog, onDebugLog } from '../lib/debugLog'
 import { wireReport } from './Diagnostics'
+import { serverDiag } from '../lib/forgefx'
 import { describeLink } from '../lib/link'
 import { FULL, BUILT_AT } from '../lib/version'
 import { platform } from '../lib/platform'
@@ -37,7 +38,21 @@ export default function DebugLog({ device, link }) {
     if (body.current) body.current.scrollTop = body.current.scrollHeight
   }, [all.length])
 
-  const text = () =>
+  /*
+   * The Mac's own account, fetched when the log is copied rather than kept
+   * live: it is one request, it can take a few seconds over the relay, and
+   * it is only wanted in the paste. A Mac that does not answer is said so
+   * in the same place, which is itself a finding.
+   */
+  const macReport = async () => {
+    try {
+      return formatMacDiag(await serverDiag())
+    } catch (e) {
+      return `MAC'S DEVICE SERVER — could not be asked: ${e?.message || e}`
+    }
+  }
+
+  const text = (mac = '') =>
     formatDebugLog(
       {
         app: `${FULL} — built ${BUILT_AT} UTC`,
@@ -62,11 +77,11 @@ export default function DebugLog({ device, link }) {
         browser: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
         at: new Date().toISOString()
       },
-      wireReport()
+      [wireReport(), mac].filter(Boolean).join('\n\n')
     )
 
   const copy = async () => {
-    const t = text()
+    const t = text(await macReport())
     setFallback('')
     try {
       await navigator.clipboard.writeText(t)
