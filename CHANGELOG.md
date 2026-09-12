@@ -3,6 +3,30 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.192.0
+
+**The AM4 is driven over MIDI, not over the serial port it also shows the
+Mac.** The first report of the Mac's own account (7.191.0) said it all:
+"resolved: midi AM4", no Fractal serial port listed, 59 of 59 writes verified,
+not a single fault. Every failure earlier in the day — "lost its connection to
+the unit" on every preset read and scene change, while the tuner worked and
+the unit switched presets underneath a screen that could not read it — carried
+the serial transport's own words. So the AM4 shows up on the Mac both ways at
+times, the Mac's server took serial first because on the FM3 that is the fast
+link, and the AM4's serial side answers the first handshake and then loses the
+port on the first real read.
+
+The server now takes an AM4 (or a VP4) over its USB-MIDI port before serial
+gets a look, matched on the port's name — the one thing known before a byte
+is exchanged. An FM3 that shows up both ways keeps its serial link. A
+connection picked by hand under Connection still wins.
+
+This is in the device server the Mac app carries (desktop/forgefx.lock.json
+moves to it), so it takes a new Mac app to get.
+
+**And the report says when a Mac app is too old to give its port history**,
+rather than "port lost and reopened: 0 times", which is not what that means.
+
 ## 7.191.0
 
 **Copy log now carries the Mac's own account of its port to the unit.** From
