@@ -42,6 +42,7 @@ import {
   useDevice,
   put as putDevice,
   getSnapshot as deviceSnapshot,
+  macSilent,
   refreshBlocks,
   refreshScene,
   refreshSceneNames,
@@ -1371,12 +1372,17 @@ export default function App() {
           // A Mac with no port to the unit says so outright, and that is more
           // specific than either of the two below: not "the read failed" but
           // "there is nothing at the other end of the cable to read".
-          err?.unitGone
-            ? 'unit-gone'
-            : err?.linkDown || /didn’t answer|didn't answer/i.test(err?.message || '')
-              ? 'no-answer'
-              : 'unreadable'
+          err?.unitGone ? 'unit-gone' : macSilent(err) ? 'no-answer' : 'unreadable'
         )
+        /*
+         * And nothing may be said about the unit on the strength of an answer
+         * that came before the Mac went quiet. "This is lying saying that a Mac
+         * is connected. My Mac is turned off completely" — over a notice about
+         * a unit, written from a `device` the last good read left behind. The
+         * reason above decides the words, and this makes sure the old answer
+         * cannot decide them instead.
+         */
+        if (macSilent(err)) setDevice(null)
         setStatus('fault')
         setError(err)
       }

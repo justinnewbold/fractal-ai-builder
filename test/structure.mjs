@@ -691,6 +691,32 @@ export function run(test) {
     assert.match(app, /if \(chain\) read\(\)/, 'every knob still re-reads the whole unit')
   })
 
+  test('nothing is said about the unit once the Mac has gone quiet', () => {
+    /*
+     * "This is lying saying that a Mac is connected. My Mac is turned off
+     * completely" — under a notice reading THE MAC CAN'T SEE YOUR UNIT, which
+     * is a sentence about a unit that only something at the Mac could have
+     * said.
+     *
+     * It had been said, once, while the Mac was on. `device` kept that answer
+     * and the notice kept reading it, because a read that fails afterwards
+     * changes the reason but leaves the object the older branch is written
+     * from. So the object goes when the Mac stops answering, and only the
+     * reason is left to speak.
+     */
+    assert.match(src, /if \(macSilent\(err\)\) setDevice\(null\)/, 'a stale answer can still write the notice')
+    assert.match(
+      src,
+      /err\?\.unitGone \? 'unit-gone' : macSilent\(err\) \? 'no-answer' : 'unreadable'/,
+      'App keeps its own copy of what a silent Mac looks like'
+    )
+    // One definition of that, in the module the reads live in, so the screen
+    // and the asking cannot disagree about what a dead line is.
+    const store = readFileSync(new URL('../src/lib/deviceState.js', import.meta.url), 'utf8')
+    assert.match(store, /export const macSilent = /)
+    assert.match(store, /if \(macSilent\(err\)\) break/, 'a dead line is asked five times again')
+  })
+
   test('a failure inside a sheet is shown inside that sheet', () => {
     /*
      * "On the chain screen it always says on. When I tap one of the buttons it

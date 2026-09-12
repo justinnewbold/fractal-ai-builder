@@ -3,6 +3,32 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.176.0
+
+**"Connected" now means the Mac answered just now, not that it answered once.**
+A phone showed MAC CONNECTED in green with the Mac switched off at the wall.
+The word came from a latch: something answered at some point, and it stayed
+true until a request failed and flipped it — so while nothing was being asked,
+which on that screen is most of the time, the word was a memory. It can only be
+said now if the Mac has answered inside the last twenty seconds, which is one
+keepalive question plus the time it takes to give up on it, and the check runs
+on the clock so it can fall over on its own with nobody touching anything.
+
+**And nothing is said about your unit once the Mac has gone quiet.** The same
+screen carried "THE MAC CAN'T SEE YOUR UNIT", which is a sentence only
+something at the Mac could have said. It had been said — once, while the Mac
+was on — and the app kept the answer and kept reading it. That answer is now
+dropped the moment the Mac stops answering, so the notice can only say what is
+still true: your Mac stopped answering.
+
+**A Mac that is switched off is asked once, not five times.** The asking exists
+because a unit answers "no" while it is loading a preset, and it is worth
+several seconds for that. A Mac that is off never answers at all, so each of
+the five attempts spends its whole twenty-second timeout — a minute and a half
+in which the screen cannot say anything true and goes on showing the last thing
+it knew. One attempt is enough to learn that nobody is there; a unit that is
+merely busy still gets all five.
+
 ## 7.175.0
 
 **A test that would have caught tonight's blank page.** The suite reads the code

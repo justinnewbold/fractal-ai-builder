@@ -228,6 +228,19 @@ export const SETTLING_TRIES = 6
 export const SETTLING_MS = 900
 
 /**
+ * Whether a failure means the Mac never heard the question.
+ *
+ * `linkDown` is set by remote.js on anything that did not leave the phone; a
+ * request that left and was never answered rejects with the sentence below and
+ * carries no flag, and the two mean the same thing here — nobody at the other
+ * end. Worth telling apart from a unit that answered "no", because asking a
+ * dead line again is a twenty-second timeout each time and the screen cannot
+ * say anything true until they are all spent.
+ */
+export const macSilent = (err) =>
+  err?.linkDown === true || /didn’t answer|didn't answer/i.test(err?.message || '')
+
+/**
  * Ask whether the unit is there, and do not take the first no for an answer.
  *
  * "I'm on the FM3. As soon as I hit next or select a scene, it goes to the
@@ -305,6 +318,19 @@ export async function confirmedDetect({
     } catch (err) {
       failure = err
       info = null
+      /*
+       * A dead line is not a busy port, and this is the difference between a
+       * screen that says something true in six seconds and one that says
+       * nothing for a minute and a half.
+       *
+       * The asking exists because a unit answers "no" while it is loading a
+       * preset. A Mac that is switched off does not answer at all: every
+       * attempt spends its whole timeout, five of them back to back, and for
+       * all of that time the screen is still showing what it last knew — a
+       * green light, and a notice about a unit — with no way to know it is
+       * out of date. One attempt is enough to learn that nobody is there.
+       */
+      if (macSilent(err)) break
     }
   }
 
