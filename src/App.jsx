@@ -2900,6 +2900,25 @@ export default function App() {
       )
 
       /*
+       * ForgeFX caches block parameters with no invalidation hook, so a read can
+       * report a value the hardware doesn't hold. Check what actually stuck.
+       *
+       * Before the scenes, not after. Checking a channel means standing on it,
+       * and which channel a block is on is part of the scene, not of the block
+       * — so this pass ends by putting every block back on the channel the
+       * write pass left it on. Run after the scenes, that landed in whichever
+       * scene the player was returned to and overwrote what the plan had just
+       * written for it: one scene came out with every block on the last channel
+       * dialled instead of the one it was designed to play. Nothing here reads
+       * or writes a scene, and values belong to channels rather than to scenes,
+       * so checking first checks exactly the same things.
+       */
+      setProgress('Checking what landed...')
+      const mismatches = await verifyChanges(result.changes, (done, total, name) =>
+        setProgress(`Verifying ${name} - ${done} of ${total}`)
+      )
+
+      /*
        * Scenes go on after the rig, never with it.
        *
        * A scene records which blocks are on; it does not record what they sound
@@ -2907,6 +2926,9 @@ export default function App() {
        * the models and values have to be in place before the states over them
        * mean anything — write them the other way round and every scene is a
        * pattern over a preset that has not been dialled yet.
+       *
+       * Last, so that nothing after it moves a block off the channel its scene
+       * plays.
        */
       const sceneFailures =
         withScenes && result.scenes?.length
@@ -2921,13 +2943,6 @@ export default function App() {
             )
           : []
       failures.push(...sceneFailures)
-
-      // ForgeFX caches block parameters with no invalidation hook, so a read can
-      // report a value the hardware doesn't hold. Check what actually stuck.
-      setProgress('Checking what landed...')
-      const mismatches = await verifyChanges(result.changes, (done, total, name) =>
-        setProgress(`Verifying ${name} - ${done} of ${total}`)
-      )
 
       // Name it now rather than at save. The name is part of the preset in the
       // edit buffer, so writing it here means the unit's screen shows what was

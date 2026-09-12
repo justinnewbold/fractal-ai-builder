@@ -3,6 +3,32 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.178.0
+
+**A scene can no longer be sent to a sound that was never built.** Two of four
+generated scenes came back with no sound at all. A scene does not hold a sound
+— it points at one. The tone put the rhythm on the amp's channel A and the lead
+on channel B, and then pointed two of its scenes at channels C and D, which
+nothing in the build had ever dialled. Those scenes played whatever happened to
+be sitting on those channels in the preset underneath, which is nothing anybody
+designed and can be nothing at all. A scene is now kept on a channel this tone
+actually built, and the preview says which scene was moved and why.
+
+Only for blocks the tone dials a channel of. Channels you set up by hand months
+ago are invisible to the app — reading a block reads the channel it is on and
+no other — so a scene naming a channel of a block this tone leaves alone is
+still taken at its word.
+
+**And checking the tone no longer moves a scene off its own channel.** Which
+channel a block plays is part of the scene, not of the block. The pass that
+reads everything back to confirm it landed has to stand on a channel to read
+it, so it finishes by putting every block back where the write pass left it —
+and it was running after the scenes, landing in whichever scene you were
+returned to and overwriting what the plan had just written there. One scene
+came out with every block on the last channel dialled instead of the one it was
+designed to play. The check now runs before the scenes, so the scene plan is
+the last word.
+
 ## 7.177.0
 
 **New chat puts the conversation down for good.** Pressing it emptied the box
