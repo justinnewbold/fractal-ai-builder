@@ -3,6 +3,30 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.189.0
+
+**The Mac stops renaming itself.** "This computer's local hostname
+Justins-MacBook-Pro-958.local is already in use on this network. The name has
+been changed to Justins-MacBook-Pro-1019.local." After every restart, and only
+once this app had been running — 910, 958, 1019, counting up.
+
+The Mac app announces itself on the network so a phone can find it by name.
+The library that does the announcing is a complete network responder of its
+own, and left to itself it announced the app AT THE MAC'S OWN NAME — answering
+"Justins-MacBook-Pro.local is here" alongside macOS, which answers for that
+name itself and checks, at every boot and wake, that nobody else does. This
+app did. So the Mac decided its name was taken, gave itself a new number, and
+said so.
+
+The app now announces itself under its own name — fractal-justins-macbook-pro
+.local, the one the menu and the QR code already show — and answers for that
+name only. The Mac's name is the Mac's again. As a side effect the .local
+address in the menu now actually works; until now nothing on the network was
+answering for it.
+
+The Mac keeps whatever number it has by now. To put the name back, open System
+Settings, General, Sharing, and edit Local hostname.
+
 ## 7.188.0
 
 **The preset list can be read off the unit again.** "Unit is showing the

@@ -524,7 +524,26 @@ export function publish(
    * that decides whether it keeps running.
    */
   const bonjour = new Bonjour({}, onError)
-  const ad = bonjour.publish({ name, type: 'http', port })
+  /*
+   * The advert answers for its OWN name on the network, never for the Mac's.
+   *
+   * bonjour-service is a complete mDNS responder of its own, and without a
+   * `host` it publishes the service at the machine's hostname — an A record
+   * saying "Justins-MacBook-Pro.local is at this address", answered by this
+   * app. macOS has a responder of its own for exactly that name, and it
+   * checks, at every boot and wake, that nobody else on the network answers
+   * for it. This app did. So the Mac concluded its name was taken, gave
+   * itself a new one, and put a dialog on screen: "This computer's local
+   * hostname is already in use on this network. The name has been changed to
+   * Justins-MacBook-Pro-1019.local." Reported after every restart, and only
+   * once this app had been running — 910, 958, 1019, counting up.
+   *
+   * Under its own name the advert answers for fractal-justins-macbook-pro
+   * .local and nothing else, which is also the address the menu and the QR
+   * code have been offering all along: until now nothing on the network
+   * actually resolved it.
+   */
+  const ad = bonjour.publish({ name, type: 'http', port, host: `${name}.local` })
   return {
     ad,
     stop: () =>
