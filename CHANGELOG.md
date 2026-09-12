@@ -5,6 +5,20 @@ roadmap in the README, patch is everything since.
 
 ## 7.193.0
 
+**Rename the preset and its scenes by hand.** "Would also like to be able to
+rename presets and scenes in the app directly without having to ask the
+chat." There is a pencil beside the preset on the Play screen now. It opens
+the sheet the scene names already lived in, with the preset's own name at the
+top as a field you can type in. Like a design's rename it changes the loaded
+preset, and sticks once you save it to a slot.
+
+**And a rename no longer gets undone by the next save.** "Rename preset to
+Tool" — done, said the chat. Six seconds later the save sheet asked the Mac
+to save it as "Tool - Adam Jones", the name the design had proposed, and the
+Mac renames before it stores, so the old name went straight back on. The save
+sheet now follows the unit's name when it changes, unless you typed a
+different one yourself.
+
 **A block placed in an empty AM4 preset is no longer called refused when it
 is sitting right there.** "Build a chain: drive → amp → cab → delay → reverb —
 The unit refused Drive." Then, from the player: "It did accept the drive

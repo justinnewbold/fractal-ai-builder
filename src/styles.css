@@ -2484,6 +2484,31 @@ button.view-tab.current:not(:disabled) {
  */
 .gig-preset {
   display: grid;
+  /* The tile, and the pencil beside it when there is one. */
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s-2);
+  align-items: stretch;
+}
+.gig-rename {
+  min-width: 44px;
+  padding: 0 var(--s-3);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  color: var(--silk-faint);
+  font-size: var(--f-4);
+}
+.gig-rename:active {
+  transform: scale(0.97);
+}
+.rename-preset {
+  display: grid;
+  gap: var(--s-2);
+  justify-items: start;
+  margin-bottom: var(--s-4);
+}
+.rename-preset .save-field {
+  width: 100%;
 }
 
 /*
