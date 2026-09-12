@@ -3,6 +3,25 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.193.0
+
+**A block placed in an empty AM4 preset is no longer called refused when it
+is sitting right there.** "Build a chain: drive → amp → cab → delay → reverb —
+The unit refused Drive." Then, from the player: "It did accept the drive
+block." It had. Over USB-MIDI the AM4 never sends the short acknowledgement
+the Mac's server listens for after a write — the same report showed 59
+parameter writes in a row marked "unit said ok:false" and every one of them
+read back exactly as sent. Parameters were already checked by reading them
+back, so that only cost a column in the log. A placement was taken at the
+unit's word, so the chain stopped at its first block. A rename over MIDI would
+have been refused the same way with the new name on the unit's display.
+
+The Mac's server now treats that acknowledgement as a hint and the read as the
+answer: with no ack, it looks at the slot (and, for a rename, at the name the
+unit reports) and says whether the thing landed. This is in the device server
+the Mac app carries (desktop/forgefx.lock.json moves to it), so it takes a
+new Mac app to get.
+
 ## 7.192.0
 
 **The AM4 is driven over MIDI, not over the serial port it also shows the
