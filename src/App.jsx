@@ -80,6 +80,7 @@ import {
   summariseCorrections
 } from './lib/corrections'
 import { matchLocal, matchRename } from './lib/localCommands'
+import RenamePreset from './components/RenamePreset'
 import { countFromRefusal, slotCount, slotOutside, slotsForChat, timeLeft } from './lib/slots'
 import { inDesktopApp } from './lib/desktop'
 import { createNameScan } from './lib/nameScan'
@@ -587,6 +588,27 @@ export default function App() {
   const [justDid, setJustDid] = useState(null)
   const [slot, setSlot] = useState('')
   const [saveName, setSaveName] = useState(restored?.saveName || '')
+  /*
+   * The save name follows the unit's name, unless somebody typed another.
+   *
+   * "Rename preset to Tool" — done, said the chat. Six seconds later the
+   * save sheet asked the Mac to save it as "Tool - Adam Jones", the name the
+   * design had proposed, and the Mac renames before it stores, so the old
+   * name went straight back on. The field is seeded when the SLOT changes
+   * and left alone after that, on purpose (see the seeding effect): a
+   * generation's suggested name must survive the re-reads its writes cause.
+   * So this only moves it when the unit's name changes AND the field still
+   * says what the unit used to — the one case where it was plainly not a
+   * name anybody typed.
+   */
+  const unitName = useRef(null)
+  const followUnitName = (p) => {
+    const now = typeof p?.name === 'string' ? p.name.trim() : null
+    const was = unitName.current
+    unitName.current = now
+    if (now === null || was === null || now === was) return
+    setSaveName((field) => (field.trim() === was ? now : field))
+  }
   // A failed save is shown on the save bar as well as in the banner — the bar is
   // where the tap happened, and on a phone the banner is off-screen above it.
   const [saveError, setSaveError] = useState(null)
@@ -1316,6 +1338,7 @@ export default function App() {
       answered = true
       const [p, b] = await Promise.all([currentPreset(), presetBlocks()])
       setPreset(p)
+      followUnitName(p)
       /*
        * The unit has just said which slot it is on and what that slot is
        * called, in one answer. That is the one name in the list this app can
@@ -3259,8 +3282,13 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      await setPresetName(name)
+      const res = await setPresetName(name)
+      if (res && res.ok === false) throw new Error('The unit refused the rename.')
       record('rename', `Renamed to "${name}"`, ['Not permanent until saved to a slot.'])
+      // The save sheet proposes this name from now on, and the buffer no
+      // longer matches the slot it came from.
+      setSaveName(name)
+      setDirty(true)
       await read()
     } catch (err) {
       setError(err.message)
@@ -5245,6 +5273,7 @@ export default function App() {
           onError={setError}
           onChanged={read}
           onPickPreset={() => setPresetMenu(true)}
+          onRename={() => setSheet('scenes')}
           /* Absent, not disabled, when play mode is on: the bar closes up to
              two buttons rather than keeping a dead third. */
           onAsk={askShows ? () => setSheet('chat') : null}
@@ -5872,7 +5901,12 @@ export default function App() {
         open={sheet === 'scenes'}
         onClose={() => setSheet(null)}
         title="Scenes"
+        alert={sheetAlert}
       >
+        {/* The preset's own name first: the pencil on the Play screen opens
+            here, and a name is the one thing about a preset with no other
+            place to be typed. */}
+        <RenamePreset preset={preset} busy={busy} onRename={rename} />
         <Scenes
           blocks={blocks}
           preset={preset}

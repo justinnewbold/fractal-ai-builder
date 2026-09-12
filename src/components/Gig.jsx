@@ -67,6 +67,8 @@ export default function Gig({
   onError,
   onChanged,
   onPickPreset,
+  /** Where the preset's name and its scene names can be typed. Absent means no pencil. */
+  onRename,
   onAsk,
   /*
    * The way to the chain and its knobs.
@@ -615,6 +617,22 @@ export default function Gig({
             </span>
           </span>
         </button>
+        {/*
+          The pencil: rename this preset, or its scenes, without asking the
+          chat. Beside the tile rather than on it, because the tile is the
+          way to the picker and one thing should do one thing.
+        */}
+        {onRename ? (
+          <button
+            type="button"
+            className="gig-rename"
+            onClick={onRename}
+            aria-label="Rename this preset or its scenes"
+            title="Rename"
+          >
+            ✎
+          </button>
+        ) : null}
       </div>
 
       <div className="gig-signal" aria-label="Signal level">

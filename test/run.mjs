@@ -1948,6 +1948,40 @@ test('a server that never comes up does not take the launcher with it', async ()
   assert.equal(unit.calls.length, 3)
 })
 
+test('a preset can be renamed by hand, and the save sheet follows a rename', () => {
+  /*
+   * "Rename preset to Tool" — done, said the chat; six seconds later the save
+   * sheet asked the Mac to save it as "Tool - Adam Jones", and the Mac
+   * renames before it stores, so the old name went straight back on. And:
+   * "Would also like to be able to rename presets and scenes in the app
+   * directly without having to ask the chat."
+   */
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  const gig = readSrc(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8')
+  const field = readSrc(new URL('../src/components/RenamePreset.jsx', import.meta.url), 'utf8')
+
+  // The pencil on the Play screen opens the sheet where names are typed.
+  assert.match(gig, /className="gig-rename"[\s\S]{0,120}onClick=\{onRename\}/, 'the Play screen has no pencil')
+  assert.match(app, /onPickPreset=\{\(\) => setPresetMenu\(true\)\}\n\s*onRename=\{\(\) => setSheet\('scenes'\)\}/, 'the pencil does not open the names sheet')
+  const sheet = app.slice(app.indexOf("open={sheet === 'scenes'}"), app.indexOf('<SceneMatrix'))
+  assert.match(sheet, /<RenamePreset preset=\{preset\} busy=\{busy\} onRename=\{rename\} \/>/, 'the preset name is not in the sheet')
+  assert.match(sheet, /alert=\{sheetAlert\}/, 'a refused rename would be explained under the sheet, where nobody can see it')
+  assert.match(field, /maxLength=\{31\}/, 'a name longer than the unit allows can be typed')
+  assert.match(field, /disabled=\{busy \|\| !changed\}/, 'the button offers to rename to the name it already has')
+
+  // A rename by hand is honest about a refusal, and the save follows it.
+  const rename = app.slice(app.indexOf('const rename = async (name) => {'), app.indexOf('const rename = async (name) => {') + 700)
+  assert.match(rename, /if \(res && res\.ok === false\) throw new Error\('The unit refused the rename\.'\)/)
+  assert.match(rename, /setSaveName\(name\)/, 'the save sheet would still propose the old name')
+  assert.match(rename, /setDirty\(true\)/, 'a renamed buffer is not marked as differing from its slot')
+
+  // And a rename from anywhere else — the chat, the Mac — moves the save name
+  // only when the field still says what the unit used to.
+  const follow = app.slice(app.indexOf('const followUnitName = '), app.indexOf('const followUnitName = ') + 400)
+  assert.match(follow, /setSaveName\(\(field\) => \(field\.trim\(\) === was \? now : field\)\)/, 'a name somebody typed would be overwritten')
+  assert.match(app, /setPreset\(p\)\n\s*followUnitName\(p\)/, 'the unit’s name is not followed on a read')
+})
+
 test('the debug report carries the Mac’s own account of its port', async () => {
   /*
    * "port not open" on the phone, live tuner readings at the same time, a
