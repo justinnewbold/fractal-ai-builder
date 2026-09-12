@@ -15,7 +15,7 @@ import Gig from './components/Gig'
 import SaveBar from './components/SaveBar'
 import SaveSheet, { SaveFooter } from './components/SaveSheet'
 import CloudPresets from './components/CloudPresets'
-import { LiveGeneration, Thinking, THINKING } from './components/LiveGeneration'
+import { LiveGeneration, LiveSteps, Thinking, THINKING } from './components/LiveGeneration'
 import { progressFor } from './lib/liveProgress'
 import { streamSpec } from './lib/stream'
 import { recordUsage } from './lib/ledger'
@@ -4810,6 +4810,13 @@ export default function App() {
         open={liveOpen}
         onToggle={() => setLiveOpen((was) => !was)}
       />
+
+      {/*
+        Each step as it lands — every block, then every scene with the line
+        the designer wrote about it — kept on screen for the length of the
+        run. The panel below is the deeper view and takes over while open.
+      */}
+      {thinking && !liveOpen ? <LiveSteps partial={partial} nameOf={blockNameFor} /> : null}
 
       <LiveGeneration
         partial={partial}
