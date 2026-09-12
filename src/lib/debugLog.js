@@ -112,8 +112,10 @@ export function formatMacDiag(d) {
   if (!d || typeof d !== 'object') return ''
   const serial = Array.isArray(d.ports?.serial) ? d.ports.serial : []
   const ports = serial.map((p) => `${p.id}${p.fractal ? ' (Fractal)' : ''}`).join(', ') || 'none'
-  const reopens = Array.isArray(d.reopens) ? d.reopens : []
-  const recent = Array.isArray(d.recent) ? d.recent : []
+  // Neither field exists on a Mac app older than 7.191.0, and "0 times" is
+  // not what that means.
+  const reopens = Array.isArray(d.reopens) ? d.reopens : null
+  const recent = Array.isArray(d.recent) ? d.recent : null
   const traffic = d.traffic
   return [
     "MAC'S DEVICE SERVER",
@@ -124,9 +126,11 @@ export function formatMacDiag(d) {
     typeof d.uptime === 'number' ? `server up: ${Math.round(d.uptime / 60)} min` : null,
     traffic ? `traffic: ${traffic.txMsgs ?? '?'} sent, ${traffic.rxMsgs ?? '?'} received since ${traffic.since || '?'}` : null,
     d.listError ? `port listing error: ${d.listError}` : null,
-    `port lost and reopened: ${reopens.length} time${reopens.length === 1 ? '' : 's'}`,
-    ...reopens.map((r) => `  ${r.at} ${r.label} — ${r.reason}`),
-    ...(recent.length ? ['', `server log, last ${recent.length} lines:`, ...recent] : [])
+    reopens
+      ? `port lost and reopened: ${reopens.length} time${reopens.length === 1 ? '' : 's'}`
+      : 'port lost and reopened: this Mac app does not say (older than 7.191.0)',
+    ...(reopens || []).map((r) => `  ${r.at} ${r.label} — ${r.reason}`),
+    ...(recent ? (recent.length ? ['', `server log, last ${recent.length} lines:`, ...recent] : ['server log: nothing said yet']) : ['server log: this Mac app does not keep one (older than 7.191.0)'])
   ]
     .filter((l) => l !== null)
     .join('\n')

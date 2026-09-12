@@ -1981,6 +1981,10 @@ test('the debug report carries the Mac’s own account of its port', async () =>
   // Nothing to say is nothing, not a heading over an empty list.
   assert.equal(formatMacDiag(null), '')
   assert.match(formatMacDiag({}), /port to the unit: NOT OPEN\nresolved: no unit found\nserial ports: none/)
+  // An older Mac app has no port history to give, and "0 times" is not what that means.
+  assert.match(formatMacDiag({}), /port lost and reopened: this Mac app does not say/)
+  assert.match(formatMacDiag({}), /server log: this Mac app does not keep one/)
+  assert.match(formatMacDiag({ reopens: [], recent: [] }), /port lost and reopened: 0 times\nserver log: nothing said yet/)
 
   const panel = readSrc(new URL('../src/components/DebugLog.jsx', import.meta.url), 'utf8')
   assert.match(panel, /const t = text\(await macReport\(\)\)/, 'Copy log does not ask the Mac')
