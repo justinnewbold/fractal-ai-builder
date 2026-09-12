@@ -80,7 +80,7 @@ import {
   summariseCorrections
 } from './lib/corrections'
 import { matchLocal, matchRename } from './lib/localCommands'
-import { countFromRefusal, slotCount, slotOutside, timeLeft } from './lib/slots'
+import { countFromRefusal, slotCount, slotOutside, slotsForChat, timeLeft } from './lib/slots'
 import { inDesktopApp } from './lib/desktop'
 import { createNameScan } from './lib/nameScan'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
@@ -3734,6 +3734,19 @@ export default function App() {
           sceneCount: device?.capabilities?.sceneCount,
           presetName: preset?.name,
           presetNumber: preset?.number,
+          /*
+           * What the unit holds, so the conversation can answer for it.
+           *
+           * "What presets do we have named Metallica?" — "I don't have a way
+           * to browse your slot list or library by name from here." The list
+           * was on screen at the time. See slotsForChat: names, empties and,
+           * most of all, which slots nobody has read yet.
+           */
+          slots: slotsForChat(
+            slots.length ? slots : cachedPresetNames(),
+            device?.capabilities,
+            preset
+          ),
           /*
            * What the conversation has to know to answer for itself: the last
            * design with its reasoning, and the same taste and corrections the

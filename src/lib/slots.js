@@ -173,3 +173,94 @@ export function wrongSlot(asked, got) {
   if (got === undefined) return false
   return got !== asked
 }
+
+/**
+ * Runs of consecutive numbers, as "0-119" rather than a hundred and twenty of them.
+ *
+ * A slot list is mostly runs — a unit is factory presets up to some point and
+ * empty after it — and the shape it goes to the model in is what decides
+ * whether it can be sent at all.
+ */
+export function runsOf(numbers = []) {
+  const sorted = [...new Set(numbers.filter((n) => Number.isInteger(n)))].sort((a, b) => a - b)
+  const out = []
+  let start = null
+  let last = null
+  for (const n of sorted) {
+    if (start === null) {
+      start = n
+      last = n
+      continue
+    }
+    if (n === last + 1) {
+      last = n
+      continue
+    }
+    out.push(start === last ? `${start}` : `${start}-${last}`)
+    start = n
+    last = n
+  }
+  if (start !== null) out.push(start === last ? `${start}` : `${start}-${last}`)
+  return out
+}
+
+/**
+ * What the unit holds, as the chat has to see it to answer for it.
+ *
+ * "What presets do we have named Metallica?" — "I don't have a way to browse
+ * your slot list or library by name from here." The app had the list on screen
+ * at the time. It was never sent, so three things in one conversation failed
+ * for the same reason: a preset could not be found by name, an empty slot could
+ * not be found at all, and "switch to an empty preset first" came back as an
+ * offer to delete every block on the one that was loaded.
+ *
+ * Three states, and the third is the one that matters. A name this app has
+ * learned is a name; a slot the unit has answered "nothing stored here" about
+ * is empty; a slot nobody has read yet is neither, and saying so is what stops
+ * "you have no preset called Metallica" being said about a list that has barely
+ * been looked at. Learning a name costs a preset dump on a gen-3 unit, so a
+ * partly-read list is the ordinary case rather than the exception.
+ *
+ * Names go one per line because they are the part that is looked up; the other
+ * two are runs, because nobody looks up an empty slot by number.
+ */
+export function slotsForChat(names = [], capabilities = null, loaded = null, cap = 400) {
+  const total = slotCount(capabilities)
+  const held = new Map()
+  for (const row of names || []) {
+    if (!Number.isInteger(row?.number)) continue
+    if (total !== null && slotOutside(row.number, capabilities)) continue
+    held.set(row.number, typeof row.name === 'string' ? row.name.trim() : '')
+  }
+  /*
+   * The loaded preset's name came from the unit itself a moment ago, and it is
+   * the one name that is certainly right. It can be missing from the cache on
+   * a phone that has scanned nothing yet, which is exactly when being asked
+   * "what is this?" is most likely.
+   */
+  if (Number.isInteger(loaded?.number) && !held.has(loaded.number)) {
+    held.set(loaded.number, loaded.empty ? '' : String(loaded.name || '').trim())
+  }
+
+  const named = []
+  const empty = []
+  for (const [number, name] of [...held.entries()].sort((a, b) => a[0] - b[0])) {
+    if (name) named.push(`${number} ${name}`)
+    else empty.push(number)
+  }
+
+  const unread = []
+  if (total !== null) {
+    for (let i = 0; i < total; i++) if (!held.has(i)) unread.push(i)
+  }
+
+  return {
+    count: total,
+    named: named.slice(0, cap),
+    /* Said rather than left to be inferred from a short list — a cap that is
+       silent is a list the model will answer "no" from. */
+    moreNamed: named.length > cap ? named.length - cap : undefined,
+    empty: runsOf(empty),
+    unread: runsOf(unread)
+  }
+}

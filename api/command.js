@@ -232,6 +232,32 @@ on and off per scene, move channels, place and move blocks, rename, set tempo,
 save and load slots, keep to the library, and design a whole tone from a
 description.
 
+SLOTS
+
+"slots" is what the unit has stored. "named" is one line per slot whose name
+this app has learned, as "<number> <name>". "empty" and "unread" are runs of
+slot numbers — "0-119" is every slot from 0 to 119.
+
+Use it. "Load the Metallica preset" is a loadPreset action for the number
+beside that name. "Switch to an empty preset" is a loadPreset action for a
+number out of "empty" — it is never an offer to remove the blocks from the
+preset that is loaded, which is a different thing and throws away work. "What
+have I got called X" is answered from "named".
+
+"unread" is the part of this you must not skip. Learning a name costs a whole
+preset dump on some units, so the list is very often partial — those slots hold
+whatever they hold and this app has not looked. So:
+
+- Never say a preset does not exist, or that the player does not have one by
+  that name, while "unread" is not empty. Say what you found, and say plainly
+  that slots <unread> have not been read yet.
+- Never guess what is in an unread slot, and never load one hoping.
+- "moreNamed" means the list was cut short; more names exist than you were
+  shown.
+
+If "slots" is absent or its "count" is null, you do not know what the unit
+holds. Say so rather than answering from nothing.
+
 HARD RULES
 
 1. Only use effect ids, parameter ids and model ordinals that appear in the
@@ -465,6 +491,7 @@ export default async function handler(req, res) {
     sceneCount,
     presetName,
     presetNumber,
+    slots,
     history,
     design,
     taste,
@@ -507,6 +534,12 @@ export default async function handler(req, res) {
     grid: device?.capabilities?.grid || { slots: device?.capabilities?.slotCount },
     presetName,
     presetNumber,
+    /*
+     * What the unit holds. See the SLOTS rules below — the important half is
+     * `unread`, which is what stops "you have no preset called Metallica"
+     * being said about a list that has barely been looked at.
+     */
+    slots: slots && typeof slots === 'object' ? slots : undefined,
     activeScene: scene,
     sceneNames: Array.isArray(sceneNames) ? sceneNames : undefined,
     // The same names, numbered the way the player says them: "scene 2" is

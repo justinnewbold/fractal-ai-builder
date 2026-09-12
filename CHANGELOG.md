@@ -3,6 +3,27 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.180.0
+
+**The chat can see your preset list now.** "What presets do we have named
+Metallica?" came back with "I don't have a way to browse your slot list or
+library by name from here" — while the list was on screen at the time. It was
+never sent. Three things in one conversation failed for that one reason: a
+preset could not be found by name, an empty slot could not be found at all,
+and "switch to an empty preset first before we write this" came back as an
+offer to delete every block on the preset that was loaded, which is a
+different thing and throws work away.
+
+It now gets the slot numbers, the names it has learned, and which slots are
+empty. "Load the Metallica preset" and "switch to an empty preset" are both
+just a slot number it can look up.
+
+**And it is told what it has not seen.** Learning a slot's name costs a whole
+preset dump on an FM3, so the list is very often only part-read — which is
+exactly how "you don't have a preset called that" gets said about a list
+nobody has looked at. The unread slots are named as unread, and saying a preset
+does not exist while any remain is now against the rules it works to.
+
 ## 7.179.1
 
 **The phone can tell the unit it isn't drawing meter bars again.** A player
