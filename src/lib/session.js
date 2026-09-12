@@ -53,6 +53,11 @@ export function saveSession(state, store = safeStore()) {
         /* Which conversation this is, so the shelf gets one row for it rather
            than a fresh one every time the phone is put in a pocket. */
         chatId: state?.chatId || null,
+        /* When a chat was last put down here. The account learns a couple of
+           seconds later, and a phone can lose the page inside those seconds —
+           so this is what stops New chat filling straight back up with the
+           conversation it just discarded. See cloudChat.pickChat. */
+        clearedAt: Number(state?.clearedAt) || 0,
         result: state?.result ?? null,
         withScenes: !!state?.withScenes,
         renamePreset: state?.renamePreset !== false,
@@ -91,6 +96,7 @@ export function loadSession(store = safeStore()) {
        * phone reloaded the page, and one chat appeared on it ten times.
        */
       chatId: typeof saved.chatId === 'string' && saved.chatId ? saved.chatId : null,
+      clearedAt: Number(saved.clearedAt) || 0,
       result: saved.result ?? null,
       withScenes: !!saved.withScenes,
       renamePreset: saved.renamePreset !== false,

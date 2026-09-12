@@ -3,6 +3,22 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.177.0
+
+**New chat puts the conversation down for good.** Pressing it emptied the box
+and then the same chat came back. The box really did clear — what came back was
+the account's copy. There is one live transcript per person so the chat is the
+same on the phone as on the Mac, and New chat was never telling it anything:
+the account went on holding the conversation, and the next time the phone
+reloaded the page — which on a phone is constantly — an empty box next to a
+full account read as a device that had not caught up yet, so it filled back up.
+The account is told now, and the moment a chat was put down is written down
+here first, so losing the page in the couple of seconds before that message
+lands does not bring the chat back either.
+
+A conversation started on the Mac *after* you pressed New chat on the phone is
+a real one waiting for you, and it still arrives.
+
 ## 7.176.1
 
 **One conversation is one row in History again.** The list showed the same
