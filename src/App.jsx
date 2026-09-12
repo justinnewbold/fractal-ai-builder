@@ -3408,6 +3408,26 @@ export default function App() {
 
       keep(replacing)
       setResult(validated)
+      /*
+       * And its scenes, which are the reason a saved tone has eight of
+       * anything.
+       *
+       * Scenes are opt-in on a fresh design — see generate — and this path
+       * never said anything about them at all, so a reload sent whatever the
+       * switch happened to be left on from earlier in the session, which after
+       * clearing a tone is off. The result was a saved eight-scene tone that
+       * reloaded as the sound only: every value landed, every scene kept the
+       * name and the layout of whatever preset was underneath it, and nothing
+       * on the card said so. "I believe this was supposed to name eight scenes
+       * with song names and it didn't."
+       *
+       * A reload is not a proposal about scenes, it is the tone that was
+       * saved, and its scenes are part of it — this app has just asked which
+       * of them should come across when there were too many, and answered in
+       * the conversation which ones made it. Asking that and then writing none
+       * of them is the contradiction this fixes.
+       */
+      setWithScenes(validated.scenes.length > 0)
       setLastDesign(designMemory(validated))
       setSaveName(validated.presetName || entry.name)
       revealResult()

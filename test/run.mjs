@@ -9356,6 +9356,47 @@ test('a setlist knows when it changed, and a delete leaves a mark', async () => 
 
 console.log('\na tone with more scenes than the unit holds')
 
+test('a saved tone brings its scenes back with it', () => {
+  /*
+   * "I believe this was supposed to name eight scenes with song names and it
+   * didn't."
+   *
+   * Scenes are opt-in on a fresh design, deliberately and visibly — the card
+   * offers "Also set up 8 scenes" and says which existing ones it would write
+   * over. The reload path said nothing about them at all, so a reloaded tone
+   * sent whatever that switch was left on from earlier in the session, which
+   * after a tone is cleared is off. An eight-scene tone came back as the sound
+   * only: every value landed and every scene kept the name and the layout of
+   * whatever preset was underneath.
+   *
+   * A reload is not a proposal about scenes. It is the tone that was saved,
+   * and its scenes are part of what was saved — this app has just offered to
+   * choose which of them come across when there were too many for the unit,
+   * and said in the conversation which ones made it. Asking that and then
+   * writing none of them is the contradiction.
+   */
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  const reload = app.slice(app.indexOf('const reload = async (entry, picked = null)'))
+  const body = reload.slice(0, reload.indexOf('const adjust') > 0 ? reload.indexOf('const adjust') : 12000)
+  assert.match(
+    body,
+    /setWithScenes\(validated\.scenes\.length > 0\)/,
+    'a reloaded tone leaves its own scenes behind'
+  )
+  assert.ok(
+    body.indexOf('setResult(validated)') < body.indexOf('setWithScenes(validated.scenes.length > 0)'),
+    'the switch is set for a result that is not on screen yet'
+  )
+
+  /* And a fresh design is untouched: still opt-in unless the scenes ARE the
+     proposal, which is the one case where leaving them off offers nothing. */
+  assert.match(
+    app,
+    /validated\.scenes\.length > 0 && \(opts\.wantScenes === true \|\| validated\.changes\.length === 0\)/,
+    'a fresh design stopped asking before it writes over scenes somebody laid out'
+  )
+})
+
 test('a tone made on the unit it is loaded onto is never asked about', async () => {
   const { scenesOverflowing } = await import('../src/lib/sceneFit.js')
   const fm3 = { scenes: [{ index: 0 }, { index: 1 }, { index: 2 }, { index: 3 }] }
