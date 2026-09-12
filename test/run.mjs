@@ -3109,6 +3109,93 @@ test('every unit the server can detect is addressed on its own terms', async () 
    * stay null all the way through: no jumps, no bound to refuse a save
    * against, and no bank letters on a unit that has no banks.
    */
+test('the chat is told what the unit holds, and what nobody has looked at', async () => {
+  /*
+   * "What presets do we have named Metallica?" — "I don't have a way to browse
+   * your slot list or library by name from here." The list was on screen at
+   * the time, and three things in one conversation failed for the same reason:
+   * a preset could not be found by name, an empty slot could not be found at
+   * all, and "switch to an empty preset first" came back as an offer to delete
+   * every block on the one that was loaded.
+   */
+  const { runsOf, slotsForChat } = await import('../src/lib/slots.js')
+
+  assert.deepEqual(runsOf([0, 1, 2, 5, 7, 8]), ['0-2', '5', '7-8'])
+  assert.deepEqual(runsOf([3, 3, 1]), ['1', '3'], 'a run list is sorted and says each slot once')
+  assert.deepEqual(runsOf([]), [])
+  assert.deepEqual(runsOf([1, null, 'x', 2]), ['1-2'], 'a slot that is not a number is not a slot')
+
+  const caps = { presets: { count: 12 } }
+  const seen = [
+    { number: 0, name: 'USA Mk IV' },
+    { number: 2, name: 'Metallica' },
+    { number: 3, name: '' },
+    { number: 4, name: '' },
+    { number: 5, name: '' }
+  ]
+  const view = slotsForChat(seen, caps, { number: 2, name: 'Metallica' })
+  assert.equal(view.count, 12)
+  assert.deepEqual(view.named, ['0 USA Mk IV', '2 Metallica'], 'a name cannot be looked up')
+  // A slot the unit answered "nothing stored here" about.
+  assert.deepEqual(view.empty, ['3-5'])
+  /*
+   * The half that matters. Learning a name costs a preset dump on a gen-3
+   * unit, so a partly-read list is the ordinary case — and without this the
+   * honest answer "slots 6 to 11 have not been read" comes out as "you have no
+   * preset called that".
+   */
+  assert.deepEqual(view.unread, ['1', '6-11'])
+
+  // The loaded preset's name came from the unit a moment ago and is the one
+  // name certainly right, so it counts even when nothing has been scanned.
+  const fresh = slotsForChat([], caps, { number: 7, name: 'Eva Under Fire' })
+  assert.deepEqual(fresh.named, ['7 Eva Under Fire'])
+  assert.deepEqual(fresh.unread, ['0-6', '8-11'])
+  // And a loaded slot with nothing in it is empty, not a preset called nothing.
+  assert.deepEqual(slotsForChat([], caps, { number: 1, empty: true }).empty, ['1'])
+
+  // A unit that has never said how many slots it has cannot have unread ones
+  // counted — see slotCount. Saying "0-511 unread" about a VP4 is the guess
+  // that rule exists to stop.
+  const quiet = slotsForChat(seen, null, null)
+  assert.equal(quiet.count, null)
+  assert.deepEqual(quiet.unread, [])
+  assert.deepEqual(quiet.named, ['0 USA Mk IV', '2 Metallica'])
+
+  // A slot past the end of this unit is not one of its slots.
+  assert.deepEqual(
+    slotsForChat([{ number: 500, name: 'Ghost' }], caps, null).named,
+    [],
+    'a slot this unit does not have was offered as one it does'
+  )
+
+  // A cut list says it was cut, because a cap that is silent is a list the
+  // model answers "no" from.
+  const many = Array.from({ length: 30 }, (_, i) => ({ number: i, name: `P${i}` }))
+  const capped = slotsForChat(many, { presets: { count: 30 } }, null, 10)
+  assert.equal(capped.named.length, 10)
+  assert.equal(capped.moreNamed, 20)
+  assert.equal(slotsForChat(many, { presets: { count: 30 } }, null).moreNamed, undefined)
+})
+
+test('the slot list reaches the chat, and the chat is told how to read it', () => {
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  const ask = app.slice(app.indexOf('const body = await askPlan('), app.indexOf('history: turns.map'))
+  assert.match(ask, /slots: slotsForChat\(/, 'the ask carries no slot list')
+
+  const route = readSrc(new URL('../api/command.js', import.meta.url), 'utf8')
+  assert.match(route, /^\s+slots,$/m, 'the route never reads the slot list off the request')
+  assert.match(route, /slots: slots && typeof slots === 'object' \? slots : undefined/)
+  /*
+   * The rules, not just the data. An unread slot holds whatever it holds and
+   * this app has not looked — a model that does not know that answers "you
+   * have no preset called Metallica" about a list it has barely seen.
+   */
+  assert.match(route, /^SLOTS$/m)
+  assert.match(route, /Never say a preset does not exist/)
+  assert.match(route, /never an offer to remove the blocks/)
+})
+
   const { slotCount, slotLabel, slotOutside } = await import('../src/lib/slots.js')
   const { jumpsFor } = await import('../src/lib/presetJumps.js')
 
