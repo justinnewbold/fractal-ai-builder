@@ -1956,6 +1956,32 @@ test('the name is written even when there is nobody to host for', async () => {
   assert.ok(unit.calls.some((c) => c.startsWith('PUT /store/config/host.name')))
 })
 
+test('the advert answers for its own name, never for the Mac’s', async () => {
+  /*
+   * "This computer's local hostname 'Justins-MacBook-Pro-958.local' is
+   * already in use on this network. The name has been changed to
+   * 'Justins-MacBook-Pro-1019.local'." After every restart, and only once the
+   * app had been running. bonjour-service is a responder of its own and,
+   * given no host, publishes the service at the machine's hostname — so this
+   * app was answering for the Mac's own name, and macOS, which checks that
+   * nobody else does, kept renaming itself out of the way.
+   */
+  const published = []
+  class FakeBonjour {
+    publish(config) {
+      published.push(config)
+      return { stop: (cb) => cb() }
+    }
+    destroy() {}
+  }
+  const ad = host.publish(FakeBonjour, { port: 5056, name: 'fractal-justins-macbook-pro' })
+  assert.equal(published.length, 1)
+  assert.equal(published[0].host, 'fractal-justins-macbook-pro.local', 'the advert is answering for the Mac’s own hostname')
+  assert.equal(published[0].name, 'fractal-justins-macbook-pro')
+  assert.equal(published[0].port, 5056)
+  await ad.stop()
+})
+
 test('publishing without mDNS available still gives a usable stop', async () => {
   // The desktop app treats bonjour as optional — without it the IP still
   // works and only the .local name is lost, so this must not throw.
