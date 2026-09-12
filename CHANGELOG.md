@@ -3,6 +3,34 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.187.0
+
+**The Mac finds the unit again after losing it.** From a log on stage: the
+header says CONNECTED, the Mac says CONNECTED, the AM4 is on and its cable is
+in — and every scene tap and every preset select comes back "the Fractal app
+on your Mac has lost its connection to the unit". Try again does nothing.
+Dismiss does nothing. It stays that way until the Mac app is quit and opened
+again.
+
+The device server inside the Mac app opens its USB port to the unit once and
+shares that one open between everything that asks. When the port closed
+underneath it — the unit switched off and on, the cable out and back, the Mac
+waking from sleep, USB deciding to re-enumerate — the server kept handing out
+the closed port for ever. The only thing that ever cleared it was an open that
+FAILED; a port that opened fine and then went away was never let go of. So
+the phone's Try again was asking, over and over, and the Mac was answering
+"port not open" every time, while its own health check said all was well
+because it only looks at whether the unit is LISTED, which it was.
+
+Now the server notices the port is no longer open and opens it again for that
+request. The next tap after the unit is back goes through, and the app's own
+backing-off retry picks it up on its own. The Mac's log also says when the
+port closed and whether the unit went away, because until now that looked
+only like "port not open" from the far end.
+
+This is in the device server the Mac app carries (desktop/forgefx.lock.json
+moves to it), so it takes a new Mac app to get — the phone side needs nothing.
+
 ## 7.186.0
 
 **A band looked up once is not looked up again.** There is no band-gear
