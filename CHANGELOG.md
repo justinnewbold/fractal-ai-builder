@@ -3,6 +3,32 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.183.0
+
+**The songs get looked up too, not just the band.** The lookup added last
+version found the band's real rig and stopped there — the designer then picked
+which songs to build scenes from out of its own memory, and nothing ever
+established what "Chalk Outline" sounds like as against "Home". So eight scenes
+came back named after eight songs over three amp voicings, one drive setting
+and one delay setting.
+
+Now it runs in the order a person would: find the band, find what they played,
+pick the songs — ones a fan would name *and* ones that genuinely sound
+different from each other — then look up each song's own tone in turn. Album
+and year, so the right era's rig is used. Amp and roughly how much gain. Drive
+pedal or none. Delay time, feedback and how loud. What the song actually sounds
+like in one line. Those songs are then the scenes, in that order, each voiced
+from its own lines rather than from the band's general sound.
+
+The number of songs it researches is the number of scenes you asked for, so
+four songs can no longer turn into eight scenes with half of them guessed. Ask
+for one sound and it looks up the rig and no songs at all.
+
+Where a song's own tone isn't documented anywhere, it says so and falls back to
+the band's usual rig rather than inventing one. Adds time to a generation — a
+song is at least one search — and if the lookup fails the tone is designed the
+way it was before rather than not at all.
+
 ## 7.182.0
 
 **It looks up what actually made the sound before it builds anything.** Ask for

@@ -134,3 +134,27 @@ export function sceneInstruction({ wantScenes, sceneBudget, sceneCount = 8 } = {
     `${n} near-copies of the same tone under different names.`
   )
 }
+
+/**
+ * How many songs to look up, which is how many scenes are coming.
+ *
+ * The same question sceneInstruction answers, asked by the step that runs
+ * BEFORE it — the rig lookup has to know how many songs to research, and the
+ * two numbers must be the same one or the chain breaks at the join: four songs
+ * looked up, eight scenes built, and half of them voiced from memory again.
+ * Which is what happened, and what "so that way we're getting accurate tones on
+ * every scene" is asking to stop.
+ *
+ * Zero for one sound, because that request needs the rig and no songs at all.
+ * The default matches rule 11's "three or four" where nobody has named a
+ * number, so the lookup and the designer agree about what "a set" means
+ * without either of them being told twice.
+ */
+export function songsWanted({ wantScenes, sceneBudget, sceneCount = 8 } = {}) {
+  if (wantScenes === false) return 0
+  const n = sceneBudgetFor(sceneBudget, sceneCount)
+  if (n) return n
+  // No number named: a set is three or four, and the unit may hold fewer.
+  const top = Number.isFinite(Number(sceneCount)) ? Math.max(1, Math.floor(Number(sceneCount))) : 8
+  return Math.min(A_FEW, top)
+}
