@@ -44,14 +44,36 @@ export const offersAll = (sceneCount) => Number(sceneCount) > A_FEW
  *
  * Clamped rather than trusted: the unit's count is the hard ceiling — writing
  * past it is refused by the validator anyway, and asking for scenes that cannot
- * exist only wastes a generation. A set of one is not a set; that answer is the
- * other button.
+ * exist only wastes a generation.
+ *
+ * One is a number too. "Make a single scene modeled after Master of Puppets"
+ * came back with four, because one was refused here as "not a set" and the
+ * request fell through to the model's own judgement. A single NAMED scene is
+ * not the same thing as the "One sound" button — that dials the tone into
+ * whatever scene is live and names nothing — so it is its own instruction,
+ * see sceneInstruction. Zero and below are still nothing asked for.
  */
 export function sceneBudgetFor(wanted, sceneCount = 8) {
   const n = Number(wanted)
   const top = Number.isFinite(Number(sceneCount)) ? Math.max(1, Math.floor(Number(sceneCount))) : 8
-  if (!Number.isInteger(n) || n < 2) return null
+  if (!Number.isInteger(n) || n < 1) return null
   return Math.min(n, top)
+}
+
+/**
+ * The exact counts the question offers beside its three buttons.
+ *
+ * "If it doesn't understand how many scenes to create, it can pull up a
+ * question box and ask how many scenes would you like to create." The three
+ * buttons answer one, a few and all; this is every number in between, so a
+ * player who wants five taps five rather than typing it. One is the first
+ * button and the unit's own count is the third, so neither is repeated here.
+ */
+export function sceneNumbers(sceneCount = 8) {
+  const top = Math.max(1, Math.floor(Number(sceneCount) || 8))
+  const out = []
+  for (let n = 2; n <= top; n += 1) if (!(offersAll(top) && n === top)) out.push(n)
+  return out
 }
 
 /**
@@ -106,13 +128,28 @@ export function sceneChoices(sceneCount = 8) {
  * model and none of it reached the footswitch. A number of scenes asked for
  * against a band's name is a number of that band's SONGS.
  */
-export function sceneInstruction({ wantScenes, sceneBudget, sceneCount = 8 } = {}) {
+export function sceneInstruction({ wantScenes, sceneBudget, sceneCount = 8, activeScene = null } = {}) {
   if (wantScenes === false) {
     return '\n\nThe player has asked for ONE SOUND, not a set. Return an empty scenes array.'
   }
   if (wantScenes !== true) return ''
 
   const n = sceneBudgetFor(sceneBudget, sceneCount)
+  /*
+   * One scene, named. "Make a single scene modeled after Master of Puppets"
+   * is one song on the footswitch they are standing on, with its name on it —
+   * not four scenes and not an unnamed tone. It goes into the scene they are
+   * in, because that is the one they will hear when they hit play.
+   */
+  if (n === 1) {
+    const at = Number.isInteger(Number(activeScene)) && Number(activeScene) >= 0 ? Number(activeScene) : 0
+    return (
+      `\n\nThe player has asked for EXACTLY ONE SCENE. Return exactly one entry in scenes, at index ` +
+      `${at} — the scene they are in now — named for the song, part or sound the description ` +
+      `names, and voiced for it. Do not return more, and do not return an empty scenes array: ` +
+      `the name on the footswitch is the point.`
+    )
+  }
   if (!n) {
     return (
       '\n\nThe player has asked for a SET OF SCENES across this preset. Return three or four ' +
@@ -217,19 +254,46 @@ export function scenesAskedFor(text, sceneCount = 8) {
     words.match(new RegExp(`\\b(?:all|every one of the)\\s+${NUMBER}\\b`))
   if (numbered) {
     const n = toCount(numbered[1])
-    if (n === 1) return { wantScenes: false, sceneBudget: undefined }
+    // "1 scene", "one scene": one, named, where they are standing.
+    if (n === 1) return { wantScenes: true, sceneBudget: 1 }
     const budget = sceneBudgetFor(n, top)
     return budget ? { wantScenes: true, sceneBudget: budget } : null
   }
 
   // "all scenes", "every scene", "each scene", "all of the scenes".
   if (/\b(?:all|every|each)\s+(?:of\s+)?(?:the\s+|its\s+|my\s+)?scenes?\b/.test(words)) return all
-  // "a full Tool preset", "the whole preset", "a complete set of scenes".
-  if (/\b(?:full|whole|entire|complete)\b[^.!?]{0,40}\b(?:preset|set of scenes)\b/.test(words)) return all
+  // "a full Tool preset", "the whole preset", "a full rig", "a complete set
+  // of scenes". "Full rig means max: if it's an FM3 that's 8, if it's an AM4
+  // that's four."
+  if (/\b(?:full|whole|entire|complete|max(?:ed)?(?: out)?)\b[^.!?]{0,40}\b(?:preset|rig|set of scenes|scenes)\b/.test(words)) return all
+  if (/\bas many scenes as\b/.test(words)) return all
 
-  // "one sound", "just one scene", "a single scene".
-  if (/\b(?:just|only)\s+(?:one|a single|1)\s+(?:scene|sound)\b|\b(?:a\s+)?single\s+(?:scene|sound)\b|\bone\s+sound\b/.test(words)) {
+  // "a single scene", "one scene" — one, named, where they are standing.
+  if (/\b(?:a\s+)?single\s+scene\b|\b(?:just\s+|only\s+)?(?:one|1)\s+scene\b/.test(words)) {
+    return { wantScenes: true, sceneBudget: 1 }
+  }
+  // "one sound", "a single sound" — the tone into the live scene, no naming.
+  if (/\b(?:just\s+|only\s+)?(?:one|a\s+single|single|1)\s+sound\b/.test(words)) {
     return { wantScenes: false, sceneBudget: undefined }
   }
   return null
+}
+
+/**
+ * Whether the player said to leave the preset's name alone.
+ *
+ * "Do not create a preset name." The design came back with "Master of
+ * Puppets 86" and the rename box ticked, because nothing read that sentence:
+ * the designer always proposes a name and the app always offers it. The
+ * words are plain and there are only a few ways to say them, so they are
+ * read here and the box starts unticked. Deciding the other way is one tap.
+ */
+export function keepsName(text) {
+  const words = String(text || '').toLowerCase()
+  if (!words.trim()) return false
+  return (
+    /\b(?:do not|don'?t|dont|never|no need to|without)\b[^.!?]{0,24}\b(?:preset name|name (?:the|this|my) preset|rename|renaming|naming|new name|name it)\b/.test(words) ||
+    /\b(?:keep|leave|retain)\b[^.!?]{0,12}\b(?:preset'?s? )?name\b/.test(words) ||
+    /\bno (?:new )?preset name\b|\bno rename\b/.test(words)
+  )
 }

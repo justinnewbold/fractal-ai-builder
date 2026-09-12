@@ -377,6 +377,9 @@ export default async function handler(req, res) {
      * leaves it to the model's own judgement, which is rule 11's three or four.
      */
     sceneBudget,
+    // Which scene the unit is in, so "one scene" lands on the footswitch the
+    // player is standing on rather than on scene 1.
+    activeScene,
     /*
      * A rig briefing this browser already has for the band being asked about.
      *
@@ -499,7 +502,7 @@ export default async function handler(req, res) {
    * rule 11 too. See ./_scenes.js, which the app shares so that the question
    * and the instruction cannot disagree about what "all of them" means.
    */
-  const asked = sceneInstruction({ wantScenes, sceneBudget, sceneCount: state.sceneCount })
+  const asked = sceneInstruction({ wantScenes, sceneBudget, sceneCount: state.sceneCount, activeScene })
 
   /*
    * What actually made this sound, looked up before anything is designed.

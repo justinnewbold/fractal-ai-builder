@@ -3,6 +3,23 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.196.0
+
+**One scene means one scene, and "do not create a preset name" means
+that.** "Make a single scene modeled after Master of Puppets by Metallica.
+Do not create a preset name." Four scenes came back, and the preset was
+offered a new name with the box ticked. One scene is now one named scene,
+written into the scene you are standing in. A request that says not to name
+or rename the preset leaves the rename box unticked. "A full rig" or "max
+out the scenes" means every scene the unit has — eight on an FM3, four on
+an AM4.
+
+**And when the request does not say how many, the app asks.** The question
+used to appear only on a preset with nothing laid out; on every other preset
+the designer guessed. Now it appears whenever the words gave no number, with
+One sound, A few, All 8, and a row of exact counts in between. Say a number
+in the request and it is not asked.
+
 ## 7.195.0
 
 **You can watch each scene being written.** "I like how it shows it's

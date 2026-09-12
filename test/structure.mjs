@@ -3612,11 +3612,17 @@ export function run(test) {
       /const nothingLaidOut = \(\) => !sceneNames\.some/,
       'nothing decides whether this preset has anything to lose'
     )
+    /* Asked whenever the words did not say — not only on an empty preset.
+       "If it doesn't understand how many scenes to create, it can pull up a
+       question box and ask." */
     assert.match(
       src,
-      /if \(opts\.wantScenes === undefined && sceneCount > 1 && nothingLaidOut\(\)\) \{\s*\n\s*setSceneAsk/,
-      'the build no longer stops to ask on a preset with no scenes named'
+      /if \(opts\.wantScenes === undefined && sceneCount > 1\) \{\s*\n\s*setSceneAsk/,
+      'the build no longer stops to ask when the request names no count'
     )
+    assert.match(src, /activeScene: scene,/, 'the designer is not told which scene the player is in')
+    assert.match(src, /setRenamePreset\(!opts\.keepName\)/, '"do not create a preset name" leaves the rename box ticked')
+    assert.match(src, /sceneNumbers\(sceneCount\)\.map\(\(n\) =>/, 'the question offers no exact count')
     // Asked before the model runs, so the answer costs one generation, not two.
     assert.match(
       src,
@@ -3624,7 +3630,7 @@ export function run(test) {
       'the answer never reaches the model, so asking changed nothing'
     )
     const api = readFileSync(new URL('../api/generate.js', import.meta.url), 'utf8')
-    assert.match(api, /sceneInstruction\(\{ wantScenes, sceneBudget, sceneCount: state\.sceneCount \}\)/, 'the designer route ignores the answer')
+    assert.match(api, /sceneInstruction\(\{ wantScenes, sceneBudget, sceneCount: state\.sceneCount, activeScene \}\)/, 'the designer route ignores the answer')
     const scenes = readFileSync(new URL('../api/_scenes.js', import.meta.url), 'utf8')
     assert.match(scenes, /SET OF SCENES/, 'a request for a set is not made plain to the model')
     assert.match(scenes, /ONE SOUND/, 'a request for one sound is not made plain to the model')
@@ -3640,7 +3646,7 @@ export function run(test) {
      * four" was refined with no count at all. The words are read first, on
      * the build and on the refinement, and the chat hands both what was typed.
      */
-    assert.match(src, /import \{ sceneChoices, scenesAskedFor, songsWanted \} from '\.\.\/api\/_scenes\.js'/)
+    assert.match(src, /import \{ keepsName, sceneChoices, sceneNumbers, scenesAskedFor, songsWanted \} from '\.\.\/api\/_scenes\.js'/)
     assert.match(
       src,
       /const named = scenesAskedFor\(description, sceneCount\)\s*\n\s*if \(named\) opts = \{ \.\.\.opts, \.\.\.named \}/,
@@ -3653,7 +3659,7 @@ export function run(test) {
     )
     assert.match(
       src,
-      /const scenesWanted = scenesAskedFor\(instruction, sceneCount\) \|\| \{\}\s*\n\s*if \(builtBlocks\)/,
+      /const scenesWanted = \{\s*\n\s*\.\.\.\(scenesAskedFor\(instruction, sceneCount\) \|\| \{\}\),\s*\n\s*\.\.\.\(keepsName\(instruction\) \? \{ keepName: true \} : \{\}\)\s*\n\s*\}\s*\n\s*if \(builtBlocks\)/,
       'the chat reads the count from what was typed, not from its retelling'
     )
     const api = readFileSync(new URL('../api/generate.js', import.meta.url), 'utf8')
