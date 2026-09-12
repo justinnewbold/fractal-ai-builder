@@ -118,7 +118,8 @@ const Action = z.object({
         'an optional name to save it under. For designTone: the tone description in the ' +
         'player own words, with any band, artist, album or song they named carried through ' +
         'word for word — that name is what the scenes get named after, and a description that ' +
-        'loses it comes back as Clean, Rhythm and Lead. For buildChain: the block slugs in ' +
+        'loses it comes back as Clean, Rhythm and Lead. A number of scenes they asked for stays ' +
+        'in too, as they said it ("8 scenes", "all eight", "a full preset"). For buildChain: the block slugs in ' +
         'signal order, comma separated, ' +
         'or null for a sensible default. Null otherwise.'
     ),

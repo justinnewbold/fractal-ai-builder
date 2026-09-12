@@ -3,6 +3,21 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.194.0
+
+**Ask for eight scenes and you get eight.** "It should be eight scenes not
+four." On an FM3 a "Full Tool preset" came back with four scenes, and saying
+so — twice — changed nothing. The app only asks how many scenes you want on a
+preset with none named yet; on any other preset the designer was left to
+judge, and its own rule says three or four. A follow-up naming a number was
+sent as an adjustment with no count attached, next to an instruction to
+change as little as possible, so it kept four. The number is now read out of
+what you typed, on the first request and on every refinement — "8 scenes",
+"eight scenes", "all eight", "every scene", or a "full" preset all mean the
+whole unit — and reaches the designer as the same instruction tapping
+"All 8" would have. The song lookup goes hunting for that many songs to fill
+them with. On an AM4 the same words mean four, because that is what it has.
+
 ## 7.193.0
 
 **Rename the preset and its scenes by hand.** "Would also like to be able to

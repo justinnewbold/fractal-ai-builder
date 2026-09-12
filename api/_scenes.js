@@ -158,3 +158,78 @@ export function songsWanted({ wantScenes, sceneBudget, sceneCount = 8 } = {}) {
   const top = Number.isFinite(Number(sceneCount)) ? Math.max(1, Math.floor(Number(sceneCount))) : 8
   return Math.min(A_FEW, top)
 }
+
+/**
+ * How many scenes the player asked for IN THEIR OWN WORDS, when they did.
+ *
+ * The buttons above only appear on a preset with no scene named yet. On one
+ * that already has names — which is every preset after the first design, and
+ * every preset that came with the unit — nobody is asked, the answer stays
+ * undefined, and rule 11 fills three or four. So "Full Tool preset" on an FM3
+ * came back with four scenes, and "It should be eight scenes not four" was
+ * handed to the designer as an adjustment with no scene count attached at all,
+ * next to an instruction to change as little as possible. Four scenes, three
+ * times, and the number was in the request every time.
+ *
+ * So the words are read for a number before anything is asked or assumed.
+ * "8 scenes", "eight scenes", "all 8", "every scene", "all scenes", and a
+ * "full" or "whole" preset all mean the same thing on a unit with eight: all
+ * of them. "One scene" or "one sound" is the other button. A number the unit
+ * cannot hold is clamped the way a tapped one is.
+ *
+ * Returns the same shape the buttons produce — `{ wantScenes, sceneBudget }`
+ * — so the two paths cannot disagree, or null when the words name no count
+ * and the model's judgement is still the right answer. A number that is being
+ * REJECTED ("not four", "instead of 4 scenes", "from 4 scenes to 8") is
+ * dropped before the count is read, because the one being asked for is the
+ * other one.
+ */
+const NUMBER_WORDS = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12
+}
+const NUMBER = '(\\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)'
+const toCount = (word) => NUMBER_WORDS[word] ?? Number(word)
+
+export function scenesAskedFor(text, sceneCount = 8) {
+  const words = String(text || '')
+    .toLowerCase()
+    // A count being turned down is not a count being asked for.
+    .replace(new RegExp(`\\b(?:not|instead of|rather than|from|only(?: made| did| built| gave me)?)\\s+${NUMBER}(?:\\s*-?\\s*scenes?)?\\b`, 'g'), ' ')
+  if (!words.trim()) return null
+
+  const top = Number.isFinite(Number(sceneCount)) ? Math.max(1, Math.floor(Number(sceneCount))) : 8
+  const all = { wantScenes: true, sceneBudget: top }
+
+  // "8 scenes", "eight scenes", "an 8-scene preset", "all 8 scenes", "all eight".
+  const numbered =
+    words.match(new RegExp(`\\b${NUMBER}\\s*-?\\s*scenes?\\b`)) ||
+    words.match(new RegExp(`\\b(?:all|every one of the)\\s+${NUMBER}\\b`))
+  if (numbered) {
+    const n = toCount(numbered[1])
+    if (n === 1) return { wantScenes: false, sceneBudget: undefined }
+    const budget = sceneBudgetFor(n, top)
+    return budget ? { wantScenes: true, sceneBudget: budget } : null
+  }
+
+  // "all scenes", "every scene", "each scene", "all of the scenes".
+  if (/\b(?:all|every|each)\s+(?:of\s+)?(?:the\s+|its\s+|my\s+)?scenes?\b/.test(words)) return all
+  // "a full Tool preset", "the whole preset", "a complete set of scenes".
+  if (/\b(?:full|whole|entire|complete)\b[^.!?]{0,40}\b(?:preset|set of scenes)\b/.test(words)) return all
+
+  // "one sound", "just one scene", "a single scene".
+  if (/\b(?:just|only)\s+(?:one|a single|1)\s+(?:scene|sound)\b|\b(?:a\s+)?single\s+(?:scene|sound)\b|\bone\s+sound\b/.test(words)) {
+    return { wantScenes: false, sceneBudget: undefined }
+  }
+  return null
+}

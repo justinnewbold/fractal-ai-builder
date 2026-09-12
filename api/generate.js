@@ -465,7 +465,19 @@ export default async function handler(req, res) {
       ? `You designed this preset:\n${JSON.stringify(previous)}\n\nThe player has now heard it ` +
         `and wants a change: ${description}\n\nAdjust it. Return the full spec again, not just ` +
         `the differences — keep everything that isn't being changed. Make a real, audible move in ` +
-        `the direction asked for rather than a token nudge, but change as little else as possible.`
+        `the direction asked for rather than a token nudge, but change as little else as possible.` +
+        /*
+         * Unless the change IS the number of scenes. "It should be eight scenes
+         * not four" is not a nudge, and "change as little as possible" read
+         * as "keep four". When the player has named a count, the instruction
+         * below carries it, and the music is whatever this design is already
+         * voiced for — more of the same band's songs, not a fresh brief.
+         */
+        (wantScenes === true && sceneBudget
+          ? ` The one thing that must grow is the scene list: the count asked for below is the ` +
+            `player's, the band or song is the one this design is already voiced for, and the ` +
+            `scenes it has are kept — the new ones are added alongside them.`
+          : '')
       : `Tone wanted: ${description}`
 
   /*

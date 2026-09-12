@@ -188,7 +188,7 @@ import {
   newChatId,
   worthKeeping
 } from './lib/chatLog'
-import { sceneChoices, songsWanted } from '../api/_scenes.js'
+import { sceneChoices, scenesAskedFor, songsWanted } from '../api/_scenes.js'
 import SceneFit from './components/SceneFit'
 import { scenesOverflowing, fitScenes, describeFit } from './lib/sceneFit'
 import { pushEntry, replaceEntry } from './lib/nav'
@@ -2823,6 +2823,19 @@ export default function App() {
 
   const generate = async (description, against = null, opts = {}) => {
     /*
+     * A number of scenes in the request itself is the answer to the question
+     * below, so it is not asked and not guessed. "Full Tool preset" on an FM3
+     * whose scenes were already named went straight to the model with no count
+     * attached and came back with four — the question is only put on a preset
+     * with nothing laid out, and rule 11 filled the silence. See
+     * scenesAskedFor in api/_scenes.js: the same shape the buttons produce, so
+     * the two cannot disagree.
+     */
+    if (opts.wantScenes === undefined) {
+      const named = scenesAskedFor(description, sceneCount)
+      if (named) opts = { ...opts, ...named }
+    }
+    /*
      * Ask once, before the model runs. Asking afterwards would mean paying for
      * a second generation to act on the answer.
      */
@@ -3593,9 +3606,21 @@ export default function App() {
    * Sends the previous spec as the subject rather than a fresh brief, so the
    * model moves one thing instead of redesigning around a new sentence.
    */
-  const refine = async (instruction, against = null) => {
+  const refine = async (instruction, against = null, opts = {}) => {
     const previous = result?.spec
     if (!previous) return
+    /*
+     * A refinement can be about the COUNT. "It should be eight scenes not
+     * four" went to the designer as an adjustment with no scene count on it,
+     * beside an instruction to change as little as possible — so it kept four,
+     * twice. A number in the words reaches the model as the same instruction a
+     * tapped "All 8" would have, and the rig lookup goes hunting for that many
+     * songs to fill them with.
+     */
+    const scenesWanted =
+      opts.wantScenes !== undefined
+        ? { wantScenes: opts.wantScenes, sceneBudget: opts.sceneBudget }
+        : scenesAskedFor(instruction, sceneCount) || {}
     /* The version being adjusted, taken before the run and kept only if a new
        one arrives. A refinement that fails leaves the old tone live — and a
        tone that is both live and in the log is the same tone drawn twice. */
@@ -3633,7 +3658,7 @@ export default function App() {
       }
 
       setProgress(null)
-      const spec = await requestSpec(schema, instruction, previous)
+      const spec = await requestSpec(schema, instruction, previous, scenesWanted)
 
       const validated = validateSpec(spec, schema, sceneCount, channelNames)
       validated.spec = spec
@@ -4066,15 +4091,21 @@ export default function App() {
          * is the tone that was actually asked for.
          */
         const startOver = design.flag === true
+        /*
+         * How many scenes they asked for, read from what they actually typed
+         * rather than from the chat model's retelling of it — a count that
+         * survives one rewrite may not survive the next.
+         */
+        const scenesWanted = scenesAskedFor(instruction, sceneCount) || {}
         if (builtBlocks) {
           setResult(null)
-          await generate(design.text || instruction, builtBlocks)
+          await generate(design.text || instruction, builtBlocks, scenesWanted)
         } else if (result?.changes?.length && !startOver) {
           // Refining means adjusting a design that produced something. A spec
           // whose every change was rejected is not a thing to build on.
-          await refine(design.text || instruction)
+          await refine(design.text || instruction, null, scenesWanted)
         } else {
-          await generate(design.text || instruction, builtBlocks)
+          await generate(design.text || instruction, builtBlocks, scenesWanted)
         }
         return
       }
