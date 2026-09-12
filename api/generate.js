@@ -12,7 +12,7 @@
  * swapping providers is an environment variable, not a code change. The key
  * lives here and never reaches the browser.
  */
-import { generateObject, generateText, streamObject } from 'ai'
+import { generateObject, streamObject, streamText } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 import { cors } from './_cors.js'
@@ -510,7 +510,7 @@ export default async function handler(req, res) {
            */
           songs: songsWanted({ wantScenes, sceneBudget, sceneCount: state.sceneCount }),
           model,
-          generateText,
+          streamText,
           webSearch: searchTool,
           signal: req.signal
         })

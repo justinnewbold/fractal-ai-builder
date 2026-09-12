@@ -5380,6 +5380,9 @@ test('a request that names no music costs nothing, and a rig that comes back is 
    * and modded Marshalls into ENGLs, all three of which this unit models.
    */
   const { cleanRig, rigInstruction, researchRig, rigOutcome } = rigMod
+  /* The lookup reads a stream now, so what it got by the time it was stopped
+     is what it keeps — see the partial case below. */
+  const lines = (parts) => (async function* () { for (const p of parts) yield p })()
 
   /* NONE means nothing, and a model that says NONE and then explains itself
      must not have the explanation read as a rig. */
@@ -5419,7 +5422,7 @@ test('a request that names no music costs nothing, and a rig that comes back is 
     description: 'three days grace',
     model: {},
     webSearch: {},
-    generateText: async () => {
+    streamText: () => {
       throw new Error('no credit')
     }
   })
@@ -5439,11 +5442,11 @@ test('a request that names no music costs nothing, and a rig that comes back is 
     songs: 6,
     model: {},
     webSearch: { kind: 'search' },
-    generateText: async (args) => {
+    streamText: (args) => {
       sawTool = !!args?.tools?.web_search
       sawSystem = args.system
       assert.equal(args.messages[0].content, 'three days grace')
-      return { text: 'AMPS: Diezel VH4, modded Marshall JMP-1 into ENGL power amps.' }
+      return { textStream: lines(['AMPS: Diezel VH4, modded ', 'Marshall JMP-1 into ENGL power amps.']) }
     }
   })
   assert.ok(sawTool, 'the lookup ran without a search tool, which is just memory again')
@@ -5476,13 +5479,62 @@ test('a request that names no music costs nothing, and a rig that comes back is 
     songs: 0,
     model: {},
     webSearch: {},
-    generateText: async (args) => {
+    streamText: (args) => {
       noSongs = args.system
-      return { text: 'AMPS: Diezel VH4' }
+      return { textStream: lines(['AMPS: Diezel VH4']) }
     }
   })
   assert.ok(!/pick exactly/.test(noSongs), 'a one-sound request went looking for songs')
   assert.match(noSongs, /AMPS:/, 'a one-sound request stopped looking up the rig too')
+
+  /*
+   * Stopped part-way, it keeps what it had reached.
+   *
+   * This waited for the whole answer and threw it away on a timeout — twice,
+   * the second time after ninety seconds of real searching, and then the design
+   * that followed was cut off with nothing written. A rig briefing is prose
+   * that accumulates, so being stopped should cost only what had not been
+   * written yet; the prompt puts the rig first and finishes each song before
+   * starting the next so the part that survives is the part worth having.
+   */
+  const cutOff = await researchRig({
+    description: 'three days grace',
+    songs: 8,
+    model: {},
+    webSearch: {},
+    streamText: () => ({
+      textStream: (async function* () {
+        yield 'RIG\nAMPS: Diezel VH4, modded Marshall JMP-1.\n'
+        yield 'SONGS\n  SONG: Riot\n  AMP: VH4 ch3\n'
+        throw new Error('aborted')
+      })()
+    })
+  })
+  assert.equal(cutOff.why, 'partial', 'a stopped lookup threw away everything it had found')
+  assert.match(cutOff.rig, /Diezel VH4/, 'the rig itself was lost, which is the part every scene needs')
+  assert.match(cutOff.rig, /SONG: Riot/, 'the songs it did reach were lost')
+  assert.match(rigOutcome(cutOff), /as much of it as it had reached/)
+
+  // Nothing written before it died is still nothing — that is a failure, not a
+  // partial, and it must not read as one.
+  const nothing = await researchRig({
+    description: 'three days grace',
+    model: {},
+    webSearch: {},
+    streamText: () => ({
+      textStream: (async function* () {
+        throw new Error('aborted')
+        // eslint-disable-next-line no-unreachable
+        yield ''
+      })()
+    })
+  })
+  assert.equal(nothing.why, 'failed')
+  assert.equal(nothing.rig, null)
+
+  // And the briefing says what survives a cut-off, so the right part does.
+  assert.match(sawSystem, /you may be stopped part-way/)
+  assert.match(sawSystem, /Finish RIG completely before starting/)
 
   /* And the songs reach the designer AS the scenes — without this the lookup
      is a briefing nobody acts on. */
@@ -5532,6 +5584,18 @@ test('the lookup happens inside the stream, under the heartbeat, and says how it
   const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
   assert.match(app, /e\.state === 'timeout' \|\| e\.state === 'failed'/)
   assert.match(app, /built on what the model already knew/)
+
+  /*
+   * And the design's thinking clock starts when the lookup ends.
+   *
+   * THINK_MS is "alive, and has not written a word" — a budget for the model,
+   * from when it was asked. With the lookup inside the same window the lookup
+   * spent it: ninety seconds of searching, then a design given whatever was
+   * left and cut off with nothing written. Two failed generations said exactly
+   * that, and the first two of those three minutes were not the model thinking
+   * about the tone at all.
+   */
+  assert.match(client, /if \(frame\.state && frame\.state !== 'looking'\) openedAt = Date\.now\(\)/)
 })
 
 test('the songs looked up and the scenes built are the same number', async () => {

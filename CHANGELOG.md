@@ -3,6 +3,31 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.185.0
+
+**The rig lookup keeps what it found instead of throwing it away.** Raising its
+time limit was the wrong lever and two failed builds in a row proved it: sixty
+seconds timed out, two minutes timed out as well, and the second time the
+design that followed was cut off by the app's own three-minute clock with
+nothing written at all. Five minutes of waiting for two tones that never
+arrived.
+
+The fault was never the number. The answer arrived in one piece at the end, so
+being stopped anywhere before that threw away every search it had made — and
+eight songs is not a job with a predictable length. It now comes back as it is
+written and is kept as it arrives, so ninety seconds of searching yields ninety
+seconds of findings. The briefing is ordered for it too: the amps first and
+complete, because every scene needs them, then the songs most worth having,
+each finished before the next is begun. Stopped part-way, what survives is the
+part that matters.
+
+**And the wait for the lookup is no longer counted against the tone.** The
+clock that gives up on a model that has not started writing was running from
+before the search began, so a minute and a half of searching came out of the
+tone's own budget and the build was stopped for "thinking too long" when most
+of that time was not the tone being thought about. The tone's clock starts when
+the lookup ends now, and the overall limit still covers the whole thing.
+
 ## 7.184.0
 
 **The rig lookup was running out of time and nothing said so.** On a real Three

@@ -62,8 +62,16 @@ const FIRST_MS = 90000
  * every ten seconds now, so the remaining question is only how long a tone is
  * worth waiting for — and being cut off at 150 seconds by our own clock, while
  * the model was demonstrably still working, is the worse answer.
+ *
+ * And it went up again when a rig lookup was put in front of the design. That
+ * is a minute and a half of searching before the model is asked anything, and
+ * the tone still has to be built afterwards; at 240 the two together could
+ * reach this ceiling on the one request that most needs the room. 285 keeps it
+ * under the route's own 300-second limit, which is the line that must not be
+ * crossed — past that the function dies with no error frame and the model gets
+ * the blame. test/limits.mjs holds the two together.
  */
-const HARD_CAP_MS = 240000
+const HARD_CAP_MS = 285000
 /**
  * A model that is alive and has not said its first word, from the server's
  * hello.
@@ -353,6 +361,22 @@ async function attemptOnce(
         if (frame.type === 'rig') {
           note('rig', { ms: since(), state: frame.state, tookMs: frame.ms })
           onEvent?.({ kind: 'rig', ms: since(), state: frame.state, note: frame.note })
+          /*
+           * And the design's thinking clock starts here, not at the hello.
+           *
+           * THINK_MS is "alive, and has not written a word yet" — a budget for
+           * the MODEL, measured from the moment it was asked. With the lookup
+           * inside the same window the lookup spent it: ninety seconds of
+           * searching, then a design that needs a minute or two of its own
+           * given whatever was left, and cut off with nothing written. Two
+           * generations in a row failed that way — "thought about it for 180
+           * seconds without starting to write the tone" — when the first two of
+           * those minutes were not the model thinking about the tone at all.
+           *
+           * So the lookup finishing IS the hello for the design. The hard cap
+           * still runs end to end, which is what keeps the whole wait bounded.
+           */
+          if (frame.state && frame.state !== 'looking') openedAt = Date.now()
           continue
         }
         answering = true

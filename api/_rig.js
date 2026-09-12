@@ -49,19 +49,25 @@
  */
 
 /**
- * Long enough to look up a band and then each song it picked.
+ * How long the lookup gets before the design has to start without it.
  *
- * Sixty seconds was not, and the failure was invisible: on a real run this
- * aborted at exactly sixty seconds, returned null, and the design went ahead
- * on memory — coming back on a Peavey 6505 with a summary confidently calling
- * it "Barry Stock's actual 5150/6505 tone", which is not a thing any source
- * says. From the log that looked identical to a lookup that had never run.
+ * Raising this was the wrong lever and it took two runs to see why. Sixty
+ * seconds timed out; two minutes timed out as well, and then the design —
+ * which needs a minute or two of its own — was cut off by the client's
+ * three-minute "still has not written a word" clock with nothing to show. Two
+ * failed generations, five minutes of waiting, no tone.
  *
- * Eight songs is eight lookups and then a summary; two minutes is the budget
- * that fits, inside the route's own 300-second ceiling and the client's 240.
- * See `why` below — whatever this costs, what it did is now said out loud.
+ * The fault was never the number. It was that this was all-or-nothing: the
+ * answer arrived in one piece at the end, so being stopped anywhere before
+ * that threw away every search it had made. Eight songs is not a job with a
+ * predictable length, and no budget makes it one.
+ *
+ * So the answer is streamed and kept as it arrives (see below), and the budget
+ * goes back down to something that leaves the design room to work. Ninety
+ * seconds of searching now yields ninety seconds of findings rather than
+ * nothing at all.
  */
-const RIG_TIMEOUT_MS = 120000
+const RIG_TIMEOUT_MS = 90000
 
 /** What comes back is a briefing for a prompt, not a document. */
 const MAX_CHARS = 8000
@@ -126,6 +132,13 @@ sound, and give, as far as the sources support:
 
 Where a song's own tone is not documented, say so on its line rather than
 inventing one, and say what it most likely shares with the band's usual rig.
+
+Order matters, because you may be stopped part-way and whatever you have
+written by then is what gets used. Finish RIG completely before starting
+SONGS — the amps are what the whole preset is built on and every scene needs
+them. Then take the songs most worth having first, and finish each one's block
+before beginning the next. Half a song's lines are worth less than one song
+fewer.
 `
     : ''
 }
@@ -153,13 +166,13 @@ export async function researchRig({
   description,
   songs = SONGS_BY_DEFAULT,
   model,
-  generateText,
+  streamText,
   webSearch,
   signal
 } = {}) {
   const began = Date.now()
   const asked = typeof description === 'string' ? description.trim() : ''
-  if (!asked || !model || typeof generateText !== 'function' || !webSearch) {
+  if (!asked || !model || typeof streamText !== 'function' || !webSearch) {
     return { rig: null, why: 'off', ms: 0 }
   }
   const wanted = Number.isInteger(songs) && songs > 0 ? Math.min(songs, 8) : 0
@@ -173,8 +186,18 @@ export async function researchRig({
   const stop = () => control.abort()
   signal?.addEventListener?.('abort', stop)
 
+  /*
+   * Kept as it arrives, so being stopped costs only what had not been written.
+   *
+   * This waited for the whole answer and threw it away on a timeout, twice —
+   * the second time after ninety searches' worth of work. A rig briefing is
+   * prose that accumulates: the amps, then a song, then another song. Stopping
+   * it mid-way leaves something genuinely useful behind, and the prompt above
+   * puts the most valuable parts first so that what survives is the right part.
+   */
+  let sofar = ''
   try {
-    const res = await generateText({
+    const res = streamText({
       model,
       system: rigSystem(wanted),
       /*
@@ -189,18 +212,23 @@ export async function researchRig({
       abortSignal: control.signal,
       messages: [{ role: 'user', content: asked }]
     })
-    const rig = cleanRig(res?.text)
+    for await (const part of res.textStream) sofar += part
+    const rig = cleanRig(sofar)
     return { rig, why: rig ? 'found' : 'none', ms: Date.now() - began }
   } catch {
     /*
      * Offline, no credit, a search that would not answer, or simply slow. The
-     * design goes ahead without it, which is what it did before this existed —
-     * but it no longer goes ahead in silence. A timed-out lookup and a lookup
-     * that never ran produced the same empty log line, and the difference
-     * between them is the difference between "raise the budget" and "check the
-     * key": one real run cost a whole round trip to tell apart.
+     * design goes ahead on whatever arrived, which on a timeout is now usually
+     * the rig and some of the songs rather than nothing.
+     *
+     * Either way it no longer goes ahead in silence. A timed-out lookup and a
+     * lookup that never ran produced the same empty log line, and the
+     * difference between them is the difference between "raise the budget" and
+     * "check the key": one real run cost a whole round trip to tell apart.
      */
-    return { rig: null, why: ranOut ? 'timeout' : 'failed', ms: Date.now() - began }
+    const rig = cleanRig(sofar)
+    const why = ranOut ? (rig ? 'partial' : 'timeout') : rig ? 'partial' : 'failed'
+    return { rig, why, ms: Date.now() - began }
   } finally {
     clearTimeout(timer)
     signal?.removeEventListener?.('abort', stop)
@@ -217,6 +245,8 @@ export async function researchRig({
 export function rigOutcome({ why, ms } = {}) {
   const secs = Number.isFinite(ms) && ms > 0 ? ` after ${Math.round(ms / 1000)}s` : ''
   if (why === 'found') return `Looked up the rig${secs}`
+  if (why === 'partial')
+    return `The rig lookup ran out of time${secs} — designed from as much of it as it had reached`
   if (why === 'none') return 'Nothing named to look up'
   if (why === 'timeout') return `The rig lookup ran out of time${secs} — designed from memory instead`
   if (why === 'failed') return `The rig lookup failed${secs} — designed from memory instead`
