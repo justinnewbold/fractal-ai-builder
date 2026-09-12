@@ -3,6 +3,25 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.176.1
+
+**One conversation is one row in History again.** The list showed the same
+chat over and over — the same opening line at ten different times on one
+afternoon — for a conversation that had only been had once. Nothing was
+invented: each row was a real write of that chat under a new id. The app notes
+down which conversation is on screen when the page goes away, and it was
+writing that down and never reading it back, so every reload restored the
+transcript, found no id, made a fresh one, and put another row on the shelf.
+A phone reloads that page a lot.
+
+**And the rows already there fold together.** Fixing the cause does nothing
+about an account that is already holding ten copies of one chat, so the list
+now recognises them: a conversation only grows, so a row whose transcript is
+the opening of a longer row's is that same chat earlier in the day, and the
+whole one is what gets shown. Nothing is hidden — the row that stays holds
+every word of the ones folded into it — and deleting it deletes the pile
+rather than uncovering the next copy down.
+
 ## 7.176.0
 
 **"Connected" now means the Mac answered just now, not that it answered once.**

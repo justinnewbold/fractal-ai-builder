@@ -180,12 +180,80 @@ export async function listCloudChats() {
   }
 }
 
+/** One turn, as the thing that says whether two transcripts start the same. */
+const turnKey = (turn) =>
+  `${turn?.role || ''}\u0000${typeof turn?.text === 'string' ? turn.text.trim() : ''}`
+
+/**
+ * Whether one transcript is the beginning of another.
+ *
+ * A conversation only ever grows: turns are appended and nothing in the middle
+ * is edited. So a shelf row whose turns are the opening of a longer row's turns
+ * is not a second conversation — it is an earlier snapshot of the same one,
+ * shelved under an id that got lost somewhere and then made again.
+ *
+ * That is how ten rows all called "Make me a three days grace full preset"
+ * happen. Nothing invented them; each one was a real write, of the same chat,
+ * under a fresh id.
+ */
+export function continues(shorter = [], longer = []) {
+  if (!shorter.length || shorter.length > longer.length) return false
+  for (let i = 0; i < shorter.length; i++) {
+    if (turnKey(shorter[i]) !== turnKey(longer[i])) return false
+  }
+  return true
+}
+
+/**
+ * The snapshots of one conversation, folded into the one that contains them.
+ *
+ * The longest transcript in a group is the whole of it, so it is the row that
+ * stays and the shorter ones are dropped — nothing said in them is hidden,
+ * because the row that survives holds every one of their turns and more. It
+ * carries the newest time of the group, and the ids of the rows folded in, so
+ * deleting it deletes the pile rather than uncovering the next one down.
+ *
+ * A row with no turns to compare — an old entry, or a list drawn before the
+ * transcripts arrive — is never folded. Being unable to tell is a reason to
+ * show a conversation, not to hide it.
+ */
+function foldSnapshots(entries) {
+  const kept = []
+  const order = [...entries].sort(
+    (a, b) => (b?.turns?.length || 0) - (a?.turns?.length || 0) || (b?.at || 0) - (a?.at || 0)
+  )
+  for (const entry of order) {
+    const turns = Array.isArray(entry.turns) ? entry.turns : []
+    const into = turns.length
+      ? kept.find((k) => continues(turns, Array.isArray(k.turns) ? k.turns : []))
+      : null
+    if (!into) {
+      kept.push({ ...entry, alsoIds: [] })
+      continue
+    }
+    /* The ids folded in are kept, not dropped: the row on screen stands for
+       all of them, so deleting it has to delete them, and the chat open in the
+       app can still recognise itself in whichever row swallowed it. */
+    into.alsoIds.push(entry.id)
+    /* The group's clock is the last time anything was said in it, wherever
+       that landed. A fold that moved a chat down the list would read as one
+       that had thrown the recent half of it away. */
+    if ((entry.at || 0) > (into.at || 0)) into.at = entry.at
+  }
+  return kept
+}
+
 /**
  * Both shelves as one list, newest first, each conversation once.
  *
  * The account's copy wins a tie on id: signing in copies this browser's chats
  * up, so for a while the same conversation is genuinely in both places, and the
  * account one is the copy that follows you to the next machine.
+ *
+ * Then the snapshots fold together — see foldSnapshots. Two rows with the same
+ * id were one write; rows whose transcripts are the opening of a longer one
+ * were one conversation, and a list that shows a chat once for every time the
+ * page reloaded under it is a list that reports work nobody did.
  */
 export function mergeChats(cloud = [], local = []) {
   const seen = new Set()
@@ -195,18 +263,25 @@ export function mergeChats(cloud = [], local = []) {
     seen.add(entry.id)
     out.push(entry)
   }
-  return out
+  return foldSnapshots(out).sort((a, b) => (b?.at || 0) - (a?.at || 0))
 }
 
-/** Throw one away, from whichever shelf it is on. */
+/**
+ * Throw one away, from whichever shelf it is on — and every snapshot of it.
+ *
+ * A folded row stands for several rows on the account. Deleting only the one
+ * on screen would take the tap and then show the next snapshot down, which
+ * looks exactly like a chat that refuses to be deleted.
+ */
 export async function deleteChat(entry) {
   const id = typeof entry === 'string' ? entry : entry?.id
   if (!id) return false
-  writeLocal(readLocal().filter((e) => e?.id !== id))
+  const ids = [id, ...(Array.isArray(entry?.alsoIds) ? entry.alsoIds : [])].filter(Boolean)
+  writeLocal(readLocal().filter((e) => !ids.includes(e?.id)))
   const client = supabaseClient()
   if (!client) return true
   try {
-    await client.from(TABLE).delete().eq('id', id)
+    await client.from(TABLE).delete().in('id', ids)
   } catch {
     // The browser copy is gone and the account copy is not. Better than
     // failing the tap: the next sign-in lists one row that can be deleted

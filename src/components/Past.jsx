@@ -56,6 +56,16 @@ export default function Past({
     return made.toLowerCase().includes(String(unit).toLowerCase()) ? null : made
   }
 
+  /*
+   * Which row is the conversation on screen.
+   *
+   * Not always its own row: a chat that was shelved several times under
+   * several ids is folded into one row on this list, and that row stands for
+   * all of them. Asking only about the id would leave the open conversation
+   * unmarked, and the list would look as though it had lost it.
+   */
+  const isOpen = (chat) => chat.id === chatId || (chat.alsoIds || []).includes(chatId)
+
   const armed = (key, act) => ({
     onClick: () => {
       if (confirm === key) act()
@@ -85,7 +95,7 @@ export default function Past({
         {chats.length ? (
           <ul className="past-list">
             {chats.map((chat) => (
-              <li key={chat.id} className={chat.id === chatId ? 'past-now' : undefined}>
+              <li key={chat.id} className={isOpen(chat) ? 'past-now' : undefined}>
                 <button
                   className="past-row"
                   disabled={busy}
@@ -96,7 +106,7 @@ export default function Past({
                     <span className="past-title">{chat.title || 'Untitled chat'}</span>
                   </span>
                   <span className="past-when mono">
-                    {chat.id === chatId ? 'Open now' : formatWhen(chat.at)}
+                    {isOpen(chat) ? 'Open now' : formatWhen(chat.at)}
                   </span>
                 </button>
                 <button

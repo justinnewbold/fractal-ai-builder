@@ -4753,6 +4753,29 @@ test('the chat and the tone come back after the phone drops the page', () => {
   assert.equal(loadSession(fakeStore({ 'fab.session.v1': JSON.stringify({ v: 1, turns: [] }) })).renamePreset, true)
 })
 
+test('a reloaded page comes back knowing which conversation it is in', () => {
+  /*
+   * The chat id was written down and never read back, so every reload restored
+   * the transcript, found no id, and made a new one — and the shelf took
+   * another row for the same conversation. Ten rows all called "Make me a
+   * three days grace full preset", one per time the phone reloaded the page.
+   */
+  const { saveSession, loadSession } = sessionMod
+  const store = fakeStore()
+  const turns = [{ role: 'user', text: 'make me a lead tone' }]
+  saveSession({ turns, chatId: 'chat-7' }, store)
+  assert.equal(loadSession(store).chatId, 'chat-7', 'the reloaded page forgot which chat it was in')
+
+  // A session with no chat yet reads as no chat, not as the string "null".
+  saveSession({ turns }, store)
+  assert.equal(loadSession(store).chatId, null)
+  assert.equal(
+    loadSession(fakeStore({ 'fab.session.v1': JSON.stringify({ v: 1, turns: [], chatId: 7 }) })).chatId,
+    null,
+    'an id that is not an id is not an id'
+  )
+})
+
 test('a transcript that cannot be read is no transcript, not a crash', () => {
   const { loadSession, saveSession } = sessionMod
   assert.equal(loadSession(fakeStore()), null, 'nothing saved is not an error')
@@ -4944,6 +4967,71 @@ test('both shelves of chats read as one list, newest first, each one once', asyn
   assert.deepEqual(mergeChats(), [])
   // A row with no id cannot be opened or deleted, so it is not listed.
   assert.deepEqual(mergeChats([{ title: 'nameless', at: 99 }], []), [])
+})
+
+test('one conversation shelved ten times is one row, not ten', async () => {
+  const { mergeChats, continues } = await import('../src/lib/chatLog.js')
+
+  /*
+   * "Something wrong with the chat history I didn't have all these chats that
+   * it said I did so it's like it's ghost riding them."
+   *
+   * They were real writes. Every reload gave the same conversation a fresh id
+   * and the shelf took another row for it — the same opening line down the
+   * whole list at ten different times. A transcript only ever grows, so a row
+   * whose turns are the opening of a longer row's turns is that row at an
+   * earlier moment, and there is one conversation there.
+   */
+  const said = (text) => ({ role: 'user', text })
+  const replied = (text) => ({ role: 'assistant', text })
+
+  assert.equal(continues([said('a')], [said('a'), replied('b')]), true)
+  assert.equal(continues([said('a'), replied('b')], [said('a')]), false, 'a longer chat is not a snapshot of a shorter one')
+  assert.equal(continues([said('a')], [said('z'), replied('b')]), false)
+  // Nothing to compare is not a match — an empty transcript is not every chat.
+  assert.equal(continues([], [said('a')]), false)
+
+  const shelved = [
+    { id: '1', title: 'three days grace', at: 10, turns: [said('three days grace')] },
+    { id: '2', title: 'three days grace', at: 20, turns: [said('three days grace'), replied('Built it.')] },
+    {
+      id: '3',
+      title: 'three days grace',
+      at: 30,
+      turns: [said('three days grace'), replied('Built it.'), said('brighter')]
+    }
+  ]
+  const folded = mergeChats(shelved, [])
+  assert.equal(folded.length, 1, 'one conversation is listed once')
+  assert.equal(folded[0].id, '3', 'the row that survived is not the whole conversation')
+  assert.deepEqual(folded[0].alsoIds.sort(), ['1', '2'], 'the folded rows were forgotten, so deleting cannot reach them')
+
+  /* The surviving row carries the newest time in the group. A fold that sent a
+     chat down the list would read as one that had thrown half of it away. */
+  const late = mergeChats(
+    [
+      { id: 'long', at: 10, turns: [said('a'), replied('b')] },
+      { id: 'short', at: 99, turns: [said('a')] }
+    ],
+    []
+  )
+  assert.equal(late.length, 1)
+  assert.equal(late[0].at, 99, 'the folded row lost the time of its own last word')
+
+  // Two real conversations that happen to open the same way both stay.
+  const two = mergeChats(
+    [
+      { id: 'x', at: 20, turns: [said('lead tone'), replied('Bright.')] },
+      { id: 'y', at: 10, turns: [said('lead tone'), replied('Dark.')] }
+    ],
+    []
+  )
+  assert.deepEqual(two.map((c) => c.id), ['x', 'y'], 'two different chats were folded into one')
+
+  // A row with no transcript to compare is shown, not hidden on a guess.
+  const blind = mergeChats([{ id: 'p', at: 5 }, { id: 'q', at: 4 }], [])
+  assert.equal(blind.length, 2)
+  assert.deepEqual(blind[0].alsoIds, [])
 })
 
 test('the account chat is readable only by the account that wrote it', () => {
