@@ -2354,6 +2354,60 @@ test('a scene cannot be sent to a channel this tone never dialled', () => {
   assert.equal(away.scenes[0].blocks.find((b) => b.eid === 58).channel, 'B')
 })
 
+test('two scenes that play the same thing are called out, not shipped as two tones', () => {
+  /*
+   * "All the songs generated here absolutely don't match these songs in real
+   * life." Eight scenes named after eight songs, over three amp voicings, one
+   * drive setting and one delay setting — because a scene carries no sound of
+   * its own. It records which blocks are on and which channel each plays, and
+   * what a channel sounds like is written once. Two scenes with the same blocks
+   * on the same channels are one tone with two names on the footswitch.
+   *
+   * Not repaired — the app cannot invent the sound that was missing — but said
+   * while the tone is still a proposal, by name, rather than discovered
+   * standing on a footswitch between two songs that sound identical.
+   */
+  const r = validateSpec(
+    {
+      blocks: [
+        { eid: 58, channel: 'A', params: [] },
+        { eid: 58, channel: 'B', params: [] }
+      ],
+      scenes: [
+        { index: 0, name: 'RIOT', engaged: [58, 106, 118], channels: [{ eid: 58, channel: 'B' }] },
+        { index: 1, name: 'I HATE U', engaged: [58, 106], channels: [{ eid: 58, channel: 'A' }] },
+        { index: 2, name: 'HOME', engaged: [58, 106, 118], channels: [{ eid: 58, channel: 'B' }] }
+      ]
+    },
+    sceneSchema,
+    8
+  )
+  const said = r.problems.join(' | ')
+  assert.match(said, /HOME/, said)
+  assert.match(said, /RIOT/, 'the scene it duplicates is not named')
+  assert.match(said, /same sound under a second name/)
+  // Only the copy is reported, and the one that differs is left alone.
+  assert.equal(r.problems.filter((p) => /same sound/.test(p)).length, 1)
+  assert.ok(!/I HATE U/.test(said), 'a scene that really is different was called a duplicate')
+  // Nothing is dropped — all three still reach the unit, because the player
+  // may well want two footswitches onto one sound.
+  assert.equal(r.scenes.length, 3)
+
+  // Different blocks on is a different sound, and so is a different channel.
+  const differs = validateSpec(
+    {
+      blocks: [{ eid: 58, channel: 'A', params: [] }],
+      scenes: [
+        { index: 0, name: 'One', engaged: [58, 106], channels: [] },
+        { index: 1, name: 'Two', engaged: [58, 106, 118], channels: [] }
+      ]
+    },
+    sceneSchema,
+    8
+  )
+  assert.ok(!differs.problems.some((p) => /same sound/.test(p)), differs.problems.join(' | '))
+})
+
 test('a scene channel the unit cannot honour is dropped, not sent', () => {
   const r = scened([
     {
@@ -5310,6 +5364,69 @@ test('a shelved conversation is readable only by the account that wrote it', () 
      deliberately, and the id comes from the client so a chat keeps its
      identity when it moves from this browser to the account. */
   assert.match(sql, /id text primary key/)
+})
+
+console.log('\nwhat made this sound')
+
+const rigMod = await import('../api/_rig.js')
+
+test('a request that names no music costs nothing, and a rig that comes back is used', async () => {
+  /*
+   * "All the songs generated here absolutely don't match these songs in real
+   * life." The roster already says what every model on the unit IS — lineage.js
+   * puts a maker and a real amp on each one — and what was missing was the
+   * other half of the join: what the BAND played. Left to memory, Three Days
+   * Grace came back built on a Peavey and a Mesa, from a band who play Diezels
+   * and modded Marshalls into ENGLs, all three of which this unit models.
+   */
+  const { cleanRig, rigInstruction, researchRig } = rigMod
+
+  /* NONE means nothing, and a model that says NONE and then explains itself
+     must not have the explanation read as a rig. */
+  assert.equal(cleanRig('NONE'), null)
+  assert.equal(cleanRig('NONE. That is a description of a sound, not a band.'), null)
+  assert.equal(cleanRig('  \n '), null)
+  assert.equal(cleanRig(null), null)
+  assert.equal(cleanRig('  AMPS: Diezel VH4  '), 'AMPS: Diezel VH4')
+  // Bounded: this goes into a prompt, and an unbounded one makes every
+  // generation expensive.
+  assert.ok(cleanRig('x'.repeat(9000)).length <= 4000)
+
+  // Nothing found is nothing said — the designer must not learn that this ran.
+  assert.equal(rigInstruction(null), '')
+  assert.equal(rigInstruction(''), '')
+  const told = rigInstruction('AMPS: Diezel VH4')
+  assert.match(told, /basedOn/, 'the rig is given with no way to join it to the roster')
+  assert.match(told, /this wins/, 'the search does not outrank the model\u2019s own memory')
+
+  /* Never costs anything for a request with no music in it, and never fails a
+     generation: a search that throws is a tone designed the old way, not a
+     tone nobody gets. */
+  assert.equal(await researchRig({}), null, 'an empty request went looking')
+  assert.equal(await researchRig({ description: 'warm blues lead' }), null, 'no model, no search')
+  const thrown = await researchRig({
+    description: 'three days grace',
+    model: {},
+    webSearch: {},
+    generateText: async () => {
+      throw new Error('no credit')
+    }
+  })
+  assert.equal(thrown, null, 'a failed lookup took the generation down with it')
+
+  let sawTool = false
+  const found = await researchRig({
+    description: 'three days grace',
+    model: {},
+    webSearch: { kind: 'search' },
+    generateText: async (args) => {
+      sawTool = !!args?.tools?.web_search
+      assert.equal(args.messages[0].content, 'three days grace')
+      return { text: 'AMPS: Diezel VH4, modded Marshall JMP-1 into ENGL power amps.' }
+    }
+  })
+  assert.ok(sawTool, 'the lookup ran without a search tool, which is just memory again')
+  assert.match(found, /Diezel VH4/)
 })
 
 console.log('\nhow many scenes')
