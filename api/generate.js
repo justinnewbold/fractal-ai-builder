@@ -12,11 +12,12 @@
  * swapping providers is an environment variable, not a code change. The key
  * lives here and never reaches the browser.
  */
-import { generateObject, streamObject } from 'ai'
+import { generateObject, generateText, streamObject } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 import { cors } from './_cors.js'
 import { sceneInstruction } from './_scenes.js'
+import { researchRig, rigInstruction } from './_rig.js'
 
 /**
  * Two ways in, because they fail differently.
@@ -40,6 +41,23 @@ function resolveModel() {
     return process.env.GENERATOR_MODEL || 'anthropic/claude-sonnet-4.5'
   }
   return null
+}
+
+/**
+ * The search the rig lookup runs on, or null.
+ *
+ * Anthropic's own server-side tool: the search happens at their end and the
+ * findings come back in the reply, so there is no second API to hold a key for
+ * and nothing to host. Only on the direct path — the gateway takes a model
+ * name and cannot carry a provider's tool — so a deployment running on the
+ * gateway designs exactly as it did before rather than failing.
+ */
+function resolveSearch() {
+  if (!process.env.ANTHROPIC_API_KEY) return null
+  const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  // Five is a handful of pages on one band. The step is a lookup, not a
+  // literature review, and every search is time the player is waiting.
+  return anthropic.tools.webSearch_20260209({ maxUses: 5 })
 }
 
 /**
@@ -253,6 +271,18 @@ switched by footswitch without a gap.
 10. Offer scenes when the request implies more than one sound — a song, a set,
     a band whose parts differ, or any mention of rhythm and lead. For a single
     specific sound, return an empty array rather than padding it out.
+10a. Scenes named after different songs have to SOUND different, and a scene can
+    only reach a sound that was dialled. A block has four channels at most, so
+    eight scenes cannot have eight amp voicings — but they can have four, and
+    eight scenes sharing one delay setting and one drive setting is eight names
+    over one tone. So for every block that carries the difference between those
+    songs — the amp first, then the drive, then the delay — list it once per
+    channel you need and point each scene at the one it plays. Two scenes that
+    engage the same blocks on the same channels are the same sound twice, and
+    the app says so. If the songs asked for genuinely need more distinct
+    voicings than four channels allow, return fewer scenes and say in the
+    summary which songs you left out and why — that is a better answer than
+    eight names over three sounds.
 11. Three or four well-judged scenes beat eight. Do not fill every slot for the
     sake of it.
 12. Name every scene you return. The name is written to the unit and is what
@@ -308,6 +338,7 @@ export default async function handler(req, res) {
   }
 
   const model = resolveModel()
+  const searchTool = resolveSearch()
   if (!model) {
     res.status(500).json({
       error:
@@ -432,6 +463,30 @@ export default async function handler(req, res) {
   const asked = sceneInstruction({ wantScenes, sceneBudget, sceneCount: state.sceneCount })
 
   /*
+   * What actually made this sound, looked up before anything is designed.
+   *
+   * The roster already says what every model on this unit IS in real life —
+   * lineage.js puts a maker and a real amp on each one. What was missing was
+   * the other half of that join: what the BAND played. Left to memory, a
+   * request for Three Days Grace came back built on a Peavey and a Mesa, from
+   * a band who play Diezels and modded Marshalls into ENGLs — all three of
+   * which this unit models.
+   *
+   * Null for a request that names no music, for a deployment with no direct
+   * key, and for every failure. See ./_rig.js: it is worth a few seconds and
+   * it is never worth a generation.
+   */
+  const rig = searchTool
+    ? await researchRig({
+        description,
+        model,
+        generateText,
+        webSearch: searchTool,
+        signal: req.signal
+      })
+    : null
+
+  /*
    * What this player has tended to keep, when the browser has enough history
    * to say. It settles the questions a short request leaves open — which of
    * four fitting amps, what "a lot of gain" means to this person — so the
@@ -503,7 +558,10 @@ export default async function handler(req, res) {
     ? {
         model: MODEL_NAME,
         system: SYSTEM,
-        task: task + asked,
+        task: task + asked + rigInstruction(rig),
+        // What the search came back with, so a tone that picked the wrong amp
+        // can be read back against what it was told.
+        rig,
         taste: context,
         corrections: fixes,
         // What it was told is on the unit right now.
@@ -574,6 +632,9 @@ export default async function handler(req, res) {
             type: 'text',
             text:
               `Current state of the loaded preset:\n${JSON.stringify(state)}\n\n${task}${asked}` +
+              /* Before taste and before corrections: this is what the request
+                 is ABOUT, and the other two are background to it. */
+              rigInstruction(rig) +
               (context ? `\n\n${context}` : '') +
               (fixes ? `\n\n${fixes}` : '')
           }

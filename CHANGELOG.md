@@ -3,6 +3,35 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.182.0
+
+**It looks up what actually made the sound before it builds anything.** Ask for
+a band and the preset came back on whatever amp the AI happened to remember —
+for Three Days Grace, a Peavey 6505 and a Mesa TriAxis. The band play Diezel
+VH4s and modded Marshall JMP-1s into ENGL power amps, and your FM3 models all
+three of them: Das Metall and Dizzy V4 are the VH4, Brit Pre and JMPre-1 are the
+JMP-1, Energyball and Angle Severe are the ENGLs.
+
+The app has always known what every model on the unit is in real life — that is
+what puts "Marshall JCM 800" under "Brit 800 2204 High". What it never knew was
+the other half: what the band played. So it searches for it now, before the
+design starts, and the amps, pedals and tuning it finds go in as findings that
+outrank what the AI thought it remembered. A request with no band or song in it
+— "a tight modern metal rhythm" — searches for nothing and costs nothing.
+
+Adds a few seconds to a generation. If the search fails, or the app is running
+on the gateway key rather than the Anthropic one, the tone is designed exactly
+as it was before rather than not at all.
+
+**And eight scenes over three sounds now says so.** A scene holds no sound of
+its own — it remembers which blocks are on and which channel each one plays,
+and what a channel sounds like is dialled once. So eight scenes named after
+eight songs, sharing one delay setting and one drive setting, are eight names
+over one tone. The preview now names any two scenes that play exactly the same
+thing, and the designer is told the budget it actually has: four channels per
+block, so voice the amp, the drive and the delay across them, and return fewer
+scenes rather than more names than sounds.
+
 ## 7.181.0
 
 **Reloading a saved tone brings its scenes back with it.** An eight-scene tone

@@ -379,7 +379,46 @@ function validateScenes(
     })
   }
 
+  sameSoundTwice(out, problems)
   return out.sort((a, b) => a.index - b.index)
+}
+
+/**
+ * Scenes that are the same sound under two names.
+ *
+ * "All the songs generated here absolutely don't match these songs in real
+ * life." Eight scenes came back named after eight songs, over three amp
+ * voicings, one drive setting and one delay setting — because a scene carries
+ * no sound of its own. It records which blocks are on and which channel each
+ * plays, and everything a channel sounds like is written once. So two scenes
+ * with the same blocks on the same channels are not two tones, they are one
+ * tone with two names on the footswitch, and nothing in the app said so.
+ *
+ * Not repaired, because there is nothing honest to repair it to — the app
+ * cannot invent the sound that was missing. Said instead, by name, while the
+ * tone is still a proposal: a player looking at RIOT and HOME can decide
+ * whether that is what they wanted long before they are standing on the
+ * footswitch between two songs that sound identical.
+ */
+function sameSoundTwice(scenes, problems) {
+  const seen = new Map()
+  for (const scene of scenes) {
+    /* What the unit will actually do in this scene, and nothing else: every
+       block, on or off, and the channel it plays. */
+    const sound = scene.blocks
+      .map((b) => `${b.eid}:${b.bypassed ? 'off' : 'on'}:${b.channel || '-'}`)
+      .join('|')
+    const first = seen.get(sound)
+    if (first === undefined) {
+      seen.set(sound, scene)
+      continue
+    }
+    const name = (s) => `scene ${s.index + 1}${s.name ? ` · ${s.name}` : ''}`
+    problems.push(
+      `${name(scene)} plays exactly what ${name(first)} plays — same blocks, same channels, ` +
+        `so it is the same sound under a second name.`
+    )
+  }
 }
 
 /** Scene names are short on the unit's own display. */
