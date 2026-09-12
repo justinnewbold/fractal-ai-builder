@@ -3,6 +3,20 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.195.0
+
+**You can watch each scene being written.** "I like how it shows it's
+writing each scene when it does it instead of just saying writing." While a
+tone builds there is now a list under the Thinking line, one row per thing
+decided, kept on screen for the length of the run: the preset's name, each
+block as it is chosen and dialled, then "Writing scene 1 SCHISM · Drop-D
+Diezel, dotted delay — the odd-meter riff, not a chug", scene 2, scene 3,
+down the screen as they land. The designer now writes that one line about
+every scene — what it is voiced for and how — and it shows in the tone's
+preview under each scene's name, and in the live feed. The Thinking line
+still says the newest thing and keeps the clock; opening "Watch it" shows
+every control and value instead.
+
 ## 7.194.0
 
 **Ask for eight scenes and you get eight.** "It should be eight scenes not

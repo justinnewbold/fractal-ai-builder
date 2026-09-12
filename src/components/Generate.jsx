@@ -418,6 +418,9 @@ export function Preview({
                   <span className={`tag ${nameOf(scene.index) ? 'off' : 'on'}`}>
                     {nameOf(scene.index) ? `replaces ${nameOf(scene.index)}` : 'empty slot'}
                   </span>
+                  {/* The designer's own line on what this scene is for —
+                      the song, the amp, the feel — where it wrote one. */}
+                  {scene.why ? <span className="scene-plan-why">{scene.why}</span> : null}
                   <span className="scene-plan-blocks">
                     {on.map((b) => b.name).join(' · ')}
                     {/* With the model the plan puts on that channel, so three

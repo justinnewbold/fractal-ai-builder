@@ -363,9 +363,17 @@ function validateScenes(
       )
     }
 
+    /*
+     * The one line the designer wrote about this scene — "Drop-D Diezel,
+     * dotted delay — the odd-meter riff". It goes nowhere near the unit, so it
+     * is only tidied, not checked: the preview and the live list read it.
+     */
+    const why = String(scene.why ?? '').replace(/\s+/g, ' ').trim().slice(0, 140)
+
     out.push({
       index,
       name,
+      ...(why ? { why } : {}),
       blocks: placed.map((eid) => ({
         eid,
         name: byEid.get(eid)?.name || byEid.get(eid)?.slug || `#${eid}`,

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { blockName, progressFor } from '../lib/liveProgress'
+import { blockName, progressFor, stepsFor } from '../lib/liveProgress'
 
 /**
  * What the line says when there is nothing true to say yet.
@@ -24,6 +24,41 @@ export const THINKING = 'Thinking'
 /* Lives in lib so the test runner can import it — this file is JSX and node
    cannot read that. Re-exported because it is read as part of this screen. */
 export { progressFor }
+
+/**
+ * Every step so far, under the Thinking line, as it happens.
+ *
+ * "When writing scenes can you make it look like this?" — a screenshot of
+ * another app: DEL off, REV on, Voice A · heavy · CA3+ R2, then "Writing
+ * scene 1 SCHISM · SCHISM — Drop-D Diezel, dotted delay — the odd-meter riff,
+ * not a 5150 chug", and on down the screen, one line per scene as each one is
+ * written. Ours said "Writing scene 3 — Forty Six And 2" on one line that
+ * replaced itself, so the whole build read as a single sentence that kept
+ * changing and the two minutes it took were two minutes of nothing to read.
+ *
+ * This is that list, from the same partial the one-line progress reads, so
+ * the two cannot disagree about what has happened. The line at the top still
+ * says the newest thing and keeps the clock; this keeps the record. The
+ * "Watch it" panel is the deeper view — every control, every value — and this
+ * stands down while it is open, so the same scene is never listed twice.
+ */
+export function LiveSteps({ partial, nameOf = null }) {
+  const steps = stepsFor(partial, nameOf)
+  if (!steps.length) return null
+  return (
+    <ul className="live-steps" aria-label="What has been decided so far">
+      {steps.map((step) => (
+        <li className="live-step" key={step.key}>
+          <svg className="live-step-glyph" viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="6.5" cy="6.5" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M10 10l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          <span>{step.text}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 /**
  * What the model is producing, as it produces it.
@@ -96,6 +131,7 @@ export function LiveGeneration({ partial, open, onToggle, chip = true, nameOf = 
                 <div className="live-scene mono" key={scene?.index ?? i}>
                   <span className="live-scene-n">{(scene?.index ?? i) + 1}</span>
                   <span>{scene?.name || '…'}</span>
+                  {scene?.why ? <span className="live-scene-on">{scene.why}</span> : null}
                   {(scene?.engaged || []).length ? (
                     <span className="live-scene-on">
                       {scene.engaged.map((eid) => blockName(eid, nameOf)).join(' · ')}

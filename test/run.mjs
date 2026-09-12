@@ -9278,7 +9278,7 @@ test('the working line says what the model is deciding, not how much of it there
      scenes, choose eight of their most popular songs to model each scene on". */
   assert.equal(
     progressFor({ blocks: [{ eid: 58 }], scenes: [{ index: 0, name: 'Last Resort' }, { index: 1, name: 'Scars' }] }, named),
-    'Scene 2 — Scars'
+    'Writing scene 2 — Scars'
   )
 
   /* Without the preset's own names it still says something true rather than
@@ -9291,6 +9291,68 @@ test('the working line says what the model is deciding, not how much of it there
   assert.ok(
     !/block\$\{e\.blocks === 1/.test(app),
     'the working line still counts blocks over the top of what the model is doing'
+  )
+})
+
+import { stepsFor } from '../src/lib/liveProgress.js'
+
+test('every step stays on screen as it lands, with the line written about each scene', () => {
+  /*
+   * "When writing scenes can you make it look like this?" — a list, one row
+   * per thing decided, down the screen as it happens: the blocks, then
+   * "Writing scene 1 SCHISM · SCHISM — Drop-D Diezel, dotted delay". Ours was
+   * one line replacing itself, so two minutes of building read as a single
+   * changing sentence.
+   */
+  const named = (eid) => ({ 58: 'Amp 1', 70: 'Delay 1', 66: 'Reverb 1' })[eid] || null
+
+  assert.deepEqual(stepsFor(null), [])
+  assert.deepEqual(stepsFor({}), [])
+
+  const partial = {
+    presetName: 'Tool Diezel Suite',
+    blocks: [
+      { eid: 70, bypassed: true },
+      { eid: 66, bypassed: false },
+      { eid: 58, typeName: 'Brit 800', params: [{ id: 1, name: 'Gain' }, { id: 2, name: 'Bass' }] }
+    ],
+    scenes: [
+      { index: 0, name: 'Schism', why: 'Drop-D Diezel, dotted delay — the odd-meter riff, not a chug.' },
+      { index: 1, name: 'Lateralus' }
+    ]
+  }
+  const lines = stepsFor(partial, named).map((s) => s.text)
+  assert.deepEqual(lines, [
+    'Naming it — Tool Diezel Suite',
+    'Delay 1 · off',
+    'Reverb 1 · on',
+    'Amp 1 · Brit 800 · Gain, Bass',
+    'Writing scene 1 SCHISM · Drop-D Diezel, dotted delay — the odd-meter riff, not a chug.',
+    'Writing scene 2 LATERALUS'
+  ])
+  /* Keys are stable across partials, so a row that has landed is not redrawn
+     as a new one when the next field of it arrives. */
+  const keys = stepsFor(partial, named).map((s) => s.key)
+  assert.equal(new Set(keys).size, keys.length, 'two rows share a key')
+  assert.deepEqual(stepsFor({ blocks: [{ eid: 58 }] }, named).map((s) => s.key), ['block-58'])
+
+  /* A scene still arriving is said as far as it has got, and nothing more. */
+  assert.deepEqual(stepsFor({ scenes: [{ index: 2 }] }).map((s) => s.text), ['Writing scene 3'])
+
+  /* The designer is asked for that line, the validator keeps it, and the
+     preview and the live feed show it. */
+  const api = readSrc(new URL('../api/generate.js', import.meta.url), 'utf8')
+  const scene = api.slice(api.indexOf('name: z'), api.indexOf('engaged: onlyWhenPlaced'))
+  assert.match(scene, /why: z\s*\n?\s*\.string\(\)/, 'the designer is not asked what each scene is for')
+  const validate = readSrc(new URL('../src/lib/validate.js', import.meta.url), 'utf8')
+  assert.match(validate, /\.\.\.\(why \? \{ why \} : \{\}\)/, 'the validator drops the line the designer wrote')
+  const preview = readSrc(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
+  assert.match(preview, /scene\.why \? <span className="scene-plan-why">/, 'the preview never shows it')
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  assert.match(
+    app,
+    /\{thinking && !liveOpen \? <LiveSteps partial=\{partial\} nameOf=\{blockNameFor\} \/> : null\}\s*\n\s*<LiveGeneration/,
+    'the steps are not drawn under the Thinking line while a tone builds'
   )
 })
 

@@ -191,6 +191,14 @@ const buildPresetSpec = (eids = []) =>
               'names one song, it is the part of that song — "Intro", "Chorus", "Solo". Only ' +
               'when it names neither is it the job — "Clean", "Rhythm", "Lead".'
           ),
+        why: z
+          .string()
+          .describe(
+            'One short line, under 90 characters, for the player watching this scene being ' +
+              'written: what it is voiced for and how — the song or record and era, the amp ' +
+              'and the feel. "Drop-D Diezel, dotted delay — the odd-meter riff, not a chug." ' +
+              'Never empty.'
+          ),
         engaged: onlyWhenPlaced(
           eids,
           z.array(eidField(eids, 'An effect id that is ON in this scene.')),
