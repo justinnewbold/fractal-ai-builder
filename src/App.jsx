@@ -174,6 +174,7 @@ import {
 } from './lib/link'
 import { keepAwake } from './lib/awake'
 import { loadSession, saveSession, interrupted } from './lib/session'
+import { knownRigs, pickRig, rememberRig } from './lib/rigCache'
 import { loadCloudChat, saveCloudChat, pickChat, chatCloudReady } from './lib/cloudChat'
 import {
   archiveChat,
@@ -185,7 +186,7 @@ import {
   newChatId,
   worthKeeping
 } from './lib/chatLog'
-import { sceneChoices } from '../api/_scenes.js'
+import { sceneChoices, songsWanted } from '../api/_scenes.js'
 import SceneFit from './components/SceneFit'
 import { scenesOverflowing, fitScenes, describeFit } from './lib/sceneFit'
 import { pushEntry, replaceEntry } from './lib/nav'
@@ -2356,6 +2357,21 @@ export default function App() {
 
   /** One path to the model, so generate and refine can't drift apart. */
   const requestSpec = async (schema, description, previous, extra = {}) => {
+    /*
+     * What this app already knows about the band being asked about.
+     *
+     * "Isn't there a band database we can download?" There is not — nobody
+     * publishes what amp a band plays — but a rig found once is that database,
+     * so it is sent back and the server skips the search entirely. The second
+     * request for a band costs no tokens, no searching and no waiting. See
+     * lib/rigCache.js.
+     */
+    const songs = songsWanted({
+      wantScenes: extra.wantScenes,
+      sceneBudget: extra.sceneBudget,
+      sceneCount
+    })
+    const already = pickRig(await knownRigs().catch(() => []), description, songs)
     setPartial(null)
     // A new run replaces whatever the last failure was offering to repeat.
     setRetryAsk(null)
@@ -2396,6 +2412,8 @@ export default function App() {
            * thrown away entirely.
            */
           corrections: tasteOn ? describeCorrections(corrections) : '',
+          // Known already, so nothing is looked up. See above.
+          ...(already?.rig ? { rig: already.rig } : {}),
           ...extra
         },
         {
@@ -2493,7 +2511,17 @@ export default function App() {
              * was designed without it.
              */
             else if (e.kind === 'rig') {
+              /*
+               * Filed away as it arrives, so the next request for this band
+               * skips the search. Never awaited and never allowed to throw: a
+               * note that failed to file costs one lookup next time, and the
+               * tone on screen does not depend on it at all.
+               */
+              if (e.rig) {
+                rememberRig(e.rig, songs).catch(() => {})
+              }
               if (e.state === 'looking') setProgress('Looking up the band and the songs…')
+              else if (e.state === 'cached') setProgress('Already know this band — designing…')
               else if (e.state === 'found') setProgress('Got the rig — designing…')
               else if (e.state === 'timeout' || e.state === 'failed') {
                 setProgress(`${THINKING}…`)
