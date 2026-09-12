@@ -369,9 +369,21 @@ export default async function handler(req, res) {
      * leaves it to the model's own judgement, which is rule 11's three or four.
      */
     sceneBudget,
+    /*
+     * A rig briefing this browser already has for the band being asked about.
+     *
+     * Client-supplied and therefore capped, like `taste` — it is text the app
+     * assembled from an earlier lookup of its own, but this endpoint cannot
+     * verify that, and an unbounded string from a request body is a way to make
+     * every generation expensive. See lib/rigCache.js.
+     */
+    rig: knownRig,
     trace
   } =
     req.body || {}
+
+  const known =
+    typeof knownRig === 'string' && knownRig.trim() ? knownRig.trim().slice(0, 8000) : null
 
   if (!description || typeof description !== 'string') {
     res.status(400).json({ error: 'Describe the tone you want.' })
@@ -497,7 +509,19 @@ export default async function handler(req, res) {
    * told plainly when the lookup does not make it.
    */
   const lookUpRig = () =>
-    searchTool
+    /*
+     * Already known, so not looked up again.
+     *
+     * "Isn't there a band database we can download?" There is not one — nobody
+     * publishes what amp a band plays — but a rig found once is that database,
+     * and the browser hands back what it has been told before. A band's gear
+     * does not change between Tuesday and Wednesday, so the second request for
+     * them costs no searching, no tokens and no waiting. See lib/rigCache.js,
+     * which decides what counts as knowing it.
+     */
+    known
+      ? Promise.resolve({ rig: known, why: 'cached', ms: 0 })
+      : searchTool
       ? researchRig({
           description,
           /*
@@ -751,7 +775,19 @@ export default async function handler(req, res) {
        */
       send({ type: 'rig', state: 'looking' })
       const found = await lookUpRig()
-      send({ type: 'rig', state: found.why, ms: found.ms, note: rigOutcome(found) })
+      send({
+        type: 'rig',
+        state: found.why,
+        ms: found.ms,
+        note: rigOutcome(found),
+        /*
+         * And the briefing itself, so the browser can keep it. Not sent back
+         * when it was the browser that supplied it — there is nothing new to
+         * file, and echoing a few kilobytes for no reason is a cost on every
+         * cached request, which is meant to be the cheap one.
+         */
+        ...(found.why !== 'cached' && found.rig ? { rig: found.rig } : {})
+      })
       const args = argsWith(found.rig)
       const traced = traceWith(found.rig)
 

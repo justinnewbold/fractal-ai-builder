@@ -360,7 +360,14 @@ async function attemptOnce(
          */
         if (frame.type === 'rig') {
           note('rig', { ms: since(), state: frame.state, tookMs: frame.ms })
-          onEvent?.({ kind: 'rig', ms: since(), state: frame.state, note: frame.note })
+          onEvent?.({
+            kind: 'rig',
+            ms: since(),
+            state: frame.state,
+            note: frame.note,
+            // The briefing, for the caller to keep. See lib/rigCache.js.
+            rig: frame.rig || null
+          })
           /*
            * And the design's thinking clock starts here, not at the hello.
            *

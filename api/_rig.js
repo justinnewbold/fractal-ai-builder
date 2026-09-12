@@ -95,6 +95,14 @@ on it ("tight modern metal", "warm blues lead", "eighties clean") is NONE.
 
 If it does name music, search and report what actually made those sounds.
 
+Open with the band's own name on a line of its own, before anything else:
+
+  ARTIST: <the band or artist, spelled the way they spell it>
+
+That line is how the app files this away and finds it again the next time
+somebody asks about them, so give the full name rather than the shorthand in
+the request — "Three Days Grace", not "TDG".
+
 RIG
 
 - AMPS: the specific heads or preamps, by make and model. Name the ones the
@@ -244,6 +252,7 @@ export async function researchRig({
  */
 export function rigOutcome({ why, ms } = {}) {
   const secs = Number.isFinite(ms) && ms > 0 ? ` after ${Math.round(ms / 1000)}s` : ''
+  if (why === 'cached') return 'Already knew this band — no lookup needed'
   if (why === 'found') return `Looked up the rig${secs}`
   if (why === 'partial')
     return `The rig lookup ran out of time${secs} — designed from as much of it as it had reached`

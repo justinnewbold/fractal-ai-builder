@@ -5366,6 +5366,85 @@ test('a shelved conversation is readable only by the account that wrote it', () 
   assert.match(sql, /id text primary key/)
 })
 
+console.log('\na band looked up once')
+
+test('a rig found once is not looked up again', async () => {
+  /*
+   * "Isn't there a band database we can download and have in the app to look
+   * up most of the info and save some tokens?"
+   *
+   * There is not one. MusicBrainz, Discogs and Wikidata carry releases,
+   * credits and personnel and none of them carry what amp anybody played;
+   * Equipboard is that database and publishes no API and no export. So the
+   * fact is found out once and kept, which is most of what a download would
+   * have bought — a band's rig does not change between Tuesday and Wednesday.
+   */
+  const { artistOf, pickRig, tidy } = await import('../src/lib/rigCache.js')
+
+  /* Keyed on the band, from the briefing's own first line — the lookup is told
+     to open with it precisely so this does not have to guess. */
+  assert.equal(artistOf('ARTIST: Three Days Grace\nRIG\nAMPS: Diezel VH4'), 'Three Days Grace')
+  assert.equal(artistOf('artist:  Papa Roach \nRIG'), 'Papa Roach')
+  assert.equal(artistOf('RIG\nAMPS: Diezel VH4'), null, 'a briefing with no band was filed anyway')
+  assert.equal(artistOf(''), null)
+
+  const rows = [
+    { artist: 'Three Days Grace', songs: 8, rig: 'ARTIST: Three Days Grace', at: Date.now() },
+    { artist: 'Metallica', songs: 4, rig: 'ARTIST: Metallica', at: Date.now() }
+  ]
+
+  /* The sentence is not the key. "Make me a Three Days Grace preset with 8
+     scenes" and "three days grace, all eight" are the same lookup. */
+  assert.equal(pickRig(rows, 'Make me a Three Days Grace preset with 8 scenes', 8).artist, 'Three Days Grace')
+  assert.equal(pickRig(rows, 'three days grace!! all eight scenes', 8).artist, 'Three Days Grace')
+  assert.equal(pickRig(rows, 'a tight modern metal rhythm', 4), null, 'a tone with no band in it matched one')
+  assert.equal(pickRig(rows, 'make me a Papa Roach preset', 4), null)
+
+  /* Four songs researched cannot answer a request for eight — the other four
+     were never looked up. Four can answer three. */
+  assert.equal(pickRig(rows, 'metallica, four scenes', 4).artist, 'Metallica')
+  assert.equal(pickRig(rows, 'metallica, three scenes', 3).artist, 'Metallica')
+  assert.equal(pickRig(rows, 'metallica, eight scenes', 8), null, 'four songs answered a request for eight')
+
+  /* Gear does change. Ninety days is far longer than any run of requests about
+     one band and far shorter than a career. */
+  const old = [{ artist: 'Metallica', songs: 8, rig: 'ARTIST: Metallica', at: 1 }]
+  assert.equal(pickRig(old, 'metallica', 4, Date.now()), null, 'a year-old rig was still trusted')
+
+  /* The specific name wins where two are in the same sentence. */
+  const both = [
+    { artist: 'Grace', songs: 8, rig: 'ARTIST: Grace', at: Date.now() },
+    { artist: 'Three Days Grace', songs: 8, rig: 'ARTIST: Three Days Grace', at: Date.now() }
+  ]
+  assert.equal(pickRig(both, 'a three days grace preset', 8).artist, 'Three Days Grace')
+
+  // A word inside another word is not that band.
+  assert.equal(pickRig([{ artist: 'Rush', songs: 4, rig: 'x', at: Date.now() }], 'brushed clean tone', 4), null)
+  assert.equal(tidy('  Three Days Grace!  '), 'three days grace')
+  assert.deepEqual(pickRig(null, 'anything', 0), null)
+})
+
+test('a band already known skips the search entirely', () => {
+  const route = readSrc(new URL('../api/generate.js', import.meta.url), 'utf8')
+  // Supplied by the browser, bounded like every other client string here.
+  assert.match(route, /rig: knownRig,/)
+  assert.match(route, /knownRig\.trim\(\)\.slice\(0, 8000\)/)
+  // And used instead of searching, reported as its own outcome.
+  assert.match(route, /known\s*\?\s*Promise\.resolve\(\{ rig: known, why: 'cached', ms: 0 \}\)/)
+  // The briefing comes back so the browser can keep it — but not when the
+  // browser is the one that supplied it.
+  assert.match(route, /found\.why !== 'cached' && found\.rig \? \{ rig: found\.rig \}/)
+
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  assert.match(app, /const already = pickRig\(await knownRigs\(\)/)
+  assert.match(app, /already\?\.rig \? \{ rig: already\.rig \} : \{\}/)
+  assert.match(app, /rememberRig\(e\.rig, songs\)/)
+
+  // And the lookup is told to name the band, or none of the above has a key.
+  const rig = readSrc(new URL('../api/_rig.js', import.meta.url), 'utf8')
+  assert.match(rig, /ARTIST: <the band or artist/)
+})
+
 console.log('\nwhat made this sound')
 
 const rigMod = await import('../api/_rig.js')
@@ -5565,7 +5644,7 @@ test('the lookup happens inside the stream, under the heartbeat, and says how it
   )
   // Announced both ways: what is being waited on, and how it went.
   assert.match(route, /send\(\{ type: 'rig', state: 'looking' \}\)/)
-  assert.match(route, /send\(\{ type: 'rig', state: found\.why[\s\S]{0,80}rigOutcome\(found\)/)
+  assert.match(route, /state: found\.why[\s\S]{0,120}rigOutcome\(found\)/)
   // And the prompt is built from what came back, not from a value fixed earlier.
   assert.match(route, /const args = argsWith\(found\.rig\)/)
 
@@ -5765,7 +5844,7 @@ test('the question and the instruction share one idea of "all of them"', () => {
    * imported by both.
    */
   const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
-  assert.match(app, /import \{ sceneChoices \} from '\.\.\/api\/_scenes\.js'/)
+  assert.match(app, /import \{ sceneChoices, songsWanted \} from '\.\.\/api\/_scenes\.js'/)
   assert.match(app, /sceneChoices\(sceneCount\)\.map/, 'the sheet hardcodes its own options again')
   assert.ok(
     !/A set of scenes/.test(app),

@@ -3,6 +3,27 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.186.0
+
+**A band looked up once is not looked up again.** There is no band-gear
+database to download — MusicBrainz, Discogs and Wikidata are enormous and carry
+releases, credits and personnel, and not one of them carries what amp anybody
+played. Equipboard really is that database and publishes no API and no export.
+
+So the fact is found out once and kept. Ask for Three Days Grace a second time
+and there is no searching, no tokens spent and no waiting — the rig and the
+songs go straight into the design. By the tenth band this is the database that
+could not be downloaded, built out of answers the app actually used.
+
+It is filed under the band rather than under the sentence, so "Make me a Three
+Days Grace preset with 8 scenes" and "three days grace, all eight" are the same
+lookup. A briefing researched for four songs answers a request for three and
+not one for eight, because the other four were never looked up. And it is kept
+for ninety days rather than forever, because bands do change rig.
+
+Kept in this browser and, signed in, with the account — so a band looked up on
+the phone at the bench is already known when you sit down at the Mac.
+
 ## 7.185.0
 
 **The rig lookup keeps what it found instead of throwing it away.** Raising its
