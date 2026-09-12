@@ -3,6 +3,24 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.181.0
+
+**Reloading a saved tone brings its scenes back with it.** An eight-scene tone
+reloaded from your library came back as the sound only — every value landed,
+and every scene kept the name and the layout of whatever preset happened to be
+underneath it. Scenes are switched off by default on a fresh design, on purpose:
+the card offers "Also set up 8 scenes" and tells you which of the ones you laid
+out it would write over. Reloading never said anything about them either way,
+so it sent whatever that switch was left on from earlier — and after clearing a
+tone off the screen, that is off.
+
+Reloading is not a proposal about scenes. It is the tone you saved, and the
+scenes are part of what you saved — the app will even stop and ask which of
+them should come across when a tone has more than the unit holds, then tell you
+which ones made it. Asking that and then writing none of them was the thing
+worth fixing. The tick is still there on the card if you want to send the sound
+without the scenes.
+
 ## 7.180.0
 
 **The chat can see your preset list now.** "What presets do we have named
