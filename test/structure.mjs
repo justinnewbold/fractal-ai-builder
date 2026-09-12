@@ -3632,6 +3632,34 @@ export function run(test) {
     assert.match(api, /Name every scene you return/, 'the model is not told to name the scenes it makes')
   })
 
+  test('a count typed into the request reaches the designer on every path', () => {
+    /*
+     * The question above is only put on a preset with nothing laid out. On
+     * every other preset "Full Tool preset" reached the model with no count
+     * and came back with four scenes, and "it should be eight scenes not
+     * four" was refined with no count at all. The words are read first, on
+     * the build and on the refinement, and the chat hands both what was typed.
+     */
+    assert.match(src, /import \{ sceneChoices, scenesAskedFor, songsWanted \} from '\.\.\/api\/_scenes\.js'/)
+    assert.match(
+      src,
+      /const named = scenesAskedFor\(description, sceneCount\)\s*\n\s*if \(named\) opts = \{ \.\.\.opts, \.\.\.named \}/,
+      'a build ignores a scene count in the request'
+    )
+    assert.match(
+      src,
+      /const refine = async \(instruction, against = null, opts = \{\}\) => \{[\s\S]{0,1500}?scenesAskedFor\(instruction, sceneCount\)[\s\S]{0,4000}?requestSpec\(schema, instruction, previous, scenesWanted\)/,
+      'a refinement ignores a scene count in the request'
+    )
+    assert.match(
+      src,
+      /const scenesWanted = scenesAskedFor\(instruction, sceneCount\) \|\| \{\}\s*\n\s*if \(builtBlocks\)/,
+      'the chat reads the count from what was typed, not from its retelling'
+    )
+    const api = readFileSync(new URL('../api/generate.js', import.meta.url), 'utf8')
+    assert.match(api, /wantScenes === true && sceneBudget\s*\n?\s*\?/, 'a refinement that names a count is still told to change as little as possible')
+  })
+
   test('the model cannot name a block this preset does not have', () => {
     /*
      * Rule 1 has always forbidden it and a run still asked for effects 70, 82

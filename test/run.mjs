@@ -5959,6 +5959,58 @@ test('a number the player chose overrides the rule that says three or four', () 
   assert.match(sceneInstruction({ wantScenes: true, sceneBudget: 8, sceneCount: 4 }), /EXACTLY 4 SCENES/)
 })
 
+test('a number of scenes in the request itself is read, not asked for or guessed', () => {
+  /*
+   * "Full Tool preset" on an FM3 came back with four scenes. "It should be
+   * eight scenes not four" came back with four. "No, I want eight scenes"
+   * came back with four. The buttons that carry a count only appear on a
+   * preset with nothing laid out, so on every other preset the count was
+   * undefined and rule 11 filled in three or four — and a refinement carried
+   * no count at all, beside an instruction to change as little as possible.
+   */
+  const { scenesAskedFor } = scenesMod
+
+  // The three requests from the log, on the unit they were made on.
+  assert.deepEqual(scenesAskedFor('Full “Tool” preset', 8), { wantScenes: true, sceneBudget: 8 })
+  assert.deepEqual(
+    scenesAskedFor('It should be eight scenes not four and it looks like you’re only putting in four blocks per scene scene?', 8),
+    { wantScenes: true, sceneBudget: 8 }
+  )
+  assert.deepEqual(
+    scenesAskedFor('No, I want eight scenes. You still only made four. What’s the problem?', 8),
+    { wantScenes: true, sceneBudget: 8 }
+  )
+
+  // Digits, words, hyphens, "all", "every".
+  assert.deepEqual(scenesAskedFor('make a full Metallica preset with 8 scenes', 8), { wantScenes: true, sceneBudget: 8 })
+  assert.deepEqual(scenesAskedFor('an 8-scene set', 8), { wantScenes: true, sceneBudget: 8 })
+  assert.deepEqual(scenesAskedFor('three days grace with 3 scenes', 8), { wantScenes: true, sceneBudget: 3 })
+  assert.deepEqual(scenesAskedFor('fill every scene', 8), { wantScenes: true, sceneBudget: 8 })
+  assert.deepEqual(scenesAskedFor('use all eight', 8), { wantScenes: true, sceneBudget: 8 })
+
+  // The number being turned down is not the number being asked for.
+  assert.equal(scenesAskedFor('go from 4 scenes to 8 scenes', 8).sceneBudget, 8)
+  assert.equal(scenesAskedFor('8 scenes instead of 4 scenes', 8).sceneBudget, 8)
+  assert.equal(scenesAskedFor('just 2 scenes, not 8 scenes', 8).sceneBudget, 2)
+
+  // Clamped to the unit, the same way a tapped number is.
+  assert.deepEqual(scenesAskedFor('give me 8 scenes', 4), { wantScenes: true, sceneBudget: 4 }, 'an AM4 asked for eight')
+  assert.deepEqual(scenesAskedFor('Full “Tool” preset', 4), { wantScenes: true, sceneBudget: 4 })
+
+  // One is the other button.
+  assert.equal(scenesAskedFor('one sound', 8).wantScenes, false)
+  assert.equal(scenesAskedFor('just one scene', 8).wantScenes, false)
+  assert.equal(scenesAskedFor('a single scene', 8).wantScenes, false)
+
+  // Naming a scene is not naming a count; neither is a plain tone.
+  assert.equal(scenesAskedFor('make the lead scene brighter', 8), null)
+  assert.equal(scenesAskedFor('less delay on scene 2', 8), null)
+  assert.equal(scenesAskedFor('tight modern metal rhythm in drop A', 8), null)
+  assert.equal(scenesAskedFor('warmer', 8), null)
+  assert.equal(scenesAskedFor('', 8), null)
+  assert.equal(scenesAskedFor(null, 8), null)
+})
+
 test('a band asked for gets its own songs on the scenes, not Clean / Rhythm / Lead', () => {
   /*
    * "This generation should've created song names for each scene and it did
@@ -6024,7 +6076,7 @@ test('the question and the instruction share one idea of "all of them"', () => {
    * imported by both.
    */
   const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
-  assert.match(app, /import \{ sceneChoices, songsWanted \} from '\.\.\/api\/_scenes\.js'/)
+  assert.match(app, /import \{ sceneChoices, scenesAskedFor, songsWanted \} from '\.\.\/api\/_scenes\.js'/)
   assert.match(app, /sceneChoices\(sceneCount\)\.map/, 'the sheet hardcodes its own options again')
   assert.ok(
     !/A set of scenes/.test(app),
