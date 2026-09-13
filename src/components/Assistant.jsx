@@ -181,6 +181,17 @@ export default function Assistant({
    */
   onNew,
   /*
+   * The Send on a "designed" line, and the way to the card it describes.
+   *
+   * A finished run says so in the conversation now, with its count, and the
+   * line carries the write itself — the card's Send button was a screen
+   * further down and nothing up here said it existed. Null once the tone has
+   * gone, so an old line never offers to send something twice.
+   */
+  onSend = null,
+  sendCount = 0,
+  onReveal = null,
+  /*
    * What is happening now: the working line, the chain arriving, and what a
    * write did. Rendered after everything said, because that is when it is
    * happening — the tone itself is no longer among them.
@@ -387,6 +398,13 @@ export default function Assistant({
     return parts.length ? parts : ['']
   }
 
+  /* The newest "designed" line is the one whose tone is on screen; only it
+     gets the buttons. Older ones describe tones already sent or set aside. */
+  let lastTone = -1
+  turns.forEach((turn, i) => {
+    if (turn.tone) lastTone = i
+  })
+
   /** One turn, drawn the same wherever it falls relative to the design. */
   const renderTurn = (turn, i) => (
           <div
@@ -426,6 +444,19 @@ export default function Assistant({
                   </li>
                 ))}
               </ul>
+            ) : null}
+
+            {turn.tone && i === lastTone && onSend ? (
+              <div className="turn-send">
+                <button className="save-now" onClick={onSend} disabled={busy}>
+                  Send {sendCount} change{sendCount === 1 ? '' : 's'}
+                </button>
+                {onReveal ? (
+                  <button className="chip" onClick={onReveal} disabled={busy}>
+                    Look it over
+                  </button>
+                ) : null}
+              </div>
             ) : null}
 
             {turn.pending ? (

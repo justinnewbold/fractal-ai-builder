@@ -3,6 +3,18 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.198.0
+
+**A finished design says so in the chat, and you can send it from there.**
+"This is what shows after generation is complete. No user notification. No
+idea what happened. User has to scroll down to bottom to see Send changes."
+The Thinking line vanished, the card appeared below the conversation, and
+its Send button was a screen further down. Now the run ends with a line in
+the conversation — Designed "Heart-Shaped Chorus", 27 changes and 1 scene,
+nothing sent yet — with a Send button on the line and a Look it over button
+that jumps to the card. The same after an adjustment. The button goes away
+once the tone has been sent.
+
 ## 7.197.0
 
 **The steps live under the Thinking line, behind a chevron.** "Put it in

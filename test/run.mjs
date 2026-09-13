@@ -9413,6 +9413,32 @@ test('every step stays on screen as it lands, with the line written about each s
   assert.match(app, /<LiveGeneration\s*\n\s*partial=\{partial\}\s*\n\s*open=\{feedOpen\}/, 'the feed shares the steps\' switch')
 })
 
+test('a finished run says so in the conversation, with a Send button on the line', () => {
+  /*
+   * "This is what shows after generation is complete. No user notification.
+   * No idea what happened. User has to scroll down to bottom to see Send
+   * changes." The Thinking line vanished, the card appeared below the
+   * conversation, and its Send button was a screen further down.
+   */
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  const assistant = readSrc(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
+
+  // Both kinds of run end with a line in the chat.
+  assert.match(app, /record\('generate'[\s\S]{0,200}?\]\)\s*\n\s*sayDesigned\('Designed', validated\)/, 'a design ends in silence')
+  assert.match(app, /record\('refine'[\s\S]{0,200}?\]\)\s*\n\s*sayDesigned\('Adjusted', validated\)/, 'a refinement ends in silence')
+  const say = app.slice(app.indexOf('const sayDesigned ='), app.indexOf('const revealResult ='))
+  assert.match(say, /tone: true/, 'the line is not marked as the one carrying the tone')
+  assert.match(say, /Nothing has been sent to your unit yet/, 'the line does not say the tone is still unsent')
+  assert.match(say, /change\$\{changes === 1 \? '' : 's'\}/, 'the line has no count')
+
+  // The line carries the write, and only while there is something to send.
+  assert.match(app, /onSend=\{result && !sent && !applied && !thinking \? apply : null\}/, 'the Send on the line is offered at the wrong times')
+  assert.match(app, /sendCount=\{writeCount \+ \(withScenes \? sceneWriteCount : 0\)\}/, 'the count on the button is not the count the card sends')
+  assert.match(assistant, /turn\.tone && i === lastTone && onSend \? \(\s*\n\s*<div className="turn-send">/, 'the newest designed line has no Send')
+  assert.match(assistant, /Send \{sendCount\} change/, 'the button does not say how many')
+  assert.match(assistant, /onClick=\{onReveal\}/, 'there is no way from the line to the card')
+})
+
 import { recordUsage, readLedger, byDay, clearLedger, ledgerText, utcDay, MAX_ROWS } from '../src/lib/ledger.js'
 
 test('every call to the model is written down, and kept', () => {

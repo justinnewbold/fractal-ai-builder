@@ -5329,7 +5329,9 @@ ol.action-list li.destructive::marker {
   line-height: 1.7;
 }
 
-.turn-confirm {
+/* The Send on a "designed" line sits like the Do it on a pending one. */
+.turn-confirm,
+.turn-send {
   display: flex;
   align-items: center;
   gap: var(--s-2);
