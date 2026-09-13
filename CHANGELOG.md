@@ -3,6 +3,13 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.201.0
+
+**The Save sheet's button says "Save to slot 478" from a phone too.** It
+read "Ask the Mac to save to slot 478", which said who holds the pen rather
+than what the button does. The Mac still does the writing over the link, and
+the sheet still says so once the save is queued.
+
 ## 7.200.0
 
 **The shared-channel question does the work for you.** When "brighten
