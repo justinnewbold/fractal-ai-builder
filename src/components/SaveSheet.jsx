@@ -41,12 +41,12 @@ export function SaveFooter({ preset, slot, onSave, busy, saving, remote, queued,
           Replaces <strong>{holds || (occupant ? 'an empty slot' : 'what is in slot ' + targetLabel)}</strong>.
         </p>
       ) : null}
+      {/* The same words from a phone as from the Mac. "Ask the Mac to save to
+          slot 478" said who holds the pen, which is this app's business and
+          not the player's; the queued line above says so once it is in
+          flight. */}
       <button className="primary save-confirm" onClick={onSave} disabled={busy || !!queued}>
-        {saving
-          ? 'Saving…'
-          : remote
-            ? `Ask the Mac to save to slot ${targetLabel}`
-            : `Save to slot ${targetLabel}`}
+        {saving ? 'Saving…' : `Save to slot ${targetLabel}`}
       </button>
     </div>
   )
