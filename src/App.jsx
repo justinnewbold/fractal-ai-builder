@@ -926,7 +926,18 @@ export default function App() {
   // should land where you were rather than at a fixed default.
   const [runningPlan, setRunningPlan] = useState(false)
   const [partial, setPartial] = useState(null)
-  const [liveOpen, setLiveOpen] = useState(false)
+  /*
+   * Whether the step list under Thinking is open. Open to begin with: the
+   * list was asked for so the scenes could be watched being written, and a
+   * chevron that starts closed hides the thing that was asked for behind a
+   * tap nobody knows to make. Closing it is one tap and sticks for the
+   * session.
+   */
+  const [liveOpen, setLiveOpen] = useState(true)
+  /* The full feed of every control and value, offered by its own chip once
+     the run has finished. Its own state, so opening the steps mid-run does
+     not pop this panel open the moment the run ends. */
+  const [feedOpen, setFeedOpen] = useState(false)
   const [thinking, setThinking] = useState(false)
   // The live request, and when it started — what Stop acts on and what the
   // elapsed clock counts from.
@@ -4820,25 +4831,26 @@ export default function App() {
         startedAt={genStarted}
         typicalMs={typicalMs(past)}
         /* Tappable only once the model has actually written something, so the
-           control never opens an empty panel. */
+           chevron never opens an empty list. */
         live={!!partial}
         open={liveOpen}
         onToggle={() => setLiveOpen((was) => !was)}
-      />
-
-      {/*
-        Each step as it lands — every block, then every scene with the line
-        the designer wrote about it — kept on screen for the length of the
-        run. The panel below is the deeper view and takes over while open.
-      */}
-      {thinking && !liveOpen ? <LiveSteps partial={partial} nameOf={blockNameFor} /> : null}
+      >
+        {/*
+          Each step as it lands — every block, then every scene with the line
+          the designer wrote about it — in the same flow as the line above,
+          under its chevron. One thing, opened and closed in one place.
+        */}
+        {thinking ? <LiveSteps partial={partial} nameOf={blockNameFor} /> : null}
+      </Thinking>
 
       <LiveGeneration
         partial={partial}
-        open={liveOpen}
-        onToggle={() => setLiveOpen(!liveOpen)}
-        /* While the run is live the line above is the way in; afterwards the
-           chip is, because that line is gone by then. */
+        open={feedOpen}
+        onToggle={() => setFeedOpen(!feedOpen)}
+        /* Offered once the run is over. While it is live the Thinking line
+           and its steps are the account of it, and a second panel saying the
+           same thing in more detail is the clutter this replaced. */
         chip={!thinking}
         nameOf={blockNameFor}
       />

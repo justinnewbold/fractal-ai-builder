@@ -1555,17 +1555,48 @@ button.thinking {
   align-items: center;
 }
 
-.thinking-more {
+/*
+ * The chevron that opens the steps, at the head of the line — the way a
+ * chat's "Thinking" row works everywhere else. Points right when closed,
+ * down when open.
+ */
+.thinking-chevron {
   flex: 0 0 auto;
-  font-size: var(--f-1);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  width: 14px;
+  height: 14px;
   color: var(--silk-dim);
-  border-bottom: 1px solid var(--rule);
+  transition: transform 140ms ease;
 }
 
-button.thinking:hover .thinking-more {
+.thinking-chevron.open {
+  transform: rotate(90deg);
+}
+
+button.thinking:hover .thinking-chevron {
   color: var(--signal);
+}
+
+/*
+ * The line and what it opens, as one block. The steps hang under the line,
+ * indented past the chevron and ruled on the left, so they read as the
+ * line's own body rather than as more of the conversation.
+ */
+.thinking-block {
+  margin-top: 14px;
+}
+
+.thinking-block .thinking {
+  margin-top: 0;
+}
+
+.thinking-detail {
+  margin: var(--s-2) 0 0 6px;
+  padding-left: var(--s-3);
+  border-left: 1px solid var(--rule);
+}
+
+.thinking-detail .live-steps {
+  margin-top: 0;
 }
 
 .thinking-bars {

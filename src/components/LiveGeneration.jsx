@@ -37,10 +37,11 @@ export { progressFor }
  * changing and the two minutes it took were two minutes of nothing to read.
  *
  * This is that list, from the same partial the one-line progress reads, so
- * the two cannot disagree about what has happened. The line at the top still
- * says the newest thing and keeps the clock; this keeps the record. The
- * "Watch it" panel is the deeper view — every control, every value — and this
- * stands down while it is open, so the same scene is never listed twice.
+ * the two cannot disagree about what has happened. It is the body of the
+ * Thinking disclosure — the chevron on that line opens and closes it — and
+ * the line itself still says the newest thing and keeps the clock. The full
+ * feed of every control and value is a separate panel, offered once the run
+ * has finished.
  */
 export function LiveSteps({ partial, nameOf = null }) {
   const steps = stepsFor(partial, nameOf)
@@ -225,7 +226,19 @@ export function Thinking({
    */
   live = false,
   open = false,
-  onToggle = null
+  onToggle = null,
+  /*
+   * What the chevron opens: the step list, in the same flow as the line.
+   *
+   * "Just put it in the same line as the thoughts instead of a different
+   * chat scroll — have a > next to Thinking to expand and collapse, just like
+   * Claude does in its chats." The steps were drawn as a separate block after
+   * this line, so the list scrolled the transcript away from the line that
+   * owned it, and nothing on screen said the two were one thing. Now the
+   * line is the header of a disclosure and the steps are its body, indented
+   * under it, opened and closed by the chevron.
+   */
+  children = null
 }) {
   const [now, setNow] = useState(Date.now())
   const running = !!(active || message)
@@ -258,6 +271,15 @@ export function Thinking({
 
   const body = (
     <>
+      {live ? (
+        <svg
+          className={`thinking-chevron${open ? ' open' : ''}`}
+          viewBox="0 0 16 16"
+          aria-hidden="true"
+        >
+          <path d="M6 3.5l4.5 4.5L6 12.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ) : null}
       <span className="thinking-bars" aria-hidden="true">
         <i />
         <i />
@@ -274,14 +296,11 @@ export function Thinking({
           </span>
         ) : null}
       </span>
-      {live ? (
-        <span className="thinking-more">{open ? 'Hide' : 'Watch it'}</span>
-      ) : null}
     </>
   )
 
-  if (live && onToggle) {
-    return (
+  const line =
+    live && onToggle ? (
       <button
         type="button"
         className="thinking thinking-tap"
@@ -292,12 +311,16 @@ export function Thinking({
       >
         {body}
       </button>
+    ) : (
+      <div className="thinking" role="status" aria-live="polite">
+        {body}
+      </div>
     )
-  }
 
   return (
-    <div className="thinking" role="status" aria-live="polite">
-      {body}
+    <div className="thinking-block">
+      {line}
+      {live && open && children ? <div className="thinking-detail">{children}</div> : null}
     </div>
   )
 }

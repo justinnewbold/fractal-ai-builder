@@ -3,6 +3,19 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.197.0
+
+**The steps live under the Thinking line, behind a chevron.** "Put it in
+the same line as the thoughts instead of a different chat scroll — have a >
+next to Thinking to expand and collapse, just like Claude does." The list of
+what the designer has decided was drawn as its own block after the line, so
+it scrolled the conversation away from the line that owned it. Now the
+Thinking line carries a chevron at its head, the steps hang under it,
+indented, and the chevron opens and closes them. Open to begin with, so the
+scenes can still be watched being written; a tap closes it and that sticks.
+The full feed of every control and value is still there, offered by its own
+chip once the run has finished.
+
 ## 7.196.0
 
 **One scene means one scene, and "do not create a preset name" means
