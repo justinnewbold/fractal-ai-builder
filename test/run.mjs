@@ -9396,11 +9396,21 @@ test('every step stays on screen as it lands, with the line written about each s
   const preview = readSrc(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
   assert.match(preview, /scene\.why \? <span className="scene-plan-why">/, 'the preview never shows it')
   const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  /* Inside the Thinking line's own disclosure, not as a block after it.
+     "Put it in the same line as the thoughts instead of a different chat
+     scroll — have a > next to Thinking to expand and collapse." */
   assert.match(
     app,
-    /\{thinking && !liveOpen \? <LiveSteps partial=\{partial\} nameOf=\{blockNameFor\} \/> : null\}\s*\n\s*<LiveGeneration/,
-    'the steps are not drawn under the Thinking line while a tone builds'
+    /\{thinking \? <LiveSteps partial=\{partial\} nameOf=\{blockNameFor\} \/> : null\}\s*\n\s*<\/Thinking>/,
+    'the steps are not the body of the Thinking line'
   )
+  const live = readSrc(new URL('../src/components/LiveGeneration.jsx', import.meta.url), 'utf8')
+  assert.match(live, /className=\{`thinking-chevron\$\{open \? ' open' : ''\}`\}/, 'the Thinking line has no chevron')
+  assert.match(live, /\{live && open && children \? <div className="thinking-detail">\{children\}<\/div> : null\}/, 'the chevron opens nothing')
+  assert.ok(!/Watch it/.test(live), 'the old "Watch it" label is still on the line beside the chevron')
+  /* The full feed keeps its own switch, so opening the steps mid-run does not
+     pop the feed open the moment the run ends. */
+  assert.match(app, /<LiveGeneration\s*\n\s*partial=\{partial\}\s*\n\s*open=\{feedOpen\}/, 'the feed shares the steps\' switch')
 })
 
 import { recordUsage, readLedger, byDay, clearLedger, ledgerText, utcDay, MAX_ROWS } from '../src/lib/ledger.js'
