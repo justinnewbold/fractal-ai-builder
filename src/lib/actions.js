@@ -218,6 +218,141 @@ const ORDER = {
 }
 
 /**
+ * A list of scene numbers as a player would say them: "scenes 1 and 3".
+ */
+const sayScenes = (indexes) => {
+  const n = indexes.map((i) => i + 1)
+  if (n.length === 1) return `scene ${n[0]}`
+  return `scenes ${n.slice(0, -1).join(', ')} and ${n[n.length - 1]}`
+}
+
+/**
+ * Where a value written "for scene N" actually lands, and what to say about it.
+ *
+ * A value belongs to the channel a block is on, not to a scene. So a write
+ * aimed at scene 2 lands on whatever channel scene 2 plays the block on — and
+ * reaches every other scene playing that same channel. When the channel map
+ * is known (the demo), the scenes it reaches are named. When it is not (a real
+ * unit, whose map can only be read audibly), a write the player aimed at one
+ * scene is flagged as one that may reach others, so App asks first.
+ *
+ *   scene      the scene index the write lands in, or null with no scenes
+ *   where      "scene 2 · Lead", or "the whole preset" — for the result card
+ *   suffix     what the action label carries: " in scene 2 · Lead (channel A,
+ *              shared with scenes 1 and 3)"
+ *   shared     true when App should ask before writing
+ *   note       the sentence that question shows
+ *   reachesLive whether the live scene's channel is the one written
+ */
+export function paramScope({
+  eid,
+  block,
+  target,
+  activeScene,
+  named = false,
+  sceneChannels = null,
+  sceneCount = 8,
+  sceneLabel = (i) => `scene ${i + 1}`
+}) {
+  if (target === null || target === undefined) {
+    return {
+      scene: null,
+      where: 'the whole preset',
+      suffix: '',
+      shared: false,
+      note: null,
+      reachesLive: true,
+      channel: null,
+      others: []
+    }
+  }
+  const map = sceneChannels ? sceneChannels[eid] ?? sceneChannels[String(eid)] ?? null : null
+  const channel = Array.isArray(map)
+    ? map[target] ?? null
+    : target === activeScene
+      ? block?.channel ?? null
+      : null
+  const others = Array.isArray(map)
+    ? map
+        .map((c, i) => [c, i])
+        .filter(([c, i]) => i !== target && i < sceneCount && c === channel)
+        .map(([, i]) => i)
+    : []
+  const where = sceneLabel(target)
+  const reachesLive = target === activeScene || others.includes(activeScene)
+  const known = Array.isArray(map)
+
+  if (known && others.length) {
+    return {
+      scene: target,
+      where,
+      suffix: ` in ${where} (channel ${channel}, shared with ${sayScenes(others)})`,
+      shared: true,
+      note: `${block?.name || 'This block'} plays channel ${channel} in ${sayScenes([
+        target,
+        ...others
+      ].sort((a, b) => a - b))}, and its values belong to the channel — so this changes all of them, not ${where} alone. To change one scene by itself, ask to give it its own channel first.`,
+      reachesLive,
+      channel,
+      others
+    }
+  }
+  if (known) {
+    return {
+      scene: target,
+      where,
+      suffix: ` in ${where}${channel ? ` (channel ${channel}, this scene only)` : ''}`,
+      shared: false,
+      note: null,
+      reachesLive,
+      channel,
+      others
+    }
+  }
+  /* Unknown map: honest about what a value is, and a question when the
+     player asked for one scene by name. */
+  return {
+    scene: target,
+    where,
+    suffix: ` in ${where}${channel ? ` (channel ${channel})` : ''}`,
+    shared: named,
+    note: named
+      ? `${block?.name || 'This block'}'s values belong to the channel it is on, not to ${where} — any other scene playing the same channel changes with it. To change one scene by itself, ask to give it its own channel first.`
+      : null,
+    reachesLive,
+    channel,
+    others
+  }
+}
+
+/**
+ * One line for the result card: where the values in a plan landed.
+ *
+ * "Done — 2 changes" on the Play screen did not say whether those changes were
+ * scene 2's or the whole preset's, and the values looked the same from scene
+ * 1. Null when the plan wrote no values, so the card says nothing it does not
+ * know.
+ */
+export function whereOf(actions = []) {
+  const scopes = actions.filter((a) => a.kind === 'setParam' && a.scope).map((a) => a.scope)
+  if (!scopes.length) return null
+  const wheres = [...new Set(scopes.map((s) => s.where))]
+  const head =
+    wheres.length === 1 && wheres[0] === 'the whole preset'
+      ? 'Preset-wide — every scene.'
+      : `Written in ${wheres.join(' and ')}.`
+  const reach = scopes.find((s) => s.others.length)
+  if (reach) {
+    return `${head} ${reach.channel ? `Channel ${reach.channel} is` : 'The channel is'} shared with ${sayScenes(
+      reach.others
+    )}, so they changed too.`
+  }
+  const unknown = scopes.find((s) => s.scene !== null && s.channel === null)
+  if (unknown) return `${head} Values belong to a block's channel, so other scenes on the same channel change too.`
+  return head
+}
+
+/**
  * What the reply says when the plan has been checked.
  *
  * "Turn the volume down a little" came back as "Nothing to change." — the
@@ -278,8 +413,17 @@ export function validatePlan(plan, blocks, capabilities) {
   const sceneNames = Array.isArray(capabilities?.sceneNames) ? capabilities.sceneNames : []
   const sceneCount = capabilities?.sceneCount ?? 8
   const sceneLabel = (i) => (sceneNames[i] ? `scene ${i + 1} · ${sceneNames[i]}` : `scene ${i + 1}`)
-  const aimedElsewhere = (raw) =>
-    typeof raw.scene === 'number' && activeScene !== null && raw.scene !== activeScene
+  /*
+   * Which channel every block plays in every scene, when that can be known
+   * without changing the sound: `{ [eid]: ['A', 'D', 'A', ...] }` by scene
+   * index. The demo knows; a real unit can only be asked by visiting each
+   * scene, which is audible, so there it is absent and a scene-aimed value
+   * is presented as one that may reach other scenes.
+   */
+  const sceneChannels =
+    capabilities?.sceneChannels && typeof capabilities.sceneChannels === 'object'
+      ? capabilities.sceneChannels
+      : null
 
   for (const raw of plan?.actions || []) {
     const block = raw.eid !== null && raw.eid !== undefined ? byEid.get(raw.eid) : null
@@ -296,14 +440,8 @@ export function validatePlan(plan, blocks, capabilities) {
         if (!need(typeof raw.value === 'number', `${block.name} / ${param.name}: no value given.`))
           break
         if (
-          !need(
-            !aimedElsewhere(raw),
-            `${block.name} / ${param.name}: a value belongs to the channel this block is on, not to ${sceneLabel(
-              raw.scene
-            )}, so writing it there would change every scene playing that channel. Give that scene its own channel for ${
-              block.name
-            } first, then set the value on it — or change it for the whole preset.`
-          )
+          typeof raw.scene === 'number' &&
+          !need(raw.scene >= 0 && raw.scene < sceneCount, `There's no scene ${raw.scene + 1}.`)
         )
           break
         if (
@@ -339,18 +477,55 @@ export function validatePlan(plan, blocks, capabilities) {
         )
           break
 
+        /*
+         * Where this value lands, said before it is written.
+         *
+         * "Brighten scene 2" used to be refused outright when the unit was in
+         * another scene, and when it was in scene 2 already the write went
+         * through with nothing saying that Treble belongs to the amp's channel
+         * and every scene playing that channel just got brighter too. Now a
+         * value aimed at another scene is written standing in that scene, the
+         * way a bypass is; the label names the scene; and a write that is
+         * known (or cannot be known not) to reach other scenes is flagged
+         * `shared`, which App turns into a question before anything is
+         * written. See paramScope.
+         */
+        const eid = block.eid ?? block.effectId
+        const target = typeof raw.scene === 'number' ? raw.scene : activeScene
+        const scope = paramScope({
+          eid,
+          block,
+          target,
+          activeScene,
+          named: typeof raw.scene === 'number',
+          sceneChannels,
+          sceneCount,
+          sceneLabel
+        })
+        const elsewhere = target !== null && activeScene !== null && target !== activeScene
+        /* The number it is moving from is the live channel's; standing in
+           another scene the block may be on a different channel, whose value
+           this plan never read. */
+        const from = elsewhere ? '' : `${round(param.value)} `
         actions.push({
           ...raw,
-          label: `${block.name} · ${param.name} ${round(param.value)} → ${round(raw.value)}${
-            param.unit || ''
+          scene: target,
+          scope,
+          shared: scope.shared,
+          sharedNote: scope.note,
+          label: `${block.name} · ${param.name} ${from}→ ${round(raw.value)}${param.unit || ''}${
+            scope.suffix
           }`,
           run: async () => {
             const d = await device()
-            const eid = block.eid ?? block.effectId
-            const res = await d.setParamConfirmed(eid, param.id, raw.value, param)
+            const res = elsewhere
+              ? await d.setSceneParam(target, eid, param.id, raw.value, param)
+              : await d.setParamConfirmed(eid, param.id, raw.value, param)
             // Confirmed by read-back inside setParamConfirmed, so recording it
             // saves re-reading the whole block to learn a number we already had.
-            if (res?.ok) d.patchSchemaValue(eid, param.id, raw.value)
+            // Only when the number written is the live channel's: the cache
+            // holds the values of the scene the unit is standing in.
+            if (res?.ok && (!elsewhere || scope.reachesLive)) d.patchSchemaValue(eid, param.id, raw.value)
             return res
           }
         })

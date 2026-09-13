@@ -617,8 +617,27 @@ button.device-summary {
 }
 
 .device-meta {
+  display: grid;
+  gap: var(--s-1);
   color: var(--silk-dim);
   font-size: var(--f-2);
+}
+
+/* One line per subject; the facts on a line are joined by dots and never
+   broken inside. If a line must wrap it wraps between facts. */
+.device-meta-line {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0;
+}
+
+.device-meta-fact {
+  white-space: nowrap;
+}
+
+.device-meta-fact + .device-meta-fact::before {
+  content: ' · ';
+  white-space: pre;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -720,6 +739,14 @@ input[type='text']:focus-visible {
   gap: var(--s-1);
   color: var(--silk-dim);
   font-size: var(--f-3);
+}
+
+/* Where the values landed — one scene, or the whole preset. A shade quieter
+   than the list, because it qualifies the list rather than adding to it. */
+.did-where {
+  margin: 0 0 10px;
+  color: var(--silk-faint);
+  font-size: var(--f-2);
 }
 
 .notice h2 {
@@ -5525,10 +5552,13 @@ button.send-btn.stopping {
 }
 
 /* The rotating placeholder reads as something being typed, so it sits a shade
-   quieter than a static hint would and holds a caret at the end. */
+   quieter than a static hint would and holds a caret at the end — and it is
+   italic, which the typed text in the same box never is, so the two cannot be
+   mistaken for each other at a glance. */
 .assistant-row .refine-input::placeholder {
   color: var(--silk-dim);
   opacity: 0.72;
+  font-style: italic;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -6356,6 +6386,20 @@ button.gig-block:disabled {
   gap: var(--s-2);
 }
 
+/* "Unsaved — Save to keep", beside the button, after a request in words has
+   written to the unit. In the row rather than hung under the bar: under it
+   the words sat on the rule and on whatever notice came next. Wide screens
+   only (App decides), where the bar has the room. */
+.save-hint {
+  white-space: nowrap;
+  font-family: var(--display);
+  font-size: var(--f-1);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+
 /* Both targets are thumb-sized. These get pressed in a hurry. */
 .save-cluster button.save-now {
   min-height: 46px;
@@ -6552,6 +6596,19 @@ button.gig-block:disabled {
 
 .update-notice span {
   flex: 1 1 220px;
+}
+
+/* Reload did not land: the same bar in the fault colour, because it is one. */
+.update-notice[data-kind='missed'] {
+  background: color-mix(in srgb, var(--fault) 14%, var(--panel));
+  border-color: color-mix(in srgb, var(--fault) 45%, var(--rule));
+}
+
+/* It did: a quiet word that goes away by itself. */
+.update-notice[data-kind='landed'] {
+  color: var(--silk-dim);
+  background: var(--panel);
+  border-color: var(--rule);
 }
 
 /* ---------- the phone link, on every screen ---------- */
@@ -7407,6 +7464,21 @@ button.sheet-close:active {
      the shell centres itself in moves the whole column instead. */
   html[data-rail='on'] #root {
     padding-right: var(--rail-w);
+  }
+
+  /*
+   * And the eight scenes stay one row while the rail is out.
+   *
+   * The column loses 380px to the rail, and at 1280 wide that left room for
+   * seven 110px tiles: scene 8 dropped to a row of its own, under the very
+   * sheet — Scenes — that was opened to work on it. Each tile may shrink to
+   * an eighth of the row instead, so all eight fit whatever the rail leaves.
+   */
+  html[data-rail='on'] .gig-scenes {
+    grid-template-columns: repeat(
+      auto-fit,
+      minmax(min(var(--gig-col, 110px), calc((100% - 7 * var(--s-2)) / 8)), 1fr)
+    );
   }
 }
 

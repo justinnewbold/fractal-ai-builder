@@ -245,6 +245,18 @@ export default function Assistant({
     // And nothing shown at all while it is.
     busy
   )
+  /*
+   * Whether the suggestion is moving right now.
+   *
+   * The cursor block on the end of the placeholder is what made it read as
+   * something already typed — "the rotating placeholder looks like typed
+   * text" — and it was drawn even while the suggestion stood still, which is
+   * exactly when a box has just been focused and a person is deciding what to
+   * write. Standing still, it is a plain hint with no cursor; only a
+   * suggestion in the middle of being typed carries one.
+   */
+  const stillMotion = useAsks('(prefers-reduced-motion: reduce)')
+  const typing = !busy && !text && !focused && !stillMotion
 
   /*
    * Where the conversation lands after something is said.
@@ -462,7 +474,10 @@ export default function Assistant({
             {turn.pending ? (
               <div className="turn-confirm">
                 <span className="hint">
-                  {turn.reason === 'broad'
+                  {turn.reason === 'shared'
+                    ? turn.actions.find((a) => a.sharedNote)?.sharedNote ||
+                      'These values are shared by more than one scene.'
+                    : turn.reason === 'broad'
                     ? `That's ${turn.actions.length} changes — worth a look first.`
                     : turn.actions.some((a) => a.kind === 'savePreset')
                       ? 'This overwrites whatever is in that slot.'
@@ -561,7 +576,7 @@ export default function Assistant({
           rows={1}
           className="refine-input"
           value={text}
-          placeholder={typed ? `${typed}\u258f` : ''}
+          placeholder={typed ? (typing ? `${typed}\u258f` : typed) : ''}
           onChange={(e) => setText(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}

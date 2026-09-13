@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { VERSION } from '../lib/version'
 
 /**
  * When the tab is running a build that no longer exists.
@@ -29,6 +30,33 @@ import { useEffect, useState } from 'react'
  */
 const CHECK_EVERY = 60 * 1000
 
+/*
+ * The reload, remembered across itself.
+ *
+ * Pressing Reload writes the script the deploy named into session storage;
+ * the page that comes up reads it back and compares it with the script it
+ * actually loaded. That is the only way to know whether Reload worked — the
+ * button cannot see the page it produces — and it is what turns "Reload did
+ * nothing" from a report into something the app says itself.
+ */
+const EXPECT_KEY = 'fab.update.expected'
+
+/*
+ * The query that makes the reload a page nobody has cached.
+ *
+ * Seen on v7.196 with v7.198 live: Reload, and still 7.196 — until the
+ * address was typed into the bar by hand. location.reload() asks for the same
+ * URL, and the same URL is exactly what a home-screen app's document cache and
+ * an edge cache both hold an answer for. A URL with a number on the end that
+ * has never been requested has no cached answer anywhere; it has to come from
+ * the deploy. Stripped again on arrival, so it never shows in the bar and
+ * never lands in a link somebody copies.
+ */
+const FRESH_PARAM = 'fresh'
+
+/** How long "up to date" stays before it gets out of the way. */
+const LANDED_FOR_MS = 6000
+
 function loadedScript() {
   const el = document.querySelector('script[type="module"][src*="/assets/"]')
   const src = el?.getAttribute('src') || ''
@@ -43,20 +71,71 @@ async function deployedScript() {
   return html.match(/assets\/(index-[A-Za-z0-9_-]+\.js)/)?.[1] ?? null
 }
 
+function expectAfterReload(script) {
+  try {
+    sessionStorage.setItem(EXPECT_KEY, script)
+  } catch {
+    // Private windows and blocked site data throw. The reload still happens;
+    // it just cannot be checked afterwards.
+  }
+}
+
+/** What the last Reload was reaching for, read once and then forgotten. */
+function expectedScript() {
+  try {
+    const wanted = sessionStorage.getItem(EXPECT_KEY)
+    if (wanted) sessionStorage.removeItem(EXPECT_KEY)
+    return wanted || null
+  } catch {
+    return null
+  }
+}
+
+/** Take the cache-buster back off the address once it has done its job. */
+function tidyAddress() {
+  try {
+    const url = new URL(window.location.href)
+    if (!url.searchParams.has(FRESH_PARAM)) return
+    url.searchParams.delete(FRESH_PARAM)
+    window.history.replaceState(window.history.state, '', url.toString())
+  } catch {
+    // A URL the browser will not let us touch is still the right page.
+  }
+}
+
+/** The address this page is at, plus a number nobody has asked for before. */
+export function freshAddress(href, now = Date.now()) {
+  const url = new URL(href)
+  url.searchParams.set(FRESH_PARAM, String(now))
+  return url.toString()
+}
+
 export default function UpdateNotice() {
-  const [stale, setStale] = useState(false)
+  // The script the deploy names, when it is not the one this tab loaded.
+  const [stale, setStale] = useState(null)
+  // What the last Reload did: 'landed', 'missed', or nothing to say.
+  const [after, setAfter] = useState(null)
 
   useEffect(() => {
     const mine = loadedScript()
+    const wanted = expectedScript()
+    tidyAddress()
     // In dev there is no hashed bundle to compare, so there is nothing to say.
     if (!mine) return
+    /*
+     * The check that Reload worked. The version in the bar is the one built
+     * into this bundle, so if the bundle is the one the deploy named, the
+     * version on screen is the deployed one — and if it is not, saying so
+     * beats a Reload button that looked like it worked.
+     */
+    if (wanted) setAfter(wanted === mine ? 'landed' : 'missed')
     let stop = false
 
     const check = async () => {
       if (stop || document.hidden) return
       try {
         const theirs = await deployedScript()
-        if (!stop && theirs && theirs !== mine) setStale(true)
+        if (!stop && theirs && theirs !== mine) setStale(theirs)
       } catch {
         // Offline, or the app is being served from something that isn't the
         // deploy. Either way this is a nicety, not a thing to raise an error
@@ -90,7 +169,12 @@ export default function UpdateNotice() {
     }
   }, [])
 
-  if (!stale) return null
+  // "Up to date" is news for a moment, then it is clutter.
+  useEffect(() => {
+    if (after !== 'landed') return undefined
+    const t = setTimeout(() => setAfter(null), LANDED_FOR_MS)
+    return () => clearTimeout(t)
+  }, [after])
 
   /*
    * A reload that actually fetches the page, which is not what reload() means
@@ -101,27 +185,55 @@ export default function UpdateNotice() {
    * cache — so pressing Reload on a stale app could leave it exactly as stale,
    * which is the worst version of this: a button that looks like it worked.
    *
-   * `cache: 'reload'` goes to the network and REPLACES the cached copy, so the
-   * reload that follows it loads the new page from the cache it just refilled.
-   * If that fetch fails — offline, or the app is served from something that is
-   * not the deploy — reloading anyway is still the right move and still what
-   * the button promised.
+   * Two things, in order. `cache: 'reload'` goes to the network and REPLACES
+   * the cached copy of this address. Then the page is left for the same
+   * address with a fresh query on it — one no cache has an answer for, so it
+   * comes from the deploy whatever the first step managed. If the fetch fails
+   * (offline, or served from something that is not the deploy) the move is
+   * still the right one and still what the button promised.
    */
   const refresh = async () => {
+    if (stale) expectAfterReload(stale)
     try {
       await fetch(window.location.pathname, { cache: 'reload' })
     } catch {
-      // Offline. The reload below will say so in the ordinary way.
+      // Offline. The page that follows will say so in the ordinary way.
     }
-    window.location.reload()
+    window.location.replace(freshAddress(window.location.href))
   }
 
-  return (
-    <div className="update-notice" role="status">
-      <span>A newer version of this app is out — this tab is running an older one.</span>
-      <button className="chip" onClick={refresh}>
-        Reload
-      </button>
-    </div>
-  )
+  if (after === 'missed') {
+    return (
+      <div className="update-notice" data-kind="missed" role="status">
+        <span>
+          Reload didn’t bring the new version in — this tab is still on v{VERSION}. Close the tab
+          and open the app again.
+        </span>
+        <button className="chip" onClick={refresh}>
+          Try again
+        </button>
+      </div>
+    )
+  }
+
+  if (stale) {
+    return (
+      <div className="update-notice" role="status">
+        <span>A newer version of this app is out — this tab is running an older one.</span>
+        <button className="chip" onClick={refresh}>
+          Reload
+        </button>
+      </div>
+    )
+  }
+
+  if (after === 'landed') {
+    return (
+      <div className="update-notice" data-kind="landed" role="status">
+        <span>✓ Up to date — v{VERSION}</span>
+      </div>
+    )
+  }
+
+  return null
 }

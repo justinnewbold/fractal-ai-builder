@@ -3,6 +3,48 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.199.0
+
+**"Brighten scene 2" is written in scene 2, and the app says who else hears
+it.** A value belongs to the channel a block is on, not to a scene, so a
+Treble change asked for in one scene reaches every scene playing that channel
+— and the app used to either refuse the ask or write it with nothing said.
+Now a value aimed at another scene is written standing in that scene, the way
+a bypass is; every value in the plan names the scene it lands in; and when
+the change would reach other scenes (the demo knows which; a real unit is
+asked before writing whenever a scene was named) the chat stops with a
+sentence saying so — "Amp 1 plays channel A in scenes 1, 3 and 4, so this
+changes all of them" — and a Do it button. The Done card that follows a
+request says where the values landed: one scene, or the whole preset.
+
+**Reload on the "newer version" bar lands on the new version.** Reload asked
+for the same address again, which is the one every cache already had an
+answer for, so a stale tab could press it and stay stale. It now leaves for
+the same page with a fresh number on the address, which no cache has seen,
+and the page that comes up checks it is the one Reload asked for: "Up to
+date — v7.199.0" for a moment when it is, and a plain warning to close the
+tab when it is not.
+
+**Scenes and Setup no longer push scene 8 onto its own row.** With a sheet
+docked at the right the Play column lost 380px and, at 1280 wide, room for
+the eighth scene. The tiles now shrink to an eighth of the row while a sheet
+is out, so all eight stay on one line under the very sheet opened to work on
+them.
+
+**The floating ✦ Ask stays off Edit, and the Done card gets out of the way.**
+Bottom-right is where the parameter search results and the Modifiers source
+picker land, and the button sat on both; the ✦ Ask tab is in the row above
+Edit, so Edit keeps its way in and loses the cover. The Done card clears
+when you press a tab (it stayed pinned on Play until Got it) and takes
+itself off after twenty seconds either way.
+
+Smaller: "Unsaved — Save to keep" appears under Save after a request in
+words has written to the unit; the stage bar's way to the chain on a phone is
+called Edit, like the tab it stands in for; the rotating suggestion in the
+chat box is italic and carries its cursor only while it is actually moving;
+and the unit line in Setup is two lines that break between facts, not one
+that broke wherever the rail cut it.
+
 ## 7.198.0
 
 **A finished design says so in the chat, and you can send it from there.**

@@ -132,10 +132,10 @@ const Action = z.object({
     .int()
     .nullable()
     .describe(
-      'Scene index, 0-based, for setSceneBlock and renameScene — and for setBypass and ' +
-        'setChannel when the player named a scene other than the one the unit is in. Null means ' +
-        'the scene the unit is in. Zero-based: 0 is the scene the player calls scene 1, so ' +
-        '"scene 2" is index 1.'
+      'Scene index, 0-based, for setSceneBlock and renameScene — and for setBypass, ' +
+        'setChannel and setParam when the player named a scene, whether or not it is the one the ' +
+        'unit is in. Null means the scene the unit is in. ' +
+        'Zero-based: 0 is the scene the player calls scene 1, so "scene 2" is index 1.'
     ),
   why: z.string().describe('One short line the player will read, in plain language.')
 })
@@ -392,6 +392,13 @@ everywhere, put that scene on a free channel with setChannel and say in
 that scene alone. If the player would rather not spend a channel, say so in
 "refused" and offer the preset-wide change instead. Never present a change that
 lands on a shared channel as a change to one scene.
+
+When the player names a scene for a value change — "brighten scene 2", "more
+gain on the lead scene" — put that scene's index in "scene" on every setParam
+in the plan, even if it is the scene the unit is in. The app writes the value
+standing in that scene, and if the scene shares its channel with others it
+tells the player so and asks before writing. Leave "scene" null on setParam
+only when no scene was named.
 
 READING INTENT
 

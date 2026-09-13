@@ -32,7 +32,19 @@ import { remoteActive } from '../lib/remote'
  */
 const SAVED_FOR_MS = 10000
 
-export default function SaveBar({ preset, dirty, busy, saving, compact, onOpenSave, queued, savedAt }) {
+export default function SaveBar({
+  preset,
+  dirty,
+  busy,
+  saving,
+  compact,
+  onOpenSave,
+  queued,
+  savedAt,
+  /* A request in words just wrote to the unit: say in words that Save is
+     what keeps it. The gold button alone was read as decoration. */
+  hint = false
+}) {
   /*
    * A slot write is on ForgeFX's never-remote list, and it should be — a phone
    * at the far side of a room shouldn't be able to overwrite a slot on a mis-tap.
@@ -100,6 +112,11 @@ export default function SaveBar({ preset, dirty, busy, saving, compact, onOpenSa
   return (
     <div className="save-cluster" data-dirty={dirty ? 'yes' : 'no'}>
       <div className="save-cluster-row">
+        {hint && dirty && !working ? (
+          <span className="save-hint" role="status">
+            Unsaved — Save to keep
+          </span>
+        ) : null}
         <button
           className="save-now"
           onClick={onOpenSave}

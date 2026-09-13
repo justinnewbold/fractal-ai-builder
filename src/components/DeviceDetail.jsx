@@ -72,11 +72,26 @@ export default function DeviceDetail({
               changes on its own with every single build, so "am I looking at
               the deploy that has my fix in it" is answerable without trusting
               anyone's memory. */}
-          {FULL} · gen {device.gen}
-          {/* The AM4 has a four-slot chain and reports no grid. "grid ×" with
-              nothing either side of it isn't a fact about the unit. */}
-          {grid?.rows && grid?.cols ? ` · grid ${grid.rows}×${grid.cols}` : ''} ·{' '}
-          {device.capabilities?.sceneCount} scenes · {device.capabilities?.presets?.count} slots
+          {/* Two lines on purpose: the app on one, the unit on the other. As
+              one line it broke wherever the 380px rail happened to cut it,
+              which was after "8 scenes ·" with "512 slots" hanging alone
+              underneath. Each fact is one unbreakable piece, so a line that
+              does have to wrap does so between facts, never inside one. */}
+          <span className="device-meta-line">
+            <span className="device-meta-fact">{FULL}</span>
+          </span>
+          <span className="device-meta-line">
+            <span className="device-meta-fact">gen {device.gen}</span>
+            {/* The AM4 has a four-slot chain and reports no grid. "grid ×" with
+                nothing either side of it isn't a fact about the unit. */}
+            {grid?.rows && grid?.cols ? (
+              <span className="device-meta-fact">
+                grid {grid.rows}×{grid.cols}
+              </span>
+            ) : null}
+            <span className="device-meta-fact">{device.capabilities?.sceneCount} scenes</span>
+            <span className="device-meta-fact">{device.capabilities?.presets?.count} slots</span>
+          </span>
         </div>
       ) : null}
 

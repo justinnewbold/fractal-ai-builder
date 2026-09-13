@@ -510,6 +510,22 @@ export function run(test) {
     )
   })
 
+  test('the eight scenes stay one row while a rail is out', () => {
+    /*
+     * "Open Scenes or Setup while on PLAY (desktop): scene 8 can drop a row."
+     * The column loses the rail's 380px, and at 1280 wide that left room for
+     * seven 110px tiles. Each tile may shrink to an eighth of the row instead,
+     * so all eight fit whatever the rail leaves — and only while it is out:
+     * the phone keeps its two-column grid.
+     */
+    const desk = code.slice(code.indexOf("html[data-rail='on'] #root {"))
+    const rule = desk.match(/html\[data-rail='on'\] \.gig-scenes \{([^}]*)\}/)
+    assert.ok(rule, 'the rail no longer makes room for eight scenes')
+    assert.match(rule[1], /minmax\(min\(var\(--gig-col, 110px\), calc\(\(100% - 7 \* var\(--s-2\)\) \/ 8\)\), 1fr\)/, `the tile floor does not yield to an eighth of the row: ${rule[1].trim()}`)
+    const media = [...code.slice(0, code.indexOf("html[data-rail='on'] .gig-scenes {")).matchAll(/@media \(min-width: (\d+)px\)/g)].pop()
+    assert.equal(media && Number(media[1]), 1000, 'the eight-on-a-row rule is not inside the rail breakpoint')
+  })
+
   test('a docked sheet is clipped to its rail and arrives without overshoot', () => {
     /*
      * The tour is a sheet; on a desktop it docks as a rail that animates in

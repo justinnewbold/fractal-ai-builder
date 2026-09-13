@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { invalidateSchema } from './schemaCache.js'
 
 /**
  * One device, one copy of what it is doing.
@@ -357,6 +358,21 @@ export async function refreshBlocks() {
   try {
     const list = await driver.presetBlocks()
     if (!Array.isArray(list)) return null
+    /*
+     * A block that changed channel changed its values.
+     *
+     * The chat's parameter cache is keyed by block, and a value belongs to the
+     * block's channel — so after a scene change that moves the amp from C to
+     * D, the cached Treble is scene 1's, and the next "brighten it a little"
+     * is computed from and labelled with a number scene 2 is not playing.
+     * Dropped per block rather than wholesale: re-reading every block down a
+     * serial port is the slowest thing this app does, and most scene changes
+     * move no channels at all.
+     */
+    const before = new Map((state.blocks || []).map((b) => [b.effectId, b.channel]))
+    for (const b of list) {
+      if (before.has(b.effectId) && before.get(b.effectId) !== b.channel) invalidateSchema(b.effectId)
+    }
     set({ blocks: list })
     return list
   } catch (err) {

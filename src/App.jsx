@@ -60,7 +60,7 @@ import ParamSearch from './components/ParamSearch'
 import Assistant from './components/Assistant'
 import UpdateNotice from './components/UpdateNotice'
 import Updates, { UpdateReadyNotice } from './components/Updates'
-import { validatePlan, replyFor, runPlan, resolvePlaceable, landedOf } from './lib/actions'
+import { validatePlan, replyFor, runPlan, resolvePlaceable, landedOf, whereOf } from './lib/actions'
 import { listPresets, newestFirst } from './lib/history'
 import {
   profileFrom,
@@ -135,6 +135,7 @@ import {
   selectPreset,
   getScene,
   setScene,
+  sceneChannels,
   setPresetName,
   setChannel,
   revertPreset,
@@ -253,6 +254,9 @@ const ofTunerOn = (s) => s.tunerOn
 const ofTuning = (s) => s.tuning
 
 const PREVIEW_ABOVE = 4
+
+/** How long the "Done" card stays on a screen before it takes itself off. */
+const DID_STAYS_MS = 20000
 
 /**
  * Write down what a slot is called, the moment a save puts a name in it.
@@ -968,6 +972,12 @@ export default function App() {
   // is what lets the app say "this is not saved yet" instead of leaving someone
   // to wonder whether they just overwrote a preset.
   const [dirty, setDirty] = useState(false)
+  /* A request in words just wrote to the unit and nothing has kept it. Shown
+     beside Save until a save lands or the preset is clean again. */
+  const [askedUnsaved, setAskedUnsaved] = useState(false)
+  useEffect(() => {
+    if (!dirty) setAskedUnsaved(false)
+  }, [dirty])
   // Read inside read(), which is built once and never sees state change.
   const dirtyRef = useRef(false)
   dirtyRef.current = dirty
@@ -1113,7 +1123,14 @@ export default function App() {
    * The rule itself lives in lib/playMode.js — testable without a browser, and
    * out of reach of a comment in this file impersonating it.
    */
-  const askShows = askButtonShows({ status, view, playing })
+  /*
+   * The floating ✦ Ask, on the screens where the conversation is not already
+   * the screen — except Edit on a wide window. It is pinned to the bottom
+   * right, and that is the edge the parameter search results and the
+   * Modifiers source picker land on: the button sat on top of both. The ✦ Ask
+   * tab is in the row above Edit, one tap away, so Edit loses nothing.
+   */
+  const askShows = askButtonShows({ status, view, playing }) && view !== 'shape'
 
   const [size, setSize] = useState(loadSize)
   /*
@@ -4168,10 +4185,17 @@ export default function App() {
         return
       }
 
+      /*
+       * Which scenes share a channel, where that can be known silently — the
+       * demo answers, a real unit says null. What turns "brighten scene 2"
+       * into either a write scoped to that scene or a question first.
+       */
+      const channelMap = await sceneChannels().catch(() => null)
       const checked = validatePlan(body, withPositions, {
         ...(device?.capabilities || {}),
         activeScene: scene,
         sceneNames,
+        sceneChannels: channelMap,
         // Over the relay the host refuses a backup, so the plan must not
         // propose one — and a slot write goes the way the Save button's does,
         // parked for the Mac to carry out. See validatePlan's `remote`.
@@ -4222,13 +4246,20 @@ export default function App() {
       }
 
       const broad = checked.actions.length > PREVIEW_ABOVE
-      if (checked.actions.some((a) => a.destructive) || broad) {
+      /*
+       * A value the player aimed at one scene that lands on a channel other
+       * scenes play too. Written straight away it reads as "brighten scene 2"
+       * having brightened the whole preset, which is what it did. So it waits,
+       * with the sentence from the plan check saying which scenes it reaches.
+       */
+      const shared = checked.actions.some((a) => a.shared)
+      if (checked.actions.some((a) => a.destructive) || shared || broad) {
         setTurns((prev) => [
           ...prev,
           {
             ...reply,
             pending: true,
-            reason: broad && !checked.actions.some((a) => a.destructive) ? 'broad' : null
+            reason: checked.actions.some((a) => a.destructive) ? null : shared ? 'shared' : 'broad'
           }
         ])
         return
@@ -4269,6 +4300,19 @@ export default function App() {
     setJustDid(null)
     setView(next)
   }
+
+  /*
+   * And it goes on its own, after long enough to be read.
+   *
+   * The card sat on Play until Got it was pressed — through closing the chat,
+   * through a song. It is a report, not a dialog: twenty seconds is long
+   * enough to read six lines, and the chat still holds the same answer.
+   */
+  useEffect(() => {
+    if (!justDid) return undefined
+    const t = setTimeout(() => setJustDid(null), DID_STAYS_MS)
+    return () => clearTimeout(t)
+  }, [justDid])
 
   const perform = async (actions) => {
     setRunningPlan(true)
@@ -4351,12 +4395,19 @@ export default function App() {
          * a moment later, which is how a request answered in full arrives as
          * an unexplained jump to another tab.
          */
-        setJustDid({ labels: done })
+        setJustDid({ labels: done, where: whereOf(actions) })
       }
 
       // Saving is what makes things permanent, so a plan containing one leaves
       // the preset clean rather than still flagged as unsaved.
-      setDirty(!actions.some((a) => a.kind === 'savePreset'))
+      const saved = actions.some((a) => a.kind === 'savePreset')
+      setDirty(!saved)
+      /*
+       * And a word beside Save saying so. The gold button was the only sign
+       * that a change made in words would be gone on the next preset change,
+       * and a button that has been gold since the first knob turn is not news.
+       */
+      setAskedUnsaved(!saved)
       showWhatChanged(actions)
       await read()
     } catch (err) {
@@ -5057,6 +5108,7 @@ export default function App() {
             busy={busy}
             saving={saving}
             compact
+            hint={askedUnsaved && !narrow}
             queued={queuedSave}
             onOpenSave={() => setSheet('save')}
           />
@@ -5298,7 +5350,11 @@ export default function App() {
             <button
               key={id}
               className={`view-tab ${view === id ? 'current' : ''}`}
-              onClick={() => setView(id)}
+              /* changeView, not setView: a tab is the person going somewhere
+                 themselves, and the report of what the last request did stops
+                 being the thing on screen when they do. Through setView it
+                 stayed pinned on Play until Got it. */
+              onClick={() => changeView(id)}
               aria-current={view === id}
             >
               {label}
@@ -5347,6 +5403,10 @@ export default function App() {
               <li key={i}>{label}</li>
             ))}
           </ul>
+          {/* Where those values landed: one scene, or the whole preset, and
+              which other scenes share the channel. Without it "Done — 2
+              changes" on Play could not be told from a preset-wide edit. */}
+          {justDid.where ? <p className="did-where">{justDid.where}</p> : null}
           <div className="history-actions">
             {views.includes('ask') ? (
               <button className="chip" onClick={() => setView('ask')}>

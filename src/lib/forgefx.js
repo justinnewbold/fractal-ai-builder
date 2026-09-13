@@ -2351,6 +2351,40 @@ export async function setSceneBlock(sceneIndex, eid, { bypassed, channel } = {})
   return { ok: true }
 }
 
+/**
+ * Write a value standing in one particular scene.
+ *
+ * A value belongs to the channel a block is on, and which channel that is
+ * belongs to the scene — so "Treble up in scene 2" means switching to scene 2,
+ * writing, and coming back, exactly the way a bypass for another scene is
+ * written. Confirmed by read-back like any other value write, and the read-back
+ * happens while still standing in that scene, so it checks the channel that
+ * was actually written.
+ */
+export async function setSceneParam(sceneIndex, eid, paramId, value, param) {
+  const started = (await getScene())?.index ?? 0
+  try {
+    if (started !== sceneIndex) {
+      await setScene(sceneIndex)
+      await new Promise((r) => setTimeout(r, 90))
+    }
+    return await setParamConfirmed(eid, paramId, value, param)
+  } finally {
+    if (started !== sceneIndex) await setScene(started).catch(() => {})
+  }
+}
+
+/**
+ * Which channel every block plays in every scene — `{ [eid]: ['A', 'D', ...] }`
+ * by scene index — when that can be known without changing the sound.
+ *
+ * The demo keeps the map and hands it over. A real unit only answers for the
+ * scene it is in (see readAllScenes, which is audible), so there this is null
+ * and a scene-aimed value is presented as one that may reach other scenes.
+ */
+export const sceneChannels = () =>
+  mock ? tick().then(() => mock.sceneChannelsNow?.() ?? null) : Promise.resolve(null)
+
 
 /**
  * Serial and MIDI connections ForgeFX can see, with Fractal units flagged.
