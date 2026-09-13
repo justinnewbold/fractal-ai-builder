@@ -170,11 +170,11 @@ body {
   /* Nothing above the bar, so nothing to reserve room for: the top is 0 and
      the bar carries the notch itself. See the padding-top rule further down.
 
-     The floating Ask button is pinned over the bottom-right of the page, so
-     the bottom padding has to be deep enough to scroll the last row of
-     controls out from under it. The @supports block further down sets the
-     figure that actually applies — this is the fallback. */
-  padding: 0 var(--s-5) calc(80px + env(safe-area-inset-bottom, 0px));
+     Nothing floats over the bottom of the page any more (the floating Ask
+     is gone), so the bottom padding is the home-indicator inset with a floor
+     under it. The @supports block further down sets the figure that actually
+     applies — this is the fallback. */
+  padding: 0 var(--s-5) max(16px, env(safe-area-inset-bottom, 0px));
 }
 
 .masthead {
@@ -1185,6 +1185,18 @@ button.chip {
   padding: var(--s-1) var(--s-2);
   color: var(--silk-dim);
   background: transparent;
+}
+
+/* The row of them above Edit's search: a scene, the presets, Revert. At chip
+   size with no fill they read as tags, and "S1 Rhythm" as a caption. These
+   are buttons that open things, and they are dressed as the buttons on Play
+   are — filled, thumb-high, in the body face. */
+.shape-row button.chip {
+  min-height: 44px;
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--f-2);
+  color: var(--silk);
+  background: var(--panel-hi);
 }
 
 .progress {
@@ -2218,6 +2230,10 @@ button.scene.current .scene-num {
 }
 
 .demo-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
   margin: 10px 0 0;
   padding: var(--s-2) var(--s-3);
   font-size: var(--f-2);
@@ -2225,6 +2241,10 @@ button.scene.current .scene-num {
   background: var(--panel);
   border: 1px dashed var(--rule);
   border-radius: var(--r-1);
+}
+
+.demo-banner > span {
+  flex: 1 1 260px;
 }
 
 /* ---------- saved presets ---------- */
@@ -2662,10 +2682,30 @@ button.gig-name:disabled .gig-name-caret {
 }
 
 .gig-signal {
-  height: 5px;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
   /* Was 10px. See button.gig-name: the whole stack gives up a step so the last
      row of effects lands on the screen instead of under the foot. */
   margin-top: var(--s-2);
+}
+
+/* The word: as small as the bar can carry and still be read, so the row
+   stays close to the 5px line it used to be. */
+.gig-signal-word {
+  flex: 0 0 auto;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: var(--f-1);
+  line-height: 1;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--silk-faint);
+}
+
+.gig-signal-track {
+  flex: 1 1 auto;
+  height: 5px;
   background: var(--panel);
   border-radius: var(--r-1);
   overflow: hidden;
@@ -2729,6 +2769,16 @@ button.gig-name:disabled .gig-name-caret {
 .gig-nav button.gig-nav-source.on {
   border-color: var(--signal);
   color: var(--silk);
+}
+
+/* "Source", small, over the name: what the button is for. */
+.gig-nav-source-kind {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: var(--f-1);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--silk-faint);
 }
 
 .gig-nav-source-name {
@@ -4965,7 +5015,7 @@ ol.action-list li.destructive::marker {
   .shell {
     padding-left: max(16px, env(safe-area-inset-left));
     padding-right: max(16px, env(safe-area-inset-right));
-    padding-bottom: calc(80px + env(safe-area-inset-bottom));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
     /* Stated here too: this is the block that applies on every real browser,
        and a shorthand elsewhere setting a top would put the bar's travel back. */
     padding-top: 0;
@@ -6390,6 +6440,18 @@ button.gig-block:disabled {
    written to the unit. In the row rather than hung under the bar: under it
    the words sat on the rule and on whatever notice came next. Wide screens
    only (App decides), where the bar has the room. */
+/* The same word on a phone, where the bar has no room for it: a dot on the
+   button, and the sentence for a screen reader. */
+.save-hint-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: var(--s-2);
+  border-radius: 50%;
+  background: var(--on-signal);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--on-signal) 35%, transparent);
+}
+
 .save-hint {
   white-space: nowrap;
   font-family: var(--display);
@@ -6906,13 +6968,13 @@ button.gig-ask {
   justify-content: center;
   gap: var(--s-1);
   /*
-   * Off by default: above the breakpoint below, the floating .ask-anywhere is
-   * the way in and two Ask buttons on one screen is one too many.
+   * Off by default: above the breakpoint below, the ✦ Ask tab in the row
+   * above is the way in and two Ask buttons on one screen is one too many.
    *
-   * The two rules are deliberately the SAME breakpoint, not merely similar
-   * ones. `narrow` in App.jsx is 620px, and gating this on that instead would
-   * leave every window between 620 and 700 with no Ask button at all — the
-   * floating one already hidden, this one not yet shown.
+   * The breakpoint is deliberately wider than `narrow` in App.jsx (620px),
+   * which is where the tab row appears: gating this on that instead would
+   * leave every window between 620 and 700 with two ways in at worst, and a
+   * narrower one would leave a band with none.
    */
   display: none;
 }
@@ -8214,17 +8276,14 @@ button.topbar-preset.open .topbar-caret {
 /* ---------- asking from anywhere ---------- */
 
 /*
- * The way into the conversation from the screen you are on.
- *
- * A floating button rather than a docked bar, and carrying no text field: a
- * fixed bar with an input is what iOS Safari handles worst, and this app
- * removed one once already. Pressing it opens a sheet, where the input can
- * behave properly.
- *
- * Bottom right. The view tabs are at the top of the page, not the bottom, so
- * there is no tab bar to clear down here — only the home indicator, which the
- * safe-area inset accounts for.
+ * There was a floating ✦ Ask button here, fixed over the bottom-right of
+ * every wide screen. It is gone: on a wide window the ✦ Ask tab is in the row
+ * above and does the same thing, and the corner it floated over is where the
+ * last control in every grid lands — the eighth scene, Edit's search results,
+ * the Modifiers source picker. On a phone the stage bar carries ✦ Ask, as it
+ * always has; the sheet it opens is still the same conversation.
  */
+
 /*
  * In a sheet the conversation is the whole content, not a card on a page.
  * Its frame and its top margin were drawn for Create, where it sits among
@@ -8241,88 +8300,17 @@ button.topbar-preset.open .topbar-caret {
   background: none;
 }
 
-.ask-anywhere {
-  position: fixed;
-  right: var(--s-4);
-  bottom: calc(var(--s-4) + env(safe-area-inset-bottom, 0px));
-  /* Chrome level: above the page, below the scrim, so a sheet covers it
-     rather than leaving a button floating over its own conversation. */
-  z-index: var(--z-bar);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s-2);
-  min-height: 48px;
-  padding: var(--s-2) var(--s-4);
-  background: var(--panel-hi);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-3);
-  box-shadow: var(--e-2);
-  color: var(--silk);
-  font-family: var(--display);
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  font-size: var(--f-1);
-}
-
-.ask-anywhere:active:not(:disabled) {
-  transform: scale(0.97);
-  transition: transform var(--t-1) var(--ease);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ask-anywhere:active:not(:disabled) {
-    transform: none;
-  }
-}
-
-/* On a narrow screen the glyph carries it; the word is what gets cut. */
-@media (max-width: 380px) {
-  .ask-anywhere-word {
-    display: none;
-  }
-}
-
 /*
- * Ask on a phone is the screen; on a wide one it is also a button.
+ * Ask on a phone is the stage bar's button; on a wide one it is the tab.
  *
- * `button.ask-tab` used to live here — a fourth tab that opened the same
- * conversation the Create tab already was. Both are gone: the screen is called
- * ✦ Ask now, so on a phone the tab row is the way in and there is nothing to
- * duplicate.
- *
- * The floating button stays hidden on a phone for the reason it always was:
- * fixed to the bottom-right corner, it sat on scene tile 6, the pad's Change
- * and Edit's Modifiers, because that corner is where the last control in every
- * grid lands. On a wide screen nothing is under it, and reaching the
- * conversation without leaving Play is worth having there.
+ * The bar button shows below the same width the floating one used to hide
+ * at, which is wider than `narrow` in App.jsx (620px) on purpose: between
+ * 620 and 700 the tab row is there too, and one band of widths with two ways
+ * in beats one with none.
  */
 @media (max-width: 700px) {
-  .ask-anywhere {
-    display: none;
-  }
-
-  /* And the bar takes over here — same line, opposite side of it. The bar is
-     laid out along the bottom already, so nothing is covered by it. */
   button.gig-ask {
     display: flex;
-  }
-
-  /*
-   * And with it gone, so is the 80px kept clear underneath it.
-   *
-   * That padding is the floating button's footprint — 16px of inset, 48px of
-   * button, 16px of air — held at the bottom of the page so the last row of
-   * controls has somewhere to scroll out from under it. On a phone there is no
-   * button there and never has been, so it was eighty pixels of nothing at the
-   * bottom of the one screen with the least room: a whole row of blocks, on
-   * the size step whose reason to exist is fitting them all.
-   *
-   * The home-indicator inset stays, and a floor under it so the last row is
-   * not flush against the edge of the glass.
-   */
-  .shell {
-    padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -9479,6 +9467,11 @@ button.phone-chip.compact {
 
 .phone-word.no {
   color: var(--fault);
+}
+
+/* Off, or never set up: grey, not red. Nothing is wrong. */
+.phone-word.off {
+  color: var(--silk-faint);
 }
 
 .phone-word.wait {

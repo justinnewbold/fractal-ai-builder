@@ -635,8 +635,13 @@ export default function Gig({
         ) : null}
       </div>
 
+      {/* Named. A thin coloured line under the preset tile was the one thing on
+          Play that never said what it was. */}
       <div className="gig-signal" aria-label="Signal level">
-        <div className="gig-signal-fill" style={{ width: `${Math.round(peak * 100)}%` }} />
+        <span className="gig-signal-word">Level</span>
+        <div className="gig-signal-track">
+          <div className="gig-signal-fill" style={{ width: `${Math.round(peak * 100)}%` }} />
+        </div>
       </div>
 
       {/*
@@ -871,6 +876,10 @@ export default function Gig({
           onClick={() => setSetlistOpen(true)}
           aria-label={sourceAria}
         >
+          {/* The word above the name: a lone "All" between Previous and Next
+              read as a caption, not as the button that picks what those two
+              step through. */}
+          <span className="gig-nav-source-kind">Source</span>
           <span className="gig-nav-source-name">{order ? sourceName : 'All'}</span>
           {sourceWhere ? <span className="gig-nav-source-pos mono">{sourceWhere}</span> : null}
         </button>

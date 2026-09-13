@@ -283,11 +283,15 @@ export function paramScope({
   const known = Array.isArray(map)
 
   if (known && others.length) {
+    /* A question only when a scene was named. "More treble" with no scene
+       said means the sound being heard, and on a preset whose amp channel is
+       shared by six scenes every plain nudge would otherwise stop to ask. The
+       label and the result card still say which scenes it reached. */
     return {
       scene: target,
       where,
       suffix: ` in ${where} (channel ${channel}, shared with ${sayScenes(others)})`,
-      shared: true,
+      shared: named,
       note: `${block?.name || 'This block'} plays channel ${channel} in ${sayScenes([
         target,
         ...others
@@ -322,6 +326,64 @@ export function paramScope({
     reachesLive,
     channel,
     others
+  }
+}
+
+/**
+ * The same plan, with the scene given its own channel first.
+ *
+ * The question "this changes scenes 1, 3 and 4 too — ask to give scene 2 its
+ * own channel first" handed the player homework. This is the homework done:
+ * for every value that would reach other scenes, a setChannel to a channel no
+ * scene plays the block on, in the scene the player named, ahead of the
+ * value. The plan check then labels those values as that scene's own.
+ *
+ * Only when the channel map is known — the demo's — because a free channel
+ * can only be chosen from a map. Null when it cannot be done: no map, no
+ * values aimed at a scene, or no channel left free for the block. What a
+ * fresh channel holds is whatever it held; the demo copies the old one, and
+ * the offer says so for a real unit.
+ */
+export function scopedActions(actions = [], { sceneChannels = null, channelNames = ['A', 'B', 'C', 'D'] } = {}) {
+  if (!sceneChannels || typeof sceneChannels !== 'object') return null
+  const raw = []
+  const moved = new Map()
+  let scene = null
+  for (const a of actions) {
+    const reaches = a.kind === 'setParam' && a.scope?.others?.length && typeof a.scene === 'number'
+    if (reaches && !moved.has(a.eid)) {
+      const used = new Set(sceneChannels[a.eid] ?? sceneChannels[String(a.eid)] ?? [])
+      const free = channelNames.find((c) => !used.has(c))
+      if (!free) return null
+      moved.set(a.eid, free)
+      scene = a.scene
+      raw.push({
+        kind: 'setChannel',
+        eid: a.eid,
+        text: free,
+        scene: a.scene,
+        why: `So scene ${a.scene + 1} has its own copy of these values.`
+      })
+    }
+    const { label, run, scope, shared, sharedNote, ...rest } = a
+    raw.push(rest)
+  }
+  if (!moved.size) return null
+  /* The map as it will be once the channels have moved, so the re-check reads
+     the values as that scene's own rather than asking the same question. */
+  const after = Object.fromEntries(
+    Object.entries(sceneChannels).map(([eid, list]) => [
+      eid,
+      moved.has(Number(eid)) ? list.map((c, i) => (i === scene ? moved.get(Number(eid)) : c)) : list
+    ])
+  )
+  const channels = [...moved.values()]
+  return {
+    actions: raw,
+    after,
+    scene,
+    channels,
+    label: `Give scene ${scene + 1} its own channel${channels.length === 1 ? ` (${channels[0]})` : ''} and do it`
   }
 }
 

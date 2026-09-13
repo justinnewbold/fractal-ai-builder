@@ -1950,15 +1950,12 @@ export function run(test) {
       3,
       'the tab row is no longer three screens'
     )
-    // And the sheet route survives for the screens that are not the conversation.
-    /* The button is gated on a NAME now, not on a viewport — see playMode.js
-       for why a phone gets it back. What must not change is that it never
-       offers to open the conversation you are already reading. */
-    assert.match(
-      src,
-      /\{askShows \? \(\s*\n?\s*<button\s*\n?\s*className="ask-anywhere"/,
-      'the floating Ask button no longer opens the conversation from Play and Edit'
-    )
+    // And the sheet route survives for the phone, from the stage bar. The
+    // floating button that opened it on a wide screen is gone: the tab above
+    // does the same thing, and the corner it floated over is where the last
+    // control in every grid lands.
+    assert.ok(!src.includes('className="ask-anywhere"'), 'the floating Ask is back over the bottom-right corner')
+    assert.match(src, /onAsk=\{askShows \? \(\) => setSheet\('chat'\) : null\}/, 'the stage bar has lost its way into the conversation')
     assert.match(
       src,
       /const askShows = askButtonShows\(\{ status, view, playing \}\)/,
@@ -2124,8 +2121,17 @@ export function run(test) {
      * three states the mark did, in the state's colour, and the button keeps
      * the gear's height so it is still something a thumb can hit.
      */
-    assert.match(chip, /const mark = said\.tone === 'good' \? 'ok' : said\.tone === 'busy' \? 'wait' : 'no'/, 'the word no longer follows the link tone')
-    assert.match(chip, /const state = mark === 'ok' \? 'connected' : mark === 'wait' \? 'connecting' : 'disconnected'/, 'the chip does not say connected or disconnected')
+    assert.match(chip, /said\.tone === 'good' \? 'ok' : said\.tone === 'busy' \? 'wait' : said\.tone === 'bad' \? 'no' : 'off'/, 'the word no longer follows the link tone')
+    assert.match(chip, /mark === 'no'\s*\? 'disconnected'/, 'the chip does not say disconnected')
+    assert.match(chip, /mark === 'ok'\s*\? 'connected'/, 'the chip does not say connected')
+    /*
+     * Quiet is not broken. A remote that is off, or never set up, was a red
+     * DISCONNECTED beside the version number — in the demo, for good — and
+     * read as the app having lost something. Grey, and it says what it is.
+     */
+    assert.match(chip, /link\.role === 'remote'\s*\? 'no Mac'\s*: 'no phone'/, 'a remote nobody turned on is called disconnected')
+    const quiet = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    assert.match(quiet, /\.phone-word\.off \{\s*color: var\(--silk-faint\)/, 'the quiet word is not grey')
     /*
      * And it names what it is about while something is wrong. "The phone app
      * says it has lost the unit, but also says it's connected in the right
@@ -2133,7 +2139,7 @@ export function run(test) {
      * neither said so, and two states at opposite ends of one bar read as the
      * app disagreeing with itself.
      */
-    assert.match(chip, /const word = sayMac \? `Mac \$\{state\}` : state/, 'the word never says which thing it is about')
+    assert.match(chip, /const word = sayMac && mark !== 'off' \? `Mac \$\{state\}` : state/, 'the word never says which thing it is about')
     const bar = readFileSync(new URL('../src/components/TopBar.jsx', import.meta.url), 'utf8')
     assert.match(
       bar,
@@ -2509,8 +2515,8 @@ export function run(test) {
       'the chat sheet no longer renders the hoisted conversation — and mounting it unconditionally would leave a second live turn list behind Create'
     )
 
-    // The way in, on the screens that are not already it.
-    assert.match(src, /className="ask-anywhere"/, 'the button that opens the chat from elsewhere is gone')
+    // The way in from the stage screen, on a phone.
+    assert.match(src, /onAsk=\{askShows \? \(\) => setSheet\('chat'\) : null\}/, 'the button that opens the chat from the stage bar is gone')
     /* Hiding on Create is now playMode's rule rather than a line written here;
        it is asserted against that module, which is testable without a DOM. */
     assert.equal(
@@ -4306,7 +4312,7 @@ export function run(test) {
      * the screen. See lib/playMode.js.
      */
     assert.ok(
-      !/views\.includes\('ask'\) \? \(\s*<button\s+className="ask-anywhere"/.test(src),
+      !/views\.includes\('ask'\) \? [^\n]*onAsk/.test(src) && /onAsk=\{askShows \?/.test(src),
       'the ask button is gated on the viewport again, which is what took tone generation off the phone'
     )
     assert.equal(
@@ -5345,7 +5351,10 @@ export function run(test) {
     assert.match(ask, /if \(checked\.actions\.some\(\(a\) => a\.destructive\) \|\| shared \|\| broad\)/, 'a shared write goes straight through')
 
     const chat = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
-    assert.match(chat, /turn\.reason === 'shared'\s*\?\s*turn\.actions\.find\(\(a\) => a\.sharedNote\)\?\.sharedNote/, 'the question about shared scenes shows no sentence saying which scenes')
+    assert.match(chat, /turn\.reason === 'shared'\s*\?\s*sharedHint\(turn\)/, 'the question about shared scenes shows no sentence saying which scenes')
+    assert.match(chat, /turn\.actions\.find\(\(a\) => a\.sharedNote\)\?\.sharedNote/, 'the sentence is not the one the plan check wrote')
+    // Beside a button that gives the scene its own channel, the sentence must not still tell the player to ask for that.
+    assert.match(chat, /turn\.scopeOffer \? note\.replace\(\/\\s\*To change one scene by itself/, 'the question still hands out homework beside the button that does it')
 
     /* The chat model is told to mark every value with the scene the player named. */
     const command = readFileSync(new URL('../api/command.js', import.meta.url), 'utf8')
@@ -5364,15 +5373,41 @@ export function run(test) {
     assert.match(refresh, /before\.get\(b\.effectId\) !== b\.channel\) invalidateSchema\(b\.effectId\)/, 'a scene change that moves a channel leaves the old channel\'s values in the cache')
   })
 
-  test('the floating Ask stands down on Edit, where it covered the search and the modifiers', () => {
+  test('there is no floating Ask; the tab and the stage bar are the ways in', () => {
     /*
      * "ASK FAB covers the right edge of EDIT search results and MODIFIERS
-     * source." It is pinned bottom-right, and that is the edge both of those
-     * land on. The ✦ Ask tab is in the row above Edit, so Edit loses nothing.
-     * The shared rule is untouched — Play keeps the button.
+     * source." It was pinned bottom-right, and that is the corner where the
+     * last control in every grid lands. On a wide window the ✦ Ask tab does
+     * the same thing, so the button is gone, along with the 80px the page
+     * kept clear under it. The shared rule still decides the stage bar's
+     * buttons.
      */
-    assert.match(src, /const askShows = askButtonShows\(\{ status, view, playing \}\) && view !== 'shape'/, 'the floating Ask is back over Edit\'s controls')
-    assert.equal(play.askButtonShows({ status: 'live', view: 'play', playing: false }), true, 'Play lost the floating Ask')
+    assert.match(src, /const askShows = askButtonShows\(\{ status, view, playing \}\)\n/, 'the stage bar rule has grown a clause of its own')
+    assert.ok(!src.includes('ask-anywhere'), 'the floating Ask is back')
+    assert.equal(play.askButtonShows({ status: 'live', view: 'play', playing: false }), true, 'the stage bar lost its Ask')
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    assert.ok(!css.includes('.ask-anywhere'), 'the floating Ask still has styling, which will dress up whatever gets that class next')
+  })
+
+  test('the shared-channel question offers to give the scene its own channel', () => {
+    /*
+     * "Ask to give it its own channel first" handed the player homework. The
+     * button does it: a setChannel to a free channel in that scene ahead of
+     * each shared value, the plan checked again against the same chain, then
+     * run. Offered only when a free channel can be chosen, which needs the
+     * channel map — so the demo has it and a real unit does not pretend to.
+     */
+    const ask = src.slice(src.indexOf('const askFor = async'), src.indexOf('const changeView ='))
+    assert.match(ask, /lastPlanBlocks\.current = withPositions/, 'the chain the plan was checked against is not kept for the re-check')
+    assert.match(ask, /scopeOffer: scoped \? scoped\.label : null/, 'the turn carries no offer for the chat to show')
+    const scope = src.slice(src.indexOf('const scopeTurn = async'), src.indexOf('const cancelTurn ='))
+    assert.match(scope, /scopedActions\(turn\.actions, \{/, 'the plan is not re-made from the turn')
+    assert.match(scope, /sceneChannels: scoped\.after,/, 'the re-check reads the old map, so it asks the same question again')
+    assert.match(scope, /validatePlan\(\{ actions: scoped\.actions \}, lastPlanBlocks\.current/, 'the re-made plan is not checked before it runs')
+    assert.match(scope, /if \(checked\.actions\.length\) await perform\(checked\.actions\)/, 'the re-made plan is checked and then not run')
+    const chat = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
+    assert.match(chat, /turn\.reason === 'shared' && turn\.scopeOffer && onScope \? \(\s*<button className="save-now" onClick=\{\(\) => onScope\(i\)\}/, 'the question has no button that does the work')
+    assert.match(chat, /'Change them all' : 'Do it'/, 'the plain Do it no longer says it changes every scene when it does')
   })
 
   test('a request in words that wrote to the unit says Save is what keeps it', () => {
@@ -5384,9 +5419,11 @@ export function run(test) {
     assert.match(src, /const \[askedUnsaved, setAskedUnsaved\] = useState\(false\)/, 'nothing remembers that a request in words wrote to the unit')
     assert.match(src, /setAskedUnsaved\(!saved\)/, 'the word is not raised when a plan writes without saving')
     assert.match(src, /if \(!dirty\) setAskedUnsaved\(false\)/, 'the word outlives the save')
-    assert.match(src, /hint=\{askedUnsaved && !narrow\}/, 'the Save bar is not told, or is told on a phone with no room for it')
+    assert.match(src, /hint=\{askedUnsaved \? \(narrow \? 'dot' : 'words'\) : false\}/, 'the Save bar is not told, or the phone is told in words it has no room for')
     const bar = readFileSync(new URL('../src/components/SaveBar.jsx', import.meta.url), 'utf8')
-    assert.match(bar, /\{hint && dirty && !working \? \(\s*<span className="save-hint" role="status">\s*Unsaved — Save to keep/, 'the Save bar has no word for unsaved')
+    assert.match(bar, /\{hint === 'words' && dirty && !working \? \(\s*<span className="save-hint" role="status">\s*Unsaved — Save to keep/, 'the Save bar has no word for unsaved')
+    // On a phone the same message is a dot on the button, with the sentence for a screen reader.
+    assert.match(bar, /\{hint === 'dot' && dirty && !working \? \(\s*<span className="save-hint-dot" role="status" aria-label="Unsaved — Save to keep" \/>/, 'a phone has no sign that a request in words went unsaved')
   })
 
   test('the way to Edit on a phone is called Edit', () => {

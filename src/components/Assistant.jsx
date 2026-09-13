@@ -151,10 +151,25 @@ function offsetWithin(el, box) {
   return el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop
 }
 
+/**
+ * The sentence over the shared-channel question.
+ *
+ * The plan check writes it ending "ask to give it its own channel first" —
+ * which is wrong to say beside a button that does exactly that. With the
+ * offer on the turn, the sentence stops before the homework.
+ */
+function sharedHint(turn) {
+  const note =
+    turn.actions.find((a) => a.sharedNote)?.sharedNote ||
+    'These values are shared by more than one scene.'
+  return turn.scopeOffer ? note.replace(/\s*To change one scene by itself[^.]*\.\s*$/, '') : note
+}
+
 export default function Assistant({
   turns,
   onAsk,
   onConfirm,
+  onScope,
   onCancel,
   busy,
   /*
@@ -475,8 +490,7 @@ export default function Assistant({
               <div className="turn-confirm">
                 <span className="hint">
                   {turn.reason === 'shared'
-                    ? turn.actions.find((a) => a.sharedNote)?.sharedNote ||
-                      'These values are shared by more than one scene.'
+                    ? sharedHint(turn)
                     : turn.reason === 'broad'
                     ? `That's ${turn.actions.length} changes — worth a look first.`
                     : turn.actions.some((a) => a.kind === 'savePreset')
@@ -485,8 +499,19 @@ export default function Assistant({
                         ? 'Anything unsaved goes with it.'
                         : 'This removes something.'}
                 </span>
-                <button className="save-now" onClick={() => onConfirm(i)} disabled={busy}>
-                  Do it
+                {/* The shared-channel question, answered without homework:
+                    give the scene its own channel, then make the change. */}
+                {turn.reason === 'shared' && turn.scopeOffer && onScope ? (
+                  <button className="save-now" onClick={() => onScope(i)} disabled={busy}>
+                    {turn.scopeOffer}
+                  </button>
+                ) : null}
+                <button
+                  className={turn.reason === 'shared' && turn.scopeOffer ? 'chip' : 'save-now'}
+                  onClick={() => onConfirm(i)}
+                  disabled={busy}
+                >
+                  {turn.reason === 'shared' && turn.scopeOffer ? 'Change them all' : 'Do it'}
                 </button>
                 <button className="chip" onClick={() => onCancel(i)} disabled={busy}>
                   Leave it
