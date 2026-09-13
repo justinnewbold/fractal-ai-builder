@@ -3,6 +3,16 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.203.0
+
+**The waiting line keeps busy.** "Thinking…" for two minutes read as stuck.
+Every ten seconds the word changes — Jamming, Noodling, Shredding, Soloing,
+Chugging, Djenting, Stomping, Researching, Picking — while the seconds keep
+counting beside it. "Nothing has been sent to your unit yet" is off the
+line: the card under the chat already says Not sent for the whole wait, and
+on a phone the sentence wrapped the line to a third row. "Longer than your
+usual 40s" still appears when a run really is.
+
 ## 7.202.0
 
 **"Saving…" is green, with no box around it.** While a save was out the

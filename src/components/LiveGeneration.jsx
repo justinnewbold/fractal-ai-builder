@@ -21,6 +21,39 @@ import { blockName, progressFor, stepsFor } from '../lib/liveProgress'
  */
 export const THINKING = 'Thinking'
 
+/*
+ * What the holding word becomes as the seconds go by.
+ *
+ * "Thinking…" for two minutes reads as stuck. These are not stages — no
+ * "Choosing an amp" that nothing checked — they are the same holding word in
+ * a guitarist's vocabulary, and they change every ten seconds so the line is
+ * visibly alive between heartbeats. Any real message from the model still
+ * wins: only a line that begins with the holding word is rewritten.
+ */
+export const HOLDING_WORDS = [
+  THINKING,
+  'Jamming',
+  'Noodling',
+  'Shredding',
+  'Soloing',
+  'Chugging',
+  'Djenting',
+  'Stomping',
+  'Researching',
+  'Picking'
+]
+export const WORD_EVERY = 10
+
+/** The holding word for this many seconds into the wait. */
+export const holdingWord = (seconds) =>
+  HOLDING_WORDS[Math.floor(Math.max(0, seconds || 0) / WORD_EVERY) % HOLDING_WORDS.length]
+
+/** A line that begins with the holding word, with the word for this second. */
+export function holdingLine(text, seconds) {
+  if (!text || !text.startsWith(THINKING)) return text
+  return holdingWord(seconds) + text.slice(THINKING.length)
+}
+
 /* Lives in lib so the test runner can import it — this file is JSX and node
    cannot read that. Re-exported because it is read as part of this screen. */
 export { progressFor }
@@ -172,7 +205,7 @@ export function LiveGeneration({ partial, open, onToggle, chip = true, nameOf = 
  * plainly that this is no longer normal.
  */
 /**
- * When to stop showing only a clock, and what to say instead.
+ * When a wait is worth a word beside the clock.
  *
  * This said "longer than usual" at sixty seconds, every time, for a reason that
  * had nothing to do with what usual is: sixty was an old server ceiling, and
@@ -184,29 +217,23 @@ export function LiveGeneration({ partial, open, onToggle, chip = true, nameOf = 
  * "Every tone generator says it takes longer than usual. How long is usual? If
  * it takes longer than usual, why does it always say that?"
  *
- * So there are two questions and they are answered separately.
- *
- * IS MY RIG SAFE is the one somebody actually has while waiting, and it does
- * not depend on knowing a norm — the answer is the same at forty seconds and at
- * two minutes, and it is worth saying once the wait is long enough to worry
- * anybody. That is REASSURE_AT, and it is a fact rather than a comparison.
- *
  * IS THIS ONE SLOW needs a norm, and is only said where there is a measured one
  * — this person's own median, from history.js. Half again as long as usual is a
  * real outlier and worth naming; with no measurements yet it says nothing,
  * because the honest answer to "is this longer than usual" with three runs of
  * data is that we do not know.
+ *
+ * "Nothing has been sent to your unit yet" used to follow the clock from
+ * forty seconds on. It is gone from this line: the card under the chat says
+ * "Not sent." the whole time, so the line was repeating it in the one place
+ * that had the least room, and on a phone it wrapped to a third row.
  */
-const REASSURE_AT = 40
 const SLOW_MULTIPLE = 1.5
 
 function aside(seconds, typicalMs) {
   const usual = Number.isFinite(typicalMs) && typicalMs > 0 ? Math.round(typicalMs / 1000) : null
   const slow = usual !== null && seconds > Math.max(usual * SLOW_MULTIPLE, usual + 15)
-
-  if (slow) return ` · longer than your usual ${usual}s — nothing has been sent to your unit yet`
-  if (seconds >= REASSURE_AT) return ' · nothing has been sent to your unit yet'
-  return ''
+  return slow ? ` · longer than your usual ${usual}s` : ''
 }
 
 export function Thinking({
@@ -252,15 +279,14 @@ export function Thinking({
   if (!running) return null
 
   const seconds = startedAt ? Math.max(0, Math.round((now - startedAt) / 1000)) : null
-  const text = message || `${THINKING}…`
+  const text = holdingLine(message || `${THINKING}…`, seconds)
 
   /*
-   * The time and the sentence after it are two spans, because they wrap
+   * The time and the note after it are two spans, because they wrap
    * differently. The figure must never break across a line — "4m" on one row
-   * and "20s" on the next reads as two numbers. The sentence must ALWAYS be
-   * allowed to: held to one line with the figure, "nothing has been sent to
-   * your unit yet" ran off the right edge of a phone and dragged the whole
-   * conversation sideways with it.
+   * and "20s" on the next reads as two numbers. The note must ALWAYS be
+   * allowed to: held to one line with the figure, it ran off the right edge
+   * of a phone and dragged the whole conversation sideways with it.
    */
   let clock = null
   let more = ''
