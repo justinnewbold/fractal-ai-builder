@@ -1109,11 +1109,14 @@ test('the waiting line answers the question somebody actually has', () => {
     !/\b60\b/.test(aside),
     'the waiting line is back on a literal sixty seconds, which is a server ceiling that moved'
   )
-  assert.match(live, /const REASSURE_AT = \d+/, 'the reassurance has no named threshold')
-  assert.match(
-    live,
-    /nothing has been sent to your unit yet/,
-    'the one thing somebody waiting actually wants to know is gone'
+  /*
+   * "Nothing has been sent to your unit yet" is off this line now — the card
+   * under the chat says "Not sent." for the whole wait, and on a phone the
+   * sentence wrapped the line to a third row.
+   */
+  assert.ok(
+    !/nothing has been sent to your unit yet/.test(live),
+    'the waiting line repeats what the Not sent card already says, and wraps a phone to do it'
   )
   // The comparison is made against the measurement, never against a constant.
   assert.match(
@@ -1126,6 +1129,37 @@ test('the waiting line answers the question somebody actually has', () => {
     /const slow = usual !== null &&/,
     'a run can be called slow with no measurement to call it slow against'
   )
+})
+
+test('the holding word changes every ten seconds, and only the holding word', async () => {
+  /*
+   * "Thinking…" for two minutes reads as stuck. Every ten seconds the word
+   * moves through a guitarist's vocabulary — Jamming, Noodling, Shredding —
+   * and the clock keeps counting beside it. These are not stages: nothing
+   * claims work nobody checked. And a real line from the model is never
+   * rewritten — only one that begins with the holding word.
+   */
+  const { holdingWord, holdingLine, HOLDING_WORDS, WORD_EVERY, THINKING } = await import(
+    '../src/components/LiveGeneration.jsx'
+  ).catch(() => ({}))
+  if (!holdingWord) {
+    // JSX cannot be imported here; hold the shape in the source instead.
+    const live = readSrc(new URL('../src/components/LiveGeneration.jsx', import.meta.url), 'utf8')
+    assert.match(live, /export const WORD_EVERY = 10/, 'the word does not change every ten seconds')
+    for (const word of ['Jamming', 'Noodling', 'Shredding', 'Soloing', 'Chugging', 'Djenting', 'Stomping', 'Researching', 'Picking']) {
+      assert.ok(live.includes(`'${word}'`), `${word} is missing from the holding words`)
+    }
+    assert.match(live, /export const HOLDING_WORDS = \[\s*THINKING,/, 'Thinking is no longer the first holding word')
+    assert.match(live, /if \(!text \|\| !text\.startsWith\(THINKING\)\) return text/, 'a real line from the model can be rewritten into a joke')
+    assert.match(live, /const text = holdingLine\(message \|\| `\$\{THINKING\}…`, seconds\)/, 'the line does not take the word for this second')
+    return
+  }
+  assert.equal(holdingWord(0), THINKING)
+  assert.equal(holdingWord(9), THINKING)
+  assert.equal(holdingWord(10), HOLDING_WORDS[1])
+  assert.equal(holdingWord(WORD_EVERY * HOLDING_WORDS.length), THINKING, 'the words do not come round again')
+  assert.equal(holdingLine('Thinking — designing your tone…', 25), `${HOLDING_WORDS[2]} — designing your tone…`)
+  assert.equal(holdingLine('Building your chain — 3 blocks so far', 25), 'Building your chain — 3 blocks so far')
 })
 
 test('two Macs on one account cannot quietly write to two units', async () => {
