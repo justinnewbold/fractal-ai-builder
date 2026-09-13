@@ -2758,22 +2758,46 @@ test('refuses a scene the device does not have', () => {
  * "Brighten scene 2" with scene 3 live used to nudge Amp Treble on scene 3.
  * A value belongs to the channel a block is on, not to a scene, so writing it
  * "for scene 2" reaches every scene playing that channel — and nothing refused
- * the ask or said where the write would land.
+ * the ask or said where the write would land. Then it was refused outright,
+ * which was honest and useless: the player asked for a thing the unit can do.
+ *
+ * Now a value aimed at another scene is written standing in that scene, the
+ * way a bypass is; every value label names the scene it lands in; and a write
+ * that reaches other scenes — known to, or not known not to — is flagged so
+ * the chat asks first, with a sentence saying which scenes.
  */
 const sceneCaps = { ...caps, activeScene: 2, sceneNames: ['Rhythm', 'Lead', 'Clean'] }
 
-test('a parameter change aimed at another scene is refused, never written elsewhere', () => {
+test('a value aimed at another scene is written standing in that scene, and says so', () => {
   const r = validatePlan(
     { actions: [{ kind: 'setParam', eid: 58, paramId: 7, value: 7.5, scene: 1, why: '' }] },
     cmdBlocks,
     sceneCaps
   )
-  assert.equal(r.actions.length, 0, 'the write went to the live scene under a scene-2 label')
-  assert.match(r.problems[0] || '', /belongs to the channel/, r.problems.join(' | '))
-  assert.match(r.problems[0] || '', /own channel/, 'the refusal does not say what would actually work')
-  assert.match(r.problems[0] || '', /scene 2 · Lead/, 'the refusal does not name the scene the player named')
+  assert.equal(r.actions.length, 1, r.problems.join(' | '))
+  const a = r.actions[0]
+  assert.match(a.label, /Amp 1 · Gain 1 → 7\.5 in scene 2 · Lead/, a.label)
+  assert.equal(a.scene, 1)
+  // The channel map is not known here (a real unit cannot say without an
+  // audible walk), and the player named a scene: so it asks first, and the
+  // sentence says why.
+  assert.equal(a.shared, true, 'a write that may reach other scenes goes through unasked')
+  assert.match(a.sharedNote, /belong to the channel/, a.sharedNote)
+  assert.match(a.sharedNote, /scene 2 · Lead/, 'the question does not name the scene the player named')
+  assert.match(a.sharedNote, /own channel/, 'the question does not say what would scope the change')
+  assert.equal(a.scope.where, 'scene 2 · Lead')
 
-  // The live scene, named or not, is fine: that is where the value lives anyway.
+  // A scene the unit does not have is refused, as it is for a bypass.
+  const none = validatePlan(
+    { actions: [{ kind: 'setParam', eid: 58, paramId: 7, value: 7.5, scene: 9, why: '' }] },
+    cmdBlocks,
+    sceneCaps
+  )
+  assert.equal(none.actions.length, 0)
+  assert.match(none.problems[0] || '', /no scene 10/)
+
+  // The live scene, named or not, is written in place — and the label still
+  // says which scene that is, because that is where the value lands.
   for (const scene of [2, null, undefined]) {
     const ok = validatePlan(
       { actions: [{ kind: 'setParam', eid: 58, paramId: 7, value: 7.5, scene, why: '' }] },
@@ -2781,7 +2805,101 @@ test('a parameter change aimed at another scene is refused, never written elsewh
       sceneCaps
     )
     assert.equal(ok.actions.length, 1, `scene ${scene} should be allowed`)
+    assert.match(ok.actions[0].label, /5 → 7\.5 in scene 3 · Clean/, ok.actions[0].label)
+    assert.equal(ok.actions[0].scene, 2)
+    // Named, it asks (the map is unknown); unnamed, it is the ordinary write.
+    assert.equal(ok.actions[0].shared, scene === 2, `scene ${scene}: shared`)
   }
+
+  // And the routing itself: another scene goes through the switch-write-return path.
+  const src = readSrc(new URL('../src/lib/actions.js', import.meta.url), 'utf8')
+  const setParam = src.slice(src.indexOf("case 'setParam'"), src.indexOf("case 'setModel'"))
+  assert.match(setParam, /d\.setSceneParam\(target, eid/, 'a scene-targeted value is written wherever the unit happens to be')
+  assert.match(setParam, /elsewhere \|\| scope\.reachesLive/, 'a value written into another scene\'s channel is cached as the live scene\'s')
+  const fx = readSrc(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+  const stand = fx.slice(fx.indexOf('export async function setSceneParam'), fx.indexOf('export const sceneChannels'))
+  assert.match(stand, /await setScene\(sceneIndex\)/, 'setSceneParam does not stand in the scene it writes for')
+  assert.match(stand, /return await setParamConfirmed\(/, 'the value written in another scene is not confirmed by read-back')
+  assert.match(stand, /finally \{\s*if \(started !== sceneIndex\) await setScene\(started\)/, 'the unit is not brought back to the scene it was in')
+})
+
+test('with the channel map known, a value says which scenes it reaches — and asks only then', () => {
+  /*
+   * The demo knows every scene's channel for every block. Scene 2 plays the
+   * amp on D alone; every other scene plays it on A. So "brighten scene 2" is
+   * scene 2's alone and goes through; "brighten scene 3" reaches six scenes
+   * and asks first, naming them.
+   */
+  const mapped = {
+    ...caps,
+    activeScene: 0,
+    sceneNames: ['Rhythm', 'Lead', 'Clean'],
+    sceneChannels: { 58: ['A', 'D', 'A', 'A', 'A', 'A', 'A', 'A'] }
+  }
+  const alone = validatePlan(
+    { actions: [{ kind: 'setParam', eid: 58, paramId: 7, value: 7.5, scene: 1, why: '' }] },
+    cmdBlocks,
+    mapped
+  )
+  assert.equal(alone.actions.length, 1, alone.problems.join(' | '))
+  assert.equal(alone.actions[0].shared, false, 'a scene with its own channel is asked about anyway')
+  assert.match(alone.actions[0].label, /in scene 2 · Lead \(channel D, this scene only\)/, alone.actions[0].label)
+
+  const many = validatePlan(
+    { actions: [{ kind: 'setParam', eid: 58, paramId: 7, value: 7.5, scene: 2, why: '' }] },
+    cmdBlocks,
+    mapped
+  )
+  const a = many.actions[0]
+  assert.equal(a.shared, true, 'a write reaching six other scenes goes through unasked')
+  assert.match(a.label, /in scene 3 · Clean \(channel A, shared with scenes 1, 4, 5, 6, 7 and 8\)/, a.label)
+  assert.match(a.sharedNote, /Amp 1 plays channel A in scenes 1, 3, 4, 5, 6, 7 and 8/, a.sharedNote)
+  assert.match(a.sharedNote, /not scene 3 · Clean alone/, a.sharedNote)
+  // The live scene (1) plays A too, so the value the chat has cached for it is
+  // the one being written.
+  assert.equal(a.scope.reachesLive, true)
+
+  // No scene named: written where the unit is, no question, and the label
+  // still says the channel is shared so the result card can.
+  const plain = validatePlan(
+    { actions: [{ kind: 'setParam', eid: 58, paramId: 7, value: 7.5, why: '' }] },
+    cmdBlocks,
+    mapped
+  )
+  assert.equal(plain.actions[0].shared, true, 'a shared write is known to be shared, named scene or not')
+  assert.match(plain.actions[0].label, /in scene 1 · Rhythm \(channel A, shared with/, plain.actions[0].label)
+})
+
+test('the result card can say where the values landed', async () => {
+  const { whereOf, paramScope } = await import('../src/lib/actions.js')
+  assert.equal(whereOf([]), null, 'a plan with no values has nowhere to name')
+  assert.equal(whereOf([{ kind: 'setBypass', label: 'x' }]), null)
+
+  const label = (i) => ['scene 1 · Rhythm', 'scene 2 · Lead', 'scene 3 · Clean'][i] || `scene ${i + 1}`
+  const block = { name: 'Amp 1', channel: 'A' }
+  const map = { 58: ['A', 'D', 'A', 'A', 'A', 'A', 'A', 'A'] }
+
+  const alone = paramScope({ eid: 58, block, target: 1, activeScene: 0, named: true, sceneChannels: map, sceneLabel: label })
+  assert.equal(whereOf([{ kind: 'setParam', scope: alone }]), 'Written in scene 2 · Lead.')
+
+  const many = paramScope({ eid: 58, block, target: 2, activeScene: 0, named: true, sceneChannels: map, sceneLabel: label })
+  assert.equal(
+    whereOf([{ kind: 'setParam', scope: many }]),
+    'Written in scene 3 · Clean. Channel A is shared with scenes 1, 4, 5, 6, 7 and 8, so they changed too.'
+  )
+
+  // Unknown map, live scene: honest about what a value is.
+  const blind = paramScope({ eid: 58, block, target: 0, activeScene: 0, sceneLabel: label })
+  assert.equal(blind.channel, 'A', 'the live scene\'s channel is on the chain, and was not used')
+  assert.equal(blind.shared, false)
+  const other = paramScope({ eid: 58, block, target: 1, activeScene: 0, named: true, sceneLabel: label })
+  assert.equal(other.channel, null)
+  assert.match(whereOf([{ kind: 'setParam', scope: other }]), /^Written in scene 2 · Lead\. Values belong to a block's channel/)
+
+  // No scenes at all: preset-wide, and said so.
+  const none = paramScope({ eid: 58, block, target: null, activeScene: null })
+  assert.equal(none.suffix, '')
+  assert.equal(whereOf([{ kind: 'setParam', scope: none }]), 'Preset-wide — every scene.')
 })
 
 test('a bypass aimed at another scene lands in that scene and says so', () => {
@@ -5122,6 +5240,47 @@ test('the demo can be turned off where there is no browser to remember it', asyn
     assert.equal(fx.isDemo(), false, 'the demo cannot be turned off without somewhere to write it down')
   } finally {
     if (had) globalThis.localStorage = saved
+  }
+})
+
+test('a value written for another scene lands on that scene’s channel and nowhere else', async () => {
+  /*
+   * The demo, driven the way the chat drives it. Scene 2 (Lead) plays the amp
+   * on channel D; scene 1 (Rhythm) on C. "Brighten scene 2" from scene 1 has
+   * to move D's Treble, leave C's alone, and put the unit back in scene 1 —
+   * which is what the QA saw not happening: "the same values also show on
+   * scene 1".
+   */
+  const fx = await import('../src/lib/forgefx.js')
+  fx.setDemo(true)
+  try {
+    await fx.setScene(0)
+    const blocks = await fx.presetBlocks()
+    const amp = blocks.find((b) => b.slug === 'amp')
+    const read = async () => (await fx.blockParams(amp.effectId))?.named || []
+    const treble = (await read()).find((p) => /treble/i.test(p.name))
+    assert.ok(treble, 'the demo amp has no treble control')
+    const before = treble.value
+    const target = before > 5 ? 2.5 : 7.5
+
+    const map = await fx.sceneChannels()
+    assert.ok(map && Array.isArray(map[amp.effectId]), 'the demo hands over no channel map')
+    assert.equal(map[amp.effectId][1], 'D', 'the lead scene is not on its own channel any more')
+    assert.notEqual(map[amp.effectId][0], map[amp.effectId][1])
+
+    const res = await fx.setSceneParam(1, amp.effectId, treble.id, target, treble)
+    assert.equal(res?.ok, true, 'the write into scene 2 did not land')
+    assert.equal((await fx.getScene())?.index, 0, 'the unit was left standing in scene 2')
+
+    const still = (await read()).find((p) => p.id === treble.id)
+    assert.equal(still.value, before, 'scene 1’s treble moved for a change asked of scene 2')
+
+    await fx.setScene(1)
+    const moved = (await read()).find((p) => p.id === treble.id)
+    assert.ok(Math.abs(moved.value - target) < 0.05, `scene 2’s treble is ${moved.value}, not ${target}`)
+    await fx.setScene(0)
+  } finally {
+    fx.setDemo(false)
   }
 })
 

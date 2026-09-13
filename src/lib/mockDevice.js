@@ -570,6 +570,21 @@ export function createMockDevice() {
           channel: chan(b.effectId)
         })),
 
+    /* Every scene's channel for every block, by effect id — what the chat's
+       plan check uses to say which scenes a value write reaches. */
+    sceneChannelsNow: () =>
+      Object.fromEntries(
+        state.blocks
+          .filter((b) => !['input', 'output'].includes(b.slug))
+          .map((b) => [
+            b.effectId,
+            Array.from(
+              { length: state.scenes.count },
+              (_, i) => state.scenes.channelOf(i, b.effectId) || b.channel || 'A'
+            )
+          ])
+      ),
+
     tempo: () => ({ bpm: state.bpm ?? 120 }),
     setTempo: (bpm) => {
       state.bpm = bpm

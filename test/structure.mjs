@@ -527,7 +527,22 @@ export function run(test) {
      * So the report goes with them: outside the screens, not inside one, and
      * not on Ask where the conversation is already saying it.
      */
-    assert.match(src, /setJustDid\(\{ labels: done \}\)/, 'a finished request no longer reports outside the chat')
+    assert.match(
+      src,
+      /setJustDid\(\{ labels: done, where: whereOf\(actions\) \}\)/,
+      'a finished request no longer reports outside the chat, or the report has stopped saying where the values landed'
+    )
+    // Where: one scene, or the whole preset. "Done — 2 changes" on Play could
+    // not be told from a preset-wide edit, and the values looked the same from
+    // scene 1.
+    assert.match(src, /\{justDid\.where \? <p className="did-where">\{justDid\.where\}<\/p> : null\}/, 'the report no longer says where the values landed')
+    // A tab is the person going somewhere themselves, so the report clears —
+    // through setView it stayed pinned on Play until Got it.
+    const tabs = src.slice(src.indexOf("['shape', 'Edit']"), src.indexOf('</nav>', src.indexOf("['shape', 'Edit']")))
+    assert.match(tabs, /onClick=\{\(\) => changeView\(id\)\}/, 'a tab press leaves the report of the last request on screen')
+    // And it goes by itself, after long enough to be read.
+    assert.match(src, /const DID_STAYS_MS = 20000/, 'the report stays until dismissed by hand')
+    assert.match(src, /setTimeout\(\(\) => setJustDid\(null\), DID_STAYS_MS\)/, 'the report is never taken off on its own')
     assert.match(
       src,
       /\{justDid && view !== 'ask' \?/,
@@ -1145,10 +1160,34 @@ export function run(test) {
       /fetch\(window\.location\.pathname, \{ cache: 'reload' \}\)/,
       'Reload can hand back the same stale page it was pressed to replace'
     )
+    /*
+     * And then it leaves for an address no cache has an answer for. Seen on
+     * v7.196 with v7.198 live: Reload, and still v7.196 until the address was
+     * typed by hand — location.reload() asks for the same URL, which is
+     * exactly what an installed app's document cache and an edge cache both
+     * hold. A query nobody has requested before has to come from the deploy.
+     */
     assert.ok(
-      notice.indexOf("cache: 'reload'") < notice.indexOf('window.location.reload()'),
-      'the page is reloaded before the cached copy is replaced'
+      !/window\.location\.reload\(\)/.test(notice),
+      'Reload asks for the same address again, which is the one every cache has an answer for'
     )
+    assert.ok(
+      notice.indexOf("cache: 'reload'") < notice.indexOf('window.location.replace(freshAddress('),
+      'the page is left before the cached copy is replaced'
+    )
+    assert.match(notice, /url\.searchParams\.set\(FRESH_PARAM, String\(now\)\)/, 'the address Reload leaves for is one a cache may already hold')
+    assert.match(notice, /url\.searchParams\.delete\(FRESH_PARAM\)/, 'the cache-buster stays in the address bar and in every copied link')
+    assert.match(notice, /history\.replaceState\(/, 'stripping the cache-buster adds a history entry, which the back gesture then lands on')
+    /*
+     * The button cannot see the page it produces, so the page that comes up
+     * checks for it: Reload remembers the script the deploy named, and the
+     * next page compares it with the one it loaded and says which happened.
+     */
+    assert.match(notice, /sessionStorage\.setItem\(EXPECT_KEY, script\)/, 'Reload does not remember what it was reaching for, so nothing can say whether it got there')
+    assert.match(notice, /wanted === mine \? 'landed' : 'missed'/, 'the page that comes up never checks it is the one Reload asked for')
+    assert.match(notice, /data-kind="missed"/, 'a Reload that changed nothing is not said out loud')
+    assert.match(notice, /data-kind="landed"/, 'a Reload that worked is not confirmed with the version now running')
+    assert.match(notice, /Up to date — v\{VERSION\}/, 'the confirmation does not name the version on screen')
     /* The check itself must not read the cache it exists to defeat. */
     assert.match(notice, /cache: 'no-store'/, 'the staleness check is served from the cache')
   })
@@ -5284,5 +5323,113 @@ export function run(test) {
       2,
       'the verification table and the copied report disagree about unchecked reads'
     )
+  })
+
+  test('a value the player aimed at one scene asks first when it reaches others', () => {
+    /*
+     * "ASK 'brighten scene 2' — Treble and Presence move in the right
+     * direction, but the same values also show on scene 1, and the DONE card
+     * does not say 'in scene 2' or 'shared amp params'."
+     *
+     * Three things, held here. The plan check is handed the channel map
+     * (the demo's; a real unit says null) so it can say which scenes a value
+     * reaches. A plan with a shared write waits, with its own reason, so the
+     * chat shows the sentence about which scenes. And the result card names
+     * where the values landed.
+     */
+    const ask = src.slice(src.indexOf('const askFor = async'), src.indexOf('const changeView ='))
+    assert.match(ask, /const channelMap = await sceneChannels\(\)\.catch\(\(\) => null\)/, 'the plan check is never told which scenes share a channel')
+    assert.match(ask, /sceneChannels: channelMap,/, 'the channel map is read and not handed to the plan check')
+    assert.match(ask, /const shared = checked\.actions\.some\(\(a\) => a\.shared\)/, 'a write that reaches other scenes is not looked for')
+    assert.match(ask, /shared \? 'shared' : 'broad'/, 'a shared write does not wait with its own reason, so the chat cannot say why')
+    assert.match(ask, /if \(checked\.actions\.some\(\(a\) => a\.destructive\) \|\| shared \|\| broad\)/, 'a shared write goes straight through')
+
+    const chat = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
+    assert.match(chat, /turn\.reason === 'shared'\s*\?\s*turn\.actions\.find\(\(a\) => a\.sharedNote\)\?\.sharedNote/, 'the question about shared scenes shows no sentence saying which scenes')
+
+    /* The chat model is told to mark every value with the scene the player named. */
+    const command = readFileSync(new URL('../api/command.js', import.meta.url), 'utf8')
+    assert.match(command, /put that scene's index in "scene" on every setParam/, 'the model is not told to say which scene a value is for')
+    assert.match(command, /setChannel and setParam when the player named a scene/, 'the scene field is not described as applying to setParam')
+
+    /* And the demo knows its map; a real unit does not pretend to. */
+    const fx = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+    assert.match(fx, /export const sceneChannels = \(\) =>\s*mock \? tick\(\)\.then\(\(\) => mock\.sceneChannelsNow\?\.\(\) \?\? null\) : Promise\.resolve\(null\)/, 'a real unit is asked for a scene map it cannot give silently')
+    const mock = readFileSync(new URL('../src/lib/mockDevice.js', import.meta.url), 'utf8')
+    assert.match(mock, /sceneChannelsNow: \(\) =>/, 'the demo does not hand over its scene map')
+
+    /* A block that changed channel changed its values, so the chat's cache of them goes. */
+    const state = readFileSync(new URL('../src/lib/deviceState.js', import.meta.url), 'utf8')
+    const refresh = state.slice(state.indexOf('export async function refreshBlocks'), state.indexOf('export async function refreshBlocks') + 1600)
+    assert.match(refresh, /before\.get\(b\.effectId\) !== b\.channel\) invalidateSchema\(b\.effectId\)/, 'a scene change that moves a channel leaves the old channel\'s values in the cache')
+  })
+
+  test('the floating Ask stands down on Edit, where it covered the search and the modifiers', () => {
+    /*
+     * "ASK FAB covers the right edge of EDIT search results and MODIFIERS
+     * source." It is pinned bottom-right, and that is the edge both of those
+     * land on. The ✦ Ask tab is in the row above Edit, so Edit loses nothing.
+     * The shared rule is untouched — Play keeps the button.
+     */
+    assert.match(src, /const askShows = askButtonShows\(\{ status, view, playing \}\) && view !== 'shape'/, 'the floating Ask is back over Edit\'s controls')
+    assert.equal(play.askButtonShows({ status: 'live', view: 'play', playing: false }), true, 'Play lost the floating Ask')
+  })
+
+  test('a request in words that wrote to the unit says Save is what keeps it', () => {
+    /*
+     * "Dirty state is only the gold Save; ASK/edits vanish on reload if Save
+     * wasn't clicked." The word goes under the button, on a wide screen —
+     * the phone bar is four controls wide and has no room for a fifth thing.
+     */
+    assert.match(src, /const \[askedUnsaved, setAskedUnsaved\] = useState\(false\)/, 'nothing remembers that a request in words wrote to the unit')
+    assert.match(src, /setAskedUnsaved\(!saved\)/, 'the word is not raised when a plan writes without saving')
+    assert.match(src, /if \(!dirty\) setAskedUnsaved\(false\)/, 'the word outlives the save')
+    assert.match(src, /hint=\{askedUnsaved && !narrow\}/, 'the Save bar is not told, or is told on a phone with no room for it')
+    const bar = readFileSync(new URL('../src/components/SaveBar.jsx', import.meta.url), 'utf8')
+    assert.match(bar, /\{hint && dirty && !working \? \(\s*<span className="save-hint" role="status">\s*Unsaved — Save to keep/, 'the Save bar has no word for unsaved')
+  })
+
+  test('the way to Edit on a phone is called Edit', () => {
+    /*
+     * "PLAY/ASK/EDIT tabs drop on phone; EDIT is easy to miss." The bar button
+     * that opens the chain was called Chain, which is the thing it shows and
+     * not the tab it stands in for.
+     */
+    const gig = readFileSync(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8')
+    const chain = gig.slice(gig.indexOf('{onChain ? ('), gig.indexOf('{onChain ? (') + 400)
+    assert.match(chain, /className="gig-bar-btn gig-edit"/, 'the chain button lost its name')
+    assert.match(chain, /<span>Edit<\/span>/, 'the way to the chain does not say Edit')
+    assert.match(chain, /aria-label="Edit — see the chain and its controls"/, 'read aloud, the button no longer says Edit')
+  })
+
+  test('the rotating suggestion carries a cursor only while it is moving', () => {
+    /*
+     * "Rotating placeholders can look like typed text." The cursor block on
+     * the end was drawn even while the suggestion stood still — which is
+     * exactly when the box has just been focused. Standing still it is a
+     * plain hint, italic, with no cursor.
+     */
+    const chat = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
+    assert.match(chat, /const typing = !busy && !text && !focused && !stillMotion/, 'nothing says whether the suggestion is moving')
+    assert.match(chat, /placeholder=\{typed \? \(typing \? `\$\{typed\}\\u258f` : typed\) : ''\}/, 'the cursor is drawn on a suggestion standing still')
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    const rule = css.slice(css.indexOf('.assistant-row .refine-input::placeholder {'), css.indexOf('.assistant-row .refine-input::placeholder {') + 200)
+    assert.match(rule, /font-style: italic/, 'the placeholder is set in the same face as typed text')
+  })
+
+  test('the Setup line about the unit is two lines that break between facts', () => {
+    /*
+     * "8 scenes · 512 slots wraps awkwardly" — one line broke wherever the
+     * rail cut it. Now the app is one line and the unit is another, and each
+     * fact is one unbreakable piece.
+     */
+    const detail = readFileSync(new URL('../src/components/DeviceDetail.jsx', import.meta.url), 'utf8')
+    assert.equal((detail.match(/className="device-meta-line"/g) || []).length, 2, 'the meta is not two lines')
+    for (const fact of ['{FULL}', 'gen {device.gen}', '{device.capabilities?.sceneCount} scenes', '{device.capabilities?.presets?.count} slots']) {
+      assert.ok(detail.includes(`<span className="device-meta-fact">${fact}</span>`), `${fact} is not one unbreakable fact`)
+    }
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    assert.match(css, /\.device-meta-fact \{\s*white-space: nowrap;/, 'a fact can break in the middle')
+    assert.match(css, /\.device-meta-fact \+ \.device-meta-fact::before \{\s*content: ' · ';/, 'the facts on a line are not joined by dots')
   })
 }

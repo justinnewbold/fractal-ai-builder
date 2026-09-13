@@ -942,9 +942,20 @@ export default function Gig({
           are on and off; they do not say what order they are in, what is wired
           to what, or what any knob is set to. This opens the chain itself.
         */}
+        {/*
+          Called Edit, because that is the tab it stands in for. A phone has no
+          Play / Ask / Edit row — Ask and Edit are bench work — so this button
+          IS the way to the chain and its knobs, and "Chain" did not say so:
+          "EDIT is easy to miss." The label under the glyph is the same word
+          the tab carries on a wide screen.
+        */}
         {onChain ? (
-          <button className="gig-bar-btn" onClick={onChain} aria-label="See the chain and its controls">
-            Chain
+          <button
+            className="gig-bar-btn gig-edit"
+            onClick={onChain}
+            aria-label="Edit — see the chain and its controls"
+          >
+            <span>Edit</span>
           </button>
         ) : null}
       </div>
