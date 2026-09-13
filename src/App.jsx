@@ -2986,6 +2986,7 @@ export default function App() {
         `${countWrites(validated.changes)} changes proposed`,
         ...validated.problems
       ])
+      sayDesigned('Designed', validated)
     } catch (err) {
       // A run that failed leaves no half chain on screen beside its error.
       setPartial(null)
@@ -3356,6 +3357,36 @@ export default function App() {
    * all through a generation. Wanting to be shown the thing you just asked for
    * is not the same as being dragged there ten times a minute.
    */
+  /**
+   * Say in the conversation that the tone is ready, and offer to send it.
+   *
+   * "This is what shows after generation is complete. No user notification.
+   * No idea what happened. User has to scroll down to bottom to see Send
+   * changes." The Thinking line vanished, the card appeared below the
+   * conversation, and its Send button was a screen further down. Nothing in
+   * the chat — the place the player was looking — said the run had finished,
+   * let alone what it made. So the run ends the way a write does: a line in
+   * the conversation, with the count, and a Send button on the line itself.
+   * Marked `tone` so the transcript can draw those buttons on the newest one
+   * while the design is still unsent, and drop them once it has gone.
+   */
+  const sayDesigned = (verb, validated) => {
+    const changes = countWrites(validated.changes)
+    const scenes = (validated.scenes || []).length
+    const parts = [`${changes} change${changes === 1 ? '' : 's'}`]
+    if (scenes) parts.push(`${scenes} scene${scenes === 1 ? '' : 's'}`)
+    setTurns((prev) => [
+      ...prev,
+      {
+        role: 'assistant',
+        text:
+          `${verb} "${validated.presetName || preset?.name || 'the tone'}" — ${parts.join(' and ')}. ` +
+          `Nothing has been sent to your unit yet. Send it from here, or look it over below first.`,
+        tone: true
+      }
+    ])
+  }
+
   const revealResult = () => {
     /*
      * Two scrolls, because the preview sits inside the assistant's own
@@ -3704,6 +3735,7 @@ export default function App() {
         `${countWrites(validated.changes)} changes proposed`,
         ...validated.problems
       ])
+      sayDesigned('Adjusted', validated)
     } catch (err) {
       // A run that failed leaves no half chain on screen beside its error.
       setPartial(null)
@@ -4802,6 +4834,15 @@ export default function App() {
       progress={progress}
       suggestions={suggestionsFrom(taste)}
       onNew={newChat}
+      /*
+       * The Send on the "designed" line. Offered while there is a tone on
+       * screen that has not gone to the unit; the same write the card's own
+       * button does. Gone once it has been sent, or while another run is
+       * adjusting it.
+       */
+      onSend={result && !sent && !applied && !thinking ? apply : null}
+      sendCount={writeCount + (withScenes ? sceneWriteCount : 0)}
+      onReveal={revealResult}
       onStop={
         genStarted
           ? () => {
