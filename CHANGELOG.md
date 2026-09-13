@@ -3,6 +3,14 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.202.0
+
+**"Saving…" is green, with no box around it.** While a save was out the
+button was disabled, so it wore the disabled look: a grey word in a grey
+frame, which read as a button that had stopped working. It is the good state
+in progress, so the word and the pulsing dot are now the same green as
+CONNECTED, and the frame is gone.
+
 ## 7.201.0
 
 **The Save sheet's button says "Save to slot 478" from a phone too.** It

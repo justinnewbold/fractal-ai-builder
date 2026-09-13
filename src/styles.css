@@ -6523,6 +6523,22 @@ button.gig-block:disabled {
   opacity: 1;
 }
 
+/*
+ * Saving: green, and no box.
+ *
+ * The button is disabled while the write is out, so it took the disabled
+ * look — a grey word in a grey frame, which read as a control that had
+ * stopped working. This is the good state in progress: the word and the
+ * pulsing dot take the live green the bar uses for CONNECTED, and the frame
+ * goes, so it reads as a status and not as a dead button.
+ */
+.save-cluster[data-working='yes'] button.save-now,
+.save-cluster[data-working='yes'] button.save-now:disabled {
+  background: none;
+  border-color: transparent;
+  color: var(--ok);
+}
+
 .save-cluster button.save-options {
   min-height: 46px;
   padding: var(--s-2) var(--s-3);
