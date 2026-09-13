@@ -111,7 +111,7 @@ export default function SaveBar({
   const working = !!queued || !!saving
 
   return (
-    <div className="save-cluster" data-dirty={dirty ? 'yes' : 'no'}>
+    <div className="save-cluster" data-dirty={dirty ? 'yes' : 'no'} data-working={working ? 'yes' : 'no'}>
       <div className="save-cluster-row">
         {hint === 'words' && dirty && !working ? (
           <span className="save-hint" role="status">
