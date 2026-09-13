@@ -60,7 +60,7 @@ import ParamSearch from './components/ParamSearch'
 import Assistant from './components/Assistant'
 import UpdateNotice from './components/UpdateNotice'
 import Updates, { UpdateReadyNotice } from './components/Updates'
-import { validatePlan, replyFor, runPlan, resolvePlaceable, landedOf, whereOf } from './lib/actions'
+import { validatePlan, replyFor, runPlan, resolvePlaceable, landedOf, whereOf, scopedActions } from './lib/actions'
 import { listPresets, newestFirst } from './lib/history'
 import {
   profileFrom,
@@ -257,6 +257,23 @@ const PREVIEW_ABOVE = 4
 
 /** How long the "Done" card stays on a screen before it takes itself off. */
 const DID_STAYS_MS = 20000
+
+/** The one-time note about the demo, once put away. */
+const DEMO_NOTE_KEY = 'fab.demo.note'
+const demoNoteWasSeen = () => {
+  try {
+    return localStorage.getItem(DEMO_NOTE_KEY) === 'seen'
+  } catch {
+    return false
+  }
+}
+const rememberDemoNote = () => {
+  try {
+    localStorage.setItem(DEMO_NOTE_KEY, 'seen')
+  } catch {
+    // Private windows throw; the note comes back next time, which is fine.
+  }
+}
 
 /**
  * Write down what a slot is called, the moment a save puts a name in it.
@@ -975,6 +992,16 @@ export default function App() {
   /* A request in words just wrote to the unit and nothing has kept it. Shown
      beside Save until a save lands or the preset is clean again. */
   const [askedUnsaved, setAskedUnsaved] = useState(false)
+  /* Whether the line explaining the demo has been put away. */
+  const [demoNoteSeen, setDemoNoteSeen] = useState(() => demoNoteWasSeen())
+  const dismissDemoNote = () => {
+    setDemoNoteSeen(true)
+    rememberDemoNote()
+  }
+  /* The blocks the last plan was checked against, kept so a plan re-made
+     from a question in the chat (see scopeTurn) is checked against the same
+     chain without another read. */
+  const lastPlanBlocks = useRef(null)
   useEffect(() => {
     if (!dirty) setAskedUnsaved(false)
   }, [dirty])
@@ -1124,13 +1151,13 @@ export default function App() {
    * out of reach of a comment in this file impersonating it.
    */
   /*
-   * The floating ✦ Ask, on the screens where the conversation is not already
-   * the screen — except Edit on a wide window. It is pinned to the bottom
-   * right, and that is the edge the parameter search results and the
-   * Modifiers source picker land on: the button sat on top of both. The ✦ Ask
-   * tab is in the row above Edit, one tap away, so Edit loses nothing.
+   * Whether asking is on offer from the stage screen: the ✦ Ask and Edit
+   * buttons in its bar. There was a floating ✦ Ask pinned over the bottom
+   * right of every wide screen as well; it is gone. On a wide window the
+   * ✦ Ask tab is in the row above and does the same thing, and the corner it
+   * floated over is where the last control in every grid lands.
    */
-  const askShows = askButtonShows({ status, view, playing }) && view !== 'shape'
+  const askShows = askButtonShows({ status, view, playing })
 
   const [size, setSize] = useState(loadSize)
   /*
@@ -4191,6 +4218,7 @@ export default function App() {
        * into either a write scoped to that scene or a question first.
        */
       const channelMap = await sceneChannels().catch(() => null)
+      lastPlanBlocks.current = withPositions
       const checked = validatePlan(body, withPositions, {
         ...(device?.capabilities || {}),
         activeScene: scene,
@@ -4254,12 +4282,25 @@ export default function App() {
        */
       const shared = checked.actions.some((a) => a.shared)
       if (checked.actions.some((a) => a.destructive) || shared || broad) {
+        /*
+         * And the way out of the shared-channel question that is not homework:
+         * a button that gives the scene its own channel and then makes the
+         * change. Offered only when a free channel can be found, which needs
+         * the channel map the demo has and a real unit does not give.
+         */
+        const scoped = shared
+          ? scopedActions(checked.actions, {
+              sceneChannels: channelMap,
+              channelNames: device?.capabilities?.channelNames
+            })
+          : null
         setTurns((prev) => [
           ...prev,
           {
             ...reply,
             pending: true,
-            reason: checked.actions.some((a) => a.destructive) ? null : shared ? 'shared' : 'broad'
+            reason: checked.actions.some((a) => a.destructive) ? null : shared ? 'shared' : 'broad',
+            scopeOffer: scoped ? scoped.label : null
           }
         ])
         return
@@ -4467,6 +4508,55 @@ export default function App() {
     setBusy(true)
     try {
       await perform(turn.actions)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * Do it, but with the scene on its own channel first.
+   *
+   * The plan is re-made from the turn's own actions with a setChannel ahead of
+   * each shared value, checked again against the same chain the first plan
+   * was, and run. The re-check is what turns "shared with scenes 1, 3 and 4"
+   * into "this scene only" on the labels, so the Done card tells the truth.
+   */
+  const scopeTurn = async (index) => {
+    const turn = turns[index]
+    if (!turn?.actions?.length || !lastPlanBlocks.current) return
+    setBusy(true)
+    try {
+      const channelMap = await sceneChannels().catch(() => null)
+      const scoped = scopedActions(turn.actions, {
+        sceneChannels: channelMap,
+        channelNames: device?.capabilities?.channelNames
+      })
+      if (!scoped) {
+        setError('No channel is free for that block any more — every one is in use by a scene.')
+        return
+      }
+      const checked = validatePlan({ actions: scoped.actions }, lastPlanBlocks.current, {
+        ...(device?.capabilities || {}),
+        activeScene: scene,
+        sceneNames,
+        sceneChannels: scoped.after,
+        remote: remoteActive()
+      })
+      setTurns((prev) =>
+        prev.map((t, i) =>
+          i === index
+            ? {
+                ...t,
+                pending: false,
+                scopeOffer: null,
+                actions: checked.actions,
+                problems: checked.problems,
+                text: `${t.text} — with scene ${scoped.scene + 1} on its own channel.`
+              }
+            : t
+        )
+      )
+      if (checked.actions.length) await perform(checked.actions)
     } finally {
       setBusy(false)
     }
@@ -4878,6 +4968,7 @@ export default function App() {
       turns={turns}
       onAsk={askFor}
       onConfirm={confirmTurn}
+      onScope={scopeTurn}
       onCancel={cancelTurn}
       busy={busy || runningPlan}
       /* Not drawn there — Thinking below draws it. Passed so the transcript
@@ -5108,7 +5199,7 @@ export default function App() {
             busy={busy}
             saving={saving}
             compact
-            hint={askedUnsaved && !narrow}
+            hint={askedUnsaved ? (narrow ? 'dot' : 'words') : false}
             queued={queuedSave}
             onOpenSave={() => setSheet('save')}
           />
@@ -5125,10 +5216,20 @@ export default function App() {
       */}
       <UpdateReadyNotice />
 
-      {isDemo() && status === 'live' ? (
+      {/*
+        Said once. The sentence took a full line at the top of every screen for
+        as long as the demo ran, and the word DEMO is already in the bar with
+        the same sentence behind it. Got it puts it away for good.
+      */}
+      {isDemo() && status === 'live' && !demoNoteSeen ? (
         <p className="demo-banner">
-          Simulated FM3 &mdash; nothing here reaches hardware. Real models and parameter ranges,
-          real write behaviour including the silent clamp.
+          <span>
+            Simulated FM3 &mdash; nothing here reaches hardware. Real models and parameter ranges,
+            real write behaviour including the silent clamp.
+          </span>
+          <button className="chip" onClick={dismissDemoNote}>
+            Got it
+          </button>
         </p>
       ) : null}
 
@@ -5364,22 +5465,6 @@ export default function App() {
       ) : null}
 
       {/*
-        A button, not a bar, on the two screens where the conversation is not
-        already the screen. Create has it full height and does not need a way
-        to open what is open.
-      */}
-      {askShows ? (
-        <button
-          className="ask-anywhere"
-          onClick={() => setSheet('chat')}
-          aria-label="Ask for a change"
-        >
-          <span aria-hidden="true">✦</span>
-          <span className="ask-anywhere-word">Ask</span>
-        </button>
-      ) : null}
-
-      {/*
         What the last request in words did, on the screen it moved you to.
 
         Outside the screens rather than inside one, because the whole problem
@@ -5493,7 +5578,7 @@ export default function App() {
             >
               {hasScenes ? (
                 <>
-                  <span className="scene-now-tag mono">S{scene + 1}</span>
+                  <span className="scene-now-tag mono">Scene {scene + 1}</span>
                   <span className="scene-now-name">{sceneNames[scene] || `Scene ${scene + 1}`}</span>
                 </>
               ) : (

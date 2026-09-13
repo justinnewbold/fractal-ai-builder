@@ -41,8 +41,9 @@ export default function SaveBar({
   onOpenSave,
   queued,
   savedAt,
-  /* A request in words just wrote to the unit: say in words that Save is
-     what keeps it. The gold button alone was read as decoration. */
+  /* A request in words just wrote to the unit: say that Save is what keeps
+     it. 'words' beside the button where there is room; 'dot' on the button
+     where there is not. The gold button alone was read as decoration. */
   hint = false
 }) {
   /*
@@ -112,7 +113,7 @@ export default function SaveBar({
   return (
     <div className="save-cluster" data-dirty={dirty ? 'yes' : 'no'}>
       <div className="save-cluster-row">
-        {hint && dirty && !working ? (
+        {hint === 'words' && dirty && !working ? (
           <span className="save-hint" role="status">
             Unsaved — Save to keep
           </span>
@@ -141,6 +142,9 @@ export default function SaveBar({
             is out, and is gone the moment the answer lands.
           */}
           {working ? <span className="save-spin" aria-hidden="true" /> : null}
+          {hint === 'dot' && dirty && !working ? (
+            <span className="save-hint-dot" role="status" aria-label="Unsaved — Save to keep" />
+          ) : null}
           {working
             ? compact
               ? 'Saving…'

@@ -37,7 +37,7 @@
 export const clampMode = (v) => v === true || v === 'true' || v === '1'
 
 /**
- * The browser's rule, for the floating ✦ Ask button.
+ * The browser's rule, for the ✦ Ask and Edit buttons in the stage bar.
  *
  * Three parts, and the first two are the ones easy to lose: there is nothing to
  * ask about before a unit has answered, and offering to open the conversation

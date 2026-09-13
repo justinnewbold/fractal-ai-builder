@@ -2859,14 +2859,16 @@ test('with the channel map known, a value says which scenes it reaches — and a
   // the one being written.
   assert.equal(a.scope.reachesLive, true)
 
-  // No scene named: written where the unit is, no question, and the label
-  // still says the channel is shared so the result card can.
+  // No scene named: written where the unit is, no question — "more treble"
+  // means the sound being heard, and on a preset whose amp channel is shared
+  // by six scenes every plain nudge would otherwise stop to ask. The label
+  // still says the channel is shared, so the result card can.
   const plain = validatePlan(
     { actions: [{ kind: 'setParam', eid: 58, paramId: 7, value: 7.5, why: '' }] },
     cmdBlocks,
     mapped
   )
-  assert.equal(plain.actions[0].shared, true, 'a shared write is known to be shared, named scene or not')
+  assert.equal(plain.actions[0].shared, false, 'a plain nudge with no scene named stops to ask')
   assert.match(plain.actions[0].label, /in scene 1 · Rhythm \(channel A, shared with/, plain.actions[0].label)
 })
 

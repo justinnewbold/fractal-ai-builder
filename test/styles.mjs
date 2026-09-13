@@ -265,38 +265,22 @@ export function run(test) {
     }
   })
 
-  test('the page reserves the room the floating Ask button takes up', () => {
+  test('nothing floats over the bottom of the page, so nothing is reserved for it', () => {
     /*
-     * `.ask-anywhere` is fixed over the bottom-right corner on Play and Edit.
-     * Whatever it covers there can only be got at by scrolling it out from
-     * under — so the shell's bottom padding has to be at least as deep as the
-     * button's inset plus its height. It was not, and the eighth scene button
-     * on a phone sat under it with nowhere to go.
-     *
-     * The padding that matters is the one in the `@supports (padding: max())`
-     * block, not the `.shell` rule at the top of the file: same specificity,
-     * later in the source, and supported everywhere. Raising the first one
-     * alone changes nothing on any real browser, which is exactly the mistake
-     * this test is here to catch.
+     * `.ask-anywhere` was fixed over the bottom-right corner on Play and
+     * Edit, and the shell kept 80px clear at the bottom so the last row of
+     * controls could be scrolled out from under it. Both are gone: the button
+     * sat on the eighth scene, Edit's search results and the Modifiers picker,
+     * and the tab row already carries ✦ Ask on every window wide enough to
+     * have one. What is left at the bottom is the home-indicator inset with a
+     * 16px floor — and it is set in the `@supports (padding: max())` block,
+     * which is the one that applies on every real browser.
      */
+    assert.ok(!code.includes('.ask-anywhere'), 'the floating Ask is back, and with it the corner it covers')
     const rule = code.match(/@supports \(padding: max\(0px\)\) \{\s*\.shell \{([^}]*)\}/)
     assert.ok(rule, 'the @supports block that sets the real shell padding is gone')
-    const reserved = Number((rule[1].match(/padding-bottom: calc\((\d+)px \+/) || [])[1])
-    assert.ok(reserved, `shell padding-bottom is no longer a plain reservation: ${rule[1].trim()}`)
-
-    const button = code.match(/\.ask-anywhere \{([^}]*)\}/)
-    assert.ok(button, '.ask-anywhere is gone')
-    const inset = Number((button[1].match(/bottom: calc\(var\(--s-(\d)\)/) || [])[1])
-    const height = Number((button[1].match(/min-height: (\d+)px/) || [])[1])
-    assert.ok(inset && height, `cannot read the button's own geometry: ${button[1].trim()}`)
-    const scale = { 1: 4, 2: 8, 3: 12, 4: 16, 5: 24, 6: 32, 7: 48 }
-    const needed = scale[inset] + height
-
-    assert.ok(
-      reserved >= needed,
-      `the shell reserves ${reserved}px but the Ask button occupies ${needed}px ` +
-        `(${scale[inset]}px inset + ${height}px tall) — the last row of controls cannot be scrolled clear of it`
-    )
+    assert.match(rule[1], /padding-bottom: max\(16px, env\(safe-area-inset-bottom\)\)/, `the shell still reserves room under a button it no longer has: ${rule[1].trim()}`)
+    assert.ok(!/padding-bottom: calc\(80px/.test(code), 'an 80px reservation is still written somewhere')
   })
   test('nothing sits above the bar, so the bar can be pinned', () => {
     /*
@@ -501,13 +485,7 @@ export function run(test) {
       !/button\.ask-tab \{/.test(code),
       'the removed Ask tab still has styling, which will dress up whatever gets that class next'
     )
-    const at = code.indexOf('.ask-anywhere {')
-    assert.notEqual(at, -1, 'the floating Ask button is gone entirely — wide screens lost the sheet')
-    assert.match(
-      code,
-      /@media \(max-width: 700px\) \{\s*\.ask-anywhere \{\s*display: none/,
-      'the floating Ask is back over a phone’s controls'
-    )
+    assert.ok(!code.includes('.ask-anywhere'), 'the floating Ask is back over a phone’s controls')
   })
 
   test('the eight scenes stay one row while a rail is out', () => {
@@ -901,15 +879,13 @@ export function run(test) {
     const narrow = code.slice(code.indexOf('.gig[data-compact] .gig-block-cell,'))
     assert.match(narrow.slice(0, 200), /min-width: 0/, 'the tiles can push their own columns wider again')
 
-    // A phone has no floating Ask button, so it keeps none of its footprint —
-    // that was 80px at the bottom of the screen with the least room.
-    // Anchored on the rule that hides the button, not on the width — there is
-    // an earlier 700px block in this file and it is about something else.
-    const noFab = code.slice(code.indexOf('.ask-anywhere {\n    display: none;'))
+    // No screen has a floating Ask button any more, so no screen keeps its
+    // footprint — that was 80px at the bottom of the screen with the least
+    // room. The one shell rule that applies says so for every width.
     assert.match(
-      noFab.slice(0, 1400),
-      /\.shell \{\s*padding-bottom: max\(16px, env\(safe-area-inset-bottom/,
-      'the phone keeps 80px clear under a button it does not have'
+      code,
+      /\.shell \{\s*padding-left: max\(16px, env\(safe-area-inset-left\)\);\s*padding-right: [^;]+;\s*padding-bottom: max\(16px, env\(safe-area-inset-bottom\)\)/,
+      'the page keeps 80px clear under a button it does not have'
     )
   })
 
@@ -1132,24 +1108,13 @@ export function run(test) {
    * side of it. Also, let's make the chat box text entry a little more rounded
    * instead of square."
    */
-  test('there is exactly one Ask button at every width', () => {
+  test('every width has a way into the conversation', () => {
     /*
-     * Two of them draw the same control: .ask-anywhere floats bottom-right on
-     * a wide screen, and .gig-ask sits in the stage bar on a phone.
-     *
-     * They must swap at THE SAME width. The floating one is hidden below
-     * 700px because that corner is where the last tile in every grid lands —
-     * on a phone it sits on scene 6 — and the bar one is shown below 700px.
-     * Move either number alone and there is a band of widths with two Ask
-     * buttons or, worse, none: `narrow` in App.jsx is 620px, and reaching for
-     * that instead would have left 620-700 with neither.
-     */
-    /*
-     * Each breakpoint is read back FROM ITS OWN RULE rather than looked up by
-     * number. Searching for `@media (max-width: 700px)` finds the first block
-     * with that width, which is not necessarily the one these rules are in —
-     * the same first-hit trap CLAUDE.md records for App.jsx. And asserting a
-     * hardcoded 700 twice would pass happily while the two drifted apart.
+     * Two ways in: the ✦ Ask tab on any window wider than `narrow` (620px in
+     * App.jsx), and .gig-ask in the stage bar below its own breakpoint. The
+     * floating .ask-anywhere that used to cover the wide end is gone. What
+     * must hold is that the bar's breakpoint is not BELOW the tab's — move it
+     * to 600 and every window between 600 and 620 has neither.
      */
     const breakpointOver = (needle) => {
       const at = code.indexOf(needle)
@@ -1159,24 +1124,19 @@ export function run(test) {
       return media ? Number(media[1]) : null
     }
 
-    const floatingOff = code.search(/\.ask-anywhere\s*\{\s*display:\s*none/)
-    assert.ok(floatingOff > -1, 'the floating Ask no longer stands down anywhere, so on a phone it covers a scene tile')
     const barOn = code.search(/button\.gig-ask\s*\{\s*display:\s*flex/)
     assert.ok(barOn > -1, 'the stage bar never gets an Ask button, so a phone has no way in')
-
-    const offAt = breakpointOver(code.slice(floatingOff, floatingOff + 20))
     const onAt = breakpointOver(code.slice(barOn, barOn + 22))
-    assert.ok(offAt, 'the floating Ask is hidden outside any breakpoint — it is gone on desktop too')
-    assert.equal(
-      onAt,
-      offAt,
-      `the two Ask buttons swap at different widths (bar at ${onAt}, floating at ${offAt}) — one band of widths now shows two, or none`
-    )
+    assert.ok(onAt, 'the bar Ask is shown outside any breakpoint — a wide screen draws it beside the tab')
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    const narrow = Number((app.match(/const narrow = useAsks\('\(max-width: (\d+)px\)'\)/) || [])[1])
+    assert.ok(narrow, 'App no longer says where a phone starts')
+    assert.ok(onAt >= narrow, `the bar Ask appears below ${onAt}px but the tab row only above ${narrow}px — windows between have no way in`)
 
-    /* Off by default, or a wide screen draws both. */
+    /* Off by default, or a wide screen draws it beside the tab. */
     const base = code.slice(code.indexOf('button.gig-ask {'), code.indexOf('}', code.indexOf('button.gig-ask {')))
     assert.ok(base.length > 20, 'the bar Ask has no style of its own')
-    assert.match(base, /display:\s*none/, 'the bar Ask is drawn on desktop too, beside the floating one')
+    assert.match(base, /display:\s*none/, 'the bar Ask is drawn on desktop too, beside the tab')
   })
 
   test('the composer ends in a round arrow and the box is not a rectangle', () => {

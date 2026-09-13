@@ -100,7 +100,16 @@ export default function TopBar({
         {/* The word carries the state as well as saying it: green when the unit
             is answering, red when it isn't, so the bar reads at a glance. */}
         {how ? (
-          <span className="topbar-how" data-state={lampState}>
+          <span
+            className="topbar-how" data-state={lampState}
+            /* The demo's one-line explanation lives behind its word once the
+               banner has been put away, so a hover still says what DEMO means. */
+            title={
+              demo
+                ? 'Simulated FM3 — nothing here reaches hardware. Real models and parameter ranges, real write behaviour including the silent clamp.'
+                : undefined
+            }
+          >
             {how}
           </span>
         ) : null}

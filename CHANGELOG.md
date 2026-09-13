@@ -3,6 +3,36 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.200.0
+
+**The shared-channel question does the work for you.** When "brighten
+scene 2" would reach other scenes, the chat used to say "ask to give scene 2
+its own channel first". Now the question carries a button — Give scene 2 its
+own channel (B) and do it — that moves the amp to a channel no scene is
+using, in that scene, and then makes the change; the Done card reads
+"Written in scene 2 · Lead." The other button says what it does too: Change
+them all. A plain "more treble" with no scene named no longer stops to ask;
+it says which scenes it reached and gets on with it.
+
+**No more red DISCONNECTED over an app that is fine.** The phone-link word
+in the bar was red whenever the remote was off or never set up — in the demo,
+for good. A link nobody has turned on is grey now and says what it is: NO
+PHONE on the Mac, NO MAC on a phone. Red is kept for a link that should be up
+and is not.
+
+**The floating ✦ Ask is gone.** It was pinned over the bottom-right of every
+wide screen, which is where the last control in every grid lands. The ✦ Ask
+tab in the row above does the same thing, and the phone keeps ✦ Ask in its
+stage bar. With it goes the 80px the page kept clear underneath it.
+
+Smaller, all on Play and Edit: the chips above Edit's search are buttons
+now, and the scene one reads "Scene 1 · Rhythm" rather than "S1"; the
+button between Previous and Next says SOURCE over its name, so "All" no
+longer reads as a caption; the thin line under the preset tile is labelled
+LEVEL; the demo's explanation is shown once, with a Got it, and lives behind
+the DEMO word in the bar after that; and on a phone an unsaved request in
+words puts a dot on the Save button, since the bar has no room for the words.
+
 ## 7.199.0
 
 **"Brighten scene 2" is written in scene 2, and the app says who else hears
