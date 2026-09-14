@@ -1251,6 +1251,65 @@ button.chip {
   flex-wrap: wrap;
 }
 
+/*
+ * The Send button while it is writing.
+ *
+ * Two motions, one purpose: a bar that fills left to right as the writes land
+ * (`--done`, 0–1, set by the card from the progress line), and a light that
+ * sweeps across the whole button on a loop so it reads as alive in the gaps
+ * between writes too. Not dimmed like other disabled buttons — a dimmed
+ * Writing… is exactly what read as a hang.
+ */
+.preview-actions button.primary.writing {
+  position: relative;
+  overflow: hidden;
+  opacity: 1;
+  color: var(--on-signal);
+  background: color-mix(in srgb, var(--signal) 42%, var(--panel));
+  border-color: color-mix(in srgb, var(--signal) 70%, var(--rule));
+}
+
+.preview-actions button.primary.writing::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: calc(var(--done, 0) * 100%);
+  background: var(--signal);
+  transition: width 400ms ease-out;
+}
+
+.preview-actions button.primary.writing::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.28) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: writing-sweep 1400ms ease-in-out infinite;
+}
+
+.preview-actions button.primary.writing > span {
+  position: relative;
+  z-index: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes writing-sweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preview-actions button.primary.writing::after {
+    animation: none;
+  }
+}
+
 .summary {
   margin: 6px 0 0;
   color: var(--silk-dim);

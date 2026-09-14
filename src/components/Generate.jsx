@@ -7,6 +7,12 @@ export function Preview({
   busy,
   /* Whether this plan, with these tick boxes, is already on the unit. */
   sent = false,
+  /*
+   * What the app is doing right now, in words — "12 of 63 - Amp 1 · Gain 1",
+   * "Checking what landed...", "Scenes — 3 of 8 · Verse". Read only while
+   * busy, to make the Writing button a thing that visibly moves.
+   */
+  progress = null,
   writeCount,
   withScenes,
   onWithScenes,
@@ -258,7 +264,20 @@ export function Preview({
             </button>
           ) : (
           <button
-            className="primary"
+            /*
+             * "Make an animation for 'writing' so user knows it working."
+             *
+             * A write is half a minute of a dimmed button that says Writing…
+             * and nothing else on the card moving, which on a phone reads as
+             * a hang. While busy the button carries two things: a fill that
+             * grows left to right with the count of writes landed, and a
+             * light that sweeps across it so it is plainly alive even between
+             * two writes. The words count too — Writing 12 of 63 — because a
+             * number that changes is the one thing nobody mistakes for stuck.
+             */
+            className={busy ? 'primary writing' : 'primary'}
+            style={busy ? { '--done': writingStep(progress).done ?? 0 } : undefined}
+            aria-live={busy ? 'polite' : undefined}
             onClick={(e) => {
               e.currentTarget.blur()
               onApply()
@@ -266,7 +285,7 @@ export function Preview({
             disabled={busy || sent || total === 0}
           >
             {busy
-              ? 'Writing…'
+              ? <span>{writingStep(progress).label}</span>
               : /*
                  * "After sending changes, it still says send changes."
                  *
@@ -588,6 +607,27 @@ export function Preview({
       </details>
     </section>
   )
+}
+
+/**
+ * The Writing button's words and how far along it is, from the progress line.
+ *
+ * The line is written for the Thinking row and comes in three shapes over a
+ * write — "12 of 63 - Amp 1 · Gain 1 → 7.5" while values land, "Checking what
+ * landed..." / "Verifying Amp 1 - 3 of 8" while they are read back, and
+ * "Scenes — 3 of 8 · Verse" while the scenes go on. The count is the first
+ * "N of M" in it, whichever shape; a block name with a digit in it ("Amp 1")
+ * never has " of " after the digit, so it cannot be mistaken for the count.
+ * No count, or no line at all, is still Writing… with the light sweeping.
+ */
+export function writingStep(progress) {
+  const line = typeof progress === 'string' ? progress : ''
+  const m = /(\d+) of (\d+)/.exec(line)
+  const done = m ? Math.min(1, Number(m[1]) / Math.max(1, Number(m[2]))) : null
+  const count = m ? ` ${m[1]} of ${m[2]}` : ''
+  if (/^Scenes/.test(line)) return { label: `Scenes${count}…`, done }
+  if (/^(Checking|Verifying)/.test(line)) return { label: `Checking${count}…`, done }
+  return { label: `Writing${count}…`, done }
 }
 
 function round(n) {
