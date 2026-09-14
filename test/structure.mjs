@@ -409,6 +409,24 @@ export function run(test) {
     assert.match(panel, /navigator\.clipboard\.writeText/, 'Copy does not use the clipboard')
     assert.match(panel, /navigator\.share/, 'no fallback for a phone that refuses the clipboard')
     assert.match(panel, /wireReport\(\)/, 'the wire tables are not in the copied text')
+    /*
+     * "Can we make it so when we copy the bug log it's just a text file that
+     * I can paste instead of paste in the entire chat?" So the first button
+     * shares the report as one .txt through the phone's share sheet, downloads
+     * it where there is no sheet, and only then falls back to the paste.
+     */
+    assert.match(panel, /Share as file/, 'the debug log cannot go out as a file')
+    const buttons = panel.slice(panel.indexOf('className="diag-actions"'))
+    assert.ok(buttons.indexOf('Share as file') < buttons.indexOf('Copy log'), 'the file is not the first offer')
+    assert.match(panel, /new File\(\[t\], fileName\(\), \{ type: 'text\/plain' \}\)/, 'the report is not a plain-text file')
+    assert.match(panel, /navigator\.canShare\?\.\(\{ files: \[file\] \}\)/, 'the share sheet is not asked whether it takes a file')
+    assert.match(panel, /a\.download = file\.name/, 'a browser with no share sheet gets no file')
+    assert.match(panel, /err\?\.name === 'AbortError'/, 'closing the share sheet is treated as a failure')
+    assert.match(panel, /\.txt`/, 'the file is not named as text')
+    // The chat route reports its cache write the way the designer does, so
+    // the first chat turn of a session is priced at the write premium.
+    const command = readFileSync(new URL('../api/command.js', import.meta.url), 'utf8')
+    assert.match(command, /cacheWriteTokens:\s*\n\s*usage\?\.inputTokenDetails\?\.cacheWriteTokens \?\?\s*\n\s*anthropicMeta\.cacheCreationInputTokens/, 'a chat turn hides its cache write')
     // The old copy button is gone: one place to copy from.
     const diag = read('components/Diagnostics.jsx')
     assert.ok(!/Copy all as text/.test(diag), 'Diagnostics still has a copy button of its own')

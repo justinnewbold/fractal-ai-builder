@@ -3,6 +3,18 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.213.0
+
+**The debug log goes out as a file.** Setup › Debug log has a new first
+button, Share as file: on a phone it opens the share sheet with the whole
+report as one .txt, so it is an attachment in the chat rather than a paste
+the length of the conversation. On a computer the file downloads, named by
+the moment it was taken. Copy log is still there for a plain paste. Also:
+a chat turn now reports the tokens it wrote to the cache, which the cost
+figures had been pricing as ordinary input — the first chat turn of a
+session primes a roster cache of its own, and the Token usage panel now
+says so.
+
 ## 7.212.0
 
 **New chat moved behind a + on the chat box.** The New chat chip that sat in

@@ -713,19 +713,38 @@ export default async function handler(req, res) {
   let fellBackFrom = null
   for (const attempt of attempts) {
     try {
-      let { object, usage } = await ask(attempt)
+      let { object, usage, providerMetadata } = await ask(attempt)
       if (silent(object)) {
         console.warn('command: empty reply, asking once more')
-        ;({ object, usage } = await ask(attempt, NUDGE))
+        ;({ object, usage, providerMetadata } = await ask(attempt, NUDGE))
       }
       const used = attempt.model
+      /*
+       * The cache write, which this route never reported.
+       *
+       * The roster above is marked for the cache, so the first chat turn of a
+       * session writes it — thirty thousand tokens or so — at the write
+       * premium. The count came back without that bucket, so the app priced
+       * the write as plain input (a quarter under) and, having nothing in the
+       * "cache write" column, could not say the turn had primed anything. The
+       * same two places the designer reads it from: the SDK's detail, then
+       * the provider's own metadata.
+       */
+      const anthropicMeta = providerMetadata?.anthropic || {}
       answer(200, {
         ...object,
         _usage: {
           inputTokens: usage?.inputTokens ?? null,
           outputTokens: usage?.outputTokens ?? null,
           cachedInputTokens:
-            usage?.cachedInputTokens ?? usage?.inputTokenDetails?.cacheReadTokens ?? null,
+            usage?.cachedInputTokens ??
+            usage?.inputTokenDetails?.cacheReadTokens ??
+            anthropicMeta.cacheReadInputTokens ??
+            null,
+          cacheWriteTokens:
+            usage?.inputTokenDetails?.cacheWriteTokens ??
+            anthropicMeta.cacheCreationInputTokens ??
+            null,
           model: typeof used === 'string' ? used : used?.modelId || MODEL_NAME,
           configured: MODEL_NAME,
           ...(fellBackFrom

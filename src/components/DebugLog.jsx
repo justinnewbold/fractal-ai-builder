@@ -80,9 +80,15 @@ export default function DebugLog({ device, link }) {
       [wireReport(), mac].filter(Boolean).join('\n\n')
     )
 
-  const copy = async () => {
-    const t = text(await macReport())
-    setFallback('')
+  /* The last resort for either button: the text selected in a box, for a
+     long-press Copy — the one thing a phone never refuses. */
+  const showToSelect = (t) => {
+    setFallback(t)
+    setCopied(null)
+    setTimeout(() => box.current?.select?.(), 0)
+  }
+
+  const copyText = async (t) => {
     try {
       await navigator.clipboard.writeText(t)
       setCopied('Copied — paste it into the chat')
@@ -93,11 +99,66 @@ export default function DebugLog({ device, link }) {
           setCopied('Shared')
         } else throw new Error('no share')
       } catch {
-        // Selected for a long-press Copy, the one thing a phone never refuses.
-        setFallback(t)
-        setCopied(null)
-        setTimeout(() => box.current?.select?.(), 0)
+        showToSelect(t)
       }
+    }
+  }
+
+  const copy = async () => {
+    const t = text(await macReport())
+    setFallback('')
+    await copyText(t)
+    setTimeout(() => setCopied(null), 3000)
+  }
+
+  /*
+   * The same report as one file, rather than a paste.
+   *
+   * "Can we make it so when we copy the bug log it's just a text file that I
+   * can paste instead of paste in the entire chat?" The log is a few hundred
+   * lines plus the Mac's own account; pasted, it is the whole conversation
+   * for a screen and a half. As a .txt it is one attachment.
+   *
+   * On a phone the share sheet takes a file straight to the chat app. Where
+   * there is no share sheet — a Mac in a browser — the file downloads, named
+   * by the moment it was taken so two of them do not overwrite each other. If
+   * the browser will do neither, the text goes on the clipboard instead: a
+   * report that arrives the old way beats one that does not arrive.
+   */
+  const fileName = () =>
+    `fractal-remote-log-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.txt`
+
+  const shareFile = async () => {
+    const t = text(await macReport())
+    setFallback('')
+    try {
+      const file = new File([t], fileName(), { type: 'text/plain' })
+      if (navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: 'Fractal Remote debug log' })
+          setCopied('Shared as a file')
+        } catch (err) {
+          // Closing the sheet without picking anything is not a failure.
+          if (err?.name === 'AbortError') {
+            setCopied(null)
+            return
+          }
+          throw err
+        }
+      } else {
+        const url = URL.createObjectURL(file)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = file.name
+        a.rel = 'noopener'
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        setTimeout(() => URL.revokeObjectURL(url), 10000)
+        setCopied('Saved as a file')
+      }
+    } catch {
+      await copyText(t)
     }
     setTimeout(() => setCopied(null), 3000)
   }
@@ -107,8 +168,11 @@ export default function DebugLog({ device, link }) {
   return (
     <section className="debug-log">
       <div className="diag-actions">
+        <button className="chip" onClick={shareFile}>
+          {copied || 'Share as file'}
+        </button>
         <button className="chip" onClick={copy}>
-          {copied || 'Copy log'}
+          Copy log
         </button>
         <button
           className="chip"
@@ -127,8 +191,8 @@ export default function DebugLog({ device, link }) {
 
       <p className="hint">
         Everything that happened this session, in order — what the AI did, what was written to the
-        unit and what it said back, every error. When something goes wrong, copy this and paste it
-        into the chat.
+        unit and what it said back, every error. When something goes wrong, share it as a file and
+        attach that to the chat — or copy it and paste, if you would rather.
       </p>
 
       {fallback ? (
