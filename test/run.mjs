@@ -2055,9 +2055,16 @@ test('a preset can be renamed by hand, and the save sheet follows a rename', () 
   const gig = readSrc(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8')
   const field = readSrc(new URL('../src/components/RenamePreset.jsx', import.meta.url), 'utf8')
 
-  // The pencil on the Play screen opens the sheet where names are typed.
-  assert.match(gig, /className="gig-rename"[\s\S]{0,120}onClick=\{onRename\}/, 'the Play screen has no pencil')
-  assert.match(app, /onPickPreset=\{\(\) => setPresetMenu\(true\)\}\n\s*onRename=\{\(\) => setSheet\('scenes'\)\}/, 'the pencil does not open the names sheet')
+  // The way to the sheet where names are typed is in Setup, beside Read the
+  // unit again — "move the rename presets and scenes button to the settings
+  // menu". The pencil that stood beside the preset tile on Play is gone.
+  assert.ok(!/gig-rename/.test(gig), 'the pencil is back beside the preset tile on Play')
+  const detail = readSrc(new URL('../src/components/DeviceDetail.jsx', import.meta.url), 'utf8')
+  const row = detail.slice(detail.indexOf('device-detail-row'))
+  assert.match(row, /onRename && status === 'live' \? \(\s*<button onClick=\{onRename\} disabled=\{busy\}>\s*Rename preset or scenes/, 'Setup has no way to rename a preset or its scenes')
+  assert.ok(row.indexOf('Read the unit again') < row.indexOf('Rename preset or scenes'), 'the rename button is not beside Read the unit again')
+  const setup = app.slice(app.indexOf('<DeviceDetail'), app.indexOf('/>', app.indexOf('<DeviceDetail')))
+  assert.match(setup, /onRename=\{\(\) => setSheet\('scenes'\)\}/, 'the rename button does not open the names sheet')
   const sheet = app.slice(app.indexOf("open={sheet === 'scenes'}"), app.indexOf('<SceneMatrix'))
   assert.match(sheet, /<RenamePreset preset=\{preset\} busy=\{busy\} onRename=\{rename\} \/>/, 'the preset name is not in the sheet')
   assert.match(sheet, /alert=\{sheetAlert\}/, 'a refused rename would be explained under the sheet, where nobody can see it')

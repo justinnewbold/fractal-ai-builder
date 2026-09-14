@@ -68,7 +68,6 @@ export default function Gig({
   onChanged,
   onPickPreset,
   /** Where the preset's name and its scene names can be typed. Absent means no pencil. */
-  onRename,
   onAsk,
   /*
    * The way to the chain and its knobs.
@@ -618,21 +617,11 @@ export default function Gig({
           </span>
         </button>
         {/*
-          The pencil: rename this preset, or its scenes, without asking the
-          chat. Beside the tile rather than on it, because the tile is the
-          way to the picker and one thing should do one thing.
+          The pencil that stood here — rename this preset or its scenes — is
+          in Setup now, beside Read the unit again: "move the rename presets
+          and scenes button to the settings menu". Renaming is bench work,
+          and the tile row is the one a thumb crosses between songs.
         */}
-        {onRename ? (
-          <button
-            type="button"
-            className="gig-rename"
-            onClick={onRename}
-            aria-label="Rename this preset or its scenes"
-            title="Rename"
-          >
-            ✎
-          </button>
-        ) : null}
       </div>
 
       {/* Named. A thin coloured line under the preset tile was the one thing on

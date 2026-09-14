@@ -32,8 +32,7 @@ export default function DeviceDetail({
    * First in the run, because it is the one here anybody opens on purpose —
    * the rest of this row is the connection, touched about once a month.
    */
-  onHistory
-}) {
+  onHistory, onRename }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(getHost())
 
@@ -143,6 +142,15 @@ export default function DeviceDetail({
             <button onClick={onRetry} disabled={busy}>
               {busy ? 'Reading…' : status === 'live' ? 'Read the unit again' : 'Reconnect'}
             </button>
+            {/* Rename this preset or its scenes. It was a pencil beside the
+                preset tile on Play; "move the rename presets and scenes button
+                to the settings menu next to read this unit again". Only with a
+                unit answering — there is nothing to name otherwise. */}
+            {onRename && status === 'live' ? (
+              <button onClick={onRename} disabled={busy}>
+                Rename preset or scenes
+              </button>
+            ) : null}
             {/* Light or dark is set about as often as the host address. */}
             <Theme />
           </>

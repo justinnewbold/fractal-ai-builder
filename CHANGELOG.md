@@ -3,6 +3,13 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.206.0
+
+**Rename preset or scenes lives in Setup now.** The pencil beside the preset
+tile on Play is gone; the same sheet opens from a button in Setup, right
+beside Read the unit again. Renaming is bench work, and the tile row is the
+one a thumb crosses between songs.
+
 ## 7.205.0
 
 **The test suite passes on the Node the checks run on.** One test installed
