@@ -3192,6 +3192,7 @@ export function run(test) {
     assert.match(landing, /prefers-reduced-motion: reduce/, 'the scroll animates for someone who asked it not to')
 
     /*
+<<<<<<< HEAD
      * "Make an animation for 'writing' so user knows it working." While busy
      * the Send button wears `writing`, carries how far along it is as --done,
      * and says the count; the styles fill it and sweep a light across it,
@@ -3207,6 +3208,8 @@ export function run(test) {
     assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*\n\s*\.preview-actions button\.primary\.writing::after \{\s*\n\s*animation: none/, 'the sweep runs for someone who asked for less motion')
 
     /*
+=======
+>>>>>>> origin/main
      * And a value that bounces off a block just moved to a channel says which
      * channel the unit reports the block on — asked once per change and only
      * on a failure, so a clean write costs nothing extra.
