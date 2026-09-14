@@ -3176,6 +3176,33 @@ export function run(test) {
     assert.match(card, /write-target/, 'which scene the bypasses land in is behind the fold')
     assert.match(card, /scene-plan/, 'what gets written over is behind the fold')
 
+    /*
+     * "After writing a scene make it scroll to where it says save to FM3 …
+     * otherwise you can't tell that everything was written to the unit
+     * because it just sits on the chat screen." The action row carries a ref
+     * and the card scrolls it into view on the crossing to sent — only then,
+     * only when there is a Save to show, and never for a card with an
+     * outcome, which is a record with nothing to press.
+     */
+    assert.match(gen, /<div className="preview-actions" ref=\{actions\}>/, 'the action row cannot be scrolled to')
+    const landing = gen.slice(gen.indexOf('const wasSent = useRef(sent)'), gen.indexOf('}, [sent, onSave, outcome])'))
+    assert.match(landing, /const crossed = sent && !wasSent\.current/, 'the card scrolls on every render, not on the crossing')
+    assert.match(landing, /if \(!crossed \|\| !onSave \|\| outcome\) return/, 'a record card, or one with no Save, still scrolls')
+    assert.match(landing, /scrollIntoView\(\{ block: 'center'/, 'the Save row is not brought to the middle of the screen')
+    assert.match(landing, /prefers-reduced-motion: reduce/, 'the scroll animates for someone who asked it not to')
+
+    /*
+     * And a value that bounces off a block just moved to a channel says which
+     * channel the unit reports the block on — asked once per change and only
+     * on a failure, so a clean write costs nothing extra.
+     */
+    const forge = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+    const apply = forge.slice(forge.indexOf('export async function applyChanges'), forge.indexOf('export async function verifyChanges'))
+    assert.match(apply, /const whereIsIt = async \(\) => \{\s*\n\s*if \(sitting !== undefined\) return sitting/, 'the block list is read more than once per change')
+    assert.match(apply, /if \(!res\.unverified && change\.channel !== undefined\) \{/, 'the channel is asked about on writes that were never checked, or blocks that never moved')
+    assert.match(apply, /is on channel \$\{found\}, not \$\{asked\}/, 'a channel move that did not take is not named on the failure line')
+    assert.match(apply, /device ignored both write encodings\$\{where\}/, 'the channel answer does not reach the failure line')
+
     // And what is folded is the bulk, not the decisions.
     const folded = gen.slice(gen.indexOf('<details className="preview-detail"'))
     assert.match(folded, /className="diff"/, 'the diff is not what is folded')

@@ -1067,6 +1067,33 @@ export async function applyChanges(changes, onProgress) {
     }
 
     // 4. parameters, then bypass
+    /*
+     * Which channel the unit says this block is on, asked only when a write
+     * has come back wrong, and once per change.
+     *
+     * Two runs of one tone, a week apart in the log and identical to the
+     * digit: the Drive block moved to channel B, took a new model, and then
+     * every one of its four values read back untouched — Drive 0, Tone 6,
+     * Level 5, Mix 60, on both encodings — while the same block on its next
+     * channel took every value first time. The channel and model moves above
+     * are fire-and-forget: nothing reads back whether the unit actually went
+     * to B. So a value "the device ignored" could just as well be a value
+     * written to, and read from, a channel the block never reached. This
+     * settles which, and puts the answer on the failure line where it is
+     * read — at the price of one block-list read, and only on a failure.
+     */
+    let sitting
+    const whereIsIt = async () => {
+      if (sitting !== undefined) return sitting
+      try {
+        const list = await presetBlocks()
+        const here = (Array.isArray(list) ? list : []).find((b) => b.effectId === change.eid)
+        sitting = here?.channel ? String(here.channel).trim().toUpperCase() : null
+      } catch {
+        sitting = null
+      }
+      return sitting
+    }
     for (const param of change.params) {
       const range = fresh?.get(param.id) ?? param.range
       advance(`${change.name} · ${param.name} → ${param.to}${param.unit}`)
@@ -1076,10 +1103,25 @@ export async function applyChanges(changes, onProgress) {
           name: param.name
         })
         if (!res.ok) {
+          let where = ''
+          if (!res.unverified && change.channel !== undefined) {
+            const asked = String(change.channel).trim().toUpperCase()
+            const found = await whereIsIt()
+            if (found && found !== asked) {
+              where = ` — the unit says ${change.name} is on channel ${found}, not ${asked}, so the channel move did not take`
+            } else if (found) {
+              where = ` — the unit confirms it is on channel ${found}`
+            }
+            logDebug(
+              'check',
+              `${change.name} · ${param.name} did not land on channel ${asked}`,
+              found ? `unit reports channel ${found}` : 'the unit did not say which channel it is on'
+            )
+          }
           failures.push(
             res.unverified
               ? `${change.name} · ${param.name} — sent, but it couldn't be checked from your phone: ${CACHE_IS_LOCAL}, so nothing here can confirm it. Check it at the Mac if it matters.`
-              : `${change.name} · ${param.name} — device ignored both write encodings`
+              : `${change.name} · ${param.name} — device ignored both write encodings${where}`
           )
         }
       } catch (err) {
