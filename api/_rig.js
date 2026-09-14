@@ -63,11 +63,14 @@
  * predictable length, and no budget makes it one.
  *
  * So the answer is streamed and kept as it arrives (see below), and the budget
- * goes back down to something that leaves the design room to work. Ninety
- * seconds of searching now yields ninety seconds of findings rather than
- * nothing at all.
+ * goes back down to something that leaves the design room to work. Thirty
+ * seconds of searching yields thirty seconds of findings rather than nothing
+ * at all — and thirty, not ninety: a run that spent the full ninety on the
+ * lookup and then died was a minute and a half in which the model had not
+ * yet been asked for a note, and for most bands what it already knows is
+ * the bigger part of the answer anyway.
  */
-const RIG_TIMEOUT_MS = 90000
+const RIG_TIMEOUT_MS = 30000
 
 /** What comes back is a briefing for a prompt, not a document. */
 const MAX_CHARS = 8000

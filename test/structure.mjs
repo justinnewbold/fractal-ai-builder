@@ -4853,7 +4853,11 @@ export function run(test) {
      * line, so it read "Thinking… 30s · 37s".
      */
     assert.ok(!/THINKING\}… \$\{Math\.round\(\(e\.thinkingMs/.test(src), 'the heartbeat writes its own count of seconds beside the live clock')
-    assert.match(src, /e\.kind === 'waiting'\)\s*\n\s*setProgress\(\(was\) => \(was && was\.startsWith\(THINKING\) \? was : `\$\{THINKING\}…`\)\)/, 'a heartbeat no longer keeps the Thinking line alive, or overwrites "(second try)"')
+    assert.match(src, /e\.kind === 'waiting'\)\s*\n\s*setProgress\(\(was\) =>\s*\n?\s*was && was\.startsWith\(THINKING\) \? was : `\$\{THINKING\}\$\{secondTry\.current \? ' — second try' : ''\}…`/, 'a heartbeat no longer keeps the Thinking line alive, or forgets it is the second try')
+    /* A retry starts its own clock and says which try it is: two ninety-second
+       waits under one running count read as one that never ended. */
+    const retry = src.slice(src.indexOf("e.kind === 'retrying') {"), src.indexOf("e.kind === 'retrying') {") + 500)
+    assert.match(retry, /secondTry\.current = true\s*\n\s*setGenStarted\(Date\.now\(\)\)/, 'the retry keeps the first attempt\'s minutes on the clock')
     const live = readFileSync(new URL('../src/components/LiveGeneration.jsx', import.meta.url), 'utf8')
     assert.match(live, /clock = seconds >= 60 \? `\$\{Math\.floor\(seconds \/ 60\)\}m \$\{seconds % 60\}s` : `\$\{seconds\}s`/, 'the live clock is gone, so nothing counts at all')
   })
