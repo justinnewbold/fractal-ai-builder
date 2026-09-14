@@ -10674,6 +10674,157 @@ test('the rig lookup is off unless switched on, and the ceilings fit the job', (
   assert.match(readme, /`GENERATOR_EFFORT`/)
 })
 
+console.log('\nthe band book')
+
+const bookSchemaA = [
+  { eid: 106, name: 'Amp 1', slug: 'amp', bypassed: false, channel: 'A',
+    models: [{ value: 5, name: 'Recto2 Red Modern' }, { value: 9, name: 'USA Clean 1' }],
+    params: [{ id: 1, name: 'Input Drive', value: 5, min: 0, max: 10 }, { id: 3, name: 'Bass', value: 5, min: 0, max: 10 }] },
+  { eid: 100, name: 'Drive 1', slug: 'drive', bypassed: true, channel: 'A',
+    models: [{ value: 2, name: 'T808 OD' }],
+    params: [{ id: 7, name: 'Drive', value: 3, min: 0, max: 10 }] },
+  { eid: 133, name: 'Delay 1', slug: 'delay', bypassed: true, channel: 'A',
+    models: [{ value: 1, name: 'Digital Mono' }],
+    params: [{ id: 20, name: 'Time', value: 300, min: 0, max: 2000 }, { id: 21, name: 'Mix', value: 20, min: 0, max: 100 }] }
+]
+// The same families on a different preset: different ids, a second amp, no delay.
+const bookSchemaB = [
+  { eid: 58, name: 'Amp 1', slug: 'amp', bypassed: false, channel: 'A',
+    models: [{ value: 41, name: 'Recto2 Red Modern' }, { value: 3, name: 'USA Clean 1' }],
+    params: [{ id: 11, name: 'Input Drive', value: 2, min: 0, max: 10 }, { id: 12, name: 'Bass', value: 5, min: 0, max: 10 }, { id: 13, name: 'Treble', value: 5, min: 0, max: 10 }] },
+  { eid: 59, name: 'Amp 2', slug: 'amp', bypassed: true, channel: 'A', models: [], params: [] },
+  { eid: 62, name: 'Drive 1', slug: 'drive', bypassed: true, channel: 'A',
+    models: [{ value: 8, name: 'T808 OD' }],
+    params: [{ id: 30, name: 'Drive', value: 1, min: 0, max: 10 }] }
+]
+const bookValidated = {
+  presetName: 'Three Days Grace', summary: 'Recto and a screamer.', notes: '', artist: 'Three Days Grace',
+  changes: [
+    { eid: 106, name: 'Amp 1', slug: 'amp', wasBypassed: false, channel: 'B', type: 5, typeName: 'Recto2 Red Modern',
+      params: [{ id: 1, name: 'Input Drive', from: 5, to: 7.5 }, { id: 3, name: 'Bass', from: 5, to: 6 }] },
+    { eid: 106, name: 'Amp 1', slug: 'amp', wasBypassed: false, channel: 'C', type: 9, typeName: 'USA Clean 1',
+      params: [{ id: 1, name: 'Input Drive', from: 5, to: 2 }] },
+    { eid: 100, name: 'Drive 1', slug: 'drive', wasBypassed: true, bypassed: false, type: 2, typeName: 'T808 OD',
+      params: [{ id: 7, name: 'Drive', from: 3, to: 4 }] },
+    { eid: 133, name: 'Delay 1', slug: 'delay', wasBypassed: true, params: [{ id: 20, name: 'Time', from: 300, to: 420 }] }
+  ],
+  scenes: [
+    { index: 0, name: 'Animal I', why: 'Drop-D Recto', blocks: [
+      { eid: 106, name: 'Amp 1', bypassed: false, channel: 'B' }, { eid: 100, name: 'Drive 1', bypassed: false }, { eid: 133, name: 'Delay 1', bypassed: true } ] },
+    { index: 1, name: 'Never Too Late', blocks: [
+      { eid: 106, name: 'Amp 1', bypassed: false, channel: 'C' }, { eid: 100, name: 'Drive 1', bypassed: true }, { eid: 133, name: 'Delay 1', bypassed: false } ] },
+    { index: 2, name: 'Riot', blocks: [
+      { eid: 106, name: 'Amp 1', bypassed: false, channel: 'B' }, { eid: 100, name: 'Drive 1', bypassed: false }, { eid: 133, name: 'Delay 1', bypassed: true } ] }
+  ]
+}
+
+test('a design is written down by family and control name, not by effect id', async () => {
+  /*
+   * The rig cache spared the second request for a band the search; it still
+   * paid for the design. The book keeps the finished tone in a form with no
+   * preset's ids in it, so it can be rebuilt onto whatever is loaded next.
+   */
+  const { portable, replay, slotsOf } = await import('../src/lib/bandBook.js')
+  assert.deepEqual([...slotsOf(bookSchemaB).values()], [
+    { slug: 'amp', nth: 0 }, { slug: 'amp', nth: 1 }, { slug: 'drive', nth: 0 }
+  ])
+  const note = portable(bookValidated, bookSchemaA)
+  assert.ok(!JSON.stringify(note).includes('106'), 'the note still carries this preset\'s ids')
+  assert.deepEqual(note.blocks[0], {
+    slug: 'amp', nth: 0, bypassed: false, channel: 'B', typeName: 'Recto2 Red Modern',
+    params: [{ name: 'Input Drive', value: 7.5 }, { name: 'Bass', value: 6 }]
+  })
+  assert.equal(note.blocks[2].bypassed, false, 'a drive the design switched on is noted as on')
+  assert.equal(note.blocks[3].bypassed, true, 'a delay the design left off is noted as off')
+  assert.deepEqual(note.scenes[1].engaged, [{ slug: 'amp', nth: 0 }, { slug: 'delay', nth: 0 }])
+  assert.deepEqual(note.scenes[1].channels, [{ slug: 'amp', nth: 0, channel: 'C' }])
+  assert.equal(note.scenes[0].why, 'Drop-D Recto')
+
+  // Back onto the same preset: the spec the designer would have returned.
+  const back = replay(note, bookSchemaA)
+  assert.equal(back.blocks[0].eid, 106)
+  assert.equal(back.blocks[0].type, 5)
+  assert.deepEqual(back.blocks[0].params, [{ id: 1, name: 'Input Drive', value: 7.5 }, { id: 3, name: 'Bass', value: 6 }])
+  assert.deepEqual(back.scenes[1].engaged, [106, 133])
+  assert.deepEqual(back.scenes[1].channels, [{ eid: 106, channel: 'C' }])
+  assert.deepEqual(back.wanted, [])
+
+  // Onto a different preset: new ids, the model found by its name, the
+  // control found by its name, and the family it lacks asked for.
+  const moved = replay(note, bookSchemaB)
+  assert.equal(moved.blocks[0].eid, 58, 'the first amp is not the first amp')
+  assert.equal(moved.blocks[0].type, 41, 'the model was carried by number rather than by name')
+  assert.equal(moved.blocks[0].typeName, 'Recto2 Red Modern')
+  assert.deepEqual(moved.blocks[0].params, [{ id: 11, name: 'Input Drive', value: 7.5 }, { id: 12, name: 'Bass', value: 6 }])
+  assert.equal(moved.blocks[2].eid, 62)
+  assert.equal(moved.blocks.length, 3, 'the delay this preset lacks was written to some other block')
+  assert.deepEqual(moved.wanted, ['delay'])
+  assert.deepEqual(moved.scenes[1].engaged, [58], 'a scene still engages a block the preset does not have')
+  // And it all passes the validator like any design would.
+  const checked = validateSpec(moved, bookSchemaB, 8)
+  assert.equal(checked.changes.length, 3)
+  assert.equal(checked.changes[0].typeName, 'Recto2 Red Modern')
+  assert.deepEqual(checked.wanted, ['delay'])
+  assert.equal(checked.scenes.length, 3)
+
+  // Fewer scenes than the note holds, when fewer were asked for.
+  assert.equal(replay(note, bookSchemaA, { scenes: 2 }).scenes.length, 2)
+  assert.equal(replay(note, bookSchemaA, { scenes: 2 }).scenes[1].name, 'Never Too Late')
+  // Nothing to build from is null, not an empty tone.
+  assert.equal(replay(note, [{ eid: 1, slug: 'reverb', models: [], params: [] }]), null)
+  assert.equal(portable({ changes: [], scenes: [] }, bookSchemaA), null)
+})
+
+test('the book answers for a band it knows, and stands aside when told to', async () => {
+  const { pickDesign, wantsFresh } = await import('../src/lib/bandBook.js')
+  const now = Date.now()
+  const rows = [
+    { artist: 'Three Days Grace', songs: 8, design: { blocks: [1] }, at: now - 1000 },
+    { artist: 'Three Days Grace', songs: 4, design: { blocks: [1] }, at: now - 5000 },
+    { artist: 'Grace', songs: 8, design: { blocks: [1] }, at: now },
+    { artist: 'Metallica', songs: 4, design: { blocks: [1] }, at: now }
+  ]
+  const hit = pickDesign(rows, 'Make me a Three Days Grace preset with 4 scenes', { songs: 4, wantScenes: true })
+  assert.equal(hit.artist, 'Three Days Grace', 'the shorter name won')
+  assert.equal(hit.songs, 4, 'an eight-scene note was cut in half when a four-scene one fit')
+  assert.equal(pickDesign(rows, 'three days grace, all eight', { songs: 8, wantScenes: true }).songs, 8)
+  assert.equal(pickDesign(rows, 'metallica, eight scenes', { songs: 8, wantScenes: true }), null, 'four scenes answered for eight')
+  assert.equal(pickDesign(rows, 'a tight modern metal rhythm', { songs: 4 }), null)
+  // One sound is not a set of scenes cut down to one; the designer does that.
+  assert.equal(pickDesign(rows, 'metallica, just one sound', { songs: 0, wantScenes: false }), null)
+  // Words that mean "not the one you have".
+  assert.equal(pickDesign(rows, 'metallica, fresh take', { songs: 4, wantScenes: true }), null)
+  assert.equal(pickDesign(rows, 'something different for Metallica', { songs: 4, wantScenes: true }), null)
+  assert.ok(wantsFresh('do it from scratch') && wantsFresh('other songs') && !wantsFresh('do metallica again'))
+  // A note from a year ago is not trusted.
+  assert.equal(pickDesign([{ ...rows[3], at: now - 400 * 24 * 3600 * 1000 }], 'metallica', { songs: 4 }), null)
+  assert.equal(pickDesign(null, 'anything', {}), null)
+})
+
+test('the app builds a known band from the book and files every design under its band', () => {
+  const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  assert.match(app, /const noted = pickDesign\(await knownDesigns\(\)\.catch\(\(\) => \[\]\), description/)
+  assert.match(app, /const spec = noted \? replay\(noted\.design, schema, \{ scenes: songs \|\| undefined \}\) : null/)
+  assert.match(app, /const noted = await fromBandBook\(description, schema, opts\)\s*\n\s*const fromBook = noted\?\.spec \|\| null/)
+  assert.match(app, /const spec = fromBook\s*\n\s*\? fromBook\s*\n\s*: await requestSpec\(schema, description, null/, 'a known band is still sent to the model')
+  assert.match(app, /Nothing was sent to the AI and it cost nothing/, 'a book hit is not said out loud')
+  assert.match(app, /if \(!fromBook\) fileDesign\(validated, schema, description\)/, 'a design is not filed')
+  assert.match(app, /fileDesign\(validated, schema, instruction\)/, 'a refined design is not filed')
+  assert.match(app, /if \(!fromBook\) noteSpend\('design', validated\.usage\)/, 'a free run is counted as spend')
+  // The designer says whose tone it is, and the validator keeps that.
+  const api = readSrc(new URL('../api/generate.js', import.meta.url), 'utf8')
+  assert.match(api, /artist: z\s*\n\s*\.string\(\)\s*\n\s*\.nullable\(\)/, 'the spec has no artist field')
+  const validate = readSrc(new URL('../src/lib/validate.js', import.meta.url), 'utf8')
+  assert.match(validate, /artist: typeof spec\.artist === 'string'/)
+  assert.equal(validateSpec({ artist: '  Tool ', blocks: [] }, bookSchemaA).artist, 'Tool')
+  assert.equal(validateSpec({ blocks: [] }, bookSchemaA).artist, null)
+  // And a table for it on the account, with the same rules as the rig cache.
+  const sql = readSrc(new URL('../supabase/migrations/20260915_band_book.sql', import.meta.url), 'utf8')
+  assert.match(sql, /create table if not exists public\.band_book/)
+  assert.match(sql, /design jsonb not null/)
+  assert.match(sql, /enable row level security/)
+})
+
 await settle()
 /*
  * The tally has to say when it is red.

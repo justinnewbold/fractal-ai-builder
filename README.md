@@ -175,6 +175,16 @@ Two ways to supply a model, set in the Vercel project settings:
 Whichever key is set, it is read only inside `api/generate.js` and never reaches
 the browser.
 
+### The band book
+
+Every finished design that names a band is written down against that band —
+by block family and control name, not by effect id, so it fits any preset.
+The next request naming the band is rebuilt from the note in the browser with
+nothing sent to the model. It is skipped for a refine, for more scenes than
+the note holds, for a single sound, and whenever the words ask for something
+fresh. Kept in this browser and, signed in, on the account (`band_book` in
+`supabase/migrations`). See `src/lib/bandBook.js`.
+
 Nothing generated is trusted. At generation time the app reads the live model
 roster and parameter ranges off the attached unit, hands those to the model as
 the only legal vocabulary, then re-checks every value on the way back in

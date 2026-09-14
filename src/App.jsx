@@ -179,7 +179,8 @@ import {
 } from './lib/link'
 import { keepAwake } from './lib/awake'
 import { loadSession, saveSession, interrupted } from './lib/session'
-import { knownRigs, pickRig, rememberRig } from './lib/rigCache'
+import { knownRigs, localRigs, pickRig, rememberRig } from './lib/rigCache'
+import { knownDesigns, pickDesign, replay, rememberDesign } from './lib/bandBook'
 import { loadCloudChat, saveCloudChat, pickChat, chatCloudReady } from './lib/cloudChat'
 import {
   archiveChat,
@@ -2940,6 +2941,40 @@ export default function App() {
     return landed
   }
 
+  /**
+   * File a finished design under its band, for lib/bandBook.js.
+   *
+   * The band is whatever the designer said it was voicing, or failing that a
+   * band the rig cache recognises in the words. A design that names no band
+   * is a sound, not an entry, and is not filed.
+   */
+  const fileDesign = (validated, schema, description) => {
+    const artist = validated?.artist || pickRig(localRigs(), description, 0)?.artist || null
+    if (!artist) return
+    rememberDesign(validated, schema, { artist, device: device?.name || null }).catch(() => {})
+  }
+
+  /**
+   * A band this app has already designed is not designed again.
+   *
+   * The rig cache spared the second request for a band the search; it still
+   * paid for the design — every roster sent again, the model thinking again,
+   * the same scenes coming back a second time. The band book keeps the
+   * finished tone itself, by block family and control name so it fits
+   * whatever is loaded, and the next request naming that band is rebuilt
+   * from it with nothing sent to the model at all. Null when the book has
+   * nothing for these words; lib/bandBook.js says when it stands aside.
+   */
+  const fromBandBook = async (description, schema, opts) => {
+    const songs = songsWanted({ wantScenes: opts.wantScenes, sceneBudget: opts.sceneBudget, sceneCount })
+    const noted = pickDesign(await knownDesigns().catch(() => []), description, {
+      songs,
+      wantScenes: opts.wantScenes
+    })
+    const spec = noted ? replay(noted.design, schema, { scenes: songs || undefined }) : null
+    return spec ? { artist: noted.artist, spec } : null
+  }
+
   const generate = async (description, against = null, opts = {}) => {
     /*
      * A number of scenes in the request itself is the answer to the question
@@ -3024,14 +3059,31 @@ export default function App() {
       }
 
       setProgress(null)
-      const spec = await requestSpec(schema, description, null, {
-        wantScenes: opts.wantScenes,
-        sceneBudget: opts.sceneBudget
-      })
+      // Known already, so not designed again — see fromBandBook above.
+      const noted = await fromBandBook(description, schema, opts)
+      const fromBook = noted?.spec || null
+      const spec = fromBook
+        ? fromBook
+        : await requestSpec(schema, description, null, {
+            wantScenes: opts.wantScenes,
+            sceneBudget: opts.sceneBudget
+          })
 
       const validated = validateSpec(spec, schema, sceneCount, channelNames)
       validated.spec = spec
       validated.description = description
+      if (fromBook) {
+        setTurns((prev) => [
+          ...prev,
+          {
+            role: 'system',
+            text:
+              `Already knew ${noted.artist} — this is the last ${noted.artist} tone this app designed, ` +
+              `rebuilt onto what is loaded. Nothing was sent to the AI and it cost nothing. ` +
+              `Ask for "${noted.artist}, fresh take" to have it designed again from scratch.`
+          }
+        ])
+      }
 
       /*
        * A tone that wanted a block the preset lacks gets the block.
@@ -3087,8 +3139,15 @@ export default function App() {
 
       setSaveName(validated.presetName || preset?.name?.trim() || '')
 
-      noteSpend('design', validated.usage)
-      record('generate', `Designed "${validated.presetName || 'untitled'}" from: ${description}`, [
+      /*
+       * Written down against the band, when there is one, for the next time.
+       * Not when it came from the book — it is already there — and never
+       * awaited: the tone on screen does not depend on the note being filed.
+       */
+      if (!fromBook) fileDesign(validated, schema, description)
+      if (!fromBook) noteSpend('design', validated.usage)
+      const source = fromBook ? ' (from the band book)' : ''
+      record('generate', `Designed "${validated.presetName || 'untitled'}" from: ${description}${source}`, [
         `${countWrites(validated.changes)} changes proposed`,
         ...validated.problems
       ])
@@ -3835,6 +3894,8 @@ export default function App() {
       setSaveName(validated.presetName || preset?.name?.trim() || '')
       revealResult()
 
+      // The adjusted tone is the better note for this band than the first take.
+      fileDesign(validated, schema, instruction)
       noteSpend('refine', validated.usage)
 
       record('refine', `Adjusted: ${instruction}`, [
