@@ -4503,10 +4503,19 @@ export function run(test) {
      */
     const a = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
     const bare = a.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ' ')
-    const effect = bare.slice(bare.indexOf('const seenTurns = useRef(0)'), bare.indexOf('}, [turns, progress])'))
+    const effect = bare.slice(bare.indexOf('const seenTurns = useRef(0)'), bare.indexOf('}, [turns, progress, busy])'))
+    assert.ok(effect.length > 100, 'the scroll effect no longer watches turns, progress and busy')
     assert.match(effect, /last\?\.role === 'assistant' && lastTurn\.current/, 'a reply is not told apart from a question')
     assert.match(effect, /box\.scrollTop = Math\.max\(0, offsetWithin\(lastTurn\.current, box\) - 4\)/, 'a reply is not brought to the top of the box')
-    assert.match(effect, /if \(landed\)/, 'a progress tick under a reply yanks it away')
+    assert.match(effect, /if \(landed\) \{/, 'a progress tick under a reply yanks it away')
+    /*
+     * "Make it scroll down to show the live jam automatically." The working
+     * line under a reply is brought into view by the least that does it —
+     * only when it is out of sight, only while the app is busy — so a short
+     * reply stays in view above it and nothing is yanked mid-read.
+     */
+    assert.match(effect, /if \(busy\) \{\s*const tailAt = offsetWithin\(el, box\)/, 'the working line under a reply is never brought into view')
+    assert.match(effect, /if \(tailAt > seenTo\) box\.scrollTop = tailAt - box\.clientHeight \+ 8/, 'the box moves more than it needs to, or not at all')
     assert.match(effect, /box\.scrollTop = box\.scrollHeight/, 'a question no longer goes to the bottom')
     assert.match(bare, /const box = scrollerOf\(el\)/, 'the scroller is guessed rather than asked for')
     assert.ok(!/scrollIntoView/.test(bare), 'scrollIntoView is back, and it drags the page')

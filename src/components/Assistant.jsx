@@ -288,6 +288,15 @@ export default function Assistant({
    * that lands after a reply leaves the reply where it is — the actions
    * running under an answer must not yank it away mid-read.
    *
+   * With one exception, and by the least amount that does it: the working
+   * line under a reply — Jamming… 12s, the chain arriving — has to be on
+   * screen, or the reply "I'll design the tone now" is the last thing shown
+   * and nothing says a tone is being designed. "Make it scroll down to show
+   * the live jam automatically." So when the app is busy and that line is
+   * below the bottom of the box, the box moves down just far enough to show
+   * it. A short reply stays wholly in view above it; only a reply taller
+   * than the box loses its top, which it would have to anyway.
+   *
    * Only inside the nearest scrollbox, never the page. This used to be
    * scrollIntoView, which scrolls every scrollable ancestor including the
    * document: each tick yanked the whole screen down to this element, against
@@ -305,12 +314,21 @@ export default function Assistant({
     const last = turns[turns.length - 1]
     if (last?.role === 'assistant' && lastTurn.current) {
       // A reply: its first line at the top of the box. Left alone when only
-      // the progress line changed underneath it.
-      if (landed) box.scrollTop = Math.max(0, offsetWithin(lastTurn.current, box) - 4)
+      // the progress line changed underneath it — unless that line is out of
+      // sight, in which case the box moves the least that brings it in.
+      if (landed) {
+        box.scrollTop = Math.max(0, offsetWithin(lastTurn.current, box) - 4)
+        return
+      }
+      if (busy) {
+        const tailAt = offsetWithin(el, box)
+        const seenTo = box.scrollTop + box.clientHeight
+        if (tailAt > seenTo) box.scrollTop = tailAt - box.clientHeight + 8
+      }
       return
     }
     box.scrollTop = box.scrollHeight
-  }, [turns, progress])
+  }, [turns, progress, busy])
 
   /*
    * The box is as tall as what is in it.

@@ -3,6 +3,16 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.207.0
+
+**The chat scrolls to show the live jam.** After "I'll design the tone now"
+the working line under it — Jamming… 12s, the chain arriving — was below
+the bottom of the box, so the reply was the last thing on screen and nothing
+said a tone was being made. Now, while the app is busy, the conversation
+moves down just far enough to show that line. A short reply stays wholly
+in view above it; a reply longer than the box keeps its end, as it would
+have to.
+
 ## 7.206.0
 
 **Rename preset or scenes lives in Setup now.** The pencil beside the preset
