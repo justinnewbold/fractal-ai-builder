@@ -1368,8 +1368,9 @@ export function run(test) {
       ['wrong', ['preset-check', 'feedback', 'what-s-changed-this-session', 'debug-log']],
       /* Token usage first behind this door: it is the panel with a question
          attached — "it's actually spending a lot more than what the app says"
-         — and the other two are things you read once. */
-      ['ai', ['token-usage', 'what-it-has-learned', 'developer']]
+         — then what it learned and what you told it (About you, the two
+         fields the agent knows you by), and the developer switch last. */
+      ['ai', ['token-usage', 'what-it-has-learned', 'about-you', 'developer']]
     ]) {
       assert.deepEqual(behind(door), panels, `the ${door} door holds ${behind(door).join(', ')}`)
     }
@@ -5468,5 +5469,45 @@ export function run(test) {
     const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
     assert.match(css, /\.device-meta-fact \{\s*white-space: nowrap;/, 'a fact can break in the middle')
     assert.match(css, /\.device-meta-fact \+ \.device-meta-fact::before \{\s*content: ' · ';/, 'the facts on a line are not joined by dots')
+  })
+
+  test('the agent knows who it is talking to, on every request and in Setup', () => {
+    /*
+     * Two fields per person — profile and preferences — kept by lib/memory.js,
+     * sent with every chat and tone request, and put in front of the model's
+     * instructions by api/_memory.js. Editable in Setup so it works on day
+     * one; the profile also learns from conversations, every ten things said
+     * and when a chat is put down.
+     */
+    assert.match(src, /const \[memory, setMemory\] = useState\(\(\) => loadMemory\(\)\)/, 'nothing holds who the agent is talking to')
+    assert.match(src, /syncMemory\(\)\.then\(\(m\) => \{\s*if \(!stop\) setMemory\(m\)/, 'the account\'s copy is never brought in')
+    assert.match(src, /\}, \[link\.account\?\.id\]\)/, 'the memory is not re-read when who is signed in changes')
+    assert.equal((src.match(/memory: memoryForRequest\(memory\),/g) || []).length, 2, 'the chat and the designer do not both carry the memory')
+    assert.match(src, /if \(dueForUpdate\(saidCount\(turns\)\)\) learn\(turns\)/, 'the profile does not learn every ten messages')
+    const fresh = src.slice(src.indexOf('const newChat = useCallback'), src.indexOf('\n  }, [', src.indexOf('const newChat = useCallback')))
+    assert.match(fresh, /if \(worthKeeping\(turns\)\) \{\s*learn\(turns\)/, 'a chat put down does not teach the profile')
+    assert.match(src, /<MemorySettings\s*\n\s*memory=\{memory\}/, 'Setup has no screen for the two fields')
+    assert.match(src, /setMemory\(await saveMemory\(next\)\)/, 'the Setup screen saves nowhere')
+
+    for (const route of ['command', 'generate']) {
+      const api = readFileSync(new URL(`../api/${route}.js`, import.meta.url), 'utf8')
+      assert.match(api, /import \{ withMemory \} from '\.\/_memory\.js'/, `${route} does not import the memory block`)
+      assert.ok(!/system: SYSTEM,/.test(api), `${route} still sends its instructions without the person in front`)
+      assert.match(api, /system: withMemory\(SYSTEM, memory\)/, `${route} does not put the person in front of its instructions`)
+    }
+    const shared = readFileSync(new URL('../api/_memory.js', import.meta.url), 'utf8')
+    for (const rule of [
+      'Greet the user by name when they say hello',
+      'Never say "based on your profile"',
+      'Never bring up sensitive or emotional details unless the user raises them first',
+      'flattering the user, hiding disagreement, or skipping honest feedback',
+      'the current message wins'
+    ]) {
+      assert.ok(shared.includes(rule), `the rules no longer say: ${rule}`)
+    }
+    assert.match(shared, /Never record inferences — only what the user actually said\. Return the full updated profile as markdown bullet points, each prefixed with \[stated\]\./, 'the update prompt drifted')
+    const migration = readFileSync(new URL('../supabase/migrations/20260914_user_memory.sql', import.meta.url), 'utf8')
+    assert.match(migration, /create table if not exists public\.user_memory/, 'the account has nowhere to keep the memory')
+    assert.match(migration, /enable row level security/, 'one person could read another\'s memory')
   })
 }

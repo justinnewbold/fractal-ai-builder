@@ -3,6 +3,24 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.204.0
+
+**The agent knows who it is talking to.** Two things are kept per person:
+what it knows about you (name, what you play, who with, what you are working
+on) and how you want it to talk to you (tone, length, format). Both go with
+every chat and tone request, in front of the model's instructions, so it
+greets you by name, uses what it knows only when that changes the answer,
+and never says "based on your profile". Sensitive things stay unsaid unless
+you raise them; a preference never buys flattery or silence where honest
+feedback is due; and what you say now beats what was stored.
+
+Both fields are under Setup → What the AI knows → About you, so it works on
+day one. The first fills itself in from your chats — every ten things said,
+and when a chat is put down — recording only durable facts you stated
+yourself, never guesses, never health or money. Kept on the device, and on
+the account when signed in (a new `user_memory` table, one row per person,
+created empty the first time you appear).
+
 ## 7.203.0
 
 **The waiting line keeps busy.** "Thinking…" for two minutes read as stuck.

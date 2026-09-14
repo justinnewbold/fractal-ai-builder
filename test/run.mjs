@@ -1162,6 +1162,64 @@ test('the holding word changes every ten seconds, and only the holding word', as
   assert.equal(holdingLine('Building your chain — 3 blocks so far', 25), 'Building your chain — 3 blocks so far')
 })
 
+test('the memory block goes first, says the rules, and takes only strings', async () => {
+  const mem = await import('../api/_memory.js')
+  const block = mem.memoryBlock({ profile: '- [stated] My name is Justin', preferences: 'Short answers.' })
+  assert.ok(block.startsWith('<user_profile>\n- [stated] My name is Justin\n</user_profile>\n\n<user_preferences>\nShort answers.\n</user_preferences>'), block.slice(0, 120))
+  assert.match(block, /Greet the user by name/, 'the rules are not in the block')
+  // Empty stays shaped: the rules refer to the tags, so the tags are always there.
+  assert.ok(mem.memoryBlock(null).startsWith('<user_profile>\n\n</user_profile>'))
+  // In front of the instructions, not behind them.
+  const sys = mem.withMemory('WHO YOU ARE', { profile: 'x', preferences: '' })
+  assert.ok(sys.indexOf('<user_profile>') === 0 && sys.endsWith('WHO YOU ARE'))
+  // Client-supplied, so capped and never anything but a string.
+  assert.equal(mem.memoryFrom({ profile: 42, preferences: ['a'] }).profile, '')
+  assert.equal(mem.memoryFrom({ profile: 'a'.repeat(9000) }).profile.length, mem.MEMORY_CAP)
+
+  // The transcript the update reads: only what was said, by either side.
+  const t = mem.transcriptText([
+    { role: 'user', text: 'hi, I am Justin' },
+    { role: 'system', text: 'Chain in: Amp (58)' },
+    { role: 'assistant', text: 'Hey Justin.' }
+  ])
+  assert.equal(t, 'User: hi, I am Justin\nAgent: Hey Justin.')
+  assert.equal(mem.transcriptText([]), '')
+
+  // The answer is kept to [stated] bullets; a chatty answer with none keeps the old profile.
+  assert.equal(
+    mem.cleanProfile('Here is the profile:\n- [stated] Name: Justin\n* [stated] Plays in a band\nHope that helps!', 'old'),
+    '- [stated] Name: Justin\n- [stated] Plays in a band'
+  )
+  assert.equal(mem.cleanProfile('I could not find anything durable.', 'old'), 'old')
+  assert.equal(mem.cleanProfile(null, 'old'), 'old')
+})
+
+test('the memory is kept on the device, counts what was said, and knows when it is due', async () => {
+  const m = await import('../src/lib/memory.js')
+  const store = new Map()
+  const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) }
+  assert.deepEqual(m.loadMemory(storage), { profile: '', preferences: '', updatedAt: 0 })
+  const saved = await m.saveMemory({ profile: ' - [stated] Name: Justin ', preferences: 'Short.' }, storage)
+  assert.equal(saved.profile, '- [stated] Name: Justin')
+  assert.ok(saved.updatedAt > 0)
+  assert.deepEqual(m.loadMemory(storage), saved, 'what was saved is not what is loaded')
+  assert.deepEqual(m.memoryForRequest(saved), { profile: '- [stated] Name: Justin', preferences: 'Short.' })
+  // A broken store is an empty memory, never a thrown render.
+  assert.deepEqual(m.loadMemory({ getItem: () => { throw new Error('private') } }), { profile: '', preferences: '', updatedAt: 0 })
+
+  const turns = [
+    { role: 'user', text: 'a' },
+    { role: 'system', text: 'note' },
+    { role: 'assistant', text: 'b' }
+  ]
+  assert.equal(m.saidCount(turns), 2, 'the app\'s own notes count as things said')
+  assert.equal(m.dueForUpdate(0), false)
+  assert.equal(m.dueForUpdate(9), false)
+  assert.equal(m.dueForUpdate(10), true)
+  assert.equal(m.dueForUpdate(20), true)
+  assert.equal(m.MEMORY_EVERY, 10)
+})
+
 test('two Macs on one account cannot quietly write to two units', async () => {
   /*
    * "If I have one Mac connected to an AM4 and one Mac connected to an FM3 and

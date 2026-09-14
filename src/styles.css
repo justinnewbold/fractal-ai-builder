@@ -2247,6 +2247,27 @@ button.scene.current .scene-num {
   flex: 1 1 260px;
 }
 
+/* ---------- what the agent knows about you ---------- */
+
+.memory-settings {
+  display: grid;
+  gap: var(--s-4);
+}
+
+.memory-field {
+  display: grid;
+  gap: var(--s-2);
+}
+
+.memory-field textarea {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  font-family: var(--body);
+  font-size: var(--f-3);
+  line-height: 1.45;
+}
+
 /* ---------- saved presets ---------- */
 
 .history {
