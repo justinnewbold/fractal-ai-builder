@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { channelLine } from '../lib/scenePlan'
 export function Preview({
   result,
@@ -47,6 +47,37 @@ export function Preview({
   cost = null,
   children
 }) {
+  /*
+   * Once the tone is on the unit, bring the Save button to the player.
+   *
+   * "After writing a scene make it scroll to where it says save to FM3 …
+   * otherwise you can't tell that everything was written to the unit because
+   * it just sits on the chat screen." The write takes half a minute, the chat
+   * is what is on screen while it runs, and the one line that says it finished
+   * — Changes sent, Save to FM3 — is on this card, below the fold of the sheet.
+   * So the moment `sent` turns true the action row scrolls into the middle of
+   * whatever is scrolling it: the sheet on a phone, the page on a Mac.
+   *
+   * On the crossing only, never on a re-render, and never for a card that has
+   * an outcome — that one is a record, and it has no button to show.
+   */
+  const actions = useRef(null)
+  const wasSent = useRef(sent)
+  useEffect(() => {
+    const crossed = sent && !wasSent.current
+    wasSent.current = sent
+    if (!crossed || !onSave || outcome) return undefined
+    const el = actions.current
+    if (!el?.scrollIntoView) return undefined
+    const still =
+      typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+    // A frame later, so the row has been drawn with its new button before it is measured.
+    const id = requestAnimationFrame(() =>
+      el.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' })
+    )
+    return () => cancelAnimationFrame(id)
+  }, [sent, onSave, outcome])
+
   /*
    * The handle on the fold, so it can be shut from the far end of itself.
    *
@@ -202,7 +233,7 @@ export function Preview({
         {outcome ? (
           <p className="preview-outcome">{outcome}</p>
         ) : (
-        <div className="preview-actions">
+        <div className="preview-actions" ref={actions}>
           <button onClick={onDiscard} disabled={busy}>
             Discard
           </button>

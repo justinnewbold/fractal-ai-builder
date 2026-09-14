@@ -3,6 +3,19 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.214.0
+
+**The card scrolls to Save once the write lands.** After a tone is written,
+the sheet used to sit where it was — on the chat — and nothing in view said
+the writing had finished. Now the moment the last change is on the unit the
+tone card's buttons slide into the middle of the screen, where it reads
+"Changes sent" beside "Save to FM3" (or whatever unit is connected). On a
+Mac the page scrolls the same way. Also: when a value bounces off a block
+that was just moved to a channel, the app now asks the unit which channel
+that block is really on and says so in the failure line — "the unit says
+Drive 1 is on channel A, not B" — so a channel move that did not take can
+no longer read like four settings the unit refused.
+
 ## 7.213.0
 
 **The debug log goes out as a file.** Setup › Debug log has a new first
