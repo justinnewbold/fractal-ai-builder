@@ -249,9 +249,14 @@ export function run(test) {
      * the whole preset has been watched being built.
      */
     const gen = read('api/generate.js').replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ' ')
-    const cap = Number(gen.match(/maxOutputTokens:\s*(\d+)/)?.[1])
-    assert.ok(Number.isFinite(cap), 'no maxOutputTokens — the request runs on the provider default')
-    assert.ok(cap >= 8000, `maxOutputTokens is ${cap}, low enough to truncate a full chain`)
+    // Two ceilings: a refine returns a spec it was handed with a few values
+    // moved, a design can fill the unit. The design one is the one that
+    // has to clear a full chain.
+    const m = gen.match(/maxOutputTokens:\s*mode === 'refine' \? (\d+) : (\d+)/)
+    assert.ok(m, 'no maxOutputTokens — the request runs on the provider default')
+    const [refine, design] = [Number(m[1]), Number(m[2])]
+    assert.ok(design >= 8000, `maxOutputTokens for a design is ${design}, low enough to truncate a full chain`)
+    assert.ok(refine >= 4096 && refine < design, `a refine's ceiling is ${refine}`)
   })
   test('the Mac app spawns Node and keeps one menu-bar icon', () => {
     /*

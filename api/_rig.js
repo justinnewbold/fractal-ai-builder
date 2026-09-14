@@ -218,7 +218,7 @@ export async function researchRig({
        * than doubling a generation that already takes a minute.
        */
       providerOptions: { anthropic: { effort: 'low' } },
-      maxOutputTokens: 4000,
+      maxOutputTokens: 2500,
       tools: { web_search: webSearch },
       abortSignal: control.signal,
       messages: [{ role: 'user', content: asked }]
