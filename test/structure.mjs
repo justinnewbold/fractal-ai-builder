@@ -3192,6 +3192,21 @@ export function run(test) {
     assert.match(landing, /prefers-reduced-motion: reduce/, 'the scroll animates for someone who asked it not to')
 
     /*
+     * "Make an animation for 'writing' so user knows it working." While busy
+     * the Send button wears `writing`, carries how far along it is as --done,
+     * and says the count; the styles fill it and sweep a light across it,
+     * with the sweep off under reduced motion.
+     */
+    assert.match(gen, /className=\{busy \? 'primary writing' : 'primary'\}/, 'the button does not change while writing')
+    assert.match(gen, /'--done': writingStep\(progress\)\.done \?\? 0/, 'the button does not know how far along the write is')
+    assert.match(gen, /<span>\{writingStep\(progress\)\.label\}<\/span>/, 'the button does not count the writes')
+    assert.match(src, /progress=\{progress\}\s*\n\s*sent=\{sent\}/, 'the live card is not told the progress line')
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    assert.match(css, /\.preview-actions button\.primary\.writing::before \{[^}]*width: calc\(var\(--done, 0\) \* 100%\)/, 'nothing fills as the writes land')
+    assert.match(css, /animation: writing-sweep/, 'nothing moves between writes')
+    assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*\n\s*\.preview-actions button\.primary\.writing::after \{\s*\n\s*animation: none/, 'the sweep runs for someone who asked for less motion')
+
+    /*
      * And a value that bounces off a block just moved to a channel says which
      * channel the unit reports the block on — asked once per change and only
      * on a failure, so a clean write costs nothing extra.

@@ -3,6 +3,16 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.215.0
+
+**The Writing button moves.** While a tone is being written the button
+used to dim and say Writing… for half a minute, which on a phone reads as
+a hang. Now it fills from left to right as the writes land, a light sweeps
+across it so it is plainly alive between writes, and the words count —
+"Writing 12 of 63…", then "Checking 3 of 8…", then "Scenes 3 of 8…". The
+sweep is off for anyone who has asked their phone for less motion; the fill
+and the count stay.
+
 ## 7.214.0
 
 **The card scrolls to Save once the write lands.** After a tone is written,

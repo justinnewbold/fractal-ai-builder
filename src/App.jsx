@@ -5027,6 +5027,9 @@ export default function App() {
             }
           }}
           busy={busy}
+          /* The same line Thinking shows, so the Writing button can count the
+             writes down and move while they land. */
+          progress={progress}
           sent={sent}
           onApply={apply}
           /* Discard clears the panel; it has never undone anything on the unit.
