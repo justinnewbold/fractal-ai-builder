@@ -1217,16 +1217,43 @@ export function run(test) {
        leave a row behind. */
     assert.match(body, /if \(worthKeeping\(turns\)\)/, 'an empty chat is shelved as a conversation')
 
-    /* The button itself lives above the transcript, not below it: the log
-       scrolls and its bottom moves under the thumb on every reply. */
+    /*
+     * "Let's add the new chat to the chat bubble as a plus sign. For now have
+     * it click a + and then select new chat just in case we wanna add other
+     * things that a user can add with the + later."
+     *
+     * So the way out is behind a + on the composer row, and the + opens a
+     * MENU that offers New chat — not a + that is New chat. The row it used
+     * to have to itself above the transcript is gone.
+     */
     const assistant = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
-    assert.match(assistant, /className="assistant-top"/, 'nothing offers a new chat')
+    assert.doesNotMatch(assistant, /assistant-top/, 'New chat still has a row of its own over the transcript')
+    assert.match(assistant, /className="add-btn"/, 'there is no + on the chat box')
     assert.ok(
-      assistant.indexOf('assistant-top') < assistant.indexOf('className="assistant-log"'),
-      'New chat sits inside the transcript and scrolls away with it'
+      assistant.indexOf('className="add-btn"') > assistant.indexOf('className="refine-row assistant-row"'),
+      'the + is not on the composer row'
     )
-    assert.match(assistant, /onNew && turns\.length/, 'New chat is offered over an empty conversation')
+    assert.ok(
+      assistant.indexOf('className="add-btn"') < assistant.indexOf('className="refine-input"'),
+      'the + is not at the start of the box'
+    )
+    assert.match(assistant, /className="add-btn"[\s\S]{0,300}?aria-haspopup="menu"/, 'the + is a button, not a door to a menu')
+    const menu = assistant.slice(assistant.indexOf('className="add-menu"'), assistant.indexOf('className="refine-input"'))
+    assert.match(menu, /role="menu"/, 'the + opens something that is not a menu')
+    assert.match(menu, /New chat/, 'the menu does not offer a new chat')
+    assert.match(menu, /onNew\(\)/, 'New chat in the menu does not put the conversation down')
+    // Quiet over an empty conversation, not gone: a fresh chat of a fresh chat is nothing.
+    assert.match(menu, /disabled=\{busy \|\| !turns\.length\}/, 'New chat is live over an empty conversation')
+    // The + itself is always there while a conversation can be put down at all.
+    assert.doesNotMatch(assistant, /onNew && turns\.length/, 'the + vanishes over an empty conversation')
+    // A tap outside or Escape closes it, the way every popover here closes.
+    assert.match(assistant, /useDismiss\(addWrap, \(\) => setAdding\(false\), \{ open: adding, ignore: '\.add-btn' \}\)/, 'the menu has no way to close but its own items')
     assert.match(src, /onNew=\{newChat\}/, 'the conversation is not given a way to be put down')
+    // And the menu opens up, over the box, not down into the keyboard.
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    const menuCss = css.slice(css.indexOf('.add-menu {'), css.indexOf('}', css.indexOf('.add-menu {')))
+    assert.match(menuCss, /bottom: calc\(100% \+ 8px\)/, 'the menu opens downward')
+    assert.doesNotMatch(css, /\.assistant-top/, 'the styles still dress a row that is gone')
   })
 
   test('history is one list of what you made, not one list per store', () => {

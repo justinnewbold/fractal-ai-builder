@@ -3,6 +3,18 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.212.0
+
+**New chat moved behind a + on the chat box.** The New chat chip that sat in
+a row of its own above the conversation is gone. In its place there is a
+round + at the left of the box you type in, level with the send arrow. Tap it
+and a small menu opens above it with New chat in it; pick that and the
+conversation goes on the shelf as before, with History still the way back to
+it. It is a menu rather than a button on purpose — the + is where the next
+thing you can add to a chat will go. Over an empty conversation the item is
+greyed out rather than hidden. A tap anywhere else, or Escape, closes the
+menu.
+
 ## 7.211.0
 
 **A band you have asked for before is built without the AI.** The app now
