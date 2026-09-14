@@ -2529,6 +2529,11 @@ export default function App() {
     const control = new AbortController()
     generationAbort.current = control
     setGenStarted(Date.now())
+    /* Whether this run is on its second attempt. The heartbeat line reads
+       it, so a retry keeps saying so after the rig lookup has had its turn
+       on the line — "Thinking… · 3m 24s" with no word of the first try
+       having died is how a wait reads as one that never ended. */
+    const secondTry = { current: false }
     /* Read through the ref, not the closure — see turnsNow. */
     setGenAt(turnsNow.current)
     try {
@@ -2641,14 +2646,26 @@ export default function App() {
              * line it keeps alive already says everything it would add.
              */
             else if (e.kind === 'waiting')
-              setProgress((was) => (was && was.startsWith(THINKING) ? was : `${THINKING}…`))
+              setProgress((was) =>
+                was && was.startsWith(THINKING) ? was : `${THINKING}${secondTry.current ? ' — second try' : ''}…`
+              )
             /* The partial itself already wrote the line — onPartial runs first
                and says what the model is deciding, which beats a count of how
                many things it has decided. */
             else if (e.kind === 'partial') {
               setProgress((was) => was || 'Building your chain…')
             } else if (e.kind === 'fallback') setProgress('Trying another way…')
-            else if (e.kind === 'retrying') setProgress('No answer yet — asking again…')
+            else if (e.kind === 'retrying') {
+              /*
+               * A second attempt starts its own clock. The first ran to the
+               * stall limit and was given up on; carrying its minutes into
+               * the retry's count made "over 3 minutes" out of two waits
+               * nobody could tell apart. The line says which try this is.
+               */
+              secondTry.current = true
+              setGenStarted(Date.now())
+              setProgress('No answer yet — asking again…')
+            }
             /*
              * The rig lookup, which happens before the model is asked anything
              * and used to happen before the stream opened at all — a minute of

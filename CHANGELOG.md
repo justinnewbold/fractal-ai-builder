@@ -3,6 +3,18 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.208.0
+
+**A tone design spends less time looking the band up, and a retry says so.**
+The rig lookup — a web search for the band and the songs before the design
+starts — was allowed ninety seconds, and took all of them on a run that then
+went on to fail: a minute and a half before the model was asked for a note.
+It gets thirty now; past that the tone is designed from what the model
+already knows, which for most bands is plenty, and the chat still says when
+that happened. And when the first attempt dies and a second starts, the
+line says "second try" and counts from the start of that try — "Thinking…
+3m 24s" was two waits nobody could tell apart.
+
 ## 7.207.0
 
 **The chat scrolls to show the live jam.** After "I'll design the tone now"
