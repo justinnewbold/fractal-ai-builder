@@ -348,7 +348,7 @@ export function run(test) {
     for (const [title, names] of [
       ['Presets', ['PresetList', 'LocalLibrary', 'Backup', 'Versions', 'DeviceBackup']],
       ['Scenes', ['Scenes', 'SceneMatrix']],
-      ['Setup', ['DeviceDetail', 'PhoneRemote', 'Ports', 'ChangeLog', 'DebugLog', 'Diagnostics', 'LinkDetails']]
+      ['Setup', ['DeviceDetail', 'PhoneRemote', 'Ports', 'ChangeLog', 'DebugLog', 'Diagnostics', 'LinkDetails', 'BandBook']]
     ]) {
       for (const name of names) {
         assert.ok(components(sheet(title)).includes(name), `${name} should be in the ${title} sheet`)
@@ -1274,6 +1274,30 @@ export function run(test) {
     assert.doesNotMatch(css, /\.assistant-top/, 'the styles still dress a row that is gone')
   })
 
+  test('the band book can be read and pruned from Setup', () => {
+    /*
+     * "How do I view the band book of saved artist and songs?" — there was no
+     * way. A thing that decides whether a request costs money needs a page
+     * where it can be read and pruned, so Setup lists it: one row per note
+     * with the band, its scenes (which is where the songs live), the unit and
+     * the date, Forget on each row, Forget all under the list.
+     */
+    const panel = readFileSync(new URL('../src/components/BandBook.jsx', import.meta.url), 'utf8')
+    assert.match(panel, /knownDesigns\(\)/, 'the panel does not read the book')
+    assert.match(panel, /forgetDesign\(row\.artist, row\.songs\)/, 'a band cannot be forgotten on its own')
+    assert.match(panel, /forgetDesigns\(\)/, 'the book cannot be emptied')
+    assert.match(panel, /\.map\(\(s\) => s\.name\)/, 'the scene names — the songs — are not shown')
+    assert.match(panel, /row\.device/, 'the unit a note was built on is not shown')
+    assert.match(panel, /toLocaleDateString\(\)/, 'the date is not shown')
+    assert.match(src, /<Section key="band-book" title="Band book"/, 'Setup has no Band book section')
+    // Forgetting one band is keyed the way filing is: band plus scene count.
+    const book = readFileSync(new URL('../src/lib/bandBook.js', import.meta.url), 'utf8')
+    const one = book.slice(book.indexOf('export async function forgetDesign('), book.indexOf('export async function forgetDesigns('))
+    assert.match(one, /const key = keyOf\(artist, songs\)/, 'forgetting one band is not keyed like filing one')
+    assert.match(one, /filter\(\(r\) => keyOf\(r\.artist, r\.songs\) !== key\)/, 'forgetting one band does not leave the others')
+    assert.match(one, /\.eq\('id', `\$\{userId\}:\$\{key\}`\)/, 'the account copy of that one band is not removed')
+  })
+
   test('history is one list of what you made, not one list per store', () => {
     /*
      * "Combine the previously generated presets into one menu, don't separate
@@ -1414,8 +1438,9 @@ export function run(test) {
       /* Token usage first behind this door: it is the panel with a question
          attached — "it's actually spending a lot more than what the app says"
          — then what it learned and what you told it (About you, the two
-         fields the agent knows you by), and the developer switch last. */
-      ['ai', ['token-usage', 'what-it-has-learned', 'about-you', 'developer']]
+         fields the agent knows you by), the band book (what it has designed
+         and will rebuild for free), and the developer switch last. */
+      ['ai', ['token-usage', 'what-it-has-learned', 'about-you', 'band-book', 'developer']]
     ]) {
       assert.deepEqual(behind(door), panels, `the ${door} door holds ${behind(door).join(', ')}`)
     }

@@ -356,6 +356,27 @@ export async function rememberDesign(validated, schema, { artist, device } = {})
   return row
 }
 
+/**
+ * Throw one band's note away, here and on the account.
+ *
+ * Keyed the way it was filed — band plus scene count — so forgetting the
+ * eight-scene Metallica leaves the four-scene one alone. The next request
+ * naming that band is designed fresh, which is the whole point of pressing it.
+ */
+export async function forgetDesign(artist, songs) {
+  const key = keyOf(artist, songs)
+  writeLocal(readLocal().filter((r) => keyOf(r.artist, r.songs) !== key))
+  const client = supabaseClient()
+  if (!client) return
+  try {
+    const { data } = await client.auth.getUser()
+    const userId = data?.user?.id
+    if (userId) await client.from(TABLE).delete().eq('id', `${userId}:${key}`)
+  } catch {
+    // The browser's copy is gone, which is the half that gets read first.
+  }
+}
+
 /** Throw the lot away. */
 export async function forgetDesigns() {
   writeLocal([])

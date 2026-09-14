@@ -5576,6 +5576,32 @@ button.send-btn.stopping {
   margin-top: 0;
 }
 
+/* ---------- the band book, in Setup ---------- */
+
+.band-book-row .log-line {
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.band-book-name {
+  font-weight: 600;
+  color: var(--silk);
+}
+
+.band-book-row .log-line .chip {
+  margin-left: auto;
+}
+
+.band-book-scenes,
+.band-book-why {
+  margin: 4px 0 0;
+  line-height: 1.45;
+}
+
+.band-book-why {
+  color: var(--silk-faint);
+}
+
 /*
  * The + at the start of the box, and the menu that opens over it.
  *
