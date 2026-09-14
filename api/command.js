@@ -25,6 +25,7 @@ import { generateObject } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 import { cors } from './_cors.js'
+import { withMemory } from './_memory.js'
 
 /*
  * Which model talks.
@@ -501,6 +502,8 @@ export default async function handler(req, res) {
     presetNumber,
     slots,
     history,
+    // Who is asking — see api/_memory.js. Goes in front of the instructions.
+    memory,
     design,
     taste,
     corrections,
@@ -616,7 +619,7 @@ export default async function handler(req, res) {
       ...attempt,
       schema: Plan,
       schemaName: 'command_plan',
-      system: SYSTEM,
+      system: withMemory(SYSTEM, memory),
       messages: [
         {
           role: 'user',

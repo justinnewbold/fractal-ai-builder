@@ -16,6 +16,7 @@ import { generateObject, streamObject, streamText } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 import { cors } from './_cors.js'
+import { withMemory } from './_memory.js'
 import { sceneInstruction, songsWanted } from './_scenes.js'
 import { researchRig, rigInstruction, rigOutcome } from './_rig.js'
 
@@ -389,7 +390,9 @@ export default async function handler(req, res) {
      * every generation expensive. See lib/rigCache.js.
      */
     rig: knownRig,
-    trace
+    trace,
+    // Who is asking — see api/_memory.js. Goes in front of the instructions.
+    memory
   } =
     req.body || {}
 
@@ -635,7 +638,7 @@ export default async function handler(req, res) {
     trace
     ? {
         model: MODEL_NAME,
-        system: SYSTEM,
+        system: withMemory(SYSTEM, memory),
         task: task + asked + rigInstruction(rig),
         // What the search came back with, so a tone that picked the wrong amp
         // can be read back against what it was told.
@@ -687,7 +690,7 @@ export default async function handler(req, res) {
     // four (or twelve) of them.
     schema: buildPresetSpec(blocks.map((b) => b.eid).filter((e) => Number.isInteger(e))),
     schemaName: 'preset_spec',
-    system: SYSTEM,
+    system: withMemory(SYSTEM, memory),
     messages: [
       {
         role: 'user',

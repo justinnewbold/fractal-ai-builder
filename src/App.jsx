@@ -59,6 +59,8 @@ import {
 import ParamSearch from './components/ParamSearch'
 import Assistant from './components/Assistant'
 import UpdateNotice from './components/UpdateNotice'
+import MemorySettings from './components/MemorySettings'
+import { loadMemory, syncMemory, saveMemory, memoryForRequest, refreshProfile, saidCount, dueForUpdate } from './lib/memory'
 import Updates, { UpdateReadyNotice } from './components/Updates'
 import { validatePlan, replyFor, runPlan, resolvePlaceable, landedOf, whereOf, scopedActions } from './lib/actions'
 import { listPresets, newestFirst } from './lib/history'
@@ -992,6 +994,34 @@ export default function App() {
   /* A request in words just wrote to the unit and nothing has kept it. Shown
      beside Save until a save lands or the preset is clean again. */
   const [askedUnsaved, setAskedUnsaved] = useState(false)
+  /*
+   * Who the agent is talking to — see lib/memory.js. Read from this device
+   * for the first paint, then brought together with the account's copy when
+   * there is one, and again whenever who is signed in changes.
+   */
+  const [memory, setMemory] = useState(() => loadMemory())
+  useEffect(() => {
+    let stop = false
+    syncMemory().then((m) => {
+      if (!stop) setMemory(m)
+    })
+    return () => {
+      stop = true
+    }
+  }, [link.account?.id])
+  /* The count the profile was last updated at, so ten more messages mean one
+     more update and not one per render. */
+  const memoryUpdatedAt = useRef(0)
+  const learn = useCallback(
+    async (fromTurns) => {
+      const said = saidCount(fromTurns)
+      if (!said || said === memoryUpdatedAt.current) return
+      memoryUpdatedAt.current = said
+      const next = await refreshProfile(memory, fromTurns, { host: getHost() })
+      setMemory(next)
+    },
+    [memory]
+  )
   /* Whether the line explaining the demo has been put away. */
   const [demoNoteSeen, setDemoNoteSeen] = useState(() => demoNoteWasSeen())
   const dismissDemoNote = () => {
@@ -1752,8 +1782,20 @@ export default function App() {
    * still remembered the last tone would not be a fresh chat — it would be the
    * same conversation with its transcript hidden.
    */
+  /*
+   * Every ten things said, the profile learns from the conversation so far —
+   * and again when the chat is put down (newChat, below), which is the other
+   * moment a conversation ends. Neither waits on the answer: the next request
+   * carries whatever the profile is by then.
+   */
+  useEffect(() => {
+    if (dueForUpdate(saidCount(turns))) learn(turns)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [turns.length])
+
   const newChat = useCallback(async () => {
     if (worthKeeping(turns)) {
+      learn(turns)
       await archiveChat(turns, chatId)
       setChatLogKey((k) => k + 1)
     }
@@ -1770,7 +1812,8 @@ export default function App() {
     setLastDesign(null)
     setLastPrompt('')
     pending.current = null
-  }, [turns, chatId])
+    memoryUpdatedAt.current = 0
+  }, [turns, chatId, learn])
 
   /*
    * Pick an old conversation back up.
@@ -2492,6 +2535,8 @@ export default function App() {
       return await streamSpec(
         {
           description,
+          // Who is asking. Goes in front of the instructions — api/_memory.js.
+          memory: memoryForRequest(memory),
           device,
           blocks: schema,
           sceneNames,
@@ -3973,6 +4018,7 @@ export default function App() {
       const body = await askPlan(
         {
           instruction,
+          memory: memoryForRequest(memory), // who is asking — api/_memory.js
           device,
           grid: { ...(device?.capabilities?.grid || {}), palette },
           placeableProblem,
@@ -6543,6 +6589,30 @@ export default function App() {
                 </button>
               ) : null}
             </div>
+          </Section>
+
+          {/*
+            The person, in their own words.
+
+            Two boxes, editable, so the agent works on day one: what it knows
+            about you, and how you want it to talk to you. The first fills
+            itself in from conversations as well — see lib/memory.js — and is
+            shown here rather than kept somewhere you cannot see, for the same
+            reason the taste summary above is.
+          */}
+          <Section
+            key="about-you"
+            title="About you"
+            note={memory?.profile || memory?.preferences ? 'Told to the agent with every request' : 'Nothing yet'}
+          >
+            <MemorySettings
+              memory={memory}
+              busy={busy}
+              onSave={async (next) => {
+                setMemory(await saveMemory(next))
+                record('memory', 'Updated what the agent knows about you')
+              }}
+            />
           </Section>
 
           <Section key="developer" title="Developer" note="See what the AI was given">
