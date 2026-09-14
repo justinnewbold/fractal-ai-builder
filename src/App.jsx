@@ -5,6 +5,7 @@ import { ChangeLog } from './components/ChangeLog'
 import Diagnostics from './components/Diagnostics'
 import Volume from './components/Volume'
 import DebugLog from './components/DebugLog'
+import BandBook from './components/BandBook'
 import PresetReport from './components/PresetReport'
 import { installCrashCapture, logDebug } from './lib/debugLog'
 import Cost from './components/Cost'
@@ -6696,6 +6697,16 @@ export default function App() {
                 record('memory', 'Updated what the agent knows about you')
               }}
             />
+          </Section>
+
+          <Section key="band-book" title="Band book" note="Bands designed once, rebuilt for free">
+            {/*
+              The book was invisible — it filed every band-named design and
+              answered for it on the next request, and the only trace was a
+              parenthesis in the chat. A thing that decides whether a request
+              costs money needs a page where it can be read and pruned.
+            */}
+            <BandBook />
           </Section>
 
           <Section key="developer" title="Developer" note="See what the AI was given">

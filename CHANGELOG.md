@@ -3,6 +3,15 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.216.0
+
+**The band book has a page.** Setup › Band book lists every band the app
+has designed and written down: the band, how many scenes the note holds and
+their names (which is where the songs are), the unit it was built on, and
+when. Forget on a row throws that band's note away so the next request for
+it is designed fresh; Forget all empties the book. Until now the book worked
+silently and the only sign of it was "(from the band book)" in the chat.
+
 ## 7.215.0
 
 **The Writing button moves.** While a tone is being written the button
