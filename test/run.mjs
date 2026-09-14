@@ -6886,6 +6886,8 @@ function scheduledFetch(scripts) {
             const step = script.steps[i++]
             setTimeout(() => {
               signal.removeEventListener('abort', onAbort)
+              // A dropped line: the browser's own words for it.
+              if (step.drop) return reject(new Error('Load failed'))
               resolve({ value: new TextEncoder().encode(step.chunk), done: false })
             }, Math.max(0, step.at - (Date.now() - t0)))
           } else if (script.end !== false) {
@@ -7119,6 +7121,35 @@ test('a hello with no answer behind it says so in those words', async () => {
     (err) => err.generationFailure === 'capped' && /never started answering/.test(err.message)
   )
   assert.equal(f.calls(), 1)
+})
+
+test('a line that drops before anything arrived is asked again, once', async () => {
+  /*
+   * "Load failed" at 98 seconds, and again at 265: an iPhone's Safari giving
+   * up a long connection with the model still working at the far end and not
+   * one partial received. Nothing was written, so the second ask is free —
+   * and the rig lookup it repeats is cached from the first.
+   */
+  const f = scheduledFetch([
+    { steps: [{ at: 5, chunk: OPEN }, { at: 15, chunk: WAITING(10) }, { at: 25, drop: true }], end: false },
+    { steps: [{ at: 5, chunk: OPEN }, { at: 15, chunk: DONE }] }
+  ])
+  globalThis.fetch = f.fetch
+  const events = []
+  const out = await streamSpec({}, { timing, onEvent: (e) => events.push(e.kind) })
+  assert.deepEqual(out.blocks, [], 'the second attempt\'s answer did not come back')
+  assert.equal(f.calls(), 2, 'a dropped line was not asked again')
+  assert.ok(events.includes('retrying'), 'the retry was not said')
+
+  // But not after partials: the player has something to look at, and a
+  // second run would replace it unasked.
+  const g = scheduledFetch([
+    { steps: [{ at: 5, chunk: OPEN }, { at: 15, chunk: PARTIAL }, { at: 25, drop: true }], end: false },
+    { steps: [{ at: 5, chunk: OPEN }, { at: 15, chunk: DONE }] }
+  ])
+  globalThis.fetch = g.fetch
+  await assert.rejects(streamSpec({}, { timing }), (err) => err.generationFailure === 'network' && err.partials === 1)
+  assert.equal(g.calls(), 1, 'a drop after partials was retried, replacing what the player could see')
 })
 
 test('quiet after the hello is the AI, and it says so without naming machines', async () => {

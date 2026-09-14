@@ -166,10 +166,19 @@ export async function streamSpec(body, opts = {}) {
        * silence is what turned one long wait into a four-minute one. That
        * case is reported, and the Try again button is there for it.
        */
+      /*
+       * A line that dropped is asked again too, once, when nothing had come
+       * back yet. On a phone this is the ordinary way a long design ends:
+       * Safari gives up the connection somewhere past a minute and a half —
+       * "Load failed" — with the model still working at the far end and not
+       * one partial received. Nothing was written, so the second ask is free,
+       * and the rig lookup it repeats is cached from the first. A drop after
+       * partials arrived is not retried: the player has something to look at
+       * and a second run would replace it unasked.
+       */
+      const dropped = err?.generationFailure === 'network' && !err.partials
       const canRetry =
-        err?.generationFailure === 'stalled' &&
-        !err.partials &&
-        !err.alive &&
+        (dropped || (err?.generationFailure === 'stalled' && !err.partials && !err.alive)) &&
         attempt === 0 &&
         !opts.signal?.aborted
       if (!canRetry) throw err
