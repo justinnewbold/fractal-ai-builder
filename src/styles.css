@@ -5199,20 +5199,6 @@ ol.action-list li.destructive::marker {
 }
 
 /*
- * The row above the transcript, which holds the way out of it.
- *
- * Right-aligned and small: New chat is the least-used control on this panel
- * and it sits over the most-read one, so it takes a corner rather than a line.
- * Outside `.assistant-log` on purpose — inside, it would scroll away with the
- * first reply and be unreachable for the rest of the conversation.
- */
-.assistant-top {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: var(--s-2);
-}
-
-/*
  * The transcript's own scroll, and how tall it is allowed to be.
  *
  * 340px was a letterbox: a conversation happening in a small window with the
@@ -5529,6 +5515,82 @@ button.send-btn.stopping {
 
 .assistant-row {
   margin-top: 0;
+}
+
+/*
+ * The + at the start of the box, and the menu that opens over it.
+ *
+ * The same circle as the arrow at the other end, so the row reads as one
+ * shape — a button, a box, a button — but dressed the way the arrow is when
+ * there is nothing to send: quiet. The arrow is the action on this row; the +
+ * is a door, and a door should not shout.
+ */
+.add-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+button.add-btn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  font-size: var(--f-4);
+  line-height: 1;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  color: var(--silk-dim);
+}
+
+button.add-btn[aria-expanded='true'] {
+  color: var(--silk);
+  border-color: var(--silk-faint);
+}
+
+/*
+ * Upward, not down: the box is the bottom of the panel — and in the sheet on
+ * a phone, the bottom of the screen with the keyboard under it — so a menu
+ * that dropped below the + would open into nothing.
+ */
+.add-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  min-width: 160px;
+  padding: var(--s-1);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  box-shadow: var(--e-2);
+}
+
+/* One item per line, thumb-high, in the body face: these are things you do,
+   not tags. */
+.add-menu .add-item {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: var(--s-2) var(--s-3);
+  text-align: left;
+  font-size: var(--f-2);
+  color: var(--silk);
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-1);
+}
+
+.add-menu .add-item:hover:not(:disabled),
+.add-menu .add-item:focus-visible {
+  background: var(--panel-hi);
+}
+
+.add-menu .add-item:disabled {
+  color: var(--silk-faint);
+  opacity: 1;
 }
 
 @media (max-width: 620px) {

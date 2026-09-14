@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAsks } from '../lib/asks'
+import { useDismiss } from '../lib/dismiss'
 
 /**
  * Things worth saying, typed out one at a time in the empty box.
@@ -223,8 +224,22 @@ export default function Assistant({
    */
   const [queue, setQueue] = useState([])
   const [focused, setFocused] = useState(false)
+  /*
+   * Whether the + at the start of the box has its menu open.
+   *
+   * The menu holds the things a person can ADD to a conversation. Today that is
+   * one thing — a fresh chat — and it is still a menu rather than a button,
+   * because the + is the place the next one will go and a button that changes
+   * what it does when a second item arrives is a button somebody has to
+   * relearn.
+   */
+  const [adding, setAdding] = useState(false)
   const tail = useRef(null)
   const box = useRef(null)
+  const addWrap = useRef(null)
+
+  // A tap outside the menu or Escape closes it, and focus returns to the +.
+  useDismiss(addWrap, () => setAdding(false), { open: adding, ignore: '.add-btn' })
 
   // Only animate in an idle, empty box.
   /*
@@ -551,25 +566,6 @@ export default function Assistant({
 
   return (
     <section className="assistant">
-      {/*
-        The way out of a conversation that has run its course.
-
-        Above the transcript rather than below it: the log scrolls and its
-        bottom is where the live turn and the box are, so a control down there
-        moves under the thumb every time the model says anything. The top of
-        the log does not move.
-
-        Nothing is thrown away by pressing it — the conversation goes on the
-        shelf and History opens it again.
-      */}
-      {onNew && turns.length ? (
-        <div className="assistant-top">
-          <button className="chip" onClick={onNew} disabled={busy}>
-            New chat
-          </button>
-        </div>
-      ) : null}
-
       <div className="assistant-log" role="log" aria-live="polite">
         {turns.length === 0 ? (
           <p className="hint assistant-empty">
@@ -605,6 +601,54 @@ export default function Assistant({
       </div>
 
       <div className="refine-row assistant-row">
+        {/*
+          The + before the box, and the menu it opens.
+
+          "Let's add the new chat to the chat bubble as a plus sign." New chat
+          was a chip in a row of its own above the transcript — the one control
+          on the panel that had a whole line to itself, sitting over the most-
+          read thing on it. Every chat puts the things you can add to a
+          conversation behind a + beside the box, so that is where it went.
+
+          The + opens a menu and the menu offers New chat, rather than the +
+          being New chat itself: the menu is the place the next thing goes
+          (a photo of a rig, a preset to talk about) without moving this one.
+
+          Nothing is thrown away by pressing New chat — the conversation goes
+          on the shelf and History opens it again. Over an empty conversation
+          the item is there but quiet: a fresh chat of a fresh chat is nothing,
+          and a control that vanishes is one you have to rediscover.
+        */}
+        {onNew ? (
+          <div className="add-wrap" ref={addWrap}>
+            <button
+              type="button"
+              className="add-btn"
+              onClick={() => setAdding((v) => !v)}
+              aria-haspopup="menu"
+              aria-expanded={adding}
+              aria-label="Add"
+            >
+              <span aria-hidden="true">+</span>
+            </button>
+            {adding ? (
+              <div className="add-menu" role="menu" aria-label="Add">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="add-item"
+                  disabled={busy || !turns.length}
+                  onClick={() => {
+                    setAdding(false)
+                    onNew()
+                  }}
+                >
+                  New chat
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         {/*
           A box you can write a paragraph in.
 
