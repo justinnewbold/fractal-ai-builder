@@ -3,6 +3,21 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.211.0
+
+**A band you have asked for before is built without the AI.** The app now
+keeps the finished tone for every band it designs — which model on which
+block, every value, every scene and its channel — written down by block
+family and control name rather than by this preset's ids, so it fits
+whatever is loaded next. Ask for that band again and the tone is rebuilt
+from the note onto the current preset: nothing is sent to the model, it
+costs nothing, and it is on screen at once. The chat says so, and says how
+to get a fresh take instead ("Three Days Grace, fresh take"). It stands
+aside for a refine, for a request with more scenes than the note holds, and
+for one sound. A design that wants a block the preset lacks still places it
+and builds again, as before. The book follows your account like the rig
+cache does — there is a new `band_book` table to apply in Supabase.
+
 ## 7.210.0
 
 **A tone design costs a fraction of the tokens it did.** Four changes, none

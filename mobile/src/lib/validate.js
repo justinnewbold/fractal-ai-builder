@@ -193,6 +193,8 @@ export function validateSpec(spec, schema, sceneCount = 8, channelNames = ['A', 
     usage: spec._usage || null,
     presetName: sanitizeName(spec.presetName),
     summary: typeof spec.summary === 'string' ? spec.summary : '',
+    // Whose tone it is, for the band book. Bounded like every other string here.
+    artist: typeof spec.artist === 'string' && spec.artist.trim() ? spec.artist.trim().slice(0, 80) : null,
     notes: typeof spec.notes === 'string' ? spec.notes : '',
     changes,
     /*

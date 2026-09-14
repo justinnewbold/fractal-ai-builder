@@ -131,6 +131,23 @@ const buildPresetSpec = (eids = []) =>
     ),
   summary: z.string().describe('One sentence on the approach taken.'),
   /*
+   * Whose tone this is, so the app can write it down against them.
+   *
+   * The rig lookup used to be the only thing that named the band, on its
+   * first line, and with the lookup off by default nothing did. The designer
+   * knows perfectly well whether "make me a Three Days Grace preset" names a
+   * band, so it says: the app files the finished design under that name and
+   * builds the next request for them from the note instead of from here.
+   * See src/lib/bandBook.js.
+   */
+  artist: z
+    .string()
+    .nullable()
+    .describe(
+      'The band or artist this preset is voiced for — the full name, spelled the way they ' +
+        'spell it: "Three Days Grace", not "TDG" — or null when the request names no music.'
+    ),
+  /*
    * Somewhere to put a block the tone needs and the preset does not have.
    *
    * The other half of narrowing the id. A model that wants a delay and cannot
