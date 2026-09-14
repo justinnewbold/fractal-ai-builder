@@ -3,6 +3,17 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.209.0
+
+**A dropped line is asked again.** On a phone a long tone design often ends
+with "Load failed" — Safari giving up the connection past a minute or so
+with the model still working and nothing received. That was the end of it;
+now, when nothing had come back yet, the app asks once more on its own, the
+way it already does when the model goes quiet. The band lookup the second
+try repeats is remembered from the first, so it starts designing at once. A
+drop after part of a tone has arrived is not retried, since you have
+something to look at and a second run would replace it.
+
 ## 7.208.0
 
 **A tone design spends less time looking the band up, and a retry says so.**
