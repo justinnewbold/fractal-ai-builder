@@ -1199,7 +1199,10 @@ test('the memory is kept on the device, counts what was said, and knows when it 
   const store = new Map()
   const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) }
   assert.deepEqual(m.loadMemory(storage), { profile: '', preferences: '', updatedAt: 0 })
-  const saved = await m.saveMemory({ profile: ' - [stated] Name: Justin ', preferences: 'Short.' }, storage)
+  // The device half alone: the account half is Supabase, which a test must
+  // not reach for — a live auth client left running behind the queue is what
+  // took another test's localStorage away on Node 20.
+  const saved = m.keepMemory({ profile: ' - [stated] Name: Justin ', preferences: 'Short.' }, storage)
   assert.equal(saved.profile, '- [stated] Name: Justin')
   assert.ok(saved.updatedAt > 0)
   assert.deepEqual(m.loadMemory(storage), saved, 'what was saved is not what is loaded')
@@ -7341,16 +7344,28 @@ test('a scan already running is not started twice', async () => {
    ------------------------------------------------------------------ */
 
 {
-  const store = new Map()
-  globalThis.localStorage = {
-    getItem: (k) => (store.has(k) ? store.get(k) : null),
-    setItem: (k, v) => store.set(k, String(v)),
-    removeItem: (k) => store.delete(k)
-  }
   const { storedSceneNames, keepSceneNames, DEFAULT_SCENE_NAMES, DEMO_SCENE_NAMES } = await import('../src/lib/demoMemory.js')
   const { createTunerStream } = await import('../src/lib/tunerStream.js')
 
   test('a demo scene name survives the mock being rebuilt', () => {
+    /*
+     * The localStorage stub lives inside the test, installed and removed in
+     * one tick. It used to sit at block scope: installed, then the block
+     * awaited two imports — and every async test already queued ran in that
+     * gap with a localStorage that vanished from under it when the block
+     * finished. Which test that happened to be depended on how many ticks
+     * the imports above took, so it passed on one Node and failed on
+     * another ("localStorage is not defined", from a test 3000 lines away).
+     */
+    const had = Object.prototype.hasOwnProperty.call(globalThis, 'localStorage')
+    const saved = globalThis.localStorage
+    const store = new Map()
+    globalThis.localStorage = {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => store.set(k, String(v)),
+      removeItem: (k) => store.delete(k)
+    }
+    try {
     // "Solo" was "4" again after a reload: the array came from a literal every time.
     assert.equal(storedSceneNames(), null, 'a fresh demo has kept names from nowhere')
     const names = DEFAULT_SCENE_NAMES.slice()
@@ -7365,6 +7380,10 @@ test('a scan already running is not started twice', async () => {
     assert.equal(storedSceneNames(), null, 'the wrong number of names is survived')
     store.clear()
     // And the mock reads them: pinned by the structure guard on mockDevice.js.
+    } finally {
+      if (had) globalThis.localStorage = saved
+      else delete globalThis.localStorage
+    }
   })
 
   test('the demo tuner never changes note while a string is still ringing', () => {
@@ -7427,8 +7446,6 @@ test('a scan already running is not started twice', async () => {
     assert.equal(jumps, 0, `cents jumped by more than 4 between ticks ${jumps} times while the string held`)
     assert.ok(sounding.every((r) => Number.isInteger(r.cents) && Math.abs(r.cents) <= 50), 'a reading is not an integer within ±50 cents')
   })
-
-  delete globalThis.localStorage
 }
 
 /* ------------------------------------------------------------------
