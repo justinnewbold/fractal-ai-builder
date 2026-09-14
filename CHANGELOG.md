@@ -3,6 +3,17 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.205.0
+
+**The test suite passes on the Node the checks run on.** One test installed
+a fake localStorage at file scope, then waited on two imports before
+removing it; any test already queued ran in that gap, and which one
+depended on the Node version. On Node 20 that was a device-write test
+three thousand lines away, which is why every push since the memory
+feature landed came with a "run failed" notification for a check that was
+green on a developer machine. The fake now lives inside the one test that
+uses it. Nothing in the app changed.
+
 ## 7.204.0
 
 **The agent knows who it is talking to.** Two things are kept per person:

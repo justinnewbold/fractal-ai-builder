@@ -55,14 +55,19 @@ export function loadMemory(storage) {
   }
 }
 
-function keepLocal(record, storage) {
+/** Keep a record on this device only. Returns it as kept. Never throws. */
+export function keepMemory(next, storage) {
+  const record = { ...normalise(next), updatedAt: Number(next?.updatedAt) || Date.now() }
   try {
     const store = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null)
     store?.setItem(KEY, JSON.stringify(record))
   } catch {
     // Private windows throw; the cloud copy, if any, still has it.
   }
+  return record
 }
+
+const keepLocal = (record, storage) => keepMemory(record, storage)
 
 /** The two fields as a request carries them. */
 export const memoryForRequest = (record) => {
@@ -77,8 +82,7 @@ export const memoryForRequest = (record) => {
  * copy whole and is retried by the next sync.
  */
 export async function saveMemory(next, storage) {
-  const record = { ...normalise(next), updatedAt: Date.now() }
-  keepLocal(record, storage)
+  const record = keepMemory({ ...next, updatedAt: Date.now() }, storage)
   const client = supabaseClient()
   if (client) {
     try {
