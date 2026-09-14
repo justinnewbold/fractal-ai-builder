@@ -169,6 +169,8 @@ Two ways to supply a model, set in the Vercel project settings:
 | `ANTHROPIC_API_KEY` | Direct. Preferred — works on a fresh account. |
 | `AI_GATEWAY_API_KEY` | Vercel AI Gateway. Needs credit; the free tier returns 403 for every Anthropic model. |
 | `GENERATOR_MODEL` | Optional override. `claude-sonnet-5` direct, `anthropic/claude-sonnet-4.5` via gateway. |
+| `RIG_LOOKUP` | Off unless set. `on` = web-search the band's real rig before designing (costs ~2x tokens + $10/1k searches). Direct path only. |
+| `GENERATOR_EFFORT` | Optional. How hard the model thinks — `low`, `medium` or `high`. Leave unset: a design runs at `medium`, a refine at `low`. |
 
 Whichever key is set, it is read only inside `api/generate.js` and never reaches
 the browser.

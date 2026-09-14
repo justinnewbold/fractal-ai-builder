@@ -5502,12 +5502,20 @@ export function run(test) {
     assert.match(src, /<MemorySettings\s*\n\s*memory=\{memory\}/, 'Setup has no screen for the two fields')
     assert.match(src, /setMemory\(await saveMemory\(next\)\)/, 'the Setup screen saves nowhere')
 
-    for (const route of ['command', 'generate']) {
-      const api = readFileSync(new URL(`../api/${route}.js`, import.meta.url), 'utf8')
-      assert.match(api, /import \{ withMemory \} from '\.\/_memory\.js'/, `${route} does not import the memory block`)
-      assert.ok(!/system: SYSTEM,/.test(api), `${route} still sends its instructions without the person in front`)
-      assert.match(api, /system: withMemory\(SYSTEM, memory\)/, `${route} does not put the person in front of its instructions`)
-    }
+    /*
+     * The chat puts the person in front of its instructions. The designer
+     * puts them in the request instead — its system prompt has to be the
+     * same bytes for every player or the rosters cached behind it are
+     * written for each one rather than read; see api/generate.js.
+     */
+    const command = readFileSync(new URL('../api/command.js', import.meta.url), 'utf8')
+    assert.match(command, /import \{ withMemory \} from '\.\/_memory\.js'/, 'command does not import the memory block')
+    assert.ok(!/system: SYSTEM,/.test(command), 'command still sends its instructions without the person in front')
+    assert.match(command, /system: withMemory\(SYSTEM, memory\)/, 'command does not put the person in front of its instructions')
+    const generate = readFileSync(new URL('../api/generate.js', import.meta.url), 'utf8')
+    assert.match(generate, /import \{ memoryBlock \} from '\.\/_memory\.js'/, 'generate does not import the memory block')
+    assert.match(generate, /const person = memoryBlock\(memory\)/, 'generate never builds the person')
+    assert.match(generate, /\$\{rigInstruction\(rig\)\}\\n\\n\$\{person\}/, 'the person does not reach the designer\'s request')
     const shared = readFileSync(new URL('../api/_memory.js', import.meta.url), 'utf8')
     for (const rule of [
       'Greet the user by name when they say hello',

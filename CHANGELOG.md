@@ -3,6 +3,21 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.210.0
+
+**A tone design costs a fraction of the tokens it did.** Four changes, none
+of them to what the model is told about tone. The band lookup — a web search
+before the design — is now off unless the deployment switches it on with
+`RIG_LOOKUP=on`, and searches fewer pages when it is. A refine sends the
+model only the block families the previous design touched, instead of every
+roster on the unit, so "a bit brighter" no longer carries eleven thousand
+tokens of amp models along with it. The instructions the model reads are the
+same bytes for every player — the player's own profile moved out of them
+and into the request — so the rosters behind them are read from the cache
+instead of being written again for each person. And the ceilings came down:
+a refine may think less and answer shorter than a design. One log line per
+run says what was cached, so the bill can be read back.
+
 ## 7.209.0
 
 **A dropped line is asked again.** On a phone a long tone design often ends

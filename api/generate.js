@@ -16,7 +16,7 @@ import { generateObject, streamObject, streamText } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 import { cors } from './_cors.js'
-import { withMemory } from './_memory.js'
+import { memoryBlock } from './_memory.js'
 import { sceneInstruction, songsWanted } from './_scenes.js'
 import { researchRig, rigInstruction, rigOutcome } from './_rig.js'
 
@@ -52,20 +52,29 @@ function resolveModel() {
  * and nothing to host. Only on the direct path — the gateway takes a model
  * name and cannot carry a provider's tool — so a deployment running on the
  * gateway designs exactly as it did before rather than failing.
+ *
+ * And only when asked for. The lookup is a second model call with its own
+ * searches, and it roughly doubles what a generation costs in tokens on top of
+ * what the searches themselves bill. So it is off unless RIG_LOOKUP=on is set
+ * in the project's environment — a deployment that never sets it designs from
+ * what the model already knows, which for most bands is the bigger part of the
+ * answer anyway. In lookUpRig below, a null here is reported as `why: 'off'`.
  */
 function resolveSearch() {
+  if (process.env.RIG_LOOKUP !== 'on') return null
   if (!process.env.ANTHROPIC_API_KEY) return null
   const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   /*
-   * Enough for the band and then each song it picks.
+   * Enough for the band and a few of the songs it picks.
    *
    * Five covered a band and nothing else, which is exactly how the first
    * version came back with the right amp and eight scenes voiced from the same
    * general sound. A song is at least one search of its own. Still a ceiling
-   * rather than a target — every search is time somebody is waiting — and the
-   * step gives up at sixty seconds whatever it has reached.
+   * rather than a target — every search is time somebody is waiting and money
+   * on the bill — and the step gives up at thirty seconds whatever it has
+   * reached, which fourteen searches never fitted inside anyway.
    */
-  return anthropic.tools.webSearch_20260209({ maxUses: 14 })
+  return anthropic.tools.webSearch_20260209({ maxUses: 6 })
 }
 
 /**
@@ -343,6 +352,116 @@ roster is a close counterpart, pick the nearest and say plainly what it is not -
 a player who knows the reference would rather hear that than be told a
 substitute is the real thing.`
 
+/**
+ * Which block families this request needs the full vocabulary for.
+ *
+ * A design can touch anything on the unit, so it is sent every family's model
+ * roster and reference. A refine cannot: the player has heard a design and is
+ * reacting to it — "too dark", "more bite" — and the instruction is to return
+ * the same spec with as little changed as possible. The blocks being adjusted
+ * are the ones the previous spec set, so those are the only families whose
+ * roster and parameter reference the model needs. The amp roster alone is
+ * around 11k tokens, and a refine that sent every roster paid for the whole
+ * unit to move one control.
+ *
+ * A previous spec that names no blocks at all is treated as a design — there
+ * is nothing to narrow to, and an empty vocabulary would leave the model
+ * nothing to adjust with.
+ */
+export function relevantSlugs(blocks, mode, previous) {
+  const all = new Set(blocks.map((b) => b.slug))
+  if (mode !== 'refine' || !previous) return all
+  const touched = new Set(
+    (Array.isArray(previous.blocks) ? previous.blocks : []).map((b) => b?.eid)
+  )
+  if (!touched.size) return all
+  return new Set(blocks.filter((b) => touched.has(b.eid)).map((b) => b.slug))
+}
+
+/**
+ * The stable half of the request, as sorted, byte-identical JSON.
+ *
+ * Model rosters are ~80% of the payload and identical on every run — the amp
+ * roster alone is around 11k tokens. Parameter values and bypass states change
+ * constantly. Sending them as one blob means paying full price for the same
+ * 11k tokens every generation.
+ *
+ * So rosters and reference go in their own content part marked for caching,
+ * built here in an order that cannot vary — families sorted by slug, a fixed
+ * key order on every entry, reference parameters sorted by name — so the text
+ * is the same bytes for every player on the same unit and the cache actually
+ * hits. Cached reads bill at a tenth of base. The first run pays a small write
+ * premium; every run after, from anyone, is much cheaper.
+ *
+ * A family outside `relevant` (see relevantSlugs) is left out of both.
+ */
+export function rosterParts(blocks, relevant) {
+  /*
+   * A model, with nothing on it that says nothing.
+   *
+   * A roster entry arrives as {value, name, manufacturer, basedOn}, and for
+   * most families both lineage fields are null on every single entry — the unit
+   * does not carry them. Sent as-is that is `"manufacturer":null,"basedOn":null`
+   * three hundred and thirty-one times in the amp roster alone: a fifth of the
+   * biggest part of the request, spent saying nothing, and read by a model that
+   * has to decide those fields are not worth attending to.
+   *
+   * Dropping them puts the rosters back to what they measured before any
+   * lineage was added, WITH the lineage on the entries that have it.
+   */
+  const trim = (models) =>
+    models.map((m) => ({
+      value: m.value,
+      name: m.name,
+      ...(m.manufacturer ? { manufacturer: m.manufacturer } : {}),
+      ...(m.basedOn ? { basedOn: m.basedOn } : {})
+    }))
+
+  const rosters = {}
+  const reference = {}
+  for (const block of [...blocks].sort((a, b) => a.slug.localeCompare(b.slug))) {
+    if (!relevant.has(block.slug)) continue
+    if (block.models?.length && !rosters[block.slug]) rosters[block.slug] = trim(block.models)
+    if (!reference[block.slug]) {
+      const params = {}
+      for (const p of [...(block.params || [])].sort((a, b) => String(a.name).localeCompare(String(b.name)))) {
+        if (p.does) params[p.name] = p.does
+      }
+      if (block.about || Object.keys(params).length) {
+        reference[block.slug] = { about: block.about || undefined, params }
+      }
+    }
+  }
+  return { rosters, reference }
+}
+
+/**
+ * One line per generation, for reading the bill back.
+ *
+ * What the Anthropic console shows is totals; what decides the cost of a run
+ * is whether the rosters were read from the cache or written to it, whether
+ * the rig was searched for, and how much came back. One JSON line with all of
+ * it, prefixed so it can be pulled out of a function log with a single grep.
+ */
+function logUsage({ mode, rigWhy, usage, meta }) {
+  console.log(
+    '[usage] ' +
+      JSON.stringify({
+        mode: mode === 'refine' ? 'refine' : 'design',
+        rigWhy: rigWhy ?? null,
+        inputTokens: usage?.inputTokens ?? null,
+        cacheReadInputTokens:
+          usage?.cachedInputTokens ??
+          usage?.inputTokenDetails?.cacheReadTokens ??
+          meta?.cacheReadInputTokens ??
+          null,
+        cacheCreationInputTokens:
+          usage?.inputTokenDetails?.cacheWriteTokens ?? meta?.cacheCreationInputTokens ?? null,
+        outputTokens: usage?.outputTokens ?? null
+      })
+  )
+}
+
 export default async function handler(req, res) {
   // Local mode serves this app from the player's own machine, so the page is a
   // cross-origin caller here. Preflight is answered and nothing else runs.
@@ -408,50 +527,10 @@ export default async function handler(req, res) {
     return
   }
 
-  // The request splits in two because the halves have very different lifetimes.
-  //
-  // Model rosters are ~80% of the payload and identical on every run — the amp
-  // roster alone is around 11k tokens. Parameter values and bypass states change
-  // constantly. Sending them as one blob means paying full price for the same
-  // 11k tokens every generation.
-  //
-  // So rosters go in their own content part marked for caching, sorted by slug
-  // so the text is byte-identical between runs and actually hits. Cached reads
-  // bill at a tenth of base. The first run of a session pays a small write
-  // premium; every run after is much cheaper.
-  /*
-   * A model, with nothing on it that says nothing.
-   *
-   * A roster entry arrives as {value, name, manufacturer, basedOn}, and for
-   * most families both lineage fields are null on every single entry — the unit
-   * does not carry them. Sent as-is that is `"manufacturer":null,"basedOn":null`
-   * three hundred and thirty-one times in the amp roster alone: a fifth of the
-   * biggest part of the request, spent saying nothing, and read by a model that
-   * has to decide those fields are not worth attending to.
-   *
-   * Dropping them puts the rosters back to what they measured before any
-   * lineage was added, WITH the lineage on the entries that have it.
-   */
-  const trim = (models) =>
-    models.map((m) => ({
-      value: m.value,
-      name: m.name,
-      ...(m.manufacturer ? { manufacturer: m.manufacturer } : {}),
-      ...(m.basedOn ? { basedOn: m.basedOn } : {})
-    }))
-
-  const rosters = {}
-  const reference = {}
-  for (const block of [...blocks].sort((a, b) => a.slug.localeCompare(b.slug))) {
-    if (block.models?.length && !rosters[block.slug]) rosters[block.slug] = trim(block.models)
-    if (!reference[block.slug]) {
-      const params = {}
-      for (const p of block.params || []) if (p.does) params[p.name] = p.does
-      if (block.about || Object.keys(params).length) {
-        reference[block.slug] = { about: block.about || undefined, params }
-      }
-    }
-  }
+  // Refines only need the rosters of the blocks being adjusted; a design
+  // needs every family. See relevantSlugs — the amp roster alone is ~11k tokens.
+  const relevant = relevantSlugs(blocks, mode, previous)
+  const { rosters, reference } = rosterParts(blocks, relevant)
 
   const state = {
     device: device?.name || 'FM3',
@@ -461,13 +540,17 @@ export default async function handler(req, res) {
     // universal across the family.
     sceneCount: device?.capabilities?.sceneCount ?? 8,
     sceneNames: Array.isArray(sceneNames) ? sceneNames : undefined,
+    // Every block is listed so the model knows what is placed; only the
+    // families this request can adjust carry their parameter dump. A block
+    // outside that set arrives with params: [] — it exists, it can be switched
+    // in or out of a scene, and nothing on it is offered to be set.
     blocks: blocks.map((b) => ({
       eid: b.eid,
       name: b.name,
       slug: b.slug,
       currentlyBypassed: b.bypassed,
       channel: b.channel,
-      params: (b.params || []).map(({ does, ...rest }) => rest)
+      params: relevant.has(b.slug) ? (b.params || []).map(({ does, ...rest }) => rest) : []
     }))
   }
 
@@ -581,6 +664,20 @@ export default async function handler(req, res) {
    * It goes after the request rather than before it. The request is the job;
    * this is background, and background that arrives first reads as the brief.
    */
+  /*
+   * Who is asking, as a block of text in the per-request part of the prompt.
+   *
+   * This used to go in front of the system prompt, and that broke the cache
+   * for everyone. Anthropic caches a prefix — tools, then system, then the
+   * messages up to the marked block — so a system prompt that carried each
+   * player's own profile made the prefix different bytes for every player,
+   * and the rosters marked for caching after it were written fresh each time
+   * instead of read. The system prompt is now the same for everybody, the
+   * rosters sit right behind it, and the person goes here: after the brief
+   * and the rig, before taste and corrections, in the part that varies anyway.
+   */
+  const person = memoryBlock(memory)
+
   const context = typeof taste === 'string' && taste.trim() ? taste.trim().slice(0, 4000) : null
 
   /*
@@ -601,18 +698,6 @@ export default async function handler(req, res) {
       ? corrections.trim().slice(0, 2000)
       : null
 
-  /*
-   * The output ceiling is set here rather than left to the provider default.
-   *
-   * The AI SDK's Anthropic provider has to send `max_tokens` on every request,
-   * so an unset one is not "no limit" — it is whatever the provider picked,
-   * which is 4096. A full chain with a dozen blocks and their parameter lists
-   * runs past that, and hitting the ceiling truncates the JSON mid-object: the
-   * schema then fails to validate and the whole generation is lost at the very
-   * end, after the player has watched it build. The cap is a ceiling, not a
-   * reservation, so a generous one costs nothing on the presets that don't
-   * need it.
-   */
   /*
    * Everything the model was given, for a person trying to work out why a tone
    * missed.
@@ -638,8 +723,8 @@ export default async function handler(req, res) {
     trace
     ? {
         model: MODEL_NAME,
-        system: withMemory(SYSTEM, memory),
-        task: task + asked + rigInstruction(rig),
+        system: SYSTEM,
+        task: briefWith(rig),
         // What the search came back with, so a tone that picked the wrong amp
         // can be read back against what it was told.
         rig,
@@ -660,9 +745,32 @@ export default async function handler(req, res) {
       }
     : null
 
+  /*
+   * The request itself, in the order the model should weigh it: what is
+   * asked, what made the sound, then who is asking. Shared by the arguments
+   * and the trace so the trace shows what was actually sent.
+   */
+  const briefWith = (rig) => `${task}${asked}${rigInstruction(rig)}\n\n${person}`
+
+  /*
+   * The output ceiling is set here rather than left to the provider default.
+   *
+   * The AI SDK's Anthropic provider has to send `max_tokens` on every request,
+   * so an unset one is not "no limit" — it is whatever the provider picked,
+   * which is 4096. A full chain with a dozen blocks and their parameter lists
+   * runs past that, and hitting the ceiling truncates the JSON mid-object: the
+   * schema then fails to validate and the whole generation is lost at the very
+   * end, after the player has watched it build.
+   *
+   * Two ceilings, because the two jobs are different sizes. A design can fill
+   * every block on the unit with a full set of scenes; a refine returns the
+   * same spec with a few values moved, on a request that only carries the
+   * families it may touch. Sixteen thousand for both was never reached and
+   * reserved thinking room the refine paid for in waiting.
+   */
   const argsWith = (rig) => ({
     model,
-    maxOutputTokens: 16000,
+    maxOutputTokens: mode === 'refine' ? 6000 : 12000,
     /*
      * How hard the model thinks before it says anything, set rather than left
      * to the default.
@@ -677,20 +785,26 @@ export default async function handler(req, res) {
      * phase — on a request carrying every roster the unit has, comfortably past
      * the ninety seconds the browser waits.
      *
-     * Medium, because of what this call actually is: the tone judgement lives
-     * in a long and very prescriptive system prompt, and the model's job here
-     * is to apply it and emit a constrained object. That is nearer extraction
-     * than open reasoning, and the top of the effort range earns its latency on
-     * problems that are neither. An env var so it can be tuned against real
-     * tones without a deploy.
+     * Medium for a design, because of what this call actually is: the tone
+     * judgement lives in a long and very prescriptive system prompt, and the
+     * model's job here is to apply it and emit a constrained object. That is
+     * nearer extraction than open reasoning, and the top of the effort range
+     * earns its latency on problems that are neither. Low for a refine, which
+     * is nearer still — the design is done and one thing about it is being
+     * moved. An env var overrides both so it can be tuned against real tones
+     * without a deploy.
      */
-    providerOptions: { anthropic: { effort: process.env.GENERATOR_EFFORT || 'medium' } },
+    providerOptions: {
+      anthropic: { effort: process.env.GENERATOR_EFFORT || (mode === 'refine' ? 'low' : 'medium') }
+    },
     // Narrowed to this preset's own ids, so an id it does not hold cannot be
     // returned at all. Built per request because every preset holds a different
     // four (or twelve) of them.
     schema: buildPresetSpec(blocks.map((b) => b.eid).filter((e) => Number.isInteger(e))),
     schemaName: 'preset_spec',
-    system: withMemory(SYSTEM, memory),
+    // Only the instructions. The person is in the request part, so the prefix
+    // ahead of the cached rosters is the same bytes for every player.
+    system: SYSTEM,
     messages: [
       {
         role: 'user',
@@ -712,10 +826,11 @@ export default async function handler(req, res) {
           {
             type: 'text',
             text:
-              `Current state of the loaded preset:\n${JSON.stringify(state)}\n\n${task}${asked}` +
-              /* Before taste and before corrections: this is what the request
-                 is ABOUT, and the other two are background to it. */
-              rigInstruction(rig) +
+              `Current state of the loaded preset:\n${JSON.stringify(state)}\n\n` +
+              /* The request, the rig and the person, then taste and
+                 corrections: the first is what the request is ABOUT, and the
+                 rest are background to it. */
+              briefWith(rig) +
               (context ? `\n\n${context}` : '') +
               (fixes ? `\n\n${fixes}` : '')
           }
@@ -827,6 +942,7 @@ export default async function handler(req, res) {
       const object = await result.object
       const usage = await result.usage
       const meta = (await result.providerMetadata)?.anthropic || {}
+      logUsage({ mode, rigWhy: found.why, usage, meta })
 
       send({
         type: 'done',
@@ -885,6 +1001,7 @@ export default async function handler(req, res) {
     const { object, usage, providerMetadata } = await generateObject(args)
 
     const anthropicMeta = providerMetadata?.anthropic || {}
+    logUsage({ mode, rigWhy: found.why, usage, meta: anthropicMeta })
 
     // Token counts come back to the browser so the app can price the run. The
     // input side is dominated by the model roster and block schema, which grow

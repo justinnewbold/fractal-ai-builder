@@ -7039,7 +7039,11 @@ test('the model is told how hard to think, and says so while it does', () => {
    * reasoning — the judgement is all in the system prompt — so the top of the
    * range bought minutes of latency and nothing else.
    */
-  assert.match(api, /providerOptions: \{ anthropic: \{ effort: process\.env\.GENERATOR_EFFORT \|\| 'medium' \} \}/)
+  assert.match(
+    api,
+    /anthropic: \{ effort: process\.env\.GENERATOR_EFFORT \|\| \(mode === 'refine' \? 'low' : 'medium'\) \}/,
+    'a design thinks at medium and a refine at low, unless the env var says otherwise'
+  )
   // The heartbeat, and the cleanup that keeps a timer from writing into a
   // response that has already ended.
   assert.match(api, /send\(\{ type: 'waiting', ms: Date\.now\(\) - startedAt \}\)/)
@@ -10578,6 +10582,96 @@ test('a spec that lists its scenes out of order still fits in playing order', as
   assert.deepEqual(defaultKeep(spec, 4), [0, 2, 5], 'the picker offers them in the order the spec happened to write them')
   const fit = fitScenes(spec, [0, 2, 5], 4)
   assert.deepEqual(fit.spec.scenes.map((s) => s.name), ['Clean', 'Verse', 'Solo'])
+})
+
+console.log('\nwhat a refine is sent')
+
+test('a refine carries only the rosters of the blocks it may adjust', async () => {
+  /*
+   * The amp roster alone is ~11k tokens, and a refine — "a bit brighter" on a
+   * design already made — was sent every roster on the unit to move one
+   * control. The previous spec says which blocks it set, and those are the
+   * only families the adjustment needs the vocabulary for.
+   */
+  const { relevantSlugs, rosterParts } = await import('../api/generate.js')
+  const blocks = [
+    { eid: 106, name: 'Amp 1', slug: 'amp', models: [{ value: 1, name: 'Brit 800' }], params: [{ id: 1, name: 'Gain', does: 'Preamp gain' }] },
+    { eid: 100, name: 'Drive 1', slug: 'drive', models: [{ value: 3, name: 'Rat Distortion' }], params: [{ id: 2, name: 'Drive', does: 'How hard' }] },
+    { eid: 133, name: 'Delay 1', slug: 'delay', models: [{ value: 2, name: 'Digital Mono' }], params: [] },
+    { eid: 134, name: 'Delay 2', slug: 'delay', models: [{ value: 2, name: 'Digital Mono' }], params: [] }
+  ]
+  const previous = { blocks: [{ eid: 106, bypassed: false, params: [{ id: 1, name: 'Gain', value: 7 }] }] }
+
+  const refine = relevantSlugs(blocks, 'refine', previous)
+  assert.deepEqual([...refine], ['amp'])
+  const { rosters, reference } = rosterParts(blocks, refine)
+  assert.deepEqual(Object.keys(rosters), ['amp'], 'a refine of the amp carried other rosters')
+  assert.deepEqual(Object.keys(reference), ['amp'])
+
+  // A design gets everything, and gets it in slug order so the bytes never move.
+  const design = relevantSlugs(blocks, 'design', null)
+  assert.deepEqual([...design].sort(), ['amp', 'delay', 'drive'])
+  assert.deepEqual(Object.keys(rosterParts(blocks, design).rosters), ['amp', 'delay', 'drive'])
+  // Same for a refine with no previous spec, or one that set no blocks.
+  assert.equal(relevantSlugs(blocks, 'refine', null).size, 3)
+  assert.equal(relevantSlugs(blocks, 'refine', { blocks: [] }).size, 3)
+
+  // The cached part is the same bytes whatever order the unit listed things in.
+  const shuffled = [blocks[3], blocks[1], blocks[0], blocks[2]].map((b) => ({
+    ...b,
+    params: [...b.params].reverse()
+  }))
+  assert.equal(
+    JSON.stringify(rosterParts(shuffled, design)),
+    JSON.stringify(rosterParts(blocks, design)),
+    'the cached prefix depends on the order the blocks arrived in'
+  )
+
+  // And the request the model reads shows every block, but only the relevant
+  // ones with their parameters.
+  const route = readSrc(new URL('../api/generate.js', import.meta.url), 'utf8')
+  assert.match(route, /params: relevant\.has\(b\.slug\) \? \(b\.params \|\| \[\]\)\.map\(\(\{ does, \.\.\.rest \}\) => rest\) : \[\]/)
+})
+
+test('the cached prefix is the same bytes for every player', () => {
+  /*
+   * Anthropic caches a prefix: system, then the messages up to the marked
+   * block. The player's profile used to be in front of the system prompt,
+   * which made the prefix different for every player and the 11k-token
+   * rosters behind it a cache write each time rather than a read.
+   */
+  const route = readSrc(new URL('../api/generate.js', import.meta.url), 'utf8')
+  assert.match(route, /schemaName: 'preset_spec',[\s\S]{0,200}system: SYSTEM,/, 'the system prompt still varies by player')
+  assert.ok(!/withMemory/.test(route), 'the person is still put in front of the instructions')
+  // The person rides in the second, per-request part: after the brief and
+  // the rig, before taste and corrections.
+  assert.match(route, /const person = memoryBlock\(memory\)/)
+  assert.match(route, /const briefWith = \(rig\) => `\$\{task\}\$\{asked\}\$\{rigInstruction\(rig\)\}\\n\\n\$\{person\}`/)
+  assert.match(route, /briefWith\(rig\) \+\s*\n\s*\(context \? /, 'taste no longer comes after the person')
+  // The trace shows what was sent.
+  assert.match(route, /system: SYSTEM,\s*\n\s*task: briefWith\(rig\),/)
+  // The rosters keep their cache mark, and they are the first thing after the system prompt.
+  const first = route.indexOf("cacheControl: { type: 'ephemeral' }")
+  assert.ok(first > 0 && first < route.indexOf('Current state of the loaded preset'), 'the cache mark moved')
+})
+
+test('the rig lookup is off unless switched on, and the ceilings fit the job', () => {
+  const route = readSrc(new URL('../api/generate.js', import.meta.url), 'utf8')
+  assert.match(route, /if \(process\.env\.RIG_LOOKUP !== 'on'\) return null/, 'the search runs for every deployment with a key')
+  assert.match(route, /webSearch_20260209\(\{ maxUses: 6 \}\)/)
+  assert.match(route, /maxOutputTokens: mode === 'refine' \? 6000 : 12000/)
+  const rig = readSrc(new URL('../api/_rig.js', import.meta.url), 'utf8')
+  assert.match(rig, /maxOutputTokens: 2500/)
+  // One line per run, with what decides the bill on it.
+  assert.match(route, /'\[usage\] ' \+/)
+  for (const key of ['mode', 'rigWhy', 'inputTokens', 'cacheReadInputTokens', 'cacheCreationInputTokens', 'outputTokens']) {
+    assert.ok(new RegExp(`\\b${key}:`).test(route.slice(route.indexOf('function logUsage'))), `the usage line has no ${key}`)
+  }
+  assert.match(route, /logUsage\(\{ mode, rigWhy: found\.why, usage, meta \}\)/, 'the streamed path does not log')
+  assert.match(route, /logUsage\(\{ mode, rigWhy: found\.why, usage, meta: anthropicMeta \}\)/, 'the plain path does not log')
+  const readme = readSrc(new URL('../README.md', import.meta.url), 'utf8')
+  assert.match(readme, /`RIG_LOOKUP`/)
+  assert.match(readme, /`GENERATOR_EFFORT`/)
 })
 
 await settle()
