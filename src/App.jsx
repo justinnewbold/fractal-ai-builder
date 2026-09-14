@@ -5570,7 +5570,6 @@ export default function App() {
           onError={setError}
           onChanged={read}
           onPickPreset={() => setPresetMenu(true)}
-          onRename={() => setSheet('scenes')}
           /* Absent, not disabled, when play mode is on: the bar closes up to
              two buttons rather than keeping a dead third. */
           onAsk={askShows ? () => setSheet('chat') : null}
@@ -6307,6 +6306,9 @@ export default function App() {
           onRetry={reconnect}
           busy={busy}
           onHistory={() => setSheet('history')}
+          /* Rename this preset or its scenes: the sheet the pencil on Play
+             used to open. Here beside Read the unit again, as asked. */
+          onRename={() => setSheet('scenes')}
         />
 
         <Group key="screen" title="Screen" note="How Play looks">
