@@ -399,6 +399,13 @@ export function run(test) {
     assert.match(forge, /function recordWire\(entry\) \{[\s\S]{0,200}logDebug\(\s*'wire'/, 'a write no longer reaches the debug log')
     assert.match(forge, /function recordCheck\(entry\) \{[\s\S]{0,200}logDebug\(\s*'check'/, 'a verification no longer reaches the debug log')
     assert.match(forge, /logDebug\('unit', `\$\{options\.method \|\| 'GET'\} \$\{path\} failed/, 'a failed request no longer reaches the debug log')
+    /* But not a refusal the phone was always going to get, nor a host
+       document that was never written: both opened every phone's log twice
+       over as alarms about nothing. */
+    assert.match(forge, /if \(!routine\(path, options, err\)\) \{\s*\n\s*logDebug\('unit'/, 'the expected refusals and absences are logged as failures again')
+    const routine = forge.slice(forge.indexOf('const routine = '), forge.indexOf('async function request('))
+    assert.match(routine, /err\?\.remoteBlocked/, 'a phone-side refusal is logged as a unit failure')
+    assert.match(routine, /\/\^\\\/store\\\/config\\\/\/\.test\(path\) && err\?\.status === 404/, 'a host document that was never written is logged as a unit failure')
     assert.match(src, /logDebug\('app', `\$\{kind\}: \$\{summary\}`/, 'the app\u2019s own change record no longer reaches the debug log')
     assert.match(src, /if \(error\) logDebug\('error'/, 'an error shown on screen no longer reaches the debug log')
     assert.match(src, /useEffect\(\(\) => installCrashCapture\(\), \[\]\)/, 'crashes are not captured')

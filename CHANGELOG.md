@@ -3,6 +3,16 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.218.0
+
+**Two lines of noise leave the debug log.** Every log from a phone opened
+with "POST /preset/backup failed — you can't back up a preset from your
+phone" and "GET scene-names failed — not found", twice each. Neither was
+anything going wrong: the first is a safety copy the phone was never
+allowed to take, the second is scene names for a slot nobody had saved
+from here. Both are expected answers now and are not written down as
+failures, so what the log opens with is what actually happened.
+
 ## 7.217.0
 
 **The preset list opens on the preset you are on, after a save too.** It
