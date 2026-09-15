@@ -5905,7 +5905,8 @@ export default function App() {
       */}
       <Sheet
         open={sheet === 'history'}
-        onClose={() => setSheet(null)}
+        /* Only Setup's AI page opens it, so closing it is going back there. */
+        onClose={() => setSheet('settings')}
         title="History"
         note={link.account ? link.account.email : 'Saved in this browser'}
       >
@@ -6452,7 +6453,8 @@ export default function App() {
       */}
       <Sheet
         open={sheet === 'gear'}
-        onClose={() => setSheet(null)}
+        /* Only Setup's row opens it, so closing it is going back there. */
+        onClose={() => setSheet('settings')}
         title="Amp and pedal names"
         note={device?.short || device?.name || null}
         tall
@@ -6462,9 +6464,20 @@ export default function App() {
 
       <Sheet
         open={sheet === 'settings'}
+        /*
+          "When you go deeper into the settings menu have swiping down or
+          clicking the X take you back to the settings menu instead of the
+          home screen." A page's way out is the list; only the list's way out
+          is the app. 'stay' tells the sheet it is still open — see Sheet's
+          Back handling.
+        */
         onClose={() => {
+          if (setupPage) {
+            setSetupPage(null)
+            return 'stay'
+          }
           setSheet(null)
-          setSetupPage(null)
+          return undefined
         }}
         title="Setup"
         note={device?.short || device?.name || null}

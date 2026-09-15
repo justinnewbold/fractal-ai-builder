@@ -3,6 +3,13 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.222.0
+
+**Inside Setup, closing goes up, not out.** On one of Setup's pages, the X,
+a swipe down, Escape and the phone's Back all return to the Setup list; only
+from the list do they close Setup. History and the amp and pedal names,
+which only Setup opens, close back onto Setup too.
+
 ## 7.221.0
 
 **Setup is a list.** The four doors and the pile of buttons over them are
