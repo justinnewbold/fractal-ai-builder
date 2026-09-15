@@ -3,6 +3,18 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.219.0
+
+**Play can fit the whole rig on one screen.** Setup › Button size has a new
+switch, Fit everything on one screen. On, the Play screen measures what is
+left once its own chrome is on and sizes the scenes and effects so the last
+row sits above the footer, with no scrolling. A bigger preset gets smaller
+buttons, then more effects to a row, but never a button under a thumb's
+width; past that the page scrolls as before. It overrides the size step
+while it is on. Also: the bar at the top is no longer a blurred layer, and
+on the home screen it starts ten pixels under the status area — iOS 27 draws
+its own glass there, and the bar came out soft under it.
+
 ## 7.218.0
 
 **Two lines of noise leave the debug log.** Every log from a phone opened

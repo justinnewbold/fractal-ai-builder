@@ -721,7 +721,8 @@ export function run(test) {
     assert.ok(full <= floor, `an effect tile holds ${full}px of content in ${floor}px`)
 
     const small = rule('.gig[data-compact] button.gig-block')
-    const stated = Number(small.match(/height: (\d+)px/)[1])
+    // Fit hands the height to the screen; the stated size is the fallback.
+    const stated = Number(small.match(/height: (?:var\(--gig-fit-tile, )?(\d+)px/)[1])
     const tight = lines + 2 * step(small, 'padding') + border
     assert.ok(tight <= stated, `at the smallest size an effect tile holds ${tight}px of content in ${stated}px`)
   })
@@ -858,7 +859,8 @@ export function run(test) {
 
     for (const sel of ['.gig[data-compact] button.gig-scene', '.gig[data-compact] button.gig-block']) {
       const r = rule(sel)
-      assert.match(r, /\n\s*height: \d+px/, `${sel} is a floor again rather than a height`)
+      // A stated height, or Fit's variable falling back to one — never a floor.
+      assert.match(r, /\n\s*height: (?:var\(--gig-fit-tile, )?\d+px/, `${sel} is a floor again rather than a height`)
       assert.match(r, /min-height: 0/, `${sel} keeps a floor that can beat its own height`)
       assert.match(r, /overflow: hidden/, `${sel} lets its contents out of the box again`)
     }

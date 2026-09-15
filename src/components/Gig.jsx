@@ -36,7 +36,7 @@ import { useDismiss } from '../lib/dismiss'
 import { Tuner } from './Console'
 import BpmBox from './BpmBox'
 import Sheet from './Sheet'
-import { sizeVars, SIZES } from '../lib/gigSize'
+import { sizeVars, SIZES, fitTiles } from '../lib/gigSize'
 
 /**
  * The stand, not the bench.
@@ -64,6 +64,16 @@ export default function Gig({
   slots,
   capabilities,
   size,
+  /*
+   * Whether the screen decides the tile height instead of the size step.
+   *
+   * "It would be nice just to have everything static on the screen without
+   * being able to scroll." On, this screen wears the Smallest layout — the
+   * chrome trimmed, the names clipped — and measures what is left for the
+   * two grids, then shares it out so the last row of blocks sits above the
+   * footer. See fitTiles in lib/gigSize.
+   */
+  fit = false,
   onError,
   onChanged,
   onPickPreset,
@@ -80,6 +90,9 @@ export default function Gig({
    */
   onChain
 }) {
+  /* Smallest, or Fit: both are the trimmed layout. The literal is what the
+     meter poll and the tests read. */
+  const compact = fit || size === 0
   /*
    * How big the buttons are is decided in the tab bar, a row this screen does
    * not own, so the step arrives as a prop. Only the CSS variables are applied
@@ -261,7 +274,7 @@ export default function Gig({
     // Hidden at the smallest size, and a bar nobody can see is not worth a
     // round trip to the unit — let alone one every half second, on the size
     // step whose whole reason to exist is a rig that has to fit.
-    if (meterEid === null || size === 0) {
+    if (meterEid === null || compact) {
       setMeters([])
       return undefined
     }
@@ -522,6 +535,55 @@ export default function Gig({
   // is getting through" always said it wasn't.
   const peak = meters.length ? Math.max(...meters.map((m) => m.norm ?? 0)) : 0
 
+  /*
+   * Fit: measure, then share out.
+   *
+   * Everything on this screen that is not a tile — the preset name, the notes,
+   * the footer — is chrome, and its height does not depend on the tile size.
+   * So it is measured once as the screen's own height less the two grids, and
+   * whatever the viewport has left after it is what the grids get. Measured
+   * again on a resize (rotation, the browser bar coming and going) and when the
+   * number of scenes or blocks changes, which are the only things that move
+   * the answer. A frame later each time, so the measure sees a drawn screen.
+   */
+  const gigRef = useRef(null)
+  const scenesRef = useRef(null)
+  const blocksRef = useRef(null)
+  const [fitVars, setFitVars] = useState(null)
+  useEffect(() => {
+    if (!fit) {
+      setFitVars(null)
+      return undefined
+    }
+    let raf = 0
+    const measure = () => {
+      const el = gigRef.current
+      if (!el) return
+      const grids = (scenesRef.current?.offsetHeight || 0) + (blocksRef.current?.offsetHeight || 0)
+      const chrome = el.scrollHeight - grids
+      const top = el.getBoundingClientRect().top + window.scrollY
+      const viewport = window.visualViewport?.height || window.innerHeight
+      const next = fitTiles({
+        available: viewport - top - chrome,
+        scenes: hasScenes ? sceneCount : 0,
+        blocks: blocks.length
+      })
+      setFitVars((was) => (was && was.tile === next.tile && was.fxCols === next.fxCols ? was : next))
+    }
+    const schedule = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(measure)
+    }
+    schedule()
+    window.addEventListener('resize', schedule)
+    window.visualViewport?.addEventListener('resize', schedule)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('resize', schedule)
+      window.visualViewport?.removeEventListener('resize', schedule)
+    }
+  }, [fit, hasScenes, sceneCount, blocks.length])
+
   return (
     /*
      * At the smallest step this is not just smaller tiles: the chrome above
@@ -532,12 +594,19 @@ export default function Gig({
      * screen, so it spends the screen on the rig.
      */
     <div
+      ref={gigRef}
       className="gig"
-      data-compact={size === 0 ? 'yes' : undefined}
+      data-compact={compact ? 'yes' : undefined}
+      data-fit={fit ? 'yes' : undefined}
       /* Three effects to a row still fits a name; four does not. The switch to
          three letters rides the column count rather than a width guess. */
-      data-fx-abbr={SIZES[size].fx >= 4 ? 'yes' : undefined}
-      style={sizeVars(size)}
+      data-fx-abbr={(fitVars?.fxCols ?? SIZES[fit ? 0 : size].fx) >= 4 ? 'yes' : undefined}
+      style={{
+        ...sizeVars(fit ? 0 : size),
+        ...(fitVars
+          ? { '--gig-fit-tile': `${fitVars.tile}px`, '--gig-fx-cols': String(fitVars.fxCols) }
+          : {})
+      }}
     >
       {/*
         The name, big, and only the name.
@@ -708,7 +777,7 @@ export default function Gig({
         /* Named as a group. On screen the grid is obvious enough in context;
            read aloud it was eight buttons called "1" through "8", between two
            other grids of buttons, with nothing saying what any of them do. */
-        <div className="gig-scenes" role="group" aria-label="Scenes">
+        <div className="gig-scenes" role="group" aria-label="Scenes" ref={scenesRef}>
           {Array.from({ length: sceneCount }, (_, i) => (
             <button
               key={i}
@@ -787,7 +856,7 @@ export default function Gig({
       ) : null}
 
       {blocks.length ? (
-        <div className="gig-blocks">
+        <div className="gig-blocks" ref={blocksRef}>
           {blocks.map((block) => (
             <BlockTile
               key={block.effectId}
