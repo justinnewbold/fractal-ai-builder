@@ -382,6 +382,7 @@ export function run(test) {
     assert.match(css, /@media \(display-mode: standalone\) \{\s*\n\s*\.topbar \{\s*\n\s*padding-top: calc\(env\(safe-area-inset-top, 0px\) \+ 10px\)/, 'the bar starts under the glass on the home screen')
   })
 
+<<<<<<< HEAD
   test('a plain design and a plain volume request never reach the model', () => {
     /*
      * "Make a Breaking Benjamin rig" spent a thirteen-cent chat turn deciding
@@ -402,6 +403,8 @@ export function run(test) {
     assert.match(ask, /Math\.max\(level\.min \?\? -Infinity, Math\.min\(level\.max \?\? Infinity, target\)\)/, 'the level can leave its range')
   })
 
+=======
+>>>>>>> origin/main
   test('emptiness is judged on editable blocks, not raw count', () => {
     // An empty AM4 slot still reports input and output rows. Both hardware
     // failures of the chain builder were this gap wearing different errors:
