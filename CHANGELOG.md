@@ -3,6 +3,18 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.221.0
+
+**Setup is a list.** The four doors and the pile of buttons over them are
+gone. The version line stays at the top; under it are seven rows — Unit,
+Phone & Mac, Play screen, AI & cost, Amp & pedal names, Help & fixes, About
+— each with one line of live status (which unit and whether it answers,
+which Mac the phone is on, the button size and theme, what today has cost,
+how long the log is) and each opening its own page with a way back. Rename
+sits on the Unit page beside Read the unit again; History moved in with the
+AI's work; the theme switch moved in with the Play screen; the real amp and
+pedal names got a row of their own.
+
 ## 7.220.0
 
 **Two requests skip the model.** A plain "make a ___ rig" (or tone, preset,

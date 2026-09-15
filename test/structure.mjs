@@ -1391,18 +1391,12 @@ export function run(test) {
      * which is both of the things that sentence rules out.
      */
     const setup = sheet('Setup')
-    assert.match(setup, /onHistory=\{\(\) => setSheet\('history'\)\}/, 'Setup has no way to reach history')
+    /* History is a button on Setup's AI page now, not a fold and not a
+       button on the unit's header: it is the AI's work, so it lives with it. */
+    assert.match(setup, /onClick=\{\(\) => setSheet\('history'\)\}/, 'Setup has no way to reach history')
     assert.ok(
       !/<Section\s+key="history"/.test(setup),
       'history is a fold again, which is the drop-down this replaced'
-    )
-
-    const detail = readFileSync(new URL('../src/components/DeviceDetail.jsx', import.meta.url), 'utf8')
-    const row = detail.slice(detail.indexOf('device-detail-row'))
-    assert.match(row, /onHistory \? <button onClick=\{onHistory\}>History<\/button>/, 'the history button is gone')
-    assert.ok(
-      row.indexOf('onHistory ?') < row.indexOf('toggleDemo'),
-      'history sits behind the connection controls rather than in front of them'
     )
   })
 
@@ -1447,74 +1441,48 @@ export function run(test) {
     )
   })
 
-  test('Setup is four doors, not twelve panels in a column', () => {
+  test('Setup is a list of rows with live status, each opening a page', () => {
     /*
-     * "It seems overwhelming and confusing with how many options there are."
-     *
-     * Twelve folds in one column, every one the same size, the same colour and
-     * the same weight — button size level with the debug log. Nothing was
-     * wrong with any single panel; the fault was that none of them was allowed
-     * to matter more than the others, so the whole list had to be read every
-     * time it was opened.
-     *
-     * Sorted by the reason somebody opens the sheet: what the screen looks
-     * like, what the rig is, something is wrong, what the AI knows. The
-     * introduction stays loose at the bottom because it is a way out of the
-     * sheet rather than a setting in it.
+     * "I wanna overhaul this whole settings set-up screen." Four doors under
+     * a pile of unrelated buttons became: the version line at the top (kept
+     * on purpose — "I like that there"), seven rows each carrying one live
+     * fact, each opening its own page. Rename stays on the Unit page beside
+     * Read the unit again (he asked for it there), History moved in with the
+     * AI's work, the theme switch in with the Play screen, and the real amp
+     * names — "I do like that as well" — got a row of their own.
      */
     const setup = sheet('Setup')
-    const doors = [...setup.matchAll(/<Group key="([^"]+)" title="([^"]+)"/g)].map((m) => m[2])
+    assert.match(setup, /<div className="device-meta mono setup-version">\{FULL\}<\/div>/, 'the version line is not at the top')
+    const rows = [...setup.matchAll(/<SetupRow key="([^"]+)" title="([^"]+)" status=/g)].map((m) => m[2])
     assert.deepEqual(
-      doors,
-      ['Screen', 'My rig', "Something's wrong", 'What the AI knows'],
-      `Setup opens on ${doors.length} doors: ${doors.join(', ')}`
+      rows,
+      ['Unit', 'Phone & Mac', 'Play screen', 'AI & cost', 'Amp & pedal names', 'Help & fixes', 'About'],
+      `Setup opens on ${rows.length} rows: ${rows.join(', ')}`
     )
-
-    /* The groups are contiguous, so everything from the first to the last is
-       the grouped region and what is left is what stayed loose. */
-    /*
-     * Two are loose on purpose, and they are the two that are not settings:
-     * the way back to the introduction, and the sheet naming what every model
-     * really is. Both are doors out to something you read. Anything else
-     * loose here is a panel that missed its group.
-     */
-    const loose = [...setup.replace(/<Group[\s\S]*<\/Group>/, '').matchAll(/<Section\s+key="([^"]+)"/g)]
-      .map((m) => m[1])
-    assert.deepEqual(loose, ['gear-names', 'how-this-works'], `panels loose in Setup again: ${loose.join(', ')}`)
+    assert.ok(!setup.includes('<Group'), 'the doors are back')
 
     const behind = (key) => {
-      const at = setup.indexOf(`<Group key="${key}"`)
-      assert.notEqual(at, -1, `the ${key} group is gone`)
-      return [...setup.slice(at, setup.indexOf('</Group>', at)).matchAll(/<Section\s+key="([^"]+)"/g)]
-        .map((m) => m[1])
+      const at = setup.indexOf(`setupPage === '${key}' ? (`)
+      assert.notEqual(at, -1, `the ${key} page is gone`)
+      const next = setup.indexOf("setupPage === '", at + 1)
+      return [...setup.slice(at, next === -1 ? undefined : next).matchAll(/<Section\s+key="([^"]+)"/g)].map((m) => m[1])
     }
-    for (const [door, panels] of [
-      ['screen', ['size', 'playing']],
-      ['rig', ['connection', 'phone-remote', 'footswitches', 'updates']],
-      ['wrong', ['preset-check', 'feedback', 'what-s-changed-this-session', 'debug-log']],
-      /* Token usage first behind this door: it is the panel with a question
-         attached — "it's actually spending a lot more than what the app says"
-         — then what it learned and what you told it (About you, the two
-         fields the agent knows you by), the band book (what it has designed
-         and will rebuild for free), and the developer switch last. */
-      ['ai', ['token-usage', 'what-it-has-learned', 'about-you', 'band-book', 'developer']]
+    for (const [page, panels] of [
+      ['unit', ['connection', 'footswitches']],
+      ['link', ['phone-remote', 'link-details']],
+      ['play', ['size', 'playing', 'appearance']],
+      ['ai', ['token-usage', 'what-it-has-learned', 'about-you', 'band-book']],
+      ['help', ['preset-check', 'debug-log', 'feedback', 'what-s-changed-this-session', 'how-this-works']],
+      ['about', ['updates', 'developer']]
     ]) {
-      assert.deepEqual(behind(door), panels, `the ${door} door holds ${behind(door).join(', ')}`)
+      assert.deepEqual(behind(page), panels, `the ${page} page holds ${behind(page).join(', ')}`)
     }
-
-    /*
-     * And a door is not a silkscreen legend. The panel titles are set in caps,
-     * which is right for a legend on a piece of equipment and wrong for a
-     * heading — caps strip the shape out of a word, so a column of them is
-     * read letter by letter. If the doors ever join them, the two levels stop
-     * telling themselves apart and the wall is back with four bricks in it.
-     */
-    const group = readFileSync(new URL('../src/components/Group.jsx', import.meta.url), 'utf8')
-    assert.ok(!/silk-label/.test(group), 'the doors are set in caps like the panels under them')
+    assert.ok(setup.slice(setup.indexOf("setupPage === 'unit'")).includes('<DeviceDetail'), 'the unit header is not on the Unit page')
+    assert.match(setup, /setSheet\('history'\)/, 'Setup has no way to reach history')
     const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
-    const rule = css.slice(css.indexOf('.group-title {'), css.indexOf('}', css.indexOf('.group-title {')))
-    assert.ok(rule.length > 0, '.group-title has no rule')
-    assert.ok(!/text-transform/.test(rule), 'the group headings are uppercased in CSS instead')
+    assert.match(css, /button\.setup-row \{[^}]*min-height: 60px/, 'a Setup row is under thumb height')
+    const row = readFileSync(new URL('../src/components/SetupRow.jsx', import.meta.url), 'utf8')
+    assert.match(row, /setup-row-status/, 'a row has nowhere to say its state')
   })
 
   test('no price note outlives the date it promises', () => {
@@ -4930,8 +4898,9 @@ export function run(test) {
      */
     const setup = src.slice(src.indexOf("open={sheet === 'settings'}"))
     assert.ok(setup.length > 0, 'the Setup sheet is gone')
-    const panel = setup.slice(0, setup.indexOf('phone-remote'))
-    assert.match(panel, /key="playing"/, 'the play mode switch is not above the connection panels')
+    /* On the Play screen page of Setup — the page about the stage screen. */
+    const panel = setup.slice(setup.indexOf("setupPage === 'play'"), setup.indexOf("setupPage === 'ai'"))
+    assert.match(panel, /key="playing"/, 'the play mode switch is not on the Play screen page')
     assert.match(panel, /Play mode/, 'the switch no longer says what it is')
     assert.match(panel, /checked=\{playing\}/, 'the switch does not show the state it controls')
     assert.match(panel, /savePlayMode\(on\)/, 'the switch is forgotten as soon as the page reloads')

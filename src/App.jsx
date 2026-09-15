@@ -7,7 +7,7 @@ import Volume from './components/Volume'
 import DebugLog from './components/DebugLog'
 import BandBook from './components/BandBook'
 import PresetReport from './components/PresetReport'
-import { installCrashCapture, logDebug } from './lib/debugLog'
+import { installCrashCapture, logDebug, getDebugLog } from './lib/debugLog'
 import Cost from './components/Cost'
 import Scenes from './components/Scenes'
 import History from './components/History'
@@ -19,7 +19,8 @@ import CloudPresets from './components/CloudPresets'
 import { LiveGeneration, LiveSteps, Thinking, THINKING } from './components/LiveGeneration'
 import { progressFor } from './lib/liveProgress'
 import { streamSpec } from './lib/stream'
-import { recordUsage } from './lib/ledger'
+import { recordUsage, today } from './lib/ledger'
+import { getMode } from './lib/theme'
 import TokenLog from './components/TokenLog'
 import { askPlan } from './lib/command'
 import { Modifiers, SceneMatrix } from './components/Modifiers'
@@ -33,7 +34,9 @@ import GridEditor from './components/GridEditor'
 import Ports from './components/Ports'
 import LocalLibrary from './components/LocalLibrary'
 import GearNames from './components/GearNames'
-import Group from './components/Group'
+import SetupRow from './components/SetupRow'
+import { FULL, BUILT_AT } from './lib/version'
+import Theme from './components/Theme'
 import Section from './components/Section'
 import Sheet from './components/Sheet'
 import DeviceDetail from './components/DeviceDetail'
@@ -376,6 +379,17 @@ const HAND_EDIT_KINDS = new Set([
   'select',
   'library'
 ])
+
+/** The pages behind Setup's rows, by key, in the words on the rows. */
+const SETUP_PAGES = {
+  unit: 'Unit',
+  link: 'Phone & Mac',
+  play: 'Play screen',
+  ai: 'AI & cost',
+  help: 'Help & fixes',
+  about: 'About'
+}
+const THEME_WORD = { auto: 'Auto', light: 'Light', dark: 'Dark' }
 
 export default function App() {
   const [status, setStatus] = useState('idle')
@@ -1196,6 +1210,8 @@ export default function App() {
   const [size, setSize] = useState(loadSize)
   /* Whether Play sizes its tiles from the screen instead of the step. */
   const [fit, setFit] = useState(loadFit)
+  /* Which page of Setup is open; null is the list of rows. */
+  const [setupPage, setSetupPage] = useState(null)
   /*
    * Named rather than written inline in the tab row.
    *
@@ -6446,36 +6462,97 @@ export default function App() {
 
       <Sheet
         open={sheet === 'settings'}
-        onClose={() => setSheet(null)}
+        onClose={() => {
+          setSheet(null)
+          setSetupPage(null)
+        }}
         title="Setup"
         note={device?.short || device?.name || null}
       >
-        {/* `reconnect`, not `read`: a plain re-read is what the old Reconnect
-            button did, and it is why refreshing the page was the only thing
-            that worked when a relay went quiet. This one drops a dead relay
-            and rejoins the session before it reads. */}
-        <DeviceDetail
-          status={status}
-          device={device}
-          onRetry={reconnect}
-          busy={busy}
-          onHistory={() => setSheet('history')}
-          /* Rename this preset or its scenes: the sheet the pencil on Play
-             used to open. Here beside Read the unit again, as asked. */
-          onRename={() => setSheet('scenes')}
-        />
+        {/*
+          Setup, as a list.
 
-        <Group key="screen" title="Screen" note="How Play looks">
-          {/*
-            How big the buttons on Play are.
+          "I wanna overhaul this whole settings set-up screen." It was four
+          doors with five unrelated buttons over them — History, Demo mode,
+          Read the unit again, Rename, a theme switch — and two panels that had
+          fallen off the end. Nothing on it said what state anything was in
+          until a door was opened.
 
-            "Let's move the sizing to the Settings menu." The two steps sat
-            beside the preset name on Play, on the one row there that was
-            already fighting for width. It is set once and kept, which is what
-            this sheet is for. Same state, same storage — App owns the step
-            because the first paint has to know it before Play mounts.
-          */}
-          <Section key="size" title="Button size" note={fit ? 'Fit to screen' : SIZES[size].name}>
+          Now: the version line he likes at the top, then seven rows, each
+          carrying the one fact you would have opened it for, each opening its
+          own page. Rename stays on the Unit page beside Read the unit again —
+          "move the rename presets and scenes button to the settings menu" —
+          History moved in with the AI's work, the theme switch in with the
+          Play screen, and the real amp names got a row of their own.
+        */}
+        {setupPage === null ? (
+          <>
+            <div className="device-meta mono setup-version">{FULL}</div>
+            <div className="setup-rows">
+              <SetupRow key="unit" title="Unit" status={status === 'live' ? `${device?.short || device?.name || 'Unit'} · connected` : 'Not connected'} onClick={() => setSetupPage('unit')} />
+              <SetupRow key="link" title="Phone & Mac" status={describeLink(link).note || 'Phone remote off'} onClick={() => setSetupPage('link')} />
+              <SetupRow key="play" title="Play screen" status={[fit ? 'Fit to screen' : SIZES[size].name, playing ? 'Play mode' : null, THEME_WORD[getMode()] || null].filter(Boolean).join(' · ')} onClick={() => setSetupPage('play')} />
+              <SetupRow key="ai" title="AI & cost" status={today()?.cost ? `${formatCost(today().cost)} today` : 'Nothing spent today'} onClick={() => setSetupPage('ai')} />
+              <SetupRow key="gear-names" title="Amp & pedal names" status="What each model on your unit really is" onClick={() => setSheet('gear')} />
+              <SetupRow key="help" title="Help & fixes" status={`${getDebugLog().length} line${getDebugLog().length === 1 ? '' : 's'} in the log`} onClick={() => setSetupPage('help')} />
+              <SetupRow key="about" title="About" status={FULL} onClick={() => setSetupPage('about')} />
+            </div>
+          </>
+        ) : null}
+
+        {setupPage === 'unit' ? (
+          <div className="setup-page">
+            <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
+              ‹ Setup
+            </button>
+            <p className="setup-page-title">{SETUP_PAGES.unit}</p>
+            <DeviceDetail status={status} device={device} onRetry={reconnect} busy={busy} onRename={() => setSheet('scenes')} />
+<Section key="connection" title="Connection" note="Which unit this app is talking to">
+            <Ports
+              busy={busy}
+              onError={setError}
+              onChanged={(summary) => {
+                record('port', summary)
+                read()
+              }}
+            />
+          </Section>
+{device?.capabilities?.fc?.model !== false ? (
+            <Section key="footswitches" title="Footswitches">
+              <Footswitches onError={setError} />
+            </Section>
+          ) : null}
+          </div>
+        ) : null}
+
+        {setupPage === 'link' ? (
+          <div className="setup-page">
+            <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
+              ‹ Setup
+            </button>
+            <p className="setup-page-title">{SETUP_PAGES.link}</p>
+<Section key="phone-remote" title="Phone remote" note={describeLink(link).note}>
+            {/*
+              One panel for both ends. It says which end this is, whether the
+              other end answers, and offers the one thing that state calls for.
+              The four panels it replaces — each written for the person who built
+              the app — are gone, and the words they used with them.
+            */}
+            <PhoneRemote link={link} onAction={linkAction} onError={setError} busy={busy} />
+          </Section>
+          <Section key="link-details" title="Link details" note="What the phone and the Mac say about the line between them">
+            <LinkDetails />
+          </Section>
+          </div>
+        ) : null}
+
+        {setupPage === 'play' ? (
+          <div className="setup-page">
+            <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
+              ‹ Setup
+            </button>
+            <p className="setup-page-title">{SETUP_PAGES.play}</p>
+<Section key="size" title="Button size" note={fit ? 'Fit to screen' : SIZES[size].name}>
             <div className="size-steps" role="group" aria-label="Button size">
               <button
                 className="size-step"
@@ -6526,15 +6603,7 @@ export default function App() {
               </span>
             </label>
           </Section>
-
-          {/*
-            The switch that clears the screen for playing.
-
-            In the first group and above the rig, because it is the one thing
-            in this sheet somebody reaches for in a hurry and with the lights
-            down — the rest of it is read once, when something is wrong.
-          */}
-          <Section key="playing" title="Playing" note={playing ? 'Ask is hidden' : 'Ask is available'}>
+<Section key="playing" title="Playing" note={playing ? 'Ask is hidden' : 'Ask is available'}>
             <label className="rename-choice">
               <input
                 type="checkbox"
@@ -6554,146 +6623,31 @@ export default function App() {
               </span>
             </label>
           </Section>
-        </Group>
-
-        <Group key="rig" title="My rig" note="Unit, phone, footswitches">
-          <Section key="connection" title="Connection" note="Which unit this app is talking to">
-            <Ports
-              busy={busy}
-              onError={setError}
-              onChanged={(summary) => {
-                record('port', summary)
-                read()
-              }}
-            />
+          <Section key="appearance" title="Appearance" note={THEME_WORD[getMode()] || 'Auto'}>
+            <Theme />
           </Section>
+          </div>
+        ) : null}
 
-          <Section key="phone-remote" title="Phone remote" note={describeLink(link).note}>
-            {/*
-              One panel for both ends. It says which end this is, whether the
-              other end answers, and offers the one thing that state calls for.
-              The four panels it replaces — each written for the person who built
-              the app — are gone, and the words they used with them.
-            */}
-            <PhoneRemote link={link} onAction={linkAction} onError={setError} busy={busy} />
-          </Section>
-
-          {device?.capabilities?.fc?.model !== false ? (
-            <Section key="footswitches" title="Footswitches">
-              <Footswitches onError={setError} />
-            </Section>
-          ) : null}
-
-          {/*
-            Only in the Mac app: Updates renders nothing without a bridge to the
-            updater, and a section that is always empty everywhere else is worse
-            than no section.
-          */}
-          {inDesktopApp() ? (
-            <Section key="updates" title="Updates" note="This app, not your unit">
-              <Updates />
-            </Section>
-          ) : null}
-        </Group>
-
-        <Group key="wrong" title="Something's wrong" note="Checks, the log, telling us">
-          {/*
-            Ask the unit about the preset you are on, when it is the preset that
-            is wrong rather than the app.
-
-            "Can we set up a way to read the parameters of the current scene to
-            investigate why there is no sound?" First behind the door that says
-            something is wrong, above the log rather than inside it: the log is
-            what the app did, and this is what the unit holds — a different
-            question, and the one asked when a preset is quiet. It reads on a
-            tap, because it is a dozen round trips down the port that is
-            carrying the audio.
-          */}
-          <Section
-            key="preset-check"
-            title="This preset"
-            note="Read every value in this scene, and what would stop it making a sound"
-          >
-            <PresetReport device={device} link={link} />
-          </Section>
-
-          <Section key="feedback" title="Tell us" note="Something broken, or something you want">
-            {/*
-              Where a person looks when the app has annoyed them: behind the
-              same door as the checks and the log, because "it's broken" and
-              "here is what broke" are one errand. It needs no account, because
-              most people driving a unit from their own Mac never sign in and
-              are exactly the ones who find the bugs.
-            */}
-            <Feedback device={device} link={link} platform={platform()} />
-          </Section>
-
-          <Section key="what-s-changed-this-session" title="What's changed this session">
-            <ChangeLog log={log} onClear={() => setLog([])} />
-          </Section>
-
-          <Section key="debug-log" title="Debug log" note="Share it as a file to the chat when something goes wrong">
-            {/*
-              One log, one Copy button. "Make a unified debug log with a copy
-              log button to send back to you for debugging in the settings menu.
-              Any debugging info already in menus move to debug log." The AI's
-              timeline, the wire, the app's own changes, every error: one list,
-              in order. The two detailed views under it are the same facts as
-              tables, for reading rather than sending.
-            */}
-            <DebugLog device={device} link={link} />
-            <Diagnostics />
-            <LinkDetails />
-
-            {/*
-              This used to sit under every screen, permanently, including the one
-              you look at on a stage. It is worth saying once and worth being
-              findable — which is here, not there.
-            */}
-            <p className="footnote">
-              Models and parameter ranges are read off the attached unit at generation time, so the
-              designer can only pick models that unit actually has and only set values inside each
-              control&rsquo;s real range. Anything outside it is rejected before a single write goes
-              out. Device access via{' '}
-              <a href="https://github.com/sKuhLight/ForgeFX" target="_blank" rel="noreferrer">
-                ForgeFX
-              </a>
-              , an independent project not affiliated with Fractal Audio Systems.
-            </p>
-          </Section>
-        </Group>
-
-        <Group key="ai" title="What the AI knows" note="What it learned from you">
-          {/*
-            What it has cost, kept across sessions and grouped the way the bill
-            is grouped.
-
-            "It's actually spending a lot more than what the app says." It was:
-            the session total counted designs and nothing else, so every message
-            on the Ask screen — the expensive ones, carrying the roster and the
-            whole transcript — spent money the screen never mentioned. A number
-            on a card that vanishes on reload cannot be checked against
-            anything; a ledger kept by UTC day can be put next to the console
-            and read straight across.
-          */}
-          <Section
+        {setupPage === 'ai' ? (
+          <div className="setup-page">
+            <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
+              ‹ Setup
+            </button>
+            <p className="setup-page-title">{SETUP_PAGES.ai}</p>
+            <div className="history-actions">
+              <button className="chip" onClick={() => setSheet('history')}>
+                History — every tone designed
+              </button>
+            </div>
+<Section
             key="token-usage"
             title="Token usage"
             note="Every call, by day — compare with your bill"
           >
             <TokenLog />
           </Section>
-
-          {/*
-            What the app has worked out about you, and the switch to stop it.
-
-            Anything inferred from someone's history has to be visible to them.
-            Without this the first surprising generation has no explanation and
-            no way to check one — and a profile you cannot see or refuse is the
-            kind of thing that reads as the app knowing too much, however
-            ordinary the arithmetic behind it turns out to be.
-          */}
-          <Section key="what-it-has-learned" title="What it has learned from you" note={taste ? `${taste.presets} presets` : 'Nothing yet'}>
+<Section key="what-it-has-learned" title="What it has learned from you" note={taste ? `${taste.presets} presets` : 'Nothing yet'}>
             <p className="hint">{summariseProfile(taste)}</p>
             {/*
               Say what actually happens, including the part that is a
@@ -6772,17 +6726,7 @@ export default function App() {
               ) : null}
             </div>
           </Section>
-
-          {/*
-            The person, in their own words.
-
-            Two boxes, editable, so the agent works on day one: what it knows
-            about you, and how you want it to talk to you. The first fills
-            itself in from conversations as well — see lib/memory.js — and is
-            shown here rather than kept somewhere you cannot see, for the same
-            reason the taste summary above is.
-          */}
-          <Section
+<Section
             key="about-you"
             title="About you"
             note={memory?.profile || memory?.preferences ? 'Told to the agent with every request' : 'Nothing yet'}
@@ -6796,8 +6740,7 @@ export default function App() {
               }}
             />
           </Section>
-
-          <Section key="band-book" title="Band book" note="Bands designed once, rebuilt for free">
+<Section key="band-book" title="Band book" note="Bands designed once, rebuilt for free">
             {/*
               The book was invisible — it filed every band-named design and
               answered for it on the next request, and the only trace was a
@@ -6806,57 +6749,64 @@ export default function App() {
             */}
             <BandBook />
           </Section>
-
-          <Section key="developer" title="Developer" note="See what the AI was given">
-            <TraceSwitch />
-          </Section>
-        </Group>
-
-        {/*
-          The way back to the introduction.
-
-          It shows itself once and then never again, which is right, but it
-          leaves the four things it explains unreachable to anyone who skipped
-          it on a day they were busy — or who has handed the app to a
-          bandmate. This is the only route back, so it is a plain button
-          rather than a link inside a paragraph.
-        */}
-        {/*
-          What every model on the unit really is.
-
-          "Add an info page like this to settings listing the real life
-          equivalents of each amp and effects pedals."
-
-          Beside the introduction rather than inside one of the four doors,
-          for the same reason that one is loose: it is a thing to read, not a
-          setting to change, and neither belongs under "Something's wrong".
-
-          Its own sheet rather than a fold, because it is four hundred rows
-          with a search over them — a list that long inside a panel inside a
-          sheet is two scrolls fighting for one thumb.
-        */}
-        <Section key="gear-names" title="Amp and pedal names" note="What each model on your unit really is">
-          <p className="hint">
-            Fractal can&rsquo;t print &ldquo;Marshall JCM800&rdquo; on a menu, so your unit says
-            &ldquo;Brit 800 2204 High&rdquo;. This is the translation, for every amp and pedal on
-            it &mdash; and you can search it by the real name.
-          </p>
-          <div className="history-actions">
-            <button
-              className="chip"
-              /* Straight from one sheet to the other. Sheet's own ledger is
-                 built for this handoff: the settings sheet pops the entry it
-                 pushed as it tears down, and the gear sheet, already listening
-                 by then, swallows that pop instead of reading it as a back
-                 gesture. */
-              onClick={() => setSheet('gear')}
-            >
-              Open the list
-            </button>
           </div>
-        </Section>
+        ) : null}
 
-        <Section key="how-this-works" title="How this works" note="A short introduction">
+        {setupPage === 'help' ? (
+          <div className="setup-page">
+            <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
+              ‹ Setup
+            </button>
+            <p className="setup-page-title">{SETUP_PAGES.help}</p>
+<Section
+            key="preset-check"
+            title="This preset"
+            note="Read every value in this scene, and what would stop it making a sound"
+          >
+            <PresetReport device={device} link={link} />
+          </Section>
+<Section key="debug-log" title="Debug log" note="Share it as a file to the chat when something goes wrong">
+            {/*
+              One log, one Copy button. "Make a unified debug log with a copy
+              log button to send back to you for debugging in the settings menu.
+              Any debugging info already in menus move to debug log." The AI's
+              timeline, the wire, the app's own changes, every error: one list,
+              in order. The two detailed views under it are the same facts as
+              tables, for reading rather than sending.
+            */}
+            <DebugLog device={device} link={link} />
+            <Diagnostics />
+
+            {/*
+              This used to sit under every screen, permanently, including the one
+              you look at on a stage. It is worth saying once and worth being
+              findable — which is here, not there.
+            */}
+            <p className="footnote">
+              Models and parameter ranges are read off the attached unit at generation time, so the
+              designer can only pick models that unit actually has and only set values inside each
+              control&rsquo;s real range. Anything outside it is rejected before a single write goes
+              out. Device access via{' '}
+              <a href="https://github.com/sKuhLight/ForgeFX" target="_blank" rel="noreferrer">
+                ForgeFX
+              </a>
+              , an independent project not affiliated with Fractal Audio Systems.
+            </p>
+          </Section>
+<Section key="feedback" title="Tell us" note="Something broken, or something you want">
+            {/*
+              Where a person looks when the app has annoyed them: behind the
+              same door as the checks and the log, because "it's broken" and
+              "here is what broke" are one errand. It needs no account, because
+              most people driving a unit from their own Mac never sign in and
+              are exactly the ones who find the bugs.
+            */}
+            <Feedback device={device} link={link} platform={platform()} />
+          </Section>
+<Section key="what-s-changed-this-session" title="What's changed this session">
+            <ChangeLog log={log} onClear={() => setLog([])} />
+          </Section>
+<Section key="how-this-works" title="How this works" note="A short introduction">
           <p className="hint">
             Four cards: what the three screens are for, how to ask for a sound, where a change
             actually goes, and what a scene is. It appears once the first time you connect.
@@ -6873,6 +6823,26 @@ export default function App() {
             </button>
           </div>
         </Section>
+          </div>
+        ) : null}
+
+        {setupPage === 'about' ? (
+          <div className="setup-page">
+            <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
+              ‹ Setup
+            </button>
+            <p className="setup-page-title">{SETUP_PAGES.about}</p>
+            <p className="device-meta mono">{FULL} · built {BUILT_AT} UTC</p>
+{inDesktopApp() ? (
+            <Section key="updates" title="Updates" note="This app, not your unit">
+              <Updates />
+            </Section>
+          ) : null}
+<Section key="developer" title="Developer" note="See what the AI was given">
+            <TraceSwitch />
+          </Section>
+          </div>
+        ) : null}
       </Sheet>
 
     </div>
