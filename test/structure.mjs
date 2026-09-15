@@ -1946,6 +1946,16 @@ export function run(test) {
     const list = console_.slice(console_.indexOf('export function PresetList'), console_.indexOf('export function BlockPanel'))
     assert.match(list, /const known = slots\.filter\(\(s\) => s\.name !== undefined\)/, 'the list no longer knows which slots have a name')
     assert.match(list, /const named = known\.filter/, 'the list shows slots read and found empty by default')
+    /*
+     * "Opened the list at 491 — the loaded preset is not a row in this list."
+     * The slot had been read as empty before a tone was saved into it, so the
+     * cached blank hid the row and the list opened at 000. The loaded
+     * preset's own name now wins over a cached name for its slot, the loaded
+     * slot is always a row, and a miss is not marked as settled.
+     */
+    assert.match(memo, /\(!byNumber\.has\(preset\.number\) \|\| preset\.name\.trim\(\)\)/, 'a slot read as empty before a save still hides the loaded preset')
+    assert.match(list, /const named = known\.filter\(\(s\) => \(s\.name \|\| ''\)\.trim\(\) \|\| s\.number === current\)/, 'the loaded slot can be hidden behind Show all')
+    assert.match(list, /done\('the loaded preset is not a row in this list'\)[\s\S]{0,600}?centredOn\.current = null/, 'a miss on opening is the only try the list ever makes')
     assert.match(list, /named\.length === 0/, 'the empty state is gated on the list length again, which is always the unit’s slot count')
     assert.ok(!/slots\.length === 0 \?/.test(list), 'the dead empty-state condition is back')
     assert.match(list, /Show all \$\{slots\.length\}/, 'the unnamed slots are shown by default again — or cannot be shown at all')
