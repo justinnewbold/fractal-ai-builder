@@ -4717,9 +4717,14 @@ export default function App() {
     const count = device?.capabilities?.presets?.count
     if (!count) return knownSlots
     const byNumber = new Map(knownSlots.map((s) => [s.number, s]))
-    // The loaded preset's name is one the unit has already told us. Its slot
-    // read "—" in a list of 512 of them, the one name on screen missing.
-    if (typeof preset?.number === 'number' && typeof preset?.name === 'string' && !byNumber.has(preset.number)) {
+    // The loaded preset's name is one the unit has already told us, and it
+    // wins over a cached name for its slot: a slot read as EMPTY and then saved
+    // into kept its blank, the blank hid the row, and the list opened at 000.
+    if (
+      typeof preset?.number === 'number' &&
+      typeof preset?.name === 'string' &&
+      (!byNumber.has(preset.number) || preset.name.trim())
+    ) {
       byNumber.set(preset.number, { number: preset.number, name: preset.name })
     }
     return Array.from({ length: count }, (_, i) => byNumber.get(i) || { number: i })

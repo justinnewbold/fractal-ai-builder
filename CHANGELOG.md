@@ -3,6 +3,17 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.217.0
+
+**The preset list opens on the preset you are on, after a save too.** It
+was meant to already, and did for a slot whose name had been read — but a
+slot that was read as empty and then saved into kept its blank in the
+name list, the blank hid the row behind "Show all", and the list opened at
+000 with the loaded preset nowhere in it. The loaded preset's own name now
+wins for its slot, the loaded slot is always a row, and if the row is not
+there the moment the sheet opens the list looks again as rows arrive
+instead of giving up for good.
+
 ## 7.216.0
 
 **The band book has a page.** Setup › Band book lists every band the app

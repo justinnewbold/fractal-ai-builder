@@ -285,7 +285,9 @@ export function PresetList({
   // The list is the presets, not the slots: a slot read and found empty is
   // hidden with the unread ones, behind the same "Show all" chip. On a
   // factory unit every slot is named, so this hides nothing there.
-  const named = known.filter((s) => (s.name || '').trim())
+  // The loaded slot is always a row, named or not: it is the one the list
+  // opens on, and a list that hides the thing you are standing on cannot.
+  const named = known.filter((s) => (s.name || '').trim() || s.number === current)
   /*
    * Recent keeps the order it was played in, which is the whole point of it —
    * sorting it by slot number would throw away the only thing it knows. The
@@ -442,6 +444,14 @@ export function PresetList({
           return
         }
         done('the loaded preset is not a row in this list')
+        /*
+         * Not settled, though. Rows arrive as names come off the unit and as
+         * the slot list is rebuilt after a save; marking this preset centred
+         * on a miss meant the first opening after a save was the only try
+         * the list ever made. Left unmarked, the next change to the rows
+         * looks again.
+         */
+        centredOn.current = null
         return
       }
 
