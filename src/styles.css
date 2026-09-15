@@ -9674,3 +9674,93 @@ button.phone-chip.compact.good,
 button.phone-chip.compact.bad {
   border-color: transparent;
 }
+
+/* ---------- Setup, as a list ---------- */
+
+.setup-version {
+  margin: 0 0 var(--s-3);
+}
+
+.setup-rows {
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+/* Thumb-high rows on a rule, like the phone's own Settings. */
+button.setup-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  min-height: 60px;
+  padding: var(--s-3) var(--s-4);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  border-top: 1px solid var(--rule);
+}
+
+button.setup-row:first-child {
+  border-top: 0;
+}
+
+.setup-row-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+
+.setup-row-title {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: var(--f-4);
+  color: var(--silk);
+}
+
+/* The one fact you would have opened the row to learn. */
+.setup-row-status {
+  font-size: var(--f-2);
+  color: var(--silk-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.setup-row-chevron {
+  flex: 0 0 auto;
+  font-size: var(--f-4);
+  color: var(--silk-faint);
+}
+
+/* A page: the way back first, then its name, then its panels on a rule. */
+button.setup-back {
+  min-height: 44px;
+  padding: var(--s-2) var(--s-3);
+  background: transparent;
+  border: 0;
+  color: var(--signal);
+  font-size: var(--f-3);
+  text-align: left;
+}
+
+.setup-page-title {
+  margin: 0 0 var(--s-2);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: var(--f-5, 20px);
+  color: var(--silk);
+}
+
+.setup-page > .section,
+.setup-page > * > .section {
+  margin-top: 0;
+  border: 0;
+  border-top: 1px solid var(--rule);
+  border-radius: 0;
+  background: transparent;
+}

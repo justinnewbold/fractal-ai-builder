@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { getHost, setHost, isDemo, setDemo } from '../lib/forgefx'
 import { remoteActive } from '../lib/remote'
-import Theme from './Theme'
 import { FULL } from '../lib/version'
 
 /**
@@ -15,24 +14,7 @@ import { FULL } from '../lib/version'
  * This was DeviceBar, whose collapsed summary the top bar carries. What
  * survives is the fold, opened by the gear.
  */
-export default function DeviceDetail({
-  status,
-  device,
-  onRetry,
-  busy,
-  /*
-   * Everything the player has made, one tap in.
-   *
-   * It was a fold near the bottom of this sheet: "I want a button, not a
-   * drop-down menu. And I want it at the top of the screen just like demo and
-   * read unit again so it's easily accessible quickly without scrolling down."
-   * So it is a plain button in this row, which is the first thing the gear
-   * opens onto and needs no scrolling to reach.
-   *
-   * First in the run, because it is the one here anybody opens on purpose —
-   * the rest of this row is the connection, touched about once a month.
-   */
-  onHistory, onRename }) {
+export default function DeviceDetail({ status, device, onRetry, busy, onRename }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(getHost())
 
@@ -123,7 +105,6 @@ export default function DeviceDetail({
             {demo || !remote ? (
               <span className="device-meta mono">{demo ? 'simulated' : getHost()}</span>
             ) : null}
-            {onHistory ? <button onClick={onHistory}>History</button> : null}
             <button onClick={toggleDemo}>{demo ? 'Use real device' : 'Demo mode'}</button>
             {!demo && !remote ? (
               <button onClick={() => setEditing(true)}>Change address</button>
@@ -142,17 +123,14 @@ export default function DeviceDetail({
             <button onClick={onRetry} disabled={busy}>
               {busy ? 'Reading…' : status === 'live' ? 'Read the unit again' : 'Reconnect'}
             </button>
-            {/* Rename this preset or its scenes. It was a pencil beside the
-                preset tile on Play; "move the rename presets and scenes button
-                to the settings menu next to read this unit again". Only with a
-                unit answering — there is nothing to name otherwise. */}
+            {/* "Move the rename presets and scenes button to the settings menu
+                next to read this unit again." Only with a unit answering — there
+                is nothing to name otherwise. */}
             {onRename && status === 'live' ? (
               <button onClick={onRename} disabled={busy}>
                 Rename preset or scenes
               </button>
             ) : null}
-            {/* Light or dark is set about as often as the host address. */}
-            <Theme />
           </>
         )}
       </div>
