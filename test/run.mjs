@@ -3379,7 +3379,29 @@ test('the stage screen is sized by whoever is holding it', () => {
    * are what a floor could never express, since a floor says "at least this
    * wide" and lets the viewport pick the rest.
    */
-  const { SIZES, DEFAULT_SIZE, clampSize, sizeVars, loadSize, saveSize } = gigSize
+  const { SIZES, DEFAULT_SIZE, clampSize, sizeVars, loadSize, saveSize, fitTiles, loadFit, saveFit } = gigSize
+
+  /*
+   * Fit: the screen decides the height. Eight scenes two across and nine
+   * blocks four across are seven rows; 560px of room less six 8px gaps is
+   * 512px, so 73px a tile. A rig too big for four across goes five, then six,
+   * before the tap floor is allowed to win and the page to scroll.
+   */
+  assert.deepEqual(fitTiles({ available: 560, scenes: 8, blocks: 9 }), { tile: 73, fxCols: 4 })
+  assert.deepEqual(fitTiles({ available: 900, scenes: 2, blocks: 4 }), { tile: 96, fxCols: 4 }, 'a small rig grows past the biggest step')
+  assert.deepEqual(fitTiles({ available: 300, scenes: 8, blocks: 16 }), { tile: 44, fxCols: 6 }, 'a rig that cannot fit does not drop under the tap floor')
+  const wide = fitTiles({ available: 340, scenes: 8, blocks: 12 })
+  assert.ok(wide.fxCols > 4 && wide.tile >= 44, `a tight rig should go wider before going under the floor — got ${JSON.stringify(wide)}`)
+  assert.deepEqual(fitTiles({ available: 500, scenes: 0, blocks: 0 }), { tile: 96, fxCols: 4 }, 'an empty preset should not divide by zero')
+  {
+    const mem = new Map()
+    const store = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, v), removeItem: (k) => mem.delete(k) }
+    assert.equal(loadFit(store), false, 'fit is on by default')
+    saveFit(true, store)
+    assert.equal(loadFit(store), true, 'fit did not stick')
+    saveFit(false, store)
+    assert.equal(loadFit(store), false, 'fit could not be turned off')
+  }
 
   assert.deepEqual(sizeVars(DEFAULT_SIZE), {
     '--gig-tile': '62px',

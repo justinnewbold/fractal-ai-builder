@@ -89,7 +89,7 @@ import { inDesktopApp } from './lib/desktop'
 import { createNameScan } from './lib/nameScan'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
 import Screens, { viewsFor } from './components/Screens'
-import { SIZES, loadSize, saveSize, clampSize } from './lib/gigSize'
+import { SIZES, loadSize, saveSize, clampSize, loadFit, saveFit } from './lib/gigSize'
 import { loadPlayMode, savePlayMode, askButtonShows } from './lib/playMode'
 import { remember as rememberPreset, CHANGED as MARKS_CHANGED } from './lib/presetMarks'
 import { CHANGED as SETLISTS_CHANGED } from './lib/setlists'
@@ -1192,6 +1192,8 @@ export default function App() {
   const askShows = askButtonShows({ status, view, playing })
 
   const [size, setSize] = useState(loadSize)
+  /* Whether Play sizes its tiles from the screen instead of the step. */
+  const [fit, setFit] = useState(loadFit)
   /*
    * Named rather than written inline in the tab row.
    *
@@ -5654,6 +5656,7 @@ export default function App() {
           slots={allSlots}
           capabilities={device?.capabilities}
           size={size}
+          fit={fit}
           onError={setError}
           onChanged={read}
           onPickPreset={() => setPresetMenu(true)}
@@ -6408,21 +6411,21 @@ export default function App() {
             this sheet is for. Same state, same storage — App owns the step
             because the first paint has to know it before Play mounts.
           */}
-          <Section key="size" title="Button size" note={SIZES[size].name}>
+          <Section key="size" title="Button size" note={fit ? 'Fit to screen' : SIZES[size].name}>
             <div className="size-steps" role="group" aria-label="Button size">
               <button
                 className="size-step"
                 onClick={() => resize(-1)}
-                disabled={size <= 0}
+                disabled={fit || size <= 0}
                 aria-label="Smaller buttons"
               >
                 −
               </button>
-              <span className="size-name">{SIZES[size].name}</span>
+              <span className="size-name">{fit ? 'Fit to screen' : SIZES[size].name}</span>
               <button
                 className="size-step"
                 onClick={() => resize(1)}
-                disabled={size >= SIZES.length - 1}
+                disabled={fit || size >= SIZES.length - 1}
                 aria-label="Bigger buttons"
               >
                 +
@@ -6432,6 +6435,32 @@ export default function App() {
               The scenes, effects and preset tile on Play, bigger or smaller. This device
               remembers it.
             </p>
+            {/*
+              "It would be nice just to have everything static on the screen
+              without being able to scroll." A step is a fixed height, so
+              whether the rig fits depends on the preset. This hands the
+              height to the screen instead: Play measures what is left and
+              sizes the tiles so the last row of effects sits above the footer.
+            */}
+            <label className="rename-choice">
+              <input
+                type="checkbox"
+                checked={fit}
+                onChange={(e) => {
+                  const on = e.target.checked
+                  setFit(on)
+                  saveFit(on)
+                }}
+              />
+              <span>
+                Fit everything on one screen
+                <span className="hint">
+                  Sizes the scenes and effects so the whole rig is on screen at once, with no
+                  scrolling. Bigger presets get smaller buttons, never under a thumb&rsquo;s width.
+                  Overrides the size above while it is on.
+                </span>
+              </span>
+            </label>
           </Section>
 
           {/*

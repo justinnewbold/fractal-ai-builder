@@ -280,14 +280,30 @@ button.scene-line:active:not(:disabled) {
   border-bottom: 1px solid var(--rule);
 }
 
-/* Blur is the depth: the content scrolling under the bar stays legible as
-   motion without competing as detail. Only where it's supported — elsewhere the
-   82% ground above carries it alone. */
-@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+/*
+ * No blur on the bar any more.
+ *
+ * It used to sit on a backdrop-filter, for depth. "I'm on iOS 27 and the top
+ * of the screen is now blurry a little bit" — the system now draws its own
+ * glass over the status area of a home-screen app, and a bar that is itself a
+ * blurred layer under that glass came out soft, text and all. A plain, nearly
+ * opaque ground is crisp under anything.
+ */
+.topbar {
+  background: color-mix(in srgb, var(--chassis) 94%, transparent);
+}
+
+/*
+ * And a little lower, on the home screen.
+ *
+ * The system's glass reaches a few pixels past the inset it reports, so a row
+ * that starts exactly at the inset has its top under it. Ten pixels of air
+ * between the two — only where there is a status bar to clear, which is the
+ * installed app; in a browser tab the browser's own chrome is above us.
+ */
+@media (display-mode: standalone) {
   .topbar {
-    background: color-mix(in srgb, var(--chassis) 72%, transparent);
-    -webkit-backdrop-filter: blur(18px) saturate(1.4);
-    backdrop-filter: blur(18px) saturate(1.4);
+    padding-top: calc(env(safe-area-inset-top, 0px) + 10px);
   }
 }
 
@@ -9363,7 +9379,9 @@ button.view-tab {
  * Both boxes stay over the 44px touch floor.
  */
 .gig[data-compact] button.gig-scene {
-  height: 56px;
+  /* Fit hands the height to the screen; see fitTiles. Without it, the
+     stated size. */
+  height: var(--gig-fit-tile, 56px);
   min-height: 0;
   padding: var(--s-1);
   gap: 0;
@@ -9384,7 +9402,7 @@ button.view-tab {
 }
 
 .gig[data-compact] button.gig-block {
-  height: 52px;
+  height: var(--gig-fit-tile, 52px);
   min-height: 0;
   /* 4px top and bottom at this size. The tile is a stated 52px here, so the
      two lines and their padding have to come in under it or the phone clips

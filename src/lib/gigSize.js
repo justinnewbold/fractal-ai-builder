@@ -112,3 +112,69 @@ export function saveSize(n, storage) {
     return false
   }
 }
+
+/*
+ * Fit: not a step on the ladder, a different rule.
+ *
+ * "It would be nice just to have everything static on the screen without
+ * being able to scroll." Every step above is a fixed height, so whether a rig
+ * fits depends on how many scenes and blocks the preset has — Smallest fits
+ * the demo and scrolls on a fourteen-block preset. Fit turns that round: the
+ * screen decides the height. The Play screen measures what is left once its
+ * own chrome is on, and this shares it out among the rows of tiles.
+ */
+const FIT_KEY = 'fractal.gigFit'
+
+/**
+ * How tall a tile can be for every scene and every block to be on screen at
+ * once, and how many blocks to a row that takes.
+ *
+ * `available` is the height left for the two grids together. Blocks start at
+ * `fxCols` to a row and go one wider each time the tile would otherwise drop
+ * under the tap floor — five or six small tiles a row is still a rig you can
+ * see whole, and a tile under 44px is one you cannot hit. Past six across it
+ * stops widening and the floor wins: a preset that big scrolls, which is what
+ * it did before.
+ */
+export function fitTiles({
+  available,
+  scenes = 0,
+  blocks = 0,
+  sceneCols = 2,
+  fxCols = 4,
+  gap = 8,
+  min = 44,
+  max = 96
+} = {}) {
+  const room = Math.max(0, Number(available) || 0)
+  const sceneRows = Math.ceil(Math.max(0, scenes) / Math.max(1, sceneCols))
+  let cols = Math.max(1, fxCols)
+  for (;;) {
+    const rows = sceneRows + Math.ceil(Math.max(0, blocks) / cols)
+    if (!rows) return { tile: max, fxCols: cols }
+    const tile = Math.floor((room - gap * (rows - 1)) / rows)
+    if (tile >= min || cols >= 6) return { tile: Math.max(min, Math.min(max, tile)), fxCols: cols }
+    cols += 1
+  }
+}
+
+/** Whether Play fits itself to the screen on this device. */
+export function loadFit(storage) {
+  try {
+    const store = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null)
+    return store?.getItem(FIT_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+export function saveFit(on, storage) {
+  try {
+    const store = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null)
+    if (on) store?.setItem(FIT_KEY, '1')
+    else store?.removeItem(FIT_KEY)
+    return true
+  } catch {
+    return false
+  }
+}

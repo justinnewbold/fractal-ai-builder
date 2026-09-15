@@ -356,6 +356,32 @@ export function run(test) {
     }
   })
 
+  test('Play can fit the whole rig on one screen, and the bar sits clear of the glass', () => {
+    /*
+     * "It would be nice just to have everything static on the screen without
+     * being able to scroll." Fit is a switch under Button size: Play wears
+     * the trimmed layout, measures what the screen has left after its own
+     * chrome, and hands that to fitTiles for the tile height and the block
+     * columns. And "I'm on iOS 27 and the top of the screen is now blurry":
+     * the bar lost its backdrop blur and sits ten pixels under the inset on
+     * the home screen.
+     */
+    const gig = readFileSync(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8')
+    assert.match(gig, /const compact = fit \|\| size === 0/, 'Fit does not wear the trimmed layout')
+    assert.match(gig, /const chrome = el\.scrollHeight - grids/, 'the chrome is not measured as the screen less its grids')
+    assert.match(gig, /fitTiles\(\{\s*\n\s*available: viewport - top - chrome/, 'the grids are not handed what the screen has left')
+    assert.match(gig, /'--gig-fit-tile': `\$\{fitVars\.tile\}px`, '--gig-fx-cols': String\(fitVars\.fxCols\)/, 'the measured height does not reach the tiles')
+    assert.match(gig, /\}, \[fit, hasScenes, sceneCount, blocks\.length\]\)/, 'the measure does not follow the rig')
+    assert.match(src, /fit=\{fit\}/, 'Play is not told about Fit')
+    assert.match(src, /Fit everything on one screen/, 'Setup has no Fit switch')
+    assert.match(src, /disabled=\{fit \|\| size <= 0\}/, 'the size steps still move while Fit is on')
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    assert.match(css, /\.gig\[data-compact\] button\.gig-scene \{[^}]*height: var\(--gig-fit-tile, 56px\)/, 'a scene tile ignores the fitted height')
+    assert.match(css, /\.gig\[data-compact\] button\.gig-block \{[^}]*height: var\(--gig-fit-tile, 52px\)/, 'a block tile ignores the fitted height')
+    assert.doesNotMatch(css, /\.topbar \{[^}]*backdrop-filter/, 'the bar is a blurred layer again')
+    assert.match(css, /@media \(display-mode: standalone\) \{\s*\n\s*\.topbar \{\s*\n\s*padding-top: calc\(env\(safe-area-inset-top, 0px\) \+ 10px\)/, 'the bar starts under the glass on the home screen')
+  })
+
   test('emptiness is judged on editable blocks, not raw count', () => {
     // An empty AM4 slot still reports input and output rows. Both hardware
     // failures of the chain builder were this gap wearing different errors:
