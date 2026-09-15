@@ -3,6 +3,13 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.223.0
+
+**The Footswitches panel is gone.** It asked the unit what its footswitches
+were set to, and no unit this app talks to answers that — the panel only
+ever opened onto a sentence saying to look at the unit. Footswitches are
+set on the unit's own Setup menu, as they always were.
+
 ## 7.222.0
 
 **Inside Setup, closing goes up, not out.** On one of Setup's pages, the X,

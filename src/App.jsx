@@ -29,7 +29,6 @@ import DevTrace, { TraceSwitch } from './components/DevTrace'
 import { traceEnabled } from './lib/devtrace'
 import { platform } from './lib/platform'
 import { Versions, DeviceBackup } from './components/Versions'
-import Footswitches from './components/Footswitches'
 import GridEditor from './components/GridEditor'
 import Ports from './components/Ports'
 import LocalLibrary from './components/LocalLibrary'
@@ -6530,11 +6529,6 @@ export default function App() {
               }}
             />
           </Section>
-{device?.capabilities?.fc?.model !== false ? (
-            <Section key="footswitches" title="Footswitches">
-              <Footswitches onError={setError} />
-            </Section>
-          ) : null}
           </div>
         ) : null}
 

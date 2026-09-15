@@ -3142,47 +3142,6 @@ table.matrix th:first-child,
   white-space: nowrap;
 }
 
-/* ---------- footswitches ---------- */
-
-.footswitches {
-  margin-top: 30px;
-}
-
-.fc-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: var(--s-2);
-  margin-top: 10px;
-}
-
-.fc-switch {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-1);
-  padding: var(--s-3) var(--s-3);
-  background: var(--panel);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-1);
-}
-
-.fc-num {
-  font-size: var(--f-1);
-  color: var(--silk-faint);
-}
-
-.fc-label {
-  font-family: var(--display);
-  font-weight: 600;
-  font-size: var(--f-2);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.fc-fn {
-  font-size: var(--f-1);
-  color: var(--live);
-}
-
 /* ---------- grid editor ---------- */
 
 .grid-editor {
