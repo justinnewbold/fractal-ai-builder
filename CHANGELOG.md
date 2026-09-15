@@ -3,6 +3,20 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.220.0
+
+**Two requests skip the model.** A plain "make a ___ rig" (or tone, preset,
+sound, patch) now goes straight to the designer with your own words — the
+chat turn that used to read it first and decide it was a design cost about
+13¢ and ten seconds and added nothing. And a plain whole-preset volume
+request — "turn it up 4 dB", "louder", "quieter a bit" — is done in the
+app on the Output block's Level, the same control the speaker slider moves,
+so every scene moves together. It used to go to the model, which cannot see
+the Output block and moved the amp's Level on one channel instead. Anything
+that names a block or a scene, or carries a brief, still goes to the model
+as before, and when the model does move an amp's Level for volume it now
+says which channel it landed on.
+
 ## 7.219.0
 
 **Play can fit the whole rig on one screen.** Setup › Button size has a new

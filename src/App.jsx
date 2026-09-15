@@ -82,7 +82,9 @@ import {
   rememberNote,
   summariseCorrections
 } from './lib/corrections'
-import { matchLocal, matchRename } from './lib/localCommands'
+import { matchLocal, matchRename, matchVolume, plainDesignRequest } from './lib/localCommands'
+import { setParamConfirmed, blockParams } from './lib/forgefx'
+import { outputLevelParam } from './lib/volume'
 import RenamePreset from './components/RenamePreset'
 import { countFromRefusal, slotCount, slotOutside, slotsForChat, timeLeft } from './lib/slots'
 import { inDesktopApp } from './lib/desktop'
@@ -4059,6 +4061,68 @@ export default function App() {
         /* A matcher that throws is a matcher that did not match, and it must
            not be able to stop a request that was going to the model anyway. */
         logDebug('local', 'the local matcher threw and was ignored', err?.message)
+      }
+
+      /*
+       * Two requests that do not go to the model at all.
+       *
+       * Both are exceptions to the watch-only rule above, and both for the
+       * same reason: the sentence has one reading, the app already owns the
+       * action, and the model turn was pure cost. "Make a Breaking Benjamin
+       * rig" spent a thirteen-cent chat turn deciding it was a design before
+       * the designer got the same words; "turn up the volume by 4 dB" spent
+       * one deciding to move the amp's Level on one channel, which is not the
+       * volume of the preset. See plainDesignRequest and matchVolume in
+       * lib/localCommands.js for exactly what is and is not caught.
+       */
+      const plain = plainDesignRequest(instruction, { blocks: withPositions })
+      if (plain && blocks.some((b) => !EXCLUDED_BLOCKS.includes(b.slug))) {
+        logDebug('local', 'handled here: a plain design request, straight to the designer', `"${instruction}"`)
+        setTurns((prev) => [
+          ...prev,
+          { role: 'assistant', text: 'Designing that — I\u2019ll show you the whole thing before anything is written.' }
+        ])
+        const scenesWanted = {
+          ...(scenesAskedFor(instruction, sceneCount) || {}),
+          ...(keepsName(instruction) ? { keepName: true } : {})
+        }
+        await generate(plain.text, null, scenesWanted)
+        return
+      }
+
+      const volume = matchVolume(instruction)
+      if (volume && outputEid !== null) {
+        /*
+         * The Output block's Level — the control the speaker slider moves and
+         * the one every scene passes through. Read fresh, moved by the dB
+         * asked for, held inside its own range, and read back the way every
+         * write is.
+         */
+        setProgress('Moving the volume…')
+        const level = outputLevelParam((await blockParams(outputEid))?.named)
+        const now = Number(level?.value)
+        if (level && Number.isFinite(now)) {
+          const target = Math.round((now + volume.by) * 10) / 10
+          const to = Math.max(level.min ?? -Infinity, Math.min(level.max ?? Infinity, target))
+          const res = await setParamConfirmed(outputEid, level.id, to, { ...level, name: level.name || 'Level' })
+          const unit = level.unit || ' dB'
+          const line = `${volume.by > 0 ? 'Up' : 'Down'} ${Math.abs(volume.by)} dB on the whole preset — Output level ${now}${unit} → ${to}${unit}`
+          logDebug('local', 'handled here: whole-preset volume on the Output block', `"${instruction}" → ${line}`)
+          record('edit', line, [], false)
+          setTurns((prev) => [
+            ...prev,
+            {
+              role: 'assistant',
+              text: res.ok
+                ? `${line}. Every scene moves together, because that is the level everything leaves through.${
+                    to !== target ? ` Stopped at the end of the control's range.` : ''
+                  }`
+                : `Sent ${line}, but the unit read back something else — check the speaker slider.`
+            }
+          ])
+          setDirty(true)
+          return
+        }
       }
 
       setProgress(`${THINKING}…`)

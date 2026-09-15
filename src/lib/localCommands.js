@@ -342,3 +342,79 @@ function tidy(text) {
   const name = String(text ?? '').trim().replace(/^["']|["']$/g, '').trim()
   return name && name.length <= 31 ? name : null
 }
+
+/*
+ * Whole-preset volume, without a block named.
+ *
+ * "Turn up the volume on this preset by 4 dB" and "pump it up a little more"
+ * both went to the model — seven to ten seconds and a chat turn's worth of
+ * tokens each — and the model, which never sees the Output block (rule 4 of
+ * its instructions, and the guardrails strip it), answered with the amp's
+ * Level on whichever channel the amp was sitting on. Scenes on another
+ * channel did not move. The control that every scene passes through is the
+ * Output block's Level, the same one the speaker slider moves, and moving it
+ * by a number of dB is arithmetic, not judgement. So this is caught here.
+ *
+ * Only the whole preset: a sentence that names a block or a scene is not
+ * matched, and goes to the model as before. The amount is the dB asked for,
+ * two for "a bit", three with none said, and never more than twelve — past
+ * that somebody should be told in words what they are about to do.
+ */
+const AMT = "(?: (?:a (?:bit|touch|little|hair|smidge)(?: more)?|(?:by )?(\\d+(?:\\.\\d+)?) ?db))?"
+const WHOLE = '(?:it|this|this preset|the preset|everything|the whole thing|the whole preset|the volume|the loudness|the level|the overall level|the master|the master level|volume|loudness)'
+const VOLUME_RULES = [
+  new RegExp(`^(?:turn |bring |pump |crank |take )?${WHOLE}(?: (?:on|of|for) (?:this |the )?(?:whole )?preset)? (up|down)${AMT}$`),
+  new RegExp(`^turn (up|down) (?:the )?(?:volume|loudness|level|whole preset|preset)(?: (?:on|of|for) (?:this |the )?(?:whole )?preset)?${AMT}$`),
+  new RegExp(`^(?:make (?:it|this|this preset|the preset|everything) )?(louder|quieter|softer)${AMT}$`),
+  new RegExp(`^(\\d+(?:\\.\\d+)?) ?db (louder|quieter|softer)$`)
+]
+
+export function matchVolume(instruction) {
+  const t = strip(instruction)
+  if (!t || t.length > 80) return null
+  for (const re of VOLUME_RULES) {
+    const m = re.exec(t)
+    if (!m) continue
+    // The direction and the number land in different groups per shape; find
+    // each by kind rather than by position.
+    const word = m.slice(1).find((g) => /^(up|down|louder|quieter|softer)$/.test(g || ''))
+    const said = m.slice(1).find((g) => g !== undefined && g !== word && /^\d/.test(g))
+    if (!word) continue
+    const up = word === 'up' || word === 'louder'
+    const little = /\ba (?:bit|touch|little|hair|smidge)\b/.test(t)
+    const amount = said !== undefined ? num(said) : little ? 2 : 3
+    if (amount === null || amount <= 0 || amount > 12) return null
+    const by = up ? amount : -amount
+    return { kind: 'setVolume', by, why: `Whole preset ${up ? 'up' : 'down'} ${amount} dB.` }
+  }
+  return null
+}
+
+/*
+ * A plain request for a whole new tone.
+ *
+ * "Make a Breaking Benjamin rig" went to the chat model first, which read it,
+ * thought about it at medium effort, and answered "this is a design" — a
+ * thirteen-cent, ten-second turn to decide the one thing the sentence already
+ * said. The designer takes the player's own words, so the chat turn added
+ * nothing but the roster it carried.
+ *
+ * Deliberately narrow, the same way the matcher above is: a verb, a thing, and
+ * a noun that means "a tone", with nothing after it. "Make the delay sound
+ * bigger" does not end in the noun; "make a scene modeled after Heart-Shaped
+ * Box" does not either. Anything with more in it — a song list, a chain of
+ * clauses — is the model's, exactly as before. A subject that is one of the
+ * blocks on the grid ("make the amp tone brighter" is caught by the ending,
+ * but "make the amp tone" is not) is not a band and not a design.
+ */
+export function plainDesignRequest(instruction, ctx = {}) {
+  const t = strip(instruction)
+  if (!t || t.length > 80) return null
+  const m = /^(?:make|build|design|create|give me|dial in|dial up|set up|do) (?:me )?(?:a |an |the )?(.+?) (rig|tone|preset|sound|patch)$/.exec(t)
+  if (!m) return null
+  const subject = m[1].trim()
+  if (!subject || /^(?:this|that|it|my|current|the current|new|another|a new)$/.test(subject)) return null
+  if (findBlock(subject, ctx.blocks || [])) return null
+  const text = String(instruction ?? '').trim()
+  return { kind: 'designTone', text, why: `A ${subject} ${m[2]} — straight to the designer.` }
+}
