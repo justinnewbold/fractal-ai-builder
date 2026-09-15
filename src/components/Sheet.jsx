@@ -152,7 +152,13 @@ export default function Sheet({
         return
       }
       pushed.current = false
-      close()
+      /*
+       * A sheet with pages inside it — Setup — answers Back by going up a
+       * page rather than closing, and says so by returning 'stay'. It is
+       * still open, so it needs an entry of its own again to catch the next
+       * Back; without this the second Back left the app.
+       */
+      if (close() === 'stay') mark()
     }
     const stop = listen(back)
     return () => {

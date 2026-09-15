@@ -1483,6 +1483,20 @@ export function run(test) {
     assert.match(css, /button\.setup-row \{[^}]*min-height: 60px/, 'a Setup row is under thumb height')
     const row = readFileSync(new URL('../src/components/SetupRow.jsx', import.meta.url), 'utf8')
     assert.match(row, /setup-row-status/, 'a row has nowhere to say its state')
+
+    /*
+     * "When you go deeper into the settings menu have swiping down or
+     * clicking the X take you back to the settings menu instead of the home
+     * screen." One handler answers all three (X, swipe, Escape) and the
+     * browser's Back: on a page it goes up to the list and says 'stay'; the
+     * sheet then keeps a history entry so the next Back is caught too. The
+     * two sheets only Setup opens close back onto Setup.
+     */
+    assert.match(setup, /if \(setupPage\) \{\s*\n\s*setSetupPage\(null\)\s*\n\s*return 'stay'/, 'closing a page leaves Setup')
+    const sheetSrc = readFileSync(new URL('../src/components/Sheet.jsx', import.meta.url), 'utf8')
+    assert.match(sheetSrc, /if \(close\(\) === 'stay'\) mark\(\)/, 'a sheet that stayed open on Back has no entry for the next Back')
+    assert.match(sheet('History'), /onClose=\{\(\) => setSheet\('settings'\)\}/, 'closing History leaves Setup')
+    assert.match(sheet('Amp and pedal names'), /onClose=\{\(\) => setSheet\('settings'\)\}/, 'closing the gear sheet leaves Setup')
   })
 
   test('no price note outlives the date it promises', () => {
