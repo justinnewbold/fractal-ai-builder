@@ -183,6 +183,23 @@ const whyItFailed = (err) =>
     ? `${err.message} (${err.detail})`
     : err?.message || String(err)
 
+/**
+ * Failures that are answers, not faults, and do not belong in the debug log.
+ *
+ * Every debug log from a phone opened with the same two lines, twice each:
+ * "POST /preset/backup failed — You can't back up a preset from your phone"
+ * and "GET /store/config/scene-names-fm3:486 failed — not found". Neither is
+ * anything going wrong. The first is the app asking for a safety copy the
+ * relay refuses by design, which the app knows and says where it matters. The
+ * second is a document the host was never given — scene names for a slot
+ * nobody has saved from here — and readHostDoc answers null for it. A log
+ * that opens with four alarms about nothing is a log whose real lines get
+ * skimmed past.
+ */
+const routine = (path, options, err) =>
+  !!err?.remoteBlocked ||
+  ((options.method || 'GET') === 'GET' && /^\/store\/config\//.test(path) && err?.status === 404)
+
 async function request(path, options = {}) {
   /*
    * A dump that arrived garbled is asked for again before anyone sees it.
@@ -194,8 +211,11 @@ async function request(path, options = {}) {
     (err) => {
       // Every request the app makes comes through here, so this is the one
       // place a failed one is written to the debug log — after the retry has
-      // had its say, so a garbled read that was asked again is not a failure.
-      logDebug('unit', `${options.method || 'GET'} ${path} failed`, whyItFailed(err))
+      // had its say, so a garbled read that was asked again is not a failure,
+      // and a refusal or an absence the app expects is not one either.
+      if (!routine(path, options, err)) {
+        logDebug('unit', `${options.method || 'GET'} ${path} failed`, whyItFailed(err))
+      }
       throw err
     }
   )
