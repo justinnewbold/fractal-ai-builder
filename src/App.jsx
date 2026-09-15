@@ -6464,6 +6464,7 @@ export default function App() {
 
       <Sheet
         open={sheet === 'settings'}
+<<<<<<< HEAD
         /*
           "When you go deeper into the settings menu have swiping down or
           clicking the X take you back to the settings menu instead of the
@@ -6478,6 +6479,11 @@ export default function App() {
           }
           setSheet(null)
           return undefined
+=======
+        onClose={() => {
+          setSheet(null)
+          setSetupPage(null)
+>>>>>>> origin/main
         }}
         title="Setup"
         note={device?.short || device?.name || null}

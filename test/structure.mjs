@@ -1483,6 +1483,7 @@ export function run(test) {
     assert.match(css, /button\.setup-row \{[^}]*min-height: 60px/, 'a Setup row is under thumb height')
     const row = readFileSync(new URL('../src/components/SetupRow.jsx', import.meta.url), 'utf8')
     assert.match(row, /setup-row-status/, 'a row has nowhere to say its state')
+<<<<<<< HEAD
 
     /*
      * "When you go deeper into the settings menu have swiping down or
@@ -1497,6 +1498,8 @@ export function run(test) {
     assert.match(sheetSrc, /if \(close\(\) === 'stay'\) mark\(\)/, 'a sheet that stayed open on Back has no entry for the next Back')
     assert.match(sheet('History'), /onClose=\{\(\) => setSheet\('settings'\)\}/, 'closing History leaves Setup')
     assert.match(sheet('Amp and pedal names'), /onClose=\{\(\) => setSheet\('settings'\)\}/, 'closing the gear sheet leaves Setup')
+=======
+>>>>>>> origin/main
   })
 
   test('no price note outlives the date it promises', () => {
