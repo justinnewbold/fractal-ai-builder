@@ -382,6 +382,26 @@ export function run(test) {
     assert.match(css, /@media \(display-mode: standalone\) \{\s*\n\s*\.topbar \{\s*\n\s*padding-top: calc\(env\(safe-area-inset-top, 0px\) \+ 10px\)/, 'the bar starts under the glass on the home screen')
   })
 
+  test('a plain design and a plain volume request never reach the model', () => {
+    /*
+     * "Make a Breaking Benjamin rig" spent a thirteen-cent chat turn deciding
+     * it was a design; "turn up the volume by 4 dB" spent one moving the
+     * amp's Level on one channel. Both are answered in the app now: the
+     * design goes straight to the designer with the player's own words, the
+     * volume moves the Output block's Level — the speaker slider's control —
+     * and reads it back like any write. Both only after the watch line, so
+     * the tally still counts them.
+     */
+    const ask = src.slice(src.indexOf("logDebug('local', 'the local matcher threw and was ignored'"), src.indexOf('const body = await askPlan('))
+    assert.match(ask, /const plain = plainDesignRequest\(instruction, \{ blocks: withPositions \}\)/, 'a plain design is not looked for')
+    assert.match(ask, /if \(plain && blocks\.some\(\(b\) => !EXCLUDED_BLOCKS\.includes\(b\.slug\)\)\)/, 'a design on an empty slot skips the chain build')
+    assert.match(ask, /await generate\(plain\.text, null, scenesWanted\)/, 'the designer does not get the player\u2019s own words')
+    assert.match(ask, /const volume = matchVolume\(instruction\)/, 'a plain volume request is not looked for')
+    assert.match(ask, /if \(volume && outputEid !== null\)/, 'volume is moved with no Output block to move')
+    assert.match(ask, /setParamConfirmed\(outputEid, level\.id, to, \{ \.\.\.level, name: level\.name \|\| 'Level' \}\)/, 'the Output level is written without a read-back')
+    assert.match(ask, /Math\.max\(level\.min \?\? -Infinity, Math\.min\(level\.max \?\? Infinity, target\)\)/, 'the level can leave its range')
+  })
+
   test('emptiness is judged on editable blocks, not raw count', () => {
     // An empty AM4 slot still reports input and output rows. Both hardware
     // failures of the chain builder were this gap wearing different errors:
@@ -996,7 +1016,11 @@ export function run(test) {
      */
     const at = src.indexOf('const would =')
     assert.notEqual(at, -1, 'the local matcher is not run at all')
-    const block = src.slice(src.lastIndexOf('try {', at), src.indexOf('THINKING', at))
+    /* The watching block ends where the two named exceptions begin — a plain
+       design and a plain volume request, which have their own test — or at
+       the model turn if those are ever removed. */
+    const exceptions = src.indexOf('Two requests that do not go to the model at all', at)
+    const block = src.slice(src.lastIndexOf('try {', at), exceptions === -1 ? src.indexOf('THINKING', at) : exceptions)
 
     assert.match(block, /logDebug\(\s*'local'/, 'a match is not recorded anywhere')
     for (const escape of ['return', 'setTurns', 'runActions', 'applyChanges', 'setParam', 'await ']) {

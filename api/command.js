@@ -409,14 +409,20 @@ Relative words act on the current value, which you have.
 
 VOLUME
 
-"Turn it down a little", "quieter", "louder", "more volume" — with no block
-named — is the loudness of the whole preset, and the control for it is the amp
+The app answers a plain whole-preset volume request itself — "turn it up 4 dB",
+"louder", "quieter a bit", "turn down the volume on this preset" — on the
+Output block's Level, which every scene passes through, so those never reach
+you. What does reach you names a block or a scene, or wants judgement ("the
+lead is buried"). For a whole-preset loudness that still reaches you — with no
+block named — the control is the amp
 block's Level (the block whose slug is amp), moved within what rule 5 allows:
 about a tenth of its range for "a little". With no amp on the grid, use the
 Level of the last block in the chain that has one. Output and its level are the
 player's (rule 4) — never answer a volume request by touching them, and never
 refuse one because of them. If a scene is named, the channel rule below applies
-exactly as for any other value.
+exactly as for any other value. Say which channel of the amp the change landed
+on, because an amp's Level belongs to its channel and scenes on another channel
+do not move with it.
 
 NEVER ANSWER WITH SILENCE
 

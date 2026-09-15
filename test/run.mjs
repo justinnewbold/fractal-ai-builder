@@ -4378,7 +4378,40 @@ test('the plain requests never needed a model, and the rest still do', async () 
    * it does today — and a wrong match writes something to a unit somebody is
    * about to play. So most of what is asserted here is what must NOT match.
    */
-  const { matchLocal, matchRename } = await import('../src/lib/localCommands.js')
+  const { matchLocal, matchRename, matchVolume, plainDesignRequest } = await import('../src/lib/localCommands.js')
+
+  /*
+   * Whole-preset volume, caught here rather than spent on the model.
+   * Both sentences from the log that started this, then the shapes around
+   * them; a block named, or an amount nobody should make in one move, is a
+   * miss and goes to the model as before.
+   */
+  assert.deepEqual(matchVolume('Turn up the volume on this preset by 4DB'), { kind: 'setVolume', by: 4, why: 'Whole preset up 4 dB.' })
+  assert.deepEqual(matchVolume('Pump it up a little more, four more DB')?.by, undefined, 'a number spelled out is guessed at')
+  assert.equal(matchVolume('pump it up a little more')?.by, 2, '"a little" is not a small step')
+  assert.equal(matchVolume('turn it down 3 db')?.by, -3)
+  assert.equal(matchVolume('louder')?.by, 3, 'a bare "louder" has no default step')
+  assert.equal(matchVolume('quieter a bit')?.by, -2)
+  assert.equal(matchVolume('6 db louder')?.by, 6)
+  assert.equal(matchVolume('make it quieter')?.by, -3)
+  assert.equal(matchVolume('turn the volume down')?.by, -3)
+  assert.equal(matchVolume('turn up the delay'), null, 'a named block is not the whole preset')
+  assert.equal(matchVolume('turn it up 20 db'), null, 'twenty dB in one move should be the model\u2019s to talk about')
+  assert.equal(matchVolume('louder in scene 3'), null, 'a scene named is not the whole preset')
+
+  /*
+   * A plain "make a ___ rig" skips the chat turn. The three from the log,
+   * then the sentences that must NOT be taken for a design.
+   */
+  assert.equal(plainDesignRequest('Make a breaking Benjamin rig')?.text, 'Make a breaking Benjamin rig')
+  assert.equal(plainDesignRequest('make a Metallica preset')?.kind, 'designTone')
+  assert.equal(plainDesignRequest('give me a clean sound')?.kind, 'designTone')
+  assert.equal(plainDesignRequest('please build me a 4 scene Tool preset')?.kind, 'designTone', 'politeness sent it to the model')
+  assert.equal(plainDesignRequest('make the delay sound bigger'), null, 'an adjustment was taken for a design')
+  assert.equal(plainDesignRequest('a scene modeled after Heart-Shaped Box by Nirvana'), null)
+  assert.equal(plainDesignRequest('Create a few scenes for bullet for my valentine song tears dont fall, should have a clean intro with delay then heavy'), null, 'a request with a brief in it is not plain')
+  assert.equal(plainDesignRequest('make the amp tone', { blocks: [{ eid: 1, name: 'Amp 1', slug: 'amp' }] }), null, 'a block on the grid was taken for a band')
+  assert.equal(plainDesignRequest('make it sound like a marshall'), null)
 
   const amp = { eid: 100, name: 'Amp 1', slug: 'amp' }
   const delay1 = { eid: 101, name: 'Delay 1', slug: 'delay' }
@@ -10191,6 +10224,8 @@ test('the model is told what volume means, and never to answer with silence', ()
   const command = readSrc(new URL('../api/command.js', import.meta.url), 'utf8')
   assert.match(command, /\nVOLUME\n/, 'the prompt says nothing about volume')
   assert.match(command, /amp\s+block's Level/, 'volume is not tied to the amp’s Level')
+  assert.match(command, /The app answers a plain whole-preset volume request itself/, 'the model is not told the app handles plain volume')
+  assert.match(command, /Say which channel of the amp the change landed\s+on/, 'an amp-level volume change does not name its channel')
   assert.match(command, /never answer a volume request by touching them, and never\s+refuse one because of them/, 'the model may still refuse "volume" because Output is off limits')
   assert.match(command, /\nNEVER ANSWER WITH SILENCE\n/, 'nothing tells the model an empty reply is wrong')
   assert.match(command, /"refused" says\s+why not and what would work instead/)
