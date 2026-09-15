@@ -1640,8 +1640,6 @@ export const backupDevice = (label, from = 0, to = 511) =>
       })
 
 
-/** Footswitch layout the unit reports. */
-export const fcModel = () => (mock ? tick().then(() => null) : request('/fc/model'))
 
 
 /* ------------------------------------------------------------------
