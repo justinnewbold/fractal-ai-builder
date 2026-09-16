@@ -96,7 +96,7 @@ refused. A mixed pair fails safe rather than quietly.
 Cloud builds, no Xcode and no Android Studio:
 
 1. Add an [Expo access token](https://expo.dev/settings/access-tokens) with build
-   permission as the repository secret `EXPO_TOKEN`.
+   permission as the repository secret `EXPO_SECRET`.
 2. Actions → **mobile** → Run workflow. Pick a platform and a profile.
 3. The build appears at [expo.dev](https://expo.dev) with an install link.
 

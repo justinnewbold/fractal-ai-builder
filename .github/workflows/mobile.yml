@@ -12,9 +12,21 @@
 # the far end of a queue.
 #
 # `build` is started by hand and produces something installable. It needs
-# EXPO_TOKEN, an Expo access token with build permission, in the repository
+# EXPO_SECRET, an Expo access token with build permission, in the repository
 # secrets. Without it the job says so and stops rather than failing halfway
 # through with an authentication error that reads like a code problem.
+#
+# EXPO_SECRET rather than the conventional EXPO_TOKEN, and the reason is worth
+# a line: that is what the secret is called. The name was written here first
+# and the secret was created second, under a different one, and the job then
+# reported no token for a token that was sitting right there. Renaming a GitHub
+# secret means deleting it and making a new one, and an Expo access token is
+# shown exactly once — so insisting on the convention would have cost a trip
+# back to expo.dev for a fresh token to fix a spelling. The file bends instead.
+#
+# It is passed to expo-github-action's `token:` input, which puts it in the
+# environment as EXPO_TOKEN for every step after it, so the EAS CLI sees the
+# name it expects regardless.
 #
 # There is no push-to-main build on purpose. An iOS build consumes a queue slot
 # and, on a paid plan, money; a native build on every merge would spend both on
@@ -88,7 +100,7 @@ jobs:
 
       # Never reads the `secrets` context as a whole, and that is the point.
       #
-      # This step briefly did, to list the secret names when EXPO_TOKEN came
+      # This step briefly did, to list the secret names when the token came
       # back empty — the idea being that a typo, the Variables tab, an
       # environment secret and the wrong repository all look identical from
       # here, and the names would tell them apart. It worked exactly as well as
@@ -104,17 +116,17 @@ jobs:
       # question, says where to go, and touches nothing else.
       - name: There is a token to build with
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_TOKEN: ${{ secrets.EXPO_SECRET }}
         run: |
           if [ -z "${EXPO_TOKEN}" ]; then
-            echo "::error::No EXPO_TOKEN secret. Add an Expo access token with build permission at Settings › Secrets and variables › Actions, on the Secrets tab, named exactly EXPO_TOKEN. Check the name against that page: Variables is a separate tab, and an environment secret is not a repository secret."
+            echo "::error::No EXPO_SECRET secret. Add an Expo access token with build permission at Settings › Secrets and variables › Actions, on the Secrets tab, named exactly EXPO_SECRET. Check the name against that page: Variables is a separate tab, and an environment secret is not a repository secret."
             exit 1
           fi
 
       - uses: expo/expo-github-action@v8
         with:
           eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+          token: ${{ secrets.EXPO_SECRET }}
 
       - name: Install the app's own dependencies
         working-directory: mobile
