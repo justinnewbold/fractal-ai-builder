@@ -3,6 +3,17 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.226.0
+
+**Two switches over the AI.** Setup › AI & cost now has Chat and AI model.
+Chat is whether the conversation is offered at all: off, the ✦ Ask button
+and the Ask tab go. AI model is whether a request may go to the model: off,
+the chat stays and the app does what it can by itself — a scene, the
+tempo, a block on or off, a channel, a control to a number or up a bit,
+the volume, a rename, a band the book already knows — and says plainly
+when a request is more than that. Nothing costs a token with the model
+off. The single "AI" switch from 7.224.0 is read as the model switch.
+
 ## 7.225.0
 
 **Fixes 7.224.0, which would not open.** The site came up on "The app

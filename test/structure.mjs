@@ -402,33 +402,42 @@ export function run(test) {
     assert.match(ask, /Math\.max\(level\.min \?\? -Infinity, Math\.min\(level\.max \?\? Infinity, target\)\)/, 'the level can leave its range')
   })
 
-  test('the AI can be turned off, and off means nothing reaches the model', () => {
+  test('two switches over the AI: the chat, and the model behind it', () => {
     /*
-     * "Can we add a toggle on settings to turn the AI on and off?" One switch
-     * on Setup's AI page; off, the Ask button and the Ask tab go, and the two
-     * doors to the model — the designer's requestSpec and the chat's turn —
-     * answer with one plain line. The band book and the local answers keep
-     * working, because they never needed the model.
+     * "When I said a button to turn the AI on off I meant have the chat still
+     * available but keep everything local. Maybe we can add a button for
+     * both." Chat off: the Ask button and the Ask tab go. Model off: the chat
+     * stays, the matcher's plan runs through the model's own path, a sentence
+     * it does not know is answered with what it could have been, and the two
+     * doors to the model — requestSpec and the chat turn — never open.
      */
-    assert.match(src, /const askShows = askButtonShows\(\{ status, view, playing, aiOn \}\)/, 'the Ask button ignores the switch')
-    assert.match(src, /viewsFor\(narrow\)\.filter\(\(v\) => aiOn \|\| v !== 'ask'\)/, 'the Ask tab ignores the switch')
-    /* And the switch exists before the list that reads it. It did not, once,
-       and the live site opened on "Cannot access 'xa' before initialization":
-       a const read before its own line is a crash, and nothing here renders
-       App to catch it. Every state a memo reads has to come first. */
-    assert.ok(
-      src.indexOf('const [aiOn, setAiOn] = useState(loadAiOn)') < src.indexOf('const views = useMemo('),
-      'the AI switch is read by the screen list before it exists'
-    )
-    const spec = src.slice(src.indexOf('const requestSpec = async'), src.indexOf('const requestSpec = async') + 400)
-    assert.match(spec, /if \(!aiOn\) throw new Error\(AI_OFF\)/, 'the designer can still be asked with the AI off')
+    assert.match(src, /const askShows = askButtonShows\(\{ status, view, playing, aiOn: chatOn \}\)/, 'the Ask button ignores the chat switch')
+    assert.match(src, /viewsFor\(narrow\)\.filter\(\(v\) => chatOn \|\| v !== 'ask'\)/, 'the Ask tab ignores the chat switch')
+    /* And the switches exist before the list that reads them. One did not,
+       once, and the live site opened on "Cannot access 'xa' before
+       initialization": a const read before its own line is a crash, and
+       nothing here renders App to catch it. Every state a memo reads has to
+       come first. */
+    for (const state of ['const [chatOn, setChatOn] = useState(loadChatOn)', 'const [modelOn, setModelOn] = useState(loadModelOn)']) {
+      assert.ok(src.indexOf(state) < src.indexOf('const views = useMemo('), `${state.split(' ')[1]} is read by the screen list before it exists`)
+    }
+    const spec = src.slice(src.indexOf('const requestSpec = async'), src.indexOf('const requestSpec = async') + 500)
+    assert.match(spec, /if \(!modelOn\) throw new Error\(MODEL_OFF\)/, 'the designer can still be asked with the model off')
     const ask = src.slice(src.indexOf('const askFor = async'), src.indexOf('const body = await askPlan('))
-    assert.match(ask, /if \(!aiOn\) \{\s*\n\s*setTurns\(\(prev\) => \[\.\.\.prev, \{ role: 'assistant', text: AI_OFF \}\]\)\s*\n\s*return/, 'the chat can still ask the model with the AI off')
-    assert.ok(ask.indexOf('const volume = matchVolume(') < ask.indexOf('if (!aiOn) {'), 'the free local answers are refused along with the model')
+    assert.match(ask, /if \(!modelOn\) \{\s*\n\s*if \(!would\) \{\s*\n\s*setTurns\(\(prev\) => \[\.\.\.prev, \{ role: 'assistant', text: MODEL_OFF \}\]\)\s*\n\s*return/, 'an unknown sentence with the model off is not answered with what it could have been')
+    assert.match(ask, /const local = validatePlan\(\{ understood: would\.why, actions: \[would\] \}, withPositions, \{/, 'the matcher’s plan skips the check the model’s gets')
+    assert.match(ask, /if \(local\.actions\.length\) await perform\(local\.actions\)/, 'the matcher’s plan does not run through the same runner')
+    assert.ok(ask.indexOf('const volume = matchVolume(') < ask.indexOf('if (!modelOn) {'), 'the free local answers are refused along with the model')
+    for (const which of ["noteSpend('design', err?.usage || null, { failed: err.message })", "noteSpend('refine', err?.usage || null, { failed: err.message })"]) {
+      const at = src.indexOf(which)
+      const caught = src.slice(src.lastIndexOf('} catch (err) {', at), at)
+      assert.match(caught, /if \(err\?\.message === MODEL_OFF\) \{[\s\S]*?return/, `a model-off refusal in ${which.slice(11, 17)} is a banner and a ledger row`)
+    }
     const setup = sheet('Setup')
-    assert.match(setup, /<Section key="ai-switch" title="AI" note=\{aiOn \? 'On' : 'Off'\} defaultOpen>/, 'Setup has no AI switch')
-    assert.match(setup, /saveAiOn\(on\)/, 'the switch is not remembered')
-    assert.match(setup, /status=\{!aiOn \? 'AI off' :/, 'the AI row does not say when the AI is off')
+    assert.match(setup, /<Section key="ai-switch" title="AI" note=\{`Chat \$\{chatOn \? 'on' : 'off'\} · model \$\{modelOn \? 'on' : 'off'\}`\} defaultOpen>/, 'Setup has no AI switches')
+    assert.match(setup, /saveChatOn\(on\)/, 'the chat switch is not remembered')
+    assert.match(setup, /saveModelOn\(on\)/, 'the model switch is not remembered')
+    assert.match(setup, /status=\{!chatOn \? 'Chat off' : !modelOn \? 'AI model off · local only' :/, 'the AI row does not say which switch is off')
   })
 
   test('emptiness is judged on editable blocks, not raw count', () => {
@@ -1043,7 +1052,7 @@ export function run(test) {
      * is what this holds: the request still goes to the model, every time,
      * whatever the matcher thought.
      */
-    const at = src.indexOf('const would =')
+    const at = src.indexOf('would =\n          matchRename(')
     assert.notEqual(at, -1, 'the local matcher is not run at all')
     /* The watching block ends where the two named exceptions begin — a plain
        design and a plain volume request, which have their own test — or at
@@ -1069,7 +1078,13 @@ export function run(test) {
     const threw = src.indexOf('the local matcher threw and was ignored', at)
     assert.notEqual(threw, -1, 'the watching block no longer has its own catch')
     const between = src.slice(threw, src.indexOf('await askPlan(', threw))
-    assert.ok(!between.includes('would'), 'what the matcher decided is read after the watching block')
+    /* With one exception, and only under the model switch: when the model is
+       off the matcher's plan IS the answer, and it goes through the model's
+       own check and runner. Anywhere else, `would` is still only a log line. */
+    const acts = between.indexOf('if (!modelOn) {')
+    assert.notEqual(acts, -1, 'the model-off branch is gone')
+    assert.ok(!between.slice(0, acts).includes('would'), 'what the matcher decided is read before the model switch is checked')
+    assert.ok(!between.slice(between.indexOf('setProgress(`${THINKING}')).includes('would'), 'what the matcher decided is read on the way to the model')
 
     /*
      * The matcher itself reaches nothing. Pure text in, a plan or null out —
@@ -2107,7 +2122,7 @@ export function run(test) {
     assert.match(src, /onAsk=\{askShows \? \(\) => setSheet\('chat'\) : null\}/, 'the stage bar has lost its way into the conversation')
     assert.match(
       src,
-      /const askShows = askButtonShows\(\{ status, view, playing, aiOn \}\)/,
+      /const askShows = askButtonShows\(\{ status, view, playing, aiOn: chatOn \}\)/,
       'the ask button decides for itself again, where a comment can impersonate the rule'
     )
     const styles = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
@@ -5551,7 +5566,7 @@ export function run(test) {
      * kept clear under it. The shared rule still decides the stage bar's
      * buttons.
      */
-    assert.match(src, /const askShows = askButtonShows\(\{ status, view, playing, aiOn \}\)\n/, 'the stage bar rule has grown a clause of its own')
+    assert.match(src, /const askShows = askButtonShows\(\{ status, view, playing, aiOn: chatOn \}\)\n/, 'the stage bar rule has grown a clause of its own')
     assert.ok(!src.includes('ask-anywhere'), 'the floating Ask is back')
     assert.equal(play.askButtonShows({ status: 'live', view: 'play', playing: false }), true, 'the stage bar lost its Ask')
     const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
