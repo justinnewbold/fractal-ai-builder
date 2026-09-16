@@ -198,6 +198,25 @@ jobs:
       # EAS CLI looks for. An app-specific password rather than the account
       # password is the whole point: it carries no two-factor prompt, which is
       # what a build server cannot answer.
+      # TEMPORARY. Asks EAS, from inside the job, what it can actually see.
+      # Nothing here builds or changes anything; every command is allowed to
+      # fail so the whole picture reaches the log rather than the first error.
+      - name: What EAS knows about our credentials
+        if: ${{ inputs.platform != 'android' }}
+        working-directory: mobile
+        continue-on-error: true
+        run: |
+          echo "───── eas-cli version"
+          eas --version || true
+          echo "───── who the token belongs to"
+          eas whoami || true
+          echo "───── credentials: what subcommands exist"
+          eas credentials --help || true
+          echo "───── the project's iOS credentials, non-interactive"
+          eas credentials --platform ios --non-interactive || true
+          echo "───── any App Store Connect keys this account holds"
+          eas credentials --platform ios --non-interactive --json || true
+
       - name: Build
         working-directory: mobile
         env:
