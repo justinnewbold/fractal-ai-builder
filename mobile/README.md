@@ -104,6 +104,15 @@ Profiles are in `eas.json`. `preview` is the one to start with — an installabl
 build for a device, an `.apk` on Android. `production` is what goes to the App
 Store and Play.
 
+`ios-simulator` is the one that needs no Apple account at all. An iOS build
+normally has to be signed with a certificate from the Apple Developer account
+and wrapped in a profile naming the devices allowed to run it, and creating
+those means logging in to Apple with two-factor, which a build server cannot
+do — so a first iOS build in CI stops dead with "couldn't find any credentials
+suitable for internal distribution". A simulator build is unsigned. It will not
+install on a phone, and that is the point: it answers whether the iOS app
+compiles, separately from whether the paperwork is done.
+
 Every pull request that touches this directory bundles both platforms already,
 so a broken import is caught before a build machine ever sees it.
 
