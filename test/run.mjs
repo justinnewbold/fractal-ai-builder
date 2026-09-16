@@ -4572,6 +4572,31 @@ test('the plain requests never needed a model, and the rest still do', async () 
   assert.equal(matchVolume('Lower the volume by 10')?.by, -10, 'the sentence from the screenshot still misses')
   assert.equal(matchVolume('raise the volume 3')?.by, 3)
   assert.equal(matchVolume('lower the volume by 20'), null, 'twenty dB in one move is still the model\u2019s to talk about')
+  /*
+   * And then it missed again the same week, on a sentence that was not on
+   * the list of shapes. The rule is a vocabulary now — every word has to be a
+   * volume word — so the shapes below are the ones that used to fall through,
+   * and the ones after them are the sentences that must still miss because
+   * one word in them belongs to a block, a scene or a control.
+   */
+  for (const [text, by] of [
+    ['turn down the master volume by 10', -10],
+    ['make it 10 db quieter', -10],
+    ['decrease the overall volume by 10', -10],
+    ['volume -10', -10],
+    ['turn it down a notch', -2],
+    ['can you turn the whole thing down a bit', -2],
+    ['bring the level down', -3],
+    ['volume up a lot', 6],
+    ['turn the volume down by 2.5 db', -2.5],
+    ['drop the output level 4', -4],
+    ['turn it up', 3]
+  ]) {
+    assert.equal(matchVolume(text)?.by, by, `"${text}" is a plain volume request and missed`)
+  }
+  for (const text of ['turn the gain down', 'amp gain down', 'more', 'more treble', 'less delay', 'set the volume to 5', 'turn it down 3 and 4', 'volume down in the lead scene']) {
+    assert.equal(matchVolume(text), null, `"${text}" is not the whole preset\u2019s volume`)
+  }
 })
 
 test('everything the runner can do with one plain reading, the matcher now catches', async () => {

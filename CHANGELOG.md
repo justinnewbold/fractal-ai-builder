@@ -3,6 +3,23 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.228.0 A volume request is a vocabulary, not a list of shapes.
+
+"Lower the volume by 10" was fixed in 7.227.0 and another volume sentence
+missed the same day, because the rule was a list of sentence shapes and no
+list is long enough. It is a vocabulary now: every word in the sentence has
+to be a volume word — a verb, "volume" / "level" / "master" / "output", a
+direction, an amount word, a number — and one word from outside that list (a
+block, a scene, a control) is what sends it to the model instead. "Turn down
+the master volume by 10", "make it 10 dB quieter", "decrease the overall
+volume by 10", "turn it down a notch" all move the Output level now. "Turn the
+gain down" is still the amp's gain.
+
+And a volume request the app cannot carry out — no Output block on the
+preset, or an Output block with no level it can read — is said in those
+words, instead of falling through to the model and, with the model off, to
+"the AI model is off".
+
 ## 7.227.0 The chat does the plain things itself, model or no model.
 
 "The app should be able to handle local commands like adjusting settings on
