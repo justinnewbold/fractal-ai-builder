@@ -767,6 +767,23 @@ test('the Ask button waits for a unit, stays off its own screen, and goes when p
   assert.equal(play.askButtonShows({ status: 'idle', view: 'play', playing: false }), false)
   assert.equal(play.askButtonShows({ status: 'live', view: 'ask', playing: false }), false)
   assert.equal(play.askButtonShows({ status: 'live', view: 'play', playing: true }), false)
+  // The bigger switch: with the AI off there is nothing to open onto. Absent means on.
+  assert.equal(play.askButtonShows({ status: 'live', view: 'play', playing: false, aiOn: false }), false)
+  assert.equal(play.askButtonShows({ status: 'live', view: 'play', playing: false, aiOn: true }), true)
+})
+
+test('the AI switch is on unless somebody turned it off, and unreadable is on', async () => {
+  const { loadAiOn, saveAiOn } = await import('../src/lib/aiSwitch.js')
+  const mem = new Map()
+  const store = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, v), removeItem: (k) => mem.delete(k) }
+  assert.equal(loadAiOn(store), true, 'a fresh device has the AI off')
+  saveAiOn(false, store)
+  assert.equal(loadAiOn(store), false, 'off did not stick')
+  saveAiOn(true, store)
+  assert.equal(loadAiOn(store), true, 'on did not stick')
+  mem.set('fractal.aiOn', 'nonsense')
+  assert.equal(loadAiOn(store), true, 'a value nobody can read turned the AI off')
+  assert.equal(loadAiOn({ getItem: () => { throw new Error('blocked') } }), true, 'a blocked store turned the AI off')
 })
 
 test('anything unreadable in the store is not playing', () => {

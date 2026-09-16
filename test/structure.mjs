@@ -402,6 +402,27 @@ export function run(test) {
     assert.match(ask, /Math\.max\(level\.min \?\? -Infinity, Math\.min\(level\.max \?\? Infinity, target\)\)/, 'the level can leave its range')
   })
 
+  test('the AI can be turned off, and off means nothing reaches the model', () => {
+    /*
+     * "Can we add a toggle on settings to turn the AI on and off?" One switch
+     * on Setup's AI page; off, the Ask button and the Ask tab go, and the two
+     * doors to the model — the designer's requestSpec and the chat's turn —
+     * answer with one plain line. The band book and the local answers keep
+     * working, because they never needed the model.
+     */
+    assert.match(src, /const askShows = askButtonShows\(\{ status, view, playing, aiOn \}\)/, 'the Ask button ignores the switch')
+    assert.match(src, /viewsFor\(narrow\)\.filter\(\(v\) => aiOn \|\| v !== 'ask'\)/, 'the Ask tab ignores the switch')
+    const spec = src.slice(src.indexOf('const requestSpec = async'), src.indexOf('const requestSpec = async') + 400)
+    assert.match(spec, /if \(!aiOn\) throw new Error\(AI_OFF\)/, 'the designer can still be asked with the AI off')
+    const ask = src.slice(src.indexOf('const askFor = async'), src.indexOf('const body = await askPlan('))
+    assert.match(ask, /if \(!aiOn\) \{\s*\n\s*setTurns\(\(prev\) => \[\.\.\.prev, \{ role: 'assistant', text: AI_OFF \}\]\)\s*\n\s*return/, 'the chat can still ask the model with the AI off')
+    assert.ok(ask.indexOf('const volume = matchVolume(') < ask.indexOf('if (!aiOn) {'), 'the free local answers are refused along with the model')
+    const setup = sheet('Setup')
+    assert.match(setup, /<Section key="ai-switch" title="AI" note=\{aiOn \? 'On' : 'Off'\} defaultOpen>/, 'Setup has no AI switch')
+    assert.match(setup, /saveAiOn\(on\)/, 'the switch is not remembered')
+    assert.match(setup, /status=\{!aiOn \? 'AI off' :/, 'the AI row does not say when the AI is off')
+  })
+
   test('emptiness is judged on editable blocks, not raw count', () => {
     // An empty AM4 slot still reports input and output rows. Both hardware
     // failures of the chain builder were this gap wearing different errors:
@@ -1471,7 +1492,7 @@ export function run(test) {
       ['unit', ['connection']],
       ['link', ['phone-remote', 'link-details']],
       ['play', ['size', 'playing', 'appearance']],
-      ['ai', ['token-usage', 'what-it-has-learned', 'about-you', 'band-book']],
+      ['ai', ['ai-switch', 'token-usage', 'what-it-has-learned', 'about-you', 'band-book']],
       ['help', ['preset-check', 'debug-log', 'feedback', 'what-s-changed-this-session', 'how-this-works']],
       ['about', ['updates', 'developer']]
     ]) {
@@ -2078,7 +2099,7 @@ export function run(test) {
     assert.match(src, /onAsk=\{askShows \? \(\) => setSheet\('chat'\) : null\}/, 'the stage bar has lost its way into the conversation')
     assert.match(
       src,
-      /const askShows = askButtonShows\(\{ status, view, playing \}\)/,
+      /const askShows = askButtonShows\(\{ status, view, playing, aiOn \}\)/,
       'the ask button decides for itself again, where a comment can impersonate the rule'
     )
     const styles = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
@@ -5522,7 +5543,7 @@ export function run(test) {
      * kept clear under it. The shared rule still decides the stage bar's
      * buttons.
      */
-    assert.match(src, /const askShows = askButtonShows\(\{ status, view, playing \}\)\n/, 'the stage bar rule has grown a clause of its own')
+    assert.match(src, /const askShows = askButtonShows\(\{ status, view, playing, aiOn \}\)\n/, 'the stage bar rule has grown a clause of its own')
     assert.ok(!src.includes('ask-anywhere'), 'the floating Ask is back')
     assert.equal(play.askButtonShows({ status: 'live', view: 'play', playing: false }), true, 'the stage bar lost its Ask')
     const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
