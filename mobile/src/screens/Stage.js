@@ -158,6 +158,11 @@ export default function Stage({ onOpenSettings, onOpenTone }) {
               Absent, not disabled, when play mode is on — and absent until the
               setting has been read back, because a button that appears late is
               safer than one that vanishes under a press. See lib/playMode.js.
+
+              Absent throughout the first release, which ships with the AI
+              switched off: App hands down no handler at all. Nothing changes
+              here for that — a row that closes up around a button it was not
+              given is the same row either way. See lib/features.js.
             */}
             {onOpenTone ? (
               <Press

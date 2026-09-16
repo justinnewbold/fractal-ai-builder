@@ -93,6 +93,59 @@ export function run(test) {
     assert.equal(clampMode('1'), true)
   })
 
+  test('the first release ships with the AI switched off, and every door to it obeys that', async () => {
+    /*
+     * "For the initial releases I only want to release the stuff related to
+     * the live gig pedal board, nothing with the AI or chat changes or things
+     * like that."
+     *
+     * The promise is not "the tone code is gone" — it is still in the bundle,
+     * and going back on in a later update. The promise is that NOTHING IN THE
+     * APP CAN REACH IT. There is exactly one door (the ✦ Tone button on the
+     * stage screen, which opens the one screen that calls the model), so this
+     * checks the switch is off and that both halves of that door read it.
+     *
+     * Worth a test rather than a careful commit because the failure is silent
+     * and lands in a store: a build that ships with the switch flipped, or a
+     * new way onto the tone screen added later without one, looks identical
+     * from the outside until somebody taps it on a stage.
+     */
+    const { AI } = await import('../mobile/src/lib/features.js')
+    assert.equal(AI, false, 'the first store release must ship with the AI off')
+
+    const app = read('mobile/App.js')
+    const settings = read('mobile/src/screens/Settings.js')
+
+    /* The route onto the screen, and the button that reaches it. */
+    assert.match(
+      app,
+      /AI && screen === 'tone'/,
+      'the tone screen can be routed to with the AI off'
+    )
+    assert.match(
+      app,
+      /AI && toneWayIn\(/,
+      'the stage screen is handed a tone button with the AI off'
+    )
+
+    /* Play mode hides the tone button and does nothing else, so with no tone
+       button it is a switch that reports success and changes nothing. */
+    assert.match(settings, /\{AI \? \(/, 'the play mode switch is offered with the AI off')
+
+    /* And the one module that talks to the model is reached from the tone
+       screen and nowhere else — so the door above is the only door. */
+    let reaches = []
+    for (const file of walk(new URL('../mobile/src/', import.meta.url))) {
+      const text = readFileSync(file, 'utf8')
+      if (/from '\.\.?\/(lib\/)?tone(\.js)?'/.test(text)) reaches.push(file.split('/mobile/')[1])
+    }
+    assert.deepEqual(
+      reaches,
+      ['src/screens/Tone.js'],
+      'something other than the tone screen imports the tone builder, so the switch no longer covers every way to the model'
+    )
+  })
+
   test('the tone screen is reachable, and says what it cannot do', () => {
     const app = read('mobile/App.js')
     const stage = read('mobile/src/screens/Stage.js')

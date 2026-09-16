@@ -12,6 +12,7 @@ import SignIn from './src/screens/SignIn'
 import Stage from './src/screens/Stage'
 import Tone from './src/screens/Tone'
 import { loadPlayMode, toneWayIn } from './src/lib/playMode'
+import { AI } from './src/lib/features'
 
 /**
  * Fractal Remote.
@@ -19,6 +20,11 @@ import { loadPlayMode, toneWayIn } from './src/lib/playMode'
  * Four states and no navigator. Signed out, playing, looking at setup, or
  * asking for a tone — that is the whole of the app, and a routing library for
  * it would be more moving parts than the thing being routed.
+ *
+ * Three of those four in a shipping build: the tone screen is behind the AI
+ * switch in lib/features.js, which is off for the first release. The route is
+ * still written here rather than removed, because it goes back on in a later
+ * update and the difference is one word.
  *
  * The status bar at the top is the one thing on every screen: what the link is
  * doing, said in words rather than an icon, because "connected" and "connected
@@ -40,6 +46,9 @@ export default function App() {
   useEffect(() => subscribeLink(setLink), [])
 
   useEffect(() => {
+    /* Nothing to hide with the AI off, and asking costs a read of storage on
+       every launch to answer a question nobody can act on. See lib/features.js. */
+    if (!AI) return undefined
     let alive = true
     loadPlayMode().then((on) => alive && setPlaying(on))
     return () => {
@@ -80,7 +89,7 @@ export default function App() {
         ) : (
           <>
             <LinkBar link={link} />
-            {screen === 'tone' ? (
+            {AI && screen === 'tone' ? (
               <Tone onBack={() => setScreen('stage')} />
             ) : screen === 'settings' ? (
               <Settings
@@ -110,7 +119,7 @@ export default function App() {
                 /* Absent rather than disabled when play mode is on, so the row
                    closes up instead of keeping a dead button. */
                 onOpenTone={
-                  toneWayIn({ connected: link.link === 'connected', playing })
+                  AI && toneWayIn({ connected: link.link === 'connected', playing })
                     ? () => setScreen('tone')
                     : null
                 }
