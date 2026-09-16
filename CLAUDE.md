@@ -35,6 +35,36 @@ jargon to make sense, the question is not finished yet.
 Give options as plain choices with the consequence attached, and say which
 one you would pick.
 
+**Never start an Expo build without asking him first.**
+
+> "I have a very limited amount of free expo builds for iOS so I need to make
+> sure that everything is actually correct before we push a build. We can't
+> just do it every little tiny change."
+
+This is the one place in the project where being wrong costs him something
+that does not come back. A test suite can be run a hundred times; an iOS
+build slot is spent. Three went on one evening, and only the first had to.
+
+So: say what the build is for and wait. It is not covered by "he said keep
+going" earlier in a session, because the cost is per build rather than per
+task.
+
+What does NOT need asking, because none of it spends anything:
+
+- `npm test`, and `npx expo export` for either platform, which is the real
+  check that the app still bundles
+- the `check` job in `.github/workflows/mobile.yml`, which runs on every pull
+  request and does exactly that
+- anything on GitHub Actions at all
+
+Which means the honest sequence is: bundle both platforms locally, get CI
+green, and only then ask whether it is worth a build.
+
+And when a build has already succeeded, a failed SUBMISSION does not need
+another one. The workflow has a Submit only box for exactly that: it sends
+the build sitting on Expo's servers rather than making a byte-identical
+replacement. Reach for it before reaching for Build.
+
 ## Things that cost real time to learn here
 
 **Every change needs a new version number.** The `version` job in
