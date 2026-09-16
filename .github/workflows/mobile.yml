@@ -45,7 +45,7 @@ on:
         description: 'Which eas.json build profile'
         type: choice
         default: preview
-        options: [preview, production, development]
+        options: [preview, ios-simulator, production, development]
   pull_request:
     paths:
       - 'mobile/**'
