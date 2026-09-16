@@ -198,11 +198,48 @@ jobs:
       # EAS CLI looks for. An app-specific password rather than the account
       # password is the whole point: it carries no two-factor prompt, which is
       # what a build server cannot answer.
+      # The App Store Connect API key, handed to the build directly.
+      #
+      # An Apple ID and an app-specific password are enough to TALK to Apple,
+      # and the build proved it: both arrived, and it still said
+      #
+      #   Distribution Certificate is not validated for non-interactive builds.
+      #
+      # Minting a new distribution certificate is the one thing that route
+      # cannot do without a human at a prompt. An App Store Connect API key
+      # can, and the key registered against the Expo ACCOUNT was not reaching
+      # this project's build — EAS credentials are per project.
+      #
+      # Passing the key by environment variable sidesteps that entirely: it is
+      # read for this run and belongs to no project. The three names are the
+      # ones the EAS CLI looks for.
+      #
+      # The .p8 is written to the runner's temp directory rather than the
+      # checkout, so it cannot be committed by accident, and the runner is
+      # destroyed with it. GitHub masks the contents in the log the way it
+      # masks any secret.
+      - name: The signing key Apple issues certificates against
+        if: ${{ inputs.platform != 'android' }}
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          if [ -z "${ASC_KEY_P8}" ]; then
+            echo "::error::No ASC_KEY_P8 secret. An iOS build needs the App Store Connect API key: add ASC_KEY_P8 (the whole .p8 file, BEGIN and END lines included), ASC_KEY_ID and ASC_ISSUER_ID under Settings › Secrets and variables › Actions."
+            exit 1
+          fi
+          printf '%s\n' "${ASC_KEY_P8}" > "${RUNNER_TEMP}/asc-key.p8"
+          chmod 600 "${RUNNER_TEMP}/asc-key.p8"
+
       - name: Build
         working-directory: mobile
         env:
+          # Kept for the Apple calls that are happy with them.
           EXPO_APPLE_ID: ${{ secrets.APPLE_ID }}
           EXPO_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          # And the key that can actually issue a certificate.
+          EXPO_ASC_API_KEY_PATH: ${{ runner.temp }}/asc-key.p8
+          EXPO_ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          EXPO_ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           eas build \
             --platform "${{ inputs.platform }}" \
