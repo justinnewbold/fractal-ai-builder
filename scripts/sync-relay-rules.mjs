@@ -53,7 +53,28 @@ export const FILES = [
    * audibly wrong on hardware nobody here can test against.
    */
   { source: '../src/lib/scale.js', target: '../mobile/src/lib/scale.js' },
-  { source: '../src/lib/encoding.js', target: '../mobile/src/lib/encoding.js' }
+  { source: '../src/lib/encoding.js', target: '../mobile/src/lib/encoding.js' },
+  /*
+   * What colour a thing is, on both screens.
+   *
+   * These read as decoration and are not. The whole argument in blockColors is
+   * recognition on a dark stage — the drive is found by its red long before
+   * three letters resolve — and sceneColors makes the same case for scenes. A
+   * phone that picked its own colours would break exactly the thing the colours
+   * are for: the browser and the handset would disagree about which tile is the
+   * delay, and a player switching between them would have to read both.
+   *
+   * Pure data with no imports, so they cross unchanged.
+   */
+  { source: '../src/lib/blockColors.js', target: '../mobile/src/lib/blockColors.js' },
+  { source: '../src/lib/sceneColors.js', target: '../mobile/src/lib/sceneColors.js' },
+  /*
+   * And what a block is called when there is no room for its name. Shared for
+   * the same reason as the colours: "DLY 2" has to mean the same block on both
+   * screens, and the rule that keeps the instance number only when it is not 1
+   * is not one anybody would reinvent identically.
+   */
+  { source: '../src/lib/shortName.js', target: '../mobile/src/lib/shortName.js' }
 ]
 
 /** Where a copy says it came from, so nobody edits the copy by mistake. */
