@@ -413,6 +413,11 @@ export function run(test) {
      */
     assert.match(src, /const askShows = askButtonShows\(\{ status, view, playing, aiOn: chatOn \}\)/, 'the Ask button ignores the chat switch')
     assert.match(src, /viewsFor\(narrow\)\.filter\(\(v\) => chatOn \|\| v !== 'ask'\)/, 'the Ask tab ignores the chat switch')
+    /* And the switches exist before the list that reads them. One did not,
+       once, and the live site opened on "Cannot access 'xa' before
+       initialization": a const read before its own line is a crash, and
+       nothing here renders App to catch it. Every state a memo reads has to
+       come first. */
     for (const state of ['const [chatOn, setChatOn] = useState(loadChatOn)', 'const [modelOn, setModelOn] = useState(loadModelOn)']) {
       assert.ok(src.indexOf(state) < src.indexOf('const views = useMemo('), `${state.split(' ')[1]} is read by the screen list before it exists`)
     }
