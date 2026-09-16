@@ -86,29 +86,12 @@ jobs:
           node-version: 20
           cache: npm
 
-      # Says which name is wrong, not just that one is missing.
-      #
-      # The first time this stopped a build, the secret HAD been added and the
-      # job still said there was no token — and "no EXPO_TOKEN secret" cannot
-      # tell apart the four ways that happens: a typo in the name, the
-      # Variables tab instead of the Secrets one, an environment secret rather
-      # than a repository secret, or the right name on the wrong repository.
-      #
-      # `toJSON(secrets)` answers it. GitHub masks every VALUE in that object,
-      # so what reaches the log is the list of names and nothing else, which is
-      # exactly the missing piece: seeing EXPO-TOKEN or Expo_Token sitting in
-      # the list is the whole diagnosis.
       - name: There is a token to build with
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          NAMES: ${{ toJSON(secrets) }}
         run: |
           if [ -z "${EXPO_TOKEN}" ]; then
-            echo "::error::No EXPO_TOKEN secret. Add an Expo access token with build permission under Settings › Secrets and variables › Actions › Secrets, then start this again."
-            echo "This repository's Actions secrets, by name. Values are never shown:"
-            node -e 'for (const k of Object.keys(JSON.parse(process.env.NAMES))) console.log("  - " + k)'
-            echo "If the name you added is in that list but spelled differently, rename it to exactly EXPO_TOKEN."
-            echo "If the list is only github_token, nothing was saved to this repository under Secrets."
+            echo "::error::No EXPO_TOKEN secret. Add an Expo access token with build permission under Settings › Secrets › Actions, then start this again."
             exit 1
           fi
 
