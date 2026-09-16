@@ -50,6 +50,10 @@ on:
         description: 'Send it to TestFlight / Play when it finishes'
         type: boolean
         default: false
+      submit_only:
+        description: 'Skip building; send the last build that succeeded'
+        type: boolean
+        default: false
   pull_request:
     paths:
       - 'mobile/**'
@@ -217,7 +221,28 @@ jobs:
       # Off by default. A submission is outward-facing — it puts a build in
       # front of Apple's review tooling and every TestFlight tester — so it is
       # asked for by ticking the box, not a side effect of building.
+      # Sends the build that already exists, rather than making another.
+      #
+      # A submission can fail on its own — a missing App Store Connect app id,
+      # a name Apple would not accept — while the build it was carrying is
+      # perfectly good and sitting on Expo's servers. Rebuilding to retry the
+      # submission costs twenty-five minutes to produce a byte-identical
+      # artefact, and burns a build slot doing it.
+      #
+      # `--latest` is the newest finished build for the platform, which is
+      # exactly the one the failed submission was for.
+      - name: Send the last build
+        if: ${{ inputs.submit_only }}
+        working-directory: mobile
+        run: |
+          eas submit \
+            --platform "${{ inputs.platform }}" \
+            --profile "${{ inputs.profile }}" \
+            --latest \
+            --non-interactive
+
       - name: Build
+        if: ${{ !inputs.submit_only }}
         working-directory: mobile
         env:
           EXPO_APPLE_ID: ${{ secrets.APPLE_ID }}
