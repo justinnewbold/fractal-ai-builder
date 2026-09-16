@@ -180,8 +180,29 @@ jobs:
       # Non-interactive and queued rather than waited on: an iOS build can sit
       # in a queue longer than a job is allowed to run, and a workflow that
       # times out waiting looks like a build that failed.
+      # The Apple login this repository already has.
+      #
+      # An iOS build needs a Distribution Certificate, and Expo will not
+      # conjure one on its own:
+      #
+      #   Distribution Certificate is not validated for non-interactive builds.
+      #   Credentials are not set up. Run this command again in interactive mode.
+      #
+      # Creating one means asking Apple, and asking Apple means logging in.
+      # These two secrets are that login, and they have been in this repository
+      # for weeks doing the Mac app's notarising in desktop.yml — the same
+      # Apple ID, the same app-specific password. Nothing new was needed; they
+      # were simply never handed to this job.
+      #
+      # EXPO_APPLE_ID and EXPO_APPLE_APP_SPECIFIC_PASSWORD are the names the
+      # EAS CLI looks for. An app-specific password rather than the account
+      # password is the whole point: it carries no two-factor prompt, which is
+      # what a build server cannot answer.
       - name: Build
         working-directory: mobile
+        env:
+          EXPO_APPLE_ID: ${{ secrets.APPLE_ID }}
+          EXPO_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
           eas build \
             --platform "${{ inputs.platform }}" \
