@@ -397,7 +397,11 @@ export function run(test) {
     assert.match(ask, /if \(plain && blocks\.some\(\(b\) => !EXCLUDED_BLOCKS\.includes\(b\.slug\)\)\)/, 'a design on an empty slot skips the chain build')
     assert.match(ask, /await generate\(plain\.text, null, scenesWanted\)/, 'the designer does not get the player\u2019s own words')
     assert.match(ask, /const volume = matchVolume\(instruction\)/, 'a plain volume request is not looked for')
-    assert.match(ask, /if \(volume && outputEid !== null\)/, 'volume is moved with no Output block to move')
+    /* A volume request the app cannot carry out is said — not handed to the
+       model, and not answered "the AI model is off". */
+    assert.match(ask, /if \(volume\) \{/, 'a volume match no longer has its own branch')
+    assert.match(ask, /if \(outputEid === null\) \{\s*\n\s*const text = 'I can\\u2019t find the Output block/, 'a volume request with no Output block falls through to the model')
+    assert.match(ask, /if \(!level \|\| !Number\.isFinite\(now\)\) \{\s*\n\s*const text = 'The Output block has no level control/, 'a volume request with no level to move falls through to the model')
     assert.match(ask, /setParamConfirmed\(outputEid, level\.id, to, \{ \.\.\.level, name: level\.name \|\| 'Level' \}\)/, 'the Output level is written without a read-back')
     assert.match(ask, /Math\.max\(level\.min \?\? -Infinity, Math\.min\(level\.max \?\? Infinity, target\)\)/, 'the level can leave its range')
   })

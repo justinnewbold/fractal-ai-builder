@@ -795,44 +795,71 @@ function tidy(text) {
  * Output block's Level, the same one the speaker slider moves, and moving it
  * by a number of dB is arithmetic, not judgement. So this is caught here.
  *
- * Only the whole preset: a sentence that names a block or a scene is not
- * matched, and goes to the model as before. The amount is the dB asked for
- * — a bare number counts as dB, because "lower the volume by 10" went to a
- * model that was switched off and came back with nothing — two for "a bit",
- * three with none said, and never more than twelve — past that somebody
+ * This began as a list of sentence shapes and lost twice to sentences that
+ * were plainly volume requests and not on the list: "Lower the volume by 10"
+ * (no "lower", no bare number), then another the same week. A list of shapes
+ * is the wrong tool for a sentence with this little in it. So it is a
+ * VOCABULARY now: every word in the sentence has to be one that belongs in a
+ * volume request — a verb, a volume word, a direction, an amount word, or a
+ * number — and there has to be a direction in it. One word from outside that
+ * list, "delay" or "scene" or "amp", and it is not the whole preset and it
+ * misses, exactly as before. That is the same whole-sentence rule the other
+ * matchers keep, applied word by word instead of shape by shape.
+ *
+ * The amount is the dB asked for — a bare number counts as dB — two for "a
+ * bit", three with none said, and never more than twelve: past that somebody
  * should be told in words what they are about to do.
  */
-const AMT = "(?: (?:a (?:bit|touch|little|hair|smidge|tad)(?: more)?|(?:by )?(\\d+(?:\\.\\d+)?) ?(?:db)?))?"
-const WHOLE = '(?:it|this|this preset|the preset|everything|the whole thing|the whole preset|the volume|the loudness|the level|the overall level|the master|the master level|volume|loudness|the output|output)'
-const VOLUME_RULES = [
-  new RegExp(`^(?:turn |bring |pump |crank |take |bump |push )?${WHOLE}(?: (?:on|of|for) (?:this |the )?(?:whole )?preset)? (up|down)${AMT}$`),
-  new RegExp(`^turn (up|down) (?:the )?(?:volume|loudness|level|whole preset|preset|output)(?: (?:on|of|for) (?:this |the )?(?:whole )?preset)?${AMT}$`),
-  new RegExp(`^(raise|increase|boost|lower|reduce|drop|decrease|cut) (?:the )?(?:volume|loudness|level|overall level|master|master level|output|whole preset)(?: (?:on|of|for) (?:this |the )?(?:whole )?preset)?${AMT}$`),
-  new RegExp(`^(?:make (?:it|this|this preset|the preset|everything) )?(louder|quieter|softer)${AMT}$`),
-  new RegExp(`^(\\d+(?:\\.\\d+)?) ?db (louder|quieter|softer)$`)
-]
-const UPWARD = /^(up|louder|raise|increase|boost)$/
-const DOWNWARD = /^(down|quieter|softer|lower|reduce|drop|decrease|cut)$/
+const VOL_VERBS = new Set(['turn', 'bring', 'pump', 'crank', 'take', 'bump', 'push', 'make', 'set', 'get', 'move', 'knock', 'back', 'roll', 'dial', 'go', 'put'])
+const VOL_NOUNS = new Set(['volume', 'loudness', 'level', 'levels', 'master', 'output', 'sound'])
+/* Not "gain": "turn the gain down" is the amp's gain to every guitarist alive,
+   and it is a control the nudge rule below already knows how to move. */
+const VOL_WHOLE = new Set(['it', 'this', 'that', 'everything', 'whole', 'entire', 'overall', 'preset', 'patch', 'rig', 'thing', 'all'])
+const VOL_UP = new Set(['up', 'louder', 'raise', 'increase', 'boost', 'higher', 'more'])
+const VOL_DOWN = new Set(['down', 'quieter', 'softer', 'lower', 'reduce', 'drop', 'decrease', 'cut', 'less', 'quiet', 'soft', 'quieten'])
+const VOL_FILL = new Set(['the', 'a', 'an', 'of', 'on', 'for', 'to', 'by', 'in', 'and', 'little', 'bit', 'touch', 'hair', 'smidge', 'tad', 'notch', 'notches', 'some', 'db', 'decibel', 'decibels', 'dbs', 'about', 'around', 'like', 'please', 'volume-wise'])
+const VOL_LITTLE = new Set(['bit', 'touch', 'hair', 'smidge', 'tad', 'little', 'notch'])
+const VOL_LOT = new Set(['lot', 'bunch', 'way', 'much'])
 
 export function matchVolume(instruction) {
   const t = strip(instruction)
   if (!t || t.length > 80) return null
-  for (const re of VOLUME_RULES) {
-    const m = re.exec(t)
-    if (!m) continue
-    // The direction and the number land in different groups per shape; find
-    // each by kind rather than by position.
-    const word = m.slice(1).find((g) => UPWARD.test(g || '') || DOWNWARD.test(g || ''))
-    const said = m.slice(1).find((g) => g !== undefined && g !== word && /^\d/.test(g))
-    if (!word) continue
-    const up = UPWARD.test(word)
-    const little = /\ba (?:bit|touch|little|hair|smidge|tad)\b/.test(t)
-    const amount = said !== undefined ? num(said) : little ? 2 : 3
-    if (amount === null || amount <= 0 || amount > 12) return null
-    const by = up ? amount : -amount
-    return { kind: 'setVolume', by, why: `Whole preset ${up ? 'up' : 'down'} ${amount} dB.` }
+  const words = t.replace(/(\d)(db|dbs)\b/g, '$1 $2').split(' ').filter(Boolean)
+  let up = null
+  let down = null
+  let noun = false
+  let whole = false
+  let said = null
+  let little = false
+  let lot = false
+  for (const w of words) {
+    if (/^[-+]?\d+(?:\.\d+)?$/.test(w)) {
+      if (said !== null) return null // two numbers is not one request
+      said = Math.abs(num(w))
+      if (w.startsWith('-')) down = true
+      if (w.startsWith('+')) up = true
+      continue
+    }
+    if (VOL_UP.has(w)) up = true
+    else if (VOL_DOWN.has(w)) down = true
+    /* "louder" and "quieter" are the noun and the direction in one word. */
+    if (/^(louder|quieter|softer|quiet|soft|quieten)$/.test(w)) noun = true
+    if (VOL_UP.has(w) || VOL_DOWN.has(w)) continue
+    if (VOL_NOUNS.has(w)) noun = true
+    else if (VOL_WHOLE.has(w)) whole = true
+    else if (VOL_LITTLE.has(w)) little = true
+    else if (VOL_LOT.has(w)) lot = true
+    else if (VOL_VERBS.has(w) || VOL_FILL.has(w)) continue
+    else return null // a word from outside the request: a block, a scene, a control — not the whole preset
   }
-  return null
+  /* A direction, one only; and something to move — a volume word, or "it" /
+     "everything" standing for the whole preset. A bare "more" has neither. */
+  if (up === down) return null
+  if (!noun && !whole) return null
+  const amount = said !== null ? said : little ? 2 : lot ? 6 : 3
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 12) return null
+  const by = up ? amount : -amount
+  return { kind: 'setVolume', by, why: `Whole preset ${up ? 'up' : 'down'} ${amount} dB.` }
 }
 
 /*

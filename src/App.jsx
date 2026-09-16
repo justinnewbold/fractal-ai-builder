@@ -4161,17 +4161,33 @@ export default function App() {
       }
 
       const volume = matchVolume(instruction)
-      if (volume && outputEid !== null) {
+      if (volume) {
         /*
          * The Output block's Level — the control the speaker slider moves and
          * the one every scene passes through. Read fresh, moved by the dB
          * asked for, held inside its own range, and read back the way every
          * write is.
+         *
+         * A volume request this cannot carry out is SAID here. It used to fall
+         * through to the model — and with the model off, to "the AI model is
+         * off", which is not why the volume did not move.
          */
+        if (outputEid === null) {
+          const text = 'I can\u2019t find the Output block on this preset, so there is no whole-preset level to move. The speaker slider on Play needs it too.'
+          logDebug('local', 'a volume request with no Output block to move', `"${instruction}"`)
+          setTurns((prev) => [...prev, { role: 'assistant', text }])
+          return
+        }
         setProgress('Moving the volume…')
         const level = outputLevelParam((await blockParams(outputEid))?.named)
         const now = Number(level?.value)
-        if (level && Number.isFinite(now)) {
+        if (!level || !Number.isFinite(now)) {
+          const text = 'The Output block has no level control I can read on this unit, so I can\u2019t move the volume from here.'
+          logDebug('local', 'a volume request, but the Output block gave no level', `"${instruction}"`)
+          setTurns((prev) => [...prev, { role: 'assistant', text }])
+          return
+        }
+        {
           const target = Math.round((now + volume.by) * 10) / 10
           const to = Math.max(level.min ?? -Infinity, Math.min(level.max ?? Infinity, target))
           const res = await setParamConfirmed(outputEid, level.id, to, { ...level, name: level.name || 'Level' })
