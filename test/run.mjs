@@ -3635,7 +3635,7 @@ test('the chat is told what the unit holds, and what nobody has looked at', asyn
 
 test('the slot list reaches the chat, and the chat is told how to read it', () => {
   const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
-  const ask = app.slice(app.indexOf('const body = await askPlan('), app.indexOf('history: turns.map'))
+  const ask = app.slice(app.indexOf('body = await askPlan('), app.indexOf('history: turns.map'))
   assert.match(ask, /slots: slotsForChat\(/, 'the ask carries no slot list')
 
   const route = readSrc(new URL('../api/command.js', import.meta.url), 'utf8')
@@ -4562,6 +4562,159 @@ test('the plain requests never needed a model, and the rest still do', async () 
   assert.equal(hit('   '), null)
   assert.equal(hit('x'.repeat(400)), null)
   assert.equal(matchRename('call it ' + 'x'.repeat(40)), null, 'a name the unit cannot hold')
+
+  /*
+   * The sentence from the screenshot that started the next round: "Lower the
+   * volume by 10" went to a model that was switched off, and came back with
+   * nothing. "Lower" was not a verb the volume rule knew, and a bare number
+   * needed "dB" after it.
+   */
+  assert.equal(matchVolume('Lower the volume by 10')?.by, -10, 'the sentence from the screenshot still misses')
+  assert.equal(matchVolume('raise the volume 3')?.by, 3)
+  assert.equal(matchVolume('lower the volume by 20'), null, 'twenty dB in one move is still the model\u2019s to talk about')
+})
+
+test('everything the runner can do with one plain reading, the matcher now catches', async () => {
+  /*
+   * "The app should be able to handle local commands like adjusting settings
+   * on controls and knobs and things like that without using the AI model.
+   * ... if I wanted to make this app completely without an AI model, let's
+   * set it up that way."
+   *
+   * So: every action kind validatePlan knows, wherever a sentence for it has
+   * one reading, plus the factual questions the app can answer from what it
+   * has read. The rules that held the matcher shut still hold — whole
+   * sentence, one thing, in range — and the second half of this test is what
+   * must still miss.
+   */
+  const { matchLocal, matchRename, matchQuestion, LOCAL_HELP } = await import('../src/lib/localCommands.js')
+
+  const amp = {
+    eid: 100, name: 'Amp 1', slug: 'amp', row: 1, col: 3, bypassed: false, channel: 'B',
+    models: [
+      { value: 5, name: 'Brit 800 2204 High', basedOn: 'Marshall JCM800 2204' },
+      { value: 6, name: 'Brit 800 Mod', basedOn: 'Marshall JCM800 2204 (modified)' },
+      { value: 9, name: 'Plexi 100W High', basedOn: 'Marshall Super Lead 100' },
+      { value: 12, name: 'USA Lead+', basedOn: 'Mesa Mark IV' }
+    ]
+  }
+  const drive = { eid: 103, name: 'Drive 1', slug: 'drive', row: 1, col: 4, bypassed: true, channel: 'A' }
+  const delay = { eid: 101, name: 'Delay 1', slug: 'delay', row: 1, col: 7, bypassed: false, channel: 'A' }
+  const tone = { eid: 108, name: 'Tone Match 1', slug: 'tonematch', row: 1, col: 10 }
+  const ctl = (block, id, name, value, min, max) => ({ block, param: { id, name, value, min, max } })
+  const ctx = {
+    sceneCount: 8,
+    sceneNames: ['Clean', 'Lead', 'Heavy Lead', '', '', '', '', ''],
+    activeScene: 1,
+    presetNumber: 464,
+    presetName: 'Olas Heavy EVH Pitch',
+    slots: [{ number: 12, name: 'Metallica' }, { number: 20, name: 'Tool' }, { number: 21, name: 'Tool' }],
+    slotCount: 512,
+    bpm: 120,
+    grid: { rows: 4, cols: 12 },
+    blocks: [amp, drive, delay, tone],
+    // The placed list as the app sees it: input at 0 and output at 11 included.
+    occupied: [{ row: 1, col: 0 }, { row: 1, col: 3 }, { row: 1, col: 4 }, { row: 1, col: 7 }, { row: 1, col: 10 }, { row: 1, col: 11 }],
+    controls: [ctl(amp, 1, 'Gain 1', 5, 0, 10), ctl(amp, 2, 'Treble 1', 5, 0, 10), ctl(delay, 3, 'Mix', 20, 0, 100)]
+  }
+  const hit = (text, c = ctx) => matchQuestion(text, c) || matchRename(text, c) || matchLocal(text, c)
+
+  // ── scenes, by name and by neighbour ──
+  assert.equal(hit('go to the lead scene')?.value, 1)
+  assert.equal(hit('heavy lead scene')?.value, 2, 'a two-word scene name')
+  assert.equal(hit('next scene')?.value, 2)
+  assert.equal(hit('previous scene')?.value, 0)
+  assert.equal(hit('next scene', { ...ctx, activeScene: 7 }), null, 'there is no scene 9')
+  assert.equal(hit('go to the solo scene'), null, 'a scene the preset does not have')
+
+  // ── on/off and channels, in a named scene ──
+  assert.deepEqual(hit('reverb on in scene 2', { ...ctx, blocks: [...ctx.blocks, { eid: 102, name: 'Reverb 1', slug: 'reverb' }] }), {
+    kind: 'setBypass', eid: 102, flag: false, why: 'Reverb 1 on in scene 2 (Lead).', scene: 1
+  })
+  assert.equal(hit('turn off the drive in the heavy lead scene')?.scene, 2)
+  assert.equal(hit('put the amp on channel c in the lead scene')?.scene, 1, 'two "on"s in one sentence')
+  assert.equal(hit('put the amp on channel c in the lead scene')?.text, 'C')
+  assert.equal(hit('turn off the drive in scene 9'), null, 'a scene the unit does not have was written to')
+  assert.equal(hit('switch off the drive')?.flag, true)
+  assert.equal(hit('switch to channel b'), null, '"to" found a block whose name contains it')
+
+  // ── controls: by an amount, to an end, in a scene ──
+  assert.equal(hit('gain up 1.5')?.value, 6.5)
+  assert.equal(hit('raise the gain by 2')?.value, 7)
+  assert.equal(hit('turn the treble down 1')?.value, 4)
+  assert.equal(hit('treble all the way down')?.value, 0)
+  assert.equal(hit('gain to max')?.value, 10)
+  assert.equal(hit('gain to 7 in scene 3')?.scene, 2, 'a value aimed at a scene lost the scene')
+  assert.equal(hit('gain up 20'), null, 'a nudge past the end of the range')
+
+  // ── a model by name, one only ──
+  assert.equal(hit('set the amp to Plexi 100W High')?.value, 9)
+  assert.equal(hit('amp to usa lead+')?.value, 12)
+  assert.equal(hit('use the plexi 100w high on the amp')?.value, 9)
+  assert.equal(hit('amp to brit 800'), null, 'two Brit 800s, and it picked one')
+  assert.equal(hit('amp to mesa mark iv')?.value, 12, 'the real amplifier\u2019s name was not tried')
+
+  // ── blocks: add, remove, move ──
+  assert.deepEqual(hit('add a reverb'), { kind: 'placeBlock', text: 'reverb', value: null, row: null, col: null, why: 'Add a reverb.' })
+  assert.equal(hit('add a whammy')?.text, 'whammy')
+  assert.equal(hit('add a bit more gain'), null, 'a control was taken for a block')
+  assert.equal(hit('add a delay after the amp'), null, 'a placed block needs the model\u2019s grid arithmetic')
+  assert.deepEqual(hit('remove the drive'), { kind: 'clearCell', row: 1, col: 4, eid: 103, why: 'Remove Drive 1.' })
+  assert.equal(hit('remove the chorus'), null, 'a block that is not there')
+  assert.deepEqual(hit('move the drive before the amp'), { kind: 'moveBlock', eid: 103, row: 1, col: 2, why: 'Move Drive 1 before Amp 1.' })
+  assert.equal(hit('move the delay before the drive'), null, 'the cell before the drive holds the amp — that is a shuffle, and the model\u2019s')
+  assert.equal(hit('move the delay after the tone match'), null, 'the cell after Tone Match holds the output, which the schema does not show')
+  assert.equal(hit('move the drive after the amp')?.text, 'Drive 1 is already right after Amp 1.', 'a move to where it already sits')
+  assert.equal(hit('move the drive to the end'), null)
+
+  // ── save, load, back up, library, chain ──
+  assert.deepEqual(hit('save'), { kind: 'savePreset', value: 464, text: '', why: 'Save to slot 464.' })
+  assert.equal(hit('save to 67')?.value, 67)
+  assert.deepEqual(hit('Save this as Heavy Pitch to 67'), { kind: 'savePreset', value: 67, text: 'Heavy Pitch', why: 'Save "Heavy Pitch" to slot 67.' })
+  assert.equal(hit('save it as Black Album')?.value, 464, 'a name with no number is the loaded slot')
+  assert.equal(hit('save', { ...ctx, presetNumber: undefined }), null, 'saved to nowhere')
+  assert.equal(hit('save to 9999'), null, 'a slot the unit does not have')
+  assert.equal(hit('load 45')?.value, 45)
+  assert.equal(hit('preset 45')?.value, 45)
+  assert.equal(hit('load the metallica preset')?.value, 12)
+  assert.equal(hit('load tool'), null, 'two slots called Tool, and it picked one')
+  assert.equal(hit('next preset')?.value, 465)
+  assert.equal(hit('back this up')?.kind, 'backupPreset')
+  assert.deepEqual(hit('keep this as Drop A Rhythm'), { kind: 'keepInLibrary', text: 'Drop A Rhythm', why: 'Keep "Drop A Rhythm" as a file in the library.' })
+  assert.equal(hit('save this to my library')?.kind, 'keepInLibrary')
+  assert.equal(hit('build a drive amp cab delay chain')?.text, 'drive amp cab delay')
+  assert.equal(hit('build a chain')?.text, '')
+  assert.equal(hit('build a drive, amp and pizza chain'), null, 'a word that is not a block')
+
+  // ── renaming this scene ──
+  assert.deepEqual(hit('rename this scene to Solo'), { kind: 'renameScene', scene: null, text: 'Solo', why: 'This scene renamed to Solo.' })
+  assert.equal(hit('rename the preset to Black Album')?.kind, 'renamePreset')
+
+  // ── questions: answered from what is in hand, nothing written ──
+  assert.deepEqual(hit('what amp is this?'), { kind: 'answer', topic: 'model', eid: 100, block: 'Amp 1' })
+  assert.equal(hit('which scene am I on')?.text, 'Scene 2 (Lead).')
+  assert.equal(hit('what preset is this')?.text, 'Slot 464 · Olas Heavy EVH Pitch.')
+  assert.equal(hit("what's the tempo")?.text, 'Tempo 120 BPM.')
+  assert.equal(hit('is the drive on')?.text, 'Drive 1 is off, channel A.')
+  assert.equal(hit('what channel is the amp on')?.text, 'Amp 1 is on channel B.')
+  assert.equal(hit('what is the gain')?.text, 'Amp 1 Gain 1 is 5.')
+  assert.equal(hit('what is the level'), null, 'no control is called Level here, and one containing the word was read back as it')
+  assert.match(hit('help')?.text, /no AI model needed/)
+  assert.equal(hit('what can you do')?.text, LOCAL_HELP)
+  assert.match(hit("what's on the grid")?.text, /Amp 1 \(on\) ch B · Drive 1 \(off\) ch A/)
+
+  // ── and what must still go to the model ──
+  for (const text of [
+    'why did you pick that amp',          // a why, not a fact
+    'make it brighter',                   // judgement
+    'what does the gain do',              // an explanation — not "what is it at"
+    'save this and make it heavier',      // two things
+    'move the drive before the amp and turn it on',
+    'is this saved',                      // not a fact the matcher holds
+    'the lead is buried'                  // a complaint, not a control
+  ]) {
+    assert.equal(hit(text), null, `matched "${text}", which needs the model`)
+  }
 })
 
 test('every model on the unit can be looked up by what it really is', async () => {

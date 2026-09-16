@@ -3,6 +3,30 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.227.0 The chat does the plain things itself, model or no model.
+
+"The app should be able to handle local commands like adjusting settings on
+controls and knobs and things like that without using the AI model ... if I
+wanted to make this app completely without an AI model, let's set it up that
+way." The local matcher watched for months and never acted; now a match is the
+answer, with the AI model on or off, and it goes through exactly the path a
+model's plan takes — checked against the unit, confirmed first if it can lose
+work, run by the same runner. Nothing it catches costs a token.
+
+What it catches now, beyond scene / tempo / on-off / channel / a control to a
+number or up a bit: scenes by name and "next scene"; a block on or off, or a
+channel, in a named scene; a control up or down by an amount, or all the way;
+a block's model by name ("amp to Plexi 100W High"); add, remove, and move a
+block before or after another; rename this scene; save (plain, to a slot, with
+a name), load by number or by a slot's name, next preset, back up, keep to the
+library, build a chain; and factual questions — which amp or cab, which scene,
+which preset, the tempo, whether a block is on, its channel, what a control is
+set to, what is on the grid — answered from what the app has already read.
+"help" lists it all.
+
+Fixed on the way: "Lower the volume by 10" went to a model that was switched
+off. "Lower" was not a verb the volume rule knew and a bare number needed "dB".
+
 ## 7.226.0
 
 **Two switches over the AI.** Setup › AI & cost now has Chat and AI model.

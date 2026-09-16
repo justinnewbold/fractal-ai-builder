@@ -84,7 +84,7 @@ import {
   rememberNote,
   summariseCorrections
 } from './lib/corrections'
-import { matchLocal, matchRename, matchVolume, plainDesignRequest } from './lib/localCommands'
+import { matchLocal, matchRename, matchVolume, matchQuestion, plainDesignRequest } from './lib/localCommands'
 import { setParamConfirmed, blockParams } from './lib/forgefx'
 import { outputLevelParam } from './lib/volume'
 import RenamePreset from './components/RenamePreset'
@@ -392,9 +392,10 @@ const SETUP_PAGES = {
 const THEME_WORD = { auto: 'Auto', light: 'Light', dark: 'Dark' }
 /** What the chat says when a request needed the model and the model is off. */
 const MODEL_OFF =
-  'The AI model is off, so I did nothing for that. Turn it on in Setup › AI & cost, or ask for something ' +
-  'the app does by itself: a scene, the tempo, a block on or off, a channel, a control to a number or up ' +
-  'a bit, the volume, a rename.'
+  'The AI model is off and that one needs it, so I did nothing. Turn it on in Setup › AI & cost, or ask for ' +
+  'something the app does by itself: a scene, the tempo, a block on or off, a channel, a control to a number ' +
+  'or up or down, a model by name, add or remove a block, the volume, a rename, save, load, back up. ' +
+  'Say "help" for the whole list.'
 
 export default function App() {
   const [status, setStatus] = useState('idle')
@@ -4072,18 +4073,37 @@ export default function App() {
         const controls = withPositions.flatMap((entry) =>
           (entry.params || []).map((param) => ({ block: entry, param }))
         )
+        /*
+         * Everything the matcher may read, and all of it already in hand: the
+         * schema just read, where the unit is (scene, preset, tempo), what
+         * the slots are called, and the grid it has to fit a move into. No
+         * device call is made to build this.
+         */
+        const known = {
+          blocks: withPositions,
+          controls,
+          sceneCount: device?.capabilities?.sceneCount ?? 8,
+          sceneNames,
+          activeScene: scene,
+          presetNumber: preset?.number,
+          presetName: preset?.name,
+          slots: slots.length ? slots : cachedPresetNames(),
+          slotCount: device?.capabilities?.slotCount ?? null,
+          bpm,
+          grid: device?.capabilities?.grid || null,
+          /* The placed list, input and output included: a cell the schema
+             does not show is still not a free cell. */
+          occupied: blocks.map((b) => ({ row: b.row, col: b.col, eid: b.effectId })),
+          /* The player's own usual move on that control, when there is one —
+             a median of what they have reached for before beats a share of
+             the range for "a bit more treble". */
+          learnedStep: (name) =>
+            corrections?.controls?.find((c) => c.name === name)?.by ?? null
+        }
         would =
-          matchRename(instruction, { sceneCount: device?.capabilities?.sceneCount ?? 8 }) ||
-          matchLocal(instruction, {
-            blocks: withPositions,
-            controls,
-            sceneCount: device?.capabilities?.sceneCount ?? 8,
-            /* The player's own usual move on that control, when there is one —
-               a median of what they have reached for before beats a share of
-               the range for "a bit more treble". */
-            learnedStep: (name) =>
-              corrections?.controls?.find((c) => c.name === name)?.by ?? null
-          })
+          matchQuestion(instruction, known) ||
+          matchRename(instruction, known) ||
+          matchLocal(instruction, known)
         localSeen.current += 1
         if (would) localHits.current += 1
         /*
@@ -4104,7 +4124,7 @@ export default function App() {
         */
         logDebug(
           'local',
-          would ? `would have handled this here: ${would.why}` : 'left to the model',
+          would ? `caught here: ${would.why || would.text || would.topic}` : 'left to the model',
           `"${instruction}"${would ? ` → ${would.kind}` : ''} · ${localHits.current} of ${localSeen.current} this session`
         )
       } catch (err) {
@@ -4176,44 +4196,57 @@ export default function App() {
       }
 
       /*
-       * The AI model is off: the app does what it can by itself.
+       * What the app does by itself, before any model is asked.
        *
-       * "Have the chat still available but keep everything local." The
-       * matcher above has watched for months and never acted; with the model
-       * off it is the only answer there is, so its plan takes exactly the
-       * path a model's plan takes — checked against the unit, run by the same
-       * runner, said in the same Done line. A sentence it does not recognise
-       * is answered with what it could have been instead. Nothing here costs
-       * a token.
+       * "The app should be able to handle local commands like adjusting
+       * settings on controls and knobs and things like that without using the
+       * AI model." The matcher above watched for months and never acted; now
+       * a match IS the answer, model on or off. A question is answered in
+       * words from what was just read. A change goes through exactly the path
+       * a model's plan takes below — checked against the unit by validatePlan,
+       * confirmed first if it can lose work, run by the same runner, said in
+       * the same Done line. Nothing here costs a token.
+       *
+       * With the model off, a sentence the matcher does not know gets one
+       * line saying so and where the list is. With it on, that sentence goes
+       * to the model as it always has.
        */
-      if (!modelOn) {
-        if (!would) {
-          setTurns((prev) => [...prev, { role: 'assistant', text: MODEL_OFF }])
-          return
+      if (would?.kind === 'answer') {
+        counted = true // nothing was spent, so a failure below must not go in the ledger as a chat turn
+        let text = would.text
+        if (would.topic === 'model') {
+          /* The one fact the schema does not carry: which model a block is on. */
+          setProgress(`Reading ${would.block}…`)
+          const read = await blockParams(would.eid).catch(() => null)
+          const type = read?.type
+          const value = typeof type === 'object' && type ? type.value : type
+          const name = typeof type === 'object' && type ? type.name : null
+          const entry = withPositions.find((b) => b.eid === would.eid)
+          const model = entry?.models?.find((m) => m.value === value)
+          const shown = name || model?.name || null
+          const gear = model?.basedOn || model?.manufacturer || null
+          text = shown
+            ? `${would.block} is on ${shown}${gear ? ` (${gear})` : ''}.`
+            : `I couldn\u2019t read which model ${would.block} is on.`
         }
-        logDebug('local', 'handled here: the AI model is off, so the app did it itself', `"${instruction}" → ${would.kind}`)
-        const local = validatePlan({ understood: would.why, actions: [would] }, withPositions, {
-          ...(device?.capabilities || {}),
-          activeScene: scene,
-          sceneNames,
-          remote: remoteActive()
-        })
-        record('ask', `Asked: ${instruction}`, [local.understood, `${local.actions.length} actions proposed`, ...local.problems], true)
-        if (remote && local.actions.some((a) => REMOTE_BLOCKED_KINDS.has(a.kind))) {
-          setTurns((prev) => [
-            ...prev,
-            { role: 'assistant', text: `${local.actions.map((a) => a.label).join(', ')} — that has to happen at the Mac.` }
-          ])
-          return
-        }
-        setTurns((prev) => [
-          ...prev,
-          { role: 'assistant', text: replyFor(local), actions: local.actions, problems: local.problems }
-        ])
-        if (local.actions.length) await perform(local.actions)
+        logDebug('local', 'answered here: a question about what is loaded', `"${instruction}" → ${text}`)
+        record('ask', `Asked: ${instruction}`, [text], true)
+        setTurns((prev) => [...prev, { role: 'assistant', text }])
         return
       }
 
+      let body = null
+      if (would) {
+        counted = true // no model turn, so nothing to write in the ledger if the write fails
+        logDebug('local', 'handled here: no model needed', `"${instruction}" → ${would.kind}`)
+        body = { understood: would.why, actions: [would] }
+      } else if (!modelOn) {
+        setTurns((prev) => [...prev, { role: 'assistant', text: MODEL_OFF }])
+        return
+      } else {
+      /* ── the model half. Kept at its old indentation: it is long, it is
+            unchanged, and the diff should say so. It ends where the shared
+            plan check begins, at "Which scenes share a channel". ── */
       setProgress(`${THINKING}…`)
       /*
        * The placeable palette rides along so "add a reverb" is sayable: the
@@ -4249,7 +4282,7 @@ export default function App() {
        * line the server keeps alive, gives up on our clock rather than the
        * browser's, and asks once more if the line really did die.
        */
-      const body = await askPlan(
+      body = await askPlan(
         {
           instruction,
           memory: memoryForRequest(memory), // who is asking — api/_memory.js
@@ -4491,6 +4524,8 @@ export default function App() {
         }
         return
       }
+
+      } // end of the model half
 
       /*
        * Which scenes share a channel, where that can be known silently — the
@@ -6755,10 +6790,12 @@ export default function App() {
                 <span>
                   AI model
                   <span className="hint">
-                    Whether a request may go to the model and cost tokens. Off, the chat stays and the
-                    app does what it can by itself — a scene, the tempo, a block on or off, a channel, a
-                    control to a number or up a bit, the volume, a rename, a band the book already knows
-                    — and says plainly when a request is more than that. This device remembers both.
+                    Whether a request may go to the model and cost tokens. Plain commands never do,
+                    either way — scenes, tempo, blocks on or off, channels, a control to a number or up
+                    or down, a model by name, add or remove a block, volume, renames, save, load, back up,
+                    and questions about what is loaded; type “help” in the chat for the list. Off, that is
+                    all the chat does, and it says plainly when a request needs the model. This device
+                    remembers both.
                   </span>
                 </span>
               </label>
