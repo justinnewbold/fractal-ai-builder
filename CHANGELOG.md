@@ -3,6 +3,13 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.225.0
+
+**Fixes 7.224.0, which would not open.** The site came up on "The app
+couldn't draw — Cannot access 'xa' before initialization". The new AI
+switch was read by the list of screens before the line that creates it.
+It is created first now.
+
 ## 7.224.0
 
 **The AI can be turned off.** Setup › AI & cost opens on a switch, Use the
