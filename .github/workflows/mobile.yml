@@ -46,6 +46,10 @@ on:
         type: choice
         default: preview
         options: [preview, ios-simulator, production, development]
+      submit:
+        description: 'Send it to TestFlight / Play when it finishes'
+        type: boolean
+        default: false
   pull_request:
     paths:
       - 'mobile/**'
@@ -198,6 +202,21 @@ jobs:
       # EAS CLI looks for. An app-specific password rather than the account
       # password is the whole point: it carries no two-factor prompt, which is
       # what a build server cannot answer.
+      # Building and shipping are two different things, and the gap between
+      # them is easy to miss: `eas build` produces a file on Expo's servers
+      # and stops there. Nothing reaches TestFlight, so nothing is installable
+      # on a phone, and the build page looks finished while the phone stays
+      # empty.
+      #
+      # `--auto-submit` closes that gap without waiting: the build is queued
+      # with `--no-wait` because an iOS build can outlast a job, and the
+      # submission is queued behind it on Expo's side rather than here. It
+      # needs the App Store Connect API key, which is on the project now, and
+      # eas.json's submit block already names the team.
+      #
+      # Off by default. A submission is outward-facing — it puts a build in
+      # front of Apple's review tooling and every TestFlight tester — so it is
+      # asked for by ticking the box, not a side effect of building.
       - name: Build
         working-directory: mobile
         env:
@@ -208,4 +227,5 @@ jobs:
             --platform "${{ inputs.platform }}" \
             --profile "${{ inputs.profile }}" \
             --non-interactive \
-            --no-wait
+            --no-wait \
+            ${{ inputs.submit && '--auto-submit' || '' }}
