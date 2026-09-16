@@ -3,6 +3,15 @@
 Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
 roadmap in the README, patch is everything since.
 
+## 7.224.0
+
+**The AI can be turned off.** Setup › AI & cost opens on a switch, Use the
+AI. Off, nothing reaches the model: the ✦ Ask button and the Ask tab go
+away, and anything that would have cost tokens gets one line saying the AI
+is off instead. Scenes, knobs, presets, the volume, renaming and the band
+book all keep working. The AI & cost row says "AI off" while it is. This
+device remembers it.
+
 ## 7.223.0
 
 **The Footswitches panel is gone.** It asked the unit what its footswitches

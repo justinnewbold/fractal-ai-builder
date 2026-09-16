@@ -42,9 +42,12 @@ export const clampMode = (v) => v === true || v === 'true' || v === '1'
  * Three parts, and the first two are the ones easy to lose: there is nothing to
  * ask about before a unit has answered, and offering to open the conversation
  * you are already reading is a button that does nothing.
+ *
+ * `aiOn` is the bigger switch (lib/aiSwitch.js in the browser): with the AI
+ * off there is nothing for the button to open onto. Absent means on.
  */
-export const askButtonShows = ({ status, view, playing }) =>
-  status === 'live' && view !== 'ask' && !playing
+export const askButtonShows = ({ status, view, playing, aiOn = true }) =>
+  status === 'live' && view !== 'ask' && !playing && aiOn !== false
 
 /**
  * The phone app's rule, for the ✦ Tone button on the stage screen.

@@ -94,6 +94,7 @@ import { createNameScan } from './lib/nameScan'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
 import Screens, { viewsFor } from './components/Screens'
 import { SIZES, loadSize, saveSize, clampSize, loadFit, saveFit } from './lib/gigSize'
+import { loadAiOn, saveAiOn } from './lib/aiSwitch'
 import { loadPlayMode, savePlayMode, askButtonShows } from './lib/playMode'
 import { remember as rememberPreset, CHANGED as MARKS_CHANGED } from './lib/presetMarks'
 import { CHANGED as SETLISTS_CHANGED } from './lib/setlists'
@@ -389,6 +390,8 @@ const SETUP_PAGES = {
   about: 'About'
 }
 const THEME_WORD = { auto: 'Auto', light: 'Light', dark: 'Dark' }
+/** What the chat says when a request would have gone to the model and the AI is off. */
+const AI_OFF = 'The AI is off. Turn it on in Setup › AI & cost to design tones or ask for changes.'
 
 export default function App() {
   const [status, setStatus] = useState('idle')
@@ -1157,7 +1160,9 @@ export default function App() {
    * Hidden on a phone rather than deleted, because a desktop browser is
    * exactly where both belong.
    */
-  const views = useMemo(() => viewsFor(narrow), [narrow])
+  /* With the AI off the Ask tab is not a screen; a view that leaves the list
+     falls back to Play below. */
+  const views = useMemo(() => viewsFor(narrow).filter((v) => aiOn || v !== 'ask'), [narrow, aiOn])
 
   /*
    * How big the buttons on Play are.
@@ -1183,6 +1188,8 @@ export default function App() {
    * rule the app infers, is written down in lib/playMode.js.
    */
   const [playing, setPlaying] = useState(loadPlayMode)
+  /* The bigger switch: whether anything may reach the model at all. */
+  const [aiOn, setAiOn] = useState(loadAiOn)
 
   /*
    * Whether the Ask button is drawn, decided once and named.
@@ -1204,7 +1211,7 @@ export default function App() {
    * ✦ Ask tab is in the row above and does the same thing, and the corner it
    * floated over is where the last control in every grid lands.
    */
-  const askShows = askButtonShows({ status, view, playing })
+  const askShows = askButtonShows({ status, view, playing, aiOn })
 
   const [size, setSize] = useState(loadSize)
   /* Whether Play sizes its tiles from the screen instead of the step. */
@@ -2523,6 +2530,8 @@ export default function App() {
 
   /** One path to the model, so generate and refine can't drift apart. */
   const requestSpec = async (schema, description, previous, extra = {}) => {
+    // The one door to the designer. Shut, it says so rather than knocking.
+    if (!aiOn) throw new Error(AI_OFF)
     /*
      * What this app already knows about the band being asked about.
      *
@@ -4138,6 +4147,13 @@ export default function App() {
           setDirty(true)
           return
         }
+      }
+
+      /* And the one door to the chat model. The local answers above still
+         work with the AI off; from here on everything is the model's. */
+      if (!aiOn) {
+        setTurns((prev) => [...prev, { role: 'assistant', text: AI_OFF }])
+        return
       }
 
       setProgress(`${THINKING}…`)
@@ -6504,7 +6520,7 @@ export default function App() {
               <SetupRow key="unit" title="Unit" status={status === 'live' ? `${device?.short || device?.name || 'Unit'} · connected` : 'Not connected'} onClick={() => setSetupPage('unit')} />
               <SetupRow key="link" title="Phone & Mac" status={describeLink(link).note || 'Phone remote off'} onClick={() => setSetupPage('link')} />
               <SetupRow key="play" title="Play screen" status={[fit ? 'Fit to screen' : SIZES[size].name, playing ? 'Play mode' : null, THEME_WORD[getMode()] || null].filter(Boolean).join(' · ')} onClick={() => setSetupPage('play')} />
-              <SetupRow key="ai" title="AI & cost" status={today()?.cost ? `${formatCost(today().cost)} today` : 'Nothing spent today'} onClick={() => setSetupPage('ai')} />
+              <SetupRow key="ai" title="AI & cost" status={!aiOn ? 'AI off' : today()?.cost ? `${formatCost(today().cost)} today` : 'Nothing spent today'} onClick={() => setSetupPage('ai')} />
               <SetupRow key="gear-names" title="Amp & pedal names" status="What each model on your unit really is" onClick={() => setSheet('gear')} />
               <SetupRow key="help" title="Help & fixes" status={`${getDebugLog().length} line${getDebugLog().length === 1 ? '' : 's'} in the log`} onClick={() => setSetupPage('help')} />
               <SetupRow key="about" title="About" status={FULL} onClick={() => setSetupPage('about')} />
@@ -6642,6 +6658,34 @@ export default function App() {
               ‹ Setup
             </button>
             <p className="setup-page-title">{SETUP_PAGES.ai}</p>
+            {/*
+              "Can we add a toggle on settings to turn the AI on and off?"
+              First on the page, because it decides whether the rest of the
+              page can spend anything. See lib/aiSwitch.js for what off means.
+            */}
+            <Section key="ai-switch" title="AI" note={aiOn ? 'On' : 'Off'} defaultOpen>
+              <label className="rename-choice">
+                <input
+                  type="checkbox"
+                  checked={aiOn}
+                  onChange={(e) => {
+                    const on = e.target.checked
+                    setAiOn(on)
+                    saveAiOn(on)
+                    record('ai', on ? 'AI turned on' : 'AI turned off')
+                  }}
+                />
+                <span>
+                  Use the AI
+                  <span className="hint">
+                    Off, nothing reaches the model: the ✦ Ask button and the Ask tab go away,
+                    and a request that would have cost tokens gets one line saying so instead.
+                    Scenes, knobs, presets, the volume, renaming and the band book all still
+                    work. This device remembers it.
+                  </span>
+                </span>
+              </label>
+            </Section>
             <div className="history-actions">
               <button className="chip" onClick={() => setSheet('history')}>
                 History — every tone designed
