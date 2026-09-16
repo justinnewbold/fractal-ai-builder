@@ -37,6 +37,21 @@ Mac on it.
 Which means the setup is one step. Turn on phone remote in the desktop app,
 sign in here with the same email, and the two find each other.
 
+## The first release has no AI in it
+
+`src/lib/features.js` holds one switch, `AI`, and it is `false`.
+
+Off, there is no ✦ Tone button on the stage screen, no way onto the tone
+screen, and no Play mode switch in Setup — that switch exists only to hide the
+Tone button, so with no button it would report success and change nothing.
+
+The tone code stays in the tree and in the bundle, unreachable, because it
+works and it is going back on in a later update. The second release turns one
+word from `false` to `true`. A test fails if a shipping build has it on, or if
+anything but the tone screen ever imports the tone builder — that import list
+is what makes "nothing here reaches the model" a checkable claim rather than a
+careful habit.
+
 ## What it will not do
 
 Saving to a slot, backups, restores, firmware and raw SysEx are refused — by
@@ -117,4 +132,5 @@ is in the web app.
 | `src/lib/unit.mjs` | What is true about a unit without asking it |
 | `src/lib/rig.js` | One store, one event subscription, optimistic writes |
 | `src/lib/link.js` | Staying joined across locks, backgrounds and handovers |
+| `src/lib/features.js` | What this build ships with. The AI switch |
 | `src/screens/Stage.js` | The stand, not the bench |

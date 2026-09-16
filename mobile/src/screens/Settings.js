@@ -12,6 +12,7 @@ import {
 } from '../lib/relay'
 import { useRig } from '../lib/rig'
 import { savePlayMode } from '../lib/playMode'
+import { AI } from '../lib/features'
 import { isPairAccount } from '../lib/pairing'
 import Lamp from '../components/Lamp'
 import Note from '../components/Note'
@@ -74,6 +75,13 @@ export default function Settings({
       </View>
 
       {/* --------------------------------------------------------- playing */}
+      {/*
+        Gone with the AI, because hiding the ✦ Tone button is the only thing
+        this switch has ever done and there is no such button in this build.
+        A switch that takes away something already absent is a switch that
+        reports success and changes nothing. See lib/features.js.
+      */}
+      {AI ? (
       <View style={{ gap: space.md }}>
         <Section>Playing</Section>
         {/*
@@ -98,6 +106,7 @@ export default function Settings({
           building a sound. Everything else works the same. This phone remembers it.
         </Note>
       </View>
+      ) : null}
 
       {/* ------------------------------------------------------------ link */}
       <View style={{ gap: space.md }}>
