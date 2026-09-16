@@ -772,18 +772,31 @@ test('the Ask button waits for a unit, stays off its own screen, and goes when p
   assert.equal(play.askButtonShows({ status: 'live', view: 'play', playing: false, aiOn: true }), true)
 })
 
-test('the AI switch is on unless somebody turned it off, and unreadable is on', async () => {
-  const { loadAiOn, saveAiOn } = await import('../src/lib/aiSwitch.js')
+test('two AI switches: on by default, remembered, unreadable is on, and 7.224\u2019s one switch was the model', async () => {
+  const { loadChatOn, saveChatOn, loadModelOn, saveModelOn } = await import('../src/lib/aiSwitch.js')
   const mem = new Map()
   const store = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, v), removeItem: (k) => mem.delete(k) }
-  assert.equal(loadAiOn(store), true, 'a fresh device has the AI off')
-  saveAiOn(false, store)
-  assert.equal(loadAiOn(store), false, 'off did not stick')
-  saveAiOn(true, store)
-  assert.equal(loadAiOn(store), true, 'on did not stick')
-  mem.set('fractal.aiOn', 'nonsense')
-  assert.equal(loadAiOn(store), true, 'a value nobody can read turned the AI off')
-  assert.equal(loadAiOn({ getItem: () => { throw new Error('blocked') } }), true, 'a blocked store turned the AI off')
+  assert.equal(loadChatOn(store), true, 'a fresh device has the chat off')
+  assert.equal(loadModelOn(store), true, 'a fresh device has the model off')
+  saveChatOn(false, store)
+  assert.equal(loadChatOn(store), false, 'chat off did not stick')
+  assert.equal(loadModelOn(store), true, 'turning the chat off turned the model off')
+  saveChatOn(true, store)
+  saveModelOn(false, store)
+  assert.equal(loadModelOn(store), false, 'model off did not stick')
+  assert.equal(loadChatOn(store), true, 'turning the model off turned the chat off')
+  saveModelOn(true, store)
+  assert.equal(loadModelOn(store), true, 'model on did not stick')
+  // 7.224.0 stored one switch as fractal.aiOn; it meant the model.
+  mem.clear()
+  mem.set('fractal.aiOn', '0')
+  assert.equal(loadModelOn(store), false, 'the old AI-off setting was not read as the model being off')
+  assert.equal(loadChatOn(store), true, 'the old AI-off setting hid the chat')
+  saveModelOn(true, store)
+  assert.equal(mem.has('fractal.aiOn'), false, 'the old key outlives the new switch')
+  mem.set('fractal.modelOn', 'nonsense')
+  assert.equal(loadModelOn(store), true, 'a value nobody can read turned the model off')
+  assert.equal(loadModelOn({ getItem: () => { throw new Error('blocked') } }), true, 'a blocked store turned the model off')
 })
 
 test('anything unreadable in the store is not playing', () => {
