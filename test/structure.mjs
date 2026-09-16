@@ -412,6 +412,14 @@ export function run(test) {
      */
     assert.match(src, /const askShows = askButtonShows\(\{ status, view, playing, aiOn \}\)/, 'the Ask button ignores the switch')
     assert.match(src, /viewsFor\(narrow\)\.filter\(\(v\) => aiOn \|\| v !== 'ask'\)/, 'the Ask tab ignores the switch')
+    /* And the switch exists before the list that reads it. It did not, once,
+       and the live site opened on "Cannot access 'xa' before initialization":
+       a const read before its own line is a crash, and nothing here renders
+       App to catch it. Every state a memo reads has to come first. */
+    assert.ok(
+      src.indexOf('const [aiOn, setAiOn] = useState(loadAiOn)') < src.indexOf('const views = useMemo('),
+      'the AI switch is read by the screen list before it exists'
+    )
     const spec = src.slice(src.indexOf('const requestSpec = async'), src.indexOf('const requestSpec = async') + 400)
     assert.match(spec, /if \(!aiOn\) throw new Error\(AI_OFF\)/, 'the designer can still be asked with the AI off')
     const ask = src.slice(src.indexOf('const askFor = async'), src.indexOf('const body = await askPlan('))

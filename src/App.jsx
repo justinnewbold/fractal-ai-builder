@@ -1160,6 +1160,15 @@ export default function App() {
    * Hidden on a phone rather than deleted, because a desktop browser is
    * exactly where both belong.
    */
+  /*
+   * The bigger switch: whether anything may reach the model at all.
+   *
+   * Declared ABOVE the screen list, which reads it. It was declared below, and
+   * the live site opened on "Cannot access 'xa' before initialization" — a
+   * const read before its line runs is a crash, and no test renders App.
+   */
+  const [aiOn, setAiOn] = useState(loadAiOn)
+
   /* With the AI off the Ask tab is not a screen; a view that leaves the list
      falls back to Play below. */
   const views = useMemo(() => viewsFor(narrow).filter((v) => aiOn || v !== 'ask'), [narrow, aiOn])
@@ -1188,8 +1197,6 @@ export default function App() {
    * rule the app infers, is written down in lib/playMode.js.
    */
   const [playing, setPlaying] = useState(loadPlayMode)
-  /* The bigger switch: whether anything may reach the model at all. */
-  const [aiOn, setAiOn] = useState(loadAiOn)
 
   /*
    * Whether the Ask button is drawn, decided once and named.
