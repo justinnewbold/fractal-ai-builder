@@ -93,9 +93,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Node 22 here, and 20 everywhere else in this repository. The difference
+      # is deliberate and the reason it is safe is the whole point.
+      #
+      # eas-cli 24.6.0 will not install on Node 20 — one of its dependencies
+      # refuses outright:
+      #
+      #   error @oclif/plugin-autocomplete@3.3.0: The engine "node" is
+      #   incompatible with this module. Expected version ">=22.0.0".
+      #   Got "20.20.2"
+      #
+      # That is one of the two things the repository has been watching for, and
+      # it has now happened: something needed will not install on Node 20.
+      #
+      # It does NOT mean the repository moves off Node 20. The reason that
+      # question is difficult belongs entirely to the Mac app: it runs the
+      # device server on Electron's bundled Node, so moving Node means moving
+      # Electron, which means rebuilding serialport and @julusian/midi — native
+      # addons bound to the runtime, and the one change that can stop the app
+      # finding the FM3. None of that is in reach from here. This job installs
+      # a CLI and hands a directory to Expo's build servers; it compiles no
+      # native module and it never runs the unit.
+      #
+      # The `check` job above stays on 20 on purpose, because it runs the test
+      # suite and that suite should run on the same version as web.yml and
+      # desktop.yml. A bug that appears on one Node version and not another has
+      # already cost a day here once.
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       # Never reads the `secrets` context as a whole, and that is the point.
@@ -131,6 +157,25 @@ jobs:
       - name: Install the app's own dependencies
         working-directory: mobile
         run: npm ci
+
+      # The app has to exist on Expo's side before anything can be built for
+      # it, and until now it never has: app.json carried an empty `extra.eas`,
+      # so there was no project id and `eas build --non-interactive` has
+      # nothing to attach a build to.
+      #
+      # `eas init` is what creates it, and it is safe to run every time: with
+      # the owner and slug set in app.json it finds the existing project on
+      # every run after the first and writes the same id back. Nothing is
+      # created twice.
+      #
+      # The id it writes lands in the runner's copy of app.json and is thrown
+      # away with the runner. That is untidy but not wrong — the owner and the
+      # slug are what identify the project, and they are committed. Pinning the
+      # id in app.json once it is known would save this call; it is not worth a
+      # round trip to find out.
+      - name: The app is registered with Expo
+        working-directory: mobile
+        run: eas init --non-interactive --force
 
       # Non-interactive and queued rather than waited on: an iOS build can sit
       # in a queue longer than a job is allowed to run, and a workflow that
