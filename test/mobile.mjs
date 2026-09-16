@@ -93,6 +93,44 @@ export function run(test) {
     assert.equal(clampMode('1'), true)
   })
 
+  test('eas.json puts the Apple team where EAS accepts it, and nowhere else', () => {
+    /*
+     * A build was told to stop asking for the Apple Team ID, and the team was
+     * written into every iOS BUILD profile. EAS does not have that field
+     * there, and it does not shrug:
+     *
+     *   eas.json is not valid.
+     *   - "build.preview.ios.appleTeamId" is not allowed
+     *   - "build.production.ios.appleTeamId" is not allowed
+     *
+     * That killed every build of both platforms, because `eas init` validates
+     * the whole file before anything else runs — so an iOS-shaped mistake
+     * took Android down with it. It reached main, which is the part worth a
+     * test: the file parses as JSON perfectly well, so nothing local objected.
+     *
+     * The team belongs under `submit`, where it already was, and the build
+     * gets its team from the credentials instead.
+     */
+    const eas = JSON.parse(read('mobile/eas.json'))
+
+    for (const [name, profile] of Object.entries(eas.build || {})) {
+      for (const platform of ['ios', 'android']) {
+        assert.ok(
+          !(profile?.[platform] || {}).appleTeamId,
+          `build.${name}.${platform}.appleTeamId is not a field EAS allows; the team goes under submit`
+        )
+      }
+    }
+
+    /* And it is still where it belongs, so this cannot be "fixed" by deleting
+       the team outright. */
+    assert.equal(
+      eas.submit?.production?.ios?.appleTeamId,
+      '3KA9RC7YE6',
+      'the Apple team is missing from the submit profile, so a submission cannot say who it is from'
+    )
+  })
+
   test('the first release ships with the AI switched off, and every door to it obeys that', async () => {
     /*
      * "For the initial releases I only want to release the stuff related to
