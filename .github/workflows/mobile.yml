@@ -158,6 +158,25 @@ jobs:
         working-directory: mobile
         run: npm ci
 
+      # The app has to exist on Expo's side before anything can be built for
+      # it, and until now it never has: app.json carried an empty `extra.eas`,
+      # so there was no project id and `eas build --non-interactive` has
+      # nothing to attach a build to.
+      #
+      # `eas init` is what creates it, and it is safe to run every time: with
+      # the owner and slug set in app.json it finds the existing project on
+      # every run after the first and writes the same id back. Nothing is
+      # created twice.
+      #
+      # The id it writes lands in the runner's copy of app.json and is thrown
+      # away with the runner. That is untidy but not wrong — the owner and the
+      # slug are what identify the project, and they are committed. Pinning the
+      # id in app.json once it is known would save this call; it is not worth a
+      # round trip to find out.
+      - name: The app is registered with Expo
+        working-directory: mobile
+        run: eas init --non-interactive --force
+
       # Non-interactive and queued rather than waited on: an iOS build can sit
       # in a queue longer than a job is allowed to run, and a workflow that
       # times out waiting looks like a build that failed.
