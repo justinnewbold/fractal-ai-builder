@@ -392,7 +392,7 @@ export function run(test) {
      * and reads it back like any write. Both only after the watch line, so
      * the tally still counts them.
      */
-    const ask = src.slice(src.indexOf("logDebug('local', 'the local matcher threw and was ignored'"), src.indexOf('const body = await askPlan('))
+    const ask = src.slice(src.indexOf("logDebug('local', 'the local matcher threw and was ignored'"), src.indexOf('body = await askPlan('))
     assert.match(ask, /const plain = plainDesignRequest\(instruction, \{ blocks: withPositions \}\)/, 'a plain design is not looked for')
     assert.match(ask, /if \(plain && blocks\.some\(\(b\) => !EXCLUDED_BLOCKS\.includes\(b\.slug\)\)\)/, 'a design on an empty slot skips the chain build')
     assert.match(ask, /await generate\(plain\.text, null, scenesWanted\)/, 'the designer does not get the player\u2019s own words')
@@ -423,11 +423,13 @@ export function run(test) {
     }
     const spec = src.slice(src.indexOf('const requestSpec = async'), src.indexOf('const requestSpec = async') + 500)
     assert.match(spec, /if \(!modelOn\) throw new Error\(MODEL_OFF\)/, 'the designer can still be asked with the model off')
-    const ask = src.slice(src.indexOf('const askFor = async'), src.indexOf('const body = await askPlan('))
-    assert.match(ask, /if \(!modelOn\) \{\s*\n\s*if \(!would\) \{\s*\n\s*setTurns\(\(prev\) => \[\.\.\.prev, \{ role: 'assistant', text: MODEL_OFF \}\]\)\s*\n\s*return/, 'an unknown sentence with the model off is not answered with what it could have been')
-    assert.match(ask, /const local = validatePlan\(\{ understood: would\.why, actions: \[would\] \}, withPositions, \{/, 'the matcher’s plan skips the check the model’s gets')
-    assert.match(ask, /if \(local\.actions\.length\) await perform\(local\.actions\)/, 'the matcher’s plan does not run through the same runner')
-    assert.ok(ask.indexOf('const volume = matchVolume(') < ask.indexOf('if (!modelOn) {'), 'the free local answers are refused along with the model')
+    const ask = src.slice(src.indexOf('const askFor = async'), src.indexOf('body = await askPlan('))
+    /* With the model off, a sentence the matcher does not know gets the one
+       line — and only when the matcher had nothing, because a match is the
+       answer whichever way the switch sits (see the acting test below). */
+    assert.match(ask, /\} else if \(!modelOn\) \{\s*\n\s*setTurns\(\(prev\) => \[\.\.\.prev, \{ role: 'assistant', text: MODEL_OFF \}\]\)\s*\n\s*return/, 'an unknown sentence with the model off is not answered with what it could have been')
+    assert.ok(ask.indexOf('if (would) {') < ask.indexOf('} else if (!modelOn) {'), 'the model switch is checked before the matcher is asked')
+    assert.ok(ask.indexOf('const volume = matchVolume(') < ask.indexOf('} else if (!modelOn) {'), 'the free local answers are refused along with the model')
     for (const which of ["noteSpend('design', err?.usage || null, { failed: err.message })", "noteSpend('refine', err?.usage || null, { failed: err.message })"]) {
       const at = src.indexOf(which)
       const caught = src.slice(src.lastIndexOf('} catch (err) {', at), at)
@@ -1041,50 +1043,58 @@ export function run(test) {
     assert.match(setup, /onClick=\{\(\) => setSheet\('gear'\)\}/, 'the way in does not open the sheet')
   })
 
-  test('the local matcher watches and cannot act', () => {
+  test('the local matcher acts, and only through the model\u2019s own check', () => {
     /*
-     * It is switched on to be measured, not to be used. How many of the things
-     * this player actually types are the plain kind is not something anybody
-     * can guess, and a matcher switched on against a guess is one that writes
-     * to a unit on the strength of a guess.
+     * It watched for months and never acted, to be measured before it was
+     * trusted. Then the brief changed: "The app should be able to handle
+     * local commands like adjusting settings on controls and knobs and things
+     * like that without using the AI model ... if I wanted to make this app
+     * completely without an AI model, let's set it up that way."
      *
-     * So the only thing it may do is write a line to the debug log, and that
-     * is what this holds: the request still goes to the model, every time,
-     * whatever the matcher thought.
+     * So a match is the answer now, model on or off. What this holds is HOW it
+     * acts: never on its own. A change the matcher proposes becomes the same
+     * `body` a model turn produces and goes through the same validatePlan,
+     * the same confirm-before-anything-destructive and the same runner. The
+     * matcher itself still reaches nothing.
      */
-    const at = src.indexOf('would =\n          matchRename(')
-    assert.notEqual(at, -1, 'the local matcher is not run at all')
-    /* The watching block ends where the two named exceptions begin — a plain
-       design and a plain volume request, which have their own test — or at
-       the model turn if those are ever removed. */
-    const exceptions = src.indexOf('Two requests that do not go to the model at all', at)
-    const block = src.slice(src.lastIndexOf('try {', at), exceptions === -1 ? src.indexOf('THINKING', at) : exceptions)
+    const at = src.indexOf('would =\n          matchQuestion(instruction, known) ||')
+    assert.notEqual(at, -1, 'the local matcher is not run at all, or a question is not tried first')
+    assert.match(src.slice(at, at + 200), /matchRename\(instruction, known\) \|\|\s*\n\s*matchLocal\(instruction, known\)/, 'the three matchers are not tried in order')
 
-    assert.match(block, /logDebug\(\s*'local'/, 'a match is not recorded anywhere')
-    for (const escape of ['return', 'setTurns', 'runActions', 'applyChanges', 'setParam', 'await ']) {
-      assert.ok(
-        !block.includes(escape),
-        'the watching block contains "' + escape + '" — it is doing something other than watching'
-      )
+    /* The matcher is given only what is in hand: no device call to build it. */
+    const known = src.slice(src.indexOf('const known = {', src.lastIndexOf('try {', at)), at)
+    assert.ok(!known.includes('await '), 'building the matcher\u2019s context waits on the device')
+    for (const field of ['sceneNames', 'activeScene: scene', 'presetNumber: preset?.number', 'slots: slots.length ? slots : cachedPresetNames()', 'bpm', 'occupied: blocks.map(']) {
+      assert.ok(known.includes(field), `the matcher is not told ${field.split(':')[0]}`)
     }
 
-    /*
-     * And what it decided never leaves that block. `would` is read to write a
-     * log line and then forgotten — if the name appears anywhere between here
-     * and the request, something downstream can branch on it, and a request
-     * the matcher can skip is a matcher that acts whatever the block above it
-     * looks like.
-     */
+    /* Still logged both ways, so a session can be read back. */
+    const watch = src.slice(at, src.indexOf('the local matcher threw and was ignored', at))
+    assert.match(watch, /logDebug\(\s*'local'/, 'a match is not recorded anywhere')
+    assert.ok(watch.includes("'left to the model'"), 'a miss is no longer written down')
+
+    /* A question is answered in words and nothing is written. */
     const threw = src.indexOf('the local matcher threw and was ignored', at)
-    assert.notEqual(threw, -1, 'the watching block no longer has its own catch')
-    const between = src.slice(threw, src.indexOf('await askPlan(', threw))
-    /* With one exception, and only under the model switch: when the model is
-       off the matcher's plan IS the answer, and it goes through the model's
-       own check and runner. Anywhere else, `would` is still only a log line. */
-    const acts = between.indexOf('if (!modelOn) {')
-    assert.notEqual(acts, -1, 'the model-off branch is gone')
-    assert.ok(!between.slice(0, acts).includes('would'), 'what the matcher decided is read before the model switch is checked')
-    assert.ok(!between.slice(between.indexOf('setProgress(`${THINKING}')).includes('would'), 'what the matcher decided is read on the way to the model')
+    const local = src.slice(threw, src.indexOf('body = await askPlan(', threw))
+    const answer = local.slice(local.indexOf("if (would?.kind === 'answer') {"), local.indexOf('let body = null'))
+    assert.ok(answer.length > 0, 'a question has no answer path')
+    for (const escape of ['perform(', 'runPlan(', 'setParam', 'setBypass', 'setScene']) {
+      assert.ok(!answer.includes(escape), `answering a question does "${escape}"`)
+    }
+    assert.ok(answer.includes('blockParams(would.eid)'), 'which model a block is on is not read')
+
+    /* A change becomes the model\u2019s own body and goes no further here. */
+    assert.match(local, /if \(would\) \{\s*\n\s*counted = true[^\n]*\n\s*logDebug\('local', 'handled here: no model needed'[^\n]*\n\s*body = \{ understood: would\.why, actions: \[would\] \}\s*\n\s*\} else if \(!modelOn\) \{/, 'a local match does not take the model\u2019s own path, or a failed local write goes in the ledger as a chat turn')
+    for (const escape of ['perform(', 'runPlan(', 'validatePlan(']) {
+      assert.ok(!local.includes(escape), `the local path does "${escape}" before the shared check`)
+    }
+    /* And the shared check is shared: one validatePlan after the model half
+       closes, reached by both. */
+    const shared = src.slice(src.indexOf('} // end of the model half'), src.indexOf('const askFor = async') + 30000)
+    const checked = shared.indexOf('const checked = validatePlan(body, withPositions, {')
+    assert.notEqual(checked, -1, 'the shared plan check is gone')
+    assert.ok(checked < shared.indexOf('await perform(checked.actions)'), 'the plan runs before it is checked')
+    assert.ok(shared.slice(0, checked).indexOf('perform(') === -1, 'something runs between the two halves and the check')
 
     /*
      * The matcher itself reaches nothing. Pure text in, a plan or null out —
