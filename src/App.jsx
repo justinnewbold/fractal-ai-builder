@@ -1197,8 +1197,6 @@ export default function App() {
    * rule the app infers, is written down in lib/playMode.js.
    */
   const [playing, setPlaying] = useState(loadPlayMode)
-  /* The bigger switch: whether anything may reach the model at all. */
-  const [aiOn, setAiOn] = useState(loadAiOn)
 
   /*
    * Whether the Ask button is drawn, decided once and named.
