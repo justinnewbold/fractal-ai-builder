@@ -16,23 +16,18 @@
         "buildType": "apk"
       },
       "ios": {
-        "simulator": false,
-        "appleTeamId": "3KA9RC7YE6"
+        "simulator": false
       }
     },
     "ios-simulator": {
       "extends": "preview",
       "ios": {
-        "simulator": true,
-        "appleTeamId": "3KA9RC7YE6"
+        "simulator": true
       }
     },
     "production": {
       "autoIncrement": true,
-      "channel": "production",
-      "ios": {
-        "appleTeamId": "3KA9RC7YE6"
-      }
+      "channel": "production"
     }
   },
   "submit": {
