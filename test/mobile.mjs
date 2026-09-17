@@ -916,6 +916,27 @@ export function run(test) {
     assert.match(read('src/lib/paramIndex.js'), /filter\(\(p\) => !isSilencingParam\(p\.name\)\)/)
   })
 
+  test('tapping a found control brings the page to the block it opened', () => {
+    /*
+     * "It'll pull up the parameters but then clicking on it does nothing." It
+     * opened the block — under the results and the block tiles, below the
+     * keyboard, off the bottom of the screen. So a tap ends the search and
+     * scrolls to the block, once the block has laid out and has a position.
+     */
+    const edit = read('mobile/src/screens/Edit.js')
+    const flat = edit.replace(/\s+/g, ' ')
+
+    assert.match(flat, /const pick = \(eid, paramId\) => \{ Keyboard\.dismiss\(\) setQuery\(''\) onPick\(eid, paramId\) \}/, 'a tap on a result leaves the keyboard and the results in the way')
+    assert.match(edit, /onPress=\{\(\) => pick\(idOf\(block\), param\.id\)\}/, 'the result rows do not go through pick')
+    assert.match(edit, /import \{ Keyboard, /, 'Keyboard is not imported')
+    assert.match(edit, /<ScrollView\s+ref=\{page\}/, 'the page has no handle to scroll it by')
+    assert.match(flat, /<View onLayout=\{panelLaid\}> <BlockPanel/, 'the block panel does not report where it landed')
+    assert.match(flat, /page\.current\?\.scrollTo\(\{ y, animated: true \}\)/, 'nothing scrolls to the opened block')
+    /* Only a search tap scrolls: a block opened from its tile is already on screen. */
+    assert.match(flat, /if \(focus\?\.nonce\) bringTo\.current = focus\.nonce/)
+    assert.match(flat, /if \(!bringTo\.current\) return bringTo\.current = null/)
+  })
+
   test('a unit that cannot attach a modifier is told so in a sentence', async () => {
     /*
      * THE BROWSER GOT THIS WRONG TWICE and both ways are worth pinning.
