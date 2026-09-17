@@ -292,6 +292,33 @@ export const setPresetName = (name) => post('/preset/name', { name })
 export const setSceneName = (index, name) => post('/scene/name', { index, name })
 
 /**
+ * Write one knob and do not wait to be told it landed.
+ *
+ * `setParamConfirmed` below is the right call for a knob somebody let go of:
+ * it reads the value back, because this hardware accepts a write it then
+ * ignores and reports success either way.
+ *
+ * It is the WRONG call for a slider being dragged. Confirming costs a second
+ * round trip per value, and the volume slider sends one per frame — so the
+ * read-backs alone would put the unit minutes behind a thumb. The volume
+ * control uses this instead and coalesces on the way in (see lib/volume's
+ * `latestWriter`, shared with the Mac): one write on the wire, newest value
+ * wins, and the last one is confirmed when the drag ends.
+ */
+export function setParam(eid, paramId, value, param, continuous) {
+  const norm = toNormalized(value, param)
+  if (norm === null) {
+    // A guessed value is worse than no value: it lands somewhere real and
+    // sounds like a decision somebody made.
+    return Promise.reject(new Error(`No range known for ${param?.name || `parameter ${paramId}`}.`))
+  }
+  return put(`/preset/blocks/${eid}/params/${paramId}`, {
+    value: norm,
+    continuous: continuous ?? preferredEncoding(eid, paramId)
+  })
+}
+
+/**
  * Write one knob, on whichever of the two paths the unit actually honours.
  *
  * The device accepts a write it then ignores, and reports success either way,

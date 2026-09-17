@@ -162,7 +162,49 @@ export const FILES = [
    * It also carries the rule that `ok:false` is not a failure on this hardware,
    * which the browser learned by rolling back moves that had worked.
    */
-  { source: '../shared/grid-plan.mjs', target: '../mobile/src/lib/grid-plan.js' }
+  { source: '../shared/grid-plan.mjs', target: '../mobile/src/lib/grid-plan.js' },
+  /*
+   * The volume slider: which control it drives, how it reads, and how a drag
+   * becomes writes a serial port can keep up with.
+   *
+   * THE LAST PART MATTERS MORE ON THE PHONE THAN IN THE BROWSER. A slider
+   * reports every pixel of a drag — sixty values a second — and the unit takes
+   * one request at a time down a serial port. The browser pays a local socket
+   * for each; the phone pays a round trip to a Mac in the wings. Sent as they
+   * come, a two-second drag would queue a hundred writes the unit works through
+   * for the next ten seconds, landing on the value you let go of long after you
+   * let go of it, and blocking the scene you pressed next behind them.
+   *
+   * `latestWriter` is the answer and it is not one anybody would reinvent
+   * identically: one write on the wire, the newest value replacing whatever was
+   * queued behind it. Shared, so the two ends cannot disagree about it.
+   */
+  { source: '../src/lib/volume.js', target: '../mobile/src/lib/volume.js' },
+  /*
+   * What every model on the unit really is.
+   *
+   * "Add an info page like this to settings listing the real life equivalents
+   * of each amp and effects pedals." Fractal cannot print "Marshall JCM800" on
+   * a menu, so the unit says "Brit 800 2204 High". Everybody who has played one
+   * for a year knows the translation and nobody who unboxed one on Saturday
+   * does — and the phone is the thing in your hand when you are standing in
+   * front of the unit wondering.
+   *
+   * Shared rather than rewritten for the plainest reason: it is a reference,
+   * and a reference that says two different things on two screens is not one.
+   */
+  { source: '../src/lib/gearCatalog.js', target: '../mobile/src/lib/gearCatalog.js' },
+  /*
+   * How big the stage tiles are.
+   *
+   * The five steps are the browser's, and they are the same five here because
+   * they are about a thumb rather than about a window: "Smallest" is the
+   * setting for somebody who wants the whole rig on one screen and "Largest"
+   * for somebody playing in the dark. Both apps also keep the choice under the
+   * same key, so a phone and a laptop signed into one account do not argue
+   * about it.
+   */
+  { source: '../src/lib/gigSize.js', target: '../mobile/src/lib/gigSize.js' }
 ]
 
 /** Where a copy says it came from, so nobody edits the copy by mistake. */
