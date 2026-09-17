@@ -1239,7 +1239,7 @@ export function run(test) {
        check that breaks when a line reflows is a check nobody can edit around. */
     assert.match(
       settings.replace(/\s+/g, ' '),
-      /permanent when the preset is saved to a slot/,
+      /lost on the next preset change unless it is saved/,
       'nothing says a new name is not permanent until the preset is saved'
     )
   })
@@ -3395,10 +3395,17 @@ export function run(test) {
     assert.equal(SAVE_WAIT_MS, 3 * 60 * 1000)
 
     /* And the button: Save, then Tap again with the warning, then the ask. */
-    const editor = read('mobile/src/screens/Edit.js').replace(/\s+/g, ' ')
-    assert.match(editor, /label=\{saving \? 'Saving…' : saveArmed \? 'Tap again' : 'Save'\}/, 'there is no Save button, or it does not ask twice')
-    assert.match(editor, /replacing what was saved there\. Tap Save again to do it\./, 'the warning does not say what a save overwrites')
-    assert.match(editor, /const res = await askComputerToSave\(\{ park: \(req\) => parkSave\(slug, req\), readResult: \(\) => readSaveResult\(slug\), slot: preset\?\.number/, 'the button does not ask the computer')
+    const saver = read('mobile/src/components/SaveToSlot.js').replace(/\s+/g, ' ')
+    assert.match(saver, /label=\{s\.saving \? 'Saving…' : s\.armed \? 'Tap again' : 'Save'\}/, 'there is no Save button, or it does not ask twice')
+    assert.match(saver, /replacing what was saved there\. Tap Save again to do it\./, 'the warning does not say what a save overwrites')
+    assert.match(saver, /const res = await askComputerToSave\(\{ park: \(req\) => parkSave\(slug, req\), readResult: \(\) => readSaveResult\(slug\), slot: preset\?\.number, name: preset\?\.name \|\| ''/, 'the button does not ask the computer, or sends no name')
+    /* On both screens where something gets changed. */
+    for (const screen of ['mobile/src/screens/Edit.js', 'mobile/src/screens/Settings.js']) {
+      const flat = read(screen).replace(/\s+/g, ' ')
+      assert.match(flat, /const saveTo = useSaveToSlot\(\)/, `${screen} has no Save`)
+      assert.match(flat, /<SaveButton s=\{saveTo\}/, `${screen} does not draw the Save button`)
+      assert.match(flat, /<SaveNotes s=\{saveTo\} \/>/, `${screen} does not say what became of a save`)
+    }
     const dev = read('mobile/src/lib/device.js')
     assert.match(dev, /encodeURIComponent\(`fractal\.pendingSave\.\$\{slug\}`\)/)
     assert.match(dev, /encodeURIComponent\(`fractal\.saveResult\.\$\{slug\}`\)/)
@@ -3474,6 +3481,36 @@ export function run(test) {
     const vol = read('mobile/src/components/Volume.js').replace(/\s+/g, ' ')
     assert.match(vol, /The volume didn’t take\. The unit is holding it at \$\{volumeLabel\(holding, p\)\}\./, 'a volume that did not take does not say what the unit holds')
     assert.match(vol, /if \(holding !== null\) setValue\(holding\)/, 'the slider keeps pointing at a number the unit refused')
+  })
+
+  test('a rename is believed, not read back out of a stale cache', () => {
+    /*
+     * "Renaming a preset doesn't work, just goes right back to the original
+     * name." The write landed. The re-read that followed came back with the
+     * old name out of the computer's cache and put it back on screen — and
+     * the scene boxes never changed at all, because refreshing the scene
+     * does not refresh its names. So the write is the evidence: the cache is
+     * dropped, and the screen, the name list and the scene tiles are told
+     * the name that was written. That is also the name the next Save
+     * carries, and the computer renames the preset to whatever the save
+     * request says, so a stale one would have undone the rename in the slot.
+     */
+    const settings = read('mobile/src/screens/Settings.js').replace(/\s+/g, ' ')
+    assert.match(settings, /await setPresetName\(wanted\) await dropReadCache\(\) notePresetName\(wanted\)/, 'a preset rename is not believed')
+    assert.match(settings, /await setSceneName\(index, wanted\) await dropReadCache\(\) noteSceneName\(index, wanted\)/, 'a scene rename is not believed')
+    assert.ok(!/await refreshPreset\(\)/.test(settings), 'the preset is re-read after a rename, which is where the old name came from')
+    assert.ok(!/await refreshScene\(\)/.test(settings), 'the scene is re-read after a rename, which never carried the names')
+
+    const rig = read('mobile/src/lib/rig.js').replace(/\s+/g, ' ')
+    assert.match(rig, /export function notePresetName\(name\) \{ const preset = state\.preset if \(!preset \|\| typeof name !== 'string'\) return set\(\{ preset: \{ \.\.\.preset, name \} \}\) if \(Number\.isInteger\(preset\.number\)\) learnName\(preset\.number, name\)/, 'the rename does not reach the screen and the name list')
+    assert.match(rig, /names\[index\] = name set\(\{ sceneNames: names \}\)/, 'a scene rename does not reach the tiles')
+    assert.match(rig, /rememberSceneNames\(device\.nameOwner\(slug\), number, names\) device\.keepSceneNames\(slug, number, names\)/, 'a scene rename is not kept for the next read')
+
+    const names = read('mobile/src/lib/presetNames.js').replace(/\s+/g, ' ')
+    assert.match(names, /export function learn\(n, name\) \{ if \(!Number\.isInteger\(n\) \|\| typeof name !== 'string'\) return names\.set\(n, cleanPresetName\(name\)\) persist\(\) announce\(\)/, 'a learned name is not kept or announced')
+
+    /* And the note says what makes it permanent, in the app's own words. */
+    assert.match(settings, /Save asks the computer to write this slot, and that keeps everything changed from this phone: names, knobs, blocks and the chain\./)
   })
 
   test('a dead account service is given twelve seconds, not the whole evening', async () => {

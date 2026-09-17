@@ -10,16 +10,13 @@ import {
   clearCell,
   idOf,
   modifierModel,
-  parkSave,
   placeBlock,
-  readSaveResult,
   sameBlock,
   setParamConfirmed,
   setType
 } from '../lib/device'
 import { colLabel, doubtfulWrite, gridShape, laneItems, lanesShown } from '../lib/grid-plan'
 import { blockPositions, landingIndex, reorderPlan } from '../lib/laneOrder'
-import { askComputerToSave } from '../lib/saveViaComputer'
 import { isSilencingParam } from '../lib/guardrails'
 import { buildParamIndex, findControls, indexFor } from '../lib/paramIndex'
 import { refreshBlocks, useRig, writeBypass, writeChannel } from '../lib/rig'
@@ -29,6 +26,7 @@ import { thud } from '../lib/feedback'
 import Knob, { fmt } from '../components/Knob'
 import Note from '../components/Note'
 import Press from '../components/Press'
+import { SaveButton, SaveNotes, useSaveToSlot } from '../components/SaveToSlot'
 import Tile from '../components/Tile'
 
 const face = Platform.select(mono)
@@ -38,8 +36,6 @@ const ofScene = (s) => s.sceneIndex
 const ofSceneNames = (s) => s.sceneNames
 const ofCaps = (s) => s.capabilities
 const ofChain = (s) => s.chain
-const ofPreset = (s) => s.preset
-const ofSlug = (s) => s.deviceSlug
 
 /**
  * Why a knob did not take, in words that say whose doing it is.
@@ -120,39 +116,9 @@ export default function Edit({ onBack }) {
 
   const [openEid, setOpenEid] = useState(null)
   const [error, setError] = useState(null)
-  /*
-   * SAVE, and it asks twice. "There needs to be a save button that actually
-   * writes it and saves it to the unit. Have it just say Save, then a pop up
-   * warning that says it will override the current settings, and tap again to
-   * confirm." Everything this screen writes lands in the unit's edit buffer
-   * and is gone on the next preset change; this is what makes it stay. A
-   * phone cannot write a slot itself — the computer refuses that from a
-   * handset — so the request is left for the computer, which writes it and
-   * answers. See lib/saveViaComputer.
-   */
-  const preset = useRig(ofPreset)
-  const slug = useRig(ofSlug)
-  const [saveArmed, setSaveArmed] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [saveSaid, setSaveSaid] = useState(null)
-  const save = async () => {
-    if (!saveArmed) {
-      setSaveArmed(true)
-      setSaveSaid(null)
-      return
-    }
-    setSaveArmed(false)
-    setSaving(true)
-    setSaveSaid({ tone: 'hint', text: 'Asked the computer to save it. The computer writes it; this says so the moment it lands.' })
-    const res = await askComputerToSave({
-      park: (req) => parkSave(slug, req),
-      readResult: () => readSaveResult(slug),
-      slot: preset?.number,
-      name: preset?.name || ''
-    })
-    setSaving(false)
-    setSaveSaid(res.ok ? { tone: 'hint', text: `Saved to slot ${res.slot}.` } : { tone: 'warn', text: res.error })
-  }
+  /* SAVE, and it asks twice. The same piece the naming section in Setup
+     uses; see components/SaveToSlot. */
+  const saveTo = useSaveToSlot()
   /*
    * Search hands over by naming a control, not by editing one. Tapping a result
    * opens the block that holds it and puts your eyes on it — so there stays
@@ -212,30 +178,12 @@ export default function Edit({ onBack }) {
           </Text>
         </View>
         <View style={{ flexDirection: 'row', gap: space.sm }}>
-          <Press
-            label={saving ? 'Saving…' : saveArmed ? 'Tap again' : 'Save'}
-            tone="signal"
-            on={saveArmed}
-            height={40}
-            disabled={saving || !Number.isInteger(preset?.number)}
-            onPress={save}
-          />
+          <SaveButton s={saveTo} />
           <Press label="Done" height={40} onPress={onBack} />
         </View>
       </View>
 
-      {saveArmed ? (
-        <Note tone="warn" onDismiss={() => setSaveArmed(false)}>
-          {`This writes what the unit is playing now over slot ${
-            Number.isInteger(preset?.number) ? colLabel(preset.number) : '—'
-          }, replacing what was saved there. Tap Save again to do it.`}
-        </Note>
-      ) : null}
-      {saveSaid ? (
-        <Note tone={saveSaid.tone} onDismiss={() => setSaveSaid(null)}>
-          {saveSaid.text}
-        </Note>
-      ) : null}
+      <SaveNotes s={saveTo} />
 
       {error ? (
         <Note tone="fault" onDismiss={() => setError(null)}>
