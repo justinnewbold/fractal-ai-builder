@@ -2266,4 +2266,106 @@ export function run(test) {
       'a name typed and then left by the Done button is thrown away'
     )
   })
+
+  test('the gear sheet is this unit’s models, and knows the comps and delays', async () => {
+    /*
+     * "Double check we have all the correct amps and effects listed. I know
+     * there is way more delay pedals and compressors."
+     *
+     * Right on both counts. The compressor list had three entries and the unit
+     * has sixteen; the delays had three against twenty-odd. Worse, one of the
+     * three was wrong: Optical was down as "Urei 1176, loosely", and Fractal's
+     * own Blocks Guide says that is the JFET type. Optical is an optocoupler.
+     *
+     * "Make sure they are specific to the unit connected as well as AM4 would
+     * have different ones versus FM9 or Axefx 3 or VP4."
+     *
+     * Keeping five researched tables would be wrong twice over: wrong the day a
+     * firmware adds a model, and wrong for a unit nobody here has ever had in
+     * front of them. Every one of these units knows its own list and hands it
+     * over, so the sheet asks — and falls back to the printed catalog when
+     * there is nothing on the other end.
+     */
+    const { GEAR_GROUPS, groupsFor, gearTotal } = await import('../mobile/src/lib/gearCatalog.js')
+    const by = (key) => GEAR_GROUPS.find((g) => g.key === key)
+
+    /* The two he said were short. Counted, not spot-checked: a list that grew
+       by one and stopped would pass any check written as "does it have X". */
+    assert.ok(by('comp').entries.length >= 16, `the compressor list is back down to ${by('comp').entries.length}`)
+    assert.ok(by('delay').entries.length >= 14, `the delay list is back down to ${by('delay').entries.length}`)
+
+    /* The correction, named: the 1176 belongs to the JFET type and nowhere else. */
+    const comp = Object.fromEntries(by('comp').entries.map((e) => [e.name, e.gear]))
+    assert.match(comp['JFET Compressor'], /1176/, 'the JFET compressor no longer names the 1176')
+    assert.ok(
+      !/1176/.test(comp['Optical Compressor'] || ''),
+      'Optical is called a 1176 again, which is the JFET type — see the Blocks Guide'
+    )
+
+    /* Every line the guide actually names a maker for. */
+    assert.match(comp['DynamiComp'], /MXR/)
+    assert.match(comp['Tube Compressor'], /Altec Lansing/)
+    assert.match(comp['Studio FB Compressor'], /LA-2A/)
+    const delay = Object.fromEntries(by('delay').entries.map((e) => [e.name, e.gear]))
+    assert.match(delay['2290'], /TC Electronic/)
+    assert.match(delay['Graphite Copy'], /Carbon Copy/)
+    assert.match(delay['Deluxe Mind Guy'], /Memory Man/)
+    assert.match(delay['Stereo Mind Guy'], /Memory Man/, 'the stereo Memory Man is missing again')
+
+    /* Nothing carries a row it cannot say anything about. */
+    for (const g of GEAR_GROUPS) {
+      for (const e of g.entries) {
+        assert.ok(typeof e.name === 'string' && e.name, `${g.key} has a nameless row`)
+      }
+    }
+
+    /*
+     * AND THE UNIT DECIDES WHAT IS LISTED. Handed three compressors, the sheet
+     * shows three — not sixteen with thirteen this unit has never had.
+     */
+    const asUnit = groupsFor({ comp: [{ name: 'Pedal 1' }, { name: 'Optical Compressor' }] })
+    const shown = asUnit.find((g) => g.key === 'comp')
+    assert.equal(shown.entries.length, 2, 'the sheet ignored what the unit said it has')
+    assert.equal(shown.fromUnit, true, 'the sheet cannot tell whether it asked or guessed')
+    assert.match(shown.entries.find((e) => e.name === 'Pedal 1').gear, /stompbox/, 'a model read off the unit lost its lineage')
+
+    /* A family the unit did not answer for keeps the printed list rather than
+       emptying: a reference sheet that goes blank when a cable is out is worse
+       than one that is a little too generous. */
+    const amps = asUnit.find((g) => g.key === 'amp')
+    assert.ok(amps.entries.length > 100, 'a family the unit said nothing about was emptied instead of kept')
+    assert.equal(amps.fromUnit, false, 'a printed list is being reported as the unit’s own')
+
+    /* What the unit says wins over the catalog, because it is the better
+       authority on its own models. */
+    const its = groupsFor({ comp: [{ name: 'DynamiComp', basedOn: 'Something only this unit knows' }] })
+    assert.equal(
+      its.find((g) => g.key === 'comp').entries[0].gear,
+      'Something only this unit knows',
+      'the catalog overrode what the unit said about its own model'
+    )
+
+    assert.ok(gearTotal() > 440, 'the sheet names fewer models than it used to')
+  })
+
+  test('the gear sheet asks the unit rather than printing one list at everybody', () => {
+    /*
+     * The screen half of the above. It said "your unit's models" over a list
+     * baked in at build time — a claim it could not back up, and the reason an
+     * AM4 was being shown three hundred amps it does not have.
+     */
+    const src = read('mobile/src/screens/Gear.js')
+    const flat = src.replace(/\s+/g, ' ')
+    assert.match(flat, /const said = await blockTypes\(family\.key\)/, 'the sheet never asks the unit what it has')
+    assert.match(flat, /for \(const family of GEAR_FAMILIES\)/, 'the families are not walked, so some are never asked for')
+    /* One at a time. Each is a round trip down the same serial port, and firing
+       them together only queues them somewhere less visible. */
+    assert.ok(
+      !/Promise\.all\(/.test(flat),
+      'the five reads go out together, which queues five slow reads at the unit at once'
+    )
+    assert.match(flat, /groupsFor\(rosters\)/, 'what the unit said is not what gets drawn')
+    /* And the subtitle no longer claims something it cannot back up. */
+    assert.match(flat, /plug in to see only yours/, 'the sheet still says “your unit’s models” about a printed list')
+  })
 }

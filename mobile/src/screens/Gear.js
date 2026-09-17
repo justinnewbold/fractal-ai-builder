@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { FlatList, Platform, Text, TextInput, View } from 'react-native'
 
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
-import { GEAR_GROUPS, GEAR_TOTAL, searchAll } from '../lib/gearCatalog'
+import { GEAR_FAMILIES, GEAR_GROUPS, gearTotal, groupsFor, searchAll } from '../lib/gearCatalog'
+import { blockTypes } from '../lib/device'
+import { useRig } from '../lib/rig'
 import Note from '../components/Note'
 import Press from '../components/Press'
 
@@ -36,9 +38,57 @@ export default function Gear({ onBack }) {
   const [query, setQuery] = useState('')
   const [group, setGroup] = useState(GEAR_GROUPS[0].key)
 
-  const groups = useMemo(() => searchAll(query), [query])
+  /*
+   * What THIS unit has, asked of the unit.
+   *
+   * "Make sure they are specific to the unit connected as well as AM4 would
+   * have different ones versus FM9 or Axefx 3 or VP4."
+   *
+   * Keeping five tables and researching the other three would have been wrong
+   * twice: wrong the day a firmware adds a model, and wrong for the unit nobody
+   * here has ever had in front of them. Every one of these units knows its own
+   * list and will hand it over, so the sheet asks.
+   *
+   * One family at a time, in order, and slowly on purpose — each of these is a
+   * round trip down the same serial port, and firing five at once only queues
+   * them somewhere less visible. The printed catalog is on screen the whole
+   * time; each answer replaces its own tab as it lands.
+   */
+  const unit = useRig(ofDeviceName)
+  const [rosters, setRosters] = useState({})
+
+  useEffect(() => {
+    if (!unit) return undefined
+    let alive = true
+    ;(async () => {
+      for (const family of GEAR_FAMILIES) {
+        try {
+          const said = await blockTypes(family.key)
+          if (!alive) return
+          if (Array.isArray(said) && said.length) {
+            setRosters((was) => ({ ...was, [family.key]: said }))
+          }
+        } catch {
+          /* A block this unit does not have, or a read that did not come back.
+             Either way the printed catalog stays, which is the honest fallback:
+             a reference sheet that empties itself when a cable is out is worse
+             than one that is a little too generous. */
+        }
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [unit])
+
+  const built = useMemo(() => groupsFor(rosters), [rosters])
+  const groups = useMemo(() => searchAll(query, built), [query, built])
   const here = groups.find((g) => g.key === group) || groups[0]
   const rows = here?.hits || []
+  const total = useMemo(() => gearTotal(built), [built])
+  /* Said plainly, because "your unit's models" was a claim the screen could not
+     back up until it started asking. */
+  const asked = built.some((g) => g.fromUnit)
 
   return (
     <View style={{ flex: 1 }}>
@@ -56,7 +106,9 @@ export default function Gear({ onBack }) {
             Amp and pedal names
           </Text>
           <Text style={{ color: color.silkDim, fontSize: font.small }}>
-            {`What ${GEAR_TOTAL} of your unit's models are really based on`}
+            {asked
+              ? `What ${total} of your ${unit || 'unit'}’s models are really based on`
+              : `What ${total} models are really based on — plug in to see only yours`}
           </Text>
         </View>
         <Press label="Done" height={40} onPress={onBack} />
@@ -135,3 +187,5 @@ export default function Gear({ onBack }) {
     </View>
   )
 }
+
+const ofDeviceName = (s) => s.deviceName
