@@ -3175,6 +3175,29 @@ export function run(test) {
     }
   })
 
+  test('at the smallest size the stage screen fits without scrolling', () => {
+    /*
+     * "On the smallest setting, if we could make it so the screen won't scroll
+     * and everything fits on the screen — it's barely hanging off the edge."
+     *
+     * The tiles were at their smallest and everything around them was not:
+     * the gaps between sections, the padding under the foot, the preset
+     * button's extra height, the chain tiles held at the stage floor of 56
+     * beside scene tiles of 48, and the foot's own 56s. At the smallest step
+     * the screen is being asked to fit, so all of that gives — and nothing
+     * pressable goes below the platform's 44.
+     */
+    const stage = read('mobile/src/screens/Stage.js').replace(/\s+/g, ' ')
+    assert.match(stage, /const tight = size === SIZES\[0\]/, 'the smallest step is not told apart')
+    assert.match(stage, /gap: tight \? space\.md : space\.lg, paddingBottom: tight \? space\.lg : space\.xxl/, 'the gaps and the padding under the foot do not give at the smallest size')
+    assert.match(stage, /height=\{tight \? TAP : TAP \+ 12\}/, 'the preset button keeps its extra height at the smallest size')
+    assert.match(stage, /height=\{Math\.max\(tight \? 44 : TAP, size\.tile - 12\)\}/, 'a chain tile is held at 56 beside scene tiles of 48')
+    assert.match(stage, /const foot = tight \? 48 : TAP/, 'the foot does not give at the smallest size')
+    assert.equal((stage.match(/height=\{foot\}/g) || []).length, 5, 'not every button in the foot follows the foot height')
+    /* And never below the platform floor. */
+    assert.doesNotMatch(stage, /tight \? (4[0-3]|[0-3]\d) :/, 'something pressable goes below 44 at the smallest size')
+  })
+
   test('a dead account service is given twelve seconds, not the whole evening', async () => {
     /*
      * "I can't log into supper base anymore. It says server error, so now I

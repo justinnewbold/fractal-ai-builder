@@ -131,6 +131,18 @@ export default function Stage({ onOpenTone, onOpenPresets, onOpenSetlists, onOpe
    * re-renders this screen on every write to storage.
    */
   const size = SIZES[loadSize(sync)] || SIZES[1]
+  /*
+   * SMALLEST MEANS IT FITS. "On the smallest setting, if we could make it so
+   * the screen won't scroll and everything fits on the screen — it's barely
+   * hanging off the edge." The tiles were already at their smallest, but
+   * everything around them was at its ordinary size: the gaps between
+   * sections, the padding under the foot, the preset button's extra height,
+   * and a chain tile that would not go below the stage floor of 56 even when
+   * the scene tiles beside it were 48. At the smallest step the screen is
+   * being asked to fit, so all of that gives too — and nothing pressable goes
+   * below the platform's own 44.
+   */
+  const tight = size === SIZES[0]
   /** Which block's channel picker is open, by effect id. */
   const [picking, setPicking] = useState(null)
 
@@ -197,10 +209,17 @@ export default function Stage({ onOpenTone, onOpenPresets, onOpenSetlists, onOpe
   const at = order ? positionIn(order, preset?.number) : 0
   const where = order ? (at ? `${at}/${order.length}` : `${order.length}`) : ''
 
+  /* The foot's buttons: the stage floor, or 48 when the screen is asked to fit. */
+  const foot = tight ? 48 : TAP
+
   return (
     <ScrollView
       style={{ flex: 1 }}
-      contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxl }}
+      contentContainerStyle={{
+        padding: space.lg,
+        gap: tight ? space.md : space.lg,
+        paddingBottom: tight ? space.lg : space.xxl
+      }}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={color.silkDim} />
       }
@@ -284,7 +303,7 @@ export default function Stage({ onOpenTone, onOpenPresets, onOpenSetlists, onOpe
         <Press
           label={preset?.pending && !preset?.name ? '…' : presetLabel(preset)}
           sub={onOpenPresets ? 'Tap for all presets' : undefined}
-          height={TAP + 12}
+          height={tight ? TAP : TAP + 12}
           disabled={!onOpenPresets}
           onPress={onOpenPresets}
           style={{ paddingHorizontal: space.lg }}
@@ -391,7 +410,7 @@ export default function Stage({ onOpenTone, onOpenPresets, onOpenSetlists, onOpe
                 fill={hue.fill}
                 ink={hue.ink}
                 on={engaged}
-                height={Math.max(TAP, size.tile - 12)}
+                height={Math.max(tight ? 44 : TAP, size.tile - 12)}
                 onPress={() => writeBypass(idOf(block), !block.bypassed)}
                 onLongPress={
                   channels?.length > 1
@@ -420,7 +439,7 @@ export default function Stage({ onOpenTone, onOpenPresets, onOpenSetlists, onOpe
       */}
       <View style={{ gap: space.sm }}>
         <View style={{ flexDirection: 'row', gap: space.sm }}>
-          <Press grow label="‹ Previous" disabled={landing(-1) === null} onPress={() => step(-1)} />
+          <Press grow label="‹ Previous" height={foot} disabled={landing(-1) === null} onPress={() => step(-1)} />
           <Press
             grow
             caption="Source"
@@ -428,11 +447,11 @@ export default function Stage({ onOpenTone, onOpenPresets, onOpenSetlists, onOpe
             sub={where || undefined}
             tone="signal"
             on={Boolean(order)}
-            height={TAP}
+            height={foot}
             disabled={!onOpenSetlists}
             onPress={onOpenSetlists}
           />
-          <Press grow label="Next ›" disabled={landing(1) === null} onPress={() => step(1)} />
+          <Press grow label="Next ›" height={foot} disabled={landing(1) === null} onPress={() => step(1)} />
         </View>
 
         {/*
@@ -451,6 +470,7 @@ export default function Stage({ onOpenTone, onOpenPresets, onOpenSetlists, onOpe
               label={tunerOn ? 'Stop tuner' : 'Tuner'}
               tone="live"
               on={tunerOn}
+              height={foot}
               onPress={() => writeTuner(!tunerOn)}
             />
           ) : null}
@@ -469,6 +489,7 @@ export default function Stage({ onOpenTone, onOpenPresets, onOpenSetlists, onOpe
             label="Tap"
             sub={Number.isFinite(bpm) ? String(Math.round(bpm)) : undefined}
             tone="signal"
+            height={foot}
             onPress={tapTempo}
             onLongPress={() => setTyping(true)}
           />
