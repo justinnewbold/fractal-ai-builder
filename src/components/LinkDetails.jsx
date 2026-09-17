@@ -28,7 +28,7 @@ export default function LinkDetails() {
       const account = await currentAccount()
       lines.push(account ? `Signed in here as ${account.email || account.id.slice(0, 8)}.` : 'Not signed in on this device.')
       if (!remoteActive()) {
-        lines.push('Not connected to the Mac. Connect from Phone remote, above.')
+        lines.push('Not connected to the computer. Connect from Phone remote, above.')
         return
       }
       lines.push('Connected to the account service.')
@@ -36,16 +36,16 @@ export default function LinkDetails() {
       const answered = await hostResponds()
       lines.push(
         answered
-          ? `The Mac answered in ${Date.now() - began} ms.`
-          : `No answer from the Mac in ${Math.round((Date.now() - began) / 1000)}s. Is the Fractal app open there, signed in as this same account?`
+          ? `The computer answered in ${Date.now() - began} ms.`
+          : `No answer from the computer in ${Math.round((Date.now() - began) / 1000)}s. Is the Fractal app open there, signed in as this same account?`
       )
       if (!answered) return
       const { detect } = await import('../lib/forgefx')
       const info = await detect()
       lines.push(
         info?.connected
-          ? `The Mac has a ${info.short || info.name} attached. The link is working.`
-          : 'The Mac is answering but has no unit attached to it — check the cable there.'
+          ? `The computer has a ${info.short || info.name} attached. The link is working.`
+          : 'The computer is answering but has no unit attached to it — check the cable there.'
       )
     } catch (err) {
       lines.push(`Stopped at: ${err.message}`)
@@ -74,7 +74,7 @@ export default function LinkDetails() {
       ) : null}
 
       <p className="hint">
-        The Mac&rsquo;s device server is started with these already set by the Fractal app. Only
+        The computer&rsquo;s device server is started with these already set by the Fractal app. Only
         if you run it some other way do they need to go in its <span className="mono">.env</span>:
       </p>
       <pre className="mono env-block">

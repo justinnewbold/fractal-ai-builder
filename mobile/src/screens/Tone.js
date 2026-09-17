@@ -205,7 +205,7 @@ export default function Tone({ onBack }) {
 
           <Text style={{ color: color.silkFaint, fontSize: font.micro, lineHeight: 18 }}>
             Nothing here is permanent. Your phone can’t save to a slot, so this only changes
-            the working copy — the stored preset is untouched until you save it at the Mac.
+            the working copy — the stored preset is untouched until you save it at the computer.
           </Text>
         </View>
       ) : null}

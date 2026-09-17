@@ -383,7 +383,7 @@ const HAND_EDIT_KINDS = new Set([
 /** The pages behind Setup's rows, by key, in the words on the rows. */
 const SETUP_PAGES = {
   unit: 'Unit',
-  link: 'Phone & Mac',
+  link: 'Phone & computer',
   play: 'Play screen',
   ai: 'AI & cost',
   help: 'Help & fixes',
@@ -1453,7 +1453,7 @@ export default function App() {
       if (!info?.connected) {
         setFaultReason('no-unit')
         setStatus('fault')
-        setError('Your Mac is connected, but no Fractal is plugged into it.')
+        setError('Your computer is connected, but no Fractal is plugged into it.')
         return
       }
       /*
@@ -1977,7 +1977,7 @@ export default function App() {
           await reconnectPhone({ fresh: true })
         } else if (kind === 'disconnect') {
           await disconnectPhone()
-          record('remote', 'Disconnected from the Mac')
+          record('remote', 'Disconnected from the computer')
           resetSchemaCache()
           read()
         } else if (kind === 'switch') {
@@ -2022,7 +2022,7 @@ export default function App() {
       setError(null)
       try {
         await pairPhone(code)
-        record('remote', 'Paired with the Mac')
+        record('remote', 'Paired with the computer')
       } catch (err) {
         setError(err.message)
       }
@@ -2038,7 +2038,7 @@ export default function App() {
         record('remote', `Phone remote set up for ${email}`)
       } else {
         await connectPhone({ email, password })
-        record('remote', `Connected to the Mac as ${email}`)
+        record('remote', `Connected to the computer as ${email}`)
       }
       setSignIn(false)
     },
@@ -2228,8 +2228,8 @@ export default function App() {
         ok: false,
         slot: req.slot,
         error: sameBuffer
-          ? 'The Mac did not pick this up within fifteen minutes, so it was dropped rather than written to a preset that has moved on. Nothing was saved — ask again with the Mac awake.'
-          : `The Mac had moved to slot ${loaded ?? 'another preset'} by the time it saw this, so the sound you edited was no longer loaded. Nothing was saved.`
+          ? 'The computer did not pick this up within fifteen minutes, so it was dropped rather than written to a preset that has moved on. Nothing was saved — ask again with the computer awake.'
+          : `The computer had moved to slot ${loaded ?? 'another preset'} by the time it saw this, so the sound you edited was no longer loaded. Nothing was saved.`
       }).catch(() => {})
     }
     look()
@@ -2265,11 +2265,11 @@ export default function App() {
         keepSavedName(res.slot, queuedSave.name)
         keepSavedScenes(res.slot, queuedSave.scenes)
         setSlots(cachedPresetNames())
-        record('save', `The Mac saved it to slot ${res.slot}`)
+        record('save', `The computer saved it to slot ${res.slot}`)
         // The unit is still writing that preset to flash. See SETTLING_TRIES.
         read({ settling: true })
       } else {
-        setSaveError(res.error || 'The Mac could not save it.')
+        setSaveError(res.error || 'The computer could not save it.')
       }
     }, 3000)
     return () => {
@@ -3330,8 +3330,8 @@ export default function App() {
           setSaveError(
             err.remoteBlocked
               ? parked
-                ? `Renaming happens at the Mac, so the unit still shows the old name. “${generatedName}” is waiting there — open this app on the Mac and it gets written automatically.`
-                : `Renaming happens at the Mac, so the unit still shows the old name. “${generatedName}” is kept in the save options here — rename at the Mac to put it on the unit.`
+                ? `Renaming happens at the computer, so the unit still shows the old name. “${generatedName}” is waiting there — open this app on the computer and it gets written automatically.`
+                : `Renaming happens at the computer, so the unit still shows the old name. “${generatedName}” is kept in the save options here — rename at the computer to put it on the unit.`
               : `Couldn't write the name “${generatedName}” to the unit — it's kept in the save options and will be applied on save.`
           )
         }
@@ -3390,7 +3390,7 @@ export default function App() {
          */
         setDirty(true)
         record('write', `Send stopped early — ${err.done} of ${err.total} written`, [
-          'The link to the Mac dropped part-way through.',
+          'The link to the computer dropped part-way through.',
           'Reconnect and send again: the writes that landed are written to the same values, so nothing is doubled.',
           ...(err.failures || [])
         ])
@@ -3457,7 +3457,7 @@ export default function App() {
           name: saveName.trim() || preset?.name || '',
           scenes: Array.isArray(sceneNames) ? [...sceneNames] : []
         })
-        record('save', `Asked the Mac to save "${saveName.trim() || preset?.name}" to slot ${number}`)
+        record('save', `Asked the computer to save "${saveName.trim() || preset?.name}" to slot ${number}`)
         return
       }
 
@@ -4284,7 +4284,7 @@ export default function App() {
         palette = (await placeableBlocks()).map((b) => ({ slug: b.slug, name: b.name }))
       } catch (err) {
         placeableProblem = `The block list could not be read from the ${
-          remoteActive() ? 'Mac over the link' : 'unit'
+          remoteActive() ? 'computer over the link' : 'unit'
         }: ${err?.message || 'no answer'}.`
       }
 
@@ -4597,7 +4597,7 @@ export default function App() {
               role: 'assistant',
               text: `${blocked
                 .map((a) => a.label)
-                .join(', ')} — that has to happen at the Mac. A phone can't overwrite a preset, which is the right call mid-set.`
+                .join(', ')} — that has to happen at the computer. A phone can't overwrite a preset, which is the right call mid-set.`
             }
           ])
           return
@@ -6627,7 +6627,7 @@ export default function App() {
             <div className="device-meta mono setup-version">{FULL}</div>
             <div className="setup-rows">
               <SetupRow key="unit" title="Unit" status={status === 'live' ? `${device?.short || device?.name || 'Unit'} · connected` : 'Not connected'} onClick={() => setSetupPage('unit')} />
-              <SetupRow key="link" title="Phone & Mac" status={describeLink(link).note || 'Phone remote off'} onClick={() => setSetupPage('link')} />
+              <SetupRow key="link" title="Phone & computer" status={describeLink(link).note || 'Phone remote off'} onClick={() => setSetupPage('link')} />
               <SetupRow key="play" title="Play screen" status={[fit ? 'Fit to screen' : SIZES[size].name, playing ? 'Play mode' : null, THEME_WORD[getMode()] || null].filter(Boolean).join(' · ')} onClick={() => setSetupPage('play')} />
               <SetupRow key="ai" title="AI & cost" status={!chatOn ? 'Chat off' : !modelOn ? 'AI model off · local only' : today()?.cost ? `${formatCost(today().cost)} today` : 'Nothing spent today'} onClick={() => setSetupPage('ai')} />
               <SetupRow key="gear-names" title="Amp & pedal names" status="What each model on your unit really is" onClick={() => setSheet('gear')} />
@@ -6672,7 +6672,7 @@ export default function App() {
             */}
             <PhoneRemote link={link} onAction={linkAction} onError={setError} busy={busy} />
           </Section>
-          <Section key="link-details" title="Link details" note="What the phone and the Mac say about the line between them">
+          <Section key="link-details" title="Link details" note="What the phone and the computer say about the line between them">
             <LinkDetails />
           </Section>
           </div>

@@ -134,7 +134,7 @@ const PORT_GONE = /\bport\s+(is\s+)?(not|isn['’]?t)\s+open\b|\bport\s+closed\b
 export const unitUnreachable = (message) => PORT_GONE.test(String(message || ''))
 
 const UNIT_GONE_SAYS =
-  'The Fractal app on your Mac has lost its connection to the unit — nothing sent from here is reaching it. Check the unit is on and its cable is in, then tap Try again.'
+  'The Fractal app on your computer has lost its connection to the unit — nothing sent from here is reaching it. Check the unit is on and its cable is in, then tap Try again.'
 
 class ForgeError extends Error {
   constructor(message, { status, cause } = {}) {
@@ -272,7 +272,7 @@ async function directRequest(path, options = {}) {
     throw new ForgeError(
       mock
         ? 'This is the demo, so there is no Fractal app to reach. Switch to a real device to connect.'
-        : 'Can’t reach the Fractal app on your Mac. Check that it is open and the Fractal unit is connected.',
+        : 'Can’t reach the Fractal app on your computer. Check that it is open and the Fractal unit is connected.',
       { cause }
     )
   }
@@ -892,7 +892,7 @@ export { ForgeError }
 function relayGone(err, done, total, what) {
   if (!err?.linkDown) return null
   const stop = new Error(
-    `The link to your Mac dropped after ${done} of ${total} ${what}. Nothing after that was sent — reconnect and send again.`
+    `The link to your computer dropped after ${done} of ${total} ${what}. Nothing after that was sent — reconnect and send again.`
   )
   stop.linkDown = true
   stop.done = done
@@ -1147,7 +1147,7 @@ export async function applyChanges(changes, onProgress) {
           }
           failures.push(
             res.unverified
-              ? `${change.name} · ${param.name} — sent, but it couldn't be checked from your phone: ${CACHE_IS_LOCAL}, so nothing here can confirm it. Check it at the Mac if it matters.`
+              ? `${change.name} · ${param.name} — sent, but it couldn't be checked from your phone: ${CACHE_IS_LOCAL}, so nothing here can confirm it. Check it at the computer if it matters.`
               : `${change.name} · ${param.name} — device ignored both write encodings${where}`
           )
         }
@@ -1481,7 +1481,7 @@ export const listIrs = () => request('/cab/irs')
 
 
 /** Why a read after a write cannot be trusted from a phone. */
-const CACHE_IS_LOCAL = 'the unit only clears its cache at the Mac'
+const CACHE_IS_LOCAL = 'the unit only clears its cache at the computer'
 
 /**
  * Clear ForgeFX's parameter cache.
@@ -2242,7 +2242,7 @@ export async function readSceneNames(number) {
     }
     traceStep(
       dump?.sceneNames === undefined
-        ? `dump: no sceneNames field at all — the decode on the Mac gave nothing (crcValid: ${dump?.crcValid ?? 'absent'})`
+        ? `dump: no sceneNames field at all — the decode on the computer gave nothing (crcValid: ${dump?.crcValid ?? 'absent'})`
         : 'dump: sceneNames present but every name is blank — the scenes are unnamed on the unit'
     )
   } catch (err) {

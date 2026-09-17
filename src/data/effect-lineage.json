@@ -1,21 +1,203 @@
 {
   "wah": [
-    { "family": "Clyde", "manufacturer": "Vox", "basedOn": "Vox Clyde McCoy wah" },
-    { "family": "Cry Babe", "manufacturer": "Dunlop", "basedOn": "Dunlop Cry Baby" },
-    { "family": "VX846", "manufacturer": "Vox", "basedOn": "Vox V846-HW hand-wired wah" },
-    { "family": "VX845", "manufacturer": "Vox", "basedOn": "Vox V845" },
-    { "family": "Color-Tone", "manufacturer": "Colorsound", "basedOn": "Colorsound wah" },
-    { "family": "Mortal", "manufacturer": "Morley", "basedOn": "Morley wah/volume pedal" },
-    { "family": "Paragon", "manufacturer": "Tychobrahe", "basedOn": "Tychobrahe Parapedal" }
+    {
+      "family": "Clyde",
+      "manufacturer": "Vox",
+      "basedOn": "Vox Clyde McCoy wah"
+    },
+    {
+      "family": "Cry Babe",
+      "manufacturer": "Dunlop",
+      "basedOn": "Dunlop Cry Baby"
+    },
+    {
+      "family": "VX846",
+      "manufacturer": "Vox",
+      "basedOn": "Vox V846-HW hand-wired wah"
+    },
+    {
+      "family": "VX845",
+      "manufacturer": "Vox",
+      "basedOn": "Vox V845"
+    },
+    {
+      "family": "Color-Tone",
+      "manufacturer": "Colorsound",
+      "basedOn": "Colorsound wah"
+    },
+    {
+      "family": "Mortal",
+      "manufacturer": "Morley",
+      "basedOn": "Morley wah/volume pedal"
+    },
+    {
+      "family": "Paragon",
+      "manufacturer": "Tychobrahe",
+      "basedOn": "Tychobrahe Parapedal"
+    },
+    {
+      "family": "Funk Wah",
+      "manufacturer": null,
+      "basedOn": "Modelled after the wah on “Shaft”"
+    },
+    {
+      "family": "FAS Wah",
+      "manufacturer": "Fractal Audio",
+      "basedOn": "A bandpass wah of Fractal's own"
+    }
   ],
   "comp": [
-    { "family": "DynamiComp", "manufacturer": "MXR", "basedOn": "MXR Dyna Comp" },
-    { "family": "Optical", "manufacturer": "Urei", "basedOn": "Urei 1176, loosely" },
-    { "family": "Tube Compressor", "manufacturer": "Altec Lansing", "basedOn": "Classic tube compressors such as the Altec Lansing" }
+    {
+      "family": "DynamiComp",
+      "manufacturer": "MXR",
+      "basedOn": "MXR Dyna Comp"
+    },
+    {
+      "family": "Tube Compressor",
+      "manufacturer": "Altec Lansing",
+      "basedOn": "Classic tube compressors such as the Altec Lansing 436C"
+    },
+    {
+      "family": "JFET Compressor",
+      "manufacturer": "Urei",
+      "basedOn": "Urei 1176, loosely"
+    },
+    {
+      "family": "JFET Sustainer",
+      "manufacturer": null,
+      "basedOn": "A rare pedal with the JFET in the op-amp's feedback network"
+    },
+    {
+      "family": "Optical Compressor",
+      "manufacturer": null,
+      "basedOn": "Optical (photocell) compression, with a choice of light"
+    },
+    {
+      "family": "Optical Sustainer",
+      "manufacturer": null,
+      "basedOn": "An optocoupler-based pedal"
+    },
+    {
+      "family": "Studio FF Compressor",
+      "manufacturer": null,
+      "basedOn": "Feed-forward studio compressors — the EMI, dbx and SSL sort"
+    },
+    {
+      "family": "Studio FF Sustainer",
+      "manufacturer": null,
+      "basedOn": "The same feed-forward studio design, compressing upwards"
+    },
+    {
+      "family": "Studio FB Compressor",
+      "manufacturer": null,
+      "basedOn": "Feedback studio compressors such as the Teletronix LA-2A, Fairchild 670 and Empirical Labs Distressor"
+    },
+    {
+      "family": "Studio FB Sustainer",
+      "manufacturer": null,
+      "basedOn": "The same feedback studio design, compressing upwards"
+    },
+    {
+      "family": "Analog Compressor",
+      "manufacturer": null,
+      "basedOn": "The soft-knee analog compressors of the 70s and 80s"
+    },
+    {
+      "family": "Analog Sustainer",
+      "manufacturer": null,
+      "basedOn": "The same analog design, compressing upwards"
+    },
+    {
+      "family": "Pedal 1",
+      "manufacturer": null,
+      "basedOn": "A classic stompbox compressor"
+    },
+    {
+      "family": "Pedal 2",
+      "manufacturer": null,
+      "basedOn": "A classic stompbox compressor, smoother and pumping less"
+    },
+    {
+      "family": "Compander",
+      "manufacturer": "Fractal Audio",
+      "basedOn": "A compressor and an expander in one — Fractal's own"
+    },
+    {
+      "family": "Dynamics Processor",
+      "manufacturer": "Fractal Audio",
+      "basedOn": "Fractal's own: compress or expand from one control"
+    }
   ],
   "delay": [
-    { "family": "2290", "manufacturer": "TC Electronic", "basedOn": "TC Electronic 2290 rack delay" },
-    { "family": "Graphite Copy", "manufacturer": "MXR", "basedOn": "MXR Carbon Copy analog delay" },
-    { "family": "Deluxe Mind Guy", "manufacturer": "Electro-Harmonix", "basedOn": "Electro-Harmonix Deluxe Memory Man" }
+    {
+      "family": "2290",
+      "manufacturer": "TC Electronic",
+      "basedOn": "TC Electronic 2290 rack delay"
+    },
+    {
+      "family": "Graphite Copy",
+      "manufacturer": "MXR",
+      "basedOn": "MXR Carbon Copy analog delay"
+    },
+    {
+      "family": "Deluxe Mind Guy",
+      "manufacturer": "Electro-Harmonix",
+      "basedOn": "Electro-Harmonix Deluxe Memory Man"
+    },
+    {
+      "family": "Stereo Mind Guy",
+      "manufacturer": "Electro-Harmonix",
+      "basedOn": "Electro-Harmonix Deluxe Memory Man, in stereo"
+    },
+    {
+      "family": "Mono Tape",
+      "manufacturer": null,
+      "basedOn": "Tape echo, with motor speed and the rest of the tape controls"
+    },
+    {
+      "family": "Stereo Tape",
+      "manufacturer": null,
+      "basedOn": "Tape echo, in stereo"
+    },
+    {
+      "family": "Lo-Fi Tape",
+      "manufacturer": null,
+      "basedOn": "Tape echo, worn out"
+    },
+    {
+      "family": "Worn Tape",
+      "manufacturer": null,
+      "basedOn": "Tape echo with the top end a worn tape has lost"
+    },
+    {
+      "family": "Mono BBD",
+      "manufacturer": null,
+      "basedOn": "Bucket-brigade analog delay"
+    },
+    {
+      "family": "Stereo BBD",
+      "manufacturer": null,
+      "basedOn": "Bucket-brigade analog delay, in stereo"
+    },
+    {
+      "family": "Analog Mono",
+      "manufacturer": null,
+      "basedOn": "The frequency response and character of an analog delay"
+    },
+    {
+      "family": "Analog Stereo",
+      "manufacturer": null,
+      "basedOn": "The frequency response and character of an analog delay, in stereo"
+    },
+    {
+      "family": "Vintage Digital",
+      "manufacturer": null,
+      "basedOn": "Early digital delays, bit-depth reduced for the lo-fi of them"
+    },
+    {
+      "family": "Zephyr",
+      "manufacturer": "Fractal Audio",
+      "basedOn": "A delay of Fractal's own"
+    }
   ]
 }

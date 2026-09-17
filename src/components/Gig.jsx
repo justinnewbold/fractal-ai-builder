@@ -321,7 +321,7 @@ export default function Gig({
       // up, forever.
       const res = await writeTuner(next)
       if (next && res && res.ok === false) {
-        onError('The unit refused the tuner — the Fractal app on the Mac may need updating.')
+        onError('The unit refused the tuner — the Fractal app on the computer may need updating.')
       }
     } catch (err) {
       onError(err.message)
@@ -757,15 +757,15 @@ export default function Gig({
                 things that are actually still possible, in the order worth
                 trying, and neither of them is a guess about the unit.
               */}
-              No readings are reaching this phone. The Mac needs to be running this version of the
+              No readings are reaching this phone. The computer needs to be running this version of the
               app too &mdash; older ones don&rsquo;t send tuner readings over the link at all. On the
-              same wifi as the Mac it works either way.
+              same wifi as the computer it works either way.
             </>
           ) : (
             <>
               No readings are arriving from the unit. Some units only send them while their own tuner
               is engaged &mdash; on an AM4 that is holding the footswitch down rather than tapping
-              it. If it is already engaged and making sound, the Fractal app on the Mac may need
+              it. If it is already engaged and making sound, the Fractal app on the computer may need
               updating.
             </>
           )}
@@ -838,7 +838,7 @@ export default function Gig({
       {hasScenes && !names.some((n) => (n || '').trim()) && remoteActive() ? (
         <p className="gig-note">
           Scene names aren&rsquo;t readable from the phone. Open this preset once at the
-          Mac and they&rsquo;ll show here from then on.
+          computer and they&rsquo;ll show here from then on.
         </p>
       ) : null}
 

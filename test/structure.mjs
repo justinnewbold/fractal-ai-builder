@@ -826,7 +826,7 @@ export function run(test) {
     assert.match(app, /if \(chain\) read\(\)/, 'every knob still re-reads the whole unit')
   })
 
-  test('nothing is said about the unit once the Mac has gone quiet', () => {
+  test('nothing is said about the unit once the computer has gone quiet', () => {
     /*
      * "This is lying saying that a Mac is connected. My Mac is turned off
      * completely" — under a notice reading THE MAC CAN'T SEE YOUR UNIT, which
@@ -843,7 +843,7 @@ export function run(test) {
     assert.match(
       src,
       /err\?\.unitGone \? 'unit-gone' : macSilent\(err\) \? 'no-answer' : 'unreadable'/,
-      'App keeps its own copy of what a silent Mac looks like'
+      'App keeps its own copy of what a silent computer looks like'
     )
     // One definition of that, in the module the reads live in, so the screen
     // and the asking cannot disagree about what a dead line is.
@@ -1519,7 +1519,7 @@ export function run(test) {
     const rows = [...setup.matchAll(/<SetupRow key="([^"]+)" title="([^"]+)" status=/g)].map((m) => m[2])
     assert.deepEqual(
       rows,
-      ['Unit', 'Phone & Mac', 'Play screen', 'AI & cost', 'Amp & pedal names', 'Help & fixes', 'About'],
+      ['Unit', 'Phone & computer', 'Play screen', 'AI & cost', 'Amp & pedal names', 'Help & fixes', 'About'],
       `Setup opens on ${rows.length} rows: ${rows.join(', ')}`
     )
     assert.ok(!setup.includes('<Group'), 'the doors are back')
@@ -1877,7 +1877,7 @@ export function run(test) {
     assert.deepEqual(hits, [], `plumbing on screen:\n  ${hits.join('\n  ')}`)
   })
 
-  test('the phone remote is honest about whether the Mac answered', () => {
+  test('the phone remote is honest about whether the computer answered', () => {
     const remote = readFileSync(new URL('../src/lib/remote.js', import.meta.url), 'utf8')
     const linkSrc = readFileSync(new URL('../src/lib/link.js', import.meta.url), 'utf8')
 
@@ -1898,7 +1898,7 @@ export function run(test) {
      */
     assert.ok(
       !/hostSeen\s*=[^=].*presenceState/s.test(remote) && !/seen\([^)]*presenceState/.test(remote),
-      'presence is deciding whether the Mac is there again — it never tracks presence, so this is always "no"'
+      'presence is deciding whether the computer is there again — it never tracks presence, so this is always "no"'
     )
 
     // Every write to the fact goes through the setter that announces it.
@@ -1967,7 +1967,7 @@ export function run(test) {
     assert.match(src, /note=\{describeLink\(link\)\.note\}/, 'the Setup note no longer says what the link is')
   })
 
-  test('the phone is never shown the Mac’s error while the app works out which end it is', () => {
+  test('the phone is never shown the computer’s error while the app works out which end it is', () => {
     /*
      * Every first-time phone visitor saw a red "Can't find your Fractal —
      * open the app on this Mac — try Chrome" before the connect screen: the
@@ -1978,7 +1978,7 @@ export function run(test) {
       !/useEffect\(\(\) => \{\s*\n\s*read\(\)\s*\n\s*\}, \[read\]\)/.test(src),
       'the unit is read at mount before anyone knows which end this is'
     )
-    assert.match(src, /if \(isDemo\(\) \|\| servedLocally\(\)\) \{\s*\n\s*read\(\)/, 'the Mac and the demo no longer read at once')
+    assert.match(src, /if \(isDemo\(\) \|\| servedLocally\(\)\) \{\s*\n\s*read\(\)/, 'the computer and the demo no longer read at once')
     assert.match(src, /if \(s\.role !== 'remote'\) read\(\)/, 'the phone reads the unit over localhost')
 
     // The words are chosen by role, in one tested place.
@@ -1986,7 +1986,7 @@ export function run(test) {
     assert.match(src, /status === 'fault' && fault \? \(/, 'a notice renders before the role is known')
     const code = src.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '')
     assert.ok(!/Try Chrome/.test(code), 'the Safari sentence is back in App, shown to everyone')
-    assert.ok(!/this Mac/.test(code), '"this Mac" is written in App, where the role cannot be checked')
+    assert.ok(!/this computer/.test(code), '"this computer" is written in App, where the role cannot be checked')
 
     // Leaving or entering the demo is a reload: the role was decided at load.
     const dir = new URL('../src/components/', import.meta.url)
@@ -2326,8 +2326,8 @@ export function run(test) {
      * DISCONNECTED beside the version number — in the demo, for good — and
      * read as the app having lost something. Grey, and it says what it is.
      */
-    assert.equal(linkWord('dim', 'remote'), 'no Mac', 'a remote nobody turned on is called disconnected')
-    assert.equal(linkWord('dim', 'mac'), 'no phone', 'a Mac with no phone on it is called disconnected')
+    assert.equal(linkWord('dim', 'remote'), 'no computer', 'a remote nobody turned on is called disconnected')
+    assert.equal(linkWord('dim', 'mac'), 'no phone', 'a computer with no phone on it is called disconnected')
     /*
      * And the phone reads the same four states off its own link module, which
      * has no describeLink in it at all. This is the join between the two: if
@@ -2350,12 +2350,12 @@ export function run(test) {
      * neither said so, and two states at opposite ends of one bar read as the
      * app disagreeing with itself.
      */
-    assert.match(chip, /const word = sayMac && mark !== 'off' \? `Mac \$\{state\}` : state/, 'the word never says which thing it is about')
+    assert.match(chip, /const word = sayMac && mark !== 'off' \? `computer \$\{state\}` : state/, 'the word never says which thing it is about')
     const bar = readFileSync(new URL('../src/components/TopBar.jsx', import.meta.url), 'utf8')
     assert.match(
       bar,
       /sayMac=\{remote && status !== 'live'\}/,
-      'the Mac is named when the unit is answering too, where there is no confusion and no room'
+      'the computer is named when the unit is answering too, where there is no confusion and no room'
     )
     assert.match(chip, /compact \? \(\s*<span className=\{`phone-word \$\{mark\}`\} aria-hidden="true">\s*\{word\}/, 'the bar chip is a mark again, not the word')
     assert.match(chip, /aria-label=\{`\$\{said\.sentence\} — phone remote options`\}/, 'the chip has no sentence for a screen reader')
@@ -2757,7 +2757,7 @@ export function run(test) {
     assert.match(
       link,
       /canReachHelper\(\)[\s\S]{0,120}set\(\{ canHost/,
-      'nothing asks whether this browser could host, so the demo cannot tell a Mac from a phone'
+      'nothing asks whether this browser could host, so the demo cannot tell a computer from a phone'
     )
 
     /*
@@ -2768,12 +2768,12 @@ export function run(test) {
     assert.match(
       chip,
       /link\.canHost/,
-      "the bar offers the Mac's setup without asking whether this end could ever be one"
+      "the bar offers the computer's setup without asking whether this end could ever be one"
     )
     assert.match(
       chip,
       /'leave-demo'/,
-      'the bar has no way out of the demo, which is how a phone got stuck wearing the Mac’s screen'
+      'the bar has no way out of the demo, which is how a phone got stuck wearing the computer’s screen'
     )
 
     /*
@@ -2785,7 +2785,7 @@ export function run(test) {
     assert.match(
       act.slice(0, 600),
       /setDemo\(false\)[\s\S]{0,200}location\.reload\(\)/,
-      'leaving the demo does not reload, so the phone goes on believing it is the Mac'
+      'leaving the demo does not reload, so the phone goes on believing it is the computer'
     )
   })
 
@@ -3225,7 +3225,7 @@ export function run(test) {
      */
     assert.ok(
       !/The phone asked to save/.test(app),
-      'the Mac is being asked again — a question whose only right answer is no'
+      'the computer is being asked again — a question whose only right answer is no'
     )
     assert.ok(
       !/setAskedSave/.test(app),
@@ -3233,7 +3233,7 @@ export function run(test) {
     )
     // Both dead ends report to the phone, and say which one it was.
     const watcher = app.slice(app.indexOf('const req = await takeParkedSave()'))
-    assert.match(watcher, /reportSave\(\{/, 'a request the Mac cannot carry out leaves the phone waiting for ever')
+    assert.match(watcher, /reportSave\(\{/, 'a request the computer cannot carry out leaves the phone waiting for ever')
     assert.match(
       watcher,
       /error: sameBuffer\s*\n?\s*\?/,
@@ -3676,7 +3676,7 @@ export function run(test) {
 
     /* Neither of the two sentences that turned out to be false. */
     assert.ok(
-      !/Tune there|only the app at the Mac/.test(bare),
+      !/Tune there|only the app at the computer/.test(bare),
       'the tuner still says a phone cannot do this, which is only true of one of its two routes'
     )
     assert.ok(
@@ -3685,8 +3685,8 @@ export function run(test) {
     )
 
     /* What is left is the two things still worth trying, and no diagnosis. */
-    assert.match(stall, /this version of the app/, 'nothing names the Mac being on an older version')
-    assert.match(stall, /same wifi/, 'the route that works whatever the Mac is running is not mentioned')
+    assert.match(stall, /this version of the app/, 'nothing names the computer being on an older version')
+    assert.match(stall, /same wifi/, 'the route that works whatever the computer is running is not mentioned')
     assert.match(
       stall,
       /footswitch/,
@@ -4154,7 +4154,7 @@ export function run(test) {
     assert.match(connect, /follow you\s+to any device/i, 'nothing says what signing in buys')
     // And it goes somewhere: an address typed in lands on the Mac's own page.
     assert.match(connect, /window\.location\.href = `http:\/\//, 'the address typed in goes nowhere')
-    assert.match(connect, /:5056/, 'a bare hostname is not given the port the Mac serves on')
+    assert.match(connect, /:5056/, 'a bare hostname is not given the port the computer serves on')
   })
 
   test('watching a pull request does not need asking about', () => {
@@ -4190,7 +4190,7 @@ export function run(test) {
     }
   })
 
-  test('the Mac app can actually install what it downloads', () => {
+  test('the computer app can actually install what it downloads', () => {
     /*
      * Three things have to agree or the app checks for updates forever and can
      * never take one, which looks identical to working.
@@ -4230,7 +4230,7 @@ export function run(test) {
      * asset, so productName in the two files that carry it must never drift.
      */
     const NAME = 'Fractal Remote'
-    assert.equal(pkg.productName, NAME, 'the Mac app is named something else')
+    assert.equal(pkg.productName, NAME, 'the computer app is named something else')
     assert.match(yml, new RegExp(`productName: ${NAME}\\s*$`, 'm'), 'the packager builds a differently named app')
 
     const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
@@ -4981,7 +4981,7 @@ export function run(test) {
     )
     /* And the phone gets the longer allowance, for the same reason the
        presence check does: the read travels a relay to a busy Mac. */
-    assert.match(fn, /remote: remoteActive\(\)/, 'the phone reads the chain on the Mac\u2019s shorter allowance')
+    assert.match(fn, /remote: remoteActive\(\)/, 'the phone reads the chain on the computer\u2019s shorter allowance')
   })
 
   test('the switch that clears the stage screen is reachable and sticks', () => {
@@ -5041,7 +5041,7 @@ export function run(test) {
     const codeAt = connect.indexOf('connect-code-row')
     const wifiAt = connect.indexOf('connect-local"')
     const accountAt = connect.indexOf('connect-account')
-    assert.ok(codeAt > 0, 'the phone has nowhere to type the code from the Mac')
+    assert.ok(codeAt > 0, 'the phone has nowhere to type the code from the computer')
     assert.ok(accountAt > 0, 'signing in is not offered at all')
     assert.ok(codeAt < wifiAt && wifiAt < accountAt, 'signing in comes before the routes that need no account')
     assert.match(connect, /No account needed/, 'the code route does not say the thing that makes it the first choice')
@@ -5054,14 +5054,14 @@ export function run(test) {
 
     const panel = readFileSync(new URL('../src/components/PhoneRemote.jsx', import.meta.url), 'utf8')
     const macIdle = panel.slice(panel.indexOf("if (link.link === 'signed-out')"), panel.indexOf('const paired = isPairAccount(email)'))
-    assert.match(macIdle, /onAction\('mac-pair'\)[\s\S]*?Set up phone remote/, 'the Mac’s Set up phone remote still opens the sign-in sheet')
-    assert.match(macIdle, /Sign in with an account instead/, 'the Mac no longer offers an account at all')
-    assert.match(panel, /function PairCard/, 'a paired Mac has no code to show')
-    assert.match(panel, /pairLink\(code\)/, 'the Mac’s QR does not carry the code')
+    assert.match(macIdle, /onAction\('mac-pair'\)[\s\S]*?Set up phone remote/, 'the computer’s Set up phone remote still opens the sign-in sheet')
+    assert.match(macIdle, /Sign in with an account instead/, 'the computer no longer offers an account at all')
+    assert.match(panel, /function PairCard/, 'a paired computer has no code to show')
+    assert.match(panel, /pairLink\(code\)/, 'the computer’s QR does not carry the code')
     assert.match(panel, /formatPairCode\(code\)/, 'the code is shown only as a QR, so a camera that will not focus is stuck')
-    assert.match(panel, /Unpair this Mac/, 'a paired Mac has no way out of pairing')
+    assert.match(panel, /Unpair this computer/, 'a paired computer has no way out of pairing')
 
-    assert.match(src, /kind === 'mac-pair'[\s\S]*?await pairMac\(\)/, 'the Mac’s pair button does nothing')
+    assert.match(src, /kind === 'mac-pair'[\s\S]*?await pairMac\(\)/, 'the computer’s pair button does nothing')
     assert.match(src, /onPair=\{pairFromCode\}/, 'the connect screen’s code is not wired to anything')
     assert.match(src, /await pairPhone\(code\)/, 'a typed code never signs the phone in')
 
@@ -5379,7 +5379,7 @@ export function run(test) {
     assert.match(panel, /silenceFaults\(/, 'the report is a dump with no answer in it')
   })
 
-  test('a phone is not told three times which Mac it is talking to', () => {
+  test('a phone is not told three times which computer it is talking to', () => {
     /*
      * "Remove where it says 'through your Mac'."
      *
@@ -5395,9 +5395,9 @@ export function run(test) {
        nobody can write. */
     const code = detail.replace(/\/\*[\s\S]*?\*\//g, ' ')
     const markup = code.slice(code.indexOf('return ('))
-    assert.ok(!markup.includes("'through your Mac'"), 'the phone is told what it is connected through again')
+    assert.ok(!markup.includes("'through your computer'"), 'the phone is told what it is connected through again')
     assert.match(markup, /\{demo \|\| !remote \?/, 'the address line no longer decides whether it has anything to say')
-    assert.match(markup, /demo \? 'simulated' : getHost\(\)/, 'the demo no longer says it is a simulation, or the Mac has lost its address')
+    assert.match(markup, /demo \? 'simulated' : getHost\(\)/, 'the demo no longer says it is a simulation, or the computer has lost its address')
   })
 
   test('setlists and stars follow the account when there is one', () => {

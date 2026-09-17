@@ -72,15 +72,77 @@ function fromFamilies(slug) {
  * What the sheet offers, in the order it offers it.
  *
  * Amps and drives first because they are the two anybody came here for and the
- * two with a per-model catalog; the three family lists after, small but real.
+ * two with a per-model catalog; the family lists after, smaller but real.
  */
-export const GEAR_GROUPS = [
-  { key: 'amp', label: 'Amps', entries: fromCatalog('amp', ampTypes) },
-  { key: 'drive', label: 'Drives', entries: fromCatalog('drive', driveTypes) },
-  { key: 'wah', label: 'Wahs', entries: fromFamilies('wah') },
-  { key: 'comp', label: 'Compressors', entries: fromFamilies('comp') },
-  { key: 'delay', label: 'Delays', entries: fromFamilies('delay') }
-].filter((g) => g.entries.length)
+export const GEAR_FAMILIES = [
+  { key: 'amp', label: 'Amps' },
+  { key: 'drive', label: 'Drives' },
+  { key: 'wah', label: 'Wahs' },
+  { key: 'comp', label: 'Compressors' },
+  { key: 'delay', label: 'Delays' }
+]
+
+/** The catalog as it stands with no unit on the other end of anything. */
+const CATALOG = {
+  amp: () => fromCatalog('amp', ampTypes),
+  drive: () => fromCatalog('drive', driveTypes),
+  wah: () => fromFamilies('wah'),
+  comp: () => fromFamilies('comp'),
+  delay: () => fromFamilies('delay')
+}
+
+export const GEAR_GROUPS = GEAR_FAMILIES.map((f) => ({ ...f, entries: CATALOG[f.key]() })).filter(
+  (g) => g.entries.length
+)
+
+/**
+ * The same sheet, but for the unit that is actually plugged in.
+ *
+ * "Make sure they are specific to the unit connected as well as AM4 would have
+ * different ones versus FM9 or Axefx 3 or VP4. I only have an FM3 and AM4 so
+ * those are the only ones I have to go off of so I'll need you to research the
+ * rest of them."
+ *
+ * The research is the wrong tool for that half of it, and would have gone
+ * stale by the next firmware anyway. Every one of these units already knows its
+ * own model list and will hand it over — `/blocks/{slug}/types` — so the right
+ * answer is to ask rather than to keep five tables and hope. An AM4 answers
+ * with an AM4's amps; a VP4 nobody here has ever seen answers correctly on the
+ * day somebody plugs one in.
+ *
+ * `rosters` is what the unit said, by block. A family the unit does not answer
+ * for — the block is not on it, or the read failed — falls back to the printed
+ * catalog rather than vanishing, because a reference sheet that empties itself
+ * when a cable is out is worse than one that is a little too generous.
+ */
+export function groupsFor(rosters = {}) {
+  return GEAR_FAMILIES.map((f) => {
+    const said = rosters[f.key]
+    const entries = Array.isArray(said) && said.length ? fromRoster(f.key, said) : CATALOG[f.key]()
+    return { ...f, entries, fromUnit: Array.isArray(said) && said.length > 0 }
+  }).filter((g) => g.entries.length)
+}
+
+/**
+ * A list read off the unit, given the same treatment as a printed one.
+ *
+ * The unit's own answer wins where it has one: `withLineage` already fills in
+ * from the catalog and leaves anything the device supplied alone, because the
+ * unit is the better authority on its own models. Here that is unwrapped back
+ * into the two columns the sheet draws.
+ */
+function fromRoster(slug, models) {
+  const seen = new Set()
+  const out = []
+  for (const model of models) {
+    const name = String(model?.name || '').trim()
+    if (!name || seen.has(name.toLowerCase())) continue
+    seen.add(name.toLowerCase())
+    const found = model?.basedOn ? model : lineageFor(slug, name)
+    out.push({ name, gear: found?.basedOn || found?.manufacturer || null })
+  }
+  return out.sort(byName)
+}
 
 /**
  * Search both sides of the arrow.
@@ -108,9 +170,12 @@ export function searchGear(entries, query) {
  * reading "Amps 331 · Drives 86" gives no hint that the five answers are one
  * tap away. Searching all five costs a pass over 430 strings, which is nothing.
  */
-export function searchAll(query) {
-  return GEAR_GROUPS.map((g) => ({ ...g, hits: searchGear(g.entries, query) }))
+export function searchAll(query, groups = GEAR_GROUPS) {
+  return groups.map((g) => ({ ...g, hits: searchGear(g.entries, query) }))
 }
 
 /** How many models the sheet can name the real gear for, for the note at the top. */
-export const GEAR_TOTAL = GEAR_GROUPS.reduce((n, g) => n + g.entries.filter((e) => e.gear).length, 0)
+export const gearTotal = (groups = GEAR_GROUPS) =>
+  groups.reduce((n, g) => n + g.entries.filter((e) => e.gear).length, 0)
+
+export const GEAR_TOTAL = gearTotal()

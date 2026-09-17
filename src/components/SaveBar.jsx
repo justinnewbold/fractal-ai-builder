@@ -122,7 +122,7 @@ export default function SaveBar({
           className="save-now"
           onClick={onOpenSave}
           disabled={busy || !!queued}
-          title={remote ? 'The page at your Mac does the writing' : undefined}
+          title={remote ? 'The page at your computer does the writing' : undefined}
         >
           {/* `saving`, not `busy`: busy is true for every long operation in the
               app, so this button used to announce a slot write while a tone was
@@ -149,12 +149,12 @@ export default function SaveBar({
             ? compact
               ? 'Saving…'
               : remote
-                ? 'Saving at the Mac…'
+                ? 'Saving at the computer…'
                 : 'Saving…'
             : !dirty && justSaved
               ? '✓ Saved'
               : remote && !compact
-                ? 'Save at the Mac'
+                ? 'Save at the computer'
                 : 'Save'}
         </button>
       </div>

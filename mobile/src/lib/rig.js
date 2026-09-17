@@ -275,6 +275,52 @@ export async function refreshSceneNames() {
 }
 
 export async function refreshBlocks({ quiet = false } = {}) {
+  /*
+   * ONE READ AT A TIME, HOWEVER MANY TIMES WE ARE ASKED — and this is the
+   * reason the whole app felt slow.
+   *
+   * "App is very laggy especially on the set list screen." The log said why,
+   * and it was nothing to do with setlists:
+   *
+   *   23:02:50.187 [wire] GET /preset/blocks — 2878ms
+   *   23:02:50.748 [wire] GET /preset/blocks — 3123ms
+   *   23:03:00.265 [wire] GET /preset/blocks — 3219ms
+   *
+   * Three of the same slow read, two of them half a second apart. The unit
+   * emits an event per change, `handleEvent` asked for the chain on each one,
+   * and every one of those asks is a preset dump down a serial port with a
+   * relay in front of it — one at a time, in a queue. A preset change that
+   * fires six events puts twenty seconds of reading in front of the next thing
+   * anybody presses, on any screen. That is what "laggy" was.
+   *
+   * So: while one is in flight, another ask does not queue. It notes that the
+   * answer now on its way is already out of date and asks ONE more time when
+   * that lands — once, no matter how many asks arrived meanwhile. The last read
+   * is still the true one, which is the only thing that has to stay true.
+   */
+  if (blocksInFlight) {
+    blocksAgain = true
+    return blocksInFlight
+  }
+  blocksInFlight = readBlocks(quiet)
+  try {
+    return await blocksInFlight
+  } finally {
+    blocksInFlight = null
+    if (blocksAgain) {
+      blocksAgain = false
+      /* Quiet: the chain on screen is a moment old, not missing, and flipping
+         it to 'reading' would blank a row of buttons somebody is aiming at. */
+      refreshBlocks({ quiet: true })
+    }
+  }
+}
+
+/** Whether a chain read is on the wire, and whether one more is owed after it. */
+let blocksInFlight = null
+let blocksAgain = false
+
+async function readBlocks(quiet) {
   if (!quiet) set({ chain: 'reading' })
   try {
     /*

@@ -111,7 +111,7 @@ export default function Ports({ onError, onChanged, busy }) {
       {open ? (
         <>
           <p className="silk-label" style={{ marginTop: 10 }}>
-            Units plugged into your Mac
+            Units plugged into your computer
           </p>
 
           {!ports ? (
@@ -196,7 +196,7 @@ function RemoteHelp() {
   if (servedLocally()) {
     return (
       <p className="hint">
-        This page is being served from your Mac, so any device on the same network can open{' '}
+        This page is being served from your computer, so any device on the same network can open{' '}
         <code>{window.location.origin}</code> — including a phone.
       </p>
     )
@@ -204,7 +204,7 @@ function RemoteHelp() {
 
   return (
     <p className="hint">
-      To play from a phone, use <strong>Phone remote</strong> above. Your Mac stays plugged into
+      To play from a phone, use <strong>Phone remote</strong> above. Your computer stays plugged into
       the unit and the phone drives it from anywhere.
     </p>
   )

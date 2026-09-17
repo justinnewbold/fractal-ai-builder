@@ -38,7 +38,7 @@ export function linkWord(tone, role) {
   if (tone === 'good') return 'connected'
   if (tone === 'busy') return 'connecting'
   if (tone === 'bad') return 'disconnected'
-  return role === 'remote' ? 'no Mac' : 'no phone'
+  return role === 'remote' ? 'no computer' : 'no phone'
 }
 
 /** The colour that word is drawn in, named rather than hexed. */

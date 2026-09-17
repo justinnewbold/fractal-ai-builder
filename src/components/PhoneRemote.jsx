@@ -35,7 +35,7 @@ export default function PhoneRemote({ link, onAction, onError, busy }) {
         <MacSide link={link} email={email} onAction={onAction} busy={busy} />
       ) : link.role === 'wifi' ? (
         <p className="hint">
-          Nothing to set up &mdash; this phone is talking to the Mac directly over wifi.
+          Nothing to set up &mdash; this phone is talking to the computer directly over wifi.
         </p>
       ) : link.role === 'remote' ? (
         <PhoneSide link={link} email={email} onAction={onAction} busy={busy} />
@@ -60,7 +60,7 @@ function MacSide({ link, email, onAction, busy }) {
   if (cloud && !cloud.enabled) {
     return (
       <p className="hint">
-        Quit and reopen the Fractal app on this Mac to turn this on.
+        Quit and reopen the Fractal app on this computer to turn this on.
       </p>
     )
   }
@@ -76,8 +76,8 @@ function MacSide({ link, email, onAction, busy }) {
       <>
         <WifiCard />
         <p className="hint">
-          Set this up once and your phone can play through this Mac from anywhere. No account
-          needed &mdash; the Mac shows a code, the phone scans it.
+          Set this up once and your phone can play through this computer from anywhere. No account
+          needed &mdash; the computer shows a code, the phone scans it.
         </p>
         <div className="history-actions">
           <button className="primary" onClick={() => onAction('mac-pair')} disabled={busy}>
@@ -185,7 +185,7 @@ function PairCard({ on, onAction, busy }) {
     return (
       <>
         <p className="hint">
-          Paired without an account, but the code was made from another browser on this Mac, so it
+          Paired without an account, but the code was made from another browser on this computer, so it
           can&rsquo;t be shown here. Pairing again makes a new code; phones with the old one will
           need the new one.
         </p>
@@ -205,7 +205,7 @@ function PairCard({ on, onAction, busy }) {
           ? 'Paired, no account. On your phone, point the camera at this — or type the code.'
           : 'Paired, no account. Turn it on and your phone can connect with this code.'}
       </p>
-      {qr ? <img className="phone-qr" src={qr} alt="Code to pair your phone with this Mac" width={160} height={160} /> : null}
+      {qr ? <img className="phone-qr" src={qr} alt="Code to pair your phone with this computer" width={160} height={160} /> : null}
       <p className="pair-code mono" aria-label="Pairing code">
         {formatPairCode(code)}
       </p>
@@ -220,8 +220,8 @@ function PhoneSide({ link, email, onAction, busy }) {
     return (
       <>
         <p className="hint">
-          Everything you change here happens on the unit at the Mac. Saving to a slot happens at
-          the Mac.
+          Everything you change here happens on the unit at the computer. Saving to a slot happens at
+          the computer.
         </p>
         <div className="history-actions">
           <button className="chip" onClick={() => onAction('disconnect')} disabled={busy}>
@@ -232,13 +232,13 @@ function PhoneSide({ link, email, onAction, busy }) {
     )
   }
   if (link.link === 'joining') {
-    return <p className="hint">Finding your Mac.</p>
+    return <p className="hint">Finding your computer.</p>
   }
   if (link.link === 'no-answer') {
     return (
       <>
         <p className="hint">
-          Make sure the Fractal app is open on the Mac and the Mac is awake. This keeps trying on
+          Make sure the Fractal app is open on the computer and the computer is awake. This keeps trying on
           its own.
         </p>
         <div className="history-actions">
@@ -254,8 +254,8 @@ function PhoneSide({ link, email, onAction, busy }) {
     <>
       <p className="hint">
         {paired
-          ? 'This phone is paired with your Mac. Connect and it becomes the remote for the unit there.'
-          : 'Connect and this phone becomes the remote for the unit at your Mac.'}
+          ? 'This phone is paired with your computer. Connect and it becomes the remote for the unit there.'
+          : 'Connect and this phone becomes the remote for the unit at your computer.'}
       </p>
       <div className="history-actions">
         <button className="primary" onClick={() => onAction('connect')} disabled={busy}>
@@ -295,7 +295,7 @@ function AccountFold({ email, paired, role, onAction, onError, busy }) {
           <div className="account">
             <p className="hint">
               {role === 'mac'
-                ? 'Presets stay on this Mac. Sign in with an account to have them follow you between devices.'
+                ? 'Presets stay on this computer. Sign in with an account to have them follow you between devices.'
                 : 'What you save stays on this phone. Sign in with an account to have it follow you between devices.'}
             </p>
             <div className="history-actions">
@@ -303,7 +303,7 @@ function AccountFold({ email, paired, role, onAction, onError, busy }) {
                 Sign in with an account
               </button>
               <button className="chip" disabled={busy} onClick={() => onAction('signout')}>
-                {role === 'mac' ? 'Unpair this Mac' : 'Unpair this phone'}
+                {role === 'mac' ? 'Unpair this computer' : 'Unpair this phone'}
               </button>
             </div>
           </div>

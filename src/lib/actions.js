@@ -884,8 +884,8 @@ export function validatePlan(plan, blocks, capabilities) {
           actions.push({
             ...raw,
             label: name
-              ? `Ask the Mac to save "${name}" to slot ${number}`
-              : `Ask the Mac to save to slot ${number}`,
+              ? `Ask the computer to save "${name}" to slot ${number}`
+              : `Ask the computer to save to slot ${number}`,
             // Overwrites whatever is in that slot, so it asks first — the Mac
             // being the one holding the pen changes nothing about that.
             destructive: true,
@@ -935,7 +935,7 @@ export function validatePlan(plan, blocks, capabilities) {
       }
 
       case 'backupPreset': {
-        if (!need(!remote, 'Backing up to a file only works at the Mac.')) break
+        if (!need(!remote, 'Backing up to a file only works at the computer.')) break
         actions.push({
           ...raw,
           label: 'Back up this preset to a file',
@@ -973,7 +973,7 @@ export function validatePlan(plan, blocks, capabilities) {
          * that had already applied everything else — the one shape this guard
          * exists to stop.
          */
-        if (!need(!remote, 'Keeping a preset as a file only works at the Mac, where the folder is.'))
+        if (!need(!remote, 'Keeping a preset as a file only works at the computer, where the folder is.'))
           break
         const name = (raw.text || '').trim().slice(0, 60)
         actions.push({
@@ -987,7 +987,7 @@ export function validatePlan(plan, blocks, capabilities) {
             const folder = await savedFolder()
             if (!folder || folder.needsPermission) {
               throw new Error(
-                'No preset folder chosen yet — pick one in Library first, under "Presets on this Mac".'
+                'No preset folder chosen yet — pick one in Library first, under "Presets on this computer".'
               )
             }
             const d = await device()

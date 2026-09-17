@@ -249,7 +249,7 @@ export default function LocalLibrary({ preset, busy, onError, onChanged, onReloa
       <section className="local-library">
         <p className="hint">
           Pick a folder and your presets get kept there as ordinary files &mdash; yours, on your own
-          Mac, where your backups will pick them up.
+          computer, where your backups will pick them up.
         </p>
         <button className="save-now" onClick={choose} disabled={busy || working === 'choose'}>
           {working === 'choose' ? 'Choosing…' : 'Choose a folder'}

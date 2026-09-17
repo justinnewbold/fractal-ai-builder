@@ -57,13 +57,13 @@ export default function ConnectScreen({ link, onPair, onConnect, onRetry, onSwit
       {state === 'joining' ? (
         <>
           <h2>Connecting…</h2>
-          <p>Finding your Mac.</p>
+          <p>Finding your computer.</p>
         </>
       ) : state === 'no-answer' ? (
         <>
-          <h2>Your Mac isn&rsquo;t answering</h2>
+          <h2>Your computer isn&rsquo;t answering</h2>
           <p>
-            Make sure the Fractal app is open on the Mac and the Mac is awake. This keeps trying on
+            Make sure the Fractal app is open on the computer and the computer is awake. This keeps trying on
             its own.
           </p>
           <div className="connect-actions">
@@ -71,19 +71,19 @@ export default function ConnectScreen({ link, onPair, onConnect, onRetry, onSwit
               Try now
             </button>
             <button className="chip" onClick={paired ? onUnpair : onSwitchAccount} disabled={busy}>
-              {paired ? 'Pair with a different Mac' : 'Sign in as someone else'}
+              {paired ? 'Pair with a different computer' : 'Sign in as someone else'}
             </button>
           </div>
         </>
       ) : (
         <>
-          <h2>Connect to your Mac</h2>
+          <h2>Connect to your computer</h2>
           {remembered ? (
             <>
               <p>
                 {paired
-                  ? 'This phone is paired with your Mac. No account needed.'
-                  : 'Your Fractal is plugged into your Mac. Connect and this phone becomes its remote.'}
+                  ? 'This phone is paired with your computer. No account needed.'
+                  : 'Your Fractal is plugged into your computer. Connect and this phone becomes its remote.'}
               </p>
               <div className="connect-actions">
                 <button className="primary" onClick={onConnect} disabled={busy}>
@@ -91,15 +91,15 @@ export default function ConnectScreen({ link, onPair, onConnect, onRetry, onSwit
                 </button>
                 {/* Unpairing forgets the hidden account and comes back to the code box; a person's account gets the sign-in sheet. */}
                 <button className="chip" onClick={paired ? onUnpair : onSwitchAccount} disabled={busy}>
-                  {paired ? 'Pair with a different Mac' : 'Use a different account'}
+                  {paired ? 'Pair with a different computer' : 'Use a different account'}
                 </button>
               </div>
             </>
           ) : (
             <>
               <p>
-                Your Fractal is plugged into your Mac. Point this phone&rsquo;s camera at the code
-                the Mac shows, or type the code here. No account needed.
+                Your Fractal is plugged into your computer. Point this phone&rsquo;s camera at the code
+                the computer shows, or type the code here. No account needed.
               </p>
               <div className="connect-actions">
                 <div className="connect-code-row">
@@ -114,7 +114,7 @@ export default function ConnectScreen({ link, onPair, onConnect, onRetry, onSwit
                     onChange={(e) => setCode(formatPairCode(e.target.value))}
                     onKeyDown={(e) => e.key === 'Enter' && pair()}
                     placeholder="XXXX-XXXX-XXXX-XXXX"
-                    aria-label="The pairing code your Mac shows"
+                    aria-label="The pairing code your computer shows"
                     maxLength={19}
                   />
                 </div>
@@ -130,7 +130,7 @@ export default function ConnectScreen({ link, onPair, onConnect, onRetry, onSwit
             </>
           )}
           <p className="hint">
-            Haven&rsquo;t set up the Mac yet? Open this app on the Mac and tap{' '}
+            Haven&rsquo;t set up the computer yet? Open this app on the computer and tap{' '}
             <strong>Set up phone remote</strong>.
           </p>
 
@@ -148,8 +148,8 @@ export default function ConnectScreen({ link, onPair, onConnect, onRetry, onSwit
           <div className="connect-local">
             <p className="silk-label">Or, on the same wifi — no account, no code</p>
             <p className="hint">
-              Your Mac shows its address in the menu bar, next to the Fractal icon. Type it here and
-              this phone talks to the Mac directly. Nothing is signed into, and what you save stays
+              Your computer shows its address in the menu bar, next to the Fractal icon. Type it here and
+              this phone talks to the computer directly. Nothing is signed into, and what you save stays
               on this phone.
             </p>
             <div className="connect-local-row">
@@ -163,7 +163,7 @@ export default function ConnectScreen({ link, onPair, onConnect, onRetry, onSwit
                 onChange={(e) => setWhere(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && go()}
                 placeholder="fractal.local"
-                aria-label="The address your Mac shows"
+                aria-label="The address your computer shows"
               />
               <button onClick={go} disabled={busy || !where.trim()}>
                 Go
@@ -182,7 +182,7 @@ export default function ConnectScreen({ link, onPair, onConnect, onRetry, onSwit
               <p className="silk-label">Or sign in — to save and sync</p>
               <p className="hint">
                 Signing in instead means your presets and what the AI has learned about your taste
-                follow you to any device, anywhere &mdash; not just at home. Set the Mac up with the
+                follow you to any device, anywhere &mdash; not just at home. Set the computer up with the
                 same account and no code is needed.
               </p>
               <div className="connect-local-row">

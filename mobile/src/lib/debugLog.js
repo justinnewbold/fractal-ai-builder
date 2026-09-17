@@ -60,6 +60,41 @@ export function logDebug(source, message, detail) {
   return entry
 }
 
+/**
+ * A button was pressed — and, when it was worth saying, how long what it
+ * started took to finish.
+ *
+ * "Can we add more, like what buttons get tapped and what the app does, how
+ * long it takes to activate what the button was suppose to do?"
+ *
+ * The wire log already said how long each request took, which answers "was the
+ * unit slow". It could not answer "I pressed the thing and nothing happened",
+ * because nothing wrote down that anything was pressed. A log of the answers
+ * with none of the questions makes a bad evening unreadable in exactly the way
+ * it is most often bad.
+ *
+ * THE LINE IS WRITTEN AT THE START, not the end, and that is the point: a tap
+ * whose work never finishes is a tap with no second line, which is the shape of
+ * the failure most worth finding. The second line only comes when the work took
+ * long enough to be worth reading about, or when it failed — every button in
+ * this app would otherwise cost two lines to say "that was instant", and the
+ * buffer holds four hundred.
+ */
+const WORTH_SAYING_MS = 100
+
+export function logTap(what, detail) {
+  const began = Date.now()
+  logDebug('tap', what, detail)
+  let said = false
+  return (outcome) => {
+    if (said) return
+    said = true
+    const took = Date.now() - began
+    if (took < WORTH_SAYING_MS && !outcome) return
+    logDebug('tap', `${what} — ${took}ms`, outcome)
+  }
+}
+
 /** Oldest first — the order a person reads a story in. */
 export const getDebugLog = () => lines.slice()
 
@@ -122,7 +157,7 @@ export function formatMacDiag(d) {
   const recent = Array.isArray(d.recent) ? d.recent : null
   const traffic = d.traffic
   return [
-    "MAC'S DEVICE SERVER",
+    "COMPUTER'S DEVICE SERVER",
     `port to the unit: ${d.transportOpen ? 'open' : 'NOT OPEN'}${d.transportLabel ? ` · ${d.transportLabel}` : ''}`,
     `resolved: ${d.resolved ? `${d.resolved.transport} ${d.resolved.id}` : 'no unit found'}`,
     `serial ports: ${ports}`,
@@ -132,9 +167,9 @@ export function formatMacDiag(d) {
     d.listError ? `port listing error: ${d.listError}` : null,
     reopens
       ? `port lost and reopened: ${reopens.length} time${reopens.length === 1 ? '' : 's'}`
-      : 'port lost and reopened: this Mac app does not say (older than 7.191.0)',
+      : 'port lost and reopened: this computer app does not say (older than 7.191.0)',
     ...(reopens || []).map((r) => `  ${r.at} ${r.label} — ${r.reason}`),
-    ...(recent ? (recent.length ? ['', `server log, last ${recent.length} lines:`, ...recent] : ['server log: nothing said yet']) : ['server log: this Mac app does not keep one (older than 7.191.0)'])
+    ...(recent ? (recent.length ? ['', `server log, last ${recent.length} lines:`, ...recent] : ['server log: nothing said yet']) : ['server log: this computer app does not keep one (older than 7.191.0)'])
   ]
     .filter((l) => l !== null)
     .join('\n')
