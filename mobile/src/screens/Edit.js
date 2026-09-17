@@ -733,6 +733,17 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
      the fresh read `after` makes. */
   const holds = (row, col) => (getState().allBlocks || []).some((b) => b.row === row && b.col === col)
 
+  /*
+   * Where the unit has a block now, whichever row it is in.
+   *
+   * A block asked into one row and found in another is the one answer that
+   * tells a wrong row number from a write the unit ignored: both leave the
+   * cell you asked for empty, and only one of them puts the block somewhere
+   * else. So the add and the move say where the unit put it, not just that
+   * it is not where it was asked to go.
+   */
+  const placeOf = (eid) => (getState().allBlocks || []).find((b) => idOf(b) === eid) || null
+
   const add = async (row, col, page = choice) => {
     if (page === null || page === undefined) return
     setBusy(true)
@@ -744,7 +755,13 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
       await after(r)
       setAddAfter(null)
       if (!holds(row, col)) {
-        setIssue(`The unit did not add it: ${where(row, col)} is still empty${refusedAnswer(r) ? ', and the unit answered “refused”' : ''}.`)
+        const put = placeOf(Number(page))
+        logDebug('chain', `block ${page} after the add`, put ? `unit has it at ${where(put.row, put.col)}` : 'unit has it nowhere')
+        setIssue(
+          `The unit did not add it: ${where(row, col)} is still empty${refusedAnswer(r) ? ', and the unit answered “refused”' : ''}.${
+            put ? ` The unit put it at ${where(put.row, put.col)} instead.` : ''
+          }`
+        )
       }
     } catch (err) {
       endChainWrite()
@@ -836,13 +853,24 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
       const now = getState().allBlocks || []
       const colOf = (m) => now.find((b) => idOf(b) === idOf(m.block) && b.row === lane.row)?.col
       const astray = moves.filter((m) => colOf(m) !== m.to)
+      /* Not in this row is not the same as nowhere: a block the unit put in
+         another row is named with the row it went to. */
+      const elsewhere = (m) => (colOf(m) === undefined ? placeOf(idOf(m.block)) : null)
+      const found = (m) => {
+        const put = elsewhere(m)
+        return put ? `unit has it at ${where(put.row, put.col)}` : `unit has it at ${colOf(m) ?? 'nowhere'}`
+      }
       for (const m of moves) {
-        logDebug('chain', `${m.block.name}: column ${m.from} → ${m.to}`, astray.includes(m) ? `unit has it at ${colOf(m) ?? 'nowhere'}` : 'landed')
+        logDebug('chain', `${m.block.name}: column ${m.from} → ${m.to}`, astray.includes(m) ? found(m) : 'landed')
       }
       if (astray.length) {
         setIssue(
           `The unit did not keep the move: ${astray
-            .map((m) => `${m.block.name} is ${colOf(m) === undefined ? 'not in this row' : `still in column ${colOf(m) + 1}`}`)
+            .map((m) => {
+              const put = elsewhere(m)
+              if (put) return `${m.block.name} is in ${where(put.row, put.col)}`
+              return `${m.block.name} is ${colOf(m) === undefined ? 'not in this row' : `still in column ${colOf(m) + 1}`}`
+            })
             .join(', ')}. ${
             refused
               ? `The unit answered “refused” to ${refused} of the ${answers.length} steps.`

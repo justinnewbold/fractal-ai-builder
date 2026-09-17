@@ -1017,6 +1017,12 @@ export function run(test) {
     assert.match(flat, /const holds = \(row, col\) => \(getState\(\)\.allBlocks \|\| \[\]\)\.some\(\(b\) => b\.row === row && b\.col === col\)/)
     assert.match(flat, /The unit did not add it: \$\{where\(row, col\)\} is still empty/, 'an add the unit ignored is silent')
     assert.match(flat, /The unit did not remove it: \$\{where\(row, col\)\} still holds a block/, 'a remove the unit ignored is silent')
+    /* And a block the unit put somewhere else is named with where it went:
+       a wrong row number and a write the unit ignored both leave the asked
+       cell empty, and only one of them puts the block in another row. */
+    assert.match(flat, /const placeOf = \(eid\) => \(getState\(\)\.allBlocks \|\| \[\]\)\.find\(\(b\) => idOf\(b\) === eid\) \|\| null/, 'nothing looks for a block outside the row it was asked into')
+    assert.match(flat, /The unit put it at \$\{where\(put\.row, put\.col\)\} instead\./, 'an add that landed in another row is called ignored')
+    assert.match(flat, /if \(put\) return `\$\{m\.block\.name\} is in \$\{where\(put\.row, put\.col\)\}`/, 'a move that landed in another row is called "not in this row"')
     /* And the volume never writes to a block it has not found. */
     const vol = read('mobile/src/components/Volume.js').replace(/\s+/g, ' ')
     assert.equal((vol.match(/No output level to move yet — the chain is still loading\./g) || []).length, 2, 'the volume writes to block "undefined" when the Output block is not known')
