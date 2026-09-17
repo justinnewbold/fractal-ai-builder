@@ -102,13 +102,16 @@ export default function Settings({
    * and whether it answers, which Mac the phone is on, what size the tiles are.
    */
   /*
-   * Behind, or too old to say — which for this purpose is the same answer.
-   * The version only started being sent in 7.205.0, so a computer that says
-   * nothing is one from before that — or one whose app could not write it,
-   * which the Mac app now retries every few minutes.
+   * Behind only when the computer SAID a version and it is older. A computer
+   * that says nothing used to be counted as behind — "Still getting the
+   * message saying the Mac version is off, but is definitely on the right
+   * version" — and telling somebody to update an app that is current is worse
+   * than saying nothing. A missing version is its own case, said as such:
+   * the Mac app writes it every few minutes, and since 7.295.0 its own menu
+   * bar line says what the phones hear.
    */
   const demo = useDemo()
-  const behind = !hostVersion || isOlder(hostVersion, APP_VERSION) === true
+  const behind = !!hostVersion && isOlder(hostVersion, APP_VERSION) === true
 
   const [page, setPage] = useState(null)
 
@@ -271,6 +274,12 @@ export default function Settings({
                 The app on the computer is behind this one. Update it there — it is the part that
                 holds the cable to your unit, and an old one is slow here in a way that looks like
                 this app being slow.
+              </Note>
+            ) : null}
+            {link === 'connected' && !demo && !hostVersion ? (
+              <Note>
+                If the computer is on 7.295.0 or newer, its menu bar icon has a line saying what the
+                phones hear about its version, and that line says what is wrong.
               </Note>
             ) : null}
 
