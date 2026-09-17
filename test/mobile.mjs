@@ -1129,8 +1129,25 @@ export function run(test) {
        cannot pay for the gaps, and the last tile of a short row stretched the
        width of the screen. The rule being checked is the same: how many go
        across comes from the setting. */
-    assert.match(stage, /width: tileWidth\(grid, size\.scenes\)/, 'the scenes are a fixed number across whatever the setting says')
-    assert.match(stage, /width: tileWidth\(grid, size\.fx\)/, 'the chain is a fixed number across whatever the setting says')
+    assert.match(stage, /width: tileWidth\(row, size\.scenes\)/, 'the scenes are a fixed number across whatever the setting says')
+    assert.match(stage, /width: tileWidth\(row, size\.fx\)/, 'the chain is a fixed number across whatever the setting says')
+    /*
+     * And `row` is not the raw measurement, which is zero on the first frame of
+     * every mount. "After going to setlists and going back it shows this screen
+     * sized wrong for a split second" — that is what zero looks like: no width
+     * to divide, so every tile falls back to the width of the word on it and
+     * eight scenes land six across before the layout pass corrects them.
+     *
+     * The first frame uses the window less this screen's own padding, which is
+     * the same answer the measurement gives, and `onLayout` still wins the
+     * moment it lands.
+     */
+    assert.match(
+      stage,
+      /const row = grid \|\| Math\.max\(0, screen - space\.lg \* 2\)/,
+      'the tiles are drawn from a width that is zero until the screen has been measured'
+    )
+    assert.match(stage, /onLayout=\{\(e\) => setGrid\(e\.nativeEvent\.layout\.width\)\}/, 'nothing measures the row any more, so an unusual screen stays guessed at')
     assert.ok(
       !/flexGrow: 1[\s\S]{0,40}flexBasis/.test(stage),
       'a tile can grow into the spare room again, so the last one in a short row fills the screen'
@@ -2117,5 +2134,28 @@ export function run(test) {
     const stage = read('mobile/src/screens/Stage.js')
     assert.ok(!/label="Setup"/.test(stage), 'Setup is on the stage screen as well as the bar')
     assert.ok(!/onOpenSettings/.test(stage), 'the stage screen still takes a way to Setup it no longer draws')
+  })
+
+  test('the play screen carries nothing but the rig', () => {
+    /*
+     * "Get rid of the everything you change here text at the bottom of the
+     * screen."
+     *
+     * A footer explaining that changes land on the unit at the Mac. True, and
+     * the kind of sentence you read once and then scroll past for the rest of
+     * the app's life — on the one screen whose whole currency is buttons you
+     * can hit without looking. The bar at the top already says which unit is
+     * being driven and whether the link is up, which is the part that goes on
+     * being worth the room.
+     */
+    const stage = read('mobile/src/screens/Stage.js')
+    assert.ok(
+      !/Everything you change here/.test(stage),
+      'the explanation is back at the bottom of the play screen'
+    )
+    /* And nothing was left behind holding it up. An unused import is not a
+       crash, but a face with nothing wearing it is how the next one starts. */
+    assert.ok(!/const face =/.test(stage), 'the play screen still builds a font nothing uses')
+    assert.ok(!/\bmono\b/.test(stage), 'the play screen still imports a face it does not draw with')
   })
 }

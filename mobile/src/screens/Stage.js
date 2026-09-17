@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Platform, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native'
+import { RefreshControl, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native'
 import { useKeepAwake } from 'expo-keep-awake'
 
-import { color, font, mono, space, TAP } from '../lib/theme'
+import { color, font, space, TAP } from '../lib/theme'
 import { hostConflict, remoteChosenHost, remoteHosts } from '../lib/relay'
 import { idOf, presetLabel, sameBlock, sceneShape, slotCount, slotLabel, stepSlot } from '../lib/device'
 import {
@@ -38,8 +38,6 @@ import Tile from '../components/Tile'
 import Sheet from '../components/Sheet'
 import TempoBox from '../components/TempoBox'
 import Tuner from '../components/Tuner'
-
-const face = Platform.select(mono)
 
 /* Hoisted: a selector rebuilt each render re-reads the store on every notify. */
 const ofPreset = (s) => s.preset
@@ -110,6 +108,23 @@ export default function Stage({ onOpenTone, onOpenPresets, onOpenSetlists, onOpe
    * a number worth writing down twice.
    */
   const [grid, setGrid] = useState(0)
+  /*
+   * And what to draw with until the measurement lands.
+   *
+   * "After going to setlists and going back it shows this screen sized wrong
+   * for a split second." It did, every time, and on every cold start too — a
+   * screen that comes back is a screen that mounts again, so `grid` was 0 for
+   * the first frame, `tileWidth` had no width to divide, and every tile fell
+   * back to the width of the word on it. Eight scenes six across, then a jump.
+   *
+   * The honest width is no mystery: this screen is the window less its own
+   * padding, and both numbers are right here. So that is what the first frame
+   * uses, and the measurement corrects it the moment it arrives — which keeps
+   * `onLayout` the authority for anything this arithmetic cannot know about,
+   * a tablet in split view among them.
+   */
+  const { width: screen } = useWindowDimensions()
+  const row = grid || Math.max(0, screen - space.lg * 2)
   /*
    * How big the tiles are, chosen in Setup and kept under the browser's own
    * key. Read here rather than passed down, because `useStored` above already
@@ -311,7 +326,7 @@ export default function Stage({ onOpenTone, onOpenPresets, onOpenSetlists, onOpe
                   height={size.tile}
                   haptic={thud}
                   onPress={() => writeScene(i)}
-                  style={{ width: tileWidth(grid, size.scenes) }}
+                  style={{ width: tileWidth(row, size.scenes) }}
                 />
               )
             })}
@@ -383,7 +398,7 @@ export default function Stage({ onOpenTone, onOpenPresets, onOpenSetlists, onOpe
                     ? () => setPicking(picking === idOf(block) ? null : idOf(block))
                     : undefined
                 }
-                style={{ width: tileWidth(grid, size.fx) }}
+                style={{ width: tileWidth(row, size.fx) }}
               />
             )
           })}
@@ -462,10 +477,15 @@ export default function Stage({ onOpenTone, onOpenPresets, onOpenSetlists, onOpe
 
       </View>
 
-      <Text style={{ color: color.silkFaint, fontSize: font.micro, fontFamily: face }}>
-        Everything you change here happens on the unit at the Mac. Saving to a slot happens there
-        too.
-      </Text>
+      {/*
+        NO FOOTER. "Get rid of the everything you change here text at the bottom
+        of the screen."
+
+        It explained where changes land — true, and the kind of thing you read
+        once and then scroll past for the rest of the app's life. The bar at the
+        top already says which unit is being driven and that the link is up,
+        which is the part that goes on mattering.
+      */}
 
       {/*
         The two things that cover the screen rather than sitting in it, drawn
