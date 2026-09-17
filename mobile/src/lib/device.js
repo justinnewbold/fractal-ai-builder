@@ -216,6 +216,36 @@ export async function storedNames(slug) {
 }
 
 /**
+ * The scene names the computer has kept for one slot, or null.
+ *
+ * The browser writes them into the computer's store the moment it reads them —
+ * `scene-names-{unit}:{slot}` — precisely so a phone can have them without the
+ * dump. One small request; the unit is not involved.
+ */
+export async function storedSceneNames(slug, number) {
+  if (!slug || !Number.isInteger(number) || demoDevice()) return null
+  const doc = await remoteRequest(`/store/config/${encodeURIComponent(`scene-names-${slug}:${number}`)}`)
+  const data = doc && typeof doc === 'object' && 'data' in doc ? doc.data : doc
+  if (!Array.isArray(data)) return null
+  const names = data.map((n) => (typeof n === 'string' ? n.trim() : ''))
+  return names.some((n) => n) ? names : null
+}
+
+/**
+ * Give the computer a slot's scene names this phone had to read the slow way,
+ * so the next device to load the slot — this one included — gets them at once.
+ * The same document the browser writes, in the same shape. Never awaited and
+ * never fails anything: it only helps a later load.
+ */
+export function keepSceneNames(slug, number, names) {
+  if (!slug || !Number.isInteger(number) || demoDevice()) return
+  if (!Array.isArray(names) || !names.some((n) => n)) return
+  put(`/store/config/${encodeURIComponent(`scene-names-${slug}:${number}`)}`, { data: names, origin: 'fractal' }).catch(
+    () => {}
+  )
+}
+
+/**
  * Whose names these are, on disk. The demo's are kept apart from the real
  * unit's — the browser does the same — so a look around the demo never leaves
  * a made-up name over a real slot.
