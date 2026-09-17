@@ -42,6 +42,28 @@ const ofPreset = (s) => s.preset
 const ofSlug = (s) => s.deviceSlug
 
 /**
+ * Why a knob did not take, in words that say whose doing it is.
+ *
+ * "Says Time 1 didn't take when I adjusted a preset." It did not: the unit
+ * read back a different number, and on a delay the usual reason is the
+ * block's own Tempo control. Set to a note value, it holds the time to the
+ * song's tempo and the time knob is decoration — the unit accepts the write,
+ * then puts its own number back. The old message stopped at "didn't take",
+ * which reads as the app failing. Now it says what the unit is holding, and
+ * when there is a Tempo control on the block that is not at its lowest
+ * setting (None), it says that is why and what to do about it.
+ */
+const didNotTake = (p, actual, params) => {
+  const held = typeof actual === 'number' ? ` The unit is holding it at ${fmt(actual)}${p.unit ? ` ${p.unit}` : ''}.` : ''
+  const tempo = (params || []).find((q) => /^tempo$/i.test(q?.name || ''))
+  const lowest = typeof tempo?.min === 'number' ? tempo.min : 0
+  if (/time/i.test(p.name || '') && tempo && typeof tempo.value === 'number' && tempo.value > lowest) {
+    return `${p.name} didn’t take.${held} This block’s Tempo is set to a note value, so its time follows the song tempo. Set Tempo to None to set the time by hand.`
+  }
+  return `${p.name} didn’t take.${held}`
+}
+
+/**
  * A word about a model whose name says nothing.
  *
  * "In the edit menu it says Null on the current effect." It does: the Filter
@@ -371,9 +393,9 @@ function BlockPanel({ block, channels, focus, onError, onScrollLock }) {
     if (next === undefined || next === p.value) return
     try {
       const res = await setParamConfirmed(eid, p.id, next, p)
-      if (!res.ok) onError(`${p.name} didn’t take.`)
       const fresh = await blockParams(eid)
       setParams(fresh?.named || [])
+      if (!res.ok) onError(didNotTake(p, res.actual, fresh?.named || []))
       setLocal((prev) => {
         const copy = { ...prev }
         delete copy[p.id]

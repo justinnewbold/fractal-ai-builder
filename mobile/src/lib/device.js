@@ -482,9 +482,13 @@ export async function setParamConfirmed(eid, paramId, value, param) {
   const write = (continuous) =>
     put(`/preset/blocks/${eid}/params/${paramId}`, { value: norm, continuous })
 
+  /* What the unit read back last, so a write that did not take can say what
+     the unit is holding instead — which is the difference between "the app
+     is broken" and "the unit is setting this itself". */
+  let actual = null
   const landed = async () => {
     try {
-      const actual = await readParamValue(eid, paramId)
+      actual = await readParamValue(eid, paramId)
       if (typeof actual !== 'number') return false
       return Math.abs(actual - value) <= Math.max(0.05, Math.abs(value) * 0.02)
     } catch {
@@ -505,5 +509,5 @@ export async function setParamConfirmed(eid, paramId, value, param) {
     return { ok: true, continuous: !first, retried: true }
   }
 
-  return { ok: false, continuous: null, retried: true }
+  return { ok: false, continuous: null, retried: true, actual }
 }
