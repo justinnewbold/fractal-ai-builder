@@ -197,6 +197,31 @@ export async function presetName(number) {
   return { number, name: cleanPresetName(name), empty: isEmptySlotName(name) }
 }
 
+/**
+ * Every name the computer has learned for this unit, in one request.
+ *
+ * The browser at the computer reads the stored names in the background — it
+ * has the cable, and it leaves the port alone between slots — and writes the
+ * lot into the computer's own document store as `preset-names-{unit}`. That
+ * read costs the unit nothing at all: it never touches the serial port. Slot
+ * number → name, where '' is a slot the unit said is empty. Null when the
+ * computer has no list yet (an older app, or a unit it has not scanned), and
+ * in the demo, which has no computer.
+ */
+export async function storedNames(slug) {
+  if (!slug || demoDevice()) return null
+  const doc = await remoteRequest(`/store/config/preset-names-${encodeURIComponent(slug)}`)
+  const data = doc && typeof doc === 'object' && 'data' in doc ? doc.data : doc
+  return data && typeof data === 'object' && !Array.isArray(data) ? data : null
+}
+
+/**
+ * Whose names these are, on disk. The demo's are kept apart from the real
+ * unit's — the browser does the same — so a look around the demo never leaves
+ * a made-up name over a real slot.
+ */
+export const nameOwner = (slug) => (slug ? (demoDevice() ? `${slug}:demo` : slug) : null)
+
 /** Switch scenes. */
 export const setScene = (index) => post('/scene', { index })
 

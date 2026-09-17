@@ -1,6 +1,8 @@
 import { useEffect, useSyncExternalStore } from 'react'
 
-import { presetName } from './device'
+import { presetName, storedNames } from './device'
+import { cleanPresetName } from './presetName'
+import { hydrate, sync } from './store'
 
 /**
  * What every slot on the unit is called, learned a few at a time.
@@ -23,6 +25,20 @@ import { presetName } from './device'
  * half-minute while somebody is playing — work nobody can see the result of.
  * What has already been read is kept: names do not go stale, and coming back to
  * the list should not mean reading them again.
+ *
+ * AND MOST OF THEM ARE NEVER READ FROM HERE AT ALL. "When selecting presets for
+ * the first time, it scrolls through and has to load them all as you're
+ * scrolling. Is there a way we can set this to load in the background when the
+ * app is first opened so that they're all there?" There is, and it is not to
+ * have the phone read five hundred presets over the relay in the background —
+ * that is the same port everything else waits behind, and the browser at the
+ * computer has been reading them quietly for weeks. It has the cable; it leaves
+ * the port alone between slots; and it writes what it learns into the
+ * computer's own store. So the phone takes THAT, in one request that never
+ * touches the unit, the moment it connects — and keeps it on disk, so the list
+ * is full from the first frame of the next launch, before the computer has
+ * even answered. Whatever the computer has not learned yet still fills in on
+ * screen the way it always has, and is kept too.
  */
 
 /** number → name, where '' means the unit says the slot is empty. */
@@ -32,9 +48,16 @@ const asked = new Set()
 const queue = []
 let draining = false
 let failed = false
+/** The rows a screen last said were in front of somebody. Refresh re-reads these. */
+let onScreen = []
 
 /** How many mounted screens are waiting on these. Zero stops the drain. */
 let interest = 0
+
+/** The unit these names belong to. Slot 45 on an FM3 is not slot 45 on an AM4. */
+let owner = null
+/** When the computer's list was last taken, for this unit. */
+let tookHostAt = 0
 
 let revision = 0
 const watchers = new Set()
@@ -76,6 +99,7 @@ async function drain() {
       try {
         const got = await presetName(n)
         names.set(n, got.empty ? '' : got.name)
+        persist()
         announce()
       } catch {
         /*
@@ -122,9 +146,9 @@ export function want(n) {
  * not make it arrive any sooner.
  */
 export function wantOnly(list) {
+  onScreen = (list || []).filter((n) => Number.isInteger(n) && n >= 0)
   const wanted = []
-  for (const n of list || []) {
-    if (!Number.isInteger(n) || n < 0) continue
+  for (const n of onScreen) {
     if (names.has(n) || wanted.includes(n)) continue
     wanted.push(n)
   }
@@ -154,6 +178,132 @@ export const namedSlots = () =>
     .filter(([, name]) => name)
     .map(([number, name]) => ({ number, name }))
     .sort((a, b) => a.number - b.number)
+
+/** How many slots have an answer of any kind, empty ones included. */
+export const knownCount = () => names.size
+
+/**
+ * The disk copy, all units together, under the browser's key and in its shape
+ * so a person reading the log or the storage sees one thing and not two.
+ */
+const KEY = 'fractal.presetNames'
+
+const readDisk = () => {
+  try {
+    const all = JSON.parse(sync.getItem(KEY) || '{}')
+    return all && typeof all === 'object' ? all : {}
+  } catch {
+    return {}
+  }
+}
+
+let saveTimer = null
+
+/**
+ * Write what is known to disk, coalesced: a scroll learns names one at a time
+ * and this rewrites the unit's whole list.
+ */
+function persist() {
+  if (!owner) return
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    saveTimer = null
+    const all = readDisk()
+    all[owner] = { at: tookHostAt, names: Object.fromEntries(names) }
+    sync.setItem(KEY, JSON.stringify(all))
+  }, 500)
+}
+
+/** For tests: nothing left waiting to be written. */
+export const flushPersist = () => {
+  if (!saveTimer) return
+  clearTimeout(saveTimer)
+  saveTimer = null
+  const all = readDisk()
+  all[owner] = { at: tookHostAt, names: Object.fromEntries(names) }
+  sync.setItem(KEY, JSON.stringify(all))
+}
+
+/** Take the computer's list. Host wins where the two disagree: it has the cable. */
+function takeIn(doc) {
+  let changed = 0
+  for (const [key, raw] of Object.entries(doc || {})) {
+    const n = Number(key)
+    if (!Number.isInteger(n) || n < 0 || typeof raw !== 'string') continue
+    const name = cleanPresetName(raw)
+    if (names.get(n) === name) continue
+    names.set(n, name)
+    changed++
+  }
+  return changed
+}
+
+/**
+ * This unit's names: off the disk now, and the computer's copy when it answers.
+ *
+ * Called by the rig as soon as it knows which unit is on the other end. Safe to
+ * call again — reconnecting takes the computer's list again, which is one small
+ * request and the only way a name saved at the computer reaches this phone.
+ * Nothing here waits on the unit, and nothing here fails: a computer with no
+ * list, an older app, the demo, a dropped link — each of those is "what the
+ * phone already knows", which is the list it had a second ago.
+ */
+export async function adopt(slug) {
+  if (!slug) return 0
+  await hydrate()
+  if (owner !== slug) {
+    owner = slug
+    names.clear()
+    asked.clear()
+    queue.length = 0
+    failed = false
+    const kept = readDisk()[slug]
+    tookHostAt = Number(kept?.at) || 0
+    if (kept?.names) takeIn(kept.names)
+    announce()
+  }
+  return pullHost()
+}
+
+/** The computer's copy, taken in. How many names changed here. */
+async function pullHost() {
+  const slug = owner
+  let doc = null
+  try {
+    doc = await storedNames(slug)
+  } catch {
+    return 0
+  }
+  if (!doc || owner !== slug) return 0
+  tookHostAt = Date.now()
+  const changed = takeIn(doc)
+  if (changed) announce()
+  persist()
+  return changed
+}
+
+/**
+ * The Refresh button: the computer's list again, and the rows in front of you
+ * read again from the unit.
+ *
+ * Two different questions. The computer's copy is where a name saved at the
+ * computer lands, and it is free to ask for. The unit is where a name changed
+ * on the unit itself lands, and every slot of that costs a preset dump — so
+ * only what is on screen is asked, the same rule as scrolling.
+ */
+export async function refresh() {
+  const changed = await pullHost()
+  const again = onScreen.slice()
+  for (const n of again) {
+    names.delete(n)
+    asked.delete(n)
+  }
+  if (again.length) {
+    announce()
+    wantOnly(again)
+  }
+  return changed
+}
 
 /**
  * Re-render while names arrive, and keep the queue running while mounted.
@@ -190,5 +340,7 @@ export function forget() {
   asked.clear()
   queue.length = 0
   failed = false
+  owner = null
+  tookHostAt = 0
   announce()
 }

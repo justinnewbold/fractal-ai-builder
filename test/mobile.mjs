@@ -2851,6 +2851,129 @@ export function run(test) {
     }
   })
 
+  test('the preset names come from the computer in one go, and are kept on disk', async () => {
+    /*
+     * "When selecting presets for the first time, it scrolls through and has
+     * to load them all as you're scrolling. Is there a way we can set this to
+     * load in the background when the app is first opened so that they're all
+     * there?"
+     *
+     * Not by reading five hundred presets over the relay in the background:
+     * that is the port everything else waits behind, and it is what 7.268.0
+     * had to stop. The computer already reads them quietly and keeps the lot
+     * in its own store, so the phone takes that list in ONE request the moment
+     * it knows which unit it is on, and keeps it on disk for the next launch.
+     *
+     * RUN, with a fake computer and a fake disk: the module is transplanted
+     * beside stubs for the unit and the store, because the real ones drag in
+     * React Native.
+     */
+    const DEVICE = `
+      export let hostDoc = null
+      export let unitReads = []
+      export const __host = (d) => { hostDoc = d }
+      export async function storedNames(slug) {
+        if (hostDoc instanceof Error) throw hostDoc
+        return hostDoc ? hostDoc[slug] ?? null : null
+      }
+      export async function presetName(n) { unitReads.push(n); return { number: n, name: 'FROM UNIT ' + n, empty: false } }
+    `
+    const STORE = `
+      const mem = new Map()
+      export const hydrate = () => Promise.resolve()
+      export const sync = {
+        getItem: (k) => mem.has(k) ? mem.get(k) : null,
+        setItem: (k, v) => { mem.set(k, String(v)) },
+        removeItem: (k) => { mem.delete(k) }
+      }
+    `
+    const src = read('mobile/src/lib/presetNames.js')
+    const dir = mkdtempSync(join(tmpdir(), 'names-'))
+    try {
+      const moved = src
+        .replace(/'\.\/device'/, "'./device.mjs'")
+        .replace(/'\.\/store'/, "'./store.mjs'")
+        .replace(/'\.\/presetName'/, "'./presetName.mjs'")
+        .replace(/from 'react'/, "from './react.mjs'")
+      assert.doesNotMatch(moved, /'\.\/device'|'\.\/store'|'\.\/presetName'|'react'/, 'presetNames no longer imports what this stands in for')
+      /* The hook is not what is under test; React is a stub so the module
+         loads from a temp folder that has no node_modules. */
+      writeFileSync(join(dir, 'react.mjs'), 'export const useEffect = () => {}\nexport const useSyncExternalStore = () => 0\n')
+      writeFileSync(join(dir, 'device.mjs'), DEVICE)
+      writeFileSync(join(dir, 'store.mjs'), STORE)
+      writeFileSync(join(dir, 'presetName.mjs'), read('mobile/src/lib/presetName.js'))
+      writeFileSync(join(dir, 'presetNames.mjs'), moved)
+      const at = (f) => pathToFileURL(join(dir, f)).href
+      const unit = await import(at('device.mjs'))
+      const store = await import(at('store.mjs'))
+      const names = await import(at('presetNames.mjs'))
+
+      /* Last time, on this FM3, the phone had learned two names. */
+      store.sync.setItem('fractal.presetNames', JSON.stringify({ fm3: { at: 1, names: { 3: 'OLD THREE', 9: 'NINE' } } }))
+      /* And the computer has scanned the lot, with a different name for 3
+         (saved at the computer since) and an empty slot at 7. */
+      unit.__host({ fm3: { 3: 'NEW THREE', 5: 'FIVE', 7: '<EMPTY>' } })
+
+      const changed = await names.adopt('fm3')
+      assert.equal(names.nameOf(9), 'NINE', 'what the phone knew from last time is gone')
+      assert.equal(names.nameOf(3), 'NEW THREE', 'the computer is the end with the cable, and its name lost to the phone’s stale one')
+      assert.equal(names.nameOf(5), 'FIVE', 'the computer’s list was not taken')
+      assert.equal(names.nameOf(7), '', 'an empty slot from the computer does not read as empty')
+      assert.equal(changed, 3, `${changed} names changed; the computer’s three should have`)
+      assert.deepEqual(unit.unitReads, [], 'the unit was asked for names the computer already had')
+      assert.equal(names.knownCount(), 4)
+
+      /* It all went to disk, under the browser’s key. */
+      names.flushPersist()
+      const disk = JSON.parse(store.sync.getItem('fractal.presetNames'))
+      assert.deepEqual(disk.fm3.names, { 3: 'NEW THREE', 5: 'FIVE', 7: '', 9: 'NINE' }, 'the disk copy is not the whole list')
+      assert.ok(disk.fm3.at > 1, 'the disk copy does not say when the computer was last asked')
+
+      /* Rows 5 and 12 are on screen. Nothing is read: no screen is mounted,
+         so there is no interest, and that rule is tested elsewhere. */
+      names.wantOnly([5, 12])
+      await new Promise((r) => setTimeout(r, 20))
+      assert.deepEqual(unit.unitReads, [], 'the queue drained with nobody looking')
+
+      /* Refresh: the computer’s list again, and the rows on screen asked
+         again — so 5 loses its name until the unit answers, 3 keeps its. */
+      unit.__host({ fm3: { 3: 'NEW THREE', 5: 'FIVE RENAMED', 7: '<EMPTY>' } })
+      const again = await names.refresh()
+      assert.equal(again, 1, 'refresh did not take the renamed slot from the computer')
+      assert.equal(names.nameOf(5), undefined, 'a row on screen keeps its old name through a refresh instead of being asked again')
+      assert.equal(names.nameOf(12), undefined)
+      assert.equal(names.nameOf(3), 'NEW THREE', 'a row off screen was thrown away by a refresh')
+
+      /* A computer with no list — an older app, or the demo — costs nothing
+         and changes nothing. */
+      unit.__host(new Error('not found'))
+      assert.equal(await names.refresh(), 0)
+      assert.equal(names.nameOf(3), 'NEW THREE')
+
+      /* A different unit: its own names off disk, and the FM3’s put away. */
+      unit.__host(null)
+      await names.adopt('am4')
+      assert.equal(names.nameOf(3), undefined, 'an FM3 name is shown over an AM4 slot')
+      assert.equal(names.knownCount(), 0)
+      names.flushPersist()
+      const both = JSON.parse(store.sync.getItem('fractal.presetNames'))
+      assert.equal(both.fm3.names[3], 'NEW THREE', 'switching units lost the FM3’s list')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+
+    /* And it is wired: the rig adopts as soon as it knows the unit, the list
+       has a Refresh button, and says how full it is. */
+    const rig = read('mobile/src/lib/rig.js')
+    assert.match(rig, /adoptNames\(device\.nameOwner\(slug\)\)\.catch/, 'the rig never takes the computer’s list, or the demo’s names land on the real unit’s slots')
+    assert.ok(rig.indexOf('adoptNames(') < rig.indexOf('await refreshPreset()'), 'the names are taken after the slow reads instead of alongside them')
+    const dev = read('mobile/src/lib/device.js')
+    assert.match(dev, /if \(!slug \|\| demoDevice\(\)\) return null/, 'the demo asks a computer it does not have for a list')
+    const screen = read('mobile/src/screens/Presets.js')
+    assert.match(screen, /label=\{refreshing \? 'Reading…' : 'Refresh'\}/, 'there is no Refresh button')
+    assert.match(screen, /names known/, 'the list does not say how full it is')
+  })
+
   test('a dead account service is given twelve seconds, not the whole evening', async () => {
     /*
      * "I can't log into supper base anymore. It says server error, so now I

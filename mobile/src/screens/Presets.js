@@ -4,7 +4,7 @@ import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'r
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
 import { Platform } from 'react-native'
 import { slotCount, slotLabel } from '../lib/device'
-import { nameOf, namedSlots, readFailed, useNames, wantOnly } from '../lib/presetNames'
+import { knownCount, nameOf, namedSlots, readFailed, refresh, useNames, wantOnly } from '../lib/presetNames'
 import { marksFor, toggleFavourite } from '../lib/lists'
 import { useStored } from '../lib/store'
 import { loadPreset, useRig } from '../lib/rig'
@@ -76,6 +76,27 @@ export default function Presets({ onBack }) {
 
   const [query, setQuery] = useState('')
 
+  /*
+   * Refresh: the computer's list again, and the rows on screen read again.
+   *
+   * "Then we could put a button that will manually refresh them if the user
+   * wants to, if some things change." Most of the names arrive from the
+   * computer's own list the moment the phone connects (see presetNames), so
+   * this is for the day something was renamed after that. The rows on screen
+   * are the only ones re-read from the unit, because each of those is a
+   * preset dump; the computer's list is free.
+   */
+  const [refreshing, setRefreshing] = useState(false)
+  const refreshNow = useCallback(async () => {
+    if (refreshing) return
+    setRefreshing(true)
+    try {
+      await refresh()
+    } finally {
+      setRefreshing(false)
+    }
+  }, [refreshing])
+
   const rows = Array.from({ length: slots || 0 }, (_, i) => i)
   const hunting = query.trim().length > 0
   const shown = hunting
@@ -145,8 +166,26 @@ export default function Presets({ onBack }) {
         <Text accessibilityRole="header" style={{ color: color.silk, fontSize: font.title, fontWeight: '700' }}>
           Presets
         </Text>
-        <Press label="Done" height={40} onPress={onBack} />
+        <View style={{ flexDirection: 'row', gap: space.sm }}>
+          <Press label={refreshing ? 'Reading…' : 'Refresh'} height={40} onPress={refreshNow} />
+          <Press label="Done" height={40} onPress={onBack} />
+        </View>
       </View>
+
+      {/*
+        How full the list is, so "still loading" and "that slot has no name"
+        stop looking the same. Most of it arrives from the computer at once;
+        this is the line that shows it did.
+      */}
+      {slots ? (
+        <View style={{ paddingHorizontal: space.lg, paddingBottom: space.xs }}>
+          <Text style={{ color: color.silkFaint, fontSize: font.micro }}>
+            {knownCount() >= slots
+              ? `All ${slots} names known`
+              : `${knownCount()} of ${slots} names known · the rest fill in as you scroll`}
+          </Text>
+        </View>
+      ) : null}
 
       <View style={{ paddingHorizontal: space.lg, paddingBottom: space.sm }}>
         <TextInput
