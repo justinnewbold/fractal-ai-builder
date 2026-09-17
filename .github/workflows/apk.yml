@@ -1,0 +1,128 @@
+# An Android APK you can put on the phone yourself, from a link on GitHub.
+#
+# WHY THIS EXISTS BESIDE mobile.yml, which can already build for Android.
+#
+# "Android I would prefer to download directly since it will let me install it
+# directly to the phone. Can you just give me a GitHub link for the android to
+# download?" An EAS build finishes on Expo's servers behind a sign-in, and the
+# `production` profile makes an .aab — a bundle for the Play Store, which a
+# phone cannot install at all. This makes the thing a phone CAN install and
+# leaves it on a Releases page, where the link is a link and tapping it on the
+# handset is the whole of the install.
+#
+# It also costs nothing that runs out. EAS build slots are a limited, spendable
+# thing on the free plan and the iOS ones are the reason every build in this
+# repository is asked for rather than automatic. This one is an ordinary
+# ubuntu-latest runner compiling an Android project — there is no queue and no
+# quota, so it is safe to run whenever there is something worth installing.
+#
+# HOW IT IS SIGNED, which is the part that bites later rather than now.
+#
+# Android will not install an unsigned APK, and it will not UPGRADE an app
+# whose signature changed — the second install fails with a conflict and the
+# only way past it is to uninstall first, which takes the app's data with it.
+# So the key has to be the same every time.
+#
+# `expo prebuild` writes the React Native template's debug keystore into
+# android/app, byte for byte the same on every run, and the template's release
+# build is configured to use it. That is the standard arrangement for an app
+# that is sideloaded rather than published, and it is what makes one of these
+# APKs install over the last one. It is NOT good enough for the Play Store, and
+# nothing here sends it there.
+name: apk
+
+on:
+  workflow_dispatch:
+  # And on a version bump that lands on main, because an APK is only useful if
+  # it is the current app. The version job in web.yml already insists every
+  # change carries a new one, so this is one APK per merged change.
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+      - 'shared/**'
+      - 'package.json'
+      - '.github/workflows/apk.yml'
+
+# The Release is written from here, so the token needs to be able to write it.
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Java 17 rather than whatever the runner defaults to. The Android
+      # Gradle Plugin the current Expo template uses refuses anything older,
+      # and the failure it gives is a stack trace about an unsupported class
+      # file version rather than a sentence about Java.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: What version this is
+        id: v
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Install the app's own dependencies
+        working-directory: mobile
+        run: npm ci
+
+      # The android/ directory is not in the repository — this app is managed
+      # by Expo and the native project is generated from app.json. Generating
+      # it here rather than committing it means the icon, the package name and
+      # the plugins are always the ones app.json says, and nothing can drift.
+      - name: Make the native Android project
+        working-directory: mobile
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build it
+        working-directory: mobile/android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Name it after the version
+        id: apk
+        run: |
+          set -e
+          built=mobile/android/app/build/outputs/apk/release/app-release.apk
+          out="fractal-remote-v${{ steps.v.outputs.version }}.apk"
+          mv "$built" "$out"
+          echo "path=$out" >> "$GITHUB_OUTPUT"
+
+      # Two ways out, because they are for different people. The artifact is
+      # here for a run you are already looking at; the Release is the link that
+      # can be sent to a phone and tapped.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fractal-remote-apk
+          path: ${{ steps.apk.outputs.path }}
+
+      - name: Put it on the Releases page
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: apk-v${{ steps.v.outputs.version }}
+        run: |
+          set -e
+          # Re-runnable on purpose: a build repeated for the same version
+          # replaces the file rather than failing on a tag that exists.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${{ steps.apk.outputs.path }}" --clobber
+          else
+            gh release create "$TAG" "${{ steps.apk.outputs.path }}" \
+              --title "Fractal Remote v${{ steps.v.outputs.version }} (Android)" \
+              --notes "Android APK for Fractal Remote v${{ steps.v.outputs.version }}. Download it on the phone and open it; Android will ask once whether this browser may install apps. It installs over an earlier one of these without removing anything." \
+              --latest=false
+          fi
+          echo "### Install it" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "https://github.com/${{ github.repository }}/releases/download/${TAG}/${{ steps.apk.outputs.path }}" >> "$GITHUB_STEP_SUMMARY"
