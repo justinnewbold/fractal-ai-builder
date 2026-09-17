@@ -479,15 +479,42 @@ export function run(test) {
      * decides for the loaded preset.
      */
     const screen = read('mobile/src/screens/Presets.js')
+    /*
+     * The queue moved out of the screen and into lib/presetNames when a second
+     * screen needed the names — the setlist sheet shows tonight's running order
+     * by name. Two caches would ask the unit for the same slot twice, which is
+     * the thing this test exists to stop, so the check follows the queue rather
+     * than the screen it used to live in.
+     */
+    const names = read('mobile/src/lib/presetNames.js')
 
-    assert.match(screen, /queue\.current/, 'the preset list no longer queues its reads')
+    assert.match(names, /const queue = \[\]/, 'the preset names are no longer queued')
+    assert.match(
+      names,
+      /while \(queue\.length && interest > 0\)/,
+      'the name reader no longer drains one at a time while somebody is looking'
+    )
+    assert.match(
+      names,
+      /await presetName\(n\)/,
+      'the name reader no longer awaits each read before starting the next'
+    )
     assert.ok(
-      !/for\s*\([^)]*slots[^)]*\)[^{]*\{[^}]*presetName/.test(screen),
+      !/Promise\.all/.test(names),
+      'the name reader fires reads together, which queues them behind each other at the Mac'
+    )
+    assert.ok(
+      !/for\s*\([^)]*slots[^)]*\)[^{]*\{[^}]*presetName/.test(screen + names),
       'the preset list reads every slot in a loop, which makes the unit dump every preset over serial'
     )
     assert.match(
       screen,
       /onViewableItemsChanged/,
+      'the preset list no longer asks only for the rows on screen'
+    )
+    assert.match(
+      screen,
+      /want\(v\.item\)/,
       'the preset list no longer asks only for the rows on screen'
     )
 
@@ -644,12 +671,194 @@ export function run(test) {
   test('the phone stores nothing it should be asking the Mac for', () => {
     /*
      * localStorage was the wrong shape for a fact the Mac learns and the phone
-     * needs, and AsyncStorage is the same shape. Only two things are kept here:
-     * the account session, which is the account library's own business, and
-     * which Mac to drive, which is a choice about this handset.
+     * needs, and AsyncStorage is the same shape. Only two things are kept in
+     * the relay: the account session, which is the account library's own
+     * business, and which Mac to drive, which is a choice about this handset.
+     *
+     * Setlists and stars are the exception and are kept somewhere else on
+     * purpose — lib/store, under a `fractal.` prefix. They are not facts about
+     * the rig that could go stale; they are a night's running order, and the
+     * point of them is that they are the same on the phone and at the Mac,
+     * which lib/cloudSetlists sees to through the account.
      */
     const relay = read('mobile/src/lib/relay.js')
     const keys = [...relay.matchAll(/AsyncStorage\.(?:get|set)Item\(([^),]+)/g)].map((m) => m[1].trim())
     assert.deepEqual([...new Set(keys)], ['HOST_KEY'], 'the phone started keeping device state locally')
+  })
+
+  test('the phone and the Mac file a setlist under the same unit', async () => {
+    /*
+     * THE FAILURE THIS STOPS IS SILENT, which is why it is worth a test that
+     * looks slightly paranoid.
+     *
+     * Setlists and stars are kept per unit, and "per unit" means per THIS
+     * STRING. Two apps that derive it differently do not disagree loudly —
+     * each keeps a full, correct set of setlists in a bucket the other never
+     * opens. The sync between them has nothing to match on and carries
+     * nothing, and the result is a Mac with tonight's running order on it and
+     * a phone insisting there isn't one. It survives a reinstall and looks
+     * exactly like a sync that is broken.
+     *
+     * So the rule lives in shared/device-slug.mjs and neither app is allowed
+     * its own copy of it.
+     */
+    const { deviceSlug, DEFAULT_SLUG } = await import('../shared/device-slug.mjs')
+
+    assert.equal(deviceSlug({ short: 'FM3', name: 'Fractal FM3' }), 'fm3', 'the short name wins')
+    assert.equal(deviceSlug({ name: 'Axe-Fx III' }), 'axefxiii', 'punctuation is not part of the key')
+    assert.equal(deviceSlug('AM4'), 'am4', 'a label already pulled out works too')
+    /* A unit that answered without naming itself still has setlists worth
+       keeping, so the fallback is a real bucket rather than null. */
+    assert.equal(deviceSlug(null), DEFAULT_SLUG)
+    assert.equal(deviceSlug({ short: '!!!' }), DEFAULT_SLUG, 'a name with no letters is not an empty key')
+
+    const forgefx = read('src/lib/forgefx.js')
+    assert.match(forgefx, /deviceSlug\(label\)/, 'the browser stopped using the shared rule')
+    assert.ok(
+      !/toLowerCase\(\)\.replace\(\/\[\^a-z0-9\]/.test(forgefx),
+      'the browser is deriving the unit key itself again, so the two apps can drift apart'
+    )
+
+    const rig = read('mobile/src/lib/rig.js')
+    assert.match(rig, /deviceSlug\(caps\)/, 'the phone is not deriving the unit key from the shared rule')
+  })
+
+  test('a setlist decides what Previous and Next walk, through a storage that answers at once', async () => {
+    /*
+     * TWO THINGS AT ONCE, and they are the same thing.
+     *
+     * The first is the running order: inside a setlist the two buttons follow
+     * the list and WRAP, because after the last song a set comes back round to
+     * the first. Slot by slot has no such order, so it stops.
+     *
+     * The second is the reason lib/store exists. Every one of these functions
+     * is called while a screen is being drawn — `orderFor` decides what the
+     * buttons walk during the stage screen's render — so the storage they are
+     * handed has to answer immediately. AsyncStorage does not. This drives the
+     * shared module through a storage of exactly the shape lib/store presents,
+     * which is the contract that makes the phone's copy work at all.
+     */
+    const setlists = await import('../mobile/src/lib/setlists.js')
+
+    const m = new Map()
+    const store = {
+      getItem: (k) => (m.has(k) ? m.get(k) : null),
+      setItem: (k, v) => m.set(k, String(v)),
+      removeItem: (k) => m.delete(k)
+    }
+
+    /* Nothing saved reads as nothing, not as an error — which is also what a
+       store that has not finished reading the disk yet answers. */
+    assert.deepEqual(setlists.listsFor('fm3', store), [])
+    assert.equal(setlists.sourceFor('fm3', store), setlists.ALL)
+    assert.equal(setlists.orderFor(setlists.ALL, {}), null, 'slot by slot is not an order')
+
+    const list = setlists.createList('fm3', 'Friday', store)
+    setlists.updateList('fm3', list.id, { presets: [10, 20, 30] }, store)
+    setlists.setSource('fm3', list.id, store)
+
+    assert.equal(setlists.sourceFor('fm3', store), list.id)
+    assert.equal(setlists.sourceLabel(list.id, { lists: setlists.listsFor('fm3', store) }), 'Friday')
+
+    const lists = setlists.listsFor('fm3', store)
+    const step = (current, delta) => setlists.stepTarget({ source: list.id, current, delta, lists })
+    assert.equal(step(10, 1), 20)
+    assert.equal(step(30, 1), 10, 'the last song of a set does not come back round to the first')
+    assert.equal(step(10, -1), 30, 'Previous from the first song does not reach the last')
+    /* On a preset that is not in the list at all, Next is the first song —
+       which is what somebody choosing a setlist mid-song wanted anyway. */
+    assert.equal(step(415, 1), 10)
+    assert.equal(setlists.positionIn([10, 20, 30], 20), 2)
+
+    /* And an empty list is a button with nothing to do, not a button that
+       guesses. */
+    setlists.updateList('fm3', list.id, { presets: [] }, store)
+    const empty = setlists.listsFor('fm3', store)
+    assert.equal(setlists.stepTarget({ source: list.id, current: 10, delta: 1, lists: empty }), null)
+  })
+
+  test('no screen on the phone reads a setlist without being told where the bytes are', () => {
+    /*
+     * The shared modules take their storage as a last argument so the browser
+     * can hand them localStorage. A call on the phone that forgets it does not
+     * throw — the module falls back to `localStorage`, there isn't one, and it
+     * reads as "nothing saved". An empty setlist and a setlist nobody looked up
+     * are the same picture, on the one screen where being wrong costs a song.
+     *
+     * So every screen goes through lib/lists, which binds the storage once.
+     */
+    const offenders = []
+    for (const file of walk(new URL('../mobile/src/screens/', import.meta.url))) {
+      const text = readFileSync(file, 'utf8')
+      if (/from '\.\.\/lib\/(setlists|presetMarks|setlistMerge)'/.test(text)) {
+        offenders.push(file.split('/mobile/').pop())
+      }
+    }
+    assert.deepEqual(
+      offenders,
+      [],
+      'a screen is calling the shared setlist module directly, so it will read an empty storage on a phone'
+    )
+
+    const lists = read('mobile/src/lib/lists.js')
+    assert.match(lists, /import \{ sync \} from '\.\/store'/, 'lib/lists is not binding the phone storage')
+    assert.match(lists, /listsForIn\(device, sync\)/, 'lib/lists is not handing the storage down')
+  })
+
+  test('Previous and Next on the phone follow the setlist, and the SOURCE button says which', () => {
+    /*
+     * "Hitting next or previous cycles through songs on the favorites or
+     * setlists." The phone's two buttons walked slot numbers, which is the
+     * unit's order and never the night's.
+     *
+     * Both halves matter and the second is the one that goes wrong quietly: a
+     * button that STEPS by the setlist but is greyed out by the slot rule
+     * refuses the wrap at the end of a set, so the last song of the night has
+     * a dead Next.
+     */
+    const stage = read('mobile/src/screens/Stage.js')
+
+    assert.match(stage, /stepTarget\(\{ source, current: preset\?\.number/, 'the phone still steps slot by slot')
+    assert.match(stage, /disabled=\{landing\(-1\) === null\}/, 'Previous is greyed out by a different rule than it steps by')
+    assert.match(stage, /disabled=\{landing\(1\) === null\}/, 'Next is greyed out by a different rule than it steps by')
+    assert.ok(
+      !/disabled=\{stepSlot\(/.test(stage),
+      'a step button is still greyed out by the slot rule, so a setlist cannot wrap at the end of the night'
+    )
+
+    /* The button between them, and the word above it: a lone "All" reads as a
+       caption rather than as the thing that decides what the other two do. */
+    assert.match(stage, /caption="Source"/, 'nothing on the stage screen says what the buttons walk')
+    assert.match(stage, /onPress=\{onOpenSetlists\}/, 'the source button does not open anything')
+    assert.match(read('mobile/App.js'), /screen === 'setlists'/, 'there is no setlist screen to open')
+  })
+
+  test('which setlist survives a sync is decided in one place, not two', () => {
+    /*
+     * The merge is the part that can lose somebody's work: a running order
+     * built at the Mac on Tuesday and a star tapped on the phone on Wednesday
+     * have to both survive meeting each other. Two apps merging by their own
+     * rules would not argue — they would take turns overwriting, and the
+     * setlist that went missing would look like one nobody saved.
+     *
+     * So the deciding is shared and only the network is not. The generated copy
+     * is checked character for character elsewhere; this checks the phone did
+     * not grow its own opinion beside it.
+     */
+    const phone = read('mobile/src/lib/cloudSetlists.js')
+    assert.match(phone, /from '\.\/setlistMerge'/, 'the phone is not using the shared merge')
+    assert.ok(
+      !/function mergeUnits?\b/.test(phone),
+      'the phone has its own merge, so the two apps can disagree about whose setlist survives'
+    )
+    /* And the recent list stays on the device that played it, both ends. */
+    assert.ok(!/\brecent\b\s*[:,]/.test(read('mobile/src/lib/setlistMerge.js')), 'the recent list is being synced between devices')
+
+    const web = read('src/lib/cloudSetlists.js')
+    assert.match(web, /from '\.\/setlistMerge\.js'/, 'the browser is not using the shared merge either')
+    assert.ok(
+      !/function mergeUnits?\b/.test(web),
+      'the browser kept a second copy of the merge'
+    )
   })
 }

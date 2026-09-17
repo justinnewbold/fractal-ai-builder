@@ -74,7 +74,57 @@ export const FILES = [
    * screens, and the rule that keeps the instance number only when it is not 1
    * is not one anybody would reinvent identically.
    */
-  { source: '../src/lib/shortName.js', target: '../mobile/src/lib/shortName.js' }
+  { source: '../src/lib/shortName.js', target: '../mobile/src/lib/shortName.js' },
+  /*
+   * What Previous and Next step through, and which presets are starred.
+   *
+   * Shared rather than rewritten because the DECIDING is identical and the
+   * cost of disagreeing is a set played in the wrong order. Both modules take
+   * their storage as an argument — the browser hands them localStorage, the
+   * phone hands them lib/store.js, which is the same shape over AsyncStorage —
+   * so the only thing that differs between the two apps is where the bytes
+   * live, which is the one thing that should differ.
+   *
+   * They also carry the merge these two copies meet in: a setlist built at the
+   * Mac has to arrive on the phone as the same list, by the same rules, or the
+   * sync is just two apps overwriting each other.
+   */
+  { source: '../src/lib/setlists.js', target: '../mobile/src/lib/setlists.js' },
+  { source: '../src/lib/presetMarks.js', target: '../mobile/src/lib/presetMarks.js' },
+  { source: '../src/lib/presetName.js', target: '../mobile/src/lib/presetName.js' },
+  /*
+   * And the key those two file everything under.
+   *
+   * Setlists are kept per unit, so the string naming the unit IS the join
+   * between the Mac's copy and the phone's. Two apps deriving it differently
+   * would not argue — they would each keep a full, correct set of setlists in
+   * a bucket the other never looks in, which reads as a sync that quietly
+   * carries nothing.
+   */
+  { source: '../shared/device-slug.mjs', target: '../mobile/src/lib/device-slug.js' },
+  /*
+   * How a slot is written down. The AM4 numbers its 104 presets in lettered
+   * banks and says so on its own front panel; gen-3 units simply number theirs.
+   * A setlist row reading "045 A02" on the Mac and "45" on the phone is the
+   * same song described two ways to somebody checking the running order in the
+   * dark, and slotCount is here too so neither app invents slots the unit does
+   * not have.
+   */
+  { source: '../src/lib/slots.js', target: '../mobile/src/lib/slots.js' },
+  /*
+   * And how two copies of a stage become one.
+   *
+   * This is the file that can lose somebody's work: a running order built at
+   * the Mac on Tuesday and a star tapped on the phone on Wednesday have to both
+   * survive meeting each other. Two apps merging by their own rules would not
+   * argue — they would take turns overwriting, and the setlist that went
+   * missing would look like a setlist nobody saved.
+   *
+   * The network is NOT in here. Each app keeps its own twenty lines of
+   * Supabase and hands them to syncStage, because the two reach Supabase
+   * through different modules and that difference is harmless.
+   */
+  { source: '../src/lib/setlistMerge.js', target: '../mobile/src/lib/setlistMerge.js' }
 ]
 
 /** Where a copy says it came from, so nobody edits the copy by mistake. */

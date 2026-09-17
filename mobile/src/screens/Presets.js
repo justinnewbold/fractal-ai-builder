@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, FlatList, Text, TextInput, View } from 'react-native'
+import { useCallback, useRef, useState } from 'react'
+import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'react-native'
 
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
 import { Platform } from 'react-native'
-import { presetName, slotCount } from '../lib/device'
+import { slotCount, slotLabel } from '../lib/device'
+import { nameOf, namedSlots, readFailed, useNames, want } from '../lib/presetNames'
+import { marksFor, toggleFavourite } from '../lib/lists'
+import { useStored } from '../lib/store'
 import { loadPreset, useRig } from '../lib/rig'
-import { thud } from '../lib/feedback'
+import { thud, tick } from '../lib/feedback'
 import Note from '../components/Note'
 import Press from '../components/Press'
 
@@ -13,6 +16,7 @@ const face = Platform.select(mono)
 
 const ofPreset = (s) => s.preset
 const ofCaps = (s) => s.capabilities
+const ofSlug = (s) => s.deviceSlug
 
 /**
  * Every slot on the unit, by name, so you can get to one.
@@ -32,74 +36,43 @@ const ofCaps = (s) => s.capabilities
  * So the list draws immediately with numbers, and names fill in for the rows
  * actually on screen, a few at a time. Scrolling asks for more. A row whose
  * name has not arrived yet is not blank — it says its number, which is what it
- * had before and is never wrong.
+ * had before and is never wrong. The reading itself lives in lib/presetNames,
+ * shared with the setlist sheet so the same slot is never read twice.
  *
- * ONE READ AT A TIME, deliberately. The relay is a single channel to one Mac
- * holding one serial port, and firing twenty reads at it does not make the unit
- * answer faster — it makes the queue longer and the tuner, the scene change and
- * everything else on that channel wait behind them.
+ * THE STAR is the second thing this list does. Starred presets are one of the
+ * three things Previous and Next can walk, and the star belongs where you are
+ * looking at the preset — so it is the right-hand end of every row, on its own
+ * target, away from the part of the row that loads the preset.
  */
 export default function Presets({ onBack }) {
   const preset = useRig(ofPreset)
   const caps = useRig(ofCaps)
+  const device = useRig(ofSlug)
   const slots = slotCount(caps)
+  const addressing = caps?.presets?.addressing
 
-  const [names, setNames] = useState({})
-  const [failed, setFailed] = useState(false)
+  /* Re-renders as names land, and keeps the reading queue draining. */
+  useNames()
+  /* Re-renders when a star is pressed — here or on the setlist sheet. */
+  useStored()
+  const favourites = marksFor(device).favourites
+
   const [query, setQuery] = useState('')
-
-  /* Slots asked for, so a row scrolled past twice is not read twice. */
-  const asked = useRef(new Set())
-  /* The queue, and whether it is draining. */
-  const queue = useRef([])
-  const draining = useRef(false)
-  const alive = useRef(true)
-  useEffect(() => () => { alive.current = false }, [])
-
-  const drain = useCallback(async () => {
-    if (draining.current) return
-    draining.current = true
-    try {
-      while (queue.current.length && alive.current) {
-        const n = queue.current.shift()
-        try {
-          const got = await presetName(n)
-          if (!alive.current) return
-          setNames((was) => ({ ...was, [n]: got.empty ? '' : got.name }))
-        } catch {
-          /*
-           * One slot failing is one slot. A unit that has gone will fail every
-           * one of them, and the note below says so once rather than per row —
-           * but the list keeps working for the slots already named.
-           */
-          if (alive.current) setFailed(true)
-        }
-      }
-    } finally {
-      draining.current = false
-    }
-  }, [])
-
-  const want = useCallback(
-    (n) => {
-      if (asked.current.has(n)) return
-      asked.current.add(n)
-      queue.current.push(n)
-      drain()
-    },
-    [drain]
-  )
 
   const rows = Array.from({ length: slots || 0 }, (_, i) => i)
   const hunting = query.trim().length > 0
   const shown = hunting
     ? rows.filter((n) => {
-        const name = names[n]
+        const name = nameOf(n)
         const q = query.trim().toLowerCase()
         if (String(n).includes(q)) return true
         return typeof name === 'string' && name.toLowerCase().includes(q)
       })
     : rows
+
+  const seen = useCallback(({ viewableItems }) => {
+    for (const v of viewableItems) if (typeof v.item === 'number') want(v.item)
+  }, [])
 
   return (
     <View style={{ flex: 1 }}>
@@ -139,7 +112,7 @@ export default function Presets({ onBack }) {
         />
       </View>
 
-      {failed ? (
+      {readFailed() ? (
         <View style={{ paddingHorizontal: space.lg, paddingBottom: space.sm }}>
           <Note tone="warn">
             The unit stopped answering while we were reading names. The slots already listed are
@@ -157,7 +130,7 @@ export default function Presets({ onBack }) {
       {hunting ? (
         <View style={{ paddingHorizontal: space.lg, paddingBottom: space.sm }}>
           <Text style={{ color: color.silkDim, fontSize: font.micro }}>
-            Searching the names read so far. Scroll the full list to read more.
+            Searching the {namedSlots().length} names read so far. Scroll the full list to read more.
           </Text>
         </View>
       ) : null}
@@ -168,25 +141,32 @@ export default function Presets({ onBack }) {
         contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space.xxl, gap: space.sm }}
         initialNumToRender={20}
         windowSize={5}
-        onViewableItemsChanged={useRef(({ viewableItems }) => {
-          for (const v of viewableItems) if (typeof v.item === 'number') want(v.item)
-        }).current}
+        onViewableItemsChanged={seen}
         viewabilityConfig={useRef({ itemVisiblePercentThreshold: 10 }).current}
         renderItem={({ item: n }) => {
-          const name = names[n]
+          const name = nameOf(n)
           const here = n === preset?.number
+          const starred = favourites.includes(n)
           return (
-            <Press
-              label={typeof name === 'string' ? (name || 'Empty') : `Slot ${n}`}
-              sub={String(n)}
-              tone="signal"
-              on={here}
-              haptic={thud}
-              onPress={async () => {
-                await loadPreset(n)
-                onBack?.()
-              }}
-            />
+            <View style={{ flexDirection: 'row', gap: space.sm }}>
+              <Press
+                grow
+                label={typeof name === 'string' ? (name || 'Empty') : `Slot ${slotLabel(n, addressing)}`}
+                sub={slotLabel(n, addressing)}
+                tone="signal"
+                on={here}
+                haptic={thud}
+                onPress={async () => {
+                  await loadPreset(n)
+                  onBack?.()
+                }}
+              />
+              <Star
+                on={starred}
+                label={`${starred ? 'Unstar' : 'Star'} ${name || `slot ${slotLabel(n, addressing)}`}`}
+                onPress={() => toggleFavourite(device, n)}
+              />
+            </View>
           )
         }}
         ListEmptyComponent={
@@ -200,5 +180,41 @@ export default function Presets({ onBack }) {
         }
       />
     </View>
+  )
+}
+
+/**
+ * The star at the end of a row.
+ *
+ * Its own target rather than a corner of the preset button, because the two do
+ * opposite things: one loads a preset and one does not, and a mis-hit while
+ * building a setlist between songs would change what the unit is playing.
+ */
+function Star({ on, label, onPress }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: on }}
+      accessibilityLabel={label}
+      onPress={() => {
+        tick()
+        onPress()
+      }}
+      style={({ pressed }) => ({
+        width: TAP,
+        minHeight: TAP,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: radius.md,
+        borderWidth: 1,
+        borderColor: on ? color.signal : color.rule,
+        backgroundColor: color.panel,
+        opacity: pressed ? 0.7 : 1
+      })}
+    >
+      <Text style={{ color: on ? color.signal : color.silkFaint, fontSize: font.title, fontFamily: face }}>
+        {on ? '★' : '☆'}
+      </Text>
+    </Pressable>
   )
 }

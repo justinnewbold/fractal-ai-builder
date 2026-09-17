@@ -23,9 +23,11 @@ import { toNormalized } from './scale'
 
 export {
   EXCLUDED_BLOCKS,
+  isBanked,
   presetLabel,
   sceneShape,
   slotCount,
+  slotLabel,
   stepSlot
 } from './unit.mjs'
 import { EXCLUDED_BLOCKS } from './unit.mjs'
