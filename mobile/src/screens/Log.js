@@ -6,6 +6,7 @@ import { color, font, mono, radius, space } from '../lib/theme'
 import { clearDebugLog, formatDebugLog, formatLine, getDebugLog, onDebugLog } from '../lib/debugLog'
 import { APP_VERSION } from '../lib/version'
 import { linkState } from '../lib/link'
+import { lastRun } from '../lib/logKeep'
 import { useRig } from '../lib/rig'
 import Note from '../components/Note'
 import Press from '../components/Press'
@@ -46,6 +47,21 @@ export default function Log({ onBack }) {
 
   useEffect(() => onDebugLog(() => setLines(getDebugLog())), [])
 
+  /*
+   * And what the run before this one had to say.
+   *
+   * The whole reason this exists: the run that needs reading is the one that
+   * ended, and until now it took its log with it.
+   */
+  const [before, setBefore] = useState(null)
+  useEffect(() => {
+    let alive = true
+    lastRun().then((held) => alive && setBefore(held))
+    return () => {
+      alive = false
+    }
+  }, [])
+
   useEffect(() => {
     if (!said) return undefined
     const t = setTimeout(() => setSaid(null), 3000)
@@ -68,7 +84,19 @@ export default function Log({ onBack }) {
        */
       'computer app': link.hostVersion || 'did not say (older than 7.192.0)',
       link: link.link
-    })
+    },
+    /*
+     * The previous run's tail goes in the same paste, under its own heading.
+     * If this launch is the one AFTER a crash, that block is the crash — and
+     * it is the half somebody actually needs.
+     */
+    before
+      ? [
+          `THE RUN BEFORE THIS ONE — ${before.lines.length} lines, oldest first`,
+          '(if the app crashed or was killed, this is what it said on the way)',
+          ...before.lines
+        ].join('\n')
+      : '')
     try {
       await Clipboard.setStringAsync(text)
       setSaid(`Copied ${lines.length} line${lines.length === 1 ? '' : 's'}. Paste it into the chat.`)
@@ -93,7 +121,9 @@ export default function Log({ onBack }) {
             Help & fixes
           </Text>
           <Text style={{ color: color.silkDim, fontSize: font.small }}>
-            {`${lines.length} line${lines.length === 1 ? '' : 's'} in the log`}
+            {`${lines.length} line${lines.length === 1 ? '' : 's'} in the log${
+              before ? ` · ${before.lines.length} kept from the run before` : ''
+            }`}
           </Text>
         </View>
         <Press label="Done" height={40} onPress={onBack} />
@@ -102,7 +132,12 @@ export default function Log({ onBack }) {
       <View style={{ paddingHorizontal: space.lg, gap: space.sm, paddingBottom: space.sm }}>
         <Press
           label="Copy the log"
-          sub="Then paste it into the chat"
+          /*
+            Named on the button, because it is the reason to press it after a
+            crash: the copy carries the end of the previous run as well as this
+            one, and after a crash that block is the crash.
+          */
+          sub={before ? 'This run and the one before it' : 'Then paste it into the chat'}
           tone="signal"
           onPress={copy}
           disabled={!lines.length}

@@ -39,9 +39,27 @@ let interest = 0
 let revision = 0
 const watchers = new Set()
 
+/*
+ * ONE RE-RENDER FOR A BURST OF NAMES, not one per name.
+ *
+ * Every screen watching this is a list of five hundred rows, and a name
+ * arriving used to redraw the lot. Twenty names is twenty full passes over
+ * five hundred rows, on the thread that also has to answer a finger — which on
+ * a phone is not slowness, it is the watchdog deciding the app is wedged.
+ *
+ * The count still moves the instant a name lands, so nothing READS stale; only
+ * the telling-everybody is held to one turn of the clock.
+ */
+let telling = false
+
 const announce = () => {
   revision += 1
-  for (const fn of watchers) fn()
+  if (telling) return
+  telling = true
+  setTimeout(() => {
+    telling = false
+    for (const fn of watchers) fn()
+  }, 120)
 }
 
 const subscribe = (fn) => {
@@ -81,6 +99,41 @@ export function want(n) {
   if (!Number.isInteger(n) || n < 0 || asked.has(n)) return
   asked.add(n)
   queue.push(n)
+  drain()
+}
+
+/**
+ * Ask for THESE slots and give up on anything else still waiting.
+ *
+ * THE BUG THIS EXISTS FOR made the app unusable and then killed it. Every row
+ * that scrolled past was queued, and nothing ever took one back — so a flick
+ * from slot 0 to slot 512 queued five hundred reads, each one of which makes
+ * the unit dump that preset off its own hardware, down the one serial port
+ * everything else waits behind. Ten to twenty minutes of solid reading, during
+ * which the chain, the scene and the tuner are all behind it, for names of
+ * slots nobody is looking at any more.
+ *
+ * The rule now: what is on screen is what is worth asking for. Scrolling past a
+ * row is not a request, it is a row going by. Anything queued and no longer
+ * visible is handed back — including its place in `asked`, so landing there
+ * later asks properly rather than waiting on a read that was thrown away.
+ *
+ * The one already on the wire is left alone. It is paid for; dropping it would
+ * not make it arrive any sooner.
+ */
+export function wantOnly(list) {
+  const wanted = []
+  for (const n of list || []) {
+    if (!Number.isInteger(n) || n < 0) continue
+    if (names.has(n) || wanted.includes(n)) continue
+    wanted.push(n)
+  }
+  for (const n of queue.splice(0)) asked.delete(n)
+  for (const n of wanted) {
+    if (asked.has(n)) continue
+    asked.add(n)
+    queue.push(n)
+  }
   drain()
 }
 

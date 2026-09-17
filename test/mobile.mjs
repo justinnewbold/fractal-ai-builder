@@ -539,11 +539,19 @@ export function run(test) {
       /onViewableItemsChanged/,
       'the preset list no longer asks only for the rows on screen'
     )
+    /*
+     * AND IT GIVES BACK WHAT SCROLLED PAST. Asking for every row it ever saw
+     * and never taking one back is what made the app unusable and then killed
+     * it: a flick from slot 0 to 512 queued five hundred preset dumps at the
+     * unit, ten to twenty minutes of solid reading, with the chain, the scene
+     * and the tuner all waiting behind them for names nobody was looking at.
+     */
     assert.match(
-      screen,
-      /want\(v\.item\)/,
-      'the preset list no longer asks only for the rows on screen'
+      screen.replace(/\s+/g, ' '),
+      /wantOnly\(viewableItems\.map\(\(v\) => v\.item\)/,
+      'the preset list queues every row it scrolls past and never takes one back'
     )
+    assert.match(names, /for \(const n of queue\.splice\(0\)\) asked\.delete\(n\)/, 'rows that scrolled off are left queued at the unit')
 
     /* And the device call itself agrees with the header about an empty slot. */
     const device = read('mobile/src/lib/device.js')
@@ -2574,5 +2582,66 @@ export function run(test) {
     assert.equal(isOlder(null, '7.265.0'), null, 'a version nobody sent is being treated as a number')
     assert.equal(isOlder('v7.265.0', '7.265.0'), null, 'a version this cannot parse still gets an opinion')
     assert.equal(isOlder('7.265', '7.265.0'), null)
+  })
+
+  test('the log survives the run that needed reading', () => {
+    /*
+     * "It crashes within a few minutes and is virtually unusable. I can't get
+     * to the log before it crashes. Here are the few screen shots I could take
+     * before the crash each time."
+     *
+     * Screenshots and a guess, for the second time. The log has been in memory
+     * only, which means the one run worth reading — the one that ended — took
+     * its log with it, every time.
+     *
+     * NOT A CRASH HANDLER, deliberately: one that writes on the way down
+     * usually does not finish, and the death that matters most here is iOS
+     * killing an app it has decided is wedged, which runs no JavaScript at all
+     * on its way out. Written as it goes, it survives anything.
+     */
+    const keep = read('mobile/src/lib/logKeep.js')
+    assert.match(keep, /const TAIL = 120/, 'the whole log is being written on every change')
+    assert.match(keep, /setTimeout\(write, EVERY_MS\)/, 'a line is written to disk per line, which is the cost this app already died of once')
+    assert.match(keep, /getDebugLog\(\)\.slice\(-TAIL\)/, 'the start of the log is kept rather than the end, which is the half that matters')
+
+    /* Started at launch, before anything else can go wrong. */
+    assert.match(read('mobile/App.js'), /useEffect\(\(\) => keepLog\(\), \[\]\)/, 'nothing starts keeping the log')
+
+    /* And it reaches the paste, which is the only route it has to a chat. */
+    const log = read('mobile/src/screens/Log.js').replace(/\s+/g, ' ')
+    assert.match(log, /THE RUN BEFORE THIS ONE/, 'the copied log does not carry the previous run')
+    assert.match(log, /lastRun\(\)\.then/, 'the previous run is never read back')
+  })
+
+  test('scrolling the preset list does not queue five hundred reads at the unit', () => {
+    /*
+     * THIS IS WHAT MADE IT UNUSABLE, and it is worth its own check because
+     * nothing about it looks wrong until you count.
+     *
+     * Every row that scrolled past was asked for and nothing was ever taken
+     * back. A flick from slot 0 to slot 512 queued five hundred reads — each
+     * one making the unit dump that preset off its own hardware, down the one
+     * serial port the chain, the scene and the tuner all wait behind. Ten to
+     * twenty minutes of solid reading for names nobody was looking at any more.
+     *
+     * And every name that landed redrew a five-hundred-row list, on the thread
+     * that also has to answer a finger.
+     */
+    const names = read('mobile/src/lib/presetNames.js')
+
+    /* What is on screen is what is worth asking for. */
+    assert.match(names, /export function wantOnly\(list\)/, 'there is no way to ask for only what is visible')
+    assert.match(names, /for \(const n of queue\.splice\(0\)\) asked\.delete\(n\)/, 'rows that scrolled off stay queued at the unit')
+    /* Given back properly: a slot dropped from the queue has to leave `asked`
+       too, or landing on it later waits forever on a read that was thrown. */
+    const drop = names.indexOf('queue.splice(0)) asked.delete(n)')
+    assert.ok(drop > 0 && names.slice(drop, drop + 400).includes('asked.add(n)'), 'a dropped slot is never asked for again')
+
+    /* One re-render for a burst, not one per name. */
+    assert.match(names.replace(/\s+/g, ' '), /let telling = false const announce = \(\) => \{ revision \+= 1 if \(telling\) return/, 'every name that lands redraws every watching screen')
+
+    /* Still one read at a time: firing them together does not make the unit
+       answer faster, it makes the queue longer. */
+    assert.match(names, /if \(draining\) return/, 'name reads can now overlap at the unit')
   })
 }

@@ -22,6 +22,7 @@ import { loadPlayMode, toneWayIn } from './src/lib/playMode'
 import { hydrate } from './src/lib/store'
 import { keepSetlistsInStep } from './src/lib/cloudSetlists'
 import { useRig } from './src/lib/rig'
+import { keepLog } from './src/lib/logKeep'
 import { AI, BENCH } from './src/lib/features'
 
 /**
@@ -102,6 +103,15 @@ export default function App() {
   useEffect(() => {
     hydrate()
   }, [])
+
+  /*
+   * Keep the end of this run on disk from the first frame.
+   *
+   * "It crashes within a few minutes and is virtually unusable. I can't get to
+   * the log before it crashes." A log that only lives in memory is a log you
+   * cannot read about the run that ended — which is every run worth reading.
+   */
+  useEffect(() => keepLog(), [])
 
   useEffect(() => {
     /* Nothing to hide with the AI off, and asking costs a read of storage on
