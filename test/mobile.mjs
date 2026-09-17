@@ -900,6 +900,119 @@ export function run(test) {
     assert.equal(rules.forbiddenRemotely('POST', '/mod/bind'), null)
   })
 
+  test('both apps count grid columns the same way, and never twice', async () => {
+    /*
+     * THE TRAP, AND IT HAS ALREADY SPRUNG ONCE. Reads report a block's column
+     * counting from zero; the write routes take it counting from one. The old
+     * panel added one of its own for a linear unit and then the wire added
+     * another, so slot 1 on an AM4 was written to column 2 — and the cells it
+     * drew could never line up with the blocks the unit reported.
+     *
+     * This is worse to get wrong than a knob. A value written to the wrong
+     * place sounds wrong and is one drag from right; a block placed in the
+     * wrong cell is a preset somebody has to rebuild. And two apps would not
+     * argue about it — one of them would simply put things one column along.
+     */
+    const grid = await import('../mobile/src/lib/grid-plan.js')
+    const web = await import('../shared/grid-plan.mjs')
+
+    assert.deepEqual(grid.toWireCell(1, 0), { row: 1, col: 1 }, 'the first column is not column one on the wire')
+    assert.deepEqual(grid.toWireCell(2, 5), { row: 2, col: 6 }, 'rows are being shifted as well as columns')
+    assert.deepEqual(grid.toWireCell(1, 0), web.toWireCell(1, 0), 'the two apps disagree about the wire boundary')
+
+    /* And the phone adds it exactly once, at the boundary and nowhere else. */
+    const device = read('mobile/src/lib/device.js')
+    assert.match(device, /put\('\/preset\/grid\/cell', \{ \.\.\.toWireCell\(row, col\), blockId \}\)/)
+    const editor = read('mobile/src/screens/Edit.js')
+    assert.ok(
+      !/col \+ 1|colLabel\(col\) \+ 1/.test(editor.replace(/\/\*[\s\S]*?\*\//g, ' ')),
+      'the chain editor is adding a column of its own on top of the wire boundary'
+    )
+
+    /* A linear unit has one row of its own slots; a grid unit has its grid. */
+    assert.deepEqual(grid.gridShape({ slotModel: 'linear', slotCount: 4 }), { linear: true, rows: 1, cols: 4 })
+    assert.deepEqual(grid.gridShape({ grid: { rows: 4, cols: 14 } }), { linear: false, rows: 4, cols: 14 })
+
+    /* Cables start at the first column and stop at the last one with a next.
+       Asking for a cable out of the input was refused on every single build. */
+    assert.deepEqual(grid.cableColumns(3), [0, 1, 2, 3])
+    assert.equal(grid.cableColumns(99).at(-1), 12)
+    assert.ok(!grid.cableColumns(5).includes(-1))
+  })
+
+  test('a chain drawn on a phone shows what is there, and the gaps between', async () => {
+    /*
+     * The browser drew forty-eight cells of which five held anything: on a
+     * phone that is three cells visible and a scroll to find the one you want.
+     * "The rest you can't really add anything or change anything… let's rethink
+     * that whole thing."
+     *
+     * A lane is the row as a CHAIN — what is in it, in signal order, with the
+     * free cells shown as gaps you can tap. Nothing hidden, nothing drawn that
+     * isn't there.
+     */
+    const { lanesShown, laneItems } = await import('../mobile/src/lib/grid-plan.js')
+    const caps = { grid: { rows: 4, cols: 4 } }
+    const blocks = [
+      { row: 1, col: 2, name: 'Amp 1' },
+      { row: 1, col: 0, name: 'Drive 1' }
+    ]
+
+    const lanes = lanesShown(blocks, caps)
+    /* The row that holds something, plus the first empty one — so a bare preset
+       can be started and a parallel row can be begun. Not all four. */
+    assert.equal(lanes.length, 2, 'every row of the grid is drawn, empty or not')
+    assert.deepEqual(lanes[0].blocks.map((b) => b.name), ['Drive 1', 'Amp 1'], 'a lane is not in signal order')
+    assert.deepEqual(lanes[0].gaps, [1, 3], 'the free cells in a lane are wrong')
+
+    const items = laneItems(lanes[0])
+    assert.deepEqual(
+      items.map((i) => `${i.kind}${i.col}`),
+      ['block0', 'gap1', 'block2', 'gap3'],
+      'the cards and gaps do not read as one chain in column order'
+    )
+
+    /* A preset with nothing in it still offers somewhere to start. */
+    assert.equal(lanesShown([], caps).length, 1)
+  })
+
+  test('a write the unit calls refused is never undone by the phone', () => {
+    /*
+     * THE BUG THIS PANEL WAS REPORTED FOR, in the browser: "delete works, the
+     * rest doesn't." The AM4 answers `ok:false` to writes that actually landed,
+     * and the old editor took it at its word — so a move that had worked was
+     * rolled straight back.
+     *
+     * So the answer is SAID and never acted on, and the chain is re-read from
+     * the unit so somebody can see which it was.
+     *
+     * The rollback that remains is for a throw — a real transport failure — and
+     * only on the move, whose block would otherwise exist nowhere: it is
+     * cleared from its old cell before being placed in the new one, because a
+     * block instance exists once and placing it twice is a question this does
+     * not want to ask.
+     */
+    const editor = read('mobile/src/screens/Edit.js')
+    const move = editor.slice(editor.indexOf('const move = async'), editor.indexOf('const remove = async'))
+    assert.ok(move.length > 200, 'the move moved; this check reads it')
+
+    assert.ok(
+      !/ok === false/.test(move),
+      'a move is being undone because the unit answered ok:false, which means nothing on this hardware'
+    )
+    assert.match(
+      move,
+      /catch \(err\) \{\s*\n\s*await placeBlock\(from\.row, from\.col, idOf\(from\.block\)\)/,
+      'a move that throws part-way leaves the block in no cell at all'
+    )
+    assert.ok(
+      move.indexOf('clearCell') < move.indexOf('placeBlock'),
+      'a move places the block before clearing it, which asks the unit to hold one block in two cells'
+    )
+    assert.match(editor, /doubtfulWrite\(res\)/, 'nothing says what ok:false actually means here')
+    assert.match(editor, /await refreshBlocks\(\{ quiet: true \}\)/, 'the chain is not re-read after it is changed')
+  })
+
   test('every component the phone draws is one that exists', () => {
     /*
      * THE HOLE THIS FILLS, found the hard way.
@@ -1115,8 +1228,16 @@ export function run(test) {
     const edit = read('mobile/src/screens/Edit.js')
 
     assert.match(edit, /setParamConfirmed\(eid, p\.id, next, p\)/, 'a knob writes without confirming it landed')
+    /*
+     * Scoped to the knob's own commit rather than the whole file. The chain
+     * editor DOES re-read after a placement, and it should: that write changes
+     * what is in the preset. This is about the knob, which changes none of it
+     * and already read its own value back two lines earlier.
+     */
+    const commit = edit.slice(edit.indexOf('const commit = async'), edit.indexOf('const applyModel'))
+    assert.ok(commit.length > 100, 'the knob commit moved; this check reads it')
     assert.ok(
-      !/refreshAll\(|refreshBlocks\(/.test(edit),
+      !/refreshAll\(|refreshBlocks\(/.test(commit),
       'a knob commit re-reads the whole rig, which is four round trips it does not need'
     )
     assert.match(

@@ -15,6 +15,7 @@ import { paletteFor } from './palette.js'
 import { withRetry } from './retry.js'
 import { cleanPresetName, isEmptySlotName } from './presetName.js'
 import { zeroBasedChain, wrongSlot } from './slots.js'
+import { cableColumns, toWireCell } from '../../shared/grid-plan.mjs'
 import { DEFAULT_SLUG, deviceSlug } from '../../shared/device-slug.mjs'
 import { toNormalized } from './scale.js'
 import { withLineage } from './lineage.js'
@@ -1660,7 +1661,10 @@ export const backupDevice = (label, from = 0, to = 511) =>
    deals in one convention.
    ------------------------------------------------------------------ */
 
-const toWireCell = (row, col) => ({ row, col: col + 1 })
+/* The 0-to-1 boundary, from shared/grid-plan — the phone gets the same copy.
+   A placement write changes a preset's STRUCTURE rather than a value, and two
+   apps counting columns differently would not disagree out loud: one of them
+   would simply put things one column along. */
 
 /**
  * Put a block in a cell, or clear it with blockId 0.
@@ -1710,15 +1714,6 @@ export const setCable = (srcRow, srcCol, destRow, connect = true) =>
  * placement that worked, and re-asserting a cable that already exists is not an
  * error either.
  */
-/**
- * The last column a cable can start from.
- *
- * A cable joins a column to the next one, and the FM3's grid is fourteen wide,
- * so the thirteenth is the last that has a next. In this app's columns, which
- * count from zero, that is twelve.
- */
-const LAST_CABLE_COL = 12
-
 export async function wireRow(row, lastCol) {
   const results = []
   /*
@@ -1736,7 +1731,7 @@ export async function wireRow(row, lastCol) {
    * a line in the log that reads like the chain came out broken when it did
    * not.
    */
-  for (let col = 0; col <= Math.min(lastCol, LAST_CABLE_COL); col++) {
+  for (const col of cableColumns(lastCol)) {
     try {
       const res = await setCable(row, col, row)
       results.push({ col, ok: res?.ok !== false })

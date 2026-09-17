@@ -4,17 +4,21 @@ import { Platform, ScrollView, Text, TextInput, View } from 'react-native'
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
 import {
   bindModifier,
+  blockCatalog,
   blockParams,
   blockTypes,
+  clearCell,
   idOf,
   modifierModel,
+  placeBlock,
   sameBlock,
   setParamConfirmed,
   setType
 } from '../lib/device'
+import { colLabel, doubtfulWrite, gridShape, laneItems, lanesShown } from '../lib/grid-plan'
 import { isSilencingParam } from '../lib/guardrails'
 import { buildParamIndex, findControls, indexFor } from '../lib/paramIndex'
-import { useRig, writeBypass, writeChannel } from '../lib/rig'
+import { refreshBlocks, useRig, writeBypass, writeChannel } from '../lib/rig'
 import { blockColor } from '../lib/blockColors'
 import { shortBlock } from '../lib/shortName'
 import { thud } from '../lib/feedback'
@@ -155,6 +159,8 @@ export default function Edit({ onBack }) {
       ) : blocks.length ? (
         <Note>Tap a block to open its controls.</Note>
       ) : null}
+
+      <ChainEditor blocks={blocks} caps={caps} onError={setError} />
 
       <Modifiers blocks={blocks} onError={setError} />
     </ScrollView>
@@ -522,6 +528,285 @@ function BlockPanel({ block, channels, focus, onError }) {
             {`${fmt(level.value)}${level.unit ? ` ${level.unit}` : ''}`}
           </Text>
           <Text style={{ color: color.silkFaint, fontSize: font.micro }}>read-only</Text>
+        </View>
+      ) : null}
+    </View>
+  )
+}
+
+/**
+ * Add, remove and move blocks.
+ *
+ * THE GRID IS NOT DRAWN AS A GRID, deliberately. Forty-eight cells of which
+ * five hold anything is three cells visible on a phone and a scroll to find the
+ * one you want — the browser had exactly that and the report was blunt: "the
+ * rest you can't really add anything or change anything… let's rethink that
+ * whole thing." So each row of the grid is a LANE: what is actually in it, in
+ * signal order, with the free cells between it shown as gaps you can tap.
+ * Nothing is hidden — the column number is on every card and a preset with
+ * parallel rows gets a lane each — but nothing is drawn that isn't there.
+ *
+ * TWO THINGS ABOUT WRITING HERE ARE WORTH KNOWING BEFORE CHANGING ANY OF IT.
+ *
+ * Placement writes STRUCTURE rather than a value, so a bad write mangles a
+ * preset rather than mis-setting a knob. Which is why the column arithmetic is
+ * `lib/grid-plan`, shared with the Mac rather than done again here: getting it
+ * wrong once already put slot 1 of an AM4 into column 2.
+ *
+ * And this hardware answers `ok:false` to writes that landed. The browser's old
+ * editor took that at its word and rolled back moves that had worked — "delete
+ * works, the rest doesn't". So nothing here acts on it: the answer is shown,
+ * the chain is re-read from the unit, and you look.
+ *
+ * Folded away until asked for. It is the least-reached-for thing on the bench
+ * and the easiest to press by accident.
+ */
+function ChainEditor({ blocks, caps, onError }) {
+  const [open, setOpen] = useState(false)
+  const [palette, setPalette] = useState(null)
+  /* Which card's actions are showing, as "row:col". One at a time. */
+  const [acting, setActing] = useState(null)
+  /* A block picked up and waiting for somewhere to land. */
+  const [moving, setMoving] = useState(null)
+  /* Which block a tapped gap would receive, by its own type code. */
+  const [choice, setChoice] = useState(null)
+  const [busy, setBusy] = useState(false)
+  /* Said beside the control that caused it, never at the top of the screen. */
+  const [issue, setIssue] = useState(null)
+  const [hunt, setHunt] = useState('')
+
+  const { linear } = gridShape(caps)
+  const lanes = lanesShown(blocks, caps)
+
+  useEffect(() => {
+    if (!open || palette !== null) return undefined
+    let stop = false
+    ;(async () => {
+      try {
+        const list = await blockCatalog()
+        if (!stop) setPalette(list)
+      } catch {
+        /* An empty catch left Place disabled with nothing to explain it. */
+        if (!stop) setPalette([])
+      }
+    })()
+    return () => {
+      stop = true
+    }
+  }, [open, palette])
+
+  if (!open) {
+    return <Press label="Add or move blocks" sub="Change what is in this preset" onPress={() => setOpen(true)} />
+  }
+
+  const where = (row, col) =>
+    linear ? `slot ${colLabel(col)}` : `row ${row}, column ${colLabel(col)}`
+
+  /* A write is done when the unit has been asked AND the chain re-read. */
+  const after = async (res) => {
+    await refreshBlocks({ quiet: true })
+    setIssue(doubtfulWrite(res))
+    if (!doubtfulWrite(res)) setActing(null)
+  }
+
+  const add = async (row, col) => {
+    if (choice === null) return
+    setBusy(true)
+    setIssue(null)
+    try {
+      await after(await placeBlock(row, col, Number(choice)))
+    } catch (err) {
+      setIssue(err.message)
+      onError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * Move a block to another cell.
+   *
+   * ORDER MATTERS AND THE SAFE ORDER IS NOT OBVIOUS. A block instance exists
+   * once — a unit has one Amp — so placing it in a second cell while it still
+   * occupies the first may be refused or may do something undefined. Clearing
+   * first avoids asking that question.
+   *
+   * The cost is a moment where the block exists nowhere, so it goes back if the
+   * placement THROWS. It does not go back on `ok:false`: that answer means
+   * nothing on this hardware, and undoing a move because of it is the bug this
+   * panel was reported for.
+   */
+  const move = async (to) => {
+    const from = moving
+    if (!from) return
+    setBusy(true)
+    setIssue(null)
+    try {
+      await clearCell(from.row, from.col)
+      let res
+      try {
+        res = await placeBlock(to.row, to.col, idOf(from.block))
+      } catch (err) {
+        await placeBlock(from.row, from.col, idOf(from.block)).catch(() => {})
+        throw err
+      }
+      setMoving(null)
+      await after(res)
+    } catch (err) {
+      setMoving(null)
+      setIssue(err.message)
+      onError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const remove = async (row, col) => {
+    setBusy(true)
+    setIssue(null)
+    try {
+      await after(await clearCell(row, col))
+    } catch (err) {
+      setIssue(err.message)
+      onError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const needle = hunt.trim().toLowerCase()
+  const offered = (palette || [])
+    .filter((b) => !needle || (b.name || '').toLowerCase().includes(needle))
+    .slice(0, 30)
+  const picked = (palette || []).find((b) => b.page === Number(choice))
+
+  return (
+    <View style={{ gap: space.md }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
+        <Label>The chain</Label>
+        <Press label="Close" height={40} onPress={() => setOpen(false)} />
+      </View>
+
+      {issue ? <Note tone="warn">{issue}</Note> : null}
+
+      {moving ? (
+        <Note>{`Moving ${moving.block.name}. Tap a free space to put it there.`}</Note>
+      ) : null}
+
+      {lanes.map((lane) => (
+        <View key={lane.row} style={{ gap: space.sm }}>
+          {linear ? null : <Label>{`Row ${lane.row}`}</Label>}
+          {laneItems(lane).map((item) =>
+            item.kind === 'block' ? (
+              <BlockCard
+                key={`b${item.col}`}
+                block={item.block}
+                at={where(lane.row, item.col)}
+                busy={busy}
+                acting={acting === `${lane.row}:${item.col}`}
+                moving={moving?.block === item.block}
+                onToggleActions={() =>
+                  setActing(acting === `${lane.row}:${item.col}` ? null : `${lane.row}:${item.col}`)
+                }
+                onMove={() => {
+                  setMoving({ row: lane.row, col: item.col, block: item.block })
+                  setActing(null)
+                }}
+                onRemove={() => remove(lane.row, item.col)}
+              />
+            ) : (
+              <Press
+                key={`g${item.col}`}
+                caption={where(lane.row, item.col)}
+                label={
+                  moving
+                    ? `Put ${moving.block.name} here`
+                    : picked
+                      ? `Put ${picked.name} here`
+                      : 'Empty'
+                }
+                disabled={busy || (!moving && !picked)}
+                height={48}
+                onPress={() => (moving ? move({ row: lane.row, col: item.col }) : add(lane.row, item.col))}
+              />
+            )
+          )}
+        </View>
+      ))}
+
+      {/* ---------------------------------------------------- what to place */}
+      {moving ? (
+        <Press label="Leave it where it was" onPress={() => setMoving(null)} />
+      ) : (
+        <View style={{ gap: space.sm }}>
+          <Label>What to put in a space</Label>
+          {palette === null ? (
+            <Note>Asking your unit what it can add…</Note>
+          ) : !palette.length ? (
+            <Note tone="warn">Couldn’t read the list of blocks from your unit.</Note>
+          ) : (
+            <>
+              <TextInput
+                value={hunt}
+                onChangeText={setHunt}
+                placeholder="Find a block"
+                placeholderTextColor={color.silkFaint}
+                autoCorrect={false}
+                autoCapitalize="none"
+                accessibilityLabel="Find a block to add"
+                style={{
+                  minHeight: TAP,
+                  paddingHorizontal: space.md,
+                  borderRadius: radius.md,
+                  borderWidth: 1,
+                  borderColor: color.rule,
+                  backgroundColor: color.panel,
+                  color: color.silk,
+                  fontSize: font.body
+                }}
+              />
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+                {offered.map((b) => (
+                  <Press
+                    key={b.page}
+                    label={b.name}
+                    tone="signal"
+                    on={b.page === Number(choice)}
+                    height={44}
+                    style={{ paddingHorizontal: space.md }}
+                    onPress={() => setChoice(b.page === Number(choice) ? null : b.page)}
+                  />
+                ))}
+              </View>
+              <Text style={{ color: color.silkDim, fontSize: font.micro }}>
+                {picked ? `Now tap an empty space to put ${picked.name} in it.` : 'Pick a block, then tap an empty space.'}
+              </Text>
+            </>
+          )}
+        </View>
+      )}
+    </View>
+  )
+}
+
+/** One block in a lane, with what you can do to it folded under it. */
+function BlockCard({ block, at, busy, acting, moving, onToggleActions, onMove, onRemove }) {
+  const hue = blockColor(block.slug)
+  return (
+    <View style={{ gap: space.sm }}>
+      <Press
+        caption={at}
+        label={block.name}
+        sub={acting ? 'Close' : 'What can I do with this?'}
+        on={moving}
+        tone="signal"
+        style={{ borderLeftWidth: 4, borderLeftColor: hue.fill }}
+        onPress={onToggleActions}
+      />
+      {acting ? (
+        <View style={{ flexDirection: 'row', gap: space.sm }}>
+          <Press grow label="Move" height={44} disabled={busy} onPress={onMove} />
+          <Press grow label="Take out" height={44} disabled={busy} onPress={onRemove} />
         </View>
       ) : null}
     </View>

@@ -18,6 +18,7 @@
  */
 import { remoteRequest } from './relay'
 import { withLineage } from './lineage'
+import { cableColumns, toWireCell } from './grid-plan'
 import { cleanPresetName, isEmptySlotName } from './unit.mjs'
 import { preferredEncoding, rememberEncoding } from './encoding'
 import { toNormalized } from './scale'
@@ -195,6 +196,78 @@ export const setType = (eid, value) => post(`/preset/blocks/${eid}/type`, { valu
  */
 export const blockTypes = async (slug) =>
   withLineage(slug, (await remoteRequest(`/blocks/${slug}/types`)) || [])
+
+/* ---------------------------------------------------------------- */
+/* Changing the chain itself                                         */
+/* ---------------------------------------------------------------- */
+
+/**
+ * Placeable blocks for whichever unit is attached.
+ *
+ * It has to come from the unit: an FM3 and an AM4 use entirely different type
+ * numbering, so a hardcoded list would place the wrong blocks on the wrong unit
+ * while looking like it worked. `page` is the block's own type code and goes
+ * straight back to `placeBlock`.
+ */
+export const blockCatalog = async () => {
+  const res = await remoteRequest('/blocks')
+  return Array.isArray(res) ? res : []
+}
+
+/**
+ * Put a block in a cell, or clear it with blockId 0.
+ *
+ * THIS WRITES STRUCTURE RATHER THAN A VALUE, which is the reason everything
+ * around it is careful. A knob written wrongly sounds wrong and is one drag
+ * from right; a block placed in the wrong cell is a preset somebody has to
+ * rebuild. The row and column are DISPLAY coordinates — the ones /preset/blocks
+ * reports — and the wire's own numbering is added once, here, by the shared
+ * rule both apps are handed.
+ *
+ * The unit answers `ok:false` to writes that landed. See `doubtfulWrite`: that
+ * answer is reported and never acted on.
+ */
+export const placeBlock = (row, col, blockId) =>
+  put('/preset/grid/cell', { ...toWireCell(row, col), blockId })
+
+export const clearCell = (row, col) => placeBlock(row, col, 0)
+
+/** Connect or cut a cable from one cell to a row in the next column. */
+export const setCable = (srcRow, srcCol, destRow, connect = true) =>
+  post('/preset/grid/cable', {
+    ...toWireCell(srcRow, srcCol),
+    srcRow,
+    srcCol: srcCol + 1,
+    destRow,
+    connect
+  })
+
+/**
+ * Run a wire the length of a row: every cell through to the one feeding the
+ * output.
+ *
+ * WITHOUT THIS A BUILT CHAIN MAKES NO SOUND. Placing a block fills a cell; it
+ * does not join that cell to anything, and an empty slot has no cabling in it
+ * at all. Five blocks went in, every value landed, the unit read them back, the
+ * preset saved — and none of it was in the signal path.
+ *
+ * Every answer is collected rather than thrown: a refusal is worth saying out
+ * loud, but it must not undo a placement that worked, and re-asserting a cable
+ * that already exists is not an error either.
+ */
+export async function wireRow(row, lastCol) {
+  const results = []
+  for (const col of cableColumns(lastCol)) {
+    try {
+      const res = await setCable(row, col, row)
+      results.push({ col, ok: res?.ok !== false })
+    } catch {
+      results.push({ col, ok: false })
+    }
+  }
+  const refused = results.filter((r) => !r.ok).length
+  return { cables: results.length, refused }
+}
 
 /**
  * What this unit can attach to a control, and where.

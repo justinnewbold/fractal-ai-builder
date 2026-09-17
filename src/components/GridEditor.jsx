@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
 import { placeBlock, clearCell, readGrid, blockCatalog, wireRow } from '../lib/forgefx'
 import { chainPlan } from '../lib/actions'
+import {
+  colLabel,
+  doubtfulWrite,
+  gridShape,
+  laneItems,
+  lanesShown
+} from '../../shared/grid-plan.mjs'
 
 /**
  * A workable starting chain, by block family rather than by number.
@@ -51,9 +58,7 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
   const [palette, setPalette] = useState([])
   const [paletteFailed, setPaletteFailed] = useState(false)
 
-  const linear = capabilities?.slotModel === 'linear'
-  const rows = linear ? 1 : capabilities?.grid?.rows ?? 4
-  const cols = linear ? capabilities?.slotCount ?? 4 : capabilities?.grid?.cols ?? 12
+  const { linear } = gridShape(capabilities)
 
   /*
    * Columns are 0-indexed here, as /preset/blocks reports them and as
@@ -64,7 +69,7 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
    * reported, because those come back 0-indexed. The label is the only place
    * that counts from one, because that is how a person counts.
    */
-  const label = (col) => col + 1
+  const label = colLabel
 
   const loadPalette = async () => {
     setPaletteFailed(false)
@@ -110,25 +115,7 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
    * empty cell — never drawn between two blocks that are already adjacent,
    * because there is nowhere there to put anything.
    */
-  const lanes = []
-  for (let row = 1; row <= rows; row++) {
-    const inRow = blocks
-      .filter((b) => b.row === row && typeof b.col === 'number')
-      .sort((a, b) => a.col - b.col)
-    const taken = new Set(inRow.map((b) => b.col))
-    const gaps = []
-    for (let col = 0; col < cols; col++) if (!taken.has(col)) gaps.push(col)
-    lanes.push({ row, blocks: inRow, gaps })
-  }
-  const firstEmpty = lanes.findIndex((l) => !l.blocks.length)
-  const shown = lanes.filter((l, i) => l.blocks.length || i === firstEmpty)
-
-  /** Cards and gaps in one list, in column order, so a lane reads as a chain. */
-  const laneItems = (lane) =>
-    [
-      ...lane.blocks.map((b) => ({ kind: 'block', col: b.col, block: b })),
-      ...lane.gaps.map((col) => ({ kind: 'gap', col }))
-    ].sort((a, b) => a.col - b.col)
+  const shown = lanesShown(blocks, capabilities)
 
   const close = () => {
     setOpen(null)
@@ -146,10 +133,7 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
    * reported as a note, the chain above is re-read from the unit, and the
    * person can see for themselves which it was.
    */
-  const doubtful = (res) =>
-    res?.ok === false
-      ? 'Your unit answered “refused”. Some units say that even when the write landed — the chain above has been re-read, so check it.'
-      : null
+  const doubtful = doubtfulWrite
 
   const add = async (row, col) => {
     if (!choice) return
