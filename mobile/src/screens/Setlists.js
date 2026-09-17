@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
@@ -83,9 +83,27 @@ export default function Setlists({ onBack }) {
   /* Delete asks twice. One tap on a screen you are scrolling is one tap. */
   const [armed, setArmed] = useState(false)
   /*
-   * The name as it is being typed. Stored names are never blank, so a box bound
-   * straight to storage snapped back to the old name the moment the last letter
-   * was deleted — you could not clear it to type a new one.
+   * The name as it is being typed, and NOTHING ELSE TOUCHED UNTIL IT IS TYPED.
+   *
+   * "When deleting the name to rename it won't let the entire name delete, it
+   * stops at the first letter." And: "when adding a set list it adds the names
+   * twice." One bug, wearing two hats.
+   *
+   * It saved on every keystroke. Each save writes storage, which announces,
+   * which re-renders this whole screen — every setlist row, every candidate
+   * song — between one letter and the next. A React text box is told what it
+   * contains by its `value`, and a `value` that arrives a frame late is a box
+   * that puts back the letter you just deleted. Deleting faster than the screen
+   * could redraw deleted nothing; typing faster than it could redraw is how a
+   * name ends up carrying pieces of itself twice.
+   *
+   * So the box is the only thing that knows the name while you are typing it,
+   * and storage is told once, when you are done — on blur, on the keyboard's
+   * Done, or on leaving the screen. Nothing re-renders in between.
+   *
+   * An empty box is allowed while typing, which it has to be: you cannot type a
+   * new name without first clearing the old one. It is simply not what is
+   * saved.
    */
   const [draft, setDraft] = useState(null)
 
@@ -109,10 +127,31 @@ export default function Setlists({ onBack }) {
     updateList(device, chosen.id, { presets })
   }
 
-  const rename = (name) => {
-    setDraft(name)
-    if (chosen && name.trim()) updateList(device, chosen.id, { name: name.trim() })
+  /** Save what was typed, if it is a name and it is a different one. */
+  const commitName = () => {
+    const name = (draft ?? '').trim()
+    setDraft(null)
+    if (!chosen || !name || name === chosen.name) return
+    updateList(device, chosen.id, { name })
   }
+
+  /*
+   * And once more on the way out, because tapping Done at the top of this
+   * screen unmounts it without the box ever being blurred — a rename typed and
+   * then left would simply not have happened.
+   */
+  const live = useRef({ draft: null, chosen: null, device: null })
+  useEffect(() => {
+    live.current = { draft, chosen, device }
+  })
+  useEffect(
+    () => () => {
+      const { draft: d, chosen: c, device: unit } = live.current
+      const name = (d ?? '').trim()
+      if (c && name && name !== c.name) updateList(unit, c.id, { name })
+    },
+    []
+  )
 
   const fresh = () => {
     // A new setlist is the one you are about to build, so it is the one the
@@ -228,8 +267,11 @@ export default function Setlists({ onBack }) {
             <Label>Name</Label>
             <TextInput
               value={draft ?? chosen.name}
-              onChangeText={rename}
-              onBlur={() => setDraft(null)}
+              onChangeText={setDraft}
+              onBlur={commitName}
+              onSubmitEditing={commitName}
+              returnKeyType="done"
+              blurOnSubmit
               accessibilityLabel="Setlist name"
               placeholderTextColor={color.silkFaint}
               style={{

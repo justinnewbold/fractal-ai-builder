@@ -2158,4 +2158,112 @@ export function run(test) {
     assert.ok(!/const face =/.test(stage), 'the play screen still builds a font nothing uses')
     assert.ok(!/\bmono\b/.test(stage), 'the play screen still imports a face it does not draw with')
   })
+
+  test('a chain read on the wire does not get a queue behind it', () => {
+    /*
+     * "App is very laggy especially on the set list screen." The log said why,
+     * and it had nothing to do with setlists:
+     *
+     *   23:02:50.187 [wire] GET /preset/blocks — 2878ms
+     *   23:02:50.748 [wire] GET /preset/blocks — 3123ms
+     *   23:03:00.265 [wire] GET /preset/blocks — 3219ms
+     *
+     * Three of the same slow read, two of them half a second apart. The unit
+     * emits an event per change and `handleEvent` asked for the chain on every
+     * one — and each ask is a preset dump down a serial port with a relay in
+     * front of it, one at a time, in a queue. A preset change that fires six
+     * events puts twenty seconds of reading in front of the next thing anybody
+     * presses, on any screen. That is what "laggy" was.
+     *
+     * The rule now: one on the wire, and at most one more owed behind it,
+     * however many asks arrive meanwhile. The last read is still the true one.
+     */
+    const rig = read('mobile/src/lib/rig.js')
+
+    /*
+     * Read out of the one function, not out of the file. `handleEvent` also
+     * calls refreshBlocks({ quiet: true }), and a pattern allowed to wander
+     * across the file finds THAT one and passes while the follow-up here is
+     * gone — which is exactly what the first version of this check did.
+     */
+    const from = rig.indexOf('export async function refreshBlocks')
+    const to = rig.indexOf('async function readBlocks')
+    assert.ok(from > 0 && to > from, 'refreshBlocks is not where this check expects it; nothing below was read')
+    const fold = rig.slice(from, to).replace(/\s+/g, ' ')
+
+    assert.match(fold, /if \(blocksInFlight\) \{ blocksAgain = true return blocksInFlight \}/, 'a second chain read queues behind the first instead of folding into it')
+    assert.match(fold, /blocksAgain = false[\s\S]*?refreshBlocks\(\{ quiet: true \}\)/, 'the asks that arrived during a read are dropped, so the chain can be left stale')
+    /* And the one that follows is quiet: the chain on screen is a moment old,
+       not missing, and 'reading' blanks a row of buttons under a thumb. */
+    assert.ok(!/refreshBlocks\(\)/.test(fold), 'the follow-up read blanks the chain somebody is aiming at')
+  })
+
+  test('the log says what was pressed, not only what answered', () => {
+    /*
+     * "Can we add more, like what buttons get tapped and what the app does, how
+     * long it takes to activate what the button was suppose to do?"
+     *
+     * The wire log answered "was the unit slow". It could not answer "I pressed
+     * it and nothing happened", because nothing wrote down that anything was
+     * pressed — a log of answers with none of the questions.
+     *
+     * Logged in the two components every button in this app is made of, rather
+     * than at the call sites: a log that depends on somebody remembering to add
+     * a line has its hole exactly where the interesting thing happened.
+     */
+    const tapped = read('mobile/src/lib/tapped.js')
+    assert.match(tapped, /await run\?\.\(\)/, 'the tap is not awaited, so nothing can say how long it took')
+    assert.match(tapped.replace(/\s+/g, ' '), /catch \(err\) \{ done\(err\?\.message \|\| 'threw'\)/, 'a handler that throws leaves no line at all')
+
+    for (const file of ['mobile/src/components/Press.js', 'mobile/src/components/Tile.js']) {
+      const src = read(file)
+      assert.match(src, /from '\.\.\/lib\/tapped'/, `${file} does not log what is pressed`)
+      assert.match(src, /fire\(`press \$\{said\(/, `${file} presses without writing a line`)
+      assert.match(src, /fire\(`hold \$\{said\(/, `${file} holds without writing a line`)
+    }
+
+    /* The first line goes down before the work starts, which is the whole
+       point: a tap whose work never finishes is a tap with no second line. */
+    assert.match(
+      read('mobile/src/lib/debugLog.js').replace(/\s+/g, ' '),
+      /export function logTap\(what, detail\) \{ const began = Date\.now\(\) logDebug\('tap', what, detail\)/,
+      'the tap is only written down once it has finished, so a hang writes nothing'
+    )
+  })
+
+  test('typing a setlist name does not fight the screen redrawing', () => {
+    /*
+     * "When deleting the name to rename it won't let the entire name delete, it
+     * stops at the first letter." And: "when adding a set list it adds the
+     * names twice."
+     *
+     * Both are one bug. It saved on every keystroke; each save writes storage,
+     * which announces, which re-renders this whole screen between one letter
+     * and the next. A React text box is told what it holds by its `value`, and
+     * a `value` one frame late puts back the letter just deleted. Deleting
+     * faster than the redraw deletes nothing; typing faster than it duplicates.
+     *
+     * So the box owns the name while it is being typed, and storage hears once,
+     * when the typing stops.
+     */
+    const flat = read('mobile/src/screens/Setlists.js').replace(/\s+/g, ' ')
+
+    assert.match(flat, /onChangeText=\{setDraft\}/, 'a keystroke still writes to storage')
+    assert.match(flat, /onBlur=\{commitName\}/, 'nothing saves the name when the box is left')
+    assert.match(flat, /onSubmitEditing=\{commitName\}/, 'the keyboard’s Done does not save the name')
+    /* An empty box has to be allowed while typing — you cannot type a new name
+       without clearing the old one — and simply is not what gets saved. */
+    assert.match(
+      flat,
+      /const name = \(draft \?\? ''\)\.trim\(\) setDraft\(null\) if \(!chosen \|\| !name \|\| name === chosen\.name\) return/,
+      'an empty name can be saved over a real one, or the box cannot be cleared'
+    )
+    /* And leaving by the Done button at the top unmounts the screen without
+       ever blurring the box, which is a rename typed and then lost. */
+    assert.match(
+      flat,
+      /useEffect\( \(\) => \(\) => \{ const \{ draft: d, chosen: c, device: unit \} = live\.current/,
+      'a name typed and then left by the Done button is thrown away'
+    )
+  })
 }

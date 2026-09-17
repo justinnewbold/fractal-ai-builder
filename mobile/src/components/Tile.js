@@ -2,6 +2,7 @@ import { Pressable, Text, View } from 'react-native'
 
 import { color, font, radius, space, TAP } from '../lib/theme'
 import { tick } from '../lib/feedback'
+import { fire, said } from '../lib/tapped'
 
 /**
  * A coloured tile, for the two things on this screen that have an identity.
@@ -57,13 +58,13 @@ export default function Tile({
       accessibilityLabel={[label, sub, caption].filter(Boolean).join(', ')}
       onPress={() => {
         haptic?.()
-        onPress?.()
+        fire(`press ${said(label, sub)}`, onPress)
       }}
       onLongPress={
         onLongPress
           ? () => {
               haptic?.()
-              onLongPress()
+              fire(`hold ${said(label, sub)}`, onLongPress)
             }
           : undefined
       }

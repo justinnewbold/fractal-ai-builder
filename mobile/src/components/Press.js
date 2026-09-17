@@ -2,6 +2,7 @@ import { Pressable, Text, View } from 'react-native'
 
 import { color, font, radius, space, TAP } from '../lib/theme'
 import { tick } from '../lib/feedback'
+import { fire, said } from '../lib/tapped'
 
 /**
  * Every button in the app.
@@ -41,7 +42,7 @@ export default function Press({
       disabled={disabled}
       onPress={() => {
         haptic?.()
-        onPress?.()
+        fire(`press ${said(caption, label)}`, onPress)
       }}
       /* A hold is a different thing from a press, and RN keeps them apart: a
          press that becomes a hold never fires onPress. Only wired when asked
@@ -50,7 +51,7 @@ export default function Press({
         onLongPress
           ? () => {
               haptic?.()
-              onLongPress()
+              fire(`hold ${said(caption, label)}`, onLongPress)
             }
           : undefined
       }

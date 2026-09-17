@@ -56,6 +56,41 @@ export function logDebug(source, message, detail) {
   return entry
 }
 
+/**
+ * A button was pressed — and, when it was worth saying, how long what it
+ * started took to finish.
+ *
+ * "Can we add more, like what buttons get tapped and what the app does, how
+ * long it takes to activate what the button was suppose to do?"
+ *
+ * The wire log already said how long each request took, which answers "was the
+ * unit slow". It could not answer "I pressed the thing and nothing happened",
+ * because nothing wrote down that anything was pressed. A log of the answers
+ * with none of the questions makes a bad evening unreadable in exactly the way
+ * it is most often bad.
+ *
+ * THE LINE IS WRITTEN AT THE START, not the end, and that is the point: a tap
+ * whose work never finishes is a tap with no second line, which is the shape of
+ * the failure most worth finding. The second line only comes when the work took
+ * long enough to be worth reading about, or when it failed — every button in
+ * this app would otherwise cost two lines to say "that was instant", and the
+ * buffer holds four hundred.
+ */
+const WORTH_SAYING_MS = 100
+
+export function logTap(what, detail) {
+  const began = Date.now()
+  logDebug('tap', what, detail)
+  let said = false
+  return (outcome) => {
+    if (said) return
+    said = true
+    const took = Date.now() - began
+    if (took < WORTH_SAYING_MS && !outcome) return
+    logDebug('tap', `${what} — ${took}ms`, outcome)
+  }
+}
+
 /** Oldest first — the order a person reads a story in. */
 export const getDebugLog = () => lines.slice()
 
