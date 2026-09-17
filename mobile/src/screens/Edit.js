@@ -157,14 +157,15 @@ export default function Edit({ onBack }) {
       keyboardShouldPersistTaps="handled"
       scrollEnabled={!held}
       /*
-       * iOS: once a knob is tracking a touch, the scroll view may not take it
-       * back to start scrolling. The lock above is a prop and reaches the
-       * native side a frame after the finger lands; this is the native rule
-       * and is in force before the finger lands. The two together are what
-       * stops "at first it scrolls the whole screen when I try to slide up
-       * and down on a knob". Android ignores the prop.
+       * NOT the scroll view's cancel-content-touches rule. It was here for the knobs — the
+       * native rule that a scroll may not take a touch a child is tracking —
+       * and on iOS it applies to every child, not just a knob. This page is
+       * buttons from top to bottom, so a finger that landed on any of them
+       * could never become a scroll: "On edit screen I can't scroll at all
+       * down to edit the parameters." The knob claims its touch in the
+       * capture phase and refuses to hand it back (see components/Knob);
+       * that, with the lock above, is what keeps a knob drag off the page.
        */
-      canCancelContentTouches={false}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
         <View style={{ flexShrink: 1 }}>

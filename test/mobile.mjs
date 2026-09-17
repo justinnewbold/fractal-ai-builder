@@ -1622,12 +1622,17 @@ export function run(test) {
      * a knob. It did start working for a minute." The lock is a prop, and a
      * prop reaches the native side a frame after the finger lands; the first
      * movement on a fresh screen got there first. Two more things, both in
-     * force before the finger lands: the knob refuses to hand the touch back
-     * when the scroll view asks, and the scroll view is told it may not take
-     * a touch a child is already tracking.
+     * force before the finger lands: the knob claims the touch in the capture
+     * phase, and refuses to hand it back when the scroll view asks.
+     *
+     * NOT the scroll view's own native rule for that (canCancelContentTouches
+     * false). On iOS it covers every child, and this page is buttons from top
+     * to bottom, so a finger that landed on any of them could never become a
+     * scroll: "On edit screen I can't scroll at all down to edit the
+     * parameters." Nothing on this page may set it.
      */
     assert.match(knob, /onPanResponderTerminationRequest: \(\) => false/, 'the knob hands the touch back the moment the scroll view asks')
-    assert.match(edit, /canCancelContentTouches=\{false\}/, 'the scroll view may still take a touch a knob is tracking')
+    assert.ok(!/canCancelContentTouches=\{false\}/.test(edit), 'the Edit page cannot be scrolled from a finger that lands on a button, which is all of it')
 
     /* And "very laggy": a finger on one knob redrew every mark on every knob
        on the block, sixty times a second. The ring and the pointer are memoised
