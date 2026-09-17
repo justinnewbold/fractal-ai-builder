@@ -3452,6 +3452,30 @@ export function run(test) {
     assert.match(dev, /return \{ ok: false, continuous: null, retried: true, actual \}/, 'the confirmed write does not hand back what the unit read')
   })
 
+  test('a write is read back off the hardware, and twice before it is called a miss', async () => {
+    /*
+     * "Change the volume again, and it said volume didn't take." The level was
+     * where it had been put; the read that followed the write came back one
+     * write behind, which is a documented habit of the computer's cache. So
+     * the phone now does what the browser does — drops that cache first — and
+     * reads once more after a pause before saying a write did not take.
+     */
+    const dev = read('mobile/src/lib/device.js').replace(/\s+/g, ' ')
+    assert.match(dev, /await remoteRequest\('\/device\/cache', \{ method: 'DELETE' \}\)/, 'the phone never drops the computer\'s read cache')
+    assert.match(dev, /export const READ_BACK_AGAIN_MS = 400/)
+    assert.match(dev, /for \(let go = 0; go < 2; go\+\+\) \{ if \(go\) await new Promise\(\(r\) => setTimeout\(r, READ_BACK_AGAIN_MS\)\)/, 'a value that came back wrong is not read a second time')
+    assert.match(dev, /await dropReadCache\(\) actual = await readParamValue\(eid, paramId\)/, 'the read-back does not follow the cache drop')
+    assert.match(dev, /if \(err\?\.status === 403 \|\| err\?\.remoteBlocked\) cacheDropRefused = true/, 'a refused drop is asked for again on every write')
+    /* And the relay lets it through. */
+    const rules = await import('../shared/relay-rules.mjs')
+    assert.equal(rules.forbiddenRemotely('DELETE', '/device/cache'), null, 'the relay refuses the cache drop')
+
+    /* The volume says what the unit is holding, and shows it, like a knob does. */
+    const vol = read('mobile/src/components/Volume.js').replace(/\s+/g, ' ')
+    assert.match(vol, /The volume didn’t take\. The unit is holding it at \$\{volumeLabel\(holding, p\)\}\./, 'a volume that did not take does not say what the unit holds')
+    assert.match(vol, /if \(holding !== null\) setValue\(holding\)/, 'the slider keeps pointing at a number the unit refused')
+  })
+
   test('a dead account service is given twelve seconds, not the whole evening', async () => {
     /*
      * "I can't log into supper base anymore. It says server error, so now I

@@ -163,7 +163,17 @@ export default function Volume({ blocks, open, onClose, onError }) {
       const failed = await writer.current.settled()
       if (failed) onError?.(failed.message)
       const res = await setParamConfirmed(eid, p.id, v, p)
-      if (!res.ok) onError?.('The volume didn’t take.')
+      if (!res.ok) {
+        /* Say what the unit is holding, and show it: a slider left pointing
+           at a number the unit refused is a slider lying about the volume. */
+        const holding = typeof res.actual === 'number' ? res.actual : null
+        if (holding !== null) setValue(holding)
+        onError?.(
+          holding === null
+            ? 'The volume didn’t take.'
+            : `The volume didn’t take. The unit is holding it at ${volumeLabel(holding, p)}.`
+        )
+      }
     } catch (err) {
       onError?.(err.message)
     }
