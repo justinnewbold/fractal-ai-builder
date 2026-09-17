@@ -284,11 +284,32 @@ export async function refreshScene() {
   }
 }
 
+/**
+ * How long a tempo this phone just set on the unit outranks a read of it.
+ *
+ * "After doing tap tempo, if I go to the edit screen and then go back to the
+ * main screen, the tap tempo doesn't save." It had saved — on the unit. The
+ * main screen re-reads everything when it appears, and the computer answers
+ * a tempo read out of the preset copy it took for the chain, which is good
+ * for fifteen seconds and was taken before the taps. So the old figure came
+ * back onto the button over the one the unit was actually playing.
+ *
+ * A tempo the phone set — by tapping or by typing — is therefore held for a
+ * while: a read that disagrees inside this window is the stale copy, not
+ * news. Longer than the copy lives, and short enough that a tempo changed at
+ * the front panel is followed within the minute.
+ */
+export const TEMPO_KEEP_MS = 20 * 1000
+let tempoSetAt = 0
+const tempoJustSet = () => Date.now() - tempoSetAt < TEMPO_KEEP_MS
+
 export async function refreshTempo() {
   try {
     const res = await device.getTempo()
     const bpm = typeof res === 'number' ? res : res?.bpm
-    if (Number.isFinite(bpm)) set({ bpm })
+    if (!Number.isFinite(bpm)) return
+    if (tempoJustSet() && Number.isFinite(state.bpm) && bpm !== state.bpm) return
+    set({ bpm })
   } catch {
     // Tempo is a nice-to-have on this screen; its absence is not a fault worth
     // a banner over a preset someone is about to play.
@@ -507,6 +528,13 @@ export function writeChannel(id, channel) {
  */
 let reread = null
 
+/** The read after a burst of taps: the tempo the unit settled on, held from then. */
+async function readTappedTempo() {
+  tempoSetAt = 0
+  await refreshTempo()
+  tempoSetAt = Date.now()
+}
+
 export async function tapTempo() {
   clearTimeout(reread)
   try {
@@ -515,13 +543,16 @@ export async function tapTempo() {
     set({ error: err.message })
     return false
   }
-  reread = setTimeout(() => refreshTempo(), TAP_REREAD_MS)
+  /* The read after the burst is the tempo the unit settled on; from then it
+     is this phone's figure, held against a stale copy. See TEMPO_KEEP_MS. */
+  reread = setTimeout(() => readTappedTempo(), TAP_REREAD_MS)
   return true
 }
 
 export function writeTempo(bpm) {
   const was = state.bpm
   expect('bpm', bpm)
+  tempoSetAt = Date.now()
   return optimistic({ bpm }, { bpm: was }, () => device.setTempo(bpm))
 }
 

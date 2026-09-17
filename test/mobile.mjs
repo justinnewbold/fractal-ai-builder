@@ -947,6 +947,25 @@ export function run(test) {
     assert.match(flat, /useEffect\(\(\) => setPages\(1\), \[q, adding\]\)/, 'a new search keeps an old page count')
   })
 
+  test('a tempo the phone just set is not overwritten by a stale re-read', () => {
+    /*
+     * "After doing tap tempo, if I go to the edit screen and then go back to
+     * the main screen, the tap tempo doesn't save." It had saved, on the
+     * unit. The main screen re-reads everything when it appears, and the
+     * tempo read came back out of the computer's fifteen-second copy of the
+     * preset, taken before the taps. A tempo this phone set is held against
+     * that for longer than the copy lives.
+     */
+    const rig = read('mobile/src/lib/rig.js').replace(/\s+/g, ' ')
+    assert.match(rig, /export const TEMPO_KEEP_MS = 20 \* 1000/, 'the hold is not longer than the fifteen seconds the copy lives')
+    assert.match(rig, /if \(tempoJustSet\(\) && Number\.isFinite\(state\.bpm\) && bpm !== state\.bpm\) return set\(\{ bpm \}\)/, 'a re-read still overwrites a tempo the phone just set')
+    /* The read after a burst of taps is the tempo the unit settled on, and
+       from then it is held; a typed tempo is held from the moment it is typed. */
+    assert.match(rig, /reread = setTimeout\(\(\) => readTappedTempo\(\), TAP_REREAD_MS\)/, 'the read after the taps does not start the hold')
+    assert.match(rig, /async function readTappedTempo\(\) \{ tempoSetAt = 0 await refreshTempo\(\) tempoSetAt = Date\.now\(\) \}/, 'the read after the taps is itself blocked by an earlier hold, or does not start one')
+    assert.match(rig, /expect\('bpm', bpm\) tempoSetAt = Date\.now\(\)/, 'a typed tempo is not held')
+  })
+
   test('tapping a found control brings the page to the block it opened', () => {
     /*
      * "It'll pull up the parameters but then clicking on it does nothing." It
@@ -1512,7 +1531,7 @@ export function run(test) {
     assert.ok(tap.length > 100, 'tapTempo moved; this check reads it')
 
     assert.match(tap, /clearTimeout\(reread\)/, 'each tap does not cancel the read-back the one before it scheduled')
-    assert.match(tap, /setTimeout\(\(\) => refreshTempo\(\), TAP_REREAD_MS\)/, 'the tempo is never read back after a tap')
+    assert.match(tap, /setTimeout\(\(\) => readTappedTempo\(\), TAP_REREAD_MS\)/, 'the tempo is never read back after a tap')
     assert.ok(
       !/await refreshTempo\(\)/.test(tap),
       'the read-back is awaited inside the tap, which makes the tap itself late and the rhythm wrong'
