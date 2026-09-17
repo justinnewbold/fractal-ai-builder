@@ -13,7 +13,8 @@ import {
   hostConflict,
   pickHost,
   remoteChosenHost,
-  remoteHosts
+  remoteHosts,
+  sendPasswordReset
 } from '../lib/relay'
 import { refreshPreset, refreshScene, useRig } from '../lib/rig'
 import { sceneShape, setPresetName, setSceneName } from '../lib/device'
@@ -24,7 +25,9 @@ import { AI } from '../lib/features'
 import { isPairAccount } from '../lib/pairing'
 import Lamp from '../components/Lamp'
 import Note from '../components/Note'
+import PasswordBox from '../components/PasswordBox'
 import Press from '../components/Press'
+import Sheet from '../components/Sheet'
 
 const face = Platform.select(mono)
 
@@ -57,7 +60,14 @@ export default function Settings({
   const [account, setAccount] = useState(null)
   const [hosts, setHosts] = useState(remoteHosts())
   const [chosen, setChosen] = useState(remoteChosenHost())
-  const [password, setPassword] = useState('')
+  /*
+   * The account line opens a small sheet of the things done about once —
+   * change the password, or have a reset link sent. "Change it to where the
+   * box isn't just showing New password": it sat open on this page for
+   * everyone who came to change the tile size.
+   */
+  const [accountMenu, setAccountMenu] = useState(false)
+  const [changing, setChanging] = useState(false)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState(null)
   const [error, setError] = useState(null)
@@ -307,52 +317,25 @@ export default function Settings({
 
           <View style={{ gap: space.md }}>
             <Section>Account</Section>
-            <Text style={{ color: color.silkDim, fontSize: font.small }}>
-              {isPairAccount(account?.email)
-                ? 'Paired with your computer, no account. What you save stays on this phone.'
-                : account?.email
-                  ? `Signed in as ${account.email}.`
+            {isPairAccount(account?.email) || !account?.email ? (
+              <Text style={{ color: color.silkDim, fontSize: font.small }}>
+                {isPairAccount(account?.email)
+                  ? 'Paired with your computer, no account. What you save stays on this phone.'
                   : 'Signed in.'}
-            </Text>
-
-            <TextInput
-              style={{
-                minHeight: TAP,
-                backgroundColor: color.panel,
-                borderWidth: 1,
-                borderColor: color.rule,
-                borderRadius: radius.md,
-                paddingHorizontal: space.md,
-                color: color.silk,
-                fontSize: font.lead
-              }}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="New password"
-              placeholderTextColor={color.silkFaint}
-              accessibilityLabel="New password"
-              autoCapitalize="none"
-              autoComplete="new-password"
-              secureTextEntry
-            />
-            <Press
-              label={busy ? 'Changing…' : 'Change password'}
-              disabled={busy || password.length < 6}
-              onPress={async () => {
-                setBusy(true)
-                setError(null)
-                setNote(null)
-                try {
-                  await changePassword(password)
-                  setPassword('')
-                  setNote('Password changed.')
-                } catch (err) {
-                  setError(err.message)
-                } finally {
-                  setBusy(false)
-                }
-              }}
-            />
+              </Text>
+            ) : (
+              /* The way in to the password: the account line itself, with a
+                 gear, rather than a box sitting open on the page. */
+              <Press
+                label={`⚙  ${account.email}`}
+                sub="Signed in · tap for password options"
+                onPress={() => {
+                  setNote(null)
+                  setError(null)
+                  setAccountMenu(true)
+                }}
+              />
+            )}
 
             {note ? <Note>{note}</Note> : null}
             {error ? <Note tone="fault">{error}</Note> : null}
@@ -362,6 +345,49 @@ export default function Settings({
               The computer stays signed in — signing out here must not drop the link mid-set.
             </Text>
           </View>
+
+          <Sheet
+            open={accountMenu}
+            onClose={() => setAccountMenu(false)}
+            title="Your account"
+            note={account?.email || ''}
+          >
+            <Press
+              label="Change password"
+              sub="Type a new one here, twice"
+              onPress={() => {
+                setAccountMenu(false)
+                setChanging(true)
+              }}
+            />
+            <Press
+              label={busy ? 'Sending…' : 'Email me a link to reset it'}
+              sub="For when the old one is forgotten"
+              disabled={busy}
+              onPress={async () => {
+                setBusy(true)
+                try {
+                  await sendPasswordReset(account.email)
+                  setAccountMenu(false)
+                  setNote(`A link to set a new password is on its way to ${account.email}.`)
+                } catch (err) {
+                  setAccountMenu(false)
+                  setError(err.message)
+                } finally {
+                  setBusy(false)
+                }
+              }}
+            />
+          </Sheet>
+
+          <PasswordBox
+            open={changing}
+            onChange={async (next) => {
+              await changePassword(next)
+              setNote('Password changed.')
+            }}
+            onClose={() => setChanging(false)}
+          />
         </>
       ) : null}
 

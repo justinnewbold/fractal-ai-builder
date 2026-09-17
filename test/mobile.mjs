@@ -3211,6 +3211,31 @@ export function run(test) {
     assert.match(flat, /\{link !== 'connected' \? <Press label="Look for the computer again" onPress=\{onReconnect\} \/> : null\}/, 'the reconnect button is shown on a live link')
   })
 
+  test('the password is asked for from the account line, not left open on the page', () => {
+    /*
+     * "For the password change section, change it to where the box isn't
+     * just showing New password. Have it be where they click on the logged
+     * in username or a little settings icon next to it, and then they can
+     * select change password, and a screen pops up — or forgot password,
+     * where they can have an email sent to reset it."
+     */
+    const flat = read('mobile/src/screens/Settings.js').replace(/\s+/g, ' ')
+    assert.doesNotMatch(flat, /placeholder="New password"/, 'a password box still sits open on the Setup page')
+    assert.match(flat, /<Press label=\{`⚙ \$\{account\.email\}`\} sub="Signed in · tap for password options"/, 'the account line is not the way in')
+    assert.match(flat, /<Sheet open=\{accountMenu\}/, 'the account line opens nothing')
+    assert.match(flat, /label="Change password" sub="Type a new one here, twice"/, 'the sheet has no Change password')
+    assert.match(flat, /await sendPasswordReset\(account\.email\)/, 'the sheet cannot send a reset email')
+    assert.match(flat, /<PasswordBox open=\{changing\} onChange=\{async \(next\) => \{ await changePassword\(next\)/, 'the popup does not change the password')
+
+    /* The popup: high, so the keyboard cannot reach it; typed twice; six at
+       least, which is what the account service accepts. */
+    const box = read('mobile/src/components/PasswordBox.js').replace(/\s+/g, ' ')
+    assert.match(box, /paddingTop: Math\.max\(space\.xxl, height \* 0\.1\)/, 'the password box sits where the keyboard covers it')
+    assert.equal((box.match(/secureTextEntry/g) || []).length, 2, 'the password is not typed twice, hidden')
+    assert.match(box, /export const PASSWORD_MIN = 6/)
+    assert.match(box, /const ready = first\.length >= PASSWORD_MIN && first === again && !busy/, 'Change lights up before the two match')
+  })
+
   test('a dead account service is given twelve seconds, not the whole evening', async () => {
     /*
      * "I can't log into supper base anymore. It says server error, so now I
