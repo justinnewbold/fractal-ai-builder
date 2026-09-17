@@ -1245,6 +1245,97 @@ export function run(test) {
     assert.match(stage, /caps\?\.tuner !== false \?/, 'a unit that says it has no tuner is still given the button')
   })
 
+  test('the tuner covers the screen instead of hiding under the button that opens it', () => {
+    /*
+     * "Tuner displays under the tuner button and isn't visible without
+     * scrolling."
+     *
+     * It was drawn in the flow of a screen that scrolls, at the bottom, under
+     * the button that turns it on — so switching the tuner on did nothing you
+     * could see. Nothing here failed: the needle rendered perfectly, off the
+     * bottom of the phone.
+     *
+     * Tuning is not something you do alongside something else. For as long as
+     * it is on it is the only thing on the screen, and it is the size of it.
+     */
+    const tuner = read('mobile/src/components/Tuner.js')
+    const stage = read('mobile/src/screens/Stage.js')
+
+    assert.match(tuner, /<Modal visible=\{on\}/, 'the tuner is drawn in the page flow again, where it scrolls out of sight')
+    assert.match(tuner, /from 'expo-blur'/, 'the glass is gone')
+    assert.match(tuner, /tint="dark"/, 'the overlay is not tinted, so the rig behind it reads through at full brightness')
+
+    /* Closing it stops the tuner at the unit. An overlay that closes and leaves
+       the unit tuning is a rig muted by a screen nobody is looking at. */
+    assert.match(stage, /onClose=\{\(\) => writeTuner\(false\)\}/, 'closing the tuner leaves it running on the unit')
+    assert.match(tuner, /onPress=\{onClose\}[\s\S]{0,200}?style=\{\{ flex: 1 \}\}/, 'tapping the overlay does not close it')
+
+    /* And it is outside the foot, so the foot does not reserve space for it. */
+    assert.ok(
+      !/<Tuner on=\{tunerOn\} reading=\{tuning\} \/>/.test(stage),
+      'the tuner is still rendered inline without a way to close it'
+    )
+  })
+
+  test('Setup is a short list of doors, not everything at once', () => {
+    /*
+     * "Setup screen needs to be fixed. It's showing rename scenes and not set
+     * up like the web app."
+     *
+     * The browser arrived at this the hard way — "I wanna overhaul this whole
+     * settings set-up screen" — and the phone had exactly the pile it replaced:
+     * one long scroll with eight empty scene-name boxes as the FIRST thing on
+     * it. Nobody opens Setup to rename scene 6.
+     *
+     * A list of rows, each carrying the one fact you would have opened it to
+     * learn, each opening its own page. Renaming lives on the Unit page, which
+     * is where the browser put it: "move the rename presets and scenes button
+     * to the settings menu".
+     */
+    const settings = read('mobile/src/screens/Settings.js')
+
+    for (const row of ['Unit', 'Phone & Mac', 'Play screen', 'About']) {
+      assert.match(
+        settings,
+        new RegExp(`title="${row.replace('&', '&')}"`),
+        `Setup has no ${row} row`
+      )
+    }
+    assert.match(settings, /const \[page, setPage\] = useState\(null\)/, 'Setup is one scroll again rather than a list of pages')
+
+    /*
+     * The renaming boxes are behind the Unit row, not in front of everything.
+     * Checked by position: what is drawn for `page === null` must not contain
+     * them.
+     */
+    const root = settings.slice(settings.indexOf('{page === null ? ('), settings.indexOf("{page === 'unit' ?"))
+    assert.ok(root.length > 200, 'the Setup root moved; this check reads it')
+    assert.ok(!/UnitBits/.test(root), 'the scene-name boxes are back on the front page of Setup')
+    assert.ok(!/TileSize/.test(root), 'the tile size buttons are on the front page rather than behind Play screen')
+
+    const unit = settings.slice(settings.indexOf("{page === 'unit' ?"), settings.indexOf("{page === 'link' ?"))
+    assert.match(unit, /<UnitBits \/>/, 'renaming is not on the Unit page')
+
+    /* Each row says something true about the state it leads to, which is the
+       whole point of the list: it answers most questions without a tap. */
+    assert.match(settings, /status=\{link === 'connected' \? `\$\{deviceName \|\| 'Unit'\} · connected`/)
+    assert.match(settings, /status=\{SIZES\[loadSize\(sync\)\]\?\.name/)
+  })
+
+  test('the version on the About page is the version that was built', async () => {
+    /*
+     * Typed by hand it is the version somebody last remembered to type, which
+     * is worse than none: a wrong one sends people hunting for a bug in a build
+     * they are not running. So it is rendered from the repository's own
+     * package.json by sync:rules, and held to it by the same staleness check as
+     * every other shared file.
+     */
+    const { APP_VERSION } = await import('../mobile/src/lib/version.js')
+    const pkg = JSON.parse(read('package.json'))
+    assert.equal(APP_VERSION, pkg.version, 'the phone reports a version the repository is not on')
+    assert.match(read('mobile/src/screens/Settings.js'), /v\$\{APP_VERSION\}/, 'Setup does not show the version')
+  })
+
   test('every component the phone draws is one that exists', () => {
     /*
      * THE HOLE THIS FILLS, found the hard way.

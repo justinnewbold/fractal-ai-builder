@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { ScrollView, Text, TextInput, View } from 'react-native'
+import { Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 
-import { color, font, radius, space, TAP } from '../lib/theme'
+import { color, font, mono, radius, space, TAP } from '../lib/theme'
+import { APP_VERSION } from '../lib/version'
+import { tick } from '../lib/feedback'
 import {
   changePassword,
   currentAccount,
@@ -20,6 +22,8 @@ import { isPairAccount } from '../lib/pairing'
 import Lamp from '../components/Lamp'
 import Note from '../components/Note'
 import Press from '../components/Press'
+
+const face = Platform.select(mono)
 
 const ofDeviceName = (s) => s.deviceName
 
@@ -68,196 +72,310 @@ export default function Settings({
   const conflict = hostConflict(hosts, chosen)
   const lamp = link === 'connected' ? 'live' : link === 'no-answer' ? 'fault' : 'idle'
 
+  /**
+   * Which page of Setup is open, or null for the list of them.
+   *
+   * SETUP IS A LIST OF DOORS, not a scroll of everything at once. That is the
+   * browser's shape and it was arrived at the hard way — "I wanna overhaul this
+   * whole settings set-up screen" — and the phone had the pile it replaced, with
+   * eight scene-name boxes as the FIRST thing you saw. Nobody opens Setup to
+   * rename scene 6.
+   *
+   * Each row carries the one fact you would have opened it to learn: which unit
+   * and whether it answers, which Mac the phone is on, what size the tiles are.
+   */
+  const [page, setPage] = useState(null)
+
+  const linkWord =
+    link === 'connected'
+      ? `Connected to ${macName || 'your Mac'}`
+      : link === 'joining'
+        ? 'Finding your Mac'
+        : link === 'no-answer'
+          ? 'Your Mac isn’t answering'
+          : 'Not connected'
+
+  const head = (title, onDone) => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
+      {onDone === 'back' ? (
+        <Press label="‹ Setup" height={40} onPress={() => setPage(null)} />
+      ) : (
+        <Text accessibilityRole="header" style={{ color: color.silk, fontSize: font.title, fontWeight: '700' }}>
+          {title}
+        </Text>
+      )}
+      {onDone === 'back' ? (
+        <Text accessibilityRole="header" style={{ color: color.silk, fontSize: font.lead, fontWeight: '700' }}>
+          {title}
+        </Text>
+      ) : (
+        <Press label="Done" height={40} onPress={onBack} />
+      )}
+    </View>
+  )
+
   return (
     <ScrollView
       style={{ flex: 1 }}
       contentContainerStyle={{ padding: space.lg, gap: space.xl, paddingBottom: space.xxl }}
       keyboardShouldPersistTaps="handled"
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text accessibilityRole="header" style={{ color: color.silk, fontSize: font.title, fontWeight: '700' }}>
-          Setup
-        </Text>
-        <Press label="Done" height={40} onPress={onBack} />
-      </View>
+      {page === null ? (
+        <>
+          {head('Setup')}
+          <Text style={{ color: color.silkFaint, fontSize: font.small, fontFamily: face }}>
+            {`v${APP_VERSION}`}
+          </Text>
+          <View style={{ gap: 0 }}>
+            <SetupRow
+              title="Unit"
+              status={link === 'connected' ? `${deviceName || 'Unit'} · connected` : 'Not connected'}
+              onPress={() => setPage('unit')}
+            />
+            <SetupRow title="Phone & Mac" status={linkWord} onPress={() => setPage('link')} />
+            <SetupRow
+              title="Play screen"
+              status={SIZES[loadSize(sync)]?.name || 'Small'}
+              onPress={() => setPage('play')}
+            />
+            {onOpenGear ? (
+              <SetupRow
+                title="Amp & pedal names"
+                status="What each model on your unit really is"
+                onPress={onOpenGear}
+              />
+            ) : null}
+            <SetupRow title="About" status={`v${APP_VERSION}`} onPress={() => setPage('about')} />
+          </View>
+        </>
+      ) : null}
 
       {/* ------------------------------------------------------------ unit */}
-      {/*
-        Renaming, and how big the stage tiles are.
-
-        "Would also like to be able to rename presets and scenes in the app
-        directly without having to ask the chat." Both of those changed the
-        unit's edit buffer only — the same as everything else this app writes —
-        so they are permanent once the preset is saved to a slot, which happens
-        at the Mac.
-      */}
-      {link === 'connected' ? <UnitBits /> : null}
-
-      <View style={{ gap: space.md }}>
-        <Section>Stage tiles</Section>
-        <TileSize />
-      </View>
-
-      {onOpenGear ? (
-        <View style={{ gap: space.md }}>
-          <Section>Amp and pedal names</Section>
-          <Press
-            label="What your models really are"
-            sub="Brit 800 2204 is a Marshall JCM800"
-            onPress={onOpenGear}
-          />
-        </View>
+      {page === 'unit' ? (
+        <>
+          {head('Unit', 'back')}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+            <Lamp state={lamp} />
+            <Text style={{ color: color.silk, fontSize: font.body, flex: 1 }}>
+              {link === 'connected'
+                ? `${deviceName || 'Your unit'} — answering`
+                : 'No unit, because the Mac isn’t answering.'}
+            </Text>
+          </View>
+          {/*
+            Renaming is here and not on the front page. "Move the rename presets
+            and scenes button to the settings menu" put it in the browser's Unit
+            page; the phone had the boxes themselves as the first thing in Setup,
+            which is eight empty fields in front of everything anybody actually
+            opened Setup for.
+          */}
+          {link === 'connected' ? <UnitBits /> : <Note>Connect to the Mac to rename anything.</Note>}
+        </>
       ) : null}
 
-      {/* --------------------------------------------------------- playing */}
-      {/*
-        Gone with the AI, because hiding the ✦ Tone button is the only thing
-        this switch has ever done and there is no such button in this build.
-        A switch that takes away something already absent is a switch that
-        reports success and changes nothing. See lib/features.js.
-      */}
-      {AI ? (
-      <View style={{ gap: space.md }}>
-        <Section>Playing</Section>
-        {/*
-          First, above the link panels, because it is the one thing in here
-          somebody reaches for in a hurry with the lights down. The rest of this
-          screen is read once, when something is wrong.
-        */}
-        <Press
-          label={playing ? 'Play mode is on' : 'Play mode is off'}
-          sub={playing ? 'The Tone button is hidden' : 'The Tone button is on the stage screen'}
-          on={!!playing}
-          tone="signal"
-          disabled={playing === null}
-          onPress={() => {
-            const next = !playing
-            onPlayMode?.(next)
-            savePlayMode(next)
-          }}
-        />
-        <Note>
-          Play mode takes the ✦ Tone button off the stage screen, so nothing there can start
-          building a sound. Everything else works the same. This phone remembers it.
-        </Note>
-      </View>
-      ) : null}
+      {/* ------------------------------------------------------ phone & mac */}
+      {page === 'link' ? (
+        <>
+          {head('Phone & Mac', 'back')}
 
-      {/* ------------------------------------------------------------ link */}
-      <View style={{ gap: space.md }}>
-        <Section>The link</Section>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-          <Lamp state={lamp} />
-          <Text style={{ color: color.silk, fontSize: font.body, flex: 1 }}>
-            {link === 'connected'
-              ? `Connected to ${macName || 'your Mac'}${deviceName ? ` — ${deviceName}` : ''}`
-              : link === 'joining'
-                ? 'Finding your Mac.'
-                : link === 'no-answer'
-                  ? 'Your Mac isn’t answering.'
-                  : 'Not connected.'}
-          </Text>
-        </View>
+          <View style={{ gap: space.md }}>
+            <Section>The link</Section>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+              <Lamp state={lamp} />
+              <Text style={{ color: color.silk, fontSize: font.body, flex: 1 }}>
+                {link === 'connected'
+                  ? `Connected to ${macName || 'your Mac'}${deviceName ? ` — ${deviceName}` : ''}`
+                  : `${linkWord}.`}
+              </Text>
+            </View>
 
-        {link === 'no-answer' ? (
-          <Note tone="warn">
-            Open the Fractal app on the Mac and make sure the Mac is awake. This keeps trying on its
-            own.
-          </Note>
-        ) : null}
+            {link === 'no-answer' ? (
+              <Note tone="warn">
+                Open the Fractal app on the Mac and make sure the Mac is awake. This keeps trying on
+                its own.
+              </Note>
+            ) : null}
 
-        <Press label="Try now" onPress={onReconnect} />
-      </View>
+            <Press label="Try now" onPress={onReconnect} />
+          </View>
 
-      {/* ----------------------------------------------------------- which */}
-      {hosts.length > 1 ? (
-        <View style={{ gap: space.md }}>
-          <Section>Which Mac</Section>
-          {conflict ? <Note tone="fault">{conflict}</Note> : null}
-          {hosts.map((name, i) => (
+          {hosts.length > 1 ? (
+            <View style={{ gap: space.md }}>
+              <Section>Which Mac</Section>
+              {conflict ? <Note tone="fault">{conflict}</Note> : null}
+              {hosts.map((name, i) => (
+                <Press
+                  key={`${name}-${i}`}
+                  label={name}
+                  tone="live"
+                  on={name === chosen}
+                  onPress={async () => {
+                    await pickHost(name)
+                    setChosen(remoteChosenHost())
+                  }}
+                />
+              ))}
+            </View>
+          ) : null}
+
+          <View style={{ gap: space.md }}>
+            <Section>Account</Section>
+            <Text style={{ color: color.silkDim, fontSize: font.small }}>
+              {isPairAccount(account?.email)
+                ? 'Paired with your Mac, no account. What you save stays on this phone.'
+                : account?.email
+                  ? `Signed in as ${account.email}.`
+                  : 'Signed in.'}
+            </Text>
+
+            <TextInput
+              style={{
+                minHeight: TAP,
+                backgroundColor: color.panel,
+                borderWidth: 1,
+                borderColor: color.rule,
+                borderRadius: radius.md,
+                paddingHorizontal: space.md,
+                color: color.silk,
+                fontSize: font.lead
+              }}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="New password"
+              placeholderTextColor={color.silkFaint}
+              accessibilityLabel="New password"
+              autoCapitalize="none"
+              autoComplete="new-password"
+              secureTextEntry
+            />
             <Press
-              key={`${name}-${i}`}
-              label={name}
-              tone="live"
-              on={name === chosen}
+              label={busy ? 'Changing…' : 'Change password'}
+              disabled={busy || password.length < 6}
               onPress={async () => {
-                await pickHost(name)
-                setChosen(remoteChosenHost())
+                setBusy(true)
+                setError(null)
+                setNote(null)
+                try {
+                  await changePassword(password)
+                  setPassword('')
+                  setNote('Password changed.')
+                } catch (err) {
+                  setError(err.message)
+                } finally {
+                  setBusy(false)
+                }
               }}
             />
-          ))}
-        </View>
+
+            {note ? <Note>{note}</Note> : null}
+            {error ? <Note tone="fault">{error}</Note> : null}
+
+            <Press label="Sign out on this phone" onPress={onSignOut} />
+            <Text style={{ color: color.silkFaint, fontSize: font.micro, lineHeight: 18 }}>
+              The Mac stays signed in — signing out here must not drop the link mid-set.
+            </Text>
+          </View>
+        </>
       ) : null}
 
-      {/* --------------------------------------------------------- account */}
-      <View style={{ gap: space.md }}>
-        <Section>Account</Section>
-        <Text style={{ color: color.silkDim, fontSize: font.small }}>
-          {isPairAccount(account?.email)
-            ? 'Paired with your Mac, no account. What you save stays on this phone.'
-            : account?.email
-              ? `Signed in as ${account.email}.`
-              : 'Signed in.'}
-        </Text>
+      {/* ----------------------------------------------------- play screen */}
+      {page === 'play' ? (
+        <>
+          {head('Play screen', 'back')}
+          <View style={{ gap: space.md }}>
+            <Section>Stage tiles</Section>
+            <TileSize />
+          </View>
 
-        <TextInput
-          style={{
-            minHeight: TAP,
-            backgroundColor: color.panel,
-            borderWidth: 1,
-            borderColor: color.rule,
-            borderRadius: radius.md,
-            paddingHorizontal: space.md,
-            color: color.silk,
-            fontSize: font.lead
-          }}
-          value={password}
-          onChangeText={setPassword}
-          placeholder="New password"
-          placeholderTextColor={color.silkFaint}
-          accessibilityLabel="New password"
-          autoCapitalize="none"
-          autoComplete="new-password"
-          secureTextEntry
-        />
-        <Press
-          label={busy ? 'Changing…' : 'Change password'}
-          disabled={busy || password.length < 6}
-          onPress={async () => {
-            setBusy(true)
-            setError(null)
-            setNote(null)
-            try {
-              await changePassword(password)
-              setPassword('')
-              setNote('Password changed.')
-            } catch (err) {
-              setError(err.message)
-            } finally {
-              setBusy(false)
-            }
-          }}
-        />
+          {/*
+            Gone with the AI, because hiding the ✦ Tone button is the only thing
+            this switch has ever done and there is no such button in this build.
+            A switch that takes away something already absent is a switch that
+            reports success and changes nothing. See lib/features.js.
+          */}
+          {AI ? (
+            <View style={{ gap: space.md }}>
+              <Section>Playing</Section>
+              <Press
+                label={playing ? 'Play mode is on' : 'Play mode is off'}
+                sub={playing ? 'The Tone button is hidden' : 'The Tone button is on the stage screen'}
+                on={!!playing}
+                tone="signal"
+                disabled={playing === null}
+                onPress={() => {
+                  const next = !playing
+                  onPlayMode?.(next)
+                  savePlayMode(next)
+                }}
+              />
+              <Note>
+                Play mode takes the ✦ Tone button off the stage screen, so nothing there can start
+                building a sound. Everything else works the same. This phone remembers it.
+              </Note>
+            </View>
+          ) : null}
+        </>
+      ) : null}
 
-        {note ? <Note>{note}</Note> : null}
-        {error ? <Note tone="fault">{error}</Note> : null}
-
-        <Press label="Sign out on this phone" onPress={onSignOut} />
-        <Text style={{ color: color.silkFaint, fontSize: font.micro, lineHeight: 18 }}>
-          The Mac stays signed in — signing out here must not drop the link mid-set.
-        </Text>
-      </View>
-
-      {/* ------------------------------------------------------- the rules */}
-      <View style={{ gap: space.md }}>
-        <Section>What stays at the Mac</Section>
-        <Note>
-          Saving to a slot, backups, restores, firmware and raw SysEx are refused from a distance —
-          by your Mac, not by this app. A phone on a dark stage should not be able to overwrite a
-          preset you spent a week on.
-        </Note>
-      </View>
+      {/* ----------------------------------------------------------- about */}
+      {page === 'about' ? (
+        <>
+          {head('About', 'back')}
+          <Text style={{ color: color.silk, fontSize: font.body, fontFamily: face }}>
+            {`Fractal Remote v${APP_VERSION}`}
+          </Text>
+          <View style={{ gap: space.md }}>
+            <Section>What stays at the Mac</Section>
+            <Note>
+              Saving to a slot, backups, restores, firmware and raw SysEx are refused from a
+              distance — by your Mac, not by this app. A phone on a dark stage should not be able to
+              overwrite a preset you spent a week on.
+            </Note>
+          </View>
+        </>
+      ) : null}
     </ScrollView>
+  )
+}
+
+/**
+ * One row of Setup: a name, one line of live status, and a way in.
+ *
+ * The browser's own row, in this app's materials. Each carries the one fact you
+ * would have opened it to learn, so the list answers most questions without
+ * anybody tapping anything.
+ */
+function SetupRow({ title, status, onPress }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={status ? `${title}, ${status}` : title}
+      onPress={() => {
+        tick()
+        onPress()
+      }}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.md,
+        minHeight: TAP + 8,
+        paddingHorizontal: space.md,
+        paddingVertical: space.md,
+        borderBottomWidth: 1,
+        borderBottomColor: color.rule,
+        backgroundColor: pressed ? color.panelHi : 'transparent'
+      })}
+    >
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={{ color: color.silk, fontSize: font.lead, fontWeight: '600' }}>{title}</Text>
+        {status ? (
+          <Text numberOfLines={1} style={{ color: color.silkDim, fontSize: font.small }}>
+            {status}
+          </Text>
+        ) : null}
+      </View>
+      <Text style={{ color: color.silkFaint, fontSize: font.lead }}>›</Text>
+    </Pressable>
   )
 }
 

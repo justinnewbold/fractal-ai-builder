@@ -560,13 +560,20 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
         ) : null}
         {typedError ? <Note tone="fault">{typedError}</Note> : null}
 
-        <Tuner on={tunerOn} reading={tuning} />
       </View>
 
       <Text style={{ color: color.silkFaint, fontSize: font.micro, fontFamily: face }}>
         Everything you change here happens on the unit at the Mac. Saving to a slot happens there
         too.
       </Text>
+
+      {/*
+        The tuner covers the screen rather than sitting at the foot of it.
+        Drawn last and outside the foot because it is a modal now — see
+        components/Tuner. Closing it stops the tuner at the unit, which is the
+        same thing the button does.
+      */}
+      <Tuner on={tunerOn} reading={tuning} onClose={() => writeTuner(false)} />
     </ScrollView>
   )
 }

@@ -204,7 +204,31 @@ export const FILES = [
    * same key, so a phone and a laptop signed into one account do not argue
    * about it.
    */
-  { source: '../src/lib/gigSize.js', target: '../mobile/src/lib/gigSize.js' }
+  { source: '../src/lib/gigSize.js', target: '../mobile/src/lib/gigSize.js' },
+  /*
+   * What this build of the phone app is.
+   *
+   * Not a copy but a rendering: the repository's version, made into a module the
+   * About page can import. Typed by hand it would be the version somebody last
+   * remembered to type, which is worse than none — a wrong one sends people
+   * hunting for a bug in a build they are not running. Every change here needs a
+   * new version number anyway, so this moves on its own.
+   */
+  {
+    source: '../package.json',
+    target: '../mobile/src/lib/version.js',
+    render: (text) => `/**
+ * What this build of the phone app is.
+ *
+ * Generated from the repository's package.json by \`npm run sync:rules\`, for the
+ * plainest reason there is: the version on the About page has to be the version
+ * that was built. Typed by hand it is the version somebody last remembered to
+ * type, which is worse than no version at all — a wrong one sends people
+ * hunting for a bug in a build they are not running.
+ */
+export const APP_VERSION = '${JSON.parse(text).version}'
+`
+  }
 ]
 
 /** Where a copy says it came from, so nobody edits the copy by mistake. */
@@ -223,8 +247,13 @@ export const banner = (source) =>
  * are still copied and still held to being identical — only the note saying so
  * has nowhere to live, which is why nothing but data is allowed to be raw.
  */
-export const generate = (source, sourcePath, raw = false) =>
-  raw ? source : banner(sourcePath) + source
+export const generate = (source, sourcePath, raw = false, render = null) => {
+  /* A rendered file is neither a copy nor raw: its content is DERIVED from the
+     source, so the banner would be lying about what to edit. The doc comment
+     the renderer writes says where it came from instead. */
+  if (render) return render(source)
+  return raw ? source : banner(sourcePath) + source
+}
 
 const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
 
@@ -244,7 +273,7 @@ export const state = () =>
     } catch {
       // A copy that does not exist yet is stale, not a crash.
     }
-    return { ...file, sourceText, copyText, expected: generate(sourceText, file.source, file.raw) }
+    return { ...file, sourceText, copyText, expected: generate(sourceText, file.source, file.raw, file.render) }
   })
 
 if (import.meta.url === `file://${process.argv[1]}`) {
