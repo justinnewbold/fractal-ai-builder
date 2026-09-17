@@ -148,13 +148,23 @@ export default function TopBar({ link, onOpenSettings }) {
         </Pressable>
       ) : null}
 
+      {/*
+        The gear is a letter, not a picture, and a letter needs a colour.
+
+        "The settings icon is too dark to even see, but if I click where it's
+        supposed to be" — on Android. ⚙ is drawn from the phone's text font in
+        the text colour, which nobody set, so it took the default: black, on
+        a bar that is nearly black. The iPhone got away with it because Apple
+        swaps that character for its own picture of a gear. The speaker beside
+        it is a true emoji and paints itself on both.
+      */}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Connection and setup"
         hitSlop={10}
         onPress={onOpenSettings}
       >
-        <Text style={{ fontSize: font.lead }}>⚙</Text>
+        <Text style={{ color: color.silk, fontSize: font.lead }}>⚙</Text>
       </Pressable>
 
       {/*
