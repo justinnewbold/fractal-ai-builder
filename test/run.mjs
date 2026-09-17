@@ -11247,6 +11247,23 @@ test('the book answers for a band it knows, and stands aside when told to', asyn
   assert.equal(pickDesign(null, 'anything', {}), null)
 })
 
+test('the account row tidies its own delete-marks, whatever writes it', () => {
+  /*
+   * 7.271.0 fixed the app; the row was back to 131,072 marks within hours,
+   * written by a phone still on 7.268.0. Every device that has not been
+   * updated carries the pile and pushes it straight back up, and the fixed
+   * app cannot stop it because the phone writes last. So the database keeps
+   * one mark per setlist itself, before every write, and never refuses one.
+   */
+  const sql = readSrc(new URL('../supabase/migrations/20260917_stage_lists_tidy.sql', import.meta.url), 'utf8')
+  assert.match(sql, /create trigger stage_lists_tidy\s+before insert or update on public\.stage_lists/, 'the row is not tidied on the way in')
+  assert.match(sql, /group by g->>'id'/, 'the marks are not reduced to one per setlist')
+  assert.match(sql, /max\(\(g->>'at'\)::numeric\)/, 'the latest delete does not win, so a setlist made in between comes back')
+  assert.match(sql, /60\.0 \* 24 \* 60 \* 60 \* 1000/, 'marks are kept for a different time than the app remembers a delete (TOMBSTONE_MS)')
+  assert.match(sql, /order by d\.at desc, d\.id/, 'the marks come back in an order the app reads as a change, so a fixed device writes them again')
+  assert.match(sql, /exception when others then/, 'a row the trigger cannot tidy is refused, which turns the sync off')
+})
+
 test('the app builds a known band from the book and files every design under its band', () => {
   const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
   assert.match(app, /const noted = pickDesign\(await knownDesigns\(\)\.catch\(\(\) => \[\]\), description/)
