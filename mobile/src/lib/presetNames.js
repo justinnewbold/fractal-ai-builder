@@ -164,6 +164,19 @@ export function wantOnly(list) {
 /** The name, or undefined when it has not been read yet. '' means empty. */
 export const nameOf = (n) => names.get(n)
 
+/**
+ * A name this phone just wrote. Better evidence than any read, since it is
+ * the write itself — and the read that follows a rename can come back with
+ * the old name out of the computer's cache, which is how a renamed preset
+ * "just goes right back to the original name".
+ */
+export function learn(n, name) {
+  if (!Number.isInteger(n) || typeof name !== 'string') return
+  names.set(n, cleanPresetName(name))
+  persist()
+  announce()
+}
+
 /** Whether the unit stopped answering while names were being read. */
 export const readFailed = () => failed
 

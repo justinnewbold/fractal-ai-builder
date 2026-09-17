@@ -16,8 +16,8 @@ import {
   remoteHosts,
   sendPasswordReset
 } from '../lib/relay'
-import { refreshPreset, refreshScene, useRig } from '../lib/rig'
-import { sceneShape, setPresetName, setSceneName } from '../lib/device'
+import { notePresetName, noteSceneName, useRig } from '../lib/rig'
+import { dropReadCache, sceneShape, setPresetName, setSceneName } from '../lib/device'
 import { SIZES, loadSize, saveSize } from '../lib/gigSize'
 import { sync, useStored } from '../lib/store'
 import { savePlayMode } from '../lib/playMode'
@@ -27,6 +27,7 @@ import Lamp from '../components/Lamp'
 import Note from '../components/Note'
 import PasswordBox from '../components/PasswordBox'
 import Press from '../components/Press'
+import { SaveButton, SaveNotes, useSaveToSlot } from '../components/SaveToSlot'
 import Sheet from '../components/Sheet'
 
 const face = Platform.select(mono)
@@ -500,8 +501,14 @@ function SetupRow({ title, status, onPress }) {
  *
  * Both write the unit's EDIT BUFFER, like everything else this app does. The
  * new name is real the moment you type it and permanent once the preset is
- * saved to a slot — which happens at the Mac, because a phone is not allowed to
- * overwrite a slot and should not be.
+ * saved to a slot — which the Save button below the names asks the computer
+ * to do, because a phone is not allowed to overwrite a slot and should not be.
+ *
+ * AND THE WRITE IS BELIEVED. "Renaming a preset doesn't work, just goes right
+ * back to the original name." The rename landed; the re-read that followed
+ * came back with the old name out of the computer's cache and put it back on
+ * screen. So the cache is dropped and the screen is told the name it wrote,
+ * rather than asked to read it back. See rig.notePresetName.
  *
  * It lives in Setup rather than on the stage screen, which is the browser's
  * choice and the right one: "move the rename presets and scenes button to the
@@ -516,6 +523,7 @@ function UnitBits() {
 
   const [said, setSaid] = useState(null)
   const [failed, setFailed] = useState(null)
+  const saveTo = useSaveToSlot()
 
   const rename = async (name) => {
     const wanted = name.trim()
@@ -523,8 +531,9 @@ function UnitBits() {
     setFailed(null)
     try {
       await setPresetName(wanted)
-      await refreshPreset()
-      setSaid(`This preset is called ${wanted} now.`)
+      await dropReadCache()
+      notePresetName(wanted)
+      setSaid(`This preset is called ${wanted} now. Tap Save to keep it.`)
     } catch (err) {
       setFailed(err.message)
     }
@@ -536,8 +545,9 @@ function UnitBits() {
     setFailed(null)
     try {
       await setSceneName(index, wanted)
-      await refreshScene()
-      setSaid(`Scene ${index + 1} is called ${wanted} now.`)
+      await dropReadCache()
+      noteSceneName(index, wanted)
+      setSaid(`Scene ${index + 1} is called ${wanted} now. Tap Save to keep it.`)
     } catch (err) {
       setFailed(err.message)
     }
@@ -566,9 +576,12 @@ function UnitBits() {
         : null}
 
       {said ? <Note>{said}</Note> : null}
+      <SaveNotes s={saveTo} />
+      <SaveButton s={saveTo} height={TAP} grow />
       <Note>
-        A new name is on the unit straight away. It becomes permanent when the preset is saved to a
-        slot, which happens at the computer.
+        A new name is on the unit straight away and is lost on the next preset change unless it is
+        saved. Save asks the computer to write this slot, and that keeps everything changed from this
+        phone: names, knobs, blocks and the chain.
       </Note>
     </View>
   )

@@ -20,7 +20,7 @@ import * as device from './device'
 import { idOf, sameBlock } from './unit.mjs'
 import { TAP_REREAD_MS } from './tempo'
 import { DEFAULT_SLUG, deviceSlug } from './device-slug'
-import { adopt as adoptNames, forget as forgetNames, nameOf } from './presetNames'
+import { adopt as adoptNames, forget as forgetNames, learn as learnName, nameOf } from './presetNames'
 import { forget as forgetControls } from './paramIndex'
 import { recallSceneNames, rememberSceneNames } from './sceneNameCache'
 import { subscribeRemoteEvents } from './relay'
@@ -223,6 +223,39 @@ export async function refreshAll() {
   await refreshBlocks()
   if (!quick) await refreshSceneNames()
   await refreshTempo()
+}
+
+/**
+ * A rename this phone just made, taken as true without asking.
+ *
+ * "Renaming a preset doesn't work, just goes right back to the original
+ * name." It did not go back: the write landed, and the read that followed it
+ * came back out of the computer's cache with the old name, which then
+ * overwrote the new one on screen. The write is better evidence than any
+ * read, so it is what the screen and the name list are told. And the name
+ * the next Save carries is this one — the computer renames the preset to
+ * whatever the save request says, so a stale name here would have undone
+ * the rename on the way into the slot.
+ */
+export function notePresetName(name) {
+  const preset = state.preset
+  if (!preset || typeof name !== 'string') return
+  set({ preset: { ...preset, name } })
+  if (Number.isInteger(preset.number)) learnName(preset.number, name)
+}
+
+/** The same for a scene: on the tiles now, and kept where the next read looks. */
+export function noteSceneName(index, name) {
+  if (!Number.isInteger(index) || index < 0 || typeof name !== 'string') return
+  const names = [...(state.sceneNames || [])]
+  while (names.length <= index) names.push('')
+  names[index] = name
+  set({ sceneNames: names })
+  const number = state.preset?.number
+  const slug = state.deviceSlug
+  if (!Number.isInteger(number) || !slug) return
+  rememberSceneNames(device.nameOwner(slug), number, names)
+  device.keepSceneNames(slug, number, names)
 }
 
 export async function refreshPreset() {

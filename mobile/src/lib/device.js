@@ -484,7 +484,7 @@ export const READ_BACK_AGAIN_MS = 400
 /* A computer that refuses the cache drop will keep refusing while it is the
    computer; a dropped relay is about this moment and is asked again. */
 let cacheDropRefused = false
-async function dropReadCache() {
+export async function dropReadCache() {
   if (cacheDropRefused) return
   try {
     await remoteRequest('/device/cache', { method: 'DELETE' })
