@@ -3236,6 +3236,13 @@ export function run(test) {
     assert.match(box, /const ready = first\.length >= PASSWORD_MIN && first === again && !busy/, 'Change lights up before the two match')
   })
 
+  test('the way into the chain editor is called Edit chain', () => {
+    /* "Change label for add or move blocks to edit chain." */
+    const edit = read('mobile/src/screens/Edit.js')
+    assert.match(edit, /<Press label="Edit chain" sub="Add, move or remove blocks in this preset"/, 'the chain editor button is not called Edit chain')
+    assert.doesNotMatch(edit, /Add or move blocks/)
+  })
+
   test('a dead account service is given twelve seconds, not the whole evening', async () => {
     /*
      * "I can't log into supper base anymore. It says server error, so now I
