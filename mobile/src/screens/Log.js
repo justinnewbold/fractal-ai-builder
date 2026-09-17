@@ -59,7 +59,14 @@ export default function Log({ onBack }) {
       platform: `${Platform.OS} ${Platform.Version}`,
       unit: deviceName || 'not detected',
       preset: Number.isInteger(preset?.number) ? `${preset.number} ${preset.name || ''}`.trim() : 'none',
-      mac: link.macName || 'none',
+      computer: link.macName || 'none',
+      /*
+       * The version at the other end, which is the thing that could not be
+       * answered from a pasted log before: "Does the Mac app need to be updated
+       * to the latest version?" A computer too old to say so is itself the
+       * answer, so that case is named rather than left blank.
+       */
+      'computer app': link.hostVersion || 'did not say (older than 7.192.0)',
       link: link.link
     })
     try {

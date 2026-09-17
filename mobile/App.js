@@ -211,6 +211,7 @@ export default function App() {
               <Settings
                 link={link.link}
                 macName={link.macName}
+                hostVersion={link.hostVersion}
                 playing={playing}
                 onPlayMode={setPlaying}
                 onBack={() => setScreen('stage')}

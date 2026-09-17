@@ -52,7 +52,28 @@ export function nextDelay(previous) {
 }
 
 /** 'off' | 'joining' | 'no-answer' | 'connected' */
-const initial = { link: 'off', macName: null, hosts: [], chosenHost: null, clash: null }
+const initial = {
+  link: 'off',
+  macName: null,
+  /*
+   * What version the app on the computer is.
+   *
+   * "Does the Mac app need to be updated to the latest version? Or would that
+   * affect how the app performs?" A fair question with an answer nobody could
+   * reach: the computer has been writing its version into `host.name` beside
+   * its own name all along, and this end read the name and threw the version
+   * away.
+   *
+   * It matters. That app is the thing holding the cable to the unit and doing
+   * every read this phone asks for, so an old one is slow here for reasons that
+   * look, from a phone, exactly like this app being slow. Null until it says,
+   * and an old enough launcher never says — which is itself an answer.
+   */
+  hostVersion: null,
+  hosts: [],
+  chosenHost: null,
+  clash: null
+}
 
 let state = initial
 const watchers = new Set()
@@ -190,6 +211,8 @@ async function readMacName() {
     const doc = await remoteRequest('/store/config/host.name')
     const name = doc?.data?.name || doc?.name
     if (name) set({ macName: String(name) })
+    const version = doc?.data?.version || doc?.version
+    if (version) set({ hostVersion: String(version) })
   } catch {
     // "your Mac" is a fine name.
   }

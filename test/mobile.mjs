@@ -2523,4 +2523,56 @@ export function run(test) {
     /* And the word the top bar shows when there is nothing on the other end. */
     assert.match(read('shared/link-word.mjs'), /'no computer' : 'no phone'/, 'the bar still says NO MAC')
   })
+
+  test('the phone can say what the computer is running', async () => {
+    /*
+     * "The app keeps crashing, but it might be the Mac app which is very laggy
+     * also. Does the Mac app need to be updated to the latest version? Or would
+     * that affect how the app performs?"
+     *
+     * A fair question with an answer nobody could reach. The computer has been
+     * writing its version into `host.name` beside its own name since 7.192.0 —
+     * and this end read the name and threw the version away. So neither the
+     * Setup screen nor a pasted log could say which version was at the other
+     * end of a slow evening.
+     *
+     * It matters: that app holds the cable to the unit and does every read this
+     * phone asks for, so an old one is slow HERE, in a way that looks from a
+     * phone exactly like this app being slow.
+     */
+    const link = read('mobile/src/lib/link.js')
+    assert.match(link, /hostVersion: null/, 'the link state has nowhere to keep it')
+    assert.match(
+      link.replace(/\s+/g, ' '),
+      /const version = doc\?\.data\?\.version \|\| doc\?\.version if \(version\) set\(\{ hostVersion: String\(version\) \}\)/,
+      'the version the computer sends is still thrown away'
+    )
+
+    /* In the log, because that is the copy that reaches a chat. */
+    assert.match(
+      read('mobile/src/screens/Log.js').replace(/\s+/g, ' '),
+      /'computer app': link\.hostVersion \|\| 'did not say \(older than 7\.192\.0\)'/,
+      'a pasted log still cannot say what the computer is running'
+    )
+
+    /* And on screen, where somebody can act on it. */
+    const settings = read('mobile/src/screens/Settings.js').replace(/\s+/g, ' ')
+    assert.match(settings, /The app on the computer is v\$\{hostVersion\}/, 'Setup never says the computer’s version')
+    assert.match(settings, /const behind = !hostVersion \|\| isOlder\(hostVersion, APP_VERSION\) === true/, 'nothing works out whether the computer is behind')
+
+    /*
+     * The comparison is strict about what it will answer, and that is the
+     * point: telling somebody to update an app that is already current is
+     * worse than saying nothing at all.
+     */
+    const { isOlder } = await import('../mobile/src/lib/versions.js')
+    assert.equal(isOlder('7.191.0', '7.265.0'), true)
+    assert.equal(isOlder('7.265.0', '7.265.0'), false)
+    assert.equal(isOlder('7.266.0', '7.265.0'), false)
+    assert.equal(isOlder('7.9.0', '7.10.0'), true, 'versions are being compared as text, so 7.9 reads as newer than 7.10')
+    assert.equal(isOlder('7.265.1', '7.265.0'), false)
+    assert.equal(isOlder(null, '7.265.0'), null, 'a version nobody sent is being treated as a number')
+    assert.equal(isOlder('v7.265.0', '7.265.0'), null, 'a version this cannot parse still gets an opinion')
+    assert.equal(isOlder('7.265', '7.265.0'), null)
+  })
 }

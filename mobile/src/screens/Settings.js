@@ -3,6 +3,7 @@ import { Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-na
 
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
 import { APP_VERSION } from '../lib/version'
+import { isOlder } from '../lib/versions'
 import { getDebugLog } from '../lib/debugLog'
 import { tick } from '../lib/feedback'
 import {
@@ -42,6 +43,7 @@ export default function Settings({
   onOpenConnect,
   link,
   macName,
+  hostVersion,
   playing,
   onPlayMode,
   onBack,
@@ -87,6 +89,13 @@ export default function Settings({
    * Each row carries the one fact you would have opened it to learn: which unit
    * and whether it answers, which Mac the phone is on, what size the tiles are.
    */
+  /*
+   * Behind, or too old to say — which for this purpose is the same answer.
+   * The version only started being sent in 7.192.0, so a computer that says
+   * nothing is one from before that.
+   */
+  const behind = !hostVersion || isOlder(hostVersion, APP_VERSION) === true
+
   const [page, setPage] = useState(null)
 
   const linkWord =
@@ -205,6 +214,32 @@ export default function Settings({
                   : `${linkWord}.`}
               </Text>
             </View>
+
+            {/*
+              What the computer is running, and whether that is behind.
+
+              "Does the Mac app need to be updated to the latest version? Or
+              would that affect how the app performs?" It would: that app holds
+              the cable to the unit and does every read this phone asks for, so
+              an old one is slow here in a way that looks exactly like this app
+              being slow. The number was already being sent and nobody looked at
+              it.
+            */}
+            {link === 'connected' ? (
+              <Text style={{ color: color.silkDim, fontSize: font.small }}>
+                {hostVersion
+                  ? `The app on the computer is v${hostVersion}. This phone is v${APP_VERSION}.`
+                  : `The computer didn’t say which version it is running, which means it is older than 7.192.0. This phone is v${APP_VERSION}.`}
+              </Text>
+            ) : null}
+
+            {link === 'connected' && behind ? (
+              <Note tone="warn">
+                The app on the computer is behind this one. Update it there — it is the part that
+                holds the cable to your unit, and an old one is slow here in a way that looks like
+                this app being slow.
+              </Note>
+            ) : null}
 
             {link === 'no-answer' ? (
               <Note tone="warn">

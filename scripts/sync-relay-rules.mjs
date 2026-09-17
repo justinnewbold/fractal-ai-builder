@@ -62,6 +62,12 @@ export const FILES = [
    * link is a difference nobody can debug from a photograph.
    */
   { source: '../shared/link-word.mjs', target: '../mobile/src/lib/link-word.js' },
+  /*
+   * Which end is behind. Both apps carry the same version by construction, so
+   * the comparison has to mean the same thing at both ends of it.
+   */
+  { source: '../shared/versions.mjs', target: '../mobile/src/lib/versions.js' },
+
 
   { source: '../src/lib/guardrails.js', target: '../mobile/src/lib/guardrails.js' },
   { source: '../src/lib/validate.js', target: '../mobile/src/lib/validate.js' },
