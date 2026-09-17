@@ -246,6 +246,15 @@ export function startLink() {
     subscribeRemoteState(() => refresh()),
     subscribeHostSeen(() => refresh()),
     AppState.addEventListener('change', (status) => {
+      /*
+       * Said in the log, because without it a paste reads as a link that
+       * keeps dropping: "connected → joining" twelve seconds after the last
+       * tap, "→ connected" a second before the next. That is the phone's
+       * screen going off — Android cuts the connection when the app is put
+       * to sleep — and this is the app coming back. Six of those in one
+       * evening's log, none of them a fault, and nothing in it said so.
+       */
+      logDebug('app', status === 'active' ? 'back on screen' : `put to sleep (${status})`)
       // Back from a locked screen or another app: ask now rather than waiting
       // out whatever backoff the loop had reached while nobody was looking.
       if (status === 'active') probeNow()

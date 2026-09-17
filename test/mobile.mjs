@@ -3369,6 +3369,18 @@ export function run(test) {
     assert.match(dev, /encodeURIComponent\(`fractal\.saveResult\.\$\{slug\}`\)/)
   })
 
+  test('the log says when the phone went to sleep and came back', () => {
+    /*
+     * Six times in one evening's log: "connected → joining" a few seconds
+     * after the last tap, "→ connected" a second before the next. Android
+     * cutting the connection when the screen goes off, and the app coming
+     * back — not a fault, and nothing in the log said so.
+     */
+    const link = read('mobile/src/lib/link.js').replace(/\s+/g, ' ')
+    assert.match(link, /logDebug\('app', status === 'active' \? 'back on screen' : `put to sleep \(\$\{status\}\)`\)/, 'a paste still cannot tell a sleeping phone from a dropping link')
+    assert.match(link, /if \(status === 'active'\) probeNow\(\)/, 'the phone does not look for the computer the moment it wakes')
+  })
+
   test('a dead account service is given twelve seconds, not the whole evening', async () => {
     /*
      * "I can't log into supper base anymore. It says server error, so now I
