@@ -2118,4 +2118,27 @@ export function run(test) {
     assert.ok(!/label="Setup"/.test(stage), 'Setup is on the stage screen as well as the bar')
     assert.ok(!/onOpenSettings/.test(stage), 'the stage screen still takes a way to Setup it no longer draws')
   })
+
+  test('the play screen carries nothing but the rig', () => {
+    /*
+     * "Get rid of the everything you change here text at the bottom of the
+     * screen."
+     *
+     * A footer explaining that changes land on the unit at the Mac. True, and
+     * the kind of sentence you read once and then scroll past for the rest of
+     * the app's life — on the one screen whose whole currency is buttons you
+     * can hit without looking. The bar at the top already says which unit is
+     * being driven and whether the link is up, which is the part that goes on
+     * being worth the room.
+     */
+    const stage = read('mobile/src/screens/Stage.js')
+    assert.ok(
+      !/Everything you change here/.test(stage),
+      'the explanation is back at the bottom of the play screen'
+    )
+    /* And nothing was left behind holding it up. An unused import is not a
+       crash, but a face with nothing wearing it is how the next one starts. */
+    assert.ok(!/const face =/.test(stage), 'the play screen still builds a font nothing uses')
+    assert.ok(!/\bmono\b/.test(stage), 'the play screen still imports a face it does not draw with')
+  })
 }

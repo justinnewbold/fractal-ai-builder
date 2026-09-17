@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Platform, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native'
+import { RefreshControl, ScrollView, Text, TextInput, View } from 'react-native'
 import { useKeepAwake } from 'expo-keep-awake'
 
-import { color, font, mono, space, TAP } from '../lib/theme'
+import { color, font, space, TAP } from '../lib/theme'
 import { hostConflict, remoteChosenHost, remoteHosts } from '../lib/relay'
 import { idOf, presetLabel, sameBlock, sceneShape, slotCount, slotLabel, stepSlot } from '../lib/device'
 import {
@@ -38,8 +38,6 @@ import Tile from '../components/Tile'
 import Sheet from '../components/Sheet'
 import TempoBox from '../components/TempoBox'
 import Tuner from '../components/Tuner'
-
-const face = Platform.select(mono)
 
 /* Hoisted: a selector rebuilt each render re-reads the store on every notify. */
 const ofPreset = (s) => s.preset
@@ -462,10 +460,15 @@ export default function Stage({ onOpenTone, onOpenPresets, onOpenSetlists, onOpe
 
       </View>
 
-      <Text style={{ color: color.silkFaint, fontSize: font.micro, fontFamily: face }}>
-        Everything you change here happens on the unit at the Mac. Saving to a slot happens there
-        too.
-      </Text>
+      {/*
+        NO FOOTER. "Get rid of the everything you change here text at the bottom
+        of the screen."
+
+        It explained where changes land — true, and the kind of thing you read
+        once and then scroll past for the rest of the app's life. The bar at the
+        top already says which unit is being driven and that the link is up,
+        which is the part that goes on mattering.
+      */}
 
       {/*
         The two things that cover the screen rather than sitting in it, drawn
