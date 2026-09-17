@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { KeyboardAvoidingView, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
 import { Platform } from 'react-native'
@@ -41,6 +41,15 @@ const ofSlug = (s) => s.deviceSlug
  * in order, to be fixed on the spot when the running order changes at the
  * venue.
  *
+ * THE NAME IS EDITED IN THE CARD, and that is the shape of the whole screen.
+ * "When creating a new list it should only show one text entry box, have it
+ * already highlight the setlist created, to rename just by typing." It had
+ * two: the chosen card at the top, in amber, saying the name, and a Name box
+ * a screen further down — behind the keyboard, on Android, the moment it
+ * opened. So the chosen card IS the box now. Press + New setlist and the new
+ * card appears chosen, its name selected, the keyboard up: type, and that is
+ * its name. Tap the name on any chosen card to rename it.
+ *
  * Everything here writes straight to storage and says nothing back: lib/store
  * announces every write and the stage screen re-reads. So this screen never
  * holds a copy of the lists that could drift from the one the buttons use.
@@ -71,6 +80,7 @@ export default function Setlists({ onBack }) {
   const current = preset?.number
   const here = Number.isInteger(current)
   const starred = here && favourites.includes(current)
+  const inList = here && !!chosen && chosen.presets.includes(current)
 
   /*
    * Adding a song that is not the one playing needs a way to find it: a filter
@@ -106,6 +116,13 @@ export default function Setlists({ onBack }) {
    * saved.
    */
   const [draft, setDraft] = useState(null)
+  /*
+   * The setlist just made, whose card opens with its name selected and the
+   * keyboard up. Only ever the one just pressed into being: a card that
+   * grabbed the keyboard every time it was chosen would be a card you cannot
+   * choose without typing.
+   */
+  const [justMade, setJustMade] = useState(null)
 
   useEffect(() => {
     setArmed(false)
@@ -120,8 +137,6 @@ export default function Setlists({ onBack }) {
     return n === current ? presetLabel(preset) : ''
   }
 
-  const choose = (src) => setSource(device, src)
-
   const setPresets = (presets) => {
     if (!chosen) return
     updateList(device, chosen.id, { presets })
@@ -129,10 +144,21 @@ export default function Setlists({ onBack }) {
 
   /** Save what was typed, if it is a name and it is a different one. */
   const commitName = () => {
+    setJustMade(null)
     const name = (draft ?? '').trim()
     setDraft(null)
     if (!chosen || !name || name === chosen.name) return
     updateList(device, chosen.id, { name })
+  }
+
+  /*
+   * Choosing another card takes the box away with the card it was in, and a
+   * box that goes away is not blurred — so a name typed and then chosen away
+   * from is saved here, before the card changes.
+   */
+  const choose = (src) => {
+    commitName()
+    setSource(device, src)
   }
 
   /*
@@ -154,10 +180,12 @@ export default function Setlists({ onBack }) {
   )
 
   const fresh = () => {
+    commitName()
     // A new setlist is the one you are about to build, so it is the one the
-    // buttons follow — and the one this screen opens for editing, below.
+    // buttons follow — and the one whose card opens ready to be named.
     const list = createList(device)
     setSource(device, list.id)
+    setJustMade(list.id)
   }
 
   const remove = () => {
@@ -184,113 +212,108 @@ export default function Setlists({ onBack }) {
         .slice(0, 40)
     : []
 
+  const box = {
+    minHeight: TAP,
+    paddingHorizontal: space.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: color.rule,
+    backgroundColor: color.panel,
+    color: color.silk,
+    fontSize: font.body
+  }
+
   return (
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxl }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
-        <View style={{ flexShrink: 1 }}>
-          <Text accessibilityRole="header" style={{ color: color.silk, fontSize: font.title, fontWeight: '700' }}>
-            Setlist
-          </Text>
-          <Text style={{ color: color.silkDim, fontSize: font.small }}>
-            What Previous and Next step through
-          </Text>
-        </View>
-        <Press label="Done" height={40} onPress={onBack} />
-      </View>
-
-      {/* --------------------------------------------------------- source */}
-      <View style={{ gap: space.sm }} accessibilityRole="radiogroup">
-        <SourceRow
-          on={source === ALL}
-          onPress={() => choose(ALL)}
-          name="All presets"
-          note="Slot by slot, in order"
-        />
-        <SourceRow
-          on={source === STARRED}
-          onPress={() => choose(STARRED)}
-          name="★ Starred"
-          note={
-            favourites.length
-              ? `${favourites.length} preset${favourites.length === 1 ? '' : 's'}, in slot order`
-              : 'Nothing starred yet'
-          }
-        />
-        {lists.map((l) => (
-          <SourceRow
-            key={l.id}
-            on={source === l.id}
-            onPress={() => choose(l.id)}
-            name={l.name}
-            note={l.presets.length ? `${l.presets.length} song${l.presets.length === 1 ? '' : 's'}` : 'Empty'}
-          />
-        ))}
-        <Press label="+ New setlist" onPress={fresh} />
-      </View>
-
-      {/*
-        The star, here as well as in the picker: this is the screen you have
-        open when you decide the preset you are on belongs in tonight's order.
-      */}
-      {here ? (
-        <View style={{ gap: space.sm }}>
-          <Label>This preset</Label>
-          <Text style={{ color: color.silkDim, fontSize: font.small, fontFamily: face }}>
-            {`${slotLabel(current, addressing)}  ${presetLabel(preset)}`}
-          </Text>
-          <Press
-            label={starred ? '★ Starred' : '☆ Star this preset'}
-            tone="signal"
-            on={starred}
-            onPress={() => toggleFavourite(device, current)}
-          />
-          {chosen ? (
-            <Press
-              label={
-                chosen.presets.includes(current) ? `Already in ${chosen.name}` : `Add to ${chosen.name}`
-              }
-              disabled={chosen.presets.includes(current)}
-              onPress={() => setPresets(addTo(chosen.presets, current))}
-            />
-          ) : null}
-        </View>
-      ) : null}
-
-      {/* ----------------------------------------------------------- edit */}
-      {chosen ? (
-        <View style={{ gap: space.md }}>
-          <View style={{ gap: space.sm }}>
-            <Label>Name</Label>
-            <TextInput
-              value={draft ?? chosen.name}
-              onChangeText={setDraft}
-              onBlur={commitName}
-              onSubmitEditing={commitName}
-              returnKeyType="done"
-              blurOnSubmit
-              accessibilityLabel="Setlist name"
-              placeholderTextColor={color.silkFaint}
-              style={{
-                minHeight: TAP,
-                paddingHorizontal: space.md,
-                borderRadius: radius.md,
-                borderWidth: 1,
-                borderColor: color.rule,
-                backgroundColor: color.panel,
-                color: color.silk,
-                fontSize: font.body
-              }}
-            />
+    /*
+     * The page moves out from under the keyboard, the way the sign-in screen
+     * does. The name box is in the top half of the page, so on most phones the
+     * keyboard never reaches it; this is for the search box further down.
+     */
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxl }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
+          <View style={{ flexShrink: 1 }}>
+            <Text accessibilityRole="header" style={{ color: color.silk, fontSize: font.title, fontWeight: '700' }}>
+              Setlist
+            </Text>
+            <Text style={{ color: color.silkDim, fontSize: font.small }}>
+              What Previous and Next step through
+            </Text>
           </View>
+          <Press label="Done" height={40} onPress={onBack} />
+        </View>
 
-          {chosen.presets.length ? (
-            <View style={{ gap: space.sm }}>
-              <Label>{`Songs in ${chosen.name}`}</Label>
-              {chosen.presets.map((n, i) => (
+        {/* --------------------------------------------------------- source */}
+        <View style={{ gap: space.sm }} accessibilityRole="radiogroup">
+          <SourceRow
+            on={source === ALL}
+            onPress={() => choose(ALL)}
+            name="All presets"
+            note="Slot by slot, in order"
+          />
+          <SourceRow
+            on={source === STARRED}
+            onPress={() => choose(STARRED)}
+            name="★ Starred"
+            note={
+              favourites.length
+                ? `${favourites.length} preset${favourites.length === 1 ? '' : 's'}, in slot order`
+                : 'Nothing starred yet — star one below'
+            }
+          />
+          {lists.map((l) => (
+            <SourceRow
+              key={l.id}
+              on={source === l.id}
+              onPress={() => choose(l.id)}
+              name={l.name}
+              note={
+                source === l.id
+                  ? `${songs(l)} · tap the name to rename`
+                  : songs(l)
+              }
+              /* The chosen card is the name box. See the note at the top. */
+              editing={
+                source === l.id
+                  ? {
+                      value: draft ?? l.name,
+                      setDraft,
+                      commitName,
+                      selectAll: justMade === l.id
+                    }
+                  : null
+              }
+            />
+          ))}
+          <Press label="+ New setlist" onPress={fresh} />
+        </View>
+
+        {/* --------------------------------------------------------- songs */}
+        {chosen ? (
+          <View style={{ gap: space.md }}>
+            <Label>{`Songs in ${chosen.name}`}</Label>
+
+            {/*
+              The preset you are on, first: this is the screen you have open
+              when you decide it belongs in tonight's order, and the button that
+              puts it there sits right above the order it goes into.
+            */}
+            {here ? (
+              <Press
+                label={inList ? `${presetLabel(preset)} is in this setlist` : `+ Add ${presetLabel(preset)}`}
+                sub={`${slotLabel(current, addressing)} · the preset you are on`}
+                tone="signal"
+                disabled={inList}
+                onPress={() => setPresets(addTo(chosen.presets, current))}
+              />
+            ) : null}
+
+            {chosen.presets.length ? (
+              chosen.presets.map((n, i) => (
                 <Song
                   key={n}
                   position={i + 1}
@@ -303,82 +326,94 @@ export default function Setlists({ onBack }) {
                   onDown={() => setPresets(moveIn(chosen.presets, i, i + 1))}
                   onRemove={() => setPresets(removeFrom(chosen.presets, n))}
                 />
-              ))}
-            </View>
-          ) : (
-            <Note>
-              No songs yet. Add the preset you are on, or find one below. Next goes to the first
-              song, and after the last one it starts over.
-            </Note>
-          )}
+              ))
+            ) : (
+              <Note>No songs yet. Next goes to the first song, and after the last one it starts over.</Note>
+            )}
 
-          {adding ? (
-            <View style={{ gap: space.sm }}>
-              <TextInput
-                autoFocus
-                value={needle}
-                onChangeText={setNeedle}
-                placeholder="Find a preset"
-                placeholderTextColor={color.silkFaint}
-                autoCorrect={false}
-                autoCapitalize="none"
-                accessibilityLabel="Find a preset to add"
-                style={{
-                  minHeight: TAP,
-                  paddingHorizontal: space.md,
-                  borderRadius: radius.md,
-                  borderWidth: 1,
-                  borderColor: color.rule,
-                  backgroundColor: color.panel,
-                  color: color.silk,
-                  fontSize: font.body
-                }}
-              />
-              {candidates.length ? (
-                candidates.map((s) => (
-                  <Press
-                    key={s.number}
-                    label={s.name}
-                    sub={`${slotLabel(s.number, addressing)}   +`}
-                    onPress={() => setPresets(addTo(chosen.presets, s.number))}
-                  />
-                ))
-              ) : (
-                <Note>
-                  {q
-                    ? `Nothing named like “${needle}”.`
-                    : namedSlots().length
-                      ? 'Every preset whose name we have read is already in this setlist.'
-                      : 'No preset names read yet — open the preset list and scroll it to read them off the unit.'}
-                </Note>
-              )}
-            </View>
-          ) : (
-            <Press label="Add another song" onPress={() => setAdding(true)} />
-          )}
+            {adding ? (
+              <View style={{ gap: space.sm }}>
+                <TextInput
+                  autoFocus
+                  value={needle}
+                  onChangeText={setNeedle}
+                  placeholder="Find a preset by name or number"
+                  placeholderTextColor={color.silkFaint}
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                  accessibilityLabel="Find a preset to add"
+                  style={box}
+                />
+                {candidates.length ? (
+                  candidates.map((s) => (
+                    <Press
+                      key={s.number}
+                      label={s.name}
+                      sub={`${slotLabel(s.number, addressing)}   +`}
+                      onPress={() => setPresets(addTo(chosen.presets, s.number))}
+                    />
+                  ))
+                ) : (
+                  <Note>
+                    {q
+                      ? `Nothing named like “${needle}”.`
+                      : namedSlots().length
+                        ? 'Every preset whose name is known is already in this setlist.'
+                        : 'No preset names known yet. Open Presets once and they will be.'}
+                  </Note>
+                )}
+                <Press label="Done adding" height={40} onPress={() => setAdding(false)} />
+              </View>
+            ) : (
+              <Press label="Find another song…" onPress={() => setAdding(true)} />
+            )}
 
-          <Press
-            label={armed ? 'Tap again to delete this setlist' : 'Delete this setlist'}
-            on={armed}
-            onPress={remove}
-          />
-        </View>
-      ) : null}
+            <Press
+              label={armed ? 'Tap again to delete this setlist' : 'Delete this setlist'}
+              on={armed}
+              tone={armed ? 'signal' : 'plain'}
+              onPress={remove}
+            />
+          </View>
+        ) : null}
 
-      {/*
-        Where they live. The phone is signed in by definition — it cannot reach
-        the Mac otherwise — so this is not the browser's two answers, it is the
-        one that is always true here.
-      */}
-      <Note>
-        Setlists and stars are kept with your account, so one built here is on the computer too.
-      </Note>
-    </ScrollView>
+        {/* ---------------------------------------------------------- star */}
+        {here ? (
+          <View style={{ gap: space.sm }}>
+            <Label>This preset</Label>
+            <Press
+              label={starred ? `★ ${presetLabel(preset)} is starred` : `☆ Star ${presetLabel(preset)}`}
+              sub={`${slotLabel(current, addressing)} · starred presets are what ★ Starred walks`}
+              tone="signal"
+              on={starred}
+              onPress={() => toggleFavourite(device, current)}
+            />
+          </View>
+        ) : null}
+
+        {/*
+          Where they live. The phone is signed in by definition — it cannot
+          reach the Mac otherwise — so this is not the browser's two answers, it
+          is the one that is always true here.
+        */}
+        <Note>Setlists and stars are kept with your account, so one built here is on the computer too.</Note>
+      </ScrollView>
+    </KeyboardAvoidingView>
   )
 }
 
-/** One choice of what Previous and Next walk. */
-function SourceRow({ on, onPress, name, note }) {
+/** "3 songs", "1 song", "Empty". */
+const songs = (l) => (l.presets.length ? `${l.presets.length} song${l.presets.length === 1 ? '' : 's'}` : 'Empty')
+
+/**
+ * One choice of what Previous and Next walk.
+ *
+ * With `editing`, the name is a text box in the card — the chosen setlist's
+ * card, which is where the name is read and so where it is changed. It is
+ * still the card: a tap outside the name chooses it, as ever.
+ */
+function SourceRow({ on, onPress, name, note, editing = null }) {
+  const { setDraft, commitName, selectAll } = editing || {}
   return (
     <Pressable
       accessibilityRole="radio"
@@ -400,9 +435,38 @@ function SourceRow({ on, onPress, name, note }) {
         opacity: pressed ? 0.7 : 1
       })}
     >
-      <Text numberOfLines={1} style={{ color: color.silk, fontSize: font.body, fontWeight: '600' }}>
-        {name}
-      </Text>
+      {editing ? (
+        <TextInput
+          value={editing.value}
+          onChangeText={setDraft}
+          onBlur={commitName}
+          onSubmitEditing={commitName}
+          returnKeyType="done"
+          blurOnSubmit
+          /*
+           * A new setlist opens with its name selected and the keyboard up, so
+           * typing replaces "Setlist 1" rather than appending to it.
+           */
+          autoFocus={selectAll}
+          selectTextOnFocus
+          accessibilityLabel="Setlist name"
+          placeholder="Name this setlist"
+          placeholderTextColor={color.silkFaint}
+          style={{
+            color: color.silk,
+            fontSize: font.body,
+            fontWeight: '600',
+            paddingVertical: 0,
+            paddingHorizontal: 0,
+            marginVertical: -2,
+            minHeight: 28
+          }}
+        />
+      ) : (
+        <Text numberOfLines={1} style={{ color: color.silk, fontSize: font.body, fontWeight: '600' }}>
+          {name}
+        </Text>
+      )}
       <Text numberOfLines={1} style={{ color: color.silkDim, fontSize: font.micro, marginTop: 2 }}>
         {note}
       </Text>
@@ -440,7 +504,9 @@ function Song({ position, slot, name, playing, first, last, onUp, onDown, onRemo
         <Text numberOfLines={1} style={{ color: color.silk, fontSize: font.body }}>
           {name}
         </Text>
-        <Text style={{ color: color.silkFaint, fontSize: font.micro, fontFamily: face }}>{slot}</Text>
+        <Text style={{ color: color.silkFaint, fontSize: font.micro, fontFamily: face }}>
+          {playing ? `${slot} · playing` : slot}
+        </Text>
       </View>
       <Nudge label={`Move ${name} up`} glyph="▲" disabled={first} onPress={onUp} />
       <Nudge label={`Move ${name} down`} glyph="▼" disabled={last} onPress={onDown} />
