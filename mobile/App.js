@@ -10,6 +10,7 @@ import Lamp from './src/components/Lamp'
 import Note from './src/components/Note'
 import Settings from './src/screens/Settings'
 import SignIn from './src/screens/SignIn'
+import Edit from './src/screens/Edit'
 import Presets from './src/screens/Presets'
 import Setlists from './src/screens/Setlists'
 import Stage from './src/screens/Stage'
@@ -155,6 +156,8 @@ export default function App() {
               <Presets onBack={() => setScreen('stage')} />
             ) : screen === 'setlists' ? (
               <Setlists onBack={() => setScreen('stage')} />
+            ) : screen === 'edit' ? (
+              <Edit onBack={() => setScreen('stage')} />
             ) : AI && screen === 'tone' ? (
               <Tone onBack={() => setScreen('stage')} />
             ) : screen === 'settings' ? (
@@ -202,6 +205,12 @@ export default function App() {
                  * one screen in this app that never needed the rig.
                  */
                 onOpenSetlists={() => setScreen('setlists')}
+                /*
+                 * The bench. Only once the Mac is answering: every control on
+                 * that screen is read off the unit, so with nothing on the
+                 * other end it is a screen of empty knobs.
+                 */
+                onOpenEdit={link.link === 'connected' ? () => setScreen('edit') : null}
               />
             )}
           </>

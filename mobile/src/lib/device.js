@@ -17,16 +17,19 @@
  * are not stage controls — is in unit.mjs, where the tests can reach it.
  */
 import { remoteRequest } from './relay'
+import { withLineage } from './lineage'
 import { cleanPresetName, isEmptySlotName } from './unit.mjs'
 import { preferredEncoding, rememberEncoding } from './encoding'
 import { toNormalized } from './scale'
 
 export {
   EXCLUDED_BLOCKS,
+  idOf,
   isBanked,
   presetLabel,
   sceneShape,
   slotCount,
+  sameBlock,
   slotLabel,
   stepSlot
 } from './unit.mjs'
@@ -58,18 +61,29 @@ export async function currentPreset() {
 }
 
 /**
- * Every block in the loaded preset that is worth a button.
+ * Every block in the loaded preset, exactly as the unit reports it.
  *
  * A slow read on purpose — on an AM4 this makes the unit dump its whole preset
  * over serial before answering, which is why the relay allows it 45 seconds
  * rather than the usual 20. Giving up early here is what once showed a preset
  * with nothing in it.
+ *
+ * NOT FILTERED HERE ANY MORE, and the distinction is the point. The stage
+ * screen hides the input, the output, the looper and the gate, because nobody
+ * kicks an input block between two bars. The edit screen shows them, because
+ * that screen is the chain being LOOKED at — and a diagram that silently drops
+ * two of its blocks disagrees with the unit about what the preset is. Which
+ * ones a screen wants is that screen's business; see `stageBlocks`.
  */
 export async function presetBlocks() {
   const list = await remoteRequest('/preset/blocks')
   if (!Array.isArray(list)) return []
-  return list.filter((b) => b?.slug && !EXCLUDED_BLOCKS.includes(b.slug))
+  return list.filter((b) => b?.slug)
 }
+
+/** The ones that belong on a stage: everything but the four you never kick. */
+export const stageBlocks = (blocks) =>
+  (blocks || []).filter((b) => !EXCLUDED_BLOCKS.includes(b.slug))
 
 /** Which scene is live. Bypass states are per-scene, so this changes what else is true. */
 export const getScene = () => remoteRequest('/scene')
@@ -170,8 +184,17 @@ export const setTuner = (on) => post('/tuner', { on })
  */
 export const setType = (eid, value) => post(`/preset/blocks/${eid}/type`, { value })
 
-/** Every model a block family offers, so a tone can ask for one by name. */
-export const blockTypes = async (slug) => (await remoteRequest(`/blocks/${slug}/types`)) || []
+/**
+ * Every model a block family offers, with what each one is modelled on.
+ *
+ * The lineage is put on here rather than asked for: an FM3 reading from its own
+ * device cache does carry it and wins, and an AM4 carries none of it at all. So
+ * the catalog fills in the nulls — the same catalog the browser uses, copied by
+ * `npm run sync:rules`, because the same amp being two amps on two screens is
+ * worse than it being a code word on both.
+ */
+export const blockTypes = async (slug) =>
+  withLineage(slug, (await remoteRequest(`/blocks/${slug}/types`)) || [])
 
 /** Name the preset, and name a scene. Both land in the edit buffer only. */
 export const setPresetName = (name) => post('/preset/name', { name })
