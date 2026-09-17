@@ -62,6 +62,12 @@ export const FILES = [
    * link is a difference nobody can debug from a photograph.
    */
   { source: '../shared/link-word.mjs', target: '../mobile/src/lib/link-word.js' },
+  /*
+   * Which end is behind. Both apps carry the same version by construction, so
+   * the comparison has to mean the same thing at both ends of it.
+   */
+  { source: '../shared/versions.mjs', target: '../mobile/src/lib/versions.js' },
+
 
   { source: '../src/lib/guardrails.js', target: '../mobile/src/lib/guardrails.js' },
   { source: '../src/lib/validate.js', target: '../mobile/src/lib/validate.js' },
@@ -167,6 +173,34 @@ export const FILES = [
   { source: '../src/data/drive-types.json', target: '../mobile/src/data/drive-types.json', raw: true },
   { source: '../src/data/amp-lineage.json', target: '../mobile/src/data/amp-lineage.json', raw: true },
   { source: '../src/data/effect-lineage.json', target: '../mobile/src/data/effect-lineage.json', raw: true },
+  /*
+   * THE SIMULATED FM3, so the phone has something to be without a rig.
+   *
+   * "Yes I want the demo mode on the phone as well. It helps me make sure the
+   * lag isn't just the app, also." That second reason is the better one and it
+   * decides how this is wired: the demo answers from memory with no relay, no
+   * serial port and no unit in it, so a screen that is still slow in the demo
+   * is slow because of this app and nothing else. It is the only way to tell
+   * those two apart, and this project has now guessed wrong about which is
+   * which more than once.
+   *
+   * Copied rather than rewritten, because a demo that behaves differently from
+   * the browser's is a demo that teaches the wrong thing — and this one carries
+   * the write semantics that cost an evening to find: normalised in, real units
+   * out, and an out-of-range write that clamps and reports success.
+   *
+   * It reaches for localStorage in two places, which a phone does not have.
+   * Both are already inside a try, so the phone simply forgets renamed scenes
+   * between launches — the one thing lost, and not worth a second copy of the
+   * file to keep.
+   */
+  { source: '../src/lib/mockDevice.js', target: '../mobile/src/lib/mockDevice.js' },
+  { source: '../src/lib/sceneState.js', target: '../mobile/src/lib/sceneState.js' },
+  { source: '../src/lib/demoMemory.js', target: '../mobile/src/lib/demoMemory.js' },
+  { source: '../src/lib/tunerStream.js', target: '../mobile/src/lib/tunerStream.js' },
+  { source: '../src/data/cab-types.json', target: '../mobile/src/data/cab-types.json', raw: true },
+  { source: '../src/data/amp-params.json', target: '../mobile/src/data/amp-params.json', raw: true },
+
   /*
    * Where a block sits, and how that becomes something the unit will accept.
    *

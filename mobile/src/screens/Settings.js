@@ -3,6 +3,8 @@ import { Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-na
 
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
 import { APP_VERSION } from '../lib/version'
+import { isOlder } from '../lib/versions'
+import { setDemo, useDemo } from '../lib/demo'
 import { getDebugLog } from '../lib/debugLog'
 import { tick } from '../lib/feedback'
 import {
@@ -42,6 +44,7 @@ export default function Settings({
   onOpenConnect,
   link,
   macName,
+  hostVersion,
   playing,
   onPlayMode,
   onBack,
@@ -87,6 +90,14 @@ export default function Settings({
    * Each row carries the one fact you would have opened it to learn: which unit
    * and whether it answers, which Mac the phone is on, what size the tiles are.
    */
+  /*
+   * Behind, or too old to say — which for this purpose is the same answer.
+   * The version only started being sent in 7.192.0, so a computer that says
+   * nothing is one from before that.
+   */
+  const demo = useDemo()
+  const behind = !hostVersion || isOlder(hostVersion, APP_VERSION) === true
+
   const [page, setPage] = useState(null)
 
   const linkWord =
@@ -135,7 +146,11 @@ export default function Settings({
               status={link === 'connected' ? `${deviceName || 'Unit'} · connected` : 'Not connected'}
               onPress={() => setPage('unit')}
             />
-            <SetupRow title="Phone & computer" status={linkWord} onPress={() => setPage('link')} />
+            <SetupRow
+              title="Phone & computer"
+              status={demo ? 'Demo — simulated FM3' : linkWord}
+              onPress={() => setPage('link')}
+            />
             {onOpenConnect ? (
               <SetupRow
                 title="Connecting a computer"
@@ -205,6 +220,47 @@ export default function Settings({
                   : `${linkWord}.`}
               </Text>
             </View>
+
+            {/*
+              The demo says what it is and offers the way out, first, because
+              everything under it is about a computer this is not talking to.
+            */}
+            {demo ? (
+              <>
+                <Note tone="warn">
+                  This is the demo — a simulated FM3. Every screen works and nothing reaches
+                  hardware. It also answers instantly, so anything still slow in here is this app
+                  rather than the line to a computer.
+                </Note>
+                <Press label="Leave the demo" tone="signal" onPress={() => setDemo(false)} />
+              </>
+            ) : null}
+
+            {/*
+              What the computer is running, and whether that is behind.
+
+              "Does the Mac app need to be updated to the latest version? Or
+              would that affect how the app performs?" It would: that app holds
+              the cable to the unit and does every read this phone asks for, so
+              an old one is slow here in a way that looks exactly like this app
+              being slow. The number was already being sent and nobody looked at
+              it.
+            */}
+            {link === 'connected' && !demo ? (
+              <Text style={{ color: color.silkDim, fontSize: font.small }}>
+                {hostVersion
+                  ? `The app on the computer is v${hostVersion}. This phone is v${APP_VERSION}.`
+                  : `The computer didn’t say which version it is running, which means it is older than 7.192.0. This phone is v${APP_VERSION}.`}
+              </Text>
+            ) : null}
+
+            {link === 'connected' && !demo && behind ? (
+              <Note tone="warn">
+                The app on the computer is behind this one. Update it there — it is the part that
+                holds the cable to your unit, and an old one is slow here in a way that looks like
+                this app being slow.
+              </Note>
+            ) : null}
 
             {link === 'no-answer' ? (
               <Note tone="warn">

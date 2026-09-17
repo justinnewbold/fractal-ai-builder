@@ -539,11 +539,19 @@ export function run(test) {
       /onViewableItemsChanged/,
       'the preset list no longer asks only for the rows on screen'
     )
+    /*
+     * AND IT GIVES BACK WHAT SCROLLED PAST. Asking for every row it ever saw
+     * and never taking one back is what made the app unusable and then killed
+     * it: a flick from slot 0 to 512 queued five hundred preset dumps at the
+     * unit, ten to twenty minutes of solid reading, with the chain, the scene
+     * and the tuner all waiting behind them for names nobody was looking at.
+     */
     assert.match(
-      screen,
-      /want\(v\.item\)/,
-      'the preset list no longer asks only for the rows on screen'
+      screen.replace(/\s+/g, ' '),
+      /wantOnly\(viewableItems\.map\(\(v\) => v\.item\)/,
+      'the preset list queues every row it scrolls past and never takes one back'
     )
+    assert.match(names, /for \(const n of queue\.splice\(0\)\) asked\.delete\(n\)/, 'rows that scrolled off are left queued at the unit')
 
     /* And the device call itself agrees with the header about an empty slot. */
     const device = read('mobile/src/lib/device.js')
@@ -2405,9 +2413,12 @@ export function run(test) {
        thing the shape of every other answer depends on. */
     assert.match(
       flat,
-      /const settling = auth === 'in' && \(link\.link === 'joining' \|\| \(link\.link === 'connected' && !caps && !readFailed\)\)/,
+      /const settling = auth === 'in' && !demo && \(link\.link === 'joining' \|\| \(link\.link === 'connected' && !caps && !readFailed\)\)/,
       'the play screen is drawn before the unit has said what it is'
     )
+    /* The demo has nothing to wait for — it answers from memory — so waiting on
+       it would be a spinner in front of a unit that is already there. */
+    assert.match(flat, /!demo &&/, 'the demo is made to wait for a computer it does not have')
     assert.match(flat, /\{settling && screen === 'stage' \? \( <Waking link=\{link\} \/>/, 'nothing is shown while the app waits')
 
     /*
@@ -2522,5 +2533,229 @@ export function run(test) {
 
     /* And the word the top bar shows when there is nothing on the other end. */
     assert.match(read('shared/link-word.mjs'), /'no computer' : 'no phone'/, 'the bar still says NO MAC')
+  })
+
+  test('the phone can say what the computer is running', async () => {
+    /*
+     * "The app keeps crashing, but it might be the Mac app which is very laggy
+     * also. Does the Mac app need to be updated to the latest version? Or would
+     * that affect how the app performs?"
+     *
+     * A fair question with an answer nobody could reach. The computer has been
+     * writing its version into `host.name` beside its own name since 7.192.0 —
+     * and this end read the name and threw the version away. So neither the
+     * Setup screen nor a pasted log could say which version was at the other
+     * end of a slow evening.
+     *
+     * It matters: that app holds the cable to the unit and does every read this
+     * phone asks for, so an old one is slow HERE, in a way that looks from a
+     * phone exactly like this app being slow.
+     */
+    const link = read('mobile/src/lib/link.js')
+    assert.match(link, /hostVersion: null/, 'the link state has nowhere to keep it')
+    assert.match(
+      link.replace(/\s+/g, ' '),
+      /const version = doc\?\.data\?\.version \|\| doc\?\.version if \(version\) set\(\{ hostVersion: String\(version\) \}\)/,
+      'the version the computer sends is still thrown away'
+    )
+
+    /* In the log, because that is the copy that reaches a chat. */
+    assert.match(
+      read('mobile/src/screens/Log.js').replace(/\s+/g, ' '),
+      /'computer app': link\.hostVersion \|\| 'did not say \(older than 7\.192\.0\)'/,
+      'a pasted log still cannot say what the computer is running'
+    )
+
+    /* And on screen, where somebody can act on it. */
+    const settings = read('mobile/src/screens/Settings.js').replace(/\s+/g, ' ')
+    assert.match(settings, /The app on the computer is v\$\{hostVersion\}/, 'Setup never says the computer’s version')
+    assert.match(settings, /const behind = !hostVersion \|\| isOlder\(hostVersion, APP_VERSION\) === true/, 'nothing works out whether the computer is behind')
+
+    /*
+     * The comparison is strict about what it will answer, and that is the
+     * point: telling somebody to update an app that is already current is
+     * worse than saying nothing at all.
+     */
+    const { isOlder } = await import('../mobile/src/lib/versions.js')
+    assert.equal(isOlder('7.191.0', '7.265.0'), true)
+    assert.equal(isOlder('7.265.0', '7.265.0'), false)
+    assert.equal(isOlder('7.266.0', '7.265.0'), false)
+    assert.equal(isOlder('7.9.0', '7.10.0'), true, 'versions are being compared as text, so 7.9 reads as newer than 7.10')
+    assert.equal(isOlder('7.265.1', '7.265.0'), false)
+    assert.equal(isOlder(null, '7.265.0'), null, 'a version nobody sent is being treated as a number')
+    assert.equal(isOlder('v7.265.0', '7.265.0'), null, 'a version this cannot parse still gets an opinion')
+    assert.equal(isOlder('7.265', '7.265.0'), null)
+  })
+
+  test('the log survives the run that needed reading', () => {
+    /*
+     * "It crashes within a few minutes and is virtually unusable. I can't get
+     * to the log before it crashes. Here are the few screen shots I could take
+     * before the crash each time."
+     *
+     * Screenshots and a guess, for the second time. The log has been in memory
+     * only, which means the one run worth reading — the one that ended — took
+     * its log with it, every time.
+     *
+     * NOT A CRASH HANDLER, deliberately: one that writes on the way down
+     * usually does not finish, and the death that matters most here is iOS
+     * killing an app it has decided is wedged, which runs no JavaScript at all
+     * on its way out. Written as it goes, it survives anything.
+     */
+    const keep = read('mobile/src/lib/logKeep.js')
+    assert.match(keep, /const TAIL = 120/, 'the whole log is being written on every change')
+    assert.match(keep, /setTimeout\(write, EVERY_MS\)/, 'a line is written to disk per line, which is the cost this app already died of once')
+    assert.match(keep, /getDebugLog\(\)\.slice\(-TAIL\)/, 'the start of the log is kept rather than the end, which is the half that matters')
+
+    /* Started at launch, before anything else can go wrong. */
+    assert.match(read('mobile/App.js'), /useEffect\(\(\) => keepLog\(\), \[\]\)/, 'nothing starts keeping the log')
+
+    /* And it reaches the paste, which is the only route it has to a chat. */
+    const log = read('mobile/src/screens/Log.js').replace(/\s+/g, ' ')
+    assert.match(log, /THE RUN BEFORE THIS ONE/, 'the copied log does not carry the previous run')
+    assert.match(log, /lastRun\(\)\.then/, 'the previous run is never read back')
+  })
+
+  test('scrolling the preset list does not queue five hundred reads at the unit', () => {
+    /*
+     * THIS IS WHAT MADE IT UNUSABLE, and it is worth its own check because
+     * nothing about it looks wrong until you count.
+     *
+     * Every row that scrolled past was asked for and nothing was ever taken
+     * back. A flick from slot 0 to slot 512 queued five hundred reads — each
+     * one making the unit dump that preset off its own hardware, down the one
+     * serial port the chain, the scene and the tuner all wait behind. Ten to
+     * twenty minutes of solid reading for names nobody was looking at any more.
+     *
+     * And every name that landed redrew a five-hundred-row list, on the thread
+     * that also has to answer a finger.
+     */
+    const names = read('mobile/src/lib/presetNames.js')
+
+    /* What is on screen is what is worth asking for. */
+    assert.match(names, /export function wantOnly\(list\)/, 'there is no way to ask for only what is visible')
+    assert.match(names, /for \(const n of queue\.splice\(0\)\) asked\.delete\(n\)/, 'rows that scrolled off stay queued at the unit')
+    /* Given back properly: a slot dropped from the queue has to leave `asked`
+       too, or landing on it later waits forever on a read that was thrown. */
+    const drop = names.indexOf('queue.splice(0)) asked.delete(n)')
+    assert.ok(drop > 0 && names.slice(drop, drop + 400).includes('asked.add(n)'), 'a dropped slot is never asked for again')
+
+    /* One re-render for a burst, not one per name. */
+    assert.match(names.replace(/\s+/g, ' '), /let telling = false const announce = \(\) => \{ revision \+= 1 if \(telling\) return/, 'every name that lands redraws every watching screen')
+
+    /* Still one read at a time: firing them together does not make the unit
+       answer faster, it makes the queue longer. */
+    assert.match(names, /if \(draining\) return/, 'name reads can now overlap at the unit')
+  })
+
+  test('the demo answers every route the phone actually asks for', async () => {
+    /*
+     * "Yes I want the demo mode on the phone as well. It helps me make sure the
+     * lag isn't just the app, also."
+     *
+     * The second reason is the better one and it decides how this is built. The
+     * demo answers from memory — no relay, no serial port, no unit — so a
+     * screen that is STILL slow in the demo is slow because of this app, and
+     * one that is quick here and slow on a rig is waiting on the wire. Nothing
+     * else in this project can tell those two apart, and it has now guessed
+     * wrong about which is which more than once.
+     *
+     * WHY THIS CHECK EXISTS: the demo stands in at `remoteRequest`, which means
+     * it has to know every route `device.js` asks for. Miss one and the failure
+     * is not an error — it is a screen that is simply empty, in a mode built so
+     * somebody can look around. So this asks for all of them.
+     */
+    const { demoRequest } = await import('../mobile/src/lib/demoWire.js')
+    const { createMockDevice } = await import('../src/lib/mockDevice.js')
+    const unit = createMockDevice()
+
+    const send = (path, method = 'GET', body) =>
+      demoRequest(unit, path, { method, body: body === undefined ? null : JSON.stringify(body) })
+
+    /* Every path in device.js, read off it rather than remembered. */
+    const device = read('mobile/src/lib/device.js')
+    const paths = [...device.matchAll(/['`](\/[a-z][^'`\s]*)['`]/g)].map((m) => m[1])
+    assert.ok(paths.length > 15, `only ${paths.length} routes were found in device.js; this check read nothing`)
+
+    const answered = [
+      ['/healthz'], ['/device/detect'], ['/preset'], ['/preset/blocks'], ['/preset/grid'],
+      ['/scene'], ['/tempo'], ['/mod/model'], ['/blocks/catalog'],
+      ['/presets/5/summary'], ['/presets/5'], ['/preset/blocks/58/params'],
+      ['/blocks/amp/types'], ['/blocks/comp/types'],
+      ['/preset/select', 'POST', { number: 7 }],
+      ['/scene', 'POST', { index: 2 }],
+      ['/scene/name', 'POST', { index: 0, name: 'X' }],
+      ['/preset/name', 'POST', { name: 'Y' }],
+      ['/tempo', 'POST', { bpm: 120 }],
+      ['/tempo/tap', 'POST'],
+      ['/tuner', 'POST', { on: true }],
+      ['/preset/blocks/118/bypass', 'POST', { bypassed: true }],
+      ['/preset/blocks/58/channel', 'POST', { channel: 'B' }],
+      ['/preset/blocks/58/type', 'POST', { value: 3 }],
+      ['/preset/blocks/58/params/0', 'PUT', { value: 0.5 }]
+    ]
+    for (const [path, method, body] of answered) {
+      const got = await send(path, method, body)
+      assert.ok(got !== undefined && got !== null, `the demo has no answer for ${method || 'GET'} ${path}`)
+    }
+
+    /* The real thing behind it: a chain, and a preset that changes when asked. */
+    const blocks = await send('/preset/blocks')
+    assert.ok(blocks.length > 5, 'the demo has no chain to draw')
+    assert.ok(blocks.some((b) => b.slug === 'amp'), 'the demo preset has no amp in it')
+    await send('/preset/select', 'POST', { number: 12 })
+    assert.equal((await send('/preset')).number, 12, 'the demo ignored a preset change')
+
+    /* A route it does not know throws rather than answering nothing: an empty
+       screen in a mode built for looking around reads as a broken screen. */
+    await assert.rejects(() => send('/nonsense'), /no answer/, 'an unknown route answers nothing instead of saying so')
+
+    /* And the switch itself, read rather than run: it reaches for React and the
+       phone's storage, neither of which exists here. */
+    const demo = read('mobile/src/lib/demo.js')
+    assert.match(demo, /export const demoDevice = \(\) => mock/, 'nothing hands the simulated unit out')
+    assert.match(demo, /mock = want \? createMockDevice\(\) : null/, 'the switch does not build a unit')
+    assert.match(
+      read('mobile/src/lib/device.js').replace(/\s+/g, ' '),
+      /const demo = demoDevice\(\) return demo \? demoRequest\(demo, path, options\) : overTheWire\(path, options\)/,
+      'the app does not route through the demo, so turning it on changes nothing'
+    )
+  })
+
+  test('the demo is offered, escapable, and never pretends to be a rig', () => {
+    /*
+     * Offered on the sign-in screen, because that is where somebody with no
+     * computer is standing, and it is the screen that otherwise asks them for a
+     * code no computer of theirs has ever shown.
+     */
+    const signIn = read('mobile/src/screens/SignIn.js').replace(/\s+/g, ' ')
+    assert.match(signIn, /Just looking\? Try the demo/, 'nothing offers the demo where somebody needs it')
+    assert.match(signIn, /setDemo\(true\)/, 'the button does not turn the demo on')
+
+    /* And escapable, or it is a trap rather than a demo. */
+    const settings = read('mobile/src/screens/Settings.js').replace(/\s+/g, ' ')
+    assert.match(settings, /Leave the demo/, 'there is no way out of the demo')
+    assert.match(settings, /onPress=\{\(\) => setDemo\(false\)\}/, 'the way out does not turn it off')
+    /* It says what it is, every time, rather than letting somebody think a
+       simulated FM3 is their FM3. */
+    assert.match(settings, /This is the demo — a simulated FM3/, 'the demo does not say it is one')
+    assert.match(settings, /status=\{demo \? 'Demo — simulated FM3' : linkWord\}/, 'Setup does not show that the demo is on')
+
+    /* The link reads as connected, because from every screen's point of view it
+       is: the questions get answered. Otherwise the app refuses to open the
+       preset list over a unit that is right there. */
+    assert.match(
+      read('mobile/src/lib/link.js').replace(/\s+/g, ' '),
+      /if \(isDemo\(\)\) \{ set\(\{ link: 'connected', macName: 'the demo', hostVersion: null \}\)/,
+      'the demo does not read as a working link, so the app refuses to use it'
+    )
+
+    /*
+     * NO ARTIFICIAL DELAY ANYWHERE. A demo that pretended to be as slow as a
+     * serial port would be prettier and would answer nothing — and answering
+     * the lag question is half of why this exists.
+     */
+    const wire = read('mobile/src/lib/demoWire.js')
+    assert.ok(!/setTimeout|sleep|delay/i.test(wire.replace(/\/\*[\s\S]*?\*\//g, '')), 'the demo has been given a fake delay, which is the one thing it must not have')
   })
 }

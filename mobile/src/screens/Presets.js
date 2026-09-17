@@ -4,7 +4,7 @@ import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'r
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
 import { Platform } from 'react-native'
 import { slotCount, slotLabel } from '../lib/device'
-import { nameOf, namedSlots, readFailed, useNames, want } from '../lib/presetNames'
+import { nameOf, namedSlots, readFailed, useNames, wantOnly } from '../lib/presetNames'
 import { marksFor, toggleFavourite } from '../lib/lists'
 import { useStored } from '../lib/store'
 import { loadPreset, useRig } from '../lib/rig'
@@ -87,8 +87,15 @@ export default function Presets({ onBack }) {
       })
     : rows
 
+  /*
+   * What is on screen is what gets asked for, and nothing else.
+   *
+   * This used to ask for every row it saw and never take one back, so a flick
+   * down the list queued hundreds of preset dumps at the unit and the whole app
+   * waited behind them. See presetNames.wantOnly.
+   */
   const seen = useCallback(({ viewableItems }) => {
-    for (const v of viewableItems) if (typeof v.item === 'number') want(v.item)
+    wantOnly(viewableItems.map((v) => v.item).filter((n) => typeof n === 'number'))
   }, [])
 
   /*
