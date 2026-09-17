@@ -4022,6 +4022,41 @@ test('unrecognised auth errors pass through unchanged', () => {
   assert.equal(explainAuth('Rate limit exceeded'), 'Rate limit exceeded')
 })
 
+test('an account service that has fallen over says so, and points at the demo', () => {
+  /*
+   * "I can't log into supper base anymore. It says server error, so now I can
+   * just do the demo."
+   *
+   * The project had run out of its disk allowance and every request to it was
+   * timing out. Sign-in sat there for twenty seconds, three times, and then
+   * said "server error" — which is true, tells a guitarist nothing, and looks
+   * exactly like a wrong password. He worked out the demo on his own.
+   *
+   * None of these are the person's fault and none of them get better by
+   * retyping anything, so each one says whose end it is and what still works.
+   */
+  for (const said of ['The account service timed out.', 'Aborted', 'signal is aborted without reason']) {
+    const msg = explainAuth(said)
+    assert.match(msg, /didn’t answer in time/, `a timeout still reads as "${said}"`)
+    assert.match(msg, /demo/, 'nothing tells them the demo still works')
+    assert.doesNotMatch(msg, /password/i, 'a dead service is being blamed on their password')
+  }
+
+  const off = explainAuth('Network request failed')
+  assert.match(off, /internet connection/, 'no wifi reads as an account problem')
+  assert.doesNotMatch(off, /password/i)
+
+  for (const said of ['server error', 'unexpected_failure', 'HTTP 503']) {
+    const msg = explainAuth(said)
+    assert.match(msg, /trouble at its end/, `"${said}" is still being handed to the person raw`)
+    assert.match(msg, /demo/)
+  }
+
+  /* And the two that ARE the person's to fix stay that way. */
+  assert.match(explainAuth('Invalid login credentials'), /didn’t match/)
+  assert.match(explainAuth('Email not confirmed'), /confirm/i)
+})
+
 test('a preset backup is refused remotely, matching the host', () => {
   // Which is why scene names have to be cached: on an AM4 they only exist
   // inside the dump, and the dump cannot cross the relay.

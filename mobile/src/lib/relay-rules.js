@@ -206,6 +206,27 @@ export function explainAuth(message) {
   if (m.includes('invalid login')) {
     return 'Email or password didn’t match.'
   }
+  /*
+   * AND THE ONE THAT SAID NOTHING AT ALL. The account service ran out of its
+   * disk allowance and stopped answering; sign-in sat there for twenty seconds
+   * three times over and then said "server error", which is true and useless:
+   *
+   *   sign in — 19874ms
+   *   sign in — 19661ms
+   *   sign in — 19735ms
+   *
+   * Nothing about that is the password, and nothing the person does will help,
+   * so the message has to say so and point at the one thing that still works.
+   */
+  if (m.includes('abort') || m.includes('timed out') || m.includes('timeout')) {
+    return 'The account service didn’t answer in time. It may be overloaded — wait a few minutes and try again. The demo works without it.'
+  }
+  if (m.includes('network request failed') || m.includes('failed to fetch') || m.includes('load failed')) {
+    return 'Couldn’t reach the account service. Check your internet connection and try again.'
+  }
+  if (m.includes('server error') || m.includes('503') || m.includes('504') || m.includes('unexpected_failure')) {
+    return 'The account service is having trouble at its end. Try again in a few minutes. The demo works without it.'
+  }
   return message
 }
 
