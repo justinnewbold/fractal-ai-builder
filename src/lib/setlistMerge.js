@@ -77,7 +77,15 @@ const slots = (list) => {
  * setting the other device syncing again.
  */
 export function mergeUnit(mine = {}, theirs = {}, now = Date.now()) {
-  const removed = cleanGoneList([...(mine.removed || []), ...(theirs.removed || [])], now)
+  /*
+   * Sorted, because both devices have to arrive at the SAME array or they
+   * write to each other forever. Run together the other way round — theirs
+   * first — the same deletes come out in a different order, which reads as a
+   * change, which is a write, which is a change on the other device.
+   */
+  const removed = cleanGoneList([...(mine.removed || []), ...(theirs.removed || [])], now).sort(
+    (a, b) => b.at - a.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+  )
   const goneAt = new Map()
   for (const g of removed) goneAt.set(g.id, Math.max(num(goneAt.get(g.id)), num(g.at)))
 
@@ -146,8 +154,37 @@ export function mergeUnits(mine = {}, theirs = {}, now = Date.now()) {
   return out
 }
 
-/** Whether two merged copies say the same thing, so an identical write is skipped. */
-export const sameUnits = (a, b) => JSON.stringify(a || {}) === JSON.stringify(b || {})
+/**
+ * The same value written the same way, whatever order the keys came in.
+ *
+ * Arrays keep their order, because a running order is an order. Object keys do
+ * not, because nobody typed them.
+ */
+const canonical = (v) => {
+  if (Array.isArray(v)) return v.map(canonical)
+  if (v && typeof v === 'object') {
+    const out = {}
+    for (const k of Object.keys(v).sort()) out[k] = canonical(v[k])
+    return out
+  }
+  return v
+}
+
+/**
+ * Whether two merged copies say the same thing, so an identical write is skipped.
+ *
+ * COMPARED BY VALUE, NOT BY THE ORDER THE KEYS HAPPEN TO BE IN, and that is
+ * not a nicety. The account stores this as Postgres `jsonb`, which does not
+ * keep key order — it hands the object back with the keys sorted by length.
+ * `mergeUnit` builds them in the order that reads well in this file. So a
+ * plain stringify of the two NEVER matched, whatever they contained, and every
+ * sync wrote a copy of what was already there. Two devices doing that to each
+ * other is a loop with no exit: thousands of reads and writes of the same
+ * unchanged setlists, which is how an account with one setlist in it managed
+ * to spend a database's entire daily disk allowance.
+ */
+export const sameUnits = (a, b) =>
+  JSON.stringify(canonical(a || {})) === JSON.stringify(canonical(b || {}))
 
 /** What this browser holds, for every unit it knows about. */
 export function localUnits(storage) {

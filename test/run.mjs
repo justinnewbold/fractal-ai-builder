@@ -10711,6 +10711,140 @@ test('two devices merge per setlist and per star, not per device', async () => {
   })
 })
 
+test('two devices stop writing to each other once they agree', async () => {
+  /*
+   * THE ONE THAT SPENT A DATABASE.
+   *
+   * The account is a single row holding one person's setlists. It came back
+   * holding 109,508 tombstones for ONE setlist, called "Hello", deleted once —
+   * five megabytes of JSON, read and written by every device every few seconds
+   * for hours. Thousands of reads and writes, until Supabase cut the project
+   * off for exhausting its disk allowance and the app could no longer sign in.
+   *
+   * Two faults, and either one alone is a loop with no exit:
+   *
+   *   1. Merging ran the two `removed` lists together and deduped nothing, so
+   *      every round put another copy of each tombstone in and the next round
+   *      doubled that.
+   *   2. `sameUnits` compared stringified JSON, and Postgres `jsonb` does not
+   *      keep key order — it sorts keys by length. So the copy that came back
+   *      never matched the copy that went up, whatever was in it, and every
+   *      sync wrote what was already there. Which the other device read, and
+   *      wrote back.
+   *
+   * SO THIS RUNS IT rather than checking either fix in isolation: two devices,
+   * a store between them that reorders keys the way jsonb does, and a count of
+   * the writes. A sync that has nothing to do must do nothing.
+   */
+  const { syncStage, localUnits } = await import('../src/lib/setlistMerge.js')
+  const { createList, deleteList } = await import('../src/lib/setlists.js')
+
+  const store = () => ({
+    data: new Map(),
+    getItem(k) { return this.data.has(k) ? this.data.get(k) : null },
+    setItem(k, v) { this.data.set(k, v) }
+  })
+
+  /* jsonb sorts an object's keys by length, then bytewise. Nothing in the app
+     asked for that; it is simply what the column does on the way back. */
+  const asJsonb = (v) => {
+    if (Array.isArray(v)) return v.map(asJsonb)
+    if (v && typeof v === 'object') {
+      const out = {}
+      const keys = Object.keys(v).sort((a, b) => a.length - b.length || (a < b ? -1 : 1))
+      for (const k of keys) out[k] = asJsonb(v[k])
+      return out
+    }
+    return v
+  }
+
+  let row = null
+  let writes = 0
+  const cloud = {
+    load: async () => (row ? { units: asJsonb(row), at: 1, device: 'the other one' } : null),
+    save: async (units) => { writes += 1; row = JSON.parse(JSON.stringify(units)); return true }
+  }
+
+  /* One setlist, made on the phone and then deleted — which is exactly what
+     was in the account that blew up. */
+  const phone = store()
+  const made = createList('fm3', 'Hello', [], phone)
+  deleteList('fm3', made.id, phone)
+  const mac = store()
+
+  await syncStage(cloud, phone)
+  await syncStage(cloud, mac)
+  const settled = writes
+
+  /* Now nothing changes on either device. Ten rounds of a sync with nothing
+     to do, which on a stage is a couple of minutes of sitting still. */
+  for (let i = 0; i < 10; i++) {
+    await syncStage(cloud, phone)
+    await syncStage(cloud, mac)
+  }
+
+  assert.equal(writes, settled, `a sync with nothing to do wrote ${writes - settled} times over ten rounds`)
+
+  /* And the delete is remembered exactly once, on both devices and in the
+     account — not once per round. */
+  const gone = row.fm3.removed
+  assert.equal(gone.length, 1, `one delete left ${gone.length} tombstones behind`)
+  assert.equal(gone[0].id, made.id)
+  assert.equal(localUnits(phone).fm3.removed.length, 1, 'the phone is keeping its own pile of duplicates')
+  assert.equal(localUnits(mac).fm3.removed.length, 1)
+
+  /*
+   * And once each device has a delete of its own, the two lists get run
+   * together in opposite orders — mine first on one, mine first on the other.
+   * Same deletes, different order, which reads as a change on both sides and
+   * is the same loop again with nothing duplicated.
+   */
+  const one = createList('fm3', 'Set one', [], phone)
+  const two = createList('fm3', 'Set two', [], mac)
+  await syncStage(cloud, phone)
+  await syncStage(cloud, mac)
+  await syncStage(cloud, phone)
+  deleteList('fm3', one.id, phone)
+  deleteList('fm3', two.id, mac)
+  for (let i = 0; i < 4; i++) {
+    await syncStage(cloud, phone)
+    await syncStage(cloud, mac)
+  }
+  const quiet = writes
+  for (let i = 0; i < 10; i++) {
+    await syncStage(cloud, phone)
+    await syncStage(cloud, mac)
+  }
+  assert.equal(
+    writes,
+    quiet,
+    `with a delete from each device, a sync with nothing to do wrote ${writes - quiet} times over ten rounds`
+  )
+  assert.equal(row.fm3.removed.length, 3, 'three deletes are not being remembered as three')
+})
+
+test('a device already carrying the duplicates heals itself', async () => {
+  /*
+   * There are real devices out there holding the 109,508, and a fix that only
+   * stops NEW duplicates would leave them carrying it forever — still five
+   * megabytes up and down every sync. Cleaning the list on every read means
+   * the first look after the update is the one that fixes it, with nobody
+   * clearing anything.
+   */
+  const { cleanGoneList } = await import('../src/lib/setlists.js')
+  const at = Date.now() - 1000
+  const pile = Array.from({ length: 5000 }, () => ({ id: 'smu526vwj1td3', at }))
+  const clean = cleanGoneList(pile)
+  assert.equal(clean.length, 1, `5000 copies of one delete came back as ${clean.length}`)
+  assert.equal(clean[0].id, 'smu526vwj1td3')
+
+  /* The latest delete of an id is the one kept: an older one would let a copy
+     of that setlist made in between come back from another device. */
+  const mixed = cleanGoneList([{ id: 'x', at: at }, { id: 'x', at: at + 500 }, { id: 'y', at }])
+  assert.equal(mixed.length, 2)
+  assert.equal(mixed.find((g) => g.id === 'x').at, at + 500, 'an older delete is winning over a newer one')
+})
+
 test('a setlist knows when it changed, and a delete leaves a mark', async () => {
   const {
     createList,
