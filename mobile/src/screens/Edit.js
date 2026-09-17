@@ -42,6 +42,20 @@ const ofPreset = (s) => s.preset
 const ofSlug = (s) => s.deviceSlug
 
 /**
+ * A word about a model whose name says nothing.
+ *
+ * "In the edit menu it says Null on the current effect." It does: the Filter
+ * block's flat type is called Null on the unit itself — no filtering at all,
+ * the block passing the sound through unchanged, which is what you pick when
+ * a Filter is there to be a level or pan control. A real name, read as an
+ * error by anyone who has not met it. So it is explained where it is shown.
+ */
+const modelNote = (name) =>
+  typeof name === 'string' && name.trim().toLowerCase() === 'null'
+    ? 'Flat: the sound passes through unchanged. For a level or pan control.'
+    : null
+
+/**
  * The bench, not the stand.
  *
  * The stage screen is for the things you do mid-song with your eyes somewhere
@@ -487,7 +501,7 @@ function BlockPanel({ block, channels, focus, onError, onScrollLock }) {
           <Press
             caption="Model"
             label={type?.name || `${models.length} to choose from`}
-            sub={picking ? 'Close' : 'Tap to change'}
+            sub={picking ? 'Close' : modelNote(type?.name) || 'Tap to change'}
             onPress={() => setPicking((v) => !v)}
           />
           {/*
@@ -536,7 +550,7 @@ function BlockPanel({ block, channels, focus, onError, onScrollLock }) {
                      happens. The maker alone is deliberately not used here: as
                      a suffix on forty rows it would say "Mesa/Boogie" beside
                      all of them and tell nobody which one is the Rectifier. */
-                  sub={m.basedOn || undefined}
+                  sub={m.basedOn || modelNote(m.name) || undefined}
                   tone="signal"
                   on={m.value === type?.value}
                   onPress={() => swap(m.value)}
