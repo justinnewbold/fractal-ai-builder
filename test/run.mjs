@@ -2182,8 +2182,10 @@ test('the computer app says which version it is, where the phone already looks',
    * a version — for good. Now it is written again on a timer, a failure is
    * said, and the menu says which version the phones are told.
    */
-  assert.match(main, /setInterval\(\(\) => tellPhones\(\{ port, version: app\.getVersion\(\), log: phoneLog \}\), TELL_PHONES_MS\)/, 'the name and version are written once and never again')
+  assert.match(main, /setInterval\(tell, TELL_PHONES_MS\)/, 'the name and version are written once and never again')
+  assert.match(main, /told = await tellPhonesChecked\(\{ port, version: app\.getVersion\(\), log: phoneLog \}\)/, 'the write is not read back')
   assert.match(main, /this app is v\$\{app\.getVersion\(\)\}/, 'the menu does not say which version the phones are told')
+  assert.match(main, /phonesHearLine\(told, app\.getVersion\(\)\)/, 'the menu does not say what the phones hear')
   assert.equal(host.TELL_PHONES_MS, 5 * 60 * 1000)
   /* A failed write is said, not swallowed. */
   const lines = []
@@ -2198,6 +2200,60 @@ test('the computer app says which version it is, where the phone already looks',
   assert.deepEqual(fine.calls, ['PUT /store/config/host.name {"data":{"name":"Studio computer","version":"7.281.0"},"origin":"fractal"}'])
   const link = readSrc(new URL('../src/lib/link.js', import.meta.url), 'utf8')
   assert.match(link, /macVersion: doc\.version \? String\(doc\.version\) : null/, 'the phone does not read the version back')
+
+  /*
+   * AND READ BACK. "My Mac is on the correct version 7.281" — and the phone
+   * still said the computer app did not say. So the write is read back the
+   * way a phone reads it, and the menu says what a phone would hear.
+   */
+  const store = (doc, { refuse = false } = {}) => {
+    const calls = []
+    return {
+      calls,
+      fetch: async (url, init = {}) => {
+        const path = new URL(url).pathname
+        const method = init.method || 'GET'
+        calls.push(`${method} ${path}`)
+        if (method === 'PUT') {
+          if (refuse) return { ok: false, status: 403, json: async () => ({}) }
+          doc = JSON.parse(init.body)
+          return { ok: true, status: 200, json: async () => ({ ok: true }) }
+        }
+        return { ok: true, status: 200, json: async () => doc }
+      }
+    }
+  }
+  const kept = store(null)
+  const checked = await host.tellPhonesChecked({ port: 5056, fetch: kept.fetch, hostname: 'Studio computer', version: '7.295.0', now: () => 7 })
+  assert.deepEqual(kept.calls, ['PUT /store/config/host.name', 'GET /store/config/host.name'], 'the write is not followed by a read-back')
+  assert.deepEqual(checked, { at: 7, wrote: true, heard: { name: 'Studio computer', version: '7.295.0' }, why: null })
+  assert.equal(host.phonesHearLine(checked, '7.295.0'), 'phones hear v7.295.0')
+
+  /* The write is accepted and the server goes on serving an older copy: the
+     shape of a Mac on the right version whose phones still hear nothing. */
+  const stale = {
+    fetch: async (url, init = {}) =>
+      (init.method || 'GET') === 'PUT'
+        ? { ok: true, status: 200, json: async () => ({ ok: true }) }
+        : { ok: true, status: 200, json: async () => ({ data: { name: 'Studio computer' } }) }
+  }
+  const nameOnly = await host.tellPhonesChecked({ port: 5056, fetch: stale.fetch, hostname: 'Studio computer', version: '7.295.0' })
+  assert.equal(nameOnly.wrote, true)
+  assert.deepEqual(nameOnly.heard, { name: 'Studio computer', version: null })
+  assert.match(host.phonesHearLine(nameOnly, '7.295.0'), /^phones hear Studio computer with no version — the device server is not keeping what this app writes$/)
+  const older = { ...nameOnly, heard: { name: 'Studio computer', version: '7.190.0' } }
+  assert.equal(host.phonesHearLine(older, '7.295.0'), 'phones hear v7.190.0, not v7.295.0 — the device server is serving an older copy')
+
+  /* A refused write is said in the menu, with the reason. */
+  const refused = await host.tellPhonesChecked({ port: 5056, fetch: store({ data: { name: 'Studio computer' } }, { refuse: true }).fetch, hostname: 'Studio computer', version: '7.295.0', log: () => {} })
+  assert.equal(refused.wrote, false)
+  assert.equal(host.phonesHearLine(refused, '7.295.0'), 'the phones can’t be told which app this is — couldn\'t tell the phones this is Studio computer, v7.295.0 (HTTP 403).')
+
+  /* And a dead server: the write fails and so does the read-back, and the read-back cannot be believed. */
+  const gone = await host.tellPhonesChecked({ port: 5056, fetch: async () => { throw new Error('ECONNREFUSED') }, hostname: 'Studio computer', version: '7.295.0' })
+  assert.equal(gone.wrote, false)
+  assert.equal(gone.heard, null)
+  assert.equal(host.phonesHearLine(null, '7.295.0'), null)
   const report = readSrc(new URL('../src/components/DebugLog.jsx', import.meta.url), 'utf8')
   assert.match(report, /computer app \$\{link\.macVersion \? `v\$\{link\.macVersion\}` : 'older than 7\.190\.0/, 'the report does not say which computer app answered')
 })
