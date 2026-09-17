@@ -172,6 +172,17 @@ export default function App() {
    */
   useEffect(() => {
     if (auth !== 'in') return undefined
+    /*
+     * NOT IN THE DEMO, and this one was costing something real.
+     *
+     * The demo signs itself in as far as this screen is concerned, so the
+     * account sync ran under it — pushing setlists at a database the demo has
+     * no business touching, on an account the person looking around may not
+     * even have. It is also the opposite of what the demo is for: the point of
+     * it is that nothing leaves the phone, so a screen that is slow in the demo
+     * is slow for its own reasons.
+     */
+    if (demo) return undefined
     let alive = true
     let stop = null
     hydrate().then(() => {
@@ -181,7 +192,7 @@ export default function App() {
       alive = false
       stop?.()
     }
-  }, [auth])
+  }, [auth, demo])
 
   /*
    * And what arrived is said out loud.

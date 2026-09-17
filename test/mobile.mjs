@@ -2758,4 +2758,49 @@ export function run(test) {
     const wire = read('mobile/src/lib/demoWire.js')
     assert.ok(!/setTimeout|sleep|delay/i.test(wire.replace(/\/\*[\s\S]*?\*\//g, '')), 'the demo has been given a fake delay, which is the one thing it must not have')
   })
+
+  test('the demo touches nothing on the network', () => {
+    /*
+     * "I can't log into supabase anymore. It says server error… It says the
+     * supabase database is like maxed out or something."
+     *
+     * It is — Supabase said so by email and every query to it times out. Which
+     * makes this worse than untidy: the demo signed itself in as far as App is
+     * concerned, so the account sync ran underneath it, pushing setlists at a
+     * database the demo has no business touching, on an account somebody
+     * looking around may not even have.
+     *
+     * It is also the opposite of what the demo is for. The whole value of it is
+     * that nothing leaves the phone, so a screen that is slow in the demo is
+     * slow for its own reasons. A cloud sync running under it puts the network
+     * back in the measurement.
+     */
+    const app = read('mobile/App.js').replace(/\s+/g, ' ')
+    assert.match(app, /if \(demo\) return undefined let alive = true let stop = null hydrate\(\)\.then/, 'the account sync still runs in the demo')
+    assert.match(app, /\}, \[auth, demo\]\)/, 'the sync is not re-decided when the demo goes on or off')
+
+    /* And the link loop never starts, so no channel is joined and no session
+       is fetched: the demo makes no request at all. */
+    assert.match(
+      read('mobile/src/lib/link.js').replace(/\s+/g, ' '),
+      /if \(isDemo\(\)\) \{ set\(\{ link: 'connected'/,
+      'the demo starts the link loop, which joins a channel it has no use for'
+    )
+  })
+
+  test('the bar says DEMO rather than wearing a real rig’s green', () => {
+    /*
+     * "It does sound connected, even in demo."
+     *
+     * It said CONNECTED, in the same green a real FM3 gets. The demo reads as a
+     * connected link everywhere else on purpose — the questions do get answered
+     * — but the bar is the one place somebody looks to know what they are
+     * driving, and dressing a simulated unit as a real one there is the app
+     * lying in the exact spot that exists to stop it.
+     */
+    const bar = read('mobile/src/components/TopBar.js').replace(/\s+/g, ' ')
+    assert.match(bar, /const demo = useDemo\(\)/, 'the bar cannot tell whether it is in the demo')
+    assert.match(bar, /const word = demo \? 'demo' : linkWord\(tone, 'remote'\)/, 'the bar still says CONNECTED in the demo')
+    assert.match(bar, /const mark = demo \? 'wait' : linkTone\(tone\)/, 'the demo word is drawn in the colour a real connection gets')
+  })
 }
