@@ -145,7 +145,24 @@ export const FILES = [
   { source: '../src/data/amp-types.json', target: '../mobile/src/data/amp-types.json', raw: true },
   { source: '../src/data/drive-types.json', target: '../mobile/src/data/drive-types.json', raw: true },
   { source: '../src/data/amp-lineage.json', target: '../mobile/src/data/amp-lineage.json', raw: true },
-  { source: '../src/data/effect-lineage.json', target: '../mobile/src/data/effect-lineage.json', raw: true }
+  { source: '../src/data/effect-lineage.json', target: '../mobile/src/data/effect-lineage.json', raw: true },
+  /*
+   * Where a block sits, and how that becomes something the unit will accept.
+   *
+   * INDEXING IS THE TRAP AND IT HAS ALREADY SPRUNG. Reads report a column
+   * counting from zero; the write routes take it counting from one. The old
+   * panel added one of its own for a linear unit and the wire added another,
+   * so slot 1 on an AM4 was written to column 2.
+   *
+   * This is worse to get wrong than a knob. A value written to the wrong place
+   * sounds wrong and is one drag from right; a block placed in the wrong cell
+   * is a preset somebody has to rebuild. And the two apps would not argue about
+   * it — one of them would simply put things one column along.
+   *
+   * It also carries the rule that `ok:false` is not a failure on this hardware,
+   * which the browser learned by rolling back moves that had worked.
+   */
+  { source: '../shared/grid-plan.mjs', target: '../mobile/src/lib/grid-plan.js' }
 ]
 
 /** Where a copy says it came from, so nobody edits the copy by mistake. */

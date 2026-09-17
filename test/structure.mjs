@@ -15,6 +15,9 @@
  */
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
+/* The grid rules both apps share, so the checks below can RUN them rather than
+   read them out of whichever file happens to hold them this month. */
+import { cableColumns, doubtfulWrite, toWireCell as wireCell } from '../shared/grid-plan.mjs'
 
 const src = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
 /* The Ask button's rule lives in a module so it can be asserted as behaviour
@@ -3497,8 +3500,23 @@ export function run(test) {
      * write side already adds the wire's one, and doing it in both places is
      * how the chain ended up off by one to begin with.
      */
-    assert.match(fx, /const toWireCell = \(row, col\) => \(\{ row, col: col \+ 1 \}\)/,
-      'the wire boundary changed; the chain may now be corrected twice or not at all')
+    /*
+     * The boundary moved to shared/grid-plan, because the phone places blocks
+     * now too and a second copy of "which end counts from one" is how this went
+     * wrong the first time. Run rather than read, so a rewrite that still types
+     * correctly but counts differently fails here.
+     */
+    assert.match(fx, /toWireCell/, 'nothing converts to the wire\'s column numbering any more')
+    assert.match(
+      fx,
+      /from '\.\.\/\.\.\/shared\/grid-plan\.mjs'/,
+      'the browser has its own wire boundary again, so the two apps can drift'
+    )
+    assert.deepEqual(
+      wireCell(1, 0),
+      { row: 1, col: 1 },
+      'the wire boundary changed; the chain may now be corrected twice or not at all'
+    )
 
     /*
      * Move, only where a move keeps the block. On a grid unit a block carries
@@ -3981,8 +3999,12 @@ export function run(test) {
     // and only for the move, whose block would otherwise exist nowhere.
     const move = grid.slice(grid.indexOf('const move = async'), grid.indexOf('const remove = async'))
     assert.match(move, /catch \(err\) \{\s*\n\s*await placeBlock\(from\.row, from\.col/, 'a move that throws mid-way loses the block')
-    assert.match(grid, /const doubtful = \(res\)/, 'nothing says what ok:false actually means here')
-    assert.match(grid, /re-read/, 'the answer to a doubtful write is not to re-read the chain')
+    /* The rule moved to shared/grid-plan, because the phone needs the same one:
+       treating ok:false as a failure is the bug this panel was reported for. */
+    assert.match(grid, /const doubtful = doubtfulWrite/, 'nothing says what ok:false actually means here')
+    assert.ok(doubtfulWrite({ ok: false }), 'a doubtful write now passes silently')
+    assert.equal(doubtfulWrite({ ok: true }), null, 'a write that worked is being questioned')
+    assert.match(doubtfulWrite({ ok: false }), /re-read/, 'the answer to a doubtful write is not to re-read the chain')
   })
 
   test('the chain editor counts columns the way the rest of the app does', () => {
@@ -3995,7 +4017,18 @@ export function run(test) {
      */
     const grid = readFileSync(new URL('../src/components/GridEditor.jsx', import.meta.url), 'utf8')
     assert.ok(!/linear \? \(i % cols\) \+ 1/.test(grid), 'a linear unit gets a second column increment again')
-    assert.match(grid, /const label = \(col\) => col \+ 1/, 'the only place that counts from one should be the label')
+    /*
+     * The rule moved to shared/grid-plan so the phone is handed the same copy —
+     * a placement write changes a preset's structure rather than a value, and
+     * two apps counting columns differently would not disagree out loud, they
+     * would each put things one column along. So the check follows it there,
+     * and runs it rather than reading it.
+     */
+    assert.ok(
+      !/=> col \+ 1/.test(grid),
+      'the panel is counting columns for itself again instead of using the shared rule'
+    )
+    assert.match(grid, /const label = colLabel/, 'the only place that counts from one should be the label')
     /*
      * The starter chain places into the columns chainPlan hands back, and a
      * linear unit — which has no grid and no input or output block to step
@@ -5210,15 +5243,20 @@ export function run(test) {
     const fx = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
     const wire = fx.slice(fx.indexOf('export async function wireRow'))
     assert.ok(wire, 'nothing wires a row of the grid')
-    const loop = wire.slice(wire.indexOf('for (let col'), wire.indexOf('const refused'))
-    assert.match(loop, /for \(let col = 0;/, 'the wire skips the first block, or asks for a cable the unit has no place for')
-    assert.match(
-      loop,
-      /Math\.min\(lastCol, LAST_CABLE_COL\)/,
+    /*
+     * Which columns get a cable is shared/grid-plan's answer now, so this runs
+     * it: the first column is included, the input's is not asked for at all,
+     * and it stops at the last column that has a next one to reach.
+     */
+    assert.match(wire, /for \(const col of cableColumns\(lastCol\)\)/, 'the wire picks its own columns again')
+    assert.deepEqual(cableColumns(3), [0, 1, 2, 3], 'the wire skips the first block')
+    assert.equal(
+      cableColumns(20).at(-1),
+      12,
       'the wire runs past the last column that can start a cable, which the unit throws out'
     )
     assert.ok(
-      !/col = -1/.test(wire),
+      !cableColumns(5).includes(-1),
       'the wire still asks the unit for a cable out of the input, which it has always refused'
     )
 
