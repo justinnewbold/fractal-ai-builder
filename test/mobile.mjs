@@ -3403,6 +3403,20 @@ export function run(test) {
     assert.match(flat, /sub=\{m\.basedOn \|\| modelNote\(m\.name\) \|\| undefined\}/, 'the model list does not carry the note')
   })
 
+  test('a knob that did not take says what the unit is holding, and why when it is the tempo', () => {
+    /*
+     * "Says Time 1 didn't take when I adjusted a preset." On a delay whose
+     * Tempo is set to a note value the time follows the song tempo and the
+     * unit puts its own number back. "Didn't take" reads as the app failing.
+     */
+    const flat = read('mobile/src/screens/Edit.js').replace(/\s+/g, ' ')
+    assert.match(flat, /if \(!res\.ok\) onError\(didNotTake\(p, res\.actual, fresh\?\.named \|\| \[\]\)\)/, 'a refused write is not explained')
+    assert.match(flat, /The unit is holding it at \$\{fmt\(actual\)\}/, 'the read-back value is not said')
+    assert.match(flat, /Set Tempo to None to set the time by hand\./, 'a tempo-locked delay time is not explained')
+    const dev = read('mobile/src/lib/device.js').replace(/\s+/g, ' ')
+    assert.match(dev, /return \{ ok: false, continuous: null, retried: true, actual \}/, 'the confirmed write does not hand back what the unit read')
+  })
+
   test('a dead account service is given twelve seconds, not the whole evening', async () => {
     /*
      * "I can't log into supper base anymore. It says server error, so now I
