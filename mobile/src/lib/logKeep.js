@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
-import { formatLine, getDebugLog, onDebugLog } from './debugLog'
+import { formatLine, getDebugLog, logDebug, onDebugLog } from './debugLog'
 
 const KEY = 'fractal.log.lastrun'
 
@@ -21,6 +21,16 @@ const KEY = 'fractal.log.lastrun'
  */
 const TAIL = 120
 const EVERY_MS = 2000
+/**
+ * How many runs are kept, not just the last one.
+ *
+ * "It looks like the debug log is not persisting through crashes." One slot
+ * was being overwritten two seconds into the next run — so a crash, a relaunch
+ * to look, and a second crash before the log screen was reached left the run
+ * that mattered gone and a twelve-line run in its place. Three keeps a bad
+ * evening's worth.
+ */
+const KEEP_RUNS = 3
 
 /**
  * Keep the end of this run on disk, so the next one can show what killed it.
@@ -58,8 +68,19 @@ let dirty = false
  * evidence. So the read happens once, at launch, and nothing may write until it
  * has finished.
  */
-let held = null
+/** The runs before this one, newest first, as read at launch. */
+let held = []
 let taken = null
+
+/** What the disk holds, in either shape it has ever been written in. */
+function runsFrom(raw) {
+  const was = JSON.parse(raw)
+  const list = Array.isArray(was?.runs) ? was.runs : was ? [was] : []
+  return list
+    .filter((r) => Array.isArray(r?.lines) && r.lines.length)
+    .map((r) => ({ at: Number(r.at) || null, lines: r.lines }))
+    .slice(0, KEEP_RUNS)
+}
 
 export function keepLog() {
   if (stop) return stop
@@ -77,7 +98,9 @@ export function keepLog() {
          had. */
       await taken
       const tail = getDebugLog().slice(-TAIL).map(formatLine)
-      await AsyncStorage.setItem(KEY, JSON.stringify({ at: Date.now(), lines: tail }))
+      /* This run at the front, the runs before it behind, the oldest dropped. */
+      const runs = [{ at: Date.now(), lines: tail }, ...held].slice(0, KEEP_RUNS)
+      await AsyncStorage.setItem(KEY, JSON.stringify({ runs }))
     } catch {
       /* A log that cannot be written down is not worth failing a launch over.
          It is a diagnostic, and the app still runs without one. */
@@ -111,15 +134,26 @@ export function keepLog() {
 async function readHeld() {
   try {
     const raw = await AsyncStorage.getItem(KEY)
-    if (!raw) return
-    const was = JSON.parse(raw)
-    if (Array.isArray(was?.lines) && was.lines.length) {
-      held = { at: Number(was.at) || null, lines: was.lines }
-    }
+    if (raw) held = runsFrom(raw)
   } catch {
     /* Nothing kept, then — which is the ordinary first launch. */
+    held = []
   }
+  /*
+   * Said in this run's own log, so a paste answers "did the keeper work" on
+   * its own. "It looks like the debug log is not persisting through crashes"
+   * could not be told apart from "the log screen never showed it" without
+   * this line.
+   */
+  const last = held[0]
+  logDebug(
+    'app',
+    last ? 'kept from the run before' : 'nothing kept from the run before',
+    last ? `${last.lines.length} lines, last written ${when(last.at)}` : ''
+  )
 }
+
+const when = (at) => (at ? new Date(at).toLocaleTimeString() : 'at an unknown time')
 
 /**
  * What the last run had to say before it stopped, or null.
@@ -131,11 +165,17 @@ async function readHeld() {
 export async function lastRun() {
   /* Whatever was on disk when this run started, never what is on disk now. */
   if (taken) await taken
-  return held
+  return held[0] || null
+}
+
+/** Every run kept, newest first. Up to KEEP_RUNS of them. */
+export async function pastRuns() {
+  if (taken) await taken
+  return held.slice()
 }
 
 export async function forgetLastRun() {
-  held = null
+  held = []
   try {
     await AsyncStorage.removeItem(KEY)
   } catch {

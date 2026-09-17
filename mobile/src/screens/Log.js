@@ -6,7 +6,7 @@ import { color, font, mono, radius, space } from '../lib/theme'
 import { clearDebugLog, formatDebugLog, formatLine, getDebugLog, onDebugLog } from '../lib/debugLog'
 import { APP_VERSION } from '../lib/version'
 import { linkState } from '../lib/link'
-import { lastRun } from '../lib/logKeep'
+import { pastRuns } from '../lib/logKeep'
 import { useRig } from '../lib/rig'
 import Note from '../components/Note'
 import Press from '../components/Press'
@@ -15,6 +15,30 @@ const face = Platform.select(mono)
 
 const ofDeviceName = (s) => s.deviceName
 const ofPreset = (s) => s.preset
+
+/** When a kept run last reached the disk, as a clock time. */
+const ended = (at) => (at ? new Date(at).toLocaleTimeString() : 'at an unknown time')
+
+/** One line of the log, this run's or a kept one's. Red when it is the bad kind. */
+function Line({ text, hot }) {
+  return (
+    <Text
+      selectable
+      style={{
+        color: hot ? color.fault : color.silkDim,
+        fontSize: font.micro,
+        fontFamily: face,
+        lineHeight: 16,
+        paddingVertical: 2,
+        paddingHorizontal: space.sm,
+        borderRadius: radius.sm,
+        backgroundColor: color.panel
+      }}
+    >
+      {text}
+    </Text>
+  )
+}
 
 /**
  * What happened, in the order it happened, and a button that copies it.
@@ -53,10 +77,10 @@ export default function Log({ onBack }) {
    * The whole reason this exists: the run that needs reading is the one that
    * ended, and until now it took its log with it.
    */
-  const [before, setBefore] = useState(null)
+  const [before, setBefore] = useState([])
   useEffect(() => {
     let alive = true
-    lastRun().then((held) => alive && setBefore(held))
+    pastRuns().then((runs) => alive && setBefore(runs))
     return () => {
       alive = false
     }
@@ -90,12 +114,16 @@ export default function Log({ onBack }) {
      * If this launch is the one AFTER a crash, that block is the crash — and
      * it is the half somebody actually needs.
      */
-    before
-      ? [
-          `THE RUN BEFORE THIS ONE — ${before.lines.length} lines, oldest first`,
-          '(if the app crashed or was killed, this is what it said on the way)',
-          ...before.lines
-        ].join('\n')
+    before.length
+      ? before
+          .map((run, i) =>
+            [
+              `${i === 0 ? 'THE RUN BEFORE THIS ONE' : `${i + 1} RUNS AGO`} — ${run.lines.length} lines, oldest first, last written ${ended(run.at)}`,
+              '(if the app crashed or was killed, this is what it said on the way)',
+              ...run.lines
+            ].join('\n')
+          )
+          .join('\n\n')
       : '')
     try {
       await Clipboard.setStringAsync(text)
@@ -122,7 +150,7 @@ export default function Log({ onBack }) {
           </Text>
           <Text style={{ color: color.silkDim, fontSize: font.small }}>
             {`${lines.length} line${lines.length === 1 ? '' : 's'} in the log${
-              before ? ` · ${before.lines.length} kept from the run before` : ''
+              before.length ? ` · ${before[0].lines.length} kept from the run before` : ''
             }`}
           </Text>
         </View>
@@ -137,7 +165,7 @@ export default function Log({ onBack }) {
             crash: the copy carries the end of the previous run as well as this
             one, and after a crash that block is the crash.
           */
-          sub={before ? 'This run and the one before it' : 'Then paste it into the chat'}
+          sub={before.length ? `This run and the ${before.length === 1 ? 'one' : before.length} before it` : 'Then paste it into the chat'}
           tone="signal"
           onPress={copy}
           disabled={!lines.length}
@@ -157,23 +185,34 @@ export default function Log({ onBack }) {
         contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space.xxl, gap: space.xs }}
         initialNumToRender={30}
         windowSize={7}
-        renderItem={({ item }) => (
-          <Text
-            selectable
-            style={{
-              color: item.source === 'crash' || /fail|gave up|refused/i.test(item.message) ? color.fault : color.silkDim,
-              fontSize: font.micro,
-              fontFamily: face,
-              lineHeight: 16,
-              paddingVertical: 2,
-              paddingHorizontal: space.sm,
-              borderRadius: radius.sm,
-              backgroundColor: color.panel
-            }}
-          >
-            {formatLine(item)}
-          </Text>
-        )}
+        renderItem={({ item }) => <Line text={formatLine(item)} hot={item.source === 'crash' || /fail|gave up|refused/i.test(item.message)} />}
+        /*
+          THE RUNS BEFORE THIS ONE, ON THE SCREEN. They were in the copy and
+          nowhere else, so a person who opened this after a crash saw this
+          run's handful of lines and nothing from the run that died — "it
+          looks like the debug log is not persisting through crashes". It was;
+          it was not being shown. Under this run's lines, each run under its
+          own heading, oldest line first because that half reads as a story.
+        */
+        ListFooterComponent={
+          before.length ? (
+            <View style={{ gap: space.xs, paddingTop: space.lg }}>
+              {before.map((run, i) => (
+                <View key={`${run.at}-${i}`} style={{ gap: space.xs }}>
+                  <Text style={{ color: color.signal, fontSize: font.micro, fontWeight: '700', letterSpacing: 1.5, paddingTop: space.sm }}>
+                    {`${i === 0 ? 'THE RUN BEFORE THIS ONE' : `${i + 1} RUNS AGO`} · ${run.lines.length} lines · last written ${ended(run.at)}`}
+                  </Text>
+                  <Text style={{ color: color.silkFaint, fontSize: font.micro }}>
+                    If the app crashed or was killed, this is what it said on the way. Oldest line first.
+                  </Text>
+                  {run.lines.map((text, j) => (
+                    <Line key={j} text={text} hot={/\[crash\]|fail|gave up|refused/i.test(text)} />
+                  ))}
+                </View>
+              ))}
+            </View>
+          ) : null
+        }
       />
 
       {lines.length ? (

@@ -2644,7 +2644,14 @@ export function run(test) {
     /* And it reaches the paste, which is the only route it has to a chat. */
     const log = read('mobile/src/screens/Log.js').replace(/\s+/g, ' ')
     assert.match(log, /THE RUN BEFORE THIS ONE/, 'the copied log does not carry the previous run')
-    assert.match(log, /lastRun\(\)\.then/, 'the previous run is never read back')
+    assert.match(log, /pastRuns\(\)\.then/, 'the previous runs are never read back')
+    /* And on the screen, not only in the copy. "It looks like the debug log is
+       not persisting through crashes" — it was; it was only ever in the paste. */
+    assert.match(log, /ListFooterComponent=\{ before\.length \? \(/, 'the runs before are not shown on the screen')
+    assert.match(log, /run\.lines\.map\(\(text, j\) => \( <Line key=\{j\} text=\{text\}/, 'the kept lines are not drawn')
+    /* Three runs, so a crash, a look, and a second crash leaves the first. */
+    assert.match(keep, /const KEEP_RUNS = 3/, 'only one run is kept, and the next short run overwrites the crash')
+    assert.match(keep, /logDebug\(\s*'app',\s*last \? 'kept from the run before' : 'nothing kept from the run before'/, 'the log does not say whether the keeper found anything, so a paste cannot tell')
   })
 
   test('the run before this one is the run before this one', async () => {
@@ -2686,6 +2693,7 @@ export function run(test) {
       export const getDebugLog = () => lines
       export const formatLine = (l) => String(l)
       export const onDebugLog = (fn) => { watchers.add(fn); return () => watchers.delete(fn) }
+      export const logDebug = () => {}
       export const __say = (l) => { lines.push(l); for (const fn of watchers) fn() }
     `
 
@@ -2836,6 +2844,7 @@ export function run(test) {
       export const getDebugLog = () => lines
       export const formatLine = (l) => l.message
       export const onDebugLog = (fn) => { watchers.add(fn); return () => watchers.delete(fn) }
+      export const logDebug = () => {}
       export const __say = (l) => { lines.push(l); for (const fn of watchers) fn(l) }
     `
     const src = read('mobile/src/lib/logKeep.js')
@@ -2864,7 +2873,7 @@ export function run(test) {
       const kept = JSON.parse(store.__get('fractal.log.lastrun') || 'null')
       off()
       assert.ok(kept, 'the crash line waited for the timer, and the app was gone by then')
-      assert.deepEqual(kept.lines, ['GET /preset ok', 'Cannot read property of undefined'], 'the crash went to disk without the run that led up to it')
+      assert.deepEqual(kept.runs[0].lines, ['GET /preset ok', 'Cannot read property of undefined'], 'the crash went to disk without the run that led up to it')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -3052,6 +3061,94 @@ export function run(test) {
     const dev = read('mobile/src/lib/device.js')
     assert.match(dev, /encodeURIComponent\(`scene-names-\$\{slug\}:\$\{number\}`\)/, 'the phone asks for a document the browser does not write')
     assert.match(dev, /\{ data: names, origin: 'fractal' \}/, 'the phone writes a document in a shape the browser does not read')
+  })
+
+  test('three runs are kept, and a run that died is not overwritten by the look at it', async () => {
+    /*
+     * "It looks like the debug log is not persisting through crashes."
+     *
+     * One slot on disk. Run A crashes; run B is opened to read it, and two
+     * seconds in it writes its own tail over A; B crashes too, or is closed;
+     * run C opens the log screen and sees B's twelve lines, and A is gone.
+     * Three runs are kept now, newest first, and the old one-run shape on
+     * disk still reads. Run, with the timer shortened.
+     */
+    const STORAGE = `
+      let store = {}
+      export const __seed = (k, v) => { store[k] = v }
+      export const __get = (k) => store[k] ?? null
+      export default {
+        getItem: (k) => Promise.resolve(store[k] ?? null),
+        setItem: (k, v) => { store[k] = v; return Promise.resolve() },
+        removeItem: (k) => { delete store[k]; return Promise.resolve() }
+      }
+    `
+    const DEBUG_LOG = `
+      const lines = []
+      const watchers = new Set()
+      export const said = []
+      export const getDebugLog = () => lines
+      export const formatLine = (l) => l.message
+      export const onDebugLog = (fn) => { watchers.add(fn); return () => watchers.delete(fn) }
+      export const logDebug = (source, message, detail) => { said.push({ source, message, detail }) }
+      export const __say = (l) => { lines.push(l); for (const fn of watchers) fn(l) }
+    `
+    const dir = mkdtempSync(join(tmpdir(), 'logkeep-runs-'))
+    try {
+      const quick = read('mobile/src/lib/logKeep.js')
+        .replace(/'@react-native-async-storage\/async-storage'/, "'./storage.mjs'")
+        .replace(/'\.\/debugLog'/, "'./debugLog.mjs'")
+        .replace(/const EVERY_MS = \d+/, 'const EVERY_MS = 5')
+      writeFileSync(join(dir, 'storage.mjs'), STORAGE)
+      writeFileSync(join(dir, 'debugLog.mjs'), DEBUG_LOG)
+      writeFileSync(join(dir, 'logKeep.mjs'), quick)
+      const at = (f) => pathToFileURL(join(dir, f)).href
+      const store = await import(at('storage.mjs'))
+      const log = await import(at('debugLog.mjs'))
+      const keep = await import(at('logKeep.mjs'))
+
+      /* The disk as 7.275.0 left it: one run, the old shape, the crash. */
+      store.__seed('fractal.log.lastrun', JSON.stringify({ at: 1000, lines: ['A: playing', 'A: [crash] died'] }))
+
+      const off = keep.keepLog()
+      const runs = await keep.pastRuns()
+      assert.deepEqual(runs.map((r) => r.lines), [['A: playing', 'A: [crash] died']], 'the old one-run shape on disk is not read')
+      /* And this run's log says so, so a paste can tell the keeper worked. */
+      assert.equal(log.said[0]?.message, 'kept from the run before')
+      assert.match(log.said[0]?.detail, /^2 lines, last written /)
+
+      /* This run writes its own tail — and A survives behind it. */
+      log.__say({ source: 'app', message: 'B: opened the log' })
+      await new Promise((r) => setTimeout(r, 40))
+      let disk = JSON.parse(store.__get('fractal.log.lastrun'))
+      assert.deepEqual(disk.runs.map((r) => r.lines), [['B: opened the log'], ['A: playing', 'A: [crash] died']], 'run B overwrote run A instead of standing in front of it')
+      off()
+
+      /* A third and a fourth run: three are kept, the oldest goes. */
+      for (const name of ['C', 'D']) {
+        const again = await import(at('logKeep.mjs') + `?${name}`)
+        const stop = again.keepLog()
+        await again.pastRuns()
+        log.__say({ source: 'app', message: `${name}: ran` })
+        await new Promise((r) => setTimeout(r, 40))
+        stop()
+      }
+      disk = JSON.parse(store.__get('fractal.log.lastrun'))
+      assert.equal(disk.runs.length, 3, `${disk.runs.length} runs on disk; three should be`)
+      assert.equal(disk.runs[2].lines[0], 'B: opened the log', 'the wrong run was dropped')
+      assert.ok(!disk.runs.some((r) => r.lines.includes('A: playing')), 'the oldest run was kept past three')
+
+      /* A first launch says so too. */
+      store.__seed('fractal.log.lastrun', undefined)
+      const fresh = await import(at('logKeep.mjs') + '?fresh')
+      log.said.length = 0
+      const stop = fresh.keepLog()
+      assert.deepEqual(await fresh.pastRuns(), [])
+      assert.equal(log.said[0]?.message, 'nothing kept from the run before')
+      stop()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   test('a dead account service is given twelve seconds, not the whole evening', async () => {
