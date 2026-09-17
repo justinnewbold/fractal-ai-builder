@@ -14,6 +14,7 @@ import { formatPairCode, isPairCode, pairCredentials } from '../lib/pairing'
 import Note from '../components/Note'
 import Press from '../components/Press'
 import Connect from './Connect'
+import { setDemo } from '../lib/demo'
 
 /**
  * One account, two ends — and a way in that never mentions it.
@@ -24,7 +25,7 @@ import Connect from './Connect'
  * thing, for a person who wants presets to follow them between devices — so
  * that is what it says.
  */
-export default function SignIn({ onSignedIn }) {
+export default function SignIn({ onSignedIn, onDemo }) {
   const [mode, setMode] = useState('code') // 'code' | 'in' | 'up'
   /*
    * The instructions, from the one screen that needs them most.
@@ -212,6 +213,23 @@ export default function SignIn({ onSignedIn }) {
         )}
 
         <Press label="How do I connect a computer?" disabled={busy} onPress={() => setHelping(true)} />
+
+        {/*
+          The demo, offered here because here is where somebody with no
+          computer is standing. It is a simulated FM3 — every screen works,
+          nothing reaches hardware — and it is also the only way to tell this
+          app being slow from the line to the computer being slow, because
+          there is no line in it.
+        */}
+        <Press
+          label="Just looking? Try the demo"
+          sub="A simulated FM3 — no computer needed"
+          disabled={busy}
+          onPress={() => {
+            setDemo(true)
+            onDemo?.()
+          }}
+        />
 
         <Text style={{ color: color.silkFaint, fontSize: font.micro, lineHeight: 18 }}>
           Saving to a slot, backups and firmware stay at the computer. Your computer refuses them from a

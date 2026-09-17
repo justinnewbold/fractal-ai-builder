@@ -23,6 +23,7 @@ import { hydrate } from './src/lib/store'
 import { keepSetlistsInStep } from './src/lib/cloudSetlists'
 import { useRig } from './src/lib/rig'
 import { keepLog } from './src/lib/logKeep'
+import { restoreDemo, useDemo } from './src/lib/demo'
 import { AI, BENCH } from './src/lib/features'
 
 /**
@@ -82,10 +83,20 @@ export default function App() {
    * way this falls through to the ordinary screen, where the top bar says NO
    * MAC and the gear is a tap away.
    */
+  /*
+   * The demo, picked up before anything decides whether to ask for a sign-in.
+   *
+   * Somebody who was in the demo a second ago has no account and does not want
+   * one; asking them to sign in on the way back would be the app forgetting
+   * what it was doing.
+   */
+  const demo = useDemo()
+
   const caps = useRig(ofCaps)
   const readFailed = useRig(ofError)
   const settling =
     auth === 'in' &&
+    !demo &&
     (link.link === 'joining' || (link.link === 'connected' && !caps && !readFailed))
 
   useEffect(() => subscribeLink(setLink), [])
@@ -130,7 +141,10 @@ export default function App() {
   // out otherwise.
   useEffect(() => {
     let alive = true
-    haveSession().then((id) => alive && setAuth(id ? 'in' : 'out'))
+    restoreDemo()
+      .then((on) => (on ? true : haveSession()))
+      .then((id) => alive && setAuth(id ? 'in' : 'out'))
+      .catch(() => alive && setAuth('out'))
     return () => {
       alive = false
     }
@@ -192,7 +206,7 @@ export default function App() {
             <ActivityIndicator color={color.silkDim} />
           </View>
         ) : auth === 'out' ? (
-          <SignIn onSignedIn={() => setAuth('in')} />
+          <SignIn onSignedIn={() => setAuth('in')} onDemo={() => setAuth('in')} />
         ) : (
           <>
             <TopBar link={link} onOpenSettings={() => setScreen('settings')} />

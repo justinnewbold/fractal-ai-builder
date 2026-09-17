@@ -15,6 +15,7 @@
  * against the same failure: a green lamp that is lying is worse than a red one.
  */
 import { AppState } from 'react-native'
+import { isDemo } from './demo'
 import { logDebug } from './debugLog'
 
 import {
@@ -220,6 +221,18 @@ async function readMacName() {
 
 /** Start the loop. Idempotent — a second call is a probe, not a second loop. */
 export function startLink() {
+  /*
+   * The demo has no far end, so there is nothing to find and nothing to poll.
+   *
+   * Said as 'connected' because that is what it is from every screen's point of
+   * view: the questions get answered. Leaving it as 'no-answer' would have the
+   * whole app refuse to open the preset list over a unit that is right there.
+   * The name is what tells anybody it is not a real rig, and the bar shows it.
+   */
+  if (isDemo()) {
+    set({ link: 'connected', macName: 'the demo', hostVersion: null })
+    return stopLink
+  }
   if (running) {
     probeNow()
     return stopLink

@@ -2413,9 +2413,12 @@ export function run(test) {
        thing the shape of every other answer depends on. */
     assert.match(
       flat,
-      /const settling = auth === 'in' && \(link\.link === 'joining' \|\| \(link\.link === 'connected' && !caps && !readFailed\)\)/,
+      /const settling = auth === 'in' && !demo && \(link\.link === 'joining' \|\| \(link\.link === 'connected' && !caps && !readFailed\)\)/,
       'the play screen is drawn before the unit has said what it is'
     )
+    /* The demo has nothing to wait for — it answers from memory — so waiting on
+       it would be a spinner in front of a unit that is already there. */
+    assert.match(flat, /!demo &&/, 'the demo is made to wait for a computer it does not have')
     assert.match(flat, /\{settling && screen === 'stage' \? \( <Waking link=\{link\} \/>/, 'nothing is shown while the app waits')
 
     /*
@@ -2643,5 +2646,116 @@ export function run(test) {
     /* Still one read at a time: firing them together does not make the unit
        answer faster, it makes the queue longer. */
     assert.match(names, /if \(draining\) return/, 'name reads can now overlap at the unit')
+  })
+
+  test('the demo answers every route the phone actually asks for', async () => {
+    /*
+     * "Yes I want the demo mode on the phone as well. It helps me make sure the
+     * lag isn't just the app, also."
+     *
+     * The second reason is the better one and it decides how this is built. The
+     * demo answers from memory — no relay, no serial port, no unit — so a
+     * screen that is STILL slow in the demo is slow because of this app, and
+     * one that is quick here and slow on a rig is waiting on the wire. Nothing
+     * else in this project can tell those two apart, and it has now guessed
+     * wrong about which is which more than once.
+     *
+     * WHY THIS CHECK EXISTS: the demo stands in at `remoteRequest`, which means
+     * it has to know every route `device.js` asks for. Miss one and the failure
+     * is not an error — it is a screen that is simply empty, in a mode built so
+     * somebody can look around. So this asks for all of them.
+     */
+    const { demoRequest } = await import('../mobile/src/lib/demoWire.js')
+    const { createMockDevice } = await import('../src/lib/mockDevice.js')
+    const unit = createMockDevice()
+
+    const send = (path, method = 'GET', body) =>
+      demoRequest(unit, path, { method, body: body === undefined ? null : JSON.stringify(body) })
+
+    /* Every path in device.js, read off it rather than remembered. */
+    const device = read('mobile/src/lib/device.js')
+    const paths = [...device.matchAll(/['`](\/[a-z][^'`\s]*)['`]/g)].map((m) => m[1])
+    assert.ok(paths.length > 15, `only ${paths.length} routes were found in device.js; this check read nothing`)
+
+    const answered = [
+      ['/healthz'], ['/device/detect'], ['/preset'], ['/preset/blocks'], ['/preset/grid'],
+      ['/scene'], ['/tempo'], ['/mod/model'], ['/blocks/catalog'],
+      ['/presets/5/summary'], ['/presets/5'], ['/preset/blocks/58/params'],
+      ['/blocks/amp/types'], ['/blocks/comp/types'],
+      ['/preset/select', 'POST', { number: 7 }],
+      ['/scene', 'POST', { index: 2 }],
+      ['/scene/name', 'POST', { index: 0, name: 'X' }],
+      ['/preset/name', 'POST', { name: 'Y' }],
+      ['/tempo', 'POST', { bpm: 120 }],
+      ['/tempo/tap', 'POST'],
+      ['/tuner', 'POST', { on: true }],
+      ['/preset/blocks/118/bypass', 'POST', { bypassed: true }],
+      ['/preset/blocks/58/channel', 'POST', { channel: 'B' }],
+      ['/preset/blocks/58/type', 'POST', { value: 3 }],
+      ['/preset/blocks/58/params/0', 'PUT', { value: 0.5 }]
+    ]
+    for (const [path, method, body] of answered) {
+      const got = await send(path, method, body)
+      assert.ok(got !== undefined && got !== null, `the demo has no answer for ${method || 'GET'} ${path}`)
+    }
+
+    /* The real thing behind it: a chain, and a preset that changes when asked. */
+    const blocks = await send('/preset/blocks')
+    assert.ok(blocks.length > 5, 'the demo has no chain to draw')
+    assert.ok(blocks.some((b) => b.slug === 'amp'), 'the demo preset has no amp in it')
+    await send('/preset/select', 'POST', { number: 12 })
+    assert.equal((await send('/preset')).number, 12, 'the demo ignored a preset change')
+
+    /* A route it does not know throws rather than answering nothing: an empty
+       screen in a mode built for looking around reads as a broken screen. */
+    await assert.rejects(() => send('/nonsense'), /no answer/, 'an unknown route answers nothing instead of saying so')
+
+    /* And the switch itself, read rather than run: it reaches for React and the
+       phone's storage, neither of which exists here. */
+    const demo = read('mobile/src/lib/demo.js')
+    assert.match(demo, /export const demoDevice = \(\) => mock/, 'nothing hands the simulated unit out')
+    assert.match(demo, /mock = want \? createMockDevice\(\) : null/, 'the switch does not build a unit')
+    assert.match(
+      read('mobile/src/lib/device.js').replace(/\s+/g, ' '),
+      /const demo = demoDevice\(\) return demo \? demoRequest\(demo, path, options\) : overTheWire\(path, options\)/,
+      'the app does not route through the demo, so turning it on changes nothing'
+    )
+  })
+
+  test('the demo is offered, escapable, and never pretends to be a rig', () => {
+    /*
+     * Offered on the sign-in screen, because that is where somebody with no
+     * computer is standing, and it is the screen that otherwise asks them for a
+     * code no computer of theirs has ever shown.
+     */
+    const signIn = read('mobile/src/screens/SignIn.js').replace(/\s+/g, ' ')
+    assert.match(signIn, /Just looking\? Try the demo/, 'nothing offers the demo where somebody needs it')
+    assert.match(signIn, /setDemo\(true\)/, 'the button does not turn the demo on')
+
+    /* And escapable, or it is a trap rather than a demo. */
+    const settings = read('mobile/src/screens/Settings.js').replace(/\s+/g, ' ')
+    assert.match(settings, /Leave the demo/, 'there is no way out of the demo')
+    assert.match(settings, /onPress=\{\(\) => setDemo\(false\)\}/, 'the way out does not turn it off')
+    /* It says what it is, every time, rather than letting somebody think a
+       simulated FM3 is their FM3. */
+    assert.match(settings, /This is the demo — a simulated FM3/, 'the demo does not say it is one')
+    assert.match(settings, /status=\{demo \? 'Demo — simulated FM3' : linkWord\}/, 'Setup does not show that the demo is on')
+
+    /* The link reads as connected, because from every screen's point of view it
+       is: the questions get answered. Otherwise the app refuses to open the
+       preset list over a unit that is right there. */
+    assert.match(
+      read('mobile/src/lib/link.js').replace(/\s+/g, ' '),
+      /if \(isDemo\(\)\) \{ set\(\{ link: 'connected', macName: 'the demo', hostVersion: null \}\)/,
+      'the demo does not read as a working link, so the app refuses to use it'
+    )
+
+    /*
+     * NO ARTIFICIAL DELAY ANYWHERE. A demo that pretended to be as slow as a
+     * serial port would be prettier and would answer nothing — and answering
+     * the lag question is half of why this exists.
+     */
+    const wire = read('mobile/src/lib/demoWire.js')
+    assert.ok(!/setTimeout|sleep|delay/i.test(wire.replace(/\/\*[\s\S]*?\*\//g, '')), 'the demo has been given a fake delay, which is the one thing it must not have')
   })
 }

@@ -16,7 +16,25 @@
  * What a unit is — how an empty slot reads, how many slots it has, which blocks
  * are not stage controls — is in unit.mjs, where the tests can reach it.
  */
-import { remoteRequest } from './relay'
+import { remoteRequest as overTheWire } from './relay'
+import { demoDevice } from './demo'
+import { demoRequest } from './demoWire'
+
+/**
+ * Every question this app asks a unit, and the one place the demo answers.
+ *
+ * "Yes I want the demo mode on the phone as well." One seam rather than
+ * twenty-eight, because a demo wired in at each call site is a second
+ * implementation of the app — and a second implementation is how a demo starts
+ * telling you things that are not true about the real one.
+ *
+ * Nothing below this line knows which it is talking to, which is the property
+ * worth having: the screens are the same screens.
+ */
+const remoteRequest = (path, options) => {
+  const demo = demoDevice()
+  return demo ? demoRequest(demo, path, options) : overTheWire(path, options)
+}
 import { withLineage } from './lineage'
 import { cableColumns, toWireCell } from './grid-plan'
 import { cleanPresetName, isEmptySlotName } from './unit.mjs'
