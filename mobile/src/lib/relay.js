@@ -26,6 +26,7 @@ import { logDebug } from './debugLog'
 import { DEFAULT_PROJECT } from './project'
 import { decode } from './decode'
 import { withRetry } from './retry'
+import { notForever } from './notForever'
 import {
   RELAY_GRACE,
   explainAuth,
@@ -82,6 +83,7 @@ const censuses = new Map()
 function supabase() {
   if (!client) {
     client = createClient(DEFAULT_PROJECT.url, DEFAULT_PROJECT.anonKey, {
+      global: { fetch: notForever },
       auth: {
         storage: AsyncStorage,
         persistSession: true,

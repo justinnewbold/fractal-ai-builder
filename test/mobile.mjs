@@ -14,8 +14,10 @@
  * App.jsx, and import the plain modules where they can.
  */
 import assert from 'node:assert/strict'
-import { readFileSync, readdirSync, statSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parse } from '@babel/parser'
 import babelTraverse from '@babel/traverse'
 
@@ -2616,6 +2618,190 @@ export function run(test) {
     assert.match(log, /lastRun\(\)\.then/, 'the previous run is never read back')
   })
 
+  test('the run before this one is the run before this one', async () => {
+    /*
+     * IT SHIPPED SHOWING THIS RUN TWICE, and Justin pasted it back:
+     *
+     *   07:57:34.857 [tap] press Just looking? Try the demo — 1993ms
+     *   THE RUN BEFORE THIS ONE — 12 lines, oldest first
+     *   07:57:34.857 [tap] press Just looking? Try the demo — 1993ms
+     *
+     * Same timestamps in both halves. The previous run was read when the log
+     * screen opened, by which time this run had been writing over it for
+     * minutes — so the heading was a lie, and a lie that looks like evidence
+     * is worse than no evidence at all. This file exists because a crash takes
+     * its log with it; a crash report quoting the run that did not crash is
+     * the same dead end with extra confidence.
+     *
+     * RUN RATHER THAN READ, because this is a race, and finding an `await` in
+     * the source proves nothing about which of two promises lands first. The
+     * module is transplanted next to stubs — there is no phone storage and no
+     * real log in node — and then actually raced, with the read made slower
+     * than the first write on purpose. That ordering IS the bug.
+     */
+    const STORAGE = `
+      let store = {}
+      let wait = 0
+      export const __seed = (k, v) => { store[k] = v }
+      export const __delay = (ms) => { wait = ms }
+      const after = (v) => new Promise((r) => setTimeout(() => r(v), wait))
+      export default {
+        getItem: (k) => after(k in store ? store[k] : null),
+        setItem: (k, v) => { store[k] = v; return Promise.resolve() },
+        removeItem: (k) => { delete store[k]; return Promise.resolve() }
+      }
+    `
+    const DEBUG_LOG = `
+      const lines = []
+      const watchers = new Set()
+      export const getDebugLog = () => lines
+      export const formatLine = (l) => String(l)
+      export const onDebugLog = (fn) => { watchers.add(fn); return () => watchers.delete(fn) }
+      export const __say = (l) => { lines.push(l); for (const fn of watchers) fn() }
+    `
+
+    const src = read('mobile/src/lib/logKeep.js')
+    const dir = mkdtempSync(join(tmpdir(), 'logkeep-'))
+    try {
+      /* Two seconds between writes is right on a phone and is dead time here,
+         so the transplanted copy writes almost at once. If that constant is
+         ever renamed this stops biting, so it has to have actually changed. */
+      const quick = src
+        .replace(/'@react-native-async-storage\/async-storage'/, "'./storage.mjs'")
+        .replace(/'\.\/debugLog'/, "'./debugLog.mjs'")
+        .replace(/const EVERY_MS = \d+/, 'const EVERY_MS = 5')
+      assert.doesNotMatch(quick, /async-storage'|'\.\/debugLog'/, 'logKeep no longer imports what this stands in for')
+      assert.match(quick, /const EVERY_MS = 5/, 'the write timer could not be shortened, so this is not testing the race')
+
+      writeFileSync(join(dir, 'storage.mjs'), STORAGE)
+      writeFileSync(join(dir, 'debugLog.mjs'), DEBUG_LOG)
+      writeFileSync(join(dir, 'logKeep.mjs'), quick)
+
+      const at = (f) => pathToFileURL(join(dir, f)).href
+      const store = await import(at('storage.mjs'))
+      const log = await import(at('debugLog.mjs'))
+      const keep = await import(at('logKeep.mjs'))
+
+      /* What the run that died left behind. */
+      store.__seed('fractal.log.lastrun', JSON.stringify({ at: 1, lines: ['WHAT THE LAST RUN SAID'] }))
+      /* And storage slower to answer than this run is to start writing, which
+         is the ordinary case on a phone busy enough to be worth logging. */
+      store.__delay(40)
+
+      const off = keep.keepLog()
+      log.__say('WHAT THIS RUN IS SAYING')
+      await new Promise((r) => setTimeout(r, 120))
+      const was = await keep.lastRun()
+      off()
+
+      assert.ok(was, 'the previous run was lost')
+      assert.deepEqual(
+        was.lines,
+        ['WHAT THE LAST RUN SAID'],
+        'the heading says the run before this one and this is what this run just wrote'
+      )
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('a dead account service is given twelve seconds, not the whole evening', async () => {
+    /*
+     * "I can't log into supper base anymore. It says server error, so now I
+     * can just do the demo."
+     *
+     * What the log underneath that said:
+     *
+     *   sign in — 19874ms
+     *   sign in — 19661ms
+     *   sign in — 19735ms
+     *
+     * Three goes, twenty seconds each, with a frozen phone in between. There
+     * was no limit on a request to the account service at all — the project
+     * had run out of its disk allowance and everything sent to it simply hung.
+     * A phone that does not repaint for twenty seconds is a crash as far as
+     * anybody holding one is concerned.
+     *
+     * STOOD IN FOR RATHER THAN SERVED, and the stub honours the only part of
+     * fetch this depends on: a request rejects with an AbortError when its
+     * signal fires, and otherwise never settles. That is the contract, and
+     * standing it up as a real socket would test node's networking instead of
+     * the one thing worth testing here, which is what fires when.
+     */
+    const { notForever, ACCOUNT_MS } = await import('../mobile/src/lib/notForever.js')
+    assert.ok(ACCOUNT_MS > 0 && ACCOUNT_MS <= 15000, 'the cap is long enough to feel like the freeze it replaced')
+
+    /* Other tests in this suite leave a stub on the global, so put back
+       whatever was there rather than the real one. */
+    const before = globalThis.fetch
+    const signals = []
+    let answer = null
+    globalThis.fetch = (_url, init = {}) =>
+      new Promise((resolve, reject) => {
+        signals.push(init.signal)
+        if (answer) {
+          resolve(answer)
+          return
+        }
+        init.signal?.addEventListener('abort', () => {
+          const err = new Error('This operation was aborted')
+          err.name = 'AbortError'
+          reject(err)
+        })
+      })
+
+    try {
+      /* It gives up, and it says something a person can act on.
+         Raced against a deadline rather than simply awaited: a version with no
+         stopwatch at all never settles, and a test that waits for it wedges the
+         whole suite instead of naming what broke. */
+      const gaveUp = await Promise.race([
+        notForever('/token', {}, 40).then(() => 'it answered', (e) => e.message),
+        new Promise((r) => setTimeout(() => r('it is still waiting'), 500))
+      ])
+      assert.match(
+        String(gaveUp),
+        /account service timed out/,
+        'a request to a service that never answers still waits forever'
+      )
+
+      /* A caller cancelling its own request gets its own error back. supabase-js
+         cancels requests, and one of those reported as "the service timed out"
+         would be a lie told exactly when somebody is trying to work out what is
+         wrong. */
+      const mine = new AbortController()
+      const caught = notForever('/token', { signal: mine.signal }, 5000).then(
+        () => null,
+        (e) => e
+      )
+      mine.abort()
+      const err = await caught
+      assert.ok(err, 'the caller cancelled and the request carried on')
+      assert.doesNotMatch(
+        String(err.message),
+        /account service timed out/,
+        'the caller’s own cancel is being reported as the service failing'
+      )
+
+      /* And an answer that arrives is just an answer, passed straight back. */
+      answer = { ok: true, status: 200 }
+      const got = await notForever('/token', {}, 5000)
+      assert.equal(got, answer)
+
+      /* The stopwatch is called off when the answer beats it. Left running, a
+         request that already finished still gets aborted on the way past — and
+         every one of them holds a timer open for twelve seconds after it is
+         done, which on a phone is a wakeup per request. That is the shape of
+         cost this app has already been made unusable by once. */
+      await notForever('/token', {}, 30)
+      const its = signals[signals.length - 1]
+      await new Promise((r) => setTimeout(r, 80))
+      assert.equal(its.aborted, false, 'the stopwatch runs on over a request that already finished')
+    } finally {
+      globalThis.fetch = before
+    }
+  })
+
   test('scrolling the preset list does not queue five hundred reads at the unit', () => {
     /*
      * THIS IS WHAT MADE IT UNUSABLE, and it is worth its own check because
@@ -2757,5 +2943,50 @@ export function run(test) {
      */
     const wire = read('mobile/src/lib/demoWire.js')
     assert.ok(!/setTimeout|sleep|delay/i.test(wire.replace(/\/\*[\s\S]*?\*\//g, '')), 'the demo has been given a fake delay, which is the one thing it must not have')
+  })
+
+  test('the demo touches nothing on the network', () => {
+    /*
+     * "I can't log into supabase anymore. It says server error… It says the
+     * supabase database is like maxed out or something."
+     *
+     * It is — Supabase said so by email and every query to it times out. Which
+     * makes this worse than untidy: the demo signed itself in as far as App is
+     * concerned, so the account sync ran underneath it, pushing setlists at a
+     * database the demo has no business touching, on an account somebody
+     * looking around may not even have.
+     *
+     * It is also the opposite of what the demo is for. The whole value of it is
+     * that nothing leaves the phone, so a screen that is slow in the demo is
+     * slow for its own reasons. A cloud sync running under it puts the network
+     * back in the measurement.
+     */
+    const app = read('mobile/App.js').replace(/\s+/g, ' ')
+    assert.match(app, /if \(demo\) return undefined let alive = true let stop = null hydrate\(\)\.then/, 'the account sync still runs in the demo')
+    assert.match(app, /\}, \[auth, demo\]\)/, 'the sync is not re-decided when the demo goes on or off')
+
+    /* And the link loop never starts, so no channel is joined and no session
+       is fetched: the demo makes no request at all. */
+    assert.match(
+      read('mobile/src/lib/link.js').replace(/\s+/g, ' '),
+      /if \(isDemo\(\)\) \{ set\(\{ link: 'connected'/,
+      'the demo starts the link loop, which joins a channel it has no use for'
+    )
+  })
+
+  test('the bar says DEMO rather than wearing a real rig’s green', () => {
+    /*
+     * "It does sound connected, even in demo."
+     *
+     * It said CONNECTED, in the same green a real FM3 gets. The demo reads as a
+     * connected link everywhere else on purpose — the questions do get answered
+     * — but the bar is the one place somebody looks to know what they are
+     * driving, and dressing a simulated unit as a real one there is the app
+     * lying in the exact spot that exists to stop it.
+     */
+    const bar = read('mobile/src/components/TopBar.js').replace(/\s+/g, ' ')
+    assert.match(bar, /const demo = useDemo\(\)/, 'the bar cannot tell whether it is in the demo')
+    assert.match(bar, /const word = demo \? 'demo' : linkWord\(tone, 'remote'\)/, 'the bar still says CONNECTED in the demo')
+    assert.match(bar, /const mark = demo \? 'wait' : linkTone\(tone\)/, 'the demo word is drawn in the colour a real connection gets')
   })
 }

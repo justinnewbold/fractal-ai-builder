@@ -5,6 +5,7 @@ import { color, font, mono, space } from '../lib/theme'
 import { linkTone, linkWord, toneOfRemote } from '../lib/link-word'
 import { APP_VERSION } from '../lib/version'
 import { useRig } from '../lib/rig'
+import { useDemo } from '../lib/demo'
 import Lamp from './Lamp'
 import Volume from './Volume'
 
@@ -39,10 +40,20 @@ export default function TopBar({ link, onOpenSettings }) {
   const [volume, setVolume] = useState(false)
   const [failed, setFailed] = useState(null)
 
+  /*
+   * The demo says DEMO, not CONNECTED.
+   *
+   * It reads as a connected link everywhere else on purpose — the questions do
+   * get answered — but the bar is the one place somebody looks to know what
+   * they are driving, and a simulated FM3 wearing the same green CONNECTED as a
+   * real one is the app telling a lie in the one spot that exists to prevent
+   * that. "It does sound connected, even in demo."
+   */
+  const demo = useDemo()
   const connected = link?.link === 'connected'
   const tone = toneOfRemote(link?.link)
-  const mark = linkTone(tone)
-  const word = linkWord(tone, 'remote')
+  const mark = demo ? 'wait' : linkTone(tone)
+  const word = demo ? 'demo' : linkWord(tone, 'remote')
 
   /*
    * The unit's short name, and a dash rather than a guess.

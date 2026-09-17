@@ -43,13 +43,39 @@ let stop = null
 let timer = null
 let dirty = false
 
+/*
+ * THE PREVIOUS RUN, TAKEN BEFORE ANYTHING IS ALLOWED TO OVERWRITE IT.
+ *
+ * The first version of this read it when the log screen opened, by which time
+ * this run had been writing over it for minutes — so the "run before this one"
+ * was this one, printed twice. It went out and Justin pasted it back:
+ *
+ *   07:57:34.857 [tap] press Just looking? Try the demo — 1993ms
+ *   THE RUN BEFORE THIS ONE — 12 lines
+ *   07:57:34.857 [tap] press Just looking? Try the demo — 1993ms
+ *
+ * Same timestamps, both halves. Useless, and worse than useless: it looks like
+ * evidence. So the read happens once, at launch, and nothing may write until it
+ * has finished.
+ */
+let held = null
+let taken = null
+
 export function keepLog() {
   if (stop) return stop
+  /* Started at launch, which is the fix: the read is asked for before this run
+     has written a word. The wait on it below is only insurance. */
+  taken = readHeld()
   const write = async () => {
     timer = null
     if (!dirty) return
     dirty = false
     try {
+      /* Storage hands back what it held when it was ASKED, so the read above is
+         already safe. This wait costs an already-started promise and removes
+         the question entirely, which is worth it for the one bug this file has
+         had. */
+      await taken
       const tail = getDebugLog().slice(-TAIL).map(formatLine)
       await AsyncStorage.setItem(KEY, JSON.stringify({ at: Date.now(), lines: tail }))
     } catch {
@@ -71,26 +97,35 @@ export function keepLog() {
   return stop
 }
 
-/**
- * What the last run had to say before it stopped, or null.
- *
- * Read once at launch and shown on the log screen under its own heading. It is
- * kept rather than cleared: a crash that happens twice is two runs worth
- * comparing, and the next launch overwrites it anyway.
- */
-export async function lastRun() {
+/** Take what is on disk into memory. Started at launch, and only then. */
+async function readHeld() {
   try {
     const raw = await AsyncStorage.getItem(KEY)
-    if (!raw) return null
-    const held = JSON.parse(raw)
-    if (!Array.isArray(held?.lines) || !held.lines.length) return null
-    return { at: Number(held.at) || null, lines: held.lines }
+    if (!raw) return
+    const was = JSON.parse(raw)
+    if (Array.isArray(was?.lines) && was.lines.length) {
+      held = { at: Number(was.at) || null, lines: was.lines }
+    }
   } catch {
-    return null
+    /* Nothing kept, then — which is the ordinary first launch. */
   }
 }
 
+/**
+ * What the last run had to say before it stopped, or null.
+ *
+ * Shown on the log screen under its own heading, and kept rather than cleared:
+ * a crash that happens twice is two runs worth comparing, and the next launch
+ * overwrites it anyway.
+ */
+export async function lastRun() {
+  /* Whatever was on disk when this run started, never what is on disk now. */
+  if (taken) await taken
+  return held
+}
+
 export async function forgetLastRun() {
+  held = null
   try {
     await AsyncStorage.removeItem(KEY)
   } catch {
