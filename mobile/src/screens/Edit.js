@@ -2,8 +2,18 @@ import { useEffect, useRef, useState } from 'react'
 import { Platform, ScrollView, Text, TextInput, View } from 'react-native'
 
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
-import { blockParams, blockTypes, idOf, sameBlock, setParamConfirmed, setType } from '../lib/device'
+import {
+  bindModifier,
+  blockParams,
+  blockTypes,
+  idOf,
+  modifierModel,
+  sameBlock,
+  setParamConfirmed,
+  setType
+} from '../lib/device'
 import { isSilencingParam } from '../lib/guardrails'
+import { buildParamIndex, findControls, indexFor } from '../lib/paramIndex'
 import { useRig, writeBypass, writeChannel } from '../lib/rig'
 import { blockColor } from '../lib/blockColors'
 import { shortBlock } from '../lib/shortName'
@@ -54,6 +64,13 @@ export default function Edit({ onBack }) {
 
   const [openEid, setOpenEid] = useState(null)
   const [error, setError] = useState(null)
+  /*
+   * Search hands over by naming a control, not by editing one. Tapping a result
+   * opens the block that holds it and puts your eyes on it — so there stays
+   * exactly one place in this app where a value changes, with its verified
+   * write behind it.
+   */
+  const [focus, setFocus] = useState(null)
 
   const block = blocks.find((b) => sameBlock(b, openEid)) || null
 
@@ -90,6 +107,15 @@ export default function Edit({ onBack }) {
       ) : null}
       {!blocks.length && chain === 'ok' ? <Note>This preset is empty.</Note> : null}
 
+      <FindControl
+        blocks={blocks}
+        onError={setError}
+        onPick={(eid, paramId) => {
+          setOpenEid(eid)
+          setFocus({ eid, paramId, nonce: Date.now() })
+        }}
+      />
+
       {/* ----------------------------------------------------------- chain */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
         {blocks.map((b) => {
@@ -123,11 +149,14 @@ export default function Edit({ onBack }) {
           key={`${idOf(block)}:${block.channel || ''}:${scene}`}
           block={block}
           channels={caps?.channelNames}
+          focus={focus}
           onError={setError}
         />
       ) : blocks.length ? (
         <Note>Tap a block to open its controls.</Note>
       ) : null}
+
+      <Modifiers blocks={blocks} onError={setError} />
     </ScrollView>
   )
 }
@@ -141,7 +170,7 @@ export default function Edit({ onBack }) {
  * identity, and keying on that threw the knobs away and read them again for
  * nothing, once per knob.
  */
-function BlockPanel({ block, channels, onError }) {
+function BlockPanel({ block, channels, focus, onError }) {
   /* Read once and used everywhere below: see unit.mjs on why this is not
      `block.eid`, and what it cost to find out. */
   const eid = idOf(block)
@@ -206,6 +235,27 @@ function BlockPanel({ block, channels, onError }) {
   const primary = editable.slice(0, 6)
   const rest = editable.slice(6)
   const shown = tab === 'main' ? primary : rest
+
+  /*
+   * Search opens the right block, then puts your eyes on the control you named.
+   *
+   * Two steps, because a control on the second page is unreachable until that
+   * page is showing: the tab moves first, and the knob is marked once the read
+   * has finished and the cell it names actually exists. Marking before that is
+   * marking nothing, which looks exactly like a search result that did nothing.
+   */
+  const [lit, setLit] = useState(null)
+  useEffect(() => {
+    if (!focus?.nonce || focus.eid !== eid) return undefined
+    const onMore = rest.some((p) => p.id === focus.paramId)
+    setTab(onMore ? 'more' : 'main')
+    if (loading) return undefined
+    if (!shown.some((p) => p.id === focus.paramId)) return undefined
+    setLit(focus.paramId)
+    const clear = setTimeout(() => setLit(null), 2500)
+    return () => clearTimeout(clear)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus, eid, loading, tab])
 
   const valueOf = (p) => (local[p.id] !== undefined ? local[p.id] : p.value)
 
@@ -438,7 +488,20 @@ function BlockPanel({ block, channels, onError }) {
       ) : (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
           {shown.map((p) => (
-            <View key={p.id} style={{ width: '30%', alignItems: 'center', gap: space.xs }}>
+            <View
+              key={p.id}
+              style={{
+                width: '30%',
+                alignItems: 'center',
+                gap: space.xs,
+                /* The one you searched for, said with a ring for a couple of
+                   seconds rather than a colour change that outstays it. */
+                borderRadius: radius.md,
+                borderWidth: 2,
+                borderColor: lit === p.id ? color.live : 'transparent',
+                paddingVertical: 2
+              }}
+            >
               <Knob
                 param={p}
                 label={p.name}
@@ -460,6 +523,317 @@ function BlockPanel({ block, channels, onError }) {
           </Text>
           <Text style={{ color: color.silkFaint, fontSize: font.micro }}>read-only</Text>
         </View>
+      ) : null}
+    </View>
+  )
+}
+
+/**
+ * Modifiers — what makes a preset respond instead of sit still.
+ *
+ * A modifier attaches a source to a control: an envelope follower on drive so
+ * it cleans up when you back off, an LFO on a filter, an expression pedal on
+ * delay mix. Everything else this app writes is a static value; this is the
+ * part that reacts to playing.
+ *
+ * NOT EVERY UNIT CAN BE TOLD TO DO THIS. An AM4 serves the modifier list and
+ * reports the wire binding unsupported — the data is there, the binding is not.
+ * So this reads the flag and says so in a sentence rather than drawing an
+ * Attach button that cannot attach. It is the specific mistake the browser made
+ * twice: once by guarding on a field the host has never served, and once by
+ * returning nothing at all, which left a heading over blank space and read as
+ * "broken" to everyone who opened it.
+ *
+ * Folded away until asked for. Four pickers and a button is most of a phone
+ * screen, and this is the least-reached-for thing on the bench.
+ */
+function Modifiers({ blocks, onError }) {
+  const [open, setOpen] = useState(false)
+  const [model, setModel] = useState(undefined)
+  const [slot, setSlot] = useState(1)
+  const [eid, setEid] = useState(null)
+  const [paramId, setParamId] = useState(null)
+  const [source, setSource] = useState(null)
+  const [params, setParams] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [said, setSaid] = useState(null)
+
+  /* Read on opening, not on mount: a fold nobody opens should cost nothing. */
+  useEffect(() => {
+    if (!open || model !== undefined) return undefined
+    let stop = false
+    ;(async () => {
+      try {
+        const m = await modifierModel()
+        if (!stop) setModel(m?.error ? null : m)
+      } catch {
+        if (!stop) setModel(null)
+      }
+    })()
+    return () => {
+      stop = true
+    }
+  }, [open, model])
+
+  useEffect(() => {
+    if (eid === null) {
+      setParams([])
+      return undefined
+    }
+    let stop = false
+    ;(async () => {
+      setLoading(true)
+      try {
+        const res = await blockParams(eid)
+        if (!stop) setParams((res?.named || []).filter((p) => !isSilencingParam(p.name)))
+      } catch (err) {
+        if (!stop) onError(err.message)
+      } finally {
+        if (!stop) setLoading(false)
+      }
+    })()
+    return () => {
+      stop = true
+    }
+  }, [eid, onError])
+
+  if (!open) {
+    return <Press label="Modifiers" sub="Let a pedal or your playing move a control" onPress={() => setOpen(true)} />
+  }
+
+  const ready = eid !== null && paramId !== null && source !== null
+
+  /*
+   * What is still to pick, said beside the button rather than left to a
+   * disabled button that says nothing.
+   */
+  const missing = [
+    eid === null && 'a block',
+    paramId === null && 'a control',
+    source === null && 'a source'
+  ].filter(Boolean)
+  const why =
+    missing.length === 0
+      ? null
+      : missing.length === 1
+        ? `Pick ${missing[0]} to attach.`
+        : `Pick ${missing.slice(0, -1).join(', ')} and ${missing[missing.length - 1]} to attach.`
+
+  const attach = async () => {
+    try {
+      await bindModifier(Number(slot), Number(eid), Number(paramId), Number(source))
+      const b = blocks.find((x) => sameBlock(x, Number(eid)))
+      const p = params.find((x) => x.id === Number(paramId))
+      const src = model.sources?.find((x) => x.ordinal === Number(source))
+      setSaid(`${src?.name} now moves ${b?.name} ${p?.name}.`)
+    } catch (err) {
+      onError(err.message)
+    }
+  }
+
+  return (
+    <View style={{ gap: space.md }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
+        <Label>Modifiers</Label>
+        <Press label="Close" height={40} onPress={() => setOpen(false)} />
+      </View>
+
+      {model === undefined ? (
+        <Note>Asking your unit what it can attach…</Note>
+      ) : !model ? (
+        <Note tone="warn">Couldn’t read the list of things to attach from your unit.</Note>
+      ) : model.bindingSupported === false ? (
+        <Note>
+          This unit doesn’t let an app attach a modifier — the FM3 and larger units do. You can
+          still set one up on the unit itself.
+        </Note>
+      ) : (
+        <>
+          <Text style={{ color: color.silkDim, fontSize: font.small, lineHeight: 20 }}>
+            Attach a source to a control so it moves while you play — your picking on a drive, a
+            pedal on delay mix.
+          </Text>
+
+          <Pick
+            title="Slot"
+            options={Array.from({ length: model.slotCount || 4 }, (_, i) => ({
+              key: i + 1,
+              label: String(i + 1)
+            }))}
+            chosen={slot}
+            onPick={setSlot}
+          />
+
+          <Pick
+            title="Block"
+            options={blocks.map((b) => ({ key: idOf(b), label: b.name }))}
+            chosen={eid}
+            onPick={(k) => {
+              setEid(k)
+              setParamId(null)
+            }}
+          />
+
+          <Pick
+            title={loading ? 'Control — reading…' : 'Control'}
+            options={params.map((p) => ({ key: p.id, label: p.name }))}
+            chosen={paramId}
+            onPick={setParamId}
+            empty={eid === null ? 'Pick a block first.' : loading ? null : 'Nothing to attach to here.'}
+          />
+
+          <Pick
+            title="Source"
+            /* `ordinal`, not `value`. A source has never carried a `value`, and
+               reading one gave the device a NaN where an ordinal belonged. */
+            options={(model.sources || []).map((x) => ({ key: x.ordinal, label: x.name }))}
+            chosen={source}
+            onPick={setSource}
+            empty={model.sourcesNote || 'This unit didn’t list any sources.'}
+          />
+
+          <Press label="Attach" tone="signal" on={ready} disabled={!ready} onPress={attach} />
+          {why ? (
+            <Text accessibilityLiveRegion="polite" style={{ color: color.silkDim, fontSize: font.small }}>
+              {why}
+            </Text>
+          ) : null}
+          {said ? <Note>{said}</Note> : null}
+        </>
+      )}
+    </View>
+  )
+}
+
+/**
+ * One row of choices.
+ *
+ * A wrapped row of buttons rather than a dropdown: a phone's native picker is a
+ * modal that covers the four other things you are in the middle of choosing,
+ * and the whole point of this panel is that you can see all four at once.
+ */
+function Pick({ title, options, chosen, onPick, empty }) {
+  return (
+    <View style={{ gap: space.sm }}>
+      <Label>{title}</Label>
+      {options.length ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+          {options.map((o) => (
+            <Press
+              key={o.key}
+              label={o.label}
+              tone="signal"
+              on={o.key === chosen}
+              height={44}
+              style={{ paddingHorizontal: space.md }}
+              onPress={() => onPick(o.key)}
+            />
+          ))}
+        </View>
+      ) : empty ? (
+        <Text style={{ color: color.silkDim, fontSize: font.small }}>{empty}</Text>
+      ) : null}
+    </View>
+  )
+}
+
+/**
+ * Find a control by name, across every block at once.
+ *
+ * "Where does the presence live" has one good answer per preset and this is it.
+ * Typing three letters beats opening four blocks in turn to look — and on a
+ * phone each of those is a round trip to the Mac, so it beats it by more.
+ *
+ * THE LIST IS NOT BUILT UNTIL SOMEBODY ASKS FOR IT. Building it means reading
+ * every block's controls, one at a time, and each of those is a slow read that
+ * can make the unit dump its preset over serial. A find box nobody touches must
+ * not cost that, so nothing happens until two letters are typed.
+ *
+ * AND IT SAYS WHAT IT IS DOING WHILE IT DOES IT. Seven of those reads on a
+ * relay is several seconds, and a search box that sits there for several
+ * seconds with no explanation is a search box that looks broken. It counts them
+ * off instead.
+ *
+ * Results navigate rather than edit. Tapping one opens that block with the
+ * control marked, so there stays exactly one place in this app where a value
+ * changes, with its verified write behind it.
+ */
+function FindControl({ blocks, onPick, onError }) {
+  const [query, setQuery] = useState('')
+  const [index, setIndex] = useState(() => indexFor(blocks))
+  const [progress, setProgress] = useState(null)
+  const alive = useRef(true)
+  useEffect(() => () => { alive.current = false }, [])
+
+  const needle = query.trim()
+  const hits = findControls(index, needle)
+
+  const change = async (text) => {
+    setQuery(text)
+    if (text.trim().length < 2 || index) return
+    const ready = indexFor(blocks)
+    if (ready) {
+      setIndex(ready)
+      return
+    }
+    try {
+      const built = await buildParamIndex(blocks, (done, total) => {
+        if (alive.current) setProgress({ done, total })
+      })
+      if (alive.current) setIndex(built)
+    } catch (err) {
+      if (alive.current) onError(err.message)
+    } finally {
+      if (alive.current) setProgress(null)
+    }
+  }
+
+  const reading = progress && progress.done < progress.total
+
+  return (
+    <View style={{ gap: space.sm }}>
+      <TextInput
+        value={query}
+        onChangeText={change}
+        placeholder="Find a control — gain, mix, presence…"
+        placeholderTextColor={color.silkFaint}
+        autoCorrect={false}
+        autoCapitalize="none"
+        accessibilityLabel="Find a control by name"
+        style={{
+          minHeight: TAP,
+          paddingHorizontal: space.md,
+          borderRadius: radius.md,
+          borderWidth: 1,
+          borderColor: color.rule,
+          backgroundColor: color.panel,
+          color: color.silk,
+          fontSize: font.body
+        }}
+      />
+
+      {reading ? (
+        <Text style={{ color: color.silkDim, fontSize: font.micro, fontFamily: face }}>
+          {`Reading block ${progress.done + 1} of ${progress.total}…`}
+        </Text>
+      ) : null}
+
+      {needle.length >= 2 && index ? (
+        hits.length ? (
+          <View style={{ gap: space.sm }}>
+            {hits.map(({ block, param }) => (
+              <Press
+                key={`${idOf(block)}-${param.id}`}
+                caption={block.name}
+                label={param.name}
+                sub={`${fmt(param.value)}${param.unit || ''}`}
+                onPress={() => onPick(idOf(block), param.id)}
+              />
+            ))}
+          </View>
+        ) : (
+          <Note>{`No control called “${needle}” in this preset.`}</Note>
+        )
       ) : null}
     </View>
   )
@@ -528,5 +902,22 @@ function ValueBox({ param, value, onCommit }) {
         paddingVertical: 2
       }}
     />
+  )
+}
+
+/** A small heading over a group of controls. */
+function Label({ children }) {
+  return (
+    <Text
+      accessibilityRole="header"
+      style={{
+        color: color.silkFaint,
+        fontSize: font.micro,
+        letterSpacing: 1.5,
+        textTransform: 'uppercase'
+      }}
+    >
+      {children}
+    </Text>
   )
 }

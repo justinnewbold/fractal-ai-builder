@@ -196,6 +196,24 @@ export const setType = (eid, value) => post(`/preset/blocks/${eid}/type`, { valu
 export const blockTypes = async (slug) =>
   withLineage(slug, (await remoteRequest(`/blocks/${slug}/types`)) || [])
 
+/**
+ * What this unit can attach to a control, and where.
+ *
+ * A modifier is what makes a preset RESPOND rather than sit still: an envelope
+ * follower on drive so it cleans up when you back off, an expression pedal on
+ * delay mix. Everything else this app writes is a static value.
+ *
+ * The answer carries `bindingSupported`. An AM4 serves the modifier list and
+ * reports the wire binding unsupported — the data is there, the binding is not —
+ * so the screen that offers this has to read that flag rather than assume. An
+ * Attach button that cannot attach is worse than no Attach button.
+ */
+export const modifierModel = () => remoteRequest('/mod/model')
+
+/** Attach a source to a control, in one of the unit's modifier slots. */
+export const bindModifier = (slot, targetEffectId, targetParam, source) =>
+  post('/mod/bind', { slot, targetEffectId, targetParam, source })
+
 /** Name the preset, and name a scene. Both land in the edit buffer only. */
 export const setPresetName = (name) => post('/preset/name', { name })
 export const setSceneName = (index, name) => post('/scene/name', { index, name })

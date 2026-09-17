@@ -16,6 +16,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { parse } from '@babel/parser'
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
 
@@ -831,6 +832,160 @@ export function run(test) {
     assert.match(stage, /caption="Source"/, 'nothing on the stage screen says what the buttons walk')
     assert.match(stage, /onPress=\{onOpenSetlists\}/, 'the source button does not open anything')
     assert.match(read('mobile/App.js'), /screen === 'setlists'/, 'there is no setlist screen to open')
+  })
+
+  test('finding a control reads the unit once, one block at a time, and never on a whim', () => {
+    /*
+     * A find box that walks the whole preset is the right feature and the
+     * wrong cost if it fires on its own. Reading a block's controls is among
+     * the SLOW reads — on an AM4 each one makes the unit dump its preset over
+     * serial — and a seven-block preset is seven of them, down one relay to one
+     * Mac holding one serial port.
+     *
+     * So: nothing until two letters are typed, one read at a time, kept
+     * afterwards, and a count on screen while it runs. A box that sits silent
+     * for ten seconds is a box that looks broken.
+     */
+    const index = read('mobile/src/lib/paramIndex.js')
+    const edit = read('mobile/src/screens/Edit.js')
+
+    assert.match(index, /for \(const block of editable\)[\s\S]{0,200}?await blockParams/, 'the index no longer reads one block at a time')
+    assert.ok(!/Promise\.all/.test(index), 'the index fires its reads together, which queues them behind each other at the Mac')
+    assert.match(index, /if \(cached\?\.key === key\) return cached\.index/, 'the index is rebuilt every time, so every search re-reads the preset')
+    assert.match(edit, /if \(text\.trim\(\)\.length < 2 \|\| index\) return/, 'the find box reads the unit before anybody has asked it to')
+    assert.match(edit, /Reading block \$\{progress\.done \+ 1\} of \$\{progress\.total\}/, 'the find box says nothing while it reads the whole preset')
+
+    /* And it is thrown away when a different preset is loaded: slot 45's
+       Presence is not slot 46's. */
+    assert.match(read('mobile/src/lib/rig.js'), /forgetControls\(\)/, 'the control index survives a preset change')
+
+    /* Levels stay off the quick surfaces, the same rule the knob deck holds:
+       a level found in a search box and dragged by a finger is the silent
+       preset by another route. */
+    assert.match(index, /filter\(\(p\) => !isSilencingParam\(p\.name\)\)/)
+    assert.match(read('src/lib/paramIndex.js'), /filter\(\(p\) => !isSilencingParam\(p\.name\)\)/)
+  })
+
+  test('a unit that cannot attach a modifier is told so in a sentence', async () => {
+    /*
+     * THE BROWSER GOT THIS WRONG TWICE and both ways are worth pinning.
+     *
+     * An AM4 serves the modifier list and reports the wire binding
+     * unsupported — the data is there, the binding is not. First the guard read
+     * a field ForgeFX has never served, so it never fired and the AM4 got
+     * exactly the dead Attach button the comment above it said it must not.
+     * Then the fix returned nothing at all, which left a heading over blank
+     * space: "The modifiers drop down also doesn't show anything."
+     *
+     * The field is `bindingSupported`, and the answer to a unit that cannot is
+     * a sentence.
+     */
+    const edit = read('mobile/src/screens/Edit.js')
+
+    assert.match(edit, /model\.bindingSupported === false/, 'the phone guards on a field the host does not serve')
+    assert.ok(!/\bbindable\b/.test(edit), 'the phone is reading `bindable`, which ForgeFX has never served anywhere')
+    assert.match(
+      edit,
+      /This unit doesn’t let an app attach a modifier/,
+      'a unit that cannot bind gets an empty panel rather than a sentence'
+    )
+
+    /* `ordinal`, not `value`. A source has never carried a `value`, and reading
+       one sent the device a NaN where an ordinal belonged. */
+    assert.match(edit, /key: x\.ordinal/, 'the source list is keyed on a field a source does not have')
+
+    /* And both routes are ones the Mac will actually carry out. */
+    const rules = await import('../shared/relay-rules.mjs')
+    assert.equal(rules.forbiddenRemotely('GET', '/mod/model'), null)
+    assert.equal(rules.forbiddenRemotely('POST', '/mod/bind'), null)
+  })
+
+  test('every component the phone draws is one that exists', () => {
+    /*
+     * THE HOLE THIS FILLS, found the hard way.
+     *
+     * A screen used <Label> without defining or importing it. Nothing caught
+     * it: `<Label>` compiles to a call on an identifier, so Metro bundles it
+     * happily, `expo export` succeeds, and the app installs. The crash arrives
+     * when somebody opens the fold that draws it — on a phone, which is the
+     * one place in this project nothing here can run.
+     *
+     * There is no linter in this repository, and CI runs the tests and two
+     * bundles. None of the three has an opinion about an identifier that is
+     * used and never declared, so this does: every capitalised thing any screen
+     * or component draws must be imported into that file, declared in it, or
+     * bound by it.
+     *
+     * Capitalised only, because that is JSX's own rule — a lowercase tag is a
+     * host element and means nothing to this check.
+     */
+    const files = [
+      ...walk(new URL('../mobile/src/screens/', import.meta.url)),
+      ...walk(new URL('../mobile/src/components/', import.meta.url)),
+      fileURLToPath(new URL('../mobile/App.js', import.meta.url))
+    ]
+    assert.ok(files.length >= 8, `only ${files.length} phone files were read; this check found nothing`)
+
+    for (const file of files) {
+      const name = file.split('/mobile/')[1] || file
+      const ast = parse(readFileSync(file, 'utf8'), {
+        sourceType: 'module',
+        plugins: ['jsx']
+      })
+
+      /* Everything this file brings into scope at the top level. */
+      const declared = new Set()
+      const bind = (node) => {
+        if (!node) return
+        if (node.type === 'Identifier') declared.add(node.name)
+        else if (node.type === 'ObjectPattern') for (const pr of node.properties) bind(pr.value || pr.argument)
+        else if (node.type === 'ArrayPattern') for (const el of node.elements) bind(el)
+        else if (node.type === 'AssignmentPattern') bind(node.left)
+        else if (node.type === 'RestElement') bind(node.argument)
+      }
+      for (const node of ast.program.body) {
+        if (node.type === 'ImportDeclaration') for (const sp of node.specifiers) declared.add(sp.local.name)
+        else if (node.type === 'FunctionDeclaration') declared.add(node.id?.name)
+        else if (node.type === 'ClassDeclaration') declared.add(node.id?.name)
+        else if (node.type === 'VariableDeclaration') for (const d of node.declarations) bind(d.id)
+        else if (node.type === 'ExportNamedDeclaration' && node.declaration) {
+          const d = node.declaration
+          if (d.type === 'FunctionDeclaration' || d.type === 'ClassDeclaration') declared.add(d.id?.name)
+          else if (d.type === 'VariableDeclaration') for (const one of d.declarations) bind(one.id)
+        } else if (node.type === 'ExportDefaultDeclaration' && node.declaration?.id) {
+          declared.add(node.declaration.id.name)
+        }
+      }
+
+      /* Every capitalised tag it draws. Walked by hand rather than with a
+         traverse dependency: the shape being looked for is one field deep. */
+      const drawn = new Set()
+      const seen = new Set()
+      const walkNode = (node) => {
+        if (!node || typeof node !== 'object' || seen.has(node)) return
+        seen.add(node)
+        if (node.type === 'JSXOpeningElement') {
+          let tag = node.name
+          /* <Foo.Bar> is Foo's business, so only the head of it is checked. */
+          while (tag?.type === 'JSXMemberExpression') tag = tag.object
+          const named = tag?.type === 'JSXIdentifier' ? tag.name : null
+          if (named && /^[A-Z]/.test(named)) drawn.add(named)
+        }
+        for (const key of Object.keys(node)) {
+          const value = node[key]
+          if (Array.isArray(value)) for (const v of value) walkNode(v)
+          else if (value && typeof value === 'object' && value.type) walkNode(value)
+        }
+      }
+      walkNode(ast.program)
+
+      for (const tag of drawn) {
+        assert.ok(
+          declared.has(tag),
+          `${name} draws <${tag}> without importing or defining it — it bundles, installs, and crashes when that part of the screen opens`
+        )
+      }
+    }
   })
 
   test('the phone addresses a block by the name the unit actually uses', async () => {
