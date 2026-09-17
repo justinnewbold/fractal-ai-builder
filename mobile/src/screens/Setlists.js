@@ -26,6 +26,9 @@ import { tick } from '../lib/feedback'
 import Note from '../components/Note'
 import Press from '../components/Press'
 
+/** How many presets "Add another" shows at a time. */
+const ADD_PAGE = 40
+
 const face = Platform.select(mono)
 
 const ofPreset = (s) => s.preset
@@ -201,16 +204,26 @@ export default function Setlists({ onBack }) {
   /*
    * What "Add another" offers: the slots whose names have been read, filtered
    * by what is typed — and never the ones already in the list, which would be a
-   * row whose + does nothing. Capped, because this is scrolled with a thumb and
-   * a 512-row list under a search box is the preset picker, which this is not.
+   * row whose + does nothing.
+   *
+   * A page at a time, and it SAYS SO. It was cut at forty rows with nothing
+   * on screen to say the rest existed: "It stopped at number 41 here, and I
+   * couldn't scroll anymore to find more songs." Forty is still the right
+   * first page — this is scrolled with a thumb, and a 512-row list under a
+   * search box is the preset picker, which this is not — but a cut has to be
+   * visible and undoable: how many are hidden, and a button for the next
+   * forty. Typing narrows the whole list, not the page.
    */
   const q = needle.trim().toLowerCase()
-  const candidates = adding
+  const [pages, setPages] = useState(1)
+  useEffect(() => setPages(1), [q, adding])
+  const offered = adding
     ? namedSlots()
         .filter((s) => !(chosen?.presets || []).includes(s.number))
         .filter((s) => !q || s.name.toLowerCase().includes(q) || String(s.number) === q)
-        .slice(0, 40)
     : []
+  const candidates = offered.slice(0, ADD_PAGE * pages)
+  const hidden = offered.length - candidates.length
 
   const box = {
     minHeight: TAP,
@@ -364,6 +377,14 @@ export default function Setlists({ onBack }) {
                         : 'No preset names known yet. Open Presets once and they will be.'}
                   </Note>
                 )}
+                {hidden > 0 ? (
+                  <Press
+                    label={`Show ${Math.min(ADD_PAGE, hidden)} more`}
+                    sub={`${candidates.length} of ${offered.length} shown — or type a name to narrow it`}
+                    height={TAP}
+                    onPress={() => setPages((n) => n + 1)}
+                  />
+                ) : null}
                 <Press label="Done adding" height={40} onPress={() => setAdding(false)} />
               </View>
             ) : (
