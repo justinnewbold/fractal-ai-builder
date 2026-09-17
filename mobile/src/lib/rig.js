@@ -22,6 +22,7 @@ import { TAP_REREAD_MS } from './tempo'
 import { DEFAULT_SLUG, deviceSlug } from './device-slug'
 import { adopt as adoptNames, forget as forgetNames, nameOf } from './presetNames'
 import { forget as forgetControls } from './paramIndex'
+import { recallSceneNames, rememberSceneNames } from './sceneNameCache'
 import { subscribeRemoteEvents } from './relay'
 
 const initial = {
@@ -214,10 +215,13 @@ export async function refreshAll() {
   adoptNames(device.nameOwner(slug)).catch(() => {})
   await refreshPreset()
   await refreshScene()
+  /* The names this phone or the computer already has, before the chain: a
+     small read, and the tiles are named while the chain is still coming. */
+  const quick = await quickSceneNames()
   /* The chain first: it is most of what the stage screen draws, and the scene
      names are a slow read nobody is waiting on. */
   await refreshBlocks()
-  await refreshSceneNames()
+  if (!quick) await refreshSceneNames()
   await refreshTempo()
 }
 
@@ -277,7 +281,47 @@ export async function refreshSceneNames() {
   const number = state.preset?.number
   if (!Number.isInteger(number)) return
   const names = await device.sceneNames(number)
-  if (names.length) set({ sceneNames: names })
+  /* Still the same preset: a slow read that lands after the next tap would
+     otherwise put the last song's names on this song's tiles. */
+  if (!names.length || state.preset?.number !== number) return
+  set({ sceneNames: names })
+  /* Read the slow way once; never again on this phone, and not on the next
+     device either. */
+  const slug = state.deviceSlug
+  rememberSceneNames(device.nameOwner(slug), number, names)
+  device.keepSceneNames(slug, number, names)
+}
+
+/**
+ * The scene names without asking the unit: this phone's disk first, then the
+ * computer's store. True when the computer had them, in which case the dump
+ * is not needed at all.
+ *
+ * "When you switch preset, it takes about 5 to 10 seconds for the scene names
+ * to load." That was the summary read, a preset dump, queued behind the chain
+ * read, another dump. Names hardly ever change, so what was read last time
+ * goes on the tiles at once and the slow read only runs when nobody has them.
+ */
+export async function quickSceneNames() {
+  const number = state.preset?.number
+  if (!Number.isInteger(number)) return false
+  /* A unit that handed the names over with the scene has already answered,
+     and fresher than any copy: nothing to fetch and no dump to run. */
+  if ((state.sceneNames || []).some((n) => (n || '').trim())) return true
+  const slug = state.deviceSlug
+  const owner = device.nameOwner(slug)
+  const kept = await recallSceneNames(owner, number)
+  if (kept.length && state.preset?.number === number) set({ sceneNames: kept })
+  let held = null
+  try {
+    held = await device.storedSceneNames(slug, number)
+  } catch {
+    held = null
+  }
+  if (!held || state.preset?.number !== number) return false
+  set({ sceneNames: held })
+  rememberSceneNames(owner, number, held)
+  return true
 }
 
 export async function refreshBlocks({ quiet = false } = {}) {
@@ -529,13 +573,16 @@ export async function loadPreset(number) {
   }
   await refreshPreset()
   await refreshScene()
+  /* What is already known about this slot's scenes, at once. See quickSceneNames. */
+  const quick = await quickSceneNames()
   /*
-   * The chain before the scene names, and the order is the point: the chain is
-   * most of what the stage screen draws, and the names are the least urgent
-   * thing on it. Reading the names first left the tiles saying "reading" for a
-   * slow read nobody was waiting on.
+   * The chain before the slow scene-name read, and the order is the point: the
+   * chain is most of what the stage screen draws, and the names are the least
+   * urgent thing on it. Reading the names first left the tiles saying
+   * "reading" for a slow read nobody was waiting on. And only when neither the
+   * phone nor the computer had them — most of the time, now, they do.
    */
   await refreshBlocks()
-  await refreshSceneNames()
+  if (!quick) await refreshSceneNames()
   return true
 }

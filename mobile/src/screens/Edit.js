@@ -94,6 +94,15 @@ export default function Edit({ onBack }) {
       contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxl }}
       keyboardShouldPersistTaps="handled"
       scrollEnabled={!held}
+      /*
+       * iOS: once a knob is tracking a touch, the scroll view may not take it
+       * back to start scrolling. The lock above is a prop and reaches the
+       * native side a frame after the finger lands; this is the native rule
+       * and is in force before the finger lands. The two together are what
+       * stops "at first it scrolls the whole screen when I try to slide up
+       * and down on a knob". Android ignores the prop.
+       */
+      canCancelContentTouches={false}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
         <View style={{ flexShrink: 1 }}>

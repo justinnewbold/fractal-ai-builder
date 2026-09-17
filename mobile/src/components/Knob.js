@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { PanResponder, Platform, Text, View } from 'react-native'
 
 import { color, font, mono } from '../lib/theme'
@@ -84,6 +84,13 @@ export default function Knob({ param, value, onChange, onCommit, size = 64, labe
       },
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
+      /*
+       * And never handed back. When the scroll view asks for the touch mid-drag
+       * — which iOS does on the first movement, before the lock above has
+       * reached the native side — the answer is no. Without this the first
+       * drag on a fresh screen scrolled the page and turned nothing.
+       */
+      onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
         origin.current = live.current.norm
         setDragging(true)
@@ -142,33 +149,7 @@ export default function Knob({ param, value, onChange, onCommit, size = 64, labe
         }}
         style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}
       >
-        {/* The ring. Each mark is a view rotated about the centre of the dial,
-            with the mark itself sitting at the top of it. */}
-        {Array.from({ length: TICKS }, (_, i) => {
-          const on = i <= lit
-          return (
-            <View
-              key={i}
-              pointerEvents="none"
-              style={{
-                position: 'absolute',
-                width: size,
-                height: size,
-                alignItems: 'center',
-                transform: [{ rotate: `${START + (i / (TICKS - 1)) * SWEEP - 180}deg` }]
-              }}
-            >
-              <View
-                style={{
-                  width: 2,
-                  height: on ? 7 : 5,
-                  borderRadius: 1,
-                  backgroundColor: on ? color.signal : color.rule
-                }}
-              />
-            </View>
-          )
-        })}
+        <Ring size={size} lit={lit} />
 
         {/* The body, and the pointer on it. */}
         <View
@@ -184,26 +165,7 @@ export default function Knob({ param, value, onChange, onCommit, size = 64, labe
             justifyContent: 'center'
           }}
         />
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            width: size,
-            height: size,
-            alignItems: 'center',
-            transform: [{ rotate: `${angle - 180}deg` }]
-          }}
-        >
-          <View
-            style={{
-              marginTop: 14,
-              width: 2,
-              height: size / 2 - 20,
-              borderRadius: 1,
-              backgroundColor: color.silk
-            }}
-          />
-        </View>
+        <Pointer size={size} angle={angle} />
 
         {/*
           A finger covers the knob and the number under it at the same time, so
@@ -242,6 +204,72 @@ export default function Knob({ param, value, onChange, onCommit, size = 64, labe
     </View>
   )
 }
+
+/**
+ * The ring. Each mark is a view rotated about the centre of the dial, with the
+ * mark itself sitting at the top of it.
+ *
+ * MEMOISED, AND THAT IS MOST OF WHAT "VERY LAGGY" WAS. Every movement of a
+ * finger on one knob changes the block's local values, which redraws the block
+ * — nine knobs, each of them twenty-one marks and a pointer, some two hundred
+ * views laid out again per touch event, sixty times a second, for eight knobs
+ * whose value had not moved. The ring only redraws when the count of lit marks
+ * changes, which for the eight is never and for the ninth is a few times a
+ * second.
+ */
+const Ring = memo(function Ring({ size, lit }) {
+  return Array.from({ length: TICKS }, (_, i) => {
+    const on = i <= lit
+    return (
+      <View
+        key={i}
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          width: size,
+          height: size,
+          alignItems: 'center',
+          transform: [{ rotate: `${START + (i / (TICKS - 1)) * SWEEP - 180}deg` }]
+        }}
+      >
+        <View
+          style={{
+            width: 2,
+            height: on ? 7 : 5,
+            borderRadius: 1,
+            backgroundColor: on ? color.signal : color.rule
+          }}
+        />
+      </View>
+    )
+  })
+})
+
+/** The pointer on the body. Redrawn only when the angle moves. */
+const Pointer = memo(function Pointer({ size, angle }) {
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        width: size,
+        height: size,
+        alignItems: 'center',
+        transform: [{ rotate: `${angle - 180}deg` }]
+      }}
+    >
+      <View
+        style={{
+          marginTop: 14,
+          width: 2,
+          height: size / 2 - 20,
+          borderRadius: 1,
+          backgroundColor: color.silk
+        }}
+      />
+    </View>
+  )
+})
 
 /** How a value is written down, here and in the box under the knob. */
 export function fmt(n) {

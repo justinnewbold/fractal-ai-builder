@@ -1574,6 +1574,25 @@ export function run(test) {
        — worse than the bug being fixed. */
     assert.match(knob, /useEffect\(\(\) => \(\) => onScrollLock\?\.\(false\), \[onScrollLock\]\)/, 'a torn-down knob can leave the screen stuck')
 
+    /*
+     * "At first it scrolls the whole screen when I try to slide up and down on
+     * a knob. It did start working for a minute." The lock is a prop, and a
+     * prop reaches the native side a frame after the finger lands; the first
+     * movement on a fresh screen got there first. Two more things, both in
+     * force before the finger lands: the knob refuses to hand the touch back
+     * when the scroll view asks, and the scroll view is told it may not take
+     * a touch a child is already tracking.
+     */
+    assert.match(knob, /onPanResponderTerminationRequest: \(\) => false/, 'the knob hands the touch back the moment the scroll view asks')
+    assert.match(edit, /canCancelContentTouches=\{false\}/, 'the scroll view may still take a touch a knob is tracking')
+
+    /* And "very laggy": a finger on one knob redrew every mark on every knob
+       on the block, sixty times a second. The ring and the pointer are memoised
+       so only the knob that moved does any work. */
+    assert.match(knob, /const Ring = memo\(function Ring\(\{ size, lit \}\)/, 'the ring is redrawn for every knob on every touch event')
+    assert.match(knob, /const Pointer = memo\(function Pointer\(\{ size, angle \}\)/, 'the pointer is redrawn for every knob on every touch event')
+    assert.match(knob, /<Ring size=\{size\} lit=\{lit\} \/>/, 'the knob does not draw its ring through the memoised part')
+
     /* And the screen it lives on honours it. */
     assert.match(edit, /scrollEnabled=\{!held\}/, 'the bench scrolls under its own knobs')
     assert.match(edit, /onScrollLock=\{onScrollLock\}/, 'the knobs are not wired to the lock')
@@ -2972,6 +2991,67 @@ export function run(test) {
     const screen = read('mobile/src/screens/Presets.js')
     assert.match(screen, /label=\{refreshing \? 'Reading…' : 'Refresh'\}/, 'there is no Refresh button')
     assert.match(screen, /names known/, 'the list does not say how full it is')
+  })
+
+  test('scene names are on the tiles before the unit has been asked', async () => {
+    /*
+     * "When you switch preset, it takes about 5 to 10 seconds for the scene
+     * names to load." They came from the preset summary — a dump — queued
+     * behind the chain read, another dump. Names hardly ever change, so what
+     * this phone read last time goes on at once, then the computer's copy,
+     * and the dump only runs when neither had them. Read the slow way once,
+     * they are written to disk and given to the computer, so no device loads
+     * that slot the slow way again.
+     *
+     * The cache runs against a fake disk; the wiring is read.
+     */
+    const STORE = `
+      const mem = new Map()
+      export const hydrate = () => Promise.resolve()
+      export const sync = {
+        getItem: (k) => mem.has(k) ? mem.get(k) : null,
+        setItem: (k, v) => { mem.set(k, String(v)) },
+        removeItem: (k) => { mem.delete(k) }
+      }
+    `
+    const dir = mkdtempSync(join(tmpdir(), 'scenes-'))
+    try {
+      const moved = read('mobile/src/lib/sceneNameCache.js').replace(/'\.\/store'/, "'./store.mjs'")
+      assert.doesNotMatch(moved, /'\.\/store'/)
+      writeFileSync(join(dir, 'store.mjs'), STORE)
+      writeFileSync(join(dir, 'sceneNameCache.mjs'), moved)
+      const at = (f) => pathToFileURL(join(dir, f)).href
+      const store = await import(at('store.mjs'))
+      const cache = await import(at('sceneNameCache.mjs'))
+
+      assert.deepEqual(await cache.recallSceneNames('fm3', 97), [], 'a slot never seen has names')
+      assert.equal(cache.rememberSceneNames('fm3', 97, ['', '', '', '', '', '', '', '']), false, 'eight blanks were worth writing down')
+      assert.equal(cache.rememberSceneNames('fm3', 97, [' Rhythm ', 'Lead', '', '', '', '', '', '']), true)
+      assert.deepEqual(await cache.recallSceneNames('fm3', 97), ['Rhythm', 'Lead', '', '', '', '', '', ''], 'what was written is not what is read back, trimmed')
+      assert.deepEqual(await cache.recallSceneNames('am4', 97), [], 'an FM3 slot’s names are shown over an AM4’s')
+      /* The browser’s key and shape, so the two apps’ disks read the same. */
+      const disk = JSON.parse(store.sync.getItem('fractal.sceneNames'))
+      assert.deepEqual(Object.keys(disk), ['fm3:97'])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+
+    const rig = read('mobile/src/lib/rig.js')
+    const flat = rig.replace(/\s+/g, ' ')
+    /* Quick names before the chain, the dump only when they were missing — on
+       a preset load and on the first read of the unit alike. */
+    assert.equal((flat.match(/const quick = await quickSceneNames\(\) /g) || []).length, 2, 'the quick read is not taken on both a preset load and the first read')
+    assert.equal((flat.match(/await refreshBlocks\(\) if \(!quick\) await refreshSceneNames\(\)/g) || []).length, 2, 'the slow read still runs when the names were already there, or before the chain')
+    assert.match(rig, /const kept = await recallSceneNames\(owner, number\)/, 'the disk is not read first')
+    assert.match(rig, /held = await device\.storedSceneNames\(slug, number\)/, 'the computer’s copy is never asked for')
+    /* Read the slow way, they are kept everywhere. */
+    assert.match(flat, /set\(\{ sceneNames: names \}\) [^]*?rememberSceneNames\(device\.nameOwner\(slug\), number, names\) device\.keepSceneNames\(slug, number, names\)/, 'a slow read is not written to disk and given to the computer')
+    /* And never for the wrong slot: a slow read landing after the next tap. */
+    assert.match(rig, /if \(!names\.length \|\| state\.preset\?\.number !== number\) return/, 'a slow read that lands after the next preset puts the last song’s names on this one')
+
+    const dev = read('mobile/src/lib/device.js')
+    assert.match(dev, /encodeURIComponent\(`scene-names-\$\{slug\}:\$\{number\}`\)/, 'the phone asks for a document the browser does not write')
+    assert.match(dev, /\{ data: names, origin: 'fractal' \}/, 'the phone writes a document in a shape the browser does not read')
   })
 
   test('a dead account service is given twelve seconds, not the whole evening', async () => {
