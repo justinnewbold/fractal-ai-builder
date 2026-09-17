@@ -23,6 +23,7 @@ import { hydrate } from './src/lib/store'
 import { keepSetlistsInStep } from './src/lib/cloudSetlists'
 import { useRig } from './src/lib/rig'
 import { keepLog } from './src/lib/logKeep'
+import { installCrashCapture } from './src/lib/debugLog'
 import { restoreDemo, useDemo } from './src/lib/demo'
 import { AI, BENCH } from './src/lib/features'
 
@@ -123,6 +124,18 @@ export default function App() {
    * cannot read about the run that ended — which is every run worth reading.
    */
   useEffect(() => keepLog(), [])
+
+  /*
+   * And tell that log when the app falls over.
+   *
+   * Every crash so far has left a log that ends mid-evening with nothing
+   * wrong in it — because the browser installs this and the phone never did.
+   * An uncaught error on a phone goes to React Native's own handler, which
+   * ends the app in silence; from here it writes a line first, with the
+   * message and where it came from, and the line is on disk before the app
+   * goes. See installCrashCapture in lib/debugLog.
+   */
+  useEffect(() => installCrashCapture(), [])
 
   useEffect(() => {
     /* Nothing to hide with the AI off, and asking costs a read of storage on

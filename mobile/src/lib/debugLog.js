@@ -178,11 +178,29 @@ export function formatMacDiag(d) {
 /**
  * Things that never reached any log before: a script error, a promise nobody
  * caught. On a phone these went to a console nobody can open. Installed once
- * by the app; harmless where there is no window.
+ * by the app; harmless where there is neither a window nor a phone runtime.
+ *
+ * TWO RUNTIMES, AND THE PHONE IS NOT THE BROWSER. A browser hands script
+ * errors to `window.addEventListener('error')`. React Native has no event
+ * target on `window` at all — the name is there, as an alias of the global,
+ * but `addEventListener` is not — so the first version of this returned a
+ * no-op on every phone, and the crash that has been chased across a dozen
+ * builds never wrote a line. Not because the log did not survive; because
+ * nothing was ever told. A phone routes an uncaught error through
+ * `ErrorUtils.setGlobalHandler`, and a dropped promise through Hermes's
+ * rejection tracker, which React Native only switches on in development.
  */
 let installed = false
 export function installCrashCapture(target = typeof window !== 'undefined' ? window : null) {
-  if (installed || !target?.addEventListener) return () => {}
+  if (installed || !target) return () => {}
+  /* The phone first: no browser has ErrorUtils, but a phone polyfill could
+     well grow an addEventListener that fires for nothing. */
+  if (typeof target.ErrorUtils?.setGlobalHandler === 'function') return installPhoneCapture(target)
+  if (typeof target.addEventListener === 'function') return installBrowserCapture(target)
+  return () => {}
+}
+
+function installBrowserCapture(target) {
   installed = true
   const onError = (e) => {
     logDebug('crash', e?.message || 'script error', e?.error?.stack || e?.filename || '')
@@ -197,5 +215,40 @@ export function installCrashCapture(target = typeof window !== 'undefined' ? win
     installed = false
     target.removeEventListener('error', onError)
     target.removeEventListener('unhandledrejection', onRejection)
+  }
+}
+
+/**
+ * How long a fatal error's line is given to reach disk before the phone's own
+ * handler runs. React Native's handler ends the app on a fatal error, and it
+ * would end it before anything logged a moment earlier had been written.
+ * lib/logKeep writes a crash line the instant it is logged; this is the head
+ * start that write gets.
+ */
+export const CRASH_FLUSH_MS = 250
+
+function installPhoneCapture(target) {
+  installed = true
+  const utils = target.ErrorUtils
+  const before = typeof utils.getGlobalHandler === 'function' ? utils.getGlobalHandler() : null
+  utils.setGlobalHandler((e, isFatal) => {
+    logDebug('crash', e?.message || 'script error', `${isFatal ? 'fatal' : 'not fatal'}${e?.stack ? `\n${e.stack}` : ''}`)
+    if (!before) return
+    if (isFatal) setTimeout(() => before(e, isFatal), CRASH_FLUSH_MS)
+    else before(e, isFatal)
+  })
+  const hermes = target.HermesInternal
+  const tracks = typeof hermes?.enablePromiseRejectionTracker === 'function'
+  if (tracks) {
+    hermes.enablePromiseRejectionTracker({
+      allRejections: true,
+      onUnhandled: (id, r) => logDebug('crash', 'unhandled promise', r?.stack || r?.message || compact(r)),
+      onHandled: () => {}
+    })
+  }
+  return () => {
+    installed = false
+    if (before) utils.setGlobalHandler(before)
+    if (tracks) hermes.enablePromiseRejectionTracker({ allRejections: false, onUnhandled: () => {}, onHandled: () => {} })
   }
 }
