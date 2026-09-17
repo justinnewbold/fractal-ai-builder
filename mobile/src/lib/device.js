@@ -246,6 +246,29 @@ export function keepSceneNames(slug, number, names) {
 }
 
 /**
+ * The save handshake with the computer. See lib/saveViaComputer.
+ *
+ * A phone cannot write a slot — the computer refuses it — so it leaves the
+ * request in the computer's store, and reads the computer's answer back from
+ * the store. Both documents are the ones the browser has used for this since
+ * the Save sheet learned to say "the computer writes it".
+ */
+export function parkSave(slug, request) {
+  if (!slug) throw new Error('No unit to save on.')
+  return put(`/store/config/${encodeURIComponent(`fractal.pendingSave.${slug}`)}`, {
+    data: { ...request, at: Date.now() },
+    origin: 'fractal'
+  })
+}
+
+export async function readSaveResult(slug) {
+  if (!slug) return null
+  const doc = await remoteRequest(`/store/config/${encodeURIComponent(`fractal.saveResult.${slug}`)}`)
+  const data = doc && typeof doc === 'object' && 'data' in doc ? doc.data : doc
+  return data && typeof data === 'object' ? data : null
+}
+
+/**
  * Whose names these are, on disk. The demo's are kept apart from the real
  * unit's — the browser does the same — so a look around the demo never leaves
  * a made-up name over a real slot.

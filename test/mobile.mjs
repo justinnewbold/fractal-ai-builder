@@ -1043,7 +1043,8 @@ export function run(test) {
      * not want to ask.
      */
     const editor = read('mobile/src/screens/Edit.js')
-    const move = editor.slice(editor.indexOf('const move = async'), editor.indexOf('const remove = async'))
+    /* The move is a drag now (7.285.0); the three rules are the same. */
+    const move = editor.slice(editor.indexOf('const reorder = async'), editor.indexOf('const remove = async'))
     assert.ok(move.length > 200, 'the move moved; this check reads it')
 
     assert.ok(
@@ -1052,8 +1053,8 @@ export function run(test) {
     )
     assert.match(
       move,
-      /catch \(err\) \{\s*\n\s*await placeBlock\(from\.row, from\.col, idOf\(from\.block\)\)/,
-      'a move that throws part-way leaves the block in no cell at all'
+      /catch \(err\) \{\s*\n\s*for \(const m of moves\) await placeBlock\(lane\.row, m\.from, idOf\(m\.block\)\)\.catch/,
+      'a move that throws part-way leaves the blocks in no cell at all'
     )
     assert.ok(
       move.indexOf('clearCell') < move.indexOf('placeBlock'),
@@ -3241,6 +3242,131 @@ export function run(test) {
     const edit = read('mobile/src/screens/Edit.js')
     assert.match(edit, /<Press label="Edit chain" sub="Add, move or remove blocks in this preset"/, 'the chain editor button is not called Edit chain')
     assert.doesNotMatch(edit, /Add or move blocks/)
+  })
+
+  test('a drag up or down the lane deals the blocks back into the same columns', async () => {
+    /*
+     * "Drag and drop with a little hamburger icon, where you can hold it and
+     * rearrange them by dragging up or down." A drag changes the ORDER and
+     * nothing else: the occupied columns stay, a gap stays a gap, and every
+     * write to the unit is planned here, in a test, before it is structure.
+     */
+    const { reorderPlan, landingIndex, blockPositions } = await import('../mobile/src/lib/laneOrder.js')
+    const B = (col, name) => ({ col, block: { name } })
+    const lane = [B(0, 'In'), B(1, 'Comp'), B(3, 'Drive'), B(4, 'Amp')]
+
+    /* Drive dragged up above Comp: Comp and Drive swap columns, the gap at 2 stays. */
+    assert.deepEqual(
+      reorderPlan(lane, 2, 1).map((m) => `${m.block.name}:${m.from}->${m.to}`),
+      ['Drive:3->1', 'Comp:1->3']
+    )
+    /* Comp dragged to the end: three blocks shift, the columns are still 0,1,3,4. */
+    assert.deepEqual(
+      reorderPlan(lane, 1, 3).map((m) => `${m.block.name}:${m.from}->${m.to}`),
+      ['Drive:3->1', 'Amp:4->3', 'Comp:1->4']
+    )
+    assert.deepEqual(reorderPlan(lane, 2, 2), [], 'a drag that lands where it started writes something')
+    assert.deepEqual(reorderPlan(lane, 9, 1), [], 'a position off the end writes something')
+    assert.deepEqual(reorderPlan([B(0, 'Only')], 0, 0), [])
+
+    /* Where the finger is, over cards and gaps of different heights. */
+    const heights = [80, 80, 48, 80]
+    assert.equal(landingIndex(heights, 0, 0, 8), 0)
+    assert.equal(landingIndex(heights, 0, 90, 8), 1, 'a card dragged one card down is not over the next card')
+    assert.equal(landingIndex(heights, 0, 300, 8), 3, 'a drag past the end goes past the end')
+    /* Up 120 from the bottom card: its middle sits over the second card. Up
+       200: over the first. The card's MIDDLE decides, not its top edge. */
+    assert.equal(landingIndex(heights, 3, -120, 8), 1)
+    assert.equal(landingIndex(heights, 3, -200, 8), 0)
+    assert.equal(landingIndex(heights, 3, -900, 8), 0, 'a drag past the top goes past the top')
+
+    /* Items with a gap in them: a drop over the gap lands before the next block. */
+    const items = [
+      { kind: 'block', col: 0 },
+      { kind: 'block', col: 1 },
+      { kind: 'gap', col: 2 },
+      { kind: 'block', col: 3 }
+    ]
+    assert.equal(blockPositions(items, 3, 2), null, 'a drop over the gap just above where the block came from changes something')
+    assert.deepEqual(blockPositions(items, 3, 1), { from: 2, to: 1 }, 'the last block dragged over the second does not take its place')
+    assert.deepEqual(blockPositions(items, 0, 3), { from: 0, to: 2 }, 'the first block dragged to the end does not go last')
+    assert.equal(blockPositions(items, 2, 0), null, 'a gap can be dragged')
+    assert.equal(blockPositions(items, 1, 1), null)
+
+    /* And the screen: a grip on every card, Add and Remove under it, no
+       question in the card, the page locked while a grip is held. */
+    const editor = read('mobile/src/screens/Edit.js').replace(/\s+/g, ' ')
+    assert.doesNotMatch(editor, /What can I do with this\?/, 'the cards still ask what you can do with them')
+    assert.match(editor, /<Press grow label="Add" sub="A new block after this one"/, 'the card has no Add')
+    assert.match(editor, /<Press grow label="Remove" sub="Delete this block"/, 'the card has no Remove')
+    assert.doesNotMatch(editor, /label="Move"|label="Take out"/, 'the old Move and Take out are still there')
+    assert.match(editor, /<Grip label=\{`Drag \$\{block\.name\}`\}/, 'there is no grip to drag a card by')
+    assert.match(editor, /onPanResponderTerminationRequest: \(\) => false/, 'the grip hands the touch back to the page')
+    assert.match(editor, /const dragStart = \(row, index\) => \{ onScrollLock\?\.\(true\)/, 'the page can scroll under a drag')
+    assert.match(editor, /<ChainEditor blocks=\{blocks\} caps=\{caps\} onError=\{setError\} onScrollLock=\{setHeld\} \/>/, 'the chain editor is not wired to the scroll lock')
+    assert.match(editor, /const free = \(lane\.gaps \|\| \[\]\)\.filter\(\(c\) => c > col\)/, 'Add does not put the new block after the card it was pressed on')
+  })
+
+  test('Save asks twice, then asks the computer, and says what became of it', async () => {
+    /*
+     * "There needs to be a save button that actually writes it and saves it
+     * to the unit. Have it just say Save, then a pop up warning that says it
+     * will override the current settings, and tap again to confirm."
+     *
+     * A phone cannot write a slot: the computer refuses that from a handset,
+     * and should. So the request is left in the computer's store — the same
+     * document the browser has left there since its Save sheet learned to
+     * say "the computer writes it" — and the computer's answer is read back.
+     * Run against a fake store and a fake clock.
+     */
+    const { askComputerToSave, pendingSaveDoc, saveResultDoc, SAVE_WAIT_MS } = await import('../mobile/src/lib/saveViaComputer.js')
+    assert.equal(pendingSaveDoc('fm3'), 'fractal.pendingSave.fm3', 'the phone leaves the request where the computer does not look')
+    assert.equal(saveResultDoc('fm3'), 'fractal.saveResult.fm3', 'the phone reads the answer from where the computer does not write it')
+
+    let parked = null
+    let clock = 1000
+    const tick = async (ms) => { clock += ms }
+    const now = () => clock
+
+    /* The computer writes it and says so. */
+    let result = null
+    const ok = await askComputerToSave({
+      park: async (req) => { parked = req; result = { id: req.id, ok: true, slot: req.slot } },
+      readResult: async () => result,
+      slot: 48, name: 'Carol Ann OD-2', id: 'p1', sleep: tick, now, pollMs: 10, waitMs: 1000
+    })
+    assert.deepEqual(parked, { id: 'p1', slot: 48, name: 'Carol Ann OD-2', fromSlot: 48, fromName: 'Carol Ann OD-2' }, 'the request is not the one the computer understands')
+    assert.deepEqual(ok, { ok: true, slot: 48 })
+
+    /* An answer for some other request is not this one's. */
+    const stale = { id: 'old', ok: true, slot: 3 }
+    const late = await askComputerToSave({
+      park: async () => {}, readResult: async () => stale,
+      slot: 48, id: 'p2', sleep: tick, now, pollMs: 10, waitMs: 50
+    })
+    assert.equal(late.ok, false)
+    assert.match(late.error, /has not picked this up/, 'a computer that never answered is not said to have')
+
+    /* The computer refuses, in its own words. */
+    const refused = await askComputerToSave({
+      park: async () => {}, readResult: async () => ({ id: 'p3', ok: false, slot: 48, error: 'The computer had moved to slot 12.' }),
+      slot: 48, id: 'p3', sleep: tick, now, pollMs: 10, waitMs: 1000
+    })
+    assert.deepEqual(refused, { ok: false, error: 'The computer had moved to slot 12.' })
+
+    /* Nothing loaded, nothing parked. */
+    const none = await askComputerToSave({ park: async () => { throw new Error('should not park') }, readResult: async () => null, slot: null })
+    assert.equal(none.ok, false)
+    assert.equal(SAVE_WAIT_MS, 3 * 60 * 1000)
+
+    /* And the button: Save, then Tap again with the warning, then the ask. */
+    const editor = read('mobile/src/screens/Edit.js').replace(/\s+/g, ' ')
+    assert.match(editor, /label=\{saving \? 'Saving…' : saveArmed \? 'Tap again' : 'Save'\}/, 'there is no Save button, or it does not ask twice')
+    assert.match(editor, /replacing what was saved there\. Tap Save again to do it\./, 'the warning does not say what a save overwrites')
+    assert.match(editor, /const res = await askComputerToSave\(\{ park: \(req\) => parkSave\(slug, req\), readResult: \(\) => readSaveResult\(slug\), slot: preset\?\.number/, 'the button does not ask the computer')
+    const dev = read('mobile/src/lib/device.js')
+    assert.match(dev, /encodeURIComponent\(`fractal\.pendingSave\.\$\{slug\}`\)/)
+    assert.match(dev, /encodeURIComponent\(`fractal\.saveResult\.\$\{slug\}`\)/)
   })
 
   test('a dead account service is given twelve seconds, not the whole evening', async () => {
