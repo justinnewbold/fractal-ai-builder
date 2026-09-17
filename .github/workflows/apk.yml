@@ -115,14 +115,28 @@ jobs:
           set -e
           # Re-runnable on purpose: a build repeated for the same version
           # replaces the file rather than failing on a tag that exists.
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "${{ steps.apk.outputs.path }}" --clobber
-          else
-            gh release create "$TAG" "${{ steps.apk.outputs.path }}" \
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" \
               --title "Fractal Remote v${{ steps.v.outputs.version }} (Android)" \
               --notes "Android APK for Fractal Remote v${{ steps.v.outputs.version }}. Download it on the phone and open it; Android will ask once whether this browser may install apps. It installs over an earlier one of these without removing anything." \
               --latest=false
           fi
+          # The upload is tried again before it is called a failure. Three
+          # runs in one evening built fine and died here on GitHub's own
+          # "HTTP 500: Error saving asset" — a 70 MB file to an upload
+          # service having a moment — and each one sent a "Run failed" to a
+          # phone, for a release that was created and merely empty.
+          for attempt in 1 2 3 4 5; do
+            if gh release upload "$TAG" "${{ steps.apk.outputs.path }}" --clobber; then
+              break
+            fi
+            if [ "$attempt" = 5 ]; then
+              echo "The upload failed five times; the file is still in this run's artifacts." >&2
+              exit 1
+            fi
+            echo "Upload attempt $attempt failed; trying again in 30s."
+            sleep 30
+          done
           echo "### Install it" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "https://github.com/${{ github.repository }}/releases/download/${TAG}/${{ steps.apk.outputs.path }}" >> "$GITHUB_STEP_SUMMARY"
