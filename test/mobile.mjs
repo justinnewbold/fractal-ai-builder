@@ -2325,6 +2325,23 @@ export function run(test) {
       /useEffect\( \(\) => \(\) => \{ const \{ draft: d, chosen: c, device: unit \} = live\.current/,
       'a name typed and then left by the Done button is thrown away'
     )
+
+    /*
+     * THE NAME IS EDITED IN THE CARD. "When creating a new list it should only
+     * show one text entry box, have it already highlight the setlist created,
+     * to rename just by typing." There were two: the chosen card in amber, and
+     * a Name box a screen further down, behind the keyboard on Android. The
+     * card is the box now; a new one opens with its name selected and the
+     * keyboard up.
+     */
+    assert.doesNotMatch(flat, /<Label>Name<\/Label>/, 'there is still a separate Name box under the cards')
+    assert.match(flat, /editing=\{ source === l\.id \? \{ value: draft \?\? l\.name, setDraft, commitName, selectAll: justMade === l\.id \}/, 'the chosen card is not the name box')
+    assert.match(flat, /autoFocus=\{selectAll\} selectTextOnFocus/, 'a new setlist does not open with its name selected and the keyboard up')
+    assert.match(flat, /const list = createList\(device\) setSource\(device, list\.id\) setJustMade\(list\.id\)/, 'a new setlist is not the one whose name is selected')
+    /* Choosing another card takes the box away unblurred; the name goes first. */
+    assert.match(flat, /const choose = \(src\) => \{ commitName\(\) setSource\(device, src\) \}/, 'a name typed and then chosen away from is lost')
+    /* And the keyboard: the page moves out from under it, as sign-in does. */
+    assert.match(flat, /<KeyboardAvoidingView behavior=\{Platform\.OS === 'ios' \? 'padding' : undefined\}/, 'the keyboard covers the box it opened for')
   })
 
   test('the gear sheet is this unit’s models, and knows the comps and delays', async () => {
