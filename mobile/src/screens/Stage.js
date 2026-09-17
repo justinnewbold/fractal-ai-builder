@@ -4,7 +4,17 @@ import { useKeepAwake } from 'expo-keep-awake'
 
 import { color, font, mono, space, TAP } from '../lib/theme'
 import { hostConflict, remoteChosenHost, remoteHosts } from '../lib/relay'
-import { presetLabel, sceneShape, slotCount, stepSlot } from '../lib/device'
+import { presetLabel, sceneShape, slotCount, slotLabel, stepSlot } from '../lib/device'
+import {
+  listsFor,
+  marksFor,
+  orderFor,
+  positionIn,
+  sourceFor,
+  sourceLabel,
+  stepTarget
+} from '../lib/lists'
+import { useStored } from '../lib/store'
 import {
   loadPreset,
   refreshAll,
@@ -39,6 +49,7 @@ const ofTunerOn = (s) => s.tunerOn
 const ofTuning = (s) => s.tuning
 const ofBpm = (s) => s.bpm
 const ofError = (s) => s.error
+const ofSlug = (s) => s.deviceSlug
 
 /**
  * The stand, not the bench.
@@ -52,7 +63,7 @@ const ofError = (s) => s.error
  * button within reach of a stage tap is a hazard, and saving to a slot is
  * refused by the Mac anyway.
  */
-export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets }) {
+export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpenSetlists }) {
   // The screen is the instrument panel for as long as this is open. A phone
   // that locks itself between songs is a phone you have to wake and unlock
   // while the count-in is happening.
@@ -67,6 +78,20 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets }) {
   const tunerOn = useRig(ofTunerOn)
   const tuning = useRig(ofTuning)
   const bpm = useRig(ofBpm)
+  const device = useRig(ofSlug)
+  /*
+   * What Previous and Next step through, and where you are in it.
+   *
+   * Re-read on every write to storage — the star is pressed on the picker and
+   * the setlist is chosen on the screen behind this one, and the count between
+   * the two buttons has to follow both. `useStored` is the phone's version of
+   * the browser's two window listeners and its counter in state.
+   */
+  useStored()
+  const favourites = marksFor(device).favourites
+  const lists = listsFor(device)
+  const source = sourceFor(device)
+  const order = orderFor(source, { favourites, lists })
   /* The tempo box under Tap, open only while somebody is typing into it. */
   const [typing, setTyping] = useState(false)
   const [typed, setTyped] = useState('')
@@ -119,8 +144,24 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets }) {
     reload()
   }, [reload])
 
+  /*
+   * Where a press of Previous or Next would land, or null when the button has
+   * nothing to do.
+   *
+   * Two rules, not one, and the split is deliberate. Inside a setlist or the
+   * stars the order wraps, because a running order does come back round to the
+   * first song — that is `stepTarget`, the browser's own. Slot by slot has no
+   * such order to come back to, so it stops at the ends: `stepSlot` knows how
+   * many slots the unit reported and greys the button rather than sending a
+   * press the unit is going to refuse.
+   */
+  const landing = (by) =>
+    order
+      ? stepTarget({ source, current: preset?.number, delta: by, favourites, lists })
+      : stepSlot(preset?.number, by, caps)
+
   const step = async (by) => {
-    const next = stepSlot(preset?.number, by, caps)
+    const next = landing(by)
     if (next === null) {
       // The end of the list. Wrapping round to slot 0 mid-set is worse than a
       // button that does nothing, so it does nothing and says so in the case.
@@ -130,6 +171,18 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets }) {
     thud()
     await loadPreset(next)
   }
+
+  /*
+   * The button between the two: what they walk, and where you are in it.
+   *
+   * "Starred 3/7" is the third starred preset of seven; a setlist shows its
+   * name. Off the list altogether it shows only the count, and Next goes to the
+   * first song. The word SOURCE sits above it because a lone "All" between
+   * Previous and Next reads as a caption rather than as the button that decides
+   * what those two do.
+   */
+  const at = order ? positionIn(order, preset?.number) : 0
+  const where = order ? (at ? `${at}/${order.length}` : `${order.length}`) : ''
 
   return (
     <ScrollView
@@ -146,7 +199,9 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets }) {
       <View style={{ gap: space.sm }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.5 }}>
-            {Number.isInteger(preset?.number) ? `SLOT ${preset.number}` : 'SLOT —'}
+            {Number.isInteger(preset?.number)
+              ? `SLOT ${slotLabel(preset.number, caps?.presets?.addressing)}`
+              : 'SLOT —'}
             {slots ? ` OF ${slots}` : ''}
           </Text>
           <View style={{ flexDirection: 'row', gap: space.sm }}>
@@ -202,19 +257,20 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets }) {
           style={{ paddingHorizontal: space.lg }}
         />
 
-        <View style={{ flexDirection: 'row', gap: space.md }}>
+        <View style={{ flexDirection: 'row', gap: space.sm }}>
+          <Press grow label="‹ Prev" disabled={landing(-1) === null} onPress={() => step(-1)} />
           <Press
             grow
-            label="Previous"
-            disabled={stepSlot(preset?.number, -1, caps) === null}
-            onPress={() => step(-1)}
+            caption="Source"
+            label={order ? sourceLabel(source, { favourites, lists }) : 'All'}
+            sub={where || undefined}
+            tone="signal"
+            on={Boolean(order)}
+            height={TAP}
+            disabled={!onOpenSetlists}
+            onPress={onOpenSetlists}
           />
-          <Press
-            grow
-            label="Next"
-            disabled={stepSlot(preset?.number, 1, caps) === null}
-            onPress={() => step(1)}
-          />
+          <Press grow label="Next ›" disabled={landing(1) === null} onPress={() => step(1)} />
         </View>
       </View>
 

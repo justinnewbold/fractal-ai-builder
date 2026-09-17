@@ -18,6 +18,7 @@ import { tick } from '../lib/feedback'
 export default function Press({
   label,
   sub,
+  caption,
   onPress,
   onLongPress,
   tone = 'plain',
@@ -36,7 +37,7 @@ export default function Press({
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: on, disabled }}
-      accessibilityLabel={sub ? `${label}, ${sub}` : label}
+      accessibilityLabel={[caption, label, sub].filter(Boolean).join(', ')}
       disabled={disabled}
       onPress={() => {
         haptic?.()
@@ -73,6 +74,25 @@ export default function Press({
       ]}
     >
       <View style={{ alignItems: 'center' }}>
+        {/*
+          A word ABOVE the label, for the one button whose name does not say
+          what it is. "All" between Previous and Next reads as a caption; the
+          word Source over it says that pressing it changes what those two do.
+        */}
+        {caption ? (
+          <Text
+            numberOfLines={1}
+            style={{
+              color: on ? color.onSignal : color.silkFaint,
+              fontSize: font.micro,
+              letterSpacing: 1.2,
+              textTransform: 'uppercase',
+              marginBottom: 1
+            }}
+          >
+            {caption}
+          </Text>
+        ) : null}
         <Text
           numberOfLines={1}
           style={{ color: ink, fontSize: font.body, fontWeight: '600', textAlign: 'center' }}

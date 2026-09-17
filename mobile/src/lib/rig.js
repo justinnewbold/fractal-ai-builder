@@ -17,12 +17,27 @@
 import { useSyncExternalStore } from 'react'
 
 import * as device from './device'
+import { DEFAULT_SLUG, deviceSlug } from './device-slug'
+import { forget as forgetNames } from './presetNames'
 import { subscribeRemoteEvents } from './relay'
 
 const initial = {
   /** null until the unit has said what it is. */
   capabilities: null,
   deviceName: '',
+  /*
+   * The same unit, as the key its setlists and stars are filed under.
+   *
+   * Kept beside the name rather than derived at each call site, because the
+   * derivation has to match the Mac's exactly — see lib/device-slug, which both
+   * apps are handed a copy of. A screen that rolled its own would build a
+   * perfectly good setlist in a drawer the Mac never opens.
+   *
+   * The shared default until the unit has said what it is, and that default is
+   * a real bucket rather than null: a unit that answered without naming itself
+   * still has setlists worth keeping.
+   */
+  deviceSlug: DEFAULT_SLUG,
   preset: null,
   blocks: [],
   sceneIndex: 0,
@@ -162,9 +177,18 @@ export function stopListening() {
  */
 export async function refreshAll() {
   const caps = await device.detect()
+  const slug = deviceSlug(caps)
+  /*
+   * A different unit means the names read off the last one are wrong, not
+   * merely old. Slot 45 on an FM3 and slot 45 on an AM4 are different presets,
+   * and a picker showing one unit's names over the other's slots would send
+   * somebody to the wrong song by its right name.
+   */
+  if (slug !== state.deviceSlug) forgetNames()
   set({
     capabilities: caps?.capabilities ?? null,
-    deviceName: caps?.short || caps?.name || ''
+    deviceName: caps?.short || caps?.name || '',
+    deviceSlug: slug
   })
   await refreshPreset()
   await refreshScene()

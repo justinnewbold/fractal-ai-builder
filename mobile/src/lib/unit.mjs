@@ -8,39 +8,22 @@
  *
  * `.mjs` rather than `.js` for the same reason decode.mjs is: plain ESM, no
  * React Native, importable by node. Metro reads either.
- */
-
-/** How a gen-3 unit says a slot has nothing in it. */
-const EMPTY_MARKER = /^\s*<\s*empty\s*>/i
-
-/** Whether this is a unit saying "nothing here", rather than a name. */
-export const isEmptySlotName = (name) => typeof name === 'string' && EMPTY_MARKER.test(name)
-
-/**
- * The name to keep, or an empty string when there is none.
  *
- * An empty gen-3 slot reports `<EMPTY>` written over the front of whatever name
- * was there before, so the tail of the old preset's name hangs off the end —
- * `<EMPTY>k Album Chug`, seven characters of truth and twelve of somebody
- * else's preset. The marker means the slot is empty; everything after it is
- * rubble and is dropped rather than shown.
- */
-export const cleanPresetName = (name) =>
-  typeof name !== 'string' ? '' : isEmptySlotName(name) ? '' : name.trim()
-
-/**
- * What to print where a preset's name goes.
+ * MOST OF IT IS NOW THE BROWSER'S OWN FILE. `presetName.js` and `slots.js` are
+ * copied in by `npm run sync:rules`, and this re-exports the pieces the phone
+ * uses rather than keeping a second copy that says the same thing in its own
+ * words. The second copy was here first and was faithful; it was still a second
+ * copy, and the way those fail is that somebody fixes one of them.
  *
- * "Empty" rather than "Untitled": an untitled preset is one somebody made and
- * did not name, and this is a slot with nothing in it at all. On this screen
- * that word is read from arm's length to know where you are, so the difference
- * is worth the two extra letters.
+ * What stays written out below is what the phone decides for itself: which
+ * blocks are not stage controls, the shape of the scene grid, and how a step
+ * lands. See EXCLUDED_BLOCKS — that one is a copy of a copy, and the guardrails
+ * file it comes from is synced too.
  */
-export function presetLabel(preset) {
-  if (!preset) return 'Untitled'
-  if (preset.empty || isEmptySlotName(preset.name)) return 'Empty'
-  return (typeof preset.name === 'string' ? preset.name.trim() : '') || 'Untitled'
-}
+export { isEmptySlotName, cleanPresetName, presetLabel } from './presetName.js'
+export { slotCount, slotLabel, isBanked } from './slots.js'
+
+import { slotCount } from './slots.js'
 
 /**
  * Input, output, looper and gate are not stage controls.
@@ -66,19 +49,6 @@ export function sceneShape(capabilities) {
 }
 
 /**
- * How many stored slots this unit actually has, or null when it has not said.
- *
- * Null rather than a guess. The web app used to answer `?? 512` — the gen-3
- * number, and a guess about somebody else's hardware — which had a phone
- * stepping toward slot 500 on a unit that holds 104, being refused every time.
- * Kept in step with slotCount in src/lib/slots.js.
- */
-export function slotCount(capabilities) {
-  const count = capabilities?.presets?.count
-  return Number.isInteger(count) && count > 0 ? count : null
-}
-
-/**
  * The next slot in a direction, or null when there isn't one.
  *
  * Clamped rather than wrapped: on stage, stepping off the end of the list and
@@ -86,6 +56,11 @@ export function slotCount(capabilities) {
  * never reported a count is given the benefit of the doubt, the same way
  * slotOutside does — refusing every step would turn a rare wrong slot into a
  * feature that never works.
+ *
+ * This is the fallback, not the rule. What Previous and Next actually walk is
+ * decided by `setlists.stepTarget`, which wraps within a setlist because a
+ * running order does come back round to the first song. Slot by slot has no
+ * such order to come back to, so it stops.
  */
 export function stepSlot(number, by, capabilities) {
   if (!Number.isInteger(number)) return null

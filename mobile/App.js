@@ -7,24 +7,29 @@ import { color, font, space } from './src/lib/theme'
 import { haveSession, linkState, probeNow, startLink, stopLink, subscribeLink } from './src/lib/link'
 import { signOut } from './src/lib/relay'
 import Lamp from './src/components/Lamp'
+import Note from './src/components/Note'
 import Settings from './src/screens/Settings'
 import SignIn from './src/screens/SignIn'
 import Presets from './src/screens/Presets'
+import Setlists from './src/screens/Setlists'
 import Stage from './src/screens/Stage'
 import Tone from './src/screens/Tone'
 import { loadPlayMode, toneWayIn } from './src/lib/playMode'
+import { hydrate } from './src/lib/store'
+import { keepSetlistsInStep } from './src/lib/cloudSetlists'
 import { AI } from './src/lib/features'
 
 /**
  * Fractal Remote.
  *
- * Four states and no navigator. Signed out, playing, looking at setup, or
- * asking for a tone — that is the whole of the app, and a routing library for
- * it would be more moving parts than the thing being routed.
+ * A handful of states and no navigator. Signed out, playing, looking at the
+ * preset list, fixing the running order, looking at setup, or asking for a
+ * tone — that is the whole of the app, and a routing library for it would be
+ * more moving parts than the thing being routed.
  *
- * Three of those four in a shipping build: the tone screen is behind the AI
- * switch in lib/features.js, which is off for the first release. The route is
- * still written here rather than removed, because it goes back on in a later
+ * All but the last of those in a shipping build: the tone screen is behind the
+ * AI switch in lib/features.js, which is off for the first release. The route
+ * is still written here rather than removed, because it goes back on in a later
  * update and the difference is one word.
  *
  * The status bar at the top is the one thing on every screen: what the link is
@@ -43,8 +48,24 @@ export default function App() {
    * the browser reads localStorage.
    */
   const [playing, setPlaying] = useState(null)
+  /** The last "picked up 2 setlists from your Mac", until it has been read. */
+  const [picked, setPicked] = useState(null)
 
   useEffect(() => subscribeLink(setLink), [])
+
+  /*
+   * Setlists and stars, off disk and into memory, once.
+   *
+   * They are read while a screen renders — what Previous and Next step through
+   * is decided during the stage screen's draw — and AsyncStorage cannot be read
+   * that way. So the waiting happens here, at launch, and every read after it is
+   * immediate. Nothing waits on it: a store that has not landed yet reads as
+   * "nothing saved", which is what a fresh install is anyway, and the screens
+   * re-draw when it does. See lib/store.
+   */
+  useEffect(() => {
+    hydrate()
+  }, [])
 
   useEffect(() => {
     /* Nothing to hide with the AI off, and asking costs a read of storage on
@@ -77,6 +98,45 @@ export default function App() {
     }
   }, [auth])
 
+  /*
+   * Setlists and stars, kept in step with the Mac.
+   *
+   * This is the point of them. A night's running order is built at the bench,
+   * with a keyboard, and then played from the phone on the stand — so it has to
+   * be the same list in both places. lib/cloudSetlists pulls once when the app
+   * opens and pushes a couple of seconds after anything changes here.
+   *
+   * Not tied to the Mac being reachable: this is the account's copy, and fixing
+   * tomorrow's running order on the sofa is a thing somebody does with the rig
+   * switched off.
+   */
+  useEffect(() => {
+    if (auth !== 'in') return undefined
+    let alive = true
+    let stop = null
+    hydrate().then(() => {
+      if (alive) stop = keepSetlistsInStep(setPicked)
+    })
+    return () => {
+      alive = false
+      stop?.()
+    }
+  }, [auth])
+
+  /*
+   * And what arrived is said out loud.
+   *
+   * A setlist appearing under Previous and Next without a word would look like
+   * the app changing its mind — so it says where it came from, once, and then
+   * gets out of the way. Eight seconds: long enough to read between songs,
+   * short enough not to be sitting on the stage screen at the next one.
+   */
+  useEffect(() => {
+    if (!picked) return undefined
+    const t = setTimeout(() => setPicked(null), 8000)
+    return () => clearTimeout(t)
+  }, [picked])
+
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
@@ -90,8 +150,11 @@ export default function App() {
         ) : (
           <>
             <LinkBar link={link} />
+            {picked ? <Arrived picked={picked} /> : null}
             {screen === 'presets' ? (
               <Presets onBack={() => setScreen('stage')} />
+            ) : screen === 'setlists' ? (
+              <Setlists onBack={() => setScreen('stage')} />
             ) : AI && screen === 'tone' ? (
               <Tone onBack={() => setScreen('stage')} />
             ) : screen === 'settings' ? (
@@ -131,12 +194,43 @@ export default function App() {
                 onOpenPresets={
                   link.link === 'connected' ? () => setScreen('presets') : null
                 }
+                /*
+                 * The setlist, unlike the preset list, works with the Mac off.
+                 * It is storage and nothing else — the running order for
+                 * tonight is a thing you fix on the sofa, and refusing to open
+                 * it because the rig is not plugged in would be refusing the
+                 * one screen in this app that never needed the rig.
+                 */
+                onOpenSetlists={() => setScreen('setlists')}
               />
             )}
           </>
         )}
       </SafeAreaView>
     </SafeAreaProvider>
+  )
+}
+
+/**
+ * What the account just handed this phone, in a sentence.
+ *
+ * Only ever drawn when something actually arrived — `gained` counts the
+ * setlists and stars this phone did not already have, so a sync that changed
+ * nothing says nothing.
+ */
+function Arrived({ picked }) {
+  const parts = []
+  if (picked.gained?.lists) {
+    parts.push(`${picked.gained.lists} setlist${picked.gained.lists === 1 ? '' : 's'}`)
+  }
+  if (picked.gained?.stars) {
+    parts.push(`${picked.gained.stars} star${picked.gained.stars === 1 ? '' : 's'}`)
+  }
+  if (!parts.length) return null
+  return (
+    <View style={{ paddingHorizontal: space.lg, paddingTop: space.sm }}>
+      <Note>{`Picked up ${parts.join(' and ')} from ${picked.from || 'your other device'}.`}</Note>
+    </View>
   )
 }
 

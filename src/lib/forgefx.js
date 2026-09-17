@@ -15,6 +15,7 @@ import { paletteFor } from './palette.js'
 import { withRetry } from './retry.js'
 import { cleanPresetName, isEmptySlotName } from './presetName.js'
 import { zeroBasedChain, wrongSlot } from './slots.js'
+import { DEFAULT_SLUG, deviceSlug } from '../../shared/device-slug.mjs'
 import { toNormalized } from './scale.js'
 import { withLineage } from './lineage.js'
 import { remoteActive, remoteRequest, subscribeRemoteEvents } from './remote.js'
@@ -338,10 +339,15 @@ export const health = async () => (mock ? (await tick(), mock.healthz()) : reque
  * Two units share one slot numbering. An AM4 and an FM3 both have a slot 97 and
  * they are not the same preset, so anything cached per preset has to be told
  * them apart or the FM3's scene names turn up on the AM4.
+ *
+ * The rule that turns a unit into that key lives in shared/device-slug.mjs,
+ * because the phone files its setlists and stars under the same key and two
+ * apps deriving it differently do not disagree loudly — they file into two
+ * buckets that never meet, and the sync between them has nothing to match on.
  */
-let deviceSlug = 'device'
+let unitSlug = DEFAULT_SLUG
 
-export const currentDeviceSlug = () => deviceSlug
+export const currentDeviceSlug = () => unitSlug
 
 /*
  * What the last detect said about how this unit numbers its chain.
@@ -357,7 +363,7 @@ let lastCaps = null
 export const detect = async () => {
   const res = mock ? (await tick(), mock.detect()) : await request('/device/detect')
   const label = res?.short || res?.name
-  if (label) deviceSlug = String(label).toLowerCase().replace(/[^a-z0-9]/g, '') || 'device'
+  if (label) unitSlug = deviceSlug(label)
   lastCaps = res?.capabilities ?? null
   return res
 }
@@ -424,7 +430,7 @@ export async function writeHostDoc(id, data) {
  * rename is allowed — picks it up and writes it. Keyed per unit and slot,
  * because an AM4 slot 97 and an FM3 slot 97 are different presets.
  */
-const pendingNameKey = (slot) => `fractal.pendingName.${deviceSlug}.${slot}`
+const pendingNameKey = (slot) => `fractal.pendingName.${unitSlug}.${slot}`
 
 export const parkPresetName = (slot, name) =>
   writeHostDoc(pendingNameKey(slot), { name, at: Date.now() })
@@ -452,8 +458,8 @@ export const clearParkedPresetName = (slot) => deleteHostDoc(pendingNameKey(slot
  * since moved on from", and an id, so the phone can be told what became of it
  * rather than being left to wonder.
  */
-const pendingSaveKey = () => `fractal.pendingSave.${deviceSlug}`
-const saveResultKey = () => `fractal.saveResult.${deviceSlug}`
+const pendingSaveKey = () => `fractal.pendingSave.${unitSlug}`
+const saveResultKey = () => `fractal.saveResult.${unitSlug}`
 
 export const parkSave = (request) => writeHostDoc(pendingSaveKey(), { ...request, at: Date.now() })
 export const takeParkedSave = () => readHostDoc(pendingSaveKey())
