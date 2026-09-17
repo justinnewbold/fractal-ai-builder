@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { PanResponder, Platform, ScrollView, Text, TextInput, View } from 'react-native'
+import { Keyboard, PanResponder, Platform, ScrollView, Text, TextInput, View } from 'react-native'
 
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
 import {
@@ -163,8 +163,29 @@ export default function Edit({ onBack }) {
 
   const block = blocks.find((b) => sameBlock(b, openEid)) || null
 
+  /*
+   * And brings the page to it. The block's knobs are drawn under the search
+   * results and the row of block tiles, and on a phone with the keyboard up
+   * that is below the bottom of the screen: "it'll pull up the parameters but
+   * then clicking on it does nothing." It did — out of sight. So a tap on a
+   * result also scrolls the page to the block it opened, once that block has
+   * been laid out, which is the moment its position is known.
+   */
+  const page = useRef(null)
+  const bringTo = useRef(null)
+  useEffect(() => {
+    if (focus?.nonce) bringTo.current = focus.nonce
+  }, [focus])
+  const panelLaid = (e) => {
+    if (!bringTo.current) return
+    bringTo.current = null
+    const y = Math.max(0, e.nativeEvent.layout.y - space.md)
+    page.current?.scrollTo({ y, animated: true })
+  }
+
   return (
     <ScrollView
+      ref={page}
       style={{ flex: 1 }}
       contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxl }}
       keyboardShouldPersistTaps="handled"
@@ -271,14 +292,16 @@ export default function Edit({ onBack }) {
       </View>
 
       {block ? (
-        <BlockPanel
-          key={`${idOf(block)}:${block.channel || ''}:${scene}`}
-          block={block}
-          channels={caps?.channelNames}
-          focus={focus}
-          onError={setError}
-          onScrollLock={setHeld}
-        />
+        <View onLayout={panelLaid}>
+          <BlockPanel
+            key={`${idOf(block)}:${block.channel || ''}:${scene}`}
+            block={block}
+            channels={caps?.channelNames}
+            focus={focus}
+            onError={setError}
+            onScrollLock={setHeld}
+          />
+        </View>
       ) : blocks.length ? (
         <Note>Tap a block to open its controls.</Note>
       ) : null}
@@ -1320,7 +1343,10 @@ function Pick({ title, options, chosen, onPick, empty }) {
  *
  * Results navigate rather than edit. Tapping one opens that block with the
  * control marked, so there stays exactly one place in this app where a value
- * changes, with its verified write behind it.
+ * changes, with its verified write behind it. And the tap is the end of the
+ * search: the keyboard goes, the results go with it, and the page is left to
+ * the block that opened — with the results still up and the keyboard still
+ * over the bottom half, the block opened somewhere nobody could see.
  */
 function FindControl({ blocks, onPick, onError }) {
   const [query, setQuery] = useState('')
@@ -1353,6 +1379,12 @@ function FindControl({ blocks, onPick, onError }) {
   }
 
   const reading = progress && progress.done < progress.total
+
+  const pick = (eid, paramId) => {
+    Keyboard.dismiss()
+    setQuery('')
+    onPick(eid, paramId)
+  }
 
   return (
     <View style={{ gap: space.sm }}>
@@ -1391,7 +1423,7 @@ function FindControl({ blocks, onPick, onError }) {
                 caption={block.name}
                 label={param.name}
                 sub={`${fmt(param.value)}${param.unit || ''}`}
-                onPress={() => onPick(idOf(block), param.id)}
+                onPress={() => pick(idOf(block), param.id)}
               />
             ))}
           </View>
