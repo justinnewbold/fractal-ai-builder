@@ -160,6 +160,13 @@ export default function Volume({ blocks, open, onClose, onError }) {
   const land = async () => {
     const { param: p, value: v } = live.current
     if (!p || typeof v !== 'number') return
+    /* No Output block known yet — the chain is still coming, or this preset
+       has none — and a write to block "undefined" was going out and being
+       refused with a sentence about doing it at the computer. */
+    if (!Number.isInteger(eid)) {
+      onError?.('No output level to move yet — the chain is still loading.')
+      return
+    }
     try {
       const failed = await writer.current.settled()
       if (failed) onError?.(failed.message)
@@ -210,6 +217,10 @@ export default function Volume({ blocks, open, onClose, onError }) {
   const nudge = (direction) => {
     const p = live.current.param
     if (!p) return
+    if (!Number.isInteger(eid)) {
+      onError?.('No output level to move yet — the chain is still loading.')
+      return
+    }
     const next = nudged(live.current.value, p, volumeNudge(p) * direction)
     setValue(next)
     live.current = { ...live.current, value: next }

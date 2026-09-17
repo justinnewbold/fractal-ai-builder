@@ -1012,6 +1012,14 @@ export function run(test) {
     assert.match(flat, /logDebug\('chain', `clear \$\{m\.block\.name\} from column \$\{m\.from \+ 1\}`, said\(r\)\)/, 'a clear is not logged with the unit\'s answer')
     assert.match(flat, /logDebug\('chain', `place \$\{m\.block\.name\} at column \$\{m\.to \+ 1\}`, said\(last\)\)/, 'a placement is not logged with the unit\'s answer')
     assert.match(flat, /The unit answered “refused” to \$\{refused\} of the \$\{answers\.length\} steps\./, 'a refusal in the middle of a move is not said')
+    /* Add and Remove check themselves the same way: the unit's own answer,
+       off the fresh read, says whether the cell changed. */
+    assert.match(flat, /const holds = \(row, col\) => \(getState\(\)\.allBlocks \|\| \[\]\)\.some\(\(b\) => b\.row === row && b\.col === col\)/)
+    assert.match(flat, /The unit did not add it: \$\{where\(row, col\)\} is still empty/, 'an add the unit ignored is silent')
+    assert.match(flat, /The unit did not remove it: \$\{where\(row, col\)\} still holds a block/, 'a remove the unit ignored is silent')
+    /* And the volume never writes to a block it has not found. */
+    const vol = read('mobile/src/components/Volume.js').replace(/\s+/g, ' ')
+    assert.equal((vol.match(/No output level to move yet — the chain is still loading\./g) || []).length, 2, 'the volume writes to block "undefined" when the Output block is not known')
   })
 
   test('a burst of volume presses is confirmed once, and a chain write is not re-read per announcement', () => {

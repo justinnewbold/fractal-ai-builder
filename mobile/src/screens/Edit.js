@@ -729,14 +729,23 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
     if (!doubtfulWrite(res)) setActing(null)
   }
 
+  /* Whether the unit now holds a block at (row, col) — its own answer, off
+     the fresh read `after` makes. */
+  const holds = (row, col) => (getState().allBlocks || []).some((b) => b.row === row && b.col === col)
+
   const add = async (row, col, page = choice) => {
     if (page === null || page === undefined) return
     setBusy(true)
     setIssue(null)
     beginChainWrite()
     try {
-      await after(await placeBlock(row, col, Number(page)))
+      const r = await placeBlock(row, col, Number(page))
+      logDebug('chain', `add block ${page} at ${where(row, col)}`, refusedAnswer(r) ? 'refused' : r?.ok === true ? 'ok' : 'no answer')
+      await after(r)
       setAddAfter(null)
+      if (!holds(row, col)) {
+        setIssue(`The unit did not add it: ${where(row, col)} is still empty${refusedAnswer(r) ? ', and the unit answered “refused”' : ''}.`)
+      }
     } catch (err) {
       endChainWrite()
       setIssue(err.message)
@@ -855,7 +864,12 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
     setIssue(null)
     beginChainWrite()
     try {
-      await after(await clearCell(row, col))
+      const r = await clearCell(row, col)
+      logDebug('chain', `remove block at ${where(row, col)}`, refusedAnswer(r) ? 'refused' : r?.ok === true ? 'ok' : 'no answer')
+      await after(r)
+      if (holds(row, col)) {
+        setIssue(`The unit did not remove it: ${where(row, col)} still holds a block${refusedAnswer(r) ? ', and the unit answered “refused”' : ''}.`)
+      }
     } catch (err) {
       setIssue(err.message)
       onError(err.message)
