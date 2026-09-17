@@ -229,7 +229,9 @@ export default function Setlists({ onBack }) {
     setDrag({ index: i, dy: 0, to: i })
   }
   const dragMove = (i, dy) => {
-    setDrag({ index: i, dy, to: landingIndex(rowHeights.current, i, dy, space.sm) })
+    /* Only the rows that exist: a removed song leaves its height behind. */
+    const heights = rowHeights.current.slice(0, chosen?.presets?.length || 0)
+    setDrag({ index: i, dy, to: landingIndex(heights, i, dy, space.sm) })
   }
   const dragEnd = (i) => {
     setHeld(false)

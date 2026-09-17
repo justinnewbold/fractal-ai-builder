@@ -22,7 +22,7 @@ import { TAP_REREAD_MS } from './tempo'
 import { DEFAULT_SLUG, deviceSlug } from './device-slug'
 import { adopt as adoptNames, forget as forgetNames, learn as learnName, nameOf } from './presetNames'
 import { forget as forgetControls } from './paramIndex'
-import { recallSceneNames, rememberSceneNames } from './sceneNameCache'
+import { forgetSceneNames, recallSceneNames, rememberSceneNames } from './sceneNameCache'
 import { subscribeRemoteEvents } from './relay'
 
 const initial = {
@@ -327,7 +327,11 @@ function pendingFor(number) {
 function discardUnsaved(unsaved) {
   const slug = state.deviceSlug
   if (!unsaved || !slug) return
-  rememberSceneNames(device.nameOwner(slug), unsaved.number, unsaved.sceneNames)
+  /* A slot that had no names before the rename gets none back — remembering
+     eight blanks writes nothing, which would have left the renamed ones. */
+  if (!rememberSceneNames(device.nameOwner(slug), unsaved.number, unsaved.sceneNames)) {
+    forgetSceneNames(device.nameOwner(slug), unsaved.number)
+  }
   if (typeof unsaved.presetName === 'string') learnName(unsaved.number, unsaved.presetName)
 }
 
@@ -342,7 +346,15 @@ export function savedToSlot(slot) {
 
 export async function refreshPreset() {
   try {
-    set({ preset: await device.currentPreset() })
+    const fresh = await device.currentPreset()
+    /* A name this phone renamed and has not saved outranks the read: the
+       read can come out of the computer's copy from before the rename, and
+       the next Save carries whatever name is here. */
+    const pending = state.unsaved
+    if (fresh && pending && pending.number === fresh.number && typeof pending.presetName === 'string') {
+      fresh.name = state.preset?.name ?? fresh.name
+    }
+    set({ preset: fresh })
   } catch (err) {
     set({ error: err.message })
   }
