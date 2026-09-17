@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Platform, ScrollView, Text, TextInput, View } from 'react-native'
+import { PanResponder, Platform, ScrollView, Text, TextInput, View } from 'react-native'
 
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
 import {
@@ -10,12 +10,16 @@ import {
   clearCell,
   idOf,
   modifierModel,
+  parkSave,
   placeBlock,
+  readSaveResult,
   sameBlock,
   setParamConfirmed,
   setType
 } from '../lib/device'
 import { colLabel, doubtfulWrite, gridShape, laneItems, lanesShown } from '../lib/grid-plan'
+import { blockPositions, landingIndex, reorderPlan } from '../lib/laneOrder'
+import { askComputerToSave } from '../lib/saveViaComputer'
 import { isSilencingParam } from '../lib/guardrails'
 import { buildParamIndex, findControls, indexFor } from '../lib/paramIndex'
 import { refreshBlocks, useRig, writeBypass, writeChannel } from '../lib/rig'
@@ -34,6 +38,8 @@ const ofScene = (s) => s.sceneIndex
 const ofSceneNames = (s) => s.sceneNames
 const ofCaps = (s) => s.capabilities
 const ofChain = (s) => s.chain
+const ofPreset = (s) => s.preset
+const ofSlug = (s) => s.deviceSlug
 
 /**
  * The bench, not the stand.
@@ -79,6 +85,39 @@ export default function Edit({ onBack }) {
   const [openEid, setOpenEid] = useState(null)
   const [error, setError] = useState(null)
   /*
+   * SAVE, and it asks twice. "There needs to be a save button that actually
+   * writes it and saves it to the unit. Have it just say Save, then a pop up
+   * warning that says it will override the current settings, and tap again to
+   * confirm." Everything this screen writes lands in the unit's edit buffer
+   * and is gone on the next preset change; this is what makes it stay. A
+   * phone cannot write a slot itself — the computer refuses that from a
+   * handset — so the request is left for the computer, which writes it and
+   * answers. See lib/saveViaComputer.
+   */
+  const preset = useRig(ofPreset)
+  const slug = useRig(ofSlug)
+  const [saveArmed, setSaveArmed] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveSaid, setSaveSaid] = useState(null)
+  const save = async () => {
+    if (!saveArmed) {
+      setSaveArmed(true)
+      setSaveSaid(null)
+      return
+    }
+    setSaveArmed(false)
+    setSaving(true)
+    setSaveSaid({ tone: 'hint', text: 'Asked the computer to save it. The computer writes it; this says so the moment it lands.' })
+    const res = await askComputerToSave({
+      park: (req) => parkSave(slug, req),
+      readResult: () => readSaveResult(slug),
+      slot: preset?.number,
+      name: preset?.name || ''
+    })
+    setSaving(false)
+    setSaveSaid(res.ok ? { tone: 'hint', text: `Saved to slot ${res.slot}.` } : { tone: 'warn', text: res.error })
+  }
+  /*
    * Search hands over by naming a control, not by editing one. Tapping a result
    * opens the block that holds it and puts your eyes on it — so there stays
    * exactly one place in this app where a value changes, with its verified
@@ -115,8 +154,31 @@ export default function Edit({ onBack }) {
               : `Changes land in scene ${scene + 1}${sceneNames[scene] ? ` — ${sceneNames[scene]}` : ''}`}
           </Text>
         </View>
-        <Press label="Done" height={40} onPress={onBack} />
+        <View style={{ flexDirection: 'row', gap: space.sm }}>
+          <Press
+            label={saving ? 'Saving…' : saveArmed ? 'Tap again' : 'Save'}
+            tone="signal"
+            on={saveArmed}
+            height={40}
+            disabled={saving || !Number.isInteger(preset?.number)}
+            onPress={save}
+          />
+          <Press label="Done" height={40} onPress={onBack} />
+        </View>
       </View>
+
+      {saveArmed ? (
+        <Note tone="warn" onDismiss={() => setSaveArmed(false)}>
+          {`This writes what the unit is playing now over slot ${
+            Number.isInteger(preset?.number) ? colLabel(preset.number) : '—'
+          }, replacing what was saved there. Tap Save again to do it.`}
+        </Note>
+      ) : null}
+      {saveSaid ? (
+        <Note tone={saveSaid.tone} onDismiss={() => setSaveSaid(null)}>
+          {saveSaid.text}
+        </Note>
+      ) : null}
 
       {error ? (
         <Note tone="fault" onDismiss={() => setError(null)}>
@@ -185,7 +247,7 @@ export default function Edit({ onBack }) {
         <Note>Tap a block to open its controls.</Note>
       ) : null}
 
-      <ChainEditor blocks={blocks} caps={caps} onError={setError} />
+      <ChainEditor blocks={blocks} caps={caps} onError={setError} onScrollLock={setHeld} />
 
       <Modifiers blocks={blocks} onError={setError} />
     </ScrollView>
@@ -587,19 +649,26 @@ function BlockPanel({ block, channels, focus, onError, onScrollLock }) {
  * Folded away until asked for. It is the least-reached-for thing on the bench
  * and the easiest to press by accident.
  */
-function ChainEditor({ blocks, caps, onError }) {
+function ChainEditor({ blocks, caps, onError, onScrollLock }) {
   const [open, setOpen] = useState(false)
   const [palette, setPalette] = useState(null)
   /* Which card's actions are showing, as "row:col". One at a time. */
   const [acting, setActing] = useState(null)
-  /* A block picked up and waiting for somewhere to land. */
-  const [moving, setMoving] = useState(null)
+  /* Add: the card whose next free space a picked block goes into. */
+  const [addAfter, setAddAfter] = useState(null)
   /* Which block a tapped gap would receive, by its own type code. */
   const [choice, setChoice] = useState(null)
   const [busy, setBusy] = useState(false)
   /* Said beside the control that caused it, never at the top of the screen. */
   const [issue, setIssue] = useState(null)
   const [hunt, setHunt] = useState('')
+  /*
+   * A block being dragged: which lane, which item, how far the finger has
+   * gone, and where that puts it. Measured heights per lane item, because a
+   * card and a free space are different heights and a lane can hold both.
+   */
+  const [drag, setDrag] = useState(null)
+  const heights = useRef({})
 
   const { linear } = gridShape(caps)
   const lanes = lanesShown(blocks, caps)
@@ -635,12 +704,13 @@ function ChainEditor({ blocks, caps, onError }) {
     if (!doubtfulWrite(res)) setActing(null)
   }
 
-  const add = async (row, col) => {
-    if (choice === null) return
+  const add = async (row, col, page = choice) => {
+    if (page === null || page === undefined) return
     setBusy(true)
     setIssue(null)
     try {
-      await after(await placeBlock(row, col, Number(choice)))
+      await after(await placeBlock(row, col, Number(page)))
+      setAddAfter(null)
     } catch (err) {
       setIssue(err.message)
       onError(err.message)
@@ -650,36 +720,54 @@ function ChainEditor({ blocks, caps, onError }) {
   }
 
   /**
-   * Move a block to another cell.
+   * Add, from a card: the picked block goes into the first free space after
+   * that card in its row. "Change Move to Add, to add a new block."
+   */
+  const addAfterCard = (lane, col, page) => {
+    const free = (lane.gaps || []).filter((c) => c > col).sort((a, b) => a - b)[0]
+    if (free === undefined) {
+      setIssue(`No free space after ${where(lane.row, col)} in this row.`)
+      return
+    }
+    add(lane.row, free, page)
+  }
+
+  /**
+   * A drag, landed: the blocks of the lane dealt back into the same columns
+   * in their new order. See lib/laneOrder for why the columns stay put.
    *
    * ORDER MATTERS AND THE SAFE ORDER IS NOT OBVIOUS. A block instance exists
    * once — a unit has one Amp — so placing it in a second cell while it still
-   * occupies the first may be refused or may do something undefined. Clearing
-   * first avoids asking that question.
-   *
-   * The cost is a moment where the block exists nowhere, so it goes back if the
-   * placement THROWS. It does not go back on `ok:false`: that answer means
-   * nothing on this hardware, and undoing a move because of it is the bug this
-   * panel was reported for.
+   * occupies the first may be refused or may do something undefined. Every
+   * moving block is cleared first, then every one is placed, so no target is
+   * occupied when it is written to. The cost is a moment where they exist
+   * nowhere, so they go back if a placement THROWS. Not on `ok:false`: that
+   * answer means nothing on this hardware, and undoing a move because of it
+   * is the bug this panel was reported for.
    */
-  const move = async (to) => {
-    const from = moving
-    if (!from) return
+  const reorder = async (lane, fromItem, toItem) => {
+    const items = laneItems(lane)
+    const pos = blockPositions(items, fromItem, toItem)
+    if (!pos) return
+    const moves = reorderPlan(
+      items.filter((it) => it.kind === 'block').map((it) => ({ col: it.col, block: it.block })),
+      pos.from,
+      pos.to
+    )
+    if (!moves.length) return
     setBusy(true)
     setIssue(null)
+    let last = null
     try {
-      await clearCell(from.row, from.col)
-      let res
+      for (const m of moves) await clearCell(lane.row, m.from)
       try {
-        res = await placeBlock(to.row, to.col, idOf(from.block))
+        for (const m of moves) last = await placeBlock(lane.row, m.to, idOf(m.block))
       } catch (err) {
-        await placeBlock(from.row, from.col, idOf(from.block)).catch(() => {})
+        for (const m of moves) await placeBlock(lane.row, m.from, idOf(m.block)).catch(() => {})
         throw err
       }
-      setMoving(null)
-      await after(res)
+      await after(last)
     } catch (err) {
-      setMoving(null)
       setIssue(err.message)
       onError(err.message)
     } finally {
@@ -700,11 +788,76 @@ function ChainEditor({ blocks, caps, onError }) {
     }
   }
 
+  /* The drag itself. The grip in each card reports; this decides. */
+  const dragStart = (row, index) => {
+    onScrollLock?.(true)
+    setDrag({ row, index, dy: 0, to: index })
+  }
+  const dragMove = (row, index, dy) => {
+    const laneHeights = heights.current[row] || []
+    const to = landingIndex(laneHeights, index, dy, space.sm)
+    setDrag({ row, index, dy, to })
+  }
+  const dragEnd = (row, index) => {
+    onScrollLock?.(false)
+    const lane = lanes.find((l) => l.row === row)
+    const to = drag?.to ?? index
+    setDrag(null)
+    if (lane && to !== index) reorder(lane, index, to)
+  }
+
   const needle = hunt.trim().toLowerCase()
   const offered = (palette || [])
     .filter((b) => !needle || (b.name || '').toLowerCase().includes(needle))
     .slice(0, 30)
   const picked = (palette || []).find((b) => b.page === Number(choice))
+
+  const paletteBox = (onPick, hint) => (
+    <View style={{ gap: space.sm }}>
+      {palette === null ? (
+        <Note>Asking your unit what it can add…</Note>
+      ) : !palette.length ? (
+        <Note tone="warn">Couldn’t read the list of blocks from your unit.</Note>
+      ) : (
+        <>
+          <TextInput
+            value={hunt}
+            onChangeText={setHunt}
+            placeholder="Find a block"
+            placeholderTextColor={color.silkFaint}
+            autoCorrect={false}
+            autoCapitalize="none"
+            accessibilityLabel="Find a block to add"
+            style={{
+              minHeight: TAP,
+              paddingHorizontal: space.md,
+              borderRadius: radius.md,
+              borderWidth: 1,
+              borderColor: color.rule,
+              backgroundColor: color.panel,
+              color: color.silk,
+              fontSize: font.body
+            }}
+          />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+            {offered.map((b) => (
+              <Press
+                key={b.page}
+                label={b.name}
+                tone="signal"
+                on={b.page === Number(choice)}
+                height={44}
+                disabled={busy}
+                style={{ paddingHorizontal: space.md }}
+                onPress={() => onPick(b)}
+              />
+            ))}
+          </View>
+          <Text style={{ color: color.silkDim, fontSize: font.micro }}>{hint}</Text>
+        </>
+      )}
+    </View>
+  )
 
   return (
     <View style={{ gap: space.md }}>
@@ -715,126 +868,190 @@ function ChainEditor({ blocks, caps, onError }) {
 
       {issue ? <Note tone="warn">{issue}</Note> : null}
 
-      {moving ? (
-        <Note>{`Moving ${moving.block.name}. Tap a free space to put it there.`}</Note>
-      ) : null}
+      <Text style={{ color: color.silkFaint, fontSize: font.micro }}>
+        Hold ≡ and drag a block up or down to move it. Tap a block for Add and Remove.
+      </Text>
 
-      {lanes.map((lane) => (
-        <View key={lane.row} style={{ gap: space.sm }}>
-          {linear ? null : <Label>{`Row ${lane.row}`}</Label>}
-          {laneItems(lane).map((item) =>
-            item.kind === 'block' ? (
-              <BlockCard
-                key={`b${item.col}`}
-                block={item.block}
-                at={where(lane.row, item.col)}
-                busy={busy}
-                acting={acting === `${lane.row}:${item.col}`}
-                moving={moving?.block === item.block}
-                onToggleActions={() =>
-                  setActing(acting === `${lane.row}:${item.col}` ? null : `${lane.row}:${item.col}`)
-                }
-                onMove={() => {
-                  setMoving({ row: lane.row, col: item.col, block: item.block })
-                  setActing(null)
-                }}
-                onRemove={() => remove(lane.row, item.col)}
-              />
-            ) : (
-              <Press
-                key={`g${item.col}`}
-                caption={where(lane.row, item.col)}
-                label={
-                  moving
-                    ? `Put ${moving.block.name} here`
-                    : picked
-                      ? `Put ${picked.name} here`
-                      : 'Empty'
-                }
-                disabled={busy || (!moving && !picked)}
-                height={48}
-                onPress={() => (moving ? move({ row: lane.row, col: item.col }) : add(lane.row, item.col))}
-              />
-            )
-          )}
-        </View>
-      ))}
+      {lanes.map((lane) => {
+        const items = laneItems(lane)
+        const dragging = drag && drag.row === lane.row ? drag : null
+        const lift = dragging ? (heights.current[lane.row] || [])[dragging.index] || 0 : 0
+        return (
+          <View key={lane.row} style={{ gap: space.sm }}>
+            {linear ? null : <Label>{`Row ${lane.row}`}</Label>}
+            {items.map((item, index) => {
+              /* Where this item is drawn while a drag is on: the dragged one
+                 follows the finger; the ones it has passed step out of its
+                 way by its own height. */
+              let shift = 0
+              if (dragging) {
+                if (index === dragging.index) shift = dragging.dy
+                else if (dragging.to > dragging.index && index > dragging.index && index <= dragging.to)
+                  shift = -(lift + space.sm)
+                else if (dragging.to < dragging.index && index >= dragging.to && index < dragging.index)
+                  shift = lift + space.sm
+              }
+              return (
+                <View
+                  key={item.kind === 'block' ? `b${item.col}` : `g${item.col}`}
+                  onLayout={(e) => {
+                    const h = heights.current[lane.row] || (heights.current[lane.row] = [])
+                    h[index] = e.nativeEvent.layout.height
+                  }}
+                  style={{
+                    transform: [{ translateY: shift }],
+                    zIndex: dragging && index === dragging.index ? 2 : 0,
+                    opacity: dragging && index === dragging.index ? 0.92 : 1
+                  }}
+                >
+                  {item.kind === 'block' ? (
+                    <BlockCard
+                      block={item.block}
+                      at={where(lane.row, item.col)}
+                      busy={busy}
+                      acting={acting === `${lane.row}:${item.col}`}
+                      lifted={!!dragging && index === dragging.index}
+                      onToggleActions={() => {
+                        setActing(acting === `${lane.row}:${item.col}` ? null : `${lane.row}:${item.col}`)
+                        setAddAfter(null)
+                      }}
+                      onAdd={() => setAddAfter(addAfter === `${lane.row}:${item.col}` ? null : `${lane.row}:${item.col}`)}
+                      onRemove={() => remove(lane.row, item.col)}
+                      onDragStart={() => dragStart(lane.row, index)}
+                      onDragMove={(dy) => dragMove(lane.row, index, dy)}
+                      onDragEnd={() => dragEnd(lane.row, index)}
+                      adding={
+                        addAfter === `${lane.row}:${item.col}`
+                          ? paletteBox(
+                              (b) => addAfterCard(lane, item.col, b.page),
+                              `Tap a block to put it right after ${item.block.name}.`
+                            )
+                          : null
+                      }
+                    />
+                  ) : (
+                    <Press
+                      caption={where(lane.row, item.col)}
+                      label={picked ? `Put ${picked.name} here` : 'Empty'}
+                      disabled={busy || !picked}
+                      height={48}
+                      onPress={() => add(lane.row, item.col)}
+                    />
+                  )}
+                </View>
+              )
+            })}
+          </View>
+        )
+      })}
 
       {/* ---------------------------------------------------- what to place */}
-      {moving ? (
-        <Press label="Leave it where it was" onPress={() => setMoving(null)} />
-      ) : (
-        <View style={{ gap: space.sm }}>
-          <Label>What to put in a space</Label>
-          {palette === null ? (
-            <Note>Asking your unit what it can add…</Note>
-          ) : !palette.length ? (
-            <Note tone="warn">Couldn’t read the list of blocks from your unit.</Note>
-          ) : (
-            <>
-              <TextInput
-                value={hunt}
-                onChangeText={setHunt}
-                placeholder="Find a block"
-                placeholderTextColor={color.silkFaint}
-                autoCorrect={false}
-                autoCapitalize="none"
-                accessibilityLabel="Find a block to add"
-                style={{
-                  minHeight: TAP,
-                  paddingHorizontal: space.md,
-                  borderRadius: radius.md,
-                  borderWidth: 1,
-                  borderColor: color.rule,
-                  backgroundColor: color.panel,
-                  color: color.silk,
-                  fontSize: font.body
-                }}
-              />
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-                {offered.map((b) => (
-                  <Press
-                    key={b.page}
-                    label={b.name}
-                    tone="signal"
-                    on={b.page === Number(choice)}
-                    height={44}
-                    style={{ paddingHorizontal: space.md }}
-                    onPress={() => setChoice(b.page === Number(choice) ? null : b.page)}
-                  />
-                ))}
-              </View>
-              <Text style={{ color: color.silkDim, fontSize: font.micro }}>
-                {picked ? `Now tap an empty space to put ${picked.name} in it.` : 'Pick a block, then tap an empty space.'}
-              </Text>
-            </>
-          )}
-        </View>
-      )}
+      <View style={{ gap: space.sm }}>
+        <Label>Put a block in an empty space</Label>
+        {paletteBox(
+          (b) => setChoice(b.page === Number(choice) ? null : b.page),
+          picked ? `Now tap an empty space to put ${picked.name} in it.` : 'Pick a block, then tap an empty space.'
+        )}
+      </View>
     </View>
   )
 }
 
-/** One block in a lane, with what you can do to it folded under it. */
-function BlockCard({ block, at, busy, acting, moving, onToggleActions, onMove, onRemove }) {
+/**
+ * One block in a lane: its name, a grip to drag it by, and Add and Remove
+ * folded under it on a tap.
+ *
+ * "Remove the words What can I do with this from each of the block's name."
+ * The card says what it is and no more; the line under the lane says how the
+ * cards work, once.
+ */
+function BlockCard({
+  block,
+  at,
+  busy,
+  acting,
+  lifted,
+  adding,
+  onToggleActions,
+  onAdd,
+  onRemove,
+  onDragStart,
+  onDragMove,
+  onDragEnd
+}) {
   const hue = blockColor(block.slug)
   return (
     <View style={{ gap: space.sm }}>
-      <Press
-        caption={at}
-        label={block.name}
-        sub={acting ? 'Close' : 'What can I do with this?'}
-        on={moving}
-        tone="signal"
-        style={{ borderLeftWidth: 4, borderLeftColor: hue.fill }}
-        onPress={onToggleActions}
-      />
+      <View style={{ flexDirection: 'row', alignItems: 'stretch', gap: space.sm }}>
+        <Press
+          grow
+          caption={at}
+          label={block.name}
+          on={lifted}
+          tone="signal"
+          style={{ borderLeftWidth: 4, borderLeftColor: hue.fill }}
+          onPress={onToggleActions}
+        />
+        <Grip label={`Drag ${block.name}`} disabled={busy} onStart={onDragStart} onMove={onDragMove} onEnd={onDragEnd} />
+      </View>
       {acting ? (
         <View style={{ flexDirection: 'row', gap: space.sm }}>
-          <Press grow label="Move" height={44} disabled={busy} onPress={onMove} />
-          <Press grow label="Take out" height={44} disabled={busy} onPress={onRemove} />
+          <Press grow label="Add" sub="A new block after this one" height={48} disabled={busy} onPress={onAdd} />
+          <Press grow label="Remove" sub="Delete this block" height={48} disabled={busy} onPress={onRemove} />
         </View>
       ) : null}
+      {acting && adding ? adding : null}
+    </View>
+  )
+}
+
+/**
+ * The grip: hold it and the card follows the finger up or down the lane.
+ *
+ * Its own target, beside the card rather than on it, so a tap on the name
+ * still opens the actions and a drag never starts by accident. The touch is
+ * claimed on landing and never handed back, and the page is told not to
+ * scroll for as long as it is held — the same two rules that stopped the
+ * knobs scrolling the page. See components/Knob.
+ */
+function Grip({ label, disabled, onStart, onMove, onEnd }) {
+  const live = useRef({ onStart, onMove, onEnd, disabled })
+  useEffect(() => {
+    live.current = { onStart, onMove, onEnd, disabled }
+  })
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponderCapture: () => !live.current.disabled,
+      onStartShouldSetPanResponder: () => !live.current.disabled,
+      onMoveShouldSetPanResponder: () => !live.current.disabled,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        thud()
+        live.current.onStart?.()
+      },
+      onPanResponderMove: (_, g) => live.current.onMove?.(g.dy),
+      onPanResponderRelease: () => live.current.onEnd?.(),
+      onPanResponderTerminate: () => live.current.onEnd?.()
+    })
+  ).current
+  return (
+    <View
+      {...pan.panHandlers}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint="Hold and drag up or down to move it in the chain"
+      style={{
+        width: 48,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: radius.md,
+        borderWidth: 1,
+        borderColor: color.rule,
+        backgroundColor: color.panelHi,
+        opacity: disabled ? 0.45 : 1
+      }}
+    >
+      <Text style={{ color: color.silk, fontSize: font.title, lineHeight: font.title + 4 }}>≡</Text>
     </View>
   )
 }
