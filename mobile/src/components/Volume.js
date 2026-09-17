@@ -170,8 +170,8 @@ export default function Volume({ blocks, open, onClose, onError }) {
         if (holding !== null) setValue(holding)
         onError?.(
           holding === null
-            ? 'The volume didn’t take.'
-            : `The volume didn’t take. The unit is holding it at ${volumeLabel(holding, p)}.`
+            ? `The volume didn’t take. You asked for ${volumeLabel(v, p)}.`
+            : `The volume didn’t take. You asked for ${volumeLabel(v, p)}; the unit says ${volumeLabel(holding, p)}.`
         )
       }
     } catch (err) {

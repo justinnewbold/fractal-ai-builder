@@ -19,6 +19,7 @@
 import { remoteRequest as overTheWire } from './relay'
 import { demoDevice } from './demo'
 import { demoRequest } from './demoWire'
+import { logDebug } from './debugLog'
 
 /**
  * Every question this app asks a unit, and the one place the demo answers.
@@ -484,12 +485,16 @@ export const READ_BACK_AGAIN_MS = 400
 /* A computer that refuses the cache drop will keep refusing while it is the
    computer; a dropped relay is about this moment and is asked again. */
 let cacheDropRefused = false
+/** True when the computer took the drop; false when it refused or could not be reached. */
 export async function dropReadCache() {
-  if (cacheDropRefused) return
+  if (cacheDropRefused) return false
   try {
     await remoteRequest('/device/cache', { method: 'DELETE' })
+    return true
   } catch (err) {
     if (err?.status === 403 || err?.remoteBlocked) cacheDropRefused = true
+    logDebug('set', 'cache drop failed', err?.message || String(err))
+    return false
   }
 }
 
@@ -510,32 +515,47 @@ export async function setParamConfirmed(eid, paramId, value, param) {
   let actual = null
   const agrees = () =>
     typeof actual === 'number' && Math.abs(actual - value) <= Math.max(0.05, Math.abs(value) * 0.02)
-  const landed = async () => {
+  const who = `${param?.name || `param ${paramId}`} on block ${eid}`
+  /*
+   * WRITTEN TO THE LOG WHEN IT MISSES, in numbers. "The volume didn't take.
+   * The unit is holding it at +0.8 dB" — and nothing said what had been
+   * asked for, which encoding went, whether the cache drop was accepted, or
+   * what the second read saw. Every miss now leaves that line, so the next
+   * log says which of those it was instead of leaving it to be guessed.
+   */
+  const landed = async (continuous) => {
     for (let go = 0; go < 2; go++) {
       if (go) await new Promise((r) => setTimeout(r, READ_BACK_AGAIN_MS))
+      let dropped = false
       try {
-        await dropReadCache()
+        dropped = await dropReadCache()
         actual = await readParamValue(eid, paramId)
       } catch {
         actual = null
       }
       if (agrees()) return true
+      logDebug(
+        'set',
+        `${who}: asked ${value}, read ${actual === null ? 'nothing' : actual}`,
+        `${continuous ? 'continuous' : 'discrete'}, read ${go + 1} of 2, cache drop ${dropped ? 'taken' : 'not taken'}`
+      )
     }
     return false
   }
 
   const first = preferredEncoding(eid, paramId)
   await write(first)
-  if (await landed()) {
+  if (await landed(first)) {
     rememberEncoding(eid, paramId, first)
     return { ok: true, continuous: first, retried: false }
   }
 
   await write(!first)
-  if (await landed()) {
+  if (await landed(!first)) {
     rememberEncoding(eid, paramId, !first)
     return { ok: true, continuous: !first, retried: true }
   }
+  logDebug('set', `${who} did not take`, `asked ${value}, unit holds ${actual === null ? 'nothing readable' : actual}`)
 
   return { ok: false, continuous: null, retried: true, actual }
 }
