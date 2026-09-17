@@ -36,10 +36,26 @@ export function outputLevelParam(named) {
   )
 }
 
+/**
+ * Whether the parameter is in decibels.
+ *
+ * By its unit when it says so — and by its NAME when it says nothing, because
+ * the FM3's Output Level comes across with no unit at all, and a Level with
+ * no unit is still a level in dB: "When adjusting the volume, it's going up by
+ * 10 decibels." It was, because without the word "dB" the buttons fell back
+ * to ten notches of a hundred-wide slider, which is ten dB.
+ */
+export function inDecibels(param) {
+  if (!usable(param)) return false
+  const unit = String(param.unit || '').trim()
+  if (unit) return /db/i.test(unit)
+  return isLevelParam(param.name)
+}
+
 /** One notch of the slider, in the parameter's own units. Half a dB is audible; a tenth is not. */
 export function volumeStep(param) {
   if (!usable(param)) return 1
-  if (/db/i.test(String(param.unit || ''))) return 0.5
+  if (inDecibels(param)) return 0.5
   const span = param.max - param.min
   return span >= 100 ? 1 : span >= 10 ? 0.1 : 0.01
 }
@@ -55,7 +71,7 @@ export function volumeStep(param) {
  */
 export function volumeNudge(param) {
   if (!usable(param)) return 1
-  if (/db/i.test(String(param.unit || ''))) return 1
+  if (inDecibels(param)) return 1
   return volumeStep(param) * 10
 }
 
@@ -77,11 +93,12 @@ export function volumePercent(value, param) {
 
 /**
  * "+2.0 dB", "−6.5 dB", "0.0 dB" — a sign on anything that has one, because
- * from arm's length "6.5" and "-6.5" are the same number.
+ * from arm's length "6.5" and "-6.5" are the same number. A level the unit
+ * sends with no unit is still labelled in dB, since that is what it is.
  */
 export function volumeLabel(value, param) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return '—'
-  const unit = param?.unit ? ` ${param.unit}` : ''
+  const unit = param?.unit ? ` ${param.unit}` : inDecibels(param) ? ' dB' : ''
   const sign = value > 0 ? '+' : value < 0 ? '−' : ''
   return `${sign}${Math.abs(value).toFixed(1)}${unit}`
 }

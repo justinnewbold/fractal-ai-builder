@@ -7923,6 +7923,26 @@ test('the buttons either side of the slider move it one dB, and stop at the ends
   assert.equal(volume.nudged(0.37, { min: 0, max: 10 }, 1), 1.4, 'the landing is not on a notch')
 })
 
+test('a Level the unit sends with no unit still moves one dB a press', () => {
+  // The FM3's Output Level arrives with no unit at all. "When adjusting the
+  // volume, it's going up by 10 decibels. It should just go up one decibel at
+  // a time when hitting plus or minus."
+  const p = { name: 'Level', min: -80, max: 20 }
+  assert.equal(volume.inDecibels(p), true, 'a Level with no unit is not taken for dB')
+  assert.equal(volume.volumeNudge(p), 1, 'a press is ten dB, not one')
+  assert.equal(volume.volumeStep(p), 0.5, 'the slider notch is not half a dB')
+  assert.equal(volume.nudged(20, p, -1), 19)
+  assert.equal(volume.nudged(19.5, p, 1), 20)
+  assert.equal(volume.volumeLabel(20, p), '+20.0 dB', 'the figure does not say dB')
+  assert.equal(volume.inDecibels({ name: 'Out Level', min: -80, max: 20 }), true)
+  // A unit that says otherwise is believed over the name.
+  assert.equal(volume.inDecibels({ name: 'Level', min: 0, max: 100, unit: '%' }), false)
+  assert.equal(volume.volumeNudge({ name: 'Level', min: 0, max: 100, unit: '%' }), 10)
+  // And a knob that is not a level and says nothing is not in dB.
+  assert.equal(volume.inDecibels({ name: 'Mix', min: 0, max: 100 }), false)
+  assert.equal(volume.volumeLabel(50, { name: 'Mix', min: 0, max: 100 }), '+50.0')
+})
+
 test('a drag sends one write at a time and the newest value wins', async () => {
   const sent = []
   let release = null
