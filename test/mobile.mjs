@@ -2368,4 +2368,53 @@ export function run(test) {
     /* And the subtitle no longer claims something it cannot back up. */
     assert.match(flat, /plug in to see only yours/, 'the sheet still says “your unit’s models” about a printed list')
   })
+
+  test('the play screen is not drawn before there is a rig to draw', () => {
+    /*
+     * "This is the screen that pops up for about 5 seconds after force closing
+     * and reopening the app. Maybe we need a splash screen while it's loading?"
+     *
+     * The screenshot was the play screen with nothing in it: SLOT —, Untitled,
+     * eight blank scene tiles, an empty chain, Previous and Next both dead. Not
+     * one of those was a bug — each is the honest answer to a question nobody
+     * has got an answer to yet — but together they read as a rig that has lost
+     * everything, which is a bad five seconds to hand somebody plugging in
+     * before a set.
+     *
+     * A splash screen would have covered it and said nothing. This says what it
+     * is waiting for, which on a dead evening is the useful half.
+     */
+    const app = read('mobile/App.js')
+    const flat = app.replace(/\s+/g, ' ')
+
+    /* Capabilities is the gate: the first thing the unit answers with, and the
+       thing the shape of every other answer depends on. */
+    assert.match(
+      flat,
+      /const settling = auth === 'in' && \(link\.link === 'joining' \|\| \(link\.link === 'connected' && !caps && !readFailed\)\)/,
+      'the play screen is drawn before the unit has said what it is'
+    )
+    assert.match(flat, /\{settling && screen === 'stage' \? \( <Waking link=\{link\} \/>/, 'nothing is shown while the app waits')
+
+    /*
+     * BOUNDED ON BOTH SIDES. A waiting screen that can wait forever is worse
+     * than the empty one it replaced: joining ends by itself when the relay
+     * gives up, and a read that fails sets an error, which is worth showing
+     * rather than waiting through.
+     */
+    assert.match(flat, /!readFailed/, 'a failed read leaves the app waiting on a spinner with the error behind it')
+    assert.ok(
+      !/settling && screen !== 'settings'/.test(flat),
+      'the wait covers Setup as well, so a Mac that never answers cannot be fixed from here'
+    )
+    /* And the bar stays up through it, which is what makes the wait safe at
+       all: whatever happens, the gear is one tap away. */
+    const bar = flat.indexOf('<TopBar link={link}')
+    const wait = flat.indexOf('{settling && screen')
+    assert.ok(bar > 0 && wait > bar, 'the waiting screen is drawn over the bar, so Setup cannot be reached')
+
+    /* It says which thing it is waiting for, not "Loading…" — the one a person
+       can act on is usually the Mac. */
+    assert.match(flat, /Finding \$\{link\.macName \|\| 'your Mac'\}/, 'the wait does not say what it is waiting for')
+  })
 }

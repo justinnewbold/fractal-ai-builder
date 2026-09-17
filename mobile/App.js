@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, View } from 'react-native'
+import { ActivityIndicator, Text, View } from 'react-native'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 
-import { color, space } from './src/lib/theme'
+import { color, font, space } from './src/lib/theme'
 import { haveSession, linkState, probeNow, startLink, stopLink, subscribeLink } from './src/lib/link'
 import { signOut } from './src/lib/relay'
 import Note from './src/components/Note'
@@ -20,6 +20,7 @@ import Tone from './src/screens/Tone'
 import { loadPlayMode, toneWayIn } from './src/lib/playMode'
 import { hydrate } from './src/lib/store'
 import { keepSetlistsInStep } from './src/lib/cloudSetlists'
+import { useRig } from './src/lib/rig'
 import { AI, BENCH } from './src/lib/features'
 
 /**
@@ -53,6 +54,37 @@ export default function App() {
   const [playing, setPlaying] = useState(null)
   /** The last "picked up 2 setlists from your Mac", until it has been read. */
   const [picked, setPicked] = useState(null)
+
+  /*
+   * Whether there is a rig to draw yet.
+   *
+   * "This is the screen that pops up for about 5 seconds after force closing
+   * and reopening the app. Maybe we need a splash screen while it's loading?"
+   *
+   * What he was looking at was the play screen with nothing in it: SLOT —,
+   * Untitled, eight blank scene tiles, an empty chain, Previous and Next both
+   * dead. Not a bug — every one of those is the honest answer to a question
+   * nobody has got an answer to yet — but it reads as a rig that has lost
+   * everything, which is a bad five seconds to hand somebody who is plugging in
+   * before a set.
+   *
+   * So the screen is not drawn until there is something to draw. `capabilities`
+   * is the first thing the unit answers with and the thing every other answer's
+   * shape depends on, which makes it the honest gate: before it, this app knows
+   * nothing about the rig at all.
+   *
+   * BOUNDED ON BOTH SIDES, because a waiting screen that can wait forever is
+   * worse than the empty one it replaced. Joining ends by itself — the relay
+   * gives up after twelve seconds and says so — and a read that fails sets an
+   * error, which is a thing worth showing rather than waiting through. Either
+   * way this falls through to the ordinary screen, where the top bar says NO
+   * MAC and the gear is a tap away.
+   */
+  const caps = useRig(ofCaps)
+  const readFailed = useRig(ofError)
+  const settling =
+    auth === 'in' &&
+    (link.link === 'joining' || (link.link === 'connected' && !caps && !readFailed))
 
   useEffect(() => subscribeLink(setLink), [])
 
@@ -154,7 +186,13 @@ export default function App() {
           <>
             <TopBar link={link} onOpenSettings={() => setScreen('settings')} />
             {picked ? <Arrived picked={picked} /> : null}
-            {screen === 'presets' ? (
+            {/*
+              The bar stays up while this waits, which is what makes the wait
+              safe: whatever happens, Setup is one tap away in the corner.
+            */}
+            {settling && screen === 'stage' ? (
+              <Waking link={link} />
+            ) : screen === 'presets' ? (
               <Presets onBack={() => setScreen('stage')} />
             ) : screen === 'setlists' ? (
               <Setlists onBack={() => setScreen('stage')} />
@@ -252,6 +290,32 @@ function Arrived({ picked }) {
   return (
     <View style={{ paddingHorizontal: space.lg, paddingTop: space.sm }}>
       <Note>{`Picked up ${parts.join(' and ')} from ${picked.from || 'your other device'}.`}</Note>
+    </View>
+  )
+}
+
+const ofCaps = (s) => s.capabilities
+const ofError = (s) => s.error
+
+/**
+ * The few seconds before there is a rig to show, said out loud.
+ *
+ * One line, in the words of the thing actually happening, because "Loading…"
+ * over a spinner tells somebody standing in front of a silent rig nothing they
+ * can act on — and what they can act on is usually the Mac.
+ */
+function Waking({ link }) {
+  const said =
+    link.link === 'connected'
+      ? 'Asking your unit what it is\u2026'
+      : `Finding ${link.macName || 'your Mac'}\u2026`
+  return (
+    <View
+      accessibilityLiveRegion="polite"
+      style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.lg, padding: space.xl }}
+    >
+      <ActivityIndicator color={color.silkDim} />
+      <Text style={{ color: color.silkDim, fontSize: font.body, textAlign: 'center' }}>{said}</Text>
     </View>
   )
 }
