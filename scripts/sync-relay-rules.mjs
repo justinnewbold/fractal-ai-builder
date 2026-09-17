@@ -297,6 +297,26 @@ export const FILES = [
  */
 export const APP_VERSION = '${JSON.parse(text).version}'
 `
+  },
+  /*
+   * And what the STORES call this build.
+   *
+   * "What build number should the iOS version be on? It says version 1.0.0
+   * with an 11 in parentheses." TestFlight and Play show app.json's version,
+   * which was typed once as 1.0.0 and never moved, so every build of the
+   * phone app has been "1.0.0" there and the only way to tell them apart was
+   * a build counter nobody can map to a change. The rest of app.json is kept
+   * as it is; only `expo.version` is held to package.json. The build counters
+   * are Expo's to increment and are left alone.
+   */
+  {
+    source: '../package.json',
+    target: '../mobile/app.json',
+    render: (text, current) => {
+      const app = JSON.parse(current || '{"expo":{}}')
+      app.expo = { ...app.expo, version: JSON.parse(text).version }
+      return `${JSON.stringify(app, null, 2)}\n`
+    }
   }
 ]
 
@@ -316,11 +336,13 @@ export const banner = (source) =>
  * are still copied and still held to being identical — only the note saying so
  * has nowhere to live, which is why nothing but data is allowed to be raw.
  */
-export const generate = (source, sourcePath, raw = false, render = null) => {
+export const generate = (source, sourcePath, raw = false, render = null, current = null) => {
   /* A rendered file is neither a copy nor raw: its content is DERIVED from the
      source, so the banner would be lying about what to edit. The doc comment
-     the renderer writes says where it came from instead. */
-  if (render) return render(source)
+     the renderer writes says where it came from instead. A renderer is also
+     handed what the copy holds now, for the one file that is edited in place
+     rather than replaced. */
+  if (render) return render(source, current)
   return raw ? source : banner(sourcePath) + source
 }
 
@@ -342,7 +364,7 @@ export const state = () =>
     } catch {
       // A copy that does not exist yet is stale, not a crash.
     }
-    return { ...file, sourceText, copyText, expected: generate(sourceText, file.source, file.raw, file.render) }
+    return { ...file, sourceText, copyText, expected: generate(sourceText, file.source, file.raw, file.render, copyText) }
   })
 
 if (import.meta.url === `file://${process.argv[1]}`) {
