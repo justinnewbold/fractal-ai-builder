@@ -18,8 +18,12 @@ import {
 } from '../lib/rig'
 import { checkBpm } from '../lib/tempo'
 import { nope, thud } from '../lib/feedback'
+import { blockColor } from '../lib/blockColors'
+import { sceneColor } from '../lib/sceneColors'
+import { shortBlock } from '../lib/shortName'
 import Note from '../components/Note'
 import Press from '../components/Press'
+import Tile from '../components/Tile'
 import Tuner from '../components/Tuner'
 
 const face = Platform.select(mono)
@@ -206,22 +210,41 @@ export default function Stage({ onOpenSettings, onOpenTone }) {
       </View>
 
       {/* ---------------------------------------------------------- scenes */}
+      {/*
+        Two across, named, and each one its own colour — the browser's Play
+        screen, tile for tile.
+
+        Four across with nothing but a numeral was a reading task: eight
+        identical panels, and between two bars of a song you are counting
+        squares. Two across buys the width for the NAME, which is the thing a
+        player actually thinks in — RHYTHM, LEAD, CLEAN — and the colour means
+        the right tile is found before any of it is read.
+
+        The number stays, small, above the name. It is what the unit calls the
+        scene and what a setlist written on paper says.
+      */}
       {scenes.hasScenes ? (
         <View style={{ gap: space.sm }}>
           <Label>Scenes</Label>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-            {Array.from({ length: scenes.count }, (_, i) => (
-              <Press
-                key={i}
-                label={String(i + 1)}
-                sub={sceneNames[i] || undefined}
-                tone="signal"
-                on={i === scene}
-                haptic={thud}
-                onPress={() => writeScene(i)}
-                style={{ minWidth: TAP + 8, flexGrow: 1, flexBasis: '22%' }}
-              />
-            ))}
+            {Array.from({ length: scenes.count }, (_, i) => {
+              const hue = sceneColor(i)
+              return (
+                <Tile
+                  key={i}
+                  caption={String(i + 1)}
+                  label={sceneNames[i] || ''}
+                  fill={hue.fill}
+                  ink={hue.ink}
+                  on={i === scene}
+                  height={TAP + 20}
+                  haptic={thud}
+                  onPress={() => writeScene(i)}
+                  /* Two columns: half the width less half the gap. */
+                  style={{ flexGrow: 1, flexBasis: '47%' }}
+                />
+              )
+            })}
           </View>
         </View>
       ) : null}
@@ -243,45 +266,78 @@ export default function Stage({ onOpenSettings, onOpenTone }) {
           <Note>Nothing in this preset but input and output.</Note>
         ) : null}
 
-        {blocks.map((block) => (
-          <View key={block.eid} style={{ gap: space.sm }}>
-            <View style={{ flexDirection: 'row', gap: space.sm }}>
-              <Press
-                grow
-                label={block.name || block.slug}
-                sub={block.channel ? `Channel ${block.channel}` : undefined}
-                tone="signal"
-                on={!block.bypassed}
-                onPress={() => writeBypass(block.eid, !block.bypassed)}
-              />
-              {channels?.length > 1 ? (
-                <Press
-                  label={block.channel || '—'}
-                  height={TAP}
-                  style={{ width: TAP }}
-                  onPress={() => setPicking(picking === block.eid ? null : block.eid)}
-                />
-              ) : null}
-            </View>
+        {/*
+          A wrapped grid of coloured tiles, which is the browser's chain and
+          also the unit's own screen.
 
-            {picking === block.eid ? (
-              <View style={{ flexDirection: 'row', gap: space.sm }}>
-                {channels.map((name) => (
-                  <Press
-                    key={name}
-                    grow
-                    label={name}
-                    on={block.channel === name}
-                    onPress={() => {
-                      writeChannel(block.eid, name)
-                      setPicking(null)
-                    }}
-                  />
-                ))}
-              </View>
-            ) : null}
+          A full-width row per block was honest and unreadable: seven rows of
+          "Delay 1 / Channel A" is a list to be read top to bottom, and it
+          pushed the tempo and the tuner off the bottom of the phone. Four
+          across fits the whole chain in the space two rows used to take, and
+          the colour does the finding — the drive is red on the AM4's display,
+          so it is red here.
+
+          The abbreviation is shortName's, shared with the browser: DLY, and
+          DLY 2 only when there is more than one, because a preset can hold a
+          second delay without holding the first.
+
+          Tapping still toggles. The channel moved into the tile as a sub-line
+          and onto a hold, because a separate square per block doubled the
+          number of targets on the busiest part of the screen.
+        */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+          {blocks.map((block) => {
+            const hue = blockColor(block.slug)
+            /* Named here rather than inline: the word the unit uses for this is
+               not a word anybody says out loud, and it has no business sitting
+               next to the text that gets drawn. */
+            const engaged = !block.bypassed
+            const state = engaged ? 'On' : 'Off'
+            return (
+              <Tile
+                key={block.eid}
+                label={shortBlock(block)}
+                sub={block.channel ? `${state}  ${block.channel}` : state}
+                fill={hue.fill}
+                ink={hue.ink}
+                on={engaged}
+                height={TAP + 8}
+                onPress={() => writeBypass(block.eid, !block.bypassed)}
+                onLongPress={
+                  channels?.length > 1
+                    ? () => setPicking(picking === block.eid ? null : block.eid)
+                    : undefined
+                }
+                style={{ flexGrow: 1, flexBasis: '22%' }}
+              />
+            )
+          })}
+        </View>
+
+        {/* The channel picker, under the grid rather than inline, so opening it
+            cannot reflow the tiles out from under a thumb. */}
+        {picking !== null && channels?.length > 1 ? (
+          <View style={{ gap: space.sm }}>
+            <Label>
+              {shortBlock(blocks.find((b) => b.eid === picking) || {})} — channel
+            </Label>
+            <View style={{ flexDirection: 'row', gap: space.sm }}>
+              {channels.map((name) => (
+                <Press
+                  key={name}
+                  grow
+                  label={name}
+                  tone="signal"
+                  on={blocks.find((b) => b.eid === picking)?.channel === name}
+                  onPress={() => {
+                    writeChannel(picking, name)
+                    setPicking(null)
+                  }}
+                />
+              ))}
+            </View>
           </View>
-        ))}
+        ) : null}
       </View>
 
       {/* ----------------------------------------------------------- tempo */}
