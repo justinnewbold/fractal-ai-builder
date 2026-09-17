@@ -33,6 +33,8 @@ let advert = { stop: async () => {} }
 let where = null
 /** What armHost found: null until it answers, then { on, email, reason }. */
 let phone = null
+/* What the phones were last told, and what they hear when they read it back. */
+let told = null
 /** Whether macOS is likely stopping a phone from reaching us. Best effort. */
 let firewall = { known: false }
 /** How the update is going: null until anything has happened. See lib/updates.mjs. */
@@ -96,7 +98,8 @@ async function start() {
     publish,
     readFirewall,
     serverEnv,
-    tellPhones,
+    tellPhonesChecked,
+    phonesHearLine,
     TELL_PHONES_MS,
     waitForServer,
     whoHasPort,
@@ -209,10 +212,19 @@ async function start() {
    * and the line in the menu updates when the answer lands.
    */
   const phoneLog = (line) => console.error('[phone]', line)
+  /*
+   * Which app this is, for the phones — written, then read back the way a
+   * phone reads it, so the menu can say what they hear. See tellPhonesChecked.
+   */
+  const tell = async () => {
+    told = await tellPhonesChecked({ port, version: app.getVersion(), log: phoneLog })
+    if (tray) buildTray()
+  }
   armHost({ port, version: app.getVersion(), log: phoneLog })
     .then((result) => {
       phone = result
       if (tray) buildTray()
+      return tell()
     })
     .catch(() => {})
   /*
@@ -220,7 +232,7 @@ async function start() {
    * computer" line: a write that failed once at launch used to leave an older
    * launcher's answer standing for good. See tellPhones.
    */
-  setInterval(() => tellPhones({ port, version: app.getVersion(), log: phoneLog }), TELL_PHONES_MS)
+  setInterval(tell, TELL_PHONES_MS)
 
   /*
    * The address in the menu works here and fails from a phone when macOS has
@@ -355,7 +367,9 @@ function buildTray() {
   const phoneLine = !phone
     ? 'Phone remote: starting…'
     : phone.on
-      ? `Phone remote: on${phone.email ? ` — ${phone.email}` : ''} · this app is v${app.getVersion()}`
+      ? `Phone remote: on${phone.email ? ` — ${phone.email}` : ''} · this app is v${app.getVersion()}${
+          told ? ` · ${phonesHearLine(told, app.getVersion())}` : ''
+        }`
       : phone.reason === 'signed-out'
         ? 'Phone remote: off — open the app and sign in once'
         : phone.reason === 'turned-off'

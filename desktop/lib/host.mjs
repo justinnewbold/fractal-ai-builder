@@ -337,6 +337,73 @@ export async function tellPhones({
 export const TELL_PHONES_MS = 5 * 60 * 1000
 
 /**
+ * Tell the phones, then read back what they will actually hear.
+ *
+ * "My Mac is on the correct version 7.281" — and the phone's report still
+ * said the computer app did not say. The write was being made, and nothing
+ * on the Mac could show whether it landed: the menu said which version this
+ * app is, which is not the same as which version the phones are told. So
+ * after every write the document is read back the way a phone reads it, and
+ * the menu says what a phone would hear — this version, an older one, a name
+ * with no version, or that the write was refused. That names the fault
+ * instead of the symptom, from the one machine that can see it.
+ *
+ * Never throws. `why` carries the sentence tellPhones logged when the write
+ * failed, or what went wrong with the read-back.
+ */
+export async function tellPhonesChecked({
+  port = DEFAULT_PORT,
+  fetch = globalThis.fetch,
+  hostname = prettyHostname(),
+  version = null,
+  log = () => {},
+  now = Date.now
+} = {}) {
+  const said = []
+  const wrote = await tellPhones({
+    port,
+    fetch,
+    hostname,
+    version,
+    log: (line) => {
+      said.push(line)
+      log(line)
+    }
+  })
+  let heard = null
+  let why = wrote ? null : said[0]?.replace(/^Phone remote: /, '') || 'the write failed'
+  try {
+    const res = await fetch(`http://localhost:${port}/store/config/host.name`)
+    if (!res.ok) {
+      why = why || `HTTP ${res.status}`
+    } else {
+      const doc = await res.json()
+      const data = doc && typeof doc === 'object' && doc.data && typeof doc.data === 'object' ? doc.data : doc
+      heard = {
+        name: data?.name ? String(data.name) : null,
+        version: data?.version ? String(data.version) : null
+      }
+    }
+  } catch (err) {
+    why = why || err?.message || String(err)
+  }
+  return { at: now(), wrote, heard, why }
+}
+
+/** The menu's words for what the phones hear, or null before the first write. */
+export function phonesHearLine(told, version = null) {
+  if (!told) return null
+  const mine = version ? String(version) : null
+  if (!told.wrote) return `the phones can’t be told which app this is — ${told.why}`
+  if (!told.heard) return `phones told, but reading it back failed${told.why ? ` (${told.why})` : ''}`
+  if (mine && told.heard.version === mine) return `phones hear v${mine}`
+  if (told.heard.version) {
+    return `phones hear v${told.heard.version}, not v${mine} — the device server is serving an older copy`
+  }
+  return `phones hear ${told.heard.name || 'a name'} with no version — the device server is not keeping what this app writes`
+}
+
+/**
  * Whether macOS is likely to be stopping a phone from reaching this Mac.
  *
  * The address in the menu works from the Mac and fails from a phone, and
