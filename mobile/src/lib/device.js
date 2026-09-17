@@ -466,11 +466,33 @@ export function setParam(eid, paramId, value, param, continuous) {
  * corrects it, which is audible. That file is generated from the browser's copy
  * so the two apps cannot drift on it.
  *
- * The browser clears the host's editor cache before each read-back. A phone
- * cannot — DELETE is not on the relay allowlist — and does not need to: the
- * value comes back off the hardware, not out of the dump the host holds for
- * fifteen seconds.
+ * THE READ-BACK CAN BE ONE WRITE BEHIND, and a check that reads once and
+ * believes it calls a write that landed a write that did not. The browser has
+ * a log from an iPhone with five knobs in a row "not taking", each one reading
+ * back the value of the write BEFORE it; and "The volume didn't take" on a
+ * slider whose level was exactly where it had been put. So the check does what
+ * the browser does — asks the computer to forget what it last read, which the
+ * relay allows since the pinned fork — and then, if the number still does not
+ * agree, waits a moment and reads once more before saying so. A miss costs
+ * two reads and half a second. A false "didn't take" costs trust in the one
+ * screen that has to be believed.
  */
+
+/** How long to give the unit before the second read of a value that came back wrong. */
+export const READ_BACK_AGAIN_MS = 400
+
+/* A computer that refuses the cache drop will keep refusing while it is the
+   computer; a dropped relay is about this moment and is asked again. */
+let cacheDropRefused = false
+async function dropReadCache() {
+  if (cacheDropRefused) return
+  try {
+    await remoteRequest('/device/cache', { method: 'DELETE' })
+  } catch (err) {
+    if (err?.status === 403 || err?.remoteBlocked) cacheDropRefused = true
+  }
+}
+
 export async function setParamConfirmed(eid, paramId, value, param) {
   const norm = toNormalized(value, param)
   if (norm === null) {
@@ -486,14 +508,20 @@ export async function setParamConfirmed(eid, paramId, value, param) {
      the unit is holding instead — which is the difference between "the app
      is broken" and "the unit is setting this itself". */
   let actual = null
+  const agrees = () =>
+    typeof actual === 'number' && Math.abs(actual - value) <= Math.max(0.05, Math.abs(value) * 0.02)
   const landed = async () => {
-    try {
-      actual = await readParamValue(eid, paramId)
-      if (typeof actual !== 'number') return false
-      return Math.abs(actual - value) <= Math.max(0.05, Math.abs(value) * 0.02)
-    } catch {
-      return false
+    for (let go = 0; go < 2; go++) {
+      if (go) await new Promise((r) => setTimeout(r, READ_BACK_AGAIN_MS))
+      try {
+        await dropReadCache()
+        actual = await readParamValue(eid, paramId)
+      } catch {
+        actual = null
+      }
+      if (agrees()) return true
     }
+    return false
   }
 
   const first = preferredEncoding(eid, paramId)

@@ -113,6 +113,9 @@ export async function demoRequest(mock, path, options = {}) {
     }
   }
 
+  /* The demo holds no read cache; dropping it is a yes. */
+  if (method === 'DELETE' && path === '/device/cache') return { ok: true }
+
   const err = new Error(`The demo has no answer for ${method} ${path}.`)
   err.status = 404
   throw err
