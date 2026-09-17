@@ -21,7 +21,7 @@ import {
 } from '../lib/lists'
 import { nameOf, namedSlots, useNames } from '../lib/presetNames'
 import { useStored } from '../lib/store'
-import { useRig } from '../lib/rig'
+import { loadPreset, useRig } from '../lib/rig'
 import { tick } from '../lib/feedback'
 import Note from '../components/Note'
 import Press from '../components/Press'
@@ -322,6 +322,8 @@ export default function Setlists({ onBack }) {
                   playing={n === current}
                   first={i === 0}
                   last={i === chosen.presets.length - 1}
+                  alone={chosen.presets.length === 1}
+                  onPlay={() => loadPreset(n)}
                   onUp={() => setPresets(moveIn(chosen.presets, i, i - 1))}
                   onDown={() => setPresets(moveIn(chosen.presets, i, i + 1))}
                   onRemove={() => setPresets(removeFrom(chosen.presets, n))}
@@ -482,7 +484,7 @@ function SourceRow({ on, onPress, name, note, editing = null }) {
  * quietly. Three buttons go wrong loudly and are undone by pressing the other
  * one.
  */
-function Song({ position, slot, name, playing, first, last, onUp, onDown, onRemove }) {
+function Song({ position, slot, name, playing, first, last, alone, onPlay, onUp, onDown, onRemove }) {
   return (
     <View
       style={{
@@ -497,19 +499,42 @@ function Song({ position, slot, name, playing, first, last, onUp, onDown, onRemo
         backgroundColor: color.panel
       }}
     >
-      <Text style={{ color: color.silkDim, fontSize: font.small, fontFamily: face, minWidth: 18 }}>
-        {position}
-      </Text>
-      <View style={{ flex: 1 }}>
-        <Text numberOfLines={1} style={{ color: color.silk, fontSize: font.body }}>
-          {name}
+      {/*
+        THE NAME IS A BUTTON: tap a song and the unit goes to it, the way a row
+        in the preset list does. "Clicking on the actual preset name doesn't
+        work." It was a label; a running order you cannot jump around in is a
+        list to read, not a setlist. Not awaited, like every preset load from a
+        phone: the rig shows the new slot on the press and confirms it behind.
+      */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={playing ? `${name}, playing` : `Play ${name}`}
+        onPress={() => {
+          tick()
+          onPlay()
+        }}
+        style={({ pressed }) => ({ flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.sm, opacity: pressed ? 0.7 : 1 })}
+      >
+        <Text style={{ color: color.silkDim, fontSize: font.small, fontFamily: face, minWidth: 18 }}>
+          {position}
         </Text>
-        <Text style={{ color: color.silkFaint, fontSize: font.micro, fontFamily: face }}>
-          {playing ? `${slot} · playing` : slot}
-        </Text>
-      </View>
-      <Nudge label={`Move ${name} up`} glyph="▲" disabled={first} onPress={onUp} />
-      <Nudge label={`Move ${name} down`} glyph="▼" disabled={last} onPress={onDown} />
+        <View style={{ flex: 1 }}>
+          <Text numberOfLines={1} style={{ color: color.silk, fontSize: font.body }}>
+            {name}
+          </Text>
+          <Text style={{ color: color.silkFaint, fontSize: font.micro, fontFamily: face }}>
+            {playing ? `${slot} · playing` : `${slot} · tap to play`}
+          </Text>
+        </View>
+      </Pressable>
+      {/* One song has nowhere to move: no arrows, rather than two greyed ones
+          that read as broken. "The little arrows to go up and down don't work." */}
+      {alone ? null : (
+        <>
+          <Nudge label={`Move ${name} up`} glyph="▲" disabled={first} onPress={onUp} />
+          <Nudge label={`Move ${name} down`} glyph="▼" disabled={last} onPress={onDown} />
+        </>
+      )}
       <Nudge label={`Remove ${name}`} glyph="✕" onPress={onRemove} />
     </View>
   )

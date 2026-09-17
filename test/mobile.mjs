@@ -3381,6 +3381,19 @@ export function run(test) {
     assert.match(link, /if \(status === 'active'\) probeNow\(\)/, 'the phone does not look for the computer the moment it wakes')
   })
 
+  test('a song in a setlist can be tapped to play it, and a lone song has no arrows', () => {
+    /*
+     * "I clicked Add to the Test setlist and it pulled up Hot Kitty, but the
+     * little arrows to go up and down don't work, and clicking on the actual
+     * preset name doesn't work." One song has nowhere to move, so the arrows
+     * were greyed out and read as broken; the name was a label.
+     */
+    const flat = read('mobile/src/screens/Setlists.js').replace(/\s+/g, ' ')
+    assert.match(flat, /alone=\{chosen\.presets\.length === 1\} onPlay=\{\(\) => loadPreset\(n\)\}/, 'a song row does not load its preset')
+    assert.match(flat, /\{alone \? null : \( <> <Nudge label=\{`Move \$\{name\} up`\}/, 'a lone song still shows arrows that cannot move it')
+    assert.match(flat, /`\$\{slot\} · tap to play`/, 'nothing says the song can be tapped')
+  })
+
   test('a dead account service is given twelve seconds, not the whole evening', async () => {
     /*
      * "I can't log into supper base anymore. It says server error, so now I
