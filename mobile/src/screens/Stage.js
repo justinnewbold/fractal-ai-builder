@@ -52,7 +52,7 @@ const ofError = (s) => s.error
  * button within reach of a stage tap is a hazard, and saving to a slot is
  * refused by the Mac anyway.
  */
-export default function Stage({ onOpenSettings, onOpenTone }) {
+export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets }) {
   // The screen is the instrument panel for as long as this is open. A phone
   // that locks itself between songs is a phone you have to wake and unlock
   // while the count-in is happening.
@@ -185,13 +185,22 @@ export default function Stage({ onOpenSettings, onOpenTone }) {
           </View>
         </View>
 
-        <Text
-          numberOfLines={2}
-          accessibilityRole="header"
-          style={{ color: color.silk, fontSize: font.display, fontWeight: '700', lineHeight: 46 }}
-        >
-          {presetLabel(preset)}
-        </Text>
+        {/*
+          The preset is a button now, not a heading.
+
+          It reads the same and does the thing the browser's does: tapping it
+          opens every slot by name. Previous and Next stay either side of it
+          because they are the mid-song controls and a list is not — but
+          "get me to SCHISM" was unanswerable on this screen until now.
+        */}
+        <Press
+          label={presetLabel(preset)}
+          sub={onOpenPresets ? 'Tap for all presets' : undefined}
+          height={TAP + 12}
+          disabled={!onOpenPresets}
+          onPress={onOpenPresets}
+          style={{ paddingHorizontal: space.lg }}
+        />
 
         <View style={{ flexDirection: 'row', gap: space.md }}>
           <Press
