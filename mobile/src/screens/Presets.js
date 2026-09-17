@@ -19,6 +19,23 @@ const ofCaps = (s) => s.capabilities
 const ofSlug = (s) => s.deviceSlug
 
 /**
+ * How tall one row is, and the space under it.
+ *
+ * WRITTEN DOWN RATHER THAN MEASURED, because `getItemLayout` needs a number and
+ * a list of five hundred slots cannot be measured to find one. Everything in a
+ * row is pinned to this: the button, the star, and the gap. A row that grew
+ * taller than this without the number moving would send "jump to preset 99" to
+ * somewhere near preset 99, which is worse than not jumping.
+ *
+ * The gap is a margin rather than the container's `gap` for the same reason —
+ * `gap` is invisible to getItemLayout, so the error would compound down the
+ * list and be fine at the top and useless at the bottom.
+ */
+const ROW = TAP
+const GAP = 8
+const STRIDE = ROW + GAP
+
+/**
  * Every slot on the unit, by name, so you can get to one.
  *
  * Previous and Next are the right controls mid-song and the wrong ones between
@@ -73,6 +90,39 @@ export default function Presets({ onBack }) {
   const seen = useCallback(({ viewableItems }) => {
     for (const v of viewableItems) if (typeof v.item === 'number') want(v.item)
   }, [])
+
+  /*
+   * Open on the preset you are playing, in the middle of the screen.
+   *
+   * "I'm on preset 99. When preset button is tapped have it go to the current
+   * preset on the list in the middle of the screen." It opened at slot 0 every
+   * time, so the first thing the list did was hide the one row you already knew
+   * you wanted — five hundred slots away.
+   *
+   * `initialScrollIndex` gets the list to render THERE rather than rendering a
+   * hundred rows on the way, and the nudge below centres it: the index alone
+   * puts the row at the top of the screen, which answers "where is it" and not
+   * "what is around it". Once, on opening — a re-centre every time the preset
+   * changed would yank the list out from under a thumb that is scrolling it.
+   */
+  const list = useRef(null)
+  const centred = useRef(false)
+  useEffect(() => {
+    if (centred.current || hunting) return
+    if (!slots || !Number.isInteger(preset?.number)) return
+    centred.current = true
+    const at = Math.min(preset.number, slots - 1)
+    /* A frame later, so the jump happens to a list that has been laid out. */
+    const id = requestAnimationFrame(() => {
+      try {
+        list.current?.scrollToIndex({ index: at, viewPosition: 0.5, animated: false })
+      } catch {
+        /* A list that will not scroll there is a list showing the top of
+           itself, which is where it used to always be. Not worth a message. */
+      }
+    })
+    return () => cancelAnimationFrame(id)
+  }, [slots, preset?.number, hunting])
 
   return (
     <View style={{ flex: 1 }}>
@@ -136,23 +186,50 @@ export default function Presets({ onBack }) {
       ) : null}
 
       <FlatList
+        ref={list}
         data={shown}
         keyExtractor={(n) => String(n)}
-        contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space.xxl, gap: space.sm }}
+        contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space.xxl }}
         initialNumToRender={20}
         windowSize={5}
         onViewableItemsChanged={seen}
         viewabilityConfig={useRef({ itemVisiblePercentThreshold: 10 }).current}
+        /* Fixed rows, so the list can be told to go to one without having drawn
+           the ones before it. See ROW. */
+        getItemLayout={(_, i) => ({ length: STRIDE, offset: STRIDE * i, index: i })}
+        initialScrollIndex={
+          !hunting && slots && Number.isInteger(preset?.number)
+            ? Math.min(preset.number, slots - 1)
+            : undefined
+        }
+        onScrollToIndexFailed={() => {
+          /* Only reachable while the list is still measuring. The centring
+             effect has already run by then; the list simply stays where it is,
+             which is the top — the behaviour this replaced. */
+        }}
         renderItem={({ item: n }) => {
           const name = nameOf(n)
           const here = n === preset?.number
           const starred = favourites.includes(n)
           return (
-            <View style={{ flexDirection: 'row', gap: space.sm }}>
+            <View style={{ flexDirection: 'row', gap: space.sm, height: ROW, marginBottom: GAP }}>
+              {/*
+                The one you are on, in the amber this app uses for "this is
+                live" everywhere else — the lit scene, the engaged block. It was
+                already marked; the trouble was that the list opened five
+                hundred slots away from it, so nobody ever saw the mark.
+
+                The caption says so in a word as well as in a colour, because
+                amber on its own is a thing to learn and "Playing" is not.
+              */}
               <Press
                 grow
+                height={ROW}
                 label={typeof name === 'string' ? (name || 'Empty') : `Slot ${slotLabel(n, addressing)}`}
-                sub={slotLabel(n, addressing)}
+                /* Two lines on every row, always: a third one on the current
+                   row alone would make it taller than ROW and put the jump to
+                   slot 99 somewhere near slot 99. */
+                sub={here ? `${slotLabel(n, addressing)} · Playing` : slotLabel(n, addressing)}
                 tone="signal"
                 on={here}
                 haptic={thud}

@@ -1545,6 +1545,54 @@ export function run(test) {
     }
   })
 
+  test('the preset list opens on the preset you are playing', () => {
+    /*
+     * "I'm on preset 99. When preset button is tapped have it go to the current
+     * preset on the list in the middle of the screen and have the current
+     * preset highlighted in yellow to show what preset it's on."
+     *
+     * It opened at slot 0 every time, so the first thing the list did was hide
+     * the one row anybody already knew they wanted — five hundred slots away.
+     * The current row WAS marked; nobody had ever seen the mark.
+     *
+     * The arithmetic is the part that can go quietly wrong. Jumping to a row in
+     * a five-hundred-row list means telling the list how tall a row is, and a
+     * row that grows taller than that number without it moving sends the jump
+     * to somewhere NEAR slot 99 — which is worse than not jumping, because it
+     * looks like it worked.
+     */
+    const presets = read('mobile/src/screens/Presets.js')
+
+    assert.match(presets, /const ROW = TAP/, 'the row height is no longer written down, so the jump cannot be computed')
+    assert.match(presets, /const STRIDE = ROW \+ GAP/, 'the gap between rows is not counted, so the jump drifts down the list')
+    assert.match(
+      presets,
+      /getItemLayout=\{\(_, i\) => \(\{ length: STRIDE, offset: STRIDE \* i, index: i \}\)\}/,
+      'the list cannot be told to go to a row without drawing every row before it'
+    )
+    assert.match(presets, /initialScrollIndex=/, 'the list renders from the top and scrolls afterwards')
+    assert.match(presets, /viewPosition: 0\.5/, 'the current preset lands at the top of the screen rather than the middle of it')
+
+    /*
+     * The gap is a margin, not the container's `gap`: getItemLayout cannot see
+     * `gap`, so the error would compound down the list — fine at the top and
+     * useless at the bottom.
+     */
+    assert.match(presets, /marginBottom: GAP/, 'the rows are spaced by something the jump cannot account for')
+    assert.ok(
+      !/contentContainerStyle=\{\{[^}]*gap:/.test(presets),
+      'the list is spaced with `gap`, which getItemLayout cannot see'
+    )
+
+    /* Once, on opening. Re-centring whenever the preset changed would yank the
+       list out from under a thumb that is scrolling it. */
+    assert.match(presets, /if \(centred\.current \|\| hunting\) return/, 'the list re-centres itself while somebody is scrolling or searching')
+
+    /* And every row stays two lines, so ROW stays true. */
+    assert.match(presets, /sub=\{here \? `\$\{slotLabel\(n, addressing\)\} · Playing`/, 'the current row is not marked in words')
+    assert.match(presets, /tone="signal"[\s\S]{0,40}?on=\{here\}/, 'the current row is not marked in the colour this app uses for live')
+  })
+
   test('every component the phone draws is one that exists', () => {
     /*
      * THE HOLE THIS FILLS, found the hard way.
