@@ -241,15 +241,8 @@ export async function armHost({
       return { on: false, reason: 'no-server' }
     }
 
-    // 2. The name the phone will show.
-    try {
-      await json('PUT', '/store/config/host.name', {
-        data: version ? { name: hostname, version: String(version) } : { name: hostname },
-        origin: 'fractal'
-      })
-    } catch {
-      // A name is a nicety; the phone says "your Mac" without one.
-    }
+    // 2. The name the phone will show, and which app this is.
+    await tellPhones({ port, fetch, hostname, version, log })
 
     // 3. Can this ForgeFX host at all, and is anyone signed in?
     const cloud = (await call('/cloud/status')).body || {}
@@ -299,6 +292,49 @@ export async function armHost({
     return { on: false, reason: 'failed', error: err.message }
   }
 }
+
+/**
+ * Tell the phones what this computer is called and which app this is.
+ *
+ * Written into the device server's own store, where every phone looks first.
+ * Once at launch was not enough: "The app on the computer is running the
+ * latest version, so I'm not sure why it's saying this" — the phone said the
+ * computer was older than the version that started writing this, on a Mac
+ * that was not. A write that failed once, quietly, left whatever an older
+ * launcher had written, for good. So it is written again every few minutes,
+ * and a failure is said in words rather than swallowed. Never throws: a name
+ * is a nicety, and the phone says "your computer" without one.
+ */
+export async function tellPhones({
+  port = DEFAULT_PORT,
+  fetch = globalThis.fetch,
+  hostname = prettyHostname(),
+  version = null,
+  log = () => {}
+} = {}) {
+  const said = version ? `${hostname}, v${version}` : hostname
+  try {
+    const res = await fetch(`http://localhost:${port}/store/config/host.name`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: version ? { name: hostname, version: String(version) } : { name: hostname },
+        origin: 'fractal'
+      })
+    })
+    if (!res.ok) {
+      log(`Phone remote: couldn't tell the phones this is ${said} (HTTP ${res.status}).`)
+      return false
+    }
+    return true
+  } catch (err) {
+    log(`Phone remote: couldn't tell the phones this is ${said} (${err?.message || err}).`)
+    return false
+  }
+}
+
+/** How often the name and version are written again. */
+export const TELL_PHONES_MS = 5 * 60 * 1000
 
 /**
  * Whether macOS is likely to be stopping a phone from reaching this Mac.
