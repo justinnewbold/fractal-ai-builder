@@ -224,7 +224,8 @@ export async function storedNames(slug) {
  * dump. One small request; the unit is not involved.
  */
 export async function storedSceneNames(slug, number) {
-  if (!slug || !Number.isInteger(number) || demoDevice()) return null
+  /* A unit mid-switch can report slot -1; there is nothing filed under it. */
+  if (!slug || !Number.isInteger(number) || number < 0 || demoDevice()) return null
   const doc = await remoteRequest(`/store/config/${encodeURIComponent(`scene-names-${slug}:${number}`)}`)
   const data = doc && typeof doc === 'object' && 'data' in doc ? doc.data : doc
   if (!Array.isArray(data)) return null
@@ -239,7 +240,7 @@ export async function storedSceneNames(slug, number) {
  * never fails anything: it only helps a later load.
  */
 export function keepSceneNames(slug, number, names) {
-  if (!slug || !Number.isInteger(number) || demoDevice()) return
+  if (!slug || !Number.isInteger(number) || number < 0 || demoDevice()) return
   if (!Array.isArray(names) || !names.some((n) => n)) return
   put(`/store/config/${encodeURIComponent(`scene-names-${slug}:${number}`)}`, { data: names, origin: 'fractal' }).catch(
     () => {}
