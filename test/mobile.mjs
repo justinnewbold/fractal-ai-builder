@@ -988,6 +988,21 @@ export function run(test) {
     assert.match(settings, /Renamed, not saved\. Tap Save to keep the new names\. Changing preset drops them, on the unit and here\./, 'nothing says a rename is not saved yet')
   })
 
+  test('a chain write is re-read off the unit, and a move the unit did not keep is named', () => {
+    /*
+     * "When I rearranged the presets with the slider and moved it up, it
+     * didn't take, it just put it right back where it was." The re-read
+     * after the move came out of the computer's fifteen-second copy of the
+     * preset, taken before the move. And if the unit really had not kept
+     * it, nothing would have said so.
+     */
+    const flat = read('mobile/src/screens/Edit.js').replace(/\s+/g, ' ')
+    assert.match(flat, /const after = async \(res\) => \{ .*?await dropReadCache\(\) await refreshBlocks\(\{ quiet: true \}\)/, 'the chain is re-read out of the stale copy after a write')
+    assert.match(flat, /const astray = moves\.filter\(\(m\) => colOf\(m\) !== m\.to\)/, 'a move is not checked against the unit\'s answer')
+    assert.match(flat, /logDebug\('chain', `\$\{m\.block\.name\}: column \$\{m\.from\} → \$\{m\.to\}`/, 'a move leaves nothing in the log')
+    assert.match(flat, /The unit did not keep the move: /, 'a move the unit dropped is silent')
+  })
+
   test('tapping a found control brings the page to the block it opened', () => {
     /*
      * "It'll pull up the parameters but then clicking on it does nothing." It

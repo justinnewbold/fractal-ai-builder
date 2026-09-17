@@ -8,6 +8,7 @@ import {
   blockParams,
   blockTypes,
   clearCell,
+  dropReadCache,
   idOf,
   modifierModel,
   placeBlock,
@@ -19,7 +20,8 @@ import { colLabel, doubtfulWrite, gridShape, laneItems, lanesShown } from '../li
 import { blockPositions, landingIndex, reorderPlan } from '../lib/laneOrder'
 import { isSilencingParam } from '../lib/guardrails'
 import { buildParamIndex, findControls, indexFor } from '../lib/paramIndex'
-import { refreshBlocks, useRig, writeBypass, writeChannel } from '../lib/rig'
+import { getState, refreshBlocks, useRig, writeBypass, writeChannel } from '../lib/rig'
+import { logDebug } from '../lib/debugLog'
 import { blockColor } from '../lib/blockColors'
 import { shortBlock } from '../lib/shortName'
 import { thud } from '../lib/feedback'
@@ -708,6 +710,14 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
 
   /* A write is done when the unit has been asked AND the chain re-read. */
   const after = async (res) => {
+    /*
+     * A structure write, then a read that must not come out of the computer's
+     * fifteen-second copy of the preset — a copy taken before the write, so
+     * a read out of it shows the chain as it was: "When I rearranged with the
+     * slider and moved it up, it didn't take, it just put it right back where
+     * it was." The copy is dropped first, so the read is off the unit.
+     */
+    await dropReadCache()
     await refreshBlocks({ quiet: true })
     setIssue(doubtfulWrite(res))
     if (!doubtfulWrite(res)) setActing(null)
@@ -776,6 +786,26 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
         throw err
       }
       await after(last)
+      /*
+       * And checked, in numbers, against the unit's own answer. A move the
+       * unit did not keep used to look exactly like one that was never made:
+       * the cards went back and nothing said why. Now each moved block is
+       * looked for where it was put, and the ones that are not there are
+       * named on screen and in the log.
+       */
+      const now = getState().allBlocks || []
+      const colOf = (m) => now.find((b) => idOf(b) === idOf(m.block) && b.row === lane.row)?.col
+      const astray = moves.filter((m) => colOf(m) !== m.to)
+      for (const m of moves) {
+        logDebug('chain', `${m.block.name}: column ${m.from} → ${m.to}`, astray.includes(m) ? `unit has it at ${colOf(m) ?? 'nowhere'}` : 'landed')
+      }
+      if (astray.length) {
+        setIssue(
+          `The unit did not keep the move: ${astray
+            .map((m) => `${m.block.name} is ${colOf(m) === undefined ? 'not in this row' : `still in column ${colOf(m) + 1}`}`)
+            .join(', ')}.`
+        )
+      }
     } catch (err) {
       setIssue(err.message)
       onError(err.message)
