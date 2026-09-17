@@ -2802,6 +2802,38 @@ export function run(test) {
     }
   })
 
+  test('scrolling the preset list does not queue five hundred reads at the unit', () => {
+    /*
+     * THIS IS WHAT MADE IT UNUSABLE, and it is worth its own check because
+     * nothing about it looks wrong until you count.
+     *
+     * Every row that scrolled past was asked for and nothing was ever taken
+     * back. A flick from slot 0 to slot 512 queued five hundred reads — each
+     * one making the unit dump that preset off its own hardware, down the one
+     * serial port the chain, the scene and the tuner all wait behind. Ten to
+     * twenty minutes of solid reading for names nobody was looking at any more.
+     *
+     * And every name that landed redrew a five-hundred-row list, on the thread
+     * that also has to answer a finger.
+     */
+    const names = read('mobile/src/lib/presetNames.js')
+
+    /* What is on screen is what is worth asking for. */
+    assert.match(names, /export function wantOnly\(list\)/, 'there is no way to ask for only what is visible')
+    assert.match(names, /for \(const n of queue\.splice\(0\)\) asked\.delete\(n\)/, 'rows that scrolled off stay queued at the unit')
+    /* Given back properly: a slot dropped from the queue has to leave `asked`
+       too, or landing on it later waits forever on a read that was thrown. */
+    const drop = names.indexOf('queue.splice(0)) asked.delete(n)')
+    assert.ok(drop > 0 && names.slice(drop, drop + 400).includes('asked.add(n)'), 'a dropped slot is never asked for again')
+
+    /* One re-render for a burst, not one per name. */
+    assert.match(names.replace(/\s+/g, ' '), /let telling = false const announce = \(\) => \{ revision \+= 1 if \(telling\) return/, 'every name that lands redraws every watching screen')
+
+    /* Still one read at a time: firing them together does not make the unit
+       answer faster, it makes the queue longer. */
+    assert.match(names, /if \(draining\) return/, 'name reads can now overlap at the unit')
+  })
+
   test('the demo answers every route the phone actually asks for', async () => {
     /*
      * "Yes I want the demo mode on the phone as well. It helps me make sure the
