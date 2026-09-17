@@ -3394,6 +3394,15 @@ export function run(test) {
     assert.match(flat, /`\$\{slot\} · tap to play`/, 'nothing says the song can be tapped')
   })
 
+  test('a model called Null is explained where it is shown', () => {
+    /* "In the edit menu it says Null on the current effect." The Filter
+       block's flat type is called that on the unit; it reads as an error. */
+    const flat = read('mobile/src/screens/Edit.js').replace(/\s+/g, ' ')
+    assert.match(flat, /const modelNote = \(name\) => typeof name === 'string' && name\.trim\(\)\.toLowerCase\(\) === 'null' \? 'Flat: the sound passes through unchanged\. For a level or pan control\.' : null/, 'Null is not explained')
+    assert.match(flat, /sub=\{picking \? 'Close' : modelNote\(type\?\.name\) \|\| 'Tap to change'\}/, 'the model button does not carry the note')
+    assert.match(flat, /sub=\{m\.basedOn \|\| modelNote\(m\.name\) \|\| undefined\}/, 'the model list does not carry the note')
+  })
+
   test('a dead account service is given twelve seconds, not the whole evening', async () => {
     /*
      * "I can't log into supper base anymore. It says server error, so now I
