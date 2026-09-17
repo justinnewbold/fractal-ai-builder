@@ -27,7 +27,6 @@ import {
   writeTempo,
   writeTuner
 } from '../lib/rig'
-import { checkBpm } from '../lib/tempo'
 import { nope, thud } from '../lib/feedback'
 import { blockColor } from '../lib/blockColors'
 import { sceneColor } from '../lib/sceneColors'
@@ -36,6 +35,7 @@ import Note from '../components/Note'
 import Press from '../components/Press'
 import Tile from '../components/Tile'
 import Sheet from '../components/Sheet'
+import TempoBox from '../components/TempoBox'
 import Tuner from '../components/Tuner'
 import Volume from '../components/Volume'
 
@@ -99,31 +99,12 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
   const lists = listsFor(device)
   const source = sourceFor(device)
   const order = orderFor(source, { favourites, lists })
-  /* The tempo box under Tap, open only while somebody is typing into it. */
+  /*
+   * Whether somebody is typing a tempo. The box itself, what is in it and what
+   * it refuses all live in components/TempoBox — it is an overlay, and holding
+   * its state out here is how the keyboard came to be covering it.
+   */
   const [typing, setTyping] = useState(false)
-  const [typed, setTyped] = useState('')
-  const [typedError, setTypedError] = useState(null)
-  useEffect(() => {
-    if (typing) {
-      setTyped(Number.isFinite(bpm) ? String(Math.round(bpm)) : '')
-      setTypedError(null)
-    }
-  }, [typing]) // eslint-disable-line react-hooks/exhaustive-deps
-  const commitTyped = async () => {
-    const checked = checkBpm(typed)
-    setTyping(false)
-    if (checked.error) {
-      setTypedError(checked.error)
-      return
-    }
-    if (checked.bpm !== undefined && checked.bpm !== Math.round(bpm)) {
-      try {
-        await writeTempo(checked.bpm)
-      } catch (err) {
-        setTypedError(err.message)
-      }
-    }
-  }
   const error = useRig(ofError)
 
   const [refreshing, setRefreshing] = useState(false)
@@ -497,38 +478,6 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
           />
         </View>
 
-        {typing ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-            <TextInput
-              autoFocus
-              selectTextOnFocus
-              value={typed}
-              onChangeText={(t) => setTyped(t.replace(/[^0-9]/g, ''))}
-              keyboardType="number-pad"
-              returnKeyType="done"
-              accessibilityLabel="Tempo in beats per minute"
-              placeholder="BPM"
-              placeholderTextColor={color.silkFaint}
-              onSubmitEditing={commitTyped}
-              onBlur={() => setTyping(false)}
-              style={{
-                flexGrow: 1,
-                minHeight: TAP,
-                backgroundColor: color.panel,
-                borderWidth: 1,
-                borderColor: color.live,
-                borderRadius: 10,
-                paddingHorizontal: space.md,
-                color: color.silk,
-                fontSize: font.hero,
-                fontFamily: face,
-                textAlign: 'center'
-              }}
-            />
-            <Press label="Set" tone="signal" on onPress={commitTyped} />
-          </View>
-        ) : null}
-        {typedError ? <Note tone="fault">{typedError}</Note> : null}
 
       </View>
 
@@ -555,6 +504,20 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
         it down — so the tiles a thumb was aimed at moved while the thumb was on
         its way, on the one screen where that can happen mid-song.
       */}
+      {/*
+        Typing a tempo, high on the screen.
+
+        "When holding tap button to manually enter tempo the keyboard blocks the
+        numbers so you can see what your typing." It was in the foot — which is
+        where a thumb rests and therefore exactly where the keyboard opens.
+      */}
+      <TempoBox
+        open={typing}
+        bpm={bpm}
+        onSet={writeTempo}
+        onClose={() => setTyping(false)}
+      />
+
       <ChannelSheet
         block={blocks.find((b) => sameBlock(b, picking)) || null}
         channels={channels}
