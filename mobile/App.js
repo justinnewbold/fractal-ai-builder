@@ -11,6 +11,7 @@ import Note from './src/components/Note'
 import Settings from './src/screens/Settings'
 import SignIn from './src/screens/SignIn'
 import Edit from './src/screens/Edit'
+import Gear from './src/screens/Gear'
 import Presets from './src/screens/Presets'
 import Setlists from './src/screens/Setlists'
 import Stage from './src/screens/Stage'
@@ -158,6 +159,8 @@ export default function App() {
               <Setlists onBack={() => setScreen('stage')} />
             ) : screen === 'edit' ? (
               <Edit onBack={() => setScreen('stage')} />
+            ) : screen === 'gear' ? (
+              <Gear onBack={() => setScreen('settings')} />
             ) : AI && screen === 'tone' ? (
               <Tone onBack={() => setScreen('stage')} />
             ) : screen === 'settings' ? (
@@ -167,6 +170,9 @@ export default function App() {
                 playing={playing}
                 onPlayMode={setPlaying}
                 onBack={() => setScreen('stage')}
+                /* Works with the Mac off: it is a reference sheet, not a
+                   question for the unit. */
+                onOpenGear={() => setScreen('gear')}
                 onReconnect={probeNow}
                 onSignOut={async () => {
                   /*

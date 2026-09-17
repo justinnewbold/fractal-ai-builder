@@ -1013,6 +1013,141 @@ export function run(test) {
     assert.match(editor, /await refreshBlocks\(\{ quiet: true \}\)/, 'the chain is not re-read after it is changed')
   })
 
+  test('the volume is a control, and a drag does not queue a hundred writes at the unit', async () => {
+    /*
+     * "Add volume slider to the play screen to quickly turn volume up or down."
+     * The phone could read the level and not move it, which is the one control
+     * a soundperson means by "give me a bit less".
+     *
+     * THE COALESCING IS THE PART THAT MATTERS ON A PHONE. A slider reports one
+     * value per frame; the unit takes one request at a time down a serial port
+     * with a relay in front of it. Sent as they come, a two-second drag queues
+     * a hundred writes the unit works through for the next ten seconds —
+     * landing on the value you let go of long after you let go, and holding up
+     * the scene you pressed next.
+     */
+    const { latestWriter, outputLevelParam, volumeNudge, volumeLabel, nudged } = await import(
+      '../mobile/src/lib/volume.js'
+    )
+
+    const level = { id: 3, name: 'Level', min: -80, max: 20, unit: 'dB', value: 0 }
+    assert.equal(outputLevelParam([{ name: 'Bypass' }, level])?.id, 3, 'the slider cannot find the level to drive')
+    assert.equal(outputLevelParam([{ name: 'Bypass' }]), null, 'a unit with no level gets a slider that can only disappoint')
+
+    /* A dB at a time on the buttons: "do a plus minus on the sides of the
+       volume slider that does 1 dB at a time". */
+    assert.equal(volumeNudge(level), 1)
+    assert.equal(nudged(-6.5, level, 1), -5.5)
+    /* A sign on anything that has one — from arm's length "6.5" and "-6.5" are
+       the same number. */
+    assert.equal(volumeLabel(-6.5, level), '−6.5 dB')
+    assert.equal(volumeLabel(2, level), '+2.0 dB')
+
+    /* Now the real thing: sixty values, one write out at a time, and the unit
+       ends on the value the thumb came off. */
+    const sent = []
+    let release
+    const gate = new Promise((r) => { release = r })
+    const writer = latestWriter((v) => {
+      sent.push(v)
+      return sent.length === 1 ? gate : Promise.resolve()
+    })
+    for (let i = 0; i < 60; i++) writer.send(i)
+    assert.deepEqual(sent, [0], 'a drag put more than one write on the wire at once')
+    release()
+    await writer.settled()
+    assert.equal(sent.length, 2, `a 60-value drag sent ${sent.length} writes instead of coalescing them`)
+    assert.equal(sent.at(-1), 59, 'the unit ends on a value the thumb has already left')
+
+    /* And mid-drag writes are NOT confirmed — a read-back per frame is the
+       same jam by another name — while the one you stop on is. */
+    const vol = read('mobile/src/components/Volume.js')
+    assert.match(vol, /latestWriter\(\(v\) => \{[\s\S]{0,200}?setParam\(eid, p\.id, v, p\)/, 'a drag confirms every value, which doubles the traffic it was written to avoid')
+    assert.match(vol, /await setParamConfirmed\(eid, p\.id, v, p\)/, 'the value the thumb stops on is never confirmed')
+
+    /* A speaker in the header, not a strip on the stage screen: "but it's not
+       there on the main screen". */
+    const stage = read('mobile/src/screens/Stage.js')
+    assert.match(stage, /showVolume \? '🔊 ✕' : '🔊'/, 'the volume is not behind a speaker button')
+    assert.match(stage, /\{showVolume \? \(/, 'the volume is on the stage screen all the time')
+  })
+
+  test('a setting that says it changed something has changed something', () => {
+    /*
+     * The rule this project learned from the play-mode switch: a switch that
+     * hides something already absent reports success and changes nothing.
+     *
+     * Tile size is the same shape of trap — it is easy to add the five buttons,
+     * save the choice, and never read it back. So this checks the stage screen
+     * actually draws from it.
+     */
+    const stage = read('mobile/src/screens/Stage.js')
+    assert.match(stage, /const size = SIZES\[loadSize\(sync\)\]/, 'the stage screen never reads the tile size')
+    assert.match(stage, /height=\{size\.tile\}/, 'the scene tiles ignore the size setting')
+    assert.match(stage, /flexBasis: across\(size\.scenes\)/, 'the scenes are a fixed number across whatever the setting says')
+    assert.match(stage, /flexBasis: across\(size\.fx\)/, 'the chain is a fixed number across whatever the setting says')
+
+    const settings = read('mobile/src/screens/Settings.js')
+    assert.match(settings, /saveSize\(i, sync\)/, 'the size buttons do not save anything')
+  })
+
+  test('the phone can rename a preset and its scenes, and says what that means', () => {
+    /*
+     * "Would also like to be able to rename presets and scenes in the app
+     * directly without having to ask the chat." The routes were wired on the
+     * phone and no screen called them.
+     *
+     * In Setup rather than on the stage screen, which is the browser's choice
+     * and the right one: renaming is bench work and the stage screen is the one
+     * a thumb crosses between songs.
+     */
+    const settings = read('mobile/src/screens/Settings.js')
+    const stage = read('mobile/src/screens/Stage.js')
+
+    assert.match(settings, /await setPresetName\(wanted\)/, 'the preset cannot be renamed from the phone')
+    assert.match(settings, /await setSceneName\(index, wanted\)/, 'a scene cannot be renamed from the phone')
+    assert.ok(!/setPresetName|setSceneName/.test(stage), 'renaming reached the stage screen, where a thumb crosses between songs')
+
+    /* And it says the thing that is true about every write this app makes.
+       Whitespace-flattened first: JSX wraps a sentence across lines, and a
+       check that breaks when a line reflows is a check nobody can edit around. */
+    assert.match(
+      settings.replace(/\s+/g, ' '),
+      /permanent when the preset is saved to a slot/,
+      'nothing says a new name is not permanent until the preset is saved'
+    )
+  })
+
+  test('the phone can say what a model really is, searched from either side', async () => {
+    /*
+     * "Add an info page like this to settings listing the real life equivalents
+     * of each amp and effects pedals."
+     *
+     * THE SEARCH HAS TO READ BOTH COLUMNS. The word somebody types is "tube
+     * screamer" — the real name, which appears nowhere in the unit's own "T808
+     * Mod". A search over the unit's names alone answers nothing for every
+     * query a person actually has, which is the whole reason the sheet exists.
+     */
+    const { searchAll, GEAR_TOTAL } = await import('../mobile/src/lib/gearCatalog.js')
+
+    assert.ok(GEAR_TOTAL > 300, `only ${GEAR_TOTAL} models are named; the catalog is not landing`)
+
+    const hits = searchAll('tube screamer').flatMap((g) => g.hits)
+    assert.ok(hits.length, 'searching the real name finds nothing, so the sheet answers no real question')
+    assert.ok(
+      hits.every((h) => !/tube screamer/i.test(h.name)),
+      'this only passes because the unit happens to use the real name; it proves nothing'
+    )
+
+    /* And searching the unit's own word still works. */
+    assert.ok(searchAll('Brit 800').flatMap((g) => g.hits).length, 'the unit’s own names no longer match')
+
+    /* The counts move with the search or the tabs mislead. */
+    const groups = searchAll('tube screamer')
+    assert.ok(groups.some((g) => g.hits.length === 0), 'every group matches everything; the search is not filtering')
+    assert.ok(groups.some((g) => g.hits.length > 0))
+  })
+
   test('every component the phone draws is one that exists', () => {
     /*
      * THE HOLE THIS FILLS, found the hard way.

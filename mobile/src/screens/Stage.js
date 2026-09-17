@@ -14,7 +14,8 @@ import {
   sourceLabel,
   stepTarget
 } from '../lib/lists'
-import { useStored } from '../lib/store'
+import { sync, useStored } from '../lib/store'
+import { SIZES, loadSize } from '../lib/gigSize'
 import {
   loadPreset,
   refreshAll,
@@ -35,12 +36,14 @@ import Note from '../components/Note'
 import Press from '../components/Press'
 import Tile from '../components/Tile'
 import Tuner from '../components/Tuner'
+import Volume from '../components/Volume'
 
 const face = Platform.select(mono)
 
 /* Hoisted: a selector rebuilt each render re-reads the store on every notify. */
 const ofPreset = (s) => s.preset
 const ofBlocks = (s) => s.blocks
+const ofAllBlocks = (s) => s.allBlocks
 const ofScene = (s) => s.sceneIndex
 const ofSceneNames = (s) => s.sceneNames
 const ofCaps = (s) => s.capabilities
@@ -71,6 +74,9 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
 
   const preset = useRig(ofPreset)
   const blocks = useRig(ofBlocks)
+  /* Everything, because the output block is one of the four the stage list
+     hides — and it is the one the volume lives on. */
+  const everything = useRig(ofAllBlocks)
   const scene = useRig(ofScene)
   const sceneNames = useRig(ofSceneNames)
   const caps = useRig(ofCaps)
@@ -120,6 +126,17 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
   const error = useRig(ofError)
 
   const [refreshing, setRefreshing] = useState(false)
+  /* Said under the slider rather than at the top of the screen, beside the
+     control that caused it. */
+  const [volumeError, setVolumeError] = useState(null)
+  /** Whether the volume is showing. Closed by default — see the speaker below. */
+  const [showVolume, setShowVolume] = useState(false)
+  /*
+   * How big the tiles are, chosen in Setup and kept under the browser's own
+   * key. Read here rather than passed down, because `useStored` above already
+   * re-renders this screen on every write to storage.
+   */
+  const size = SIZES[loadSize(sync)] || SIZES[1]
   /** Which block's channel picker is open, by effect id. */
   const [picking, setPicking] = useState(null)
 
@@ -244,6 +261,25 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
                 onPress={onOpenEdit}
               />
             ) : null}
+            {/*
+              The speaker, and what it opens is not on this screen until it is
+              asked for.
+
+              "Put a sound button that looks like a speaker in the header, and
+              when it's tapped you can slide the volume left or right or do the
+              plus minus thing that's already set up, but it's not there on the
+              main screen." The same trade the browser made: the control is
+              wanted twice in a night and was holding a strip of the stage open
+              for the rest of it.
+            */}
+            <Press
+              label={showVolume ? '🔊 ✕' : '🔊'}
+              height={36}
+              style={{ paddingHorizontal: space.md }}
+              accessibilityLabel={showVolume ? 'Close volume' : 'Volume'}
+              on={showVolume}
+              onPress={() => setShowVolume((v) => !v)}
+            />
             <Press
               label="Setup"
               height={36}
@@ -269,6 +305,13 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
           onPress={onOpenPresets}
           style={{ paddingHorizontal: space.lg }}
         />
+
+        {showVolume ? (
+          <>
+            <Volume blocks={everything} onError={setVolumeError} />
+            {volumeError ? <Note tone="fault">{volumeError}</Note> : null}
+          </>
+        ) : null}
 
         <View style={{ flexDirection: 'row', gap: space.sm }}>
           <Press grow label="‹ Prev" disabled={landing(-1) === null} onPress={() => step(-1)} />
@@ -315,11 +358,10 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
                   fill={hue.fill}
                   ink={hue.ink}
                   on={i === scene}
-                  height={TAP + 20}
+                  height={size.tile}
                   haptic={thud}
                   onPress={() => writeScene(i)}
-                  /* Two columns: half the width less half the gap. */
-                  style={{ flexGrow: 1, flexBasis: '47%' }}
+                  style={{ flexGrow: 1, flexBasis: across(size.scenes) }}
                 />
               )
             })}
@@ -379,14 +421,14 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
                 fill={hue.fill}
                 ink={hue.ink}
                 on={engaged}
-                height={TAP + 8}
+                height={Math.max(TAP, size.tile - 12)}
                 onPress={() => writeBypass(idOf(block), !block.bypassed)}
                 onLongPress={
                   channels?.length > 1
                     ? () => setPicking(picking === idOf(block) ? null : idOf(block))
                     : undefined
                 }
-                style={{ flexGrow: 1, flexBasis: '22%' }}
+                style={{ flexGrow: 1, flexBasis: across(size.fx) }}
               />
             )
           })}
@@ -494,6 +536,16 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
     </ScrollView>
   )
 }
+
+/**
+ * How wide a tile is when `n` of them share a row.
+ *
+ * A percentage rather than a measured width: the gap between tiles is real
+ * pixels and the row is however wide the phone is, so asking for exactly 100/n
+ * puts the last tile of every row on a line of its own. Two points of slack per
+ * tile is what leaves room for the gaps at every one of the five sizes.
+ */
+const across = (n) => `${Math.floor(100 / Math.max(1, n)) - 2}%`
 
 function Label({ children }) {
   return (
