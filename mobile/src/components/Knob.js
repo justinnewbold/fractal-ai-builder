@@ -64,20 +64,29 @@ export default function Knob({ param, value, onChange, onCommit, size = 64, labe
 
   const pan = useRef(
     PanResponder.create({
+      /*
+       * THE LOCK GOES ON HERE, IN THE CAPTURE PHASE, and that is the whole
+       * difference between a knob that turns and one that scrolls the page.
+       *
+       * Claiming the responder is not enough. On iOS the scroll view's pan
+       * gesture recogniser is NATIVE: it takes the touch back and terminates
+       * the drag rather than losing to a JavaScript responder. "The knobs just
+       * scroll the screen up and down when trying to change them."
+       *
+       * Capture runs on touch-down, from the root inward, before anything has
+       * been granted and before the scroll view has decided this is a scroll.
+       * Doing it in onPanResponderGrant is one hop later and one re-render
+       * closer to the first move — which is a race this does not need to be in.
+       */
+      onStartShouldSetPanResponderCapture: () => {
+        live.current.onScrollLock?.(true)
+        return true
+      },
       onStartShouldSetPanResponder: () => true,
-      onStartShouldSetPanResponderCapture: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
         origin.current = live.current.norm
         setDragging(true)
-        /*
-         * THE ONE THING THAT MAKES A KNOB TURN INSIDE A SCROLL VIEW. Claiming
-         * the responder is not enough: on iOS the scroll view's gesture
-         * recogniser is native, and it takes the touch and terminates the drag
-         * rather than losing to a JavaScript responder. "The knobs just scroll
-         * the screen up and down when trying to change them."
-         */
-        live.current.onScrollLock?.(true)
         tick()
       },
       onPanResponderMove: (_, gesture) => {

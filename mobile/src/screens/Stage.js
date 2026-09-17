@@ -138,15 +138,6 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
    */
   const [grid, setGrid] = useState(0)
   /*
-   * Whether a control is being held, and the screen therefore must not scroll.
-   *
-   * On iOS the scroll view's gesture recogniser is native and does not lose to
-   * a JavaScript responder — it takes the touch and terminates the drag. The
-   * only thing that reliably stops it is turning scrolling off while a control
-   * has the finger. See components/Volume.
-   */
-  const [held, setHeld] = useState(false)
-  /*
    * How big the tiles are, chosen in Setup and kept under the browser's own
    * key. Read here rather than passed down, because `useStored` above already
    * re-renders this screen on every write to storage.
@@ -220,7 +211,6 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
     <ScrollView
       style={{ flex: 1 }}
       contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxl }}
-      scrollEnabled={!held}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={color.silkDim} />
       }
@@ -321,13 +311,6 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
           onPress={onOpenPresets}
           style={{ paddingHorizontal: space.lg }}
         />
-
-        {showVolume ? (
-          <>
-            <Volume blocks={everything} onError={setVolumeError} onScrollLock={setHeld} />
-            {volumeError ? <Note tone="fault">{volumeError}</Note> : null}
-          </>
-        ) : null}
 
       </View>
 
@@ -578,11 +561,23 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
       </Text>
 
       {/*
-        The tuner covers the screen rather than sitting at the foot of it.
-        Drawn last and outside the foot because it is a modal now — see
-        components/Tuner. Closing it stops the tuner at the unit, which is the
-        same thing the button does.
+        The two things that cover the screen rather than sitting in it, drawn
+        last and outside the foot because both are modals.
+
+        The volume is one for a reason worth keeping: a slider inside a scroll
+        view loses its drag to the scroll view's native gesture, and a control
+        wanted twice a night is better taken out of that fight than armed for
+        it. See components/Volume.
       */}
+      <Volume
+        blocks={everything}
+        open={showVolume}
+        onClose={() => setShowVolume(false)}
+        onError={setVolumeError}
+      />
+      {volumeError ? <Note tone="fault">{volumeError}</Note> : null}
+
+      {/* Closing the tuner stops it at the unit, which is what the button does. */}
       <Tuner on={tunerOn} reading={tuning} onClose={() => writeTuner(false)} />
     </ScrollView>
   )
