@@ -1336,6 +1336,95 @@ export function run(test) {
     assert.match(read('mobile/src/screens/Settings.js'), /v\$\{APP_VERSION\}/, 'Setup does not show the version')
   })
 
+  test('a tap moves the number on the button, not just the unit', async () => {
+    /*
+     * "Tap tempo isn't changing (or it's extremely slow) on the phone screen,
+     * but it does update the unit."
+     *
+     * The tap worked. The phone then sat waiting to be TOLD the new tempo by a
+     * `tempo` event — and over the relay that event is not reliably carried,
+     * the same filtering that keeps the tuner's readings at the Mac. So the
+     * unit changed and the screen did not, until something else happened to
+     * cause a read.
+     *
+     * THE TAP AND THE READ-BACK MUST NOT BE FOLDED TOGETHER, which is why this
+     * is a delay and not an await. The unit works the tempo out from the
+     * SPACING between taps, so a tap held back by a debounce is a different
+     * rhythm; and reading mid-burst answers with the tempo of the taps before
+     * this one, putting a stale number on the button still under your thumb.
+     */
+    const { TAP_REREAD_MS } = await import('../mobile/src/lib/tempo.js')
+    const web = await import('../shared/tempo.mjs')
+
+    assert.equal(TAP_REREAD_MS, web.TAP_REREAD_MS, 'the two apps wait different lengths before reading the tempo back')
+    assert.ok(TAP_REREAD_MS >= 600 && TAP_REREAD_MS <= 2000, `${TAP_REREAD_MS}ms is outside a tap burst`)
+
+    const rig = read('mobile/src/lib/rig.js')
+    const tap = rig.slice(rig.indexOf('export async function tapTempo'), rig.indexOf('export function writeTempo'))
+    assert.ok(tap.length > 100, 'tapTempo moved; this check reads it')
+
+    assert.match(tap, /clearTimeout\(reread\)/, 'each tap does not cancel the read-back the one before it scheduled')
+    assert.match(tap, /setTimeout\(\(\) => refreshTempo\(\), TAP_REREAD_MS\)/, 'the tempo is never read back after a tap')
+    assert.ok(
+      !/await refreshTempo\(\)/.test(tap),
+      'the read-back is awaited inside the tap, which makes the tap itself late and the rhythm wrong'
+    )
+
+    /* Both apps do it the same way. */
+    assert.match(read('src/components/Gig.jsx'), /setTimeout\(\(\) => refreshTempo\(\), TAP_REREAD_MS\)/)
+  })
+
+  test('the phone keeps a log of what went wrong, and can hand it over', async () => {
+    /*
+     * "I need a debug log with a copy log button so I can paste the log for you
+     * to debug."
+     *
+     * A browser has a console somebody can open. A phone on a dark stage has
+     * nowhere at all for a failure to go, so every bad evening was
+     * unreconstructable: the screen shows the latest state and nothing about
+     * the sequence that produced it. "It kept dropping" cannot be answered from
+     * a screen that says "Connected".
+     */
+    const { logDebug, getDebugLog, clearDebugLog, formatDebugLog } = await import(
+      '../mobile/src/lib/debugLog.js'
+    )
+
+    clearDebugLog()
+    logDebug('wire', 'GET /preset/blocks failed', 'Your Mac didn’t answer.')
+    logDebug('link', 'connected → no-answer')
+    const lines = getDebugLog()
+    assert.equal(lines.length, 2, 'the log does not keep what it is told')
+    assert.equal(lines[0].message, 'GET /preset/blocks failed', 'the log is newest-first; a story reads in order')
+
+    /* The copy carries a header, because the first three questions about any
+       report are which build, which unit and which end of the link — and none
+       of them can be read off the lines. */
+    const text = formatDebugLog({ app: 'Fractal Remote (phone) v9.9.9', unit: 'FM3', link: 'no-answer' })
+    assert.match(text, /app: Fractal Remote \(phone\) v9\.9\.9/)
+    assert.match(text, /unit: FM3/)
+    assert.match(text, /GET \/preset\/blocks failed/)
+    clearDebugLog()
+
+    /* It is written at the choke points every trip passes through, rather than
+       sprinkled: one place for the wire, one for the link. */
+    const relay = read('mobile/src/lib/relay.js')
+    assert.match(relay, /logDebug\('wire', `\$\{method\} \$\{path\} failed`/, 'a failed request is not logged')
+    assert.match(relay, /logDebug\('wire', `\$\{method\} \$\{path\} refused here`/, 'a refusal by this app is not logged')
+    assert.match(read('mobile/src/lib/link.js'), /logDebug\('link', `\$\{was\} → \$\{next\.link\}`/, 'the link changing its mind is not logged')
+
+    /*
+     * And bodies stay out of it. This gets pasted into a chat: a preset dump is
+     * neither readable nor anybody else's business.
+     */
+    assert.ok(!/logDebug\([^)]*options\.body/.test(relay), 'request bodies are being written into a log meant for pasting')
+
+    /* The screen that hands it over. */
+    const log = read('mobile/src/screens/Log.js')
+    assert.match(log, /Clipboard\.setStringAsync\(text\)/, 'there is no way to get the log off the phone')
+    assert.match(log, /label="Copy the log"/)
+    assert.match(read('mobile/src/screens/Settings.js'), /title="Help & fixes"/, 'Setup has no way into the log')
+  })
+
   test('every component the phone draws is one that exists', () => {
     /*
      * THE HOLE THIS FILLS, found the hard way.

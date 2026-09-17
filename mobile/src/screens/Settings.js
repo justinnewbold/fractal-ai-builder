@@ -3,6 +3,7 @@ import { Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-na
 
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
 import { APP_VERSION } from '../lib/version'
+import { getDebugLog } from '../lib/debugLog'
 import { tick } from '../lib/feedback'
 import {
   changePassword,
@@ -45,7 +46,8 @@ export default function Settings({
   onBack,
   onReconnect,
   onSignOut,
-  onOpenGear
+  onOpenGear,
+  onOpenLog
 }) {
   const deviceName = useRig(ofDeviceName)
   const [account, setAccount] = useState(null)
@@ -143,6 +145,13 @@ export default function Settings({
                 title="Amp & pedal names"
                 status="What each model on your unit really is"
                 onPress={onOpenGear}
+              />
+            ) : null}
+            {onOpenLog ? (
+              <SetupRow
+                title="Help & fixes"
+                status={`${getDebugLog().length} line${getDebugLog().length === 1 ? '' : 's'} in the log`}
+                onPress={onOpenLog}
               />
             ) : null}
             <SetupRow title="About" status={`v${APP_VERSION}`} onPress={() => setPage('about')} />

@@ -18,6 +18,7 @@ import { useSyncExternalStore } from 'react'
 
 import * as device from './device'
 import { idOf, sameBlock } from './unit.mjs'
+import { TAP_REREAD_MS } from './tempo'
 import { DEFAULT_SLUG, deviceSlug } from './device-slug'
 import { forget as forgetNames } from './presetNames'
 import { forget as forgetControls } from './paramIndex'
@@ -344,14 +345,37 @@ export function writeChannel(id, channel) {
  * unit works out the BPM from the spacing. The number on screen follows what
  * the unit reports rather than anything this app computed.
  */
+/**
+ * One tap, and the number that follows it.
+ *
+ * THE TAP GOES NOW; THE READ-BACK WAITS FOR THE BURST TO END. The unit works
+ * the tempo out from the SPACING between taps, so a tap held back by a debounce
+ * is a different rhythm, not a late one. And the figure can only be read once
+ * tapping has stopped — reading mid-burst answers with the tempo of the taps
+ * before this one and puts a stale number on the button still under your thumb.
+ *
+ * WHY THE PHONE NEEDS THIS AND THE BROWSER GOT AWAY WITHOUT IT FOR LONGER.
+ * There is a `tempo` event, and the phone was relying on it entirely: tap, and
+ * wait to be told. Over the relay that event is not reliably carried — the same
+ * filtering that keeps the tuner's readings at the Mac — so the unit's tempo
+ * changed and the screen did not. "Tap tempo isn't changing on the phone screen,
+ * but it does update the unit."
+ *
+ * The event still works where it arrives; this just stops the screen depending
+ * on it. The delay is shared with the browser so the two cannot drift.
+ */
+let reread = null
+
 export async function tapTempo() {
+  clearTimeout(reread)
   try {
     await device.tapTempo()
-    return true
   } catch (err) {
     set({ error: err.message })
     return false
   }
+  reread = setTimeout(() => refreshTempo(), TAP_REREAD_MS)
+  return true
 }
 
 export function writeTempo(bpm) {

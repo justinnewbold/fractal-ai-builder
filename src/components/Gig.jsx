@@ -12,6 +12,7 @@ import {
   tapBeat,
   refreshTempo
 } from '../lib/deviceState'
+import { TAP_REREAD_MS } from '../../shared/tempo.mjs'
 import { remoteActive } from '../lib/remote'
 import { EXCLUDED_BLOCKS } from '../lib/guardrails'
 import { blockColor } from '../lib/blockColors'
@@ -415,7 +416,7 @@ export default function Gig({
       onError(err.message)
       return
     }
-    reread.current = setTimeout(() => refreshTempo(), 900)
+    reread.current = setTimeout(() => refreshTempo(), TAP_REREAD_MS)
   }
 
   /* A pending read on a screen that has gone is a write into nothing. */

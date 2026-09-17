@@ -206,6 +206,20 @@ export const FILES = [
    */
   { source: '../src/lib/gigSize.js', target: '../mobile/src/lib/gigSize.js' },
   /*
+   * One log for everything, in the order it happened.
+   *
+   * "Make a unified debug log with a copy log button to send back to you for
+   * debugging." The phone needs it MORE than the browser does and had none at
+   * all: a browser has a console somebody can open, and a phone on a stage has
+   * nowhere for a failure to go. Every bad evening was unreconstructable.
+   *
+   * Shared so the two logs read the same, because the whole point of the copy
+   * button is that what gets pasted back is a format somebody already knows how
+   * to read. No imports at all in it — the crash capture is guarded on
+   * `addEventListener` and simply does nothing where there is no window.
+   */
+  { source: '../src/lib/debugLog.js', target: '../mobile/src/lib/debugLog.js' },
+  /*
    * What this build of the phone app is.
    *
    * Not a copy but a rendering: the repository's version, made into a module the
