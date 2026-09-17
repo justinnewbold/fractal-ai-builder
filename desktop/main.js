@@ -96,6 +96,8 @@ async function start() {
     publish,
     readFirewall,
     serverEnv,
+    tellPhones,
+    TELL_PHONES_MS,
     waitForServer,
     whoHasPort,
     PORT_TAKEN
@@ -206,12 +208,19 @@ async function start() {
    * Not awaited: the window and tray should not wait on the account service,
    * and the line in the menu updates when the answer lands.
    */
-  armHost({ port, version: app.getVersion() })
+  const phoneLog = (line) => console.error('[phone]', line)
+  armHost({ port, version: app.getVersion(), log: phoneLog })
     .then((result) => {
       phone = result
       if (tray) buildTray()
     })
     .catch(() => {})
+  /*
+   * And again every few minutes, for the phone's "which app is on the
+   * computer" line: a write that failed once at launch used to leave an older
+   * launcher's answer standing for good. See tellPhones.
+   */
+  setInterval(() => tellPhones({ port, version: app.getVersion(), log: phoneLog }), TELL_PHONES_MS)
 
   /*
    * The address in the menu works here and fails from a phone when macOS has
@@ -346,7 +355,7 @@ function buildTray() {
   const phoneLine = !phone
     ? 'Phone remote: starting…'
     : phone.on
-      ? `Phone remote: on${phone.email ? ` — ${phone.email}` : ''}`
+      ? `Phone remote: on${phone.email ? ` — ${phone.email}` : ''} · this app is v${app.getVersion()}`
       : phone.reason === 'signed-out'
         ? 'Phone remote: off — open the app and sign in once'
         : phone.reason === 'turned-off'

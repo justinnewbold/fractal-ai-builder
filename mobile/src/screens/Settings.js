@@ -92,8 +92,9 @@ export default function Settings({
    */
   /*
    * Behind, or too old to say — which for this purpose is the same answer.
-   * The version only started being sent in 7.192.0, so a computer that says
-   * nothing is one from before that.
+   * The version only started being sent in 7.205.0, so a computer that says
+   * nothing is one from before that — or one whose app could not write it,
+   * which the Mac app now retries every few minutes.
    */
   const demo = useDemo()
   const behind = !hostVersion || isOlder(hostVersion, APP_VERSION) === true
@@ -250,7 +251,7 @@ export default function Settings({
               <Text style={{ color: color.silkDim, fontSize: font.small }}>
                 {hostVersion
                   ? `The app on the computer is v${hostVersion}. This phone is v${APP_VERSION}.`
-                  : `The computer didn’t say which version it is running, which means it is older than 7.192.0. This phone is v${APP_VERSION}.`}
+                  : `The computer didn’t say which version it is running: its app is older than 7.205.0, or it could not write its name for the phone. This phone is v${APP_VERSION}.`}
               </Text>
             ) : null}
 

@@ -2174,7 +2174,28 @@ test('the computer app says which version it is, where the phone already looks',
     'the version did not reach the host doc'
   )
   const main = readSrc(new URL('../desktop/main.js', import.meta.url), 'utf8')
-  assert.match(main, /armHost\(\{ port, version: app\.getVersion\(\) \}\)/, 'the computer app does not say which version it is')
+  assert.match(main, /armHost\(\{ port, version: app\.getVersion\(\), log: phoneLog \}\)/, 'the computer app does not say which version it is, or says nothing when it cannot')
+  /*
+   * AND AGAIN EVERY FEW MINUTES. "The app on the computer is running the
+   * latest version, so I'm not sure why it's saying this." A write that failed
+   * once at launch, quietly, left an older launcher's name standing — without
+   * a version — for good. Now it is written again on a timer, a failure is
+   * said, and the menu says which version the phones are told.
+   */
+  assert.match(main, /setInterval\(\(\) => tellPhones\(\{ port, version: app\.getVersion\(\), log: phoneLog \}\), TELL_PHONES_MS\)/, 'the name and version are written once and never again')
+  assert.match(main, /this app is v\$\{app\.getVersion\(\)\}/, 'the menu does not say which version the phones are told')
+  assert.equal(host.TELL_PHONES_MS, 5 * 60 * 1000)
+  /* A failed write is said, not swallowed. */
+  const lines = []
+  const refusing = { fetch: async () => ({ ok: false, status: 400, json: async () => ({}) }) }
+  assert.equal(await host.tellPhones({ port: 5056, fetch: refusing.fetch, hostname: 'Studio computer', version: '7.281.0', log: (l) => lines.push(l) }), false)
+  assert.match(lines[0], /couldn't tell the phones this is Studio computer, v7\.281\.0 \(HTTP 400\)/)
+  const dead = { fetch: async () => { throw new Error('ECONNREFUSED') } }
+  assert.equal(await host.tellPhones({ port: 5056, fetch: dead.fetch, hostname: 'Studio computer', log: (l) => lines.push(l) }), false)
+  assert.match(lines[1], /couldn't tell the phones this is Studio computer \(ECONNREFUSED\)/)
+  const fine = fakeForgeFX()
+  assert.equal(await host.tellPhones({ port: 5056, fetch: fine.fetch, hostname: 'Studio computer', version: '7.281.0' }), true)
+  assert.deepEqual(fine.calls, ['PUT /store/config/host.name {"data":{"name":"Studio computer","version":"7.281.0"},"origin":"fractal"}'])
   const link = readSrc(new URL('../src/lib/link.js', import.meta.url), 'utf8')
   assert.match(link, /macVersion: doc\.version \? String\(doc\.version\) : null/, 'the phone does not read the version back')
   const report = readSrc(new URL('../src/components/DebugLog.jsx', import.meta.url), 'utf8')

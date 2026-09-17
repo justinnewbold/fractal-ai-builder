@@ -2597,7 +2597,7 @@ export function run(test) {
      * that affect how the app performs?"
      *
      * A fair question with an answer nobody could reach. The computer has been
-     * writing its version into `host.name` beside its own name since 7.192.0 —
+     * writing its version into `host.name` beside its own name since 7.205.0 —
      * and this end read the name and threw the version away. So neither the
      * Setup screen nor a pasted log could say which version was at the other
      * end of a slow evening.
@@ -2617,7 +2617,7 @@ export function run(test) {
     /* In the log, because that is the copy that reaches a chat. */
     assert.match(
       read('mobile/src/screens/Log.js').replace(/\s+/g, ' '),
-      /'computer app': link\.hostVersion \|\| 'did not say \(older than 7\.192\.0\)'/,
+      /'computer app': link\.hostVersion \|\| 'did not say \(older than 7\.205\.0, or could not write it\)'/,
       'a pasted log still cannot say what the computer is running'
     )
 

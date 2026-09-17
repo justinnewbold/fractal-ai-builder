@@ -106,7 +106,7 @@ export default function Log({ onBack }) {
        * to the latest version?" A computer too old to say so is itself the
        * answer, so that case is named rather than left blank.
        */
-      'computer app': link.hostVersion || 'did not say (older than 7.192.0)',
+      'computer app': link.hostVersion || 'did not say (older than 7.205.0, or could not write it)',
       link: link.link
     },
     /*
