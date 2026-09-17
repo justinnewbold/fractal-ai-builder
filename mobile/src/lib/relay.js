@@ -84,6 +84,13 @@ function supabase() {
   if (!client) {
     client = createClient(DEFAULT_PROJECT.url, DEFAULT_PROJECT.anonKey, {
       global: { fetch: notForever },
+      /*
+       * A socket that died quietly — the phone stepped from wifi to cellular,
+       * the screen locked — is only found out by a missed heartbeat, and the
+       * default is one every twenty-five seconds. Ten, so a dead link is
+       * noticed inside twenty seconds rather than fifty.
+       */
+      realtime: { heartbeatIntervalMs: HEARTBEAT_MS },
       auth: {
         storage: AsyncStorage,
         persistSession: true,
@@ -287,6 +294,9 @@ export function canReuseChannel(chan, sess, c) {
   return !!chan && !!c && sess?.client === c && isJoined(chan)
 }
 
+/** How often the relay socket proves it is alive. See supabase(). */
+export const HEARTBEAT_MS = 10000
+
 export async function remoteConnect() {
   if (!userId) await restoreSession()
   if (!userId) throw new Error('Sign in first.')
@@ -414,6 +424,16 @@ async function joinChannel() {
     // Leave nothing registered on the way out, or the next attempt inherits it.
     if (session?.chan === chan) session = null
     await c.removeChannel(chan).catch(() => {})
+    /*
+     * AND THE SOCKET GOES TOO. A join that failed was handing the next attempt
+     * the same socket, and a socket that has quietly died — the phone moved
+     * from wifi to cellular, or was locked — stays dead until a heartbeat
+     * finds it out. Every attempt in between waited its twelve seconds on it
+     * and backed off: one log has the link "joining" for two and a half
+     * minutes, another for six. Closed here, the next subscribe opens a fresh
+     * socket, which is the one thing a dead one cannot become.
+     */
+    await c.realtime?.disconnect?.().catch?.(() => {})
     throw err
   })
 
