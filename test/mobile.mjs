@@ -3379,7 +3379,7 @@ export function run(test) {
     assert.match(editor, /<Press grow label="Remove" sub="Delete this block"/, 'the card has no Remove')
     assert.doesNotMatch(editor, /label="Move"|label="Take out"/, 'the old Move and Take out are still there')
     assert.match(editor, /<Grip label=\{`Drag \$\{block\.name\}`\}/, 'there is no grip to drag a card by')
-    assert.match(editor, /onPanResponderTerminationRequest: \(\) => false/, 'the grip hands the touch back to the page')
+    assert.match(read('mobile/src/components/Grip.js'), /onPanResponderTerminationRequest: \(\) => false/, 'the grip hands the touch back to the page')
     assert.match(editor, /const dragStart = \(row, index\) => \{ onScrollLock\?\.\(true\)/, 'the page can scroll under a drag')
     assert.match(editor, /<ChainEditor blocks=\{blocks\} caps=\{caps\} onError=\{setError\} onScrollLock=\{setHeld\} \/>/, 'the chain editor is not wired to the scroll lock')
     assert.match(editor, /const free = \(lane\.gaps \|\| \[\]\)\.filter\(\(c\) => c > col\)/, 'Add does not put the new block after the card it was pressed on')
@@ -3475,8 +3475,29 @@ export function run(test) {
      */
     const flat = read('mobile/src/screens/Setlists.js').replace(/\s+/g, ' ')
     assert.match(flat, /alone=\{chosen\.presets\.length === 1\} onPlay=\{\(\) => loadPreset\(n\)\}/, 'a song row does not load its preset')
-    assert.match(flat, /\{alone \? null : \( <> <Nudge label=\{`Move \$\{name\} up`\}/, 'a lone song still shows arrows that cannot move it')
+    assert.match(flat, /\{alone \? null : \( <Grip label=\{`Drag \$\{name\}`\}/, 'a lone song still shows a grip that cannot move it')
     assert.match(flat, /`\$\{slot\} · tap to play`/, 'nothing says the song can be tapped')
+  })
+
+  test('a setlist is rearranged by dragging, the way the chain is', () => {
+    /*
+     * "Let's make the set lists drag to rearrange as well, like it is on the
+     * chain editor, instead of the up-down arrows." The same grip, the same
+     * landing arithmetic, and the same two rules that keep a drag off the
+     * page: the grip claims the touch and the page stops scrolling.
+     */
+    const flat = read('mobile/src/screens/Setlists.js').replace(/\s+/g, ' ')
+    assert.match(flat, /import Grip from '\.\.\/components\/Grip'/, 'the setlist does not use the shared grip')
+    assert.match(flat, /import \{ landingIndex \} from '\.\.\/lib\/laneOrder'/, 'the setlist decides where a drag lands its own way')
+    assert.match(flat, /scrollEnabled=\{!held\}/, 'the page still scrolls under a dragged song')
+    assert.match(flat, /to: landingIndex\(rowHeights\.current, i, dy, space\.sm\)/, 'the landing row is not measured')
+    assert.match(flat, /if \(to !== i\) setPresets\(moveIn\(chosen\.presets, i, to\)\)/, 'a drop does not reorder the setlist')
+    assert.ok(!/▲|▼/.test(flat), 'the arrows are still there')
+    /* The chain editor and the setlist share one grip. */
+    const grip = read('mobile/src/components/Grip.js').replace(/\s+/g, ' ')
+    assert.match(grip, /onPanResponderTerminationRequest: \(\) => false/, 'the shared grip hands the touch back')
+    assert.match(grip, /onStartShouldSetPanResponderCapture: \(\) => !live\.current\.disabled/, 'the shared grip does not claim the touch on landing')
+    assert.match(read('mobile/src/screens/Edit.js'), /import Grip from '\.\.\/components\/Grip'/, 'the chain editor has its own grip')
   })
 
   test('a model called Null is explained where it is shown', () => {

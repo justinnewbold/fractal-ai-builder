@@ -24,7 +24,9 @@ import { useStored } from '../lib/store'
 import { loadPreset, useRig } from '../lib/rig'
 import { tick } from '../lib/feedback'
 import Note from '../components/Note'
+import Grip from '../components/Grip'
 import Press from '../components/Press'
+import { landingIndex } from '../lib/laneOrder'
 
 /** How many presets "Add another" shows at a time. */
 const ADD_PAGE = 40
@@ -214,6 +216,38 @@ export default function Setlists({ onBack }) {
    * visible and undoable: how many are hidden, and a button for the next
    * forty. Typing narrows the whole list, not the page.
    */
+  /*
+   * A song being dragged: which row, how far the finger has gone, and where
+   * that lands it. Row heights are measured, and the page is locked against
+   * scrolling for as long as the grip is held — the chain editor's rules.
+   */
+  const [drag, setDrag] = useState(null)
+  const [held, setHeld] = useState(false)
+  const rowHeights = useRef([])
+  const dragStart = (i) => {
+    setHeld(true)
+    setDrag({ index: i, dy: 0, to: i })
+  }
+  const dragMove = (i, dy) => {
+    setDrag({ index: i, dy, to: landingIndex(rowHeights.current, i, dy, space.sm) })
+  }
+  const dragEnd = (i) => {
+    setHeld(false)
+    const to = drag?.to ?? i
+    setDrag(null)
+    if (to !== i) setPresets(moveIn(chosen.presets, i, to))
+  }
+  /* Where each row is drawn mid-drag: the lifted one under the finger, the
+     ones it has passed stepped out of its way. */
+  const shiftFor = (i) => {
+    if (!drag) return 0
+    if (i === drag.index) return drag.dy
+    const h = (rowHeights.current[drag.index] || 0) + space.sm
+    if (drag.to > drag.index && i > drag.index && i <= drag.to) return -h
+    if (drag.to < drag.index && i >= drag.to && i < drag.index) return h
+    return 0
+  }
+
   const q = needle.trim().toLowerCase()
   const [pages, setPages] = useState(1)
   useEffect(() => setPages(1), [q, adding])
@@ -247,6 +281,7 @@ export default function Setlists({ onBack }) {
         style={{ flex: 1 }}
         contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxl }}
         keyboardShouldPersistTaps="handled"
+        scrollEnabled={!held}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
           <View style={{ flexShrink: 1 }}>
@@ -327,20 +362,31 @@ export default function Setlists({ onBack }) {
 
             {chosen.presets.length ? (
               chosen.presets.map((n, i) => (
-                <Song
+                <View
                   key={n}
-                  position={i + 1}
-                  slot={slotLabel(n, addressing)}
-                  name={nameOfSlot(n) || 'Unnamed'}
-                  playing={n === current}
-                  first={i === 0}
-                  last={i === chosen.presets.length - 1}
-                  alone={chosen.presets.length === 1}
-                  onPlay={() => loadPreset(n)}
-                  onUp={() => setPresets(moveIn(chosen.presets, i, i - 1))}
-                  onDown={() => setPresets(moveIn(chosen.presets, i, i + 1))}
-                  onRemove={() => setPresets(removeFrom(chosen.presets, n))}
-                />
+                  onLayout={(e) => {
+                    rowHeights.current[i] = e.nativeEvent.layout.height
+                  }}
+                  style={{
+                    transform: [{ translateY: shiftFor(i) }],
+                    zIndex: drag && i === drag.index ? 2 : 0,
+                    opacity: drag && i === drag.index ? 0.92 : 1
+                  }}
+                >
+                  <Song
+                    position={i + 1}
+                    slot={slotLabel(n, addressing)}
+                    name={nameOfSlot(n) || 'Unnamed'}
+                    playing={n === current}
+                    lifted={!!drag && i === drag.index}
+                    alone={chosen.presets.length === 1}
+                    onPlay={() => loadPreset(n)}
+                    onDragStart={() => dragStart(i)}
+                    onDragMove={(dy) => dragMove(i, dy)}
+                    onDragEnd={() => dragEnd(i)}
+                    onRemove={() => setPresets(removeFrom(chosen.presets, n))}
+                  />
+                </View>
               ))
             ) : (
               <Note>No songs yet. Next goes to the first song, and after the last one it starts over.</Note>
@@ -500,12 +546,13 @@ function SourceRow({ on, onPress, name, note, editing = null }) {
 /**
  * One song in the running order.
  *
- * Up, down and remove as three separate targets rather than a drag: dragging a
- * row on a phone with a thumb, between songs, is a gesture that goes wrong
- * quietly. Three buttons go wrong loudly and are undone by pressing the other
- * one.
+ * Dragged by a grip, the way a block is in the chain editor: "Let's make the
+ * set lists drag to rearrange as well, like it is on the chain editor,
+ * instead of the up-down arrows." The grip claims the touch and the page
+ * stops scrolling while it is held, so a thumb between songs moves the song
+ * and nothing else. Remove stays a button of its own.
  */
-function Song({ position, slot, name, playing, first, last, alone, onPlay, onUp, onDown, onRemove }) {
+function Song({ position, slot, name, playing, alone, lifted, onPlay, onDragStart, onDragMove, onDragEnd, onRemove }) {
   return (
     <View
       style={{
@@ -515,9 +562,9 @@ function Song({ position, slot, name, playing, first, last, alone, onPlay, onUp,
         paddingHorizontal: space.sm,
         paddingVertical: space.sm,
         borderRadius: radius.md,
-        borderWidth: playing ? 2 : 1,
-        borderColor: playing ? color.signal : color.rule,
-        backgroundColor: color.panel
+        borderWidth: playing || lifted ? 2 : 1,
+        borderColor: lifted ? color.silk : playing ? color.signal : color.rule,
+        backgroundColor: lifted ? color.panelHi : color.panel
       }}
     >
       {/*
@@ -548,13 +595,16 @@ function Song({ position, slot, name, playing, first, last, alone, onPlay, onUp,
           </Text>
         </View>
       </Pressable>
-      {/* One song has nowhere to move: no arrows, rather than two greyed ones
-          that read as broken. "The little arrows to go up and down don't work." */}
+      {/* One song has nowhere to move: no grip, rather than one that does
+          nothing. "The little arrows to go up and down don't work." */}
       {alone ? null : (
-        <>
-          <Nudge label={`Move ${name} up`} glyph="▲" disabled={first} onPress={onUp} />
-          <Nudge label={`Move ${name} down`} glyph="▼" disabled={last} onPress={onDown} />
-        </>
+        <Grip
+          label={`Drag ${name}`}
+          hint="Hold and drag up or down to move it in the running order"
+          onStart={onDragStart}
+          onMove={onDragMove}
+          onEnd={onDragEnd}
+        />
       )}
       <Nudge label={`Remove ${name}`} glyph="✕" onPress={onRemove} />
     </View>
