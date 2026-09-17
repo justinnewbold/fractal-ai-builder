@@ -226,7 +226,9 @@ export default function Presets({ onBack }) {
       {hunting ? (
         <View style={{ paddingHorizontal: space.lg, paddingBottom: space.sm }}>
           <Text style={{ color: color.silkDim, fontSize: font.micro }}>
-            Searching the {namedSlots().length} names read so far. Scroll the full list to read more.
+            {knownCount() >= slots
+              ? `Searching all ${slots} names.`
+              : `Searching the ${namedSlots().length} names known so far. Tap Refresh to get the rest from the computer.`}
           </Text>
         </View>
       ) : null}
@@ -299,7 +301,11 @@ export default function Presets({ onBack }) {
         }}
         ListEmptyComponent={
           slots ? (
-            <Note>Nothing matches that.</Note>
+            <Note>
+              {knownCount() >= slots
+                ? 'Nothing matches that.'
+                : 'Nothing matches that among the names known so far. Tap Refresh to get the rest from the computer.'}
+            </Note>
           ) : (
             <View style={{ alignItems: 'center', paddingVertical: space.xl }}>
               <ActivityIndicator color={color.silkDim} />
