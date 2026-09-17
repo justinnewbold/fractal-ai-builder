@@ -138,6 +138,15 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
    */
   const [grid, setGrid] = useState(0)
   /*
+   * Whether a control is being held, and the screen therefore must not scroll.
+   *
+   * On iOS the scroll view's gesture recogniser is native and does not lose to
+   * a JavaScript responder — it takes the touch and terminates the drag. The
+   * only thing that reliably stops it is turning scrolling off while a control
+   * has the finger. See components/Volume.
+   */
+  const [held, setHeld] = useState(false)
+  /*
    * How big the tiles are, chosen in Setup and kept under the browser's own
    * key. Read here rather than passed down, because `useStored` above already
    * re-renders this screen on every write to storage.
@@ -211,6 +220,7 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
     <ScrollView
       style={{ flex: 1 }}
       contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxl }}
+      scrollEnabled={!held}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={color.silkDim} />
       }
@@ -314,7 +324,7 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
 
         {showVolume ? (
           <>
-            <Volume blocks={everything} onError={setVolumeError} />
+            <Volume blocks={everything} onError={setVolumeError} onScrollLock={setHeld} />
             {volumeError ? <Note tone="fault">{volumeError}</Note> : null}
           </>
         ) : null}

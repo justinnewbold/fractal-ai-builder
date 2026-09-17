@@ -1425,6 +1425,74 @@ export function run(test) {
     assert.match(read('mobile/src/screens/Settings.js'), /title="Help & fixes"/, 'Setup has no way into the log')
   })
 
+  test('the first release ships without the bench, and every door to it obeys that', async () => {
+    /*
+     * "Just remove edit for now and mark it as something we will work on in a
+     * later update."
+     *
+     * And it is the brief read properly: "for the initial releases I only want
+     * to release the stuff related to the live gig pedal board." The bench is
+     * not the pedalboard.
+     *
+     * The promise is the same one the AI switch makes and is worth checking the
+     * same way: not that the code is gone — it is still in the bundle and still
+     * tested — but that NOTHING IN THE APP CAN REACH IT. A build that ships
+     * with the switch flipped, or a new way onto that screen added later
+     * without one, looks identical from the outside until somebody taps it.
+     */
+    const { BENCH } = await import('../mobile/src/lib/features.js')
+    assert.equal(BENCH, false, 'the first store release must ship without the bench')
+
+    const app = read('mobile/App.js')
+    assert.match(app, /BENCH && screen === 'edit'/, 'the edit screen can be routed to with the bench off')
+    assert.match(app, /BENCH && link\.link === 'connected'/, 'the stage screen is handed an Edit button with the bench off')
+
+    /* The button is absent rather than disabled: App hands down no handler, so
+       the row closes up instead of keeping something dead in it. */
+    assert.match(read('mobile/src/screens/Stage.js'), /\{onOpenEdit \? \(/, 'the Edit button is drawn whether or not there is anywhere to go')
+  })
+
+  test('a control keeps the finger the scroll view would otherwise take', () => {
+    /*
+     * "The knobs just scroll the screen up and down when trying to change them."
+     *
+     * WHY CLAIMING THE RESPONDER IS NOT ENOUGH, which is the thing to know
+     * before touching any of this again. A knob turns on a vertical drag and it
+     * lives on a screen that scrolls vertically. The JS responder system grants
+     * the knob the touch — and then iOS's scroll view, whose pan gesture
+     * recogniser is NATIVE, takes it anyway and terminates the drag. The
+     * symptom is the screen moving and the control not.
+     *
+     * The only thing that reliably stops it is turning scrolling off for as
+     * long as a control is held.
+     *
+     * The bench is behind a switch for this release, but the volume slider is
+     * not, and it has exactly the same shape — so this is checked on both.
+     */
+    const knob = read('mobile/src/components/Knob.js')
+    const volume = read('mobile/src/components/Volume.js')
+    const stage = read('mobile/src/screens/Stage.js')
+    const edit = read('mobile/src/screens/Edit.js')
+
+    for (const [name, text] of [['Knob', knob], ['Volume', volume]]) {
+      assert.match(text, /live\.current\.onScrollLock\?\.\(true\)/, `${name} never stops the screen scrolling under the drag`)
+      assert.equal(
+        (text.match(/live\.current\.onScrollLock\?\.\(false\)/g) || []).length,
+        2,
+        `${name} does not release the screen on both the end and the termination of a drag`
+      )
+      /* A screen left locked by a drag that never released will not scroll
+         again — worse than the bug being fixed. */
+      assert.match(text, /useEffect\(\(\) => \(\) => onScrollLock\?\.\(false\), \[onScrollLock\]\)/, `${name} can leave the screen stuck`)
+    }
+
+    /* And the screens actually honour it. */
+    assert.match(stage, /scrollEnabled=\{!held\}/, 'the stage screen scrolls while the volume is being dragged')
+    assert.match(stage, /onScrollLock=\{setHeld\}/, 'the volume slider is not wired to the lock')
+    assert.match(edit, /scrollEnabled=\{!held\}/, 'the bench will scroll under its knobs when it comes back')
+    assert.match(edit, /onScrollLock=\{onScrollLock\}/, 'the bench knobs are not wired to the lock')
+  })
+
   test('every component the phone draws is one that exists', () => {
     /*
      * THE HOLE THIS FILLS, found the hard way.

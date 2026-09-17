@@ -46,15 +46,18 @@ const ROTOR = [{ name: 'increment' }, { name: 'decrement' }]
  * `live` holds the current props for the responder, which is created once. Not
  * a micro-optimisation — a responder rebuilt mid-drag is a drag that stops.
  */
-export default function Knob({ param, value, onChange, onCommit, size = 64, label }) {
+export default function Knob({ param, value, onChange, onCommit, size = 64, label, onScrollLock }) {
   const [dragging, setDragging] = useState(false)
 
   const norm = clamp01(toNormalized(value, param) ?? 0)
 
-  const live = useRef({ norm, param, onChange, onCommit })
+  const live = useRef({ norm, param, onChange, onCommit, onScrollLock })
   useEffect(() => {
-    live.current = { norm, param, onChange, onCommit }
+    live.current = { norm, param, onChange, onCommit, onScrollLock }
   })
+
+  /* A screen left locked by a drag that never released will not scroll again. */
+  useEffect(() => () => onScrollLock?.(false), [onScrollLock])
 
   /** Where the value was when the finger landed. */
   const origin = useRef(0)
@@ -67,6 +70,14 @@ export default function Knob({ param, value, onChange, onCommit, size = 64, labe
       onPanResponderGrant: () => {
         origin.current = live.current.norm
         setDragging(true)
+        /*
+         * THE ONE THING THAT MAKES A KNOB TURN INSIDE A SCROLL VIEW. Claiming
+         * the responder is not enough: on iOS the scroll view's gesture
+         * recogniser is native, and it takes the touch and terminates the drag
+         * rather than losing to a JavaScript responder. "The knobs just scroll
+         * the screen up and down when trying to change them."
+         */
+        live.current.onScrollLock?.(true)
         tick()
       },
       onPanResponderMove: (_, gesture) => {
@@ -82,10 +93,12 @@ export default function Knob({ param, value, onChange, onCommit, size = 64, labe
       },
       onPanResponderRelease: () => {
         setDragging(false)
+        live.current.onScrollLock?.(false)
         live.current.onCommit?.()
       },
       onPanResponderTerminate: () => {
         setDragging(false)
+        live.current.onScrollLock?.(false)
         live.current.onCommit?.()
       }
     })

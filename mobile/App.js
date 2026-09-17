@@ -20,7 +20,7 @@ import Tone from './src/screens/Tone'
 import { loadPlayMode, toneWayIn } from './src/lib/playMode'
 import { hydrate } from './src/lib/store'
 import { keepSetlistsInStep } from './src/lib/cloudSetlists'
-import { AI } from './src/lib/features'
+import { AI, BENCH } from './src/lib/features'
 
 /**
  * Fractal Remote.
@@ -158,7 +158,7 @@ export default function App() {
               <Presets onBack={() => setScreen('stage')} />
             ) : screen === 'setlists' ? (
               <Setlists onBack={() => setScreen('stage')} />
-            ) : screen === 'edit' ? (
+            ) : BENCH && screen === 'edit' ? (
               <Edit onBack={() => setScreen('stage')} />
             ) : screen === 'gear' ? (
               <Gear onBack={() => setScreen('settings')} />
@@ -217,11 +217,14 @@ export default function App() {
                  */
                 onOpenSetlists={() => setScreen('setlists')}
                 /*
-                 * The bench. Only once the Mac is answering: every control on
-                 * that screen is read off the unit, so with nothing on the
-                 * other end it is a screen of empty knobs.
+                 * The bench, behind the switch in lib/features for this release.
+                 * Only once the Mac is answering either way: every control on
+                 * that screen is read off the unit, so with nothing on the other
+                 * end it is a screen of empty knobs.
                  */
-                onOpenEdit={link.link === 'connected' ? () => setScreen('edit') : null}
+                onOpenEdit={
+                  BENCH && link.link === 'connected' ? () => setScreen('edit') : null
+                }
               />
             )}
           </>

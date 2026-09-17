@@ -47,7 +47,18 @@ const face = Platform.select(mono)
  * a whole one is the smallest change worth a press: the slider is for the
  * sweep, the buttons for landing on a number.
  */
-export default function Volume({ blocks, onError }) {
+/*
+ * `onScrollLock` is not optional plumbing. A slider drags vertically-ish on a
+ * screen that scrolls vertically, and on iOS the scroll view's own gesture
+ * recogniser is a NATIVE one: it does not lose to a JavaScript responder, it
+ * takes the touch and terminates the drag out from under it. The symptom is the
+ * screen moving and the control not.
+ *
+ * So the screen stops scrolling for as long as a control is held. The bench's
+ * knobs were reported exactly this way — "the knobs just scroll the screen up
+ * and down when trying to change them" — and that is the fix waiting for them.
+ */
+export default function Volume({ blocks, onError, onScrollLock }) {
   const output = (blocks || []).find((b) => b.slug === 'output')
   const eid = idOf(output)
 
@@ -58,10 +69,14 @@ export default function Volume({ blocks, onError }) {
      track rather than of a number typed here. */
   const [width, setWidth] = useState(0)
 
-  const live = useRef({ param: null, value: null, width: 0 })
+  const live = useRef({ param: null, value: null, width: 0, onScrollLock: null })
   useEffect(() => {
-    live.current = { param, value, width }
+    live.current = { param, value, width, onScrollLock }
   })
+
+  /* A screen left locked by a drag that never released is a screen that will
+     not scroll again. Cheap insurance for a responder that gets torn down. */
+  useEffect(() => () => onScrollLock?.(false), [onScrollLock])
 
   /* One write on the wire at a time; see the note above. */
   const writer = useRef(null)
@@ -102,6 +117,7 @@ export default function Volume({ blocks, onError }) {
       onPanResponderGrant: () => {
         from.current = live.current.value
         setDragging(true)
+        live.current.onScrollLock?.(true)
         tick()
       },
       onPanResponderMove: (_, gesture) => {
@@ -115,10 +131,12 @@ export default function Volume({ blocks, onError }) {
       },
       onPanResponderRelease: () => {
         setDragging(false)
+        live.current.onScrollLock?.(false)
         land()
       },
       onPanResponderTerminate: () => {
         setDragging(false)
+        live.current.onScrollLock?.(false)
         land()
       }
     })

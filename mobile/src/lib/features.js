@@ -36,3 +36,38 @@
  * only thing that ever did was the screen this takes the door away from.
  */
 export const AI = false
+
+/**
+ * The bench — the Edit screen — and for the first release it is off too.
+ *
+ * "Just remove edit for now and mark it as something we will work on in a
+ * later update."
+ *
+ * And it is the brief, read properly: "for the initial releases I only want to
+ * release the stuff related to the live gig pedal board." The bench is not the
+ * pedalboard. It is the other half of the app — the chain, the knobs, the model
+ * picker, finding a control by name, modifiers, adding and moving blocks — and
+ * none of it is a thing anybody does between two bars.
+ *
+ * IT IS ALSO NOT FINISHED, which is the honest second reason. "The knobs just
+ * scroll the screen up and down when trying to change them." A knob turns on a
+ * vertical drag and it lives on a screen that scrolls vertically, and on iOS
+ * the scroll view's own gesture recogniser wins that argument at the native
+ * level — the JS responder is granted and then terminated out from under the
+ * drag. The fix is to stop the scroll view scrolling for as long as a control
+ * is being held, which is what `onScrollLock` does; the volume slider uses it
+ * and works, and the bench will use it when it comes back. Shipping a screen of
+ * knobs that cannot be turned is worse than not shipping the screen.
+ *
+ * WHAT IT TAKES AWAY, in two places:
+ *
+ *   App.js     the route to the edit screen, and the handler it hands down
+ *   Stage.js   the Edit button (App passes no handler, so the row closes up
+ *              rather than keeping a dead button)
+ *
+ * Everything behind it stays in the bundle and stays tested, for the same
+ * reason the tone screen does: it goes back on by turning one word from
+ * `false` to `true`, and rebuilding it against a rig that is not in the room
+ * would be the expensive way to get back to here.
+ */
+export const BENCH = false
