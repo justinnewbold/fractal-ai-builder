@@ -9,6 +9,7 @@ import { signOut } from './src/lib/relay'
 import Lamp from './src/components/Lamp'
 import Settings from './src/screens/Settings'
 import SignIn from './src/screens/SignIn'
+import Presets from './src/screens/Presets'
 import Stage from './src/screens/Stage'
 import Tone from './src/screens/Tone'
 import { loadPlayMode, toneWayIn } from './src/lib/playMode'
@@ -89,7 +90,9 @@ export default function App() {
         ) : (
           <>
             <LinkBar link={link} />
-            {AI && screen === 'tone' ? (
+            {screen === 'presets' ? (
+              <Presets onBack={() => setScreen('stage')} />
+            ) : AI && screen === 'tone' ? (
               <Tone onBack={() => setScreen('stage')} />
             ) : screen === 'settings' ? (
               <Settings
@@ -122,6 +125,11 @@ export default function App() {
                   AI && toneWayIn({ connected: link.link === 'connected', playing })
                     ? () => setScreen('tone')
                     : null
+                }
+                /* Only once the Mac is answering: a list of slot numbers with
+                   no names behind them is a screen that cannot do its one job. */
+                onOpenPresets={
+                  link.link === 'connected' ? () => setScreen('presets') : null
                 }
               />
             )}

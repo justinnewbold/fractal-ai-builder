@@ -458,6 +458,49 @@ export function run(test) {
     assert.equal(await decode({ encoding: 'gzip', body: gz }), big)
   })
 
+  test('the preset list reads one slot at a time, and an empty one reads as empty', async () => {
+    /*
+     * TWO THINGS, and the first is the one that would hurt on stage.
+     *
+     * Asking what slot 412 is called makes the unit read that preset off its
+     * own hardware — relay-rules counts `/presets/{n}` among the SLOW_READS for
+     * exactly that reason. The relay is one channel to one Mac holding one
+     * serial port, so twenty reads fired at once do not arrive sooner; they sit
+     * in a queue that the tuner, the scene change and every other press then
+     * wait behind. The screen must ask for the rows in view, one at a time,
+     * never in a loop over every slot.
+     *
+     * This is checked by reading the screen rather than running it, the way
+     * structure.mjs reads App.jsx: a `for` over the slot count calling the
+     * reader would be the bug, and it is visible in the source.
+     *
+     * The second is the ordinary one: a slot nobody has saved into has to read
+     * the same here as it does in the header, which is what unit.mjs already
+     * decides for the loaded preset.
+     */
+    const screen = read('mobile/src/screens/Presets.js')
+
+    assert.match(screen, /queue\.current/, 'the preset list no longer queues its reads')
+    assert.ok(
+      !/for\s*\([^)]*slots[^)]*\)[^{]*\{[^}]*presetName/.test(screen),
+      'the preset list reads every slot in a loop, which makes the unit dump every preset over serial'
+    )
+    assert.match(
+      screen,
+      /onViewableItemsChanged/,
+      'the preset list no longer asks only for the rows on screen'
+    )
+
+    /* And the device call itself agrees with the header about an empty slot. */
+    const device = read('mobile/src/lib/device.js')
+    assert.match(
+      device,
+      /isEmptySlotName\(name\)/,
+      'presetName does not mark an empty slot, so the list and the header disagree'
+    )
+    assert.match(device, /cleanPresetName\(name\)/, 'presetName returns the raw name the unit gave')
+  })
+
   test('the phone reads an empty slot the same way the browser does', async () => {
     /*
      * `<EMPTY>` is written over the front of the previous name rather than

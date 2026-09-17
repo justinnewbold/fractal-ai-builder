@@ -99,6 +99,29 @@ async function readParamValue(eid, paramId) {
 /** Load a stored slot into the edit buffer. Nothing is committed by doing this. */
 export const selectPreset = (number) => post('/preset/select', { number })
 
+/**
+ * What a stored slot is called, without loading it.
+ *
+ * The one thing that turns Previous and Next into a preset list. Stepping
+ * blind is fine for the slot either side of the one you are on and useless for
+ * "get me to the one called SCHISM", which between songs is the whole question.
+ *
+ * `/presets/{n}` is the short read and the host allows it over the relay —
+ * `relay-rules` lists it among the SLOW_READS, because on some units answering
+ * means dumping the preset over serial first. That is why this is asked for one
+ * slot at a time by the caller rather than in a loop here: a unit with 512
+ * slots would be 512 serial reads, and the screen wants the first twenty.
+ *
+ * An empty slot is named as such rather than left blank, the same way the
+ * loaded preset is, so a list of slots reads the same as the header does.
+ */
+export async function presetName(number) {
+  const res = await remoteRequest(`/presets/${number}`)
+  const name = typeof res?.name === 'string' ? res.name : null
+  if (name === null) return { number, name: null, empty: false }
+  return { number, name: cleanPresetName(name), empty: isEmptySlotName(name) }
+}
+
 /** Switch scenes. */
 export const setScene = (index) => post('/scene', { index })
 

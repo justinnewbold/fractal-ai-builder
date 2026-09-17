@@ -49,6 +49,15 @@ So: say what the build is for and wait. It is not covered by "he said keep
 going" earlier in a session, because the cost is per build rather than per
 task.
 
+**And while the phone is being brought up to the browser, the answer is no.**
+
+> "You can do it in passes but don't push to expo until it's all done."
+
+The port of the browser's screens onto the phone lands in several pieces,
+each one merged and each one useless to look at on a handset until the last
+of them is in. Building after every pass would spend a slot to show him a
+third of a screen. Work, merge, and let the builds wait for the end of it.
+
 What does NOT need asking, because none of it spends anything:
 
 - `npm test`, and `npx expo export` for either platform, which is the real
