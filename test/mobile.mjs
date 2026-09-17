@@ -3499,10 +3499,17 @@ export function run(test) {
     const rules = await import('../shared/relay-rules.mjs')
     assert.equal(rules.forbiddenRemotely('DELETE', '/device/cache'), null, 'the relay refuses the cache drop')
 
-    /* The volume says what the unit is holding, and shows it, like a knob does. */
+    /* The volume says what was asked and what the unit holds, and shows it, like a knob does. */
     const vol = read('mobile/src/components/Volume.js').replace(/\s+/g, ' ')
-    assert.match(vol, /The volume didn’t take\. The unit is holding it at \$\{volumeLabel\(holding, p\)\}\./, 'a volume that did not take does not say what the unit holds')
+    assert.match(vol, /The volume didn’t take\. You asked for \$\{volumeLabel\(v, p\)\}; the unit says \$\{volumeLabel\(holding, p\)\}\./, 'a volume that did not take does not say what was asked and what the unit holds')
     assert.match(vol, /if \(holding !== null\) setValue\(holding\)/, 'the slider keeps pointing at a number the unit refused')
+
+    /* And a miss is written to the log in numbers: what was asked, what each
+       read saw, which encoding went, and whether the cache drop was taken.
+       "The unit is holding it at +0.8 dB" said none of that. */
+    assert.match(dev, /logDebug\( 'set', `\$\{who\}: asked \$\{value\}, read \$\{actual === null \? 'nothing' : actual\}`, `\$\{continuous \? 'continuous' : 'discrete'\}, read \$\{go \+ 1\} of 2, cache drop \$\{dropped \? 'taken' : 'not taken'\}` \)/, 'a missed read-back is not logged in numbers')
+    assert.match(dev, /logDebug\('set', `\$\{who\} did not take`, `asked \$\{value\}, unit holds \$\{actual === null \? 'nothing readable' : actual\}`\)/, 'a write that did not take is not logged')
+    assert.match(dev, /logDebug\('set', 'cache drop failed', err\?\.message \|\| String\(err\)\)/, 'a refused cache drop is silent')
   })
 
   test('a rename is believed, not read back out of a stale cache', () => {
