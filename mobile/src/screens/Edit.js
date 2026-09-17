@@ -622,7 +622,7 @@ function ChainEditor({ blocks, caps, onError }) {
   }, [open, palette])
 
   if (!open) {
-    return <Press label="Add or move blocks" sub="Change what is in this preset" onPress={() => setOpen(true)} />
+    return <Press label="Edit chain" sub="Add, move or remove blocks in this preset" onPress={() => setOpen(true)} />
   }
 
   const where = (row, col) =>
