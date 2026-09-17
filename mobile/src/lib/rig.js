@@ -18,8 +18,9 @@ import { useSyncExternalStore } from 'react'
 
 import * as device from './device'
 import { idOf, sameBlock } from './unit.mjs'
+import { TAP_REREAD_MS } from './tempo'
 import { DEFAULT_SLUG, deviceSlug } from './device-slug'
-import { forget as forgetNames } from './presetNames'
+import { forget as forgetNames, nameOf } from './presetNames'
 import { forget as forgetControls } from './paramIndex'
 import { subscribeRemoteEvents } from './relay'
 
@@ -69,6 +70,16 @@ export function set(patch) {
 
 export const getState = () => state
 export const reset = () => set(initial)
+
+/**
+ * Put the last failure away.
+ *
+ * Nothing else clears an error until the next thing goes wrong or the next
+ * write succeeds, and on a rig that is working again neither may happen for a
+ * song — so the red bar stays above the preset being played, about a read that
+ * has since been answered. The ✕ on it comes here.
+ */
+export const clearError = () => set({ error: null })
 
 function subscribe(fn) {
   subscribers.add(fn)
@@ -197,8 +208,10 @@ export async function refreshAll() {
   })
   await refreshPreset()
   await refreshScene()
-  await refreshSceneNames()
+  /* The chain first: it is most of what the stage screen draws, and the scene
+     names are a slow read nobody is waiting on. */
   await refreshBlocks()
+  await refreshSceneNames()
   await refreshTempo()
 }
 
@@ -344,14 +357,37 @@ export function writeChannel(id, channel) {
  * unit works out the BPM from the spacing. The number on screen follows what
  * the unit reports rather than anything this app computed.
  */
+/**
+ * One tap, and the number that follows it.
+ *
+ * THE TAP GOES NOW; THE READ-BACK WAITS FOR THE BURST TO END. The unit works
+ * the tempo out from the SPACING between taps, so a tap held back by a debounce
+ * is a different rhythm, not a late one. And the figure can only be read once
+ * tapping has stopped — reading mid-burst answers with the tempo of the taps
+ * before this one and puts a stale number on the button still under your thumb.
+ *
+ * WHY THE PHONE NEEDS THIS AND THE BROWSER GOT AWAY WITHOUT IT FOR LONGER.
+ * There is a `tempo` event, and the phone was relying on it entirely: tap, and
+ * wait to be told. Over the relay that event is not reliably carried — the same
+ * filtering that keeps the tuner's readings at the Mac — so the unit's tempo
+ * changed and the screen did not. "Tap tempo isn't changing on the phone screen,
+ * but it does update the unit."
+ *
+ * The event still works where it arrives; this just stops the screen depending
+ * on it. The delay is shared with the browser so the two cannot drift.
+ */
+let reread = null
+
 export async function tapTempo() {
+  clearTimeout(reread)
   try {
     await device.tapTempo()
-    return true
   } catch (err) {
     set({ error: err.message })
     return false
   }
+  reread = setTimeout(() => refreshTempo(), TAP_REREAD_MS)
+  return true
 }
 
 export function writeTempo(bpm) {
@@ -384,28 +420,70 @@ export async function writeTuner(on) {
  * patched — including the name, which is the one thing on this screen read from
  * arm's length.
  */
+/**
+ * Load a stored slot, and show it before the unit has finished saying so.
+ *
+ * "When tapping a preset there is about a 2 second delay before it highlights
+ * it and goes back to the main screen."
+ *
+ * It waited for the lot: the select, then the preset, the scene, the scene
+ * names and the whole chain — six round trips, two of them among the SLOW reads
+ * that make the unit dump a preset over serial. Only then did anything move. A
+ * control that waits that long before acknowledging a press reads as a control
+ * that did not register it, which is how a preset gets loaded twice.
+ *
+ * So it is optimistic, like every other write in this file. The new slot is on
+ * screen on the press; the reads that confirm it happen behind that. If the
+ * unit refuses the select, the old preset goes back — captured before the
+ * change rather than rebuilt after the failure, for the reason `optimistic`
+ * gives above.
+ *
+ * THE NAME COMES FROM WHAT HAS ALREADY BEEN READ. The picker has it — it is
+ * drawn on the row somebody just tapped — and lib/presetNames is where it is
+ * kept, so this looks there rather than taking it as an argument. When nothing
+ * is known, `pending` says so and the screen shows the slot rather than
+ * inventing "Untitled" for the one round trip it takes to find out.
+ */
 export async function loadPreset(number) {
+  const was = state.preset
   /*
    * The control index is about the preset that was loaded, not this one. Slot
    * 45's Presence is not slot 46's, and a search box answering from the last
    * preset sends somebody to a control that is not there.
    */
   forgetControls()
+  const known = nameOf(number)
   /*
-   * And the scene names go with it. They belong to the preset being left, so
+   * The scene names go with it too. They belong to the preset being left, so
    * carrying them across would put the last song's names on this song's tiles —
    * which is worse than the numbers, because numbers are never wrong.
    */
-  set({ error: null, chain: 'reading', sceneNames: [] })
+  set({
+    error: null,
+    chain: 'reading',
+    sceneNames: [],
+    preset: {
+      number,
+      name: typeof known === 'string' ? known : '',
+      empty: false,
+      pending: typeof known !== 'string'
+    }
+  })
   try {
     await device.selectPreset(number)
   } catch (err) {
-    set({ error: err.message, chain: 'ok' })
+    set({ error: err.message, chain: 'ok', preset: was })
     return false
   }
   await refreshPreset()
   await refreshScene()
-  await refreshSceneNames()
+  /*
+   * The chain before the scene names, and the order is the point: the chain is
+   * most of what the stage screen draws, and the names are the least urgent
+   * thing on it. Reading the names first left the tiles saying "reading" for a
+   * slow read nobody was waiting on.
+   */
   await refreshBlocks()
+  await refreshSceneNames()
   return true
 }

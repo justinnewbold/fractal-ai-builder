@@ -34,3 +34,25 @@ export function checkBpm(text) {
   }
   return { bpm: n }
 }
+
+/**
+ * How long after the last tap to ask the unit what tempo it worked out.
+ *
+ * THE TAP AND THE READ-BACK MUST NOT BE FOLDED TOGETHER, and that is the whole
+ * reason this number exists rather than a plain "tap and read". The unit works
+ * the tempo out from the SPACING between taps, so a tap held back by a debounce
+ * is not a tap — it is a different rhythm. And the figure can only be read once
+ * tapping has stopped, because reading mid-burst answers with the tempo of the
+ * taps before this one and puts a stale number on the button still under your
+ * thumb.
+ *
+ * So: every press goes immediately, and the tempo is read once, this long after
+ * the last one. Four taps at 60 BPM are three seconds apart — the slowest
+ * anybody counts in — and this sits comfortably inside that.
+ *
+ * Shared because the phone got it wrong by not having it: it tapped, the unit
+ * changed, and the number on screen waited on an event the relay does not
+ * always carry. The tempo was right everywhere except the screen you were
+ * looking at.
+ */
+export const TAP_REREAD_MS = 900

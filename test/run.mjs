@@ -9671,8 +9671,20 @@ test('the Tap button opens the tempo box on a hold or a right-click, at both end
   assert.match(press, /onLongPress=\{\s*onLongPress/, 'the phone’s button cannot be held')
   const stage = readSrc(new URL('../mobile/src/screens/Stage.js', import.meta.url), 'utf8')
   assert.match(stage, /label="Tap"[^>]*onLongPress=\{\(\) => setTyping\(true\)\}/, 'holding Tap on the phone does nothing')
-  assert.match(stage, /checkBpm\(typed\)/, 'the phone checks a typed tempo by its own rule')
-  assert.match(stage, /await writeTempo\(checked\.bpm\)/, 'a typed tempo on the phone goes nowhere')
+  /*
+   * The box moved out of the stage screen and into an overlay of its own — the
+   * keyboard was covering it where it was, at the foot, which is exactly where
+   * iOS opens one. The rule being checked is unchanged: the phone must not have
+   * its own idea of a valid tempo.
+   */
+  const tempoBox = readSrc(new URL('../mobile/src/components/TempoBox.js', import.meta.url), 'utf8')
+  assert.match(tempoBox, /checkBpm\(typed\)/, 'the phone checks a typed tempo by its own rule')
+  assert.match(tempoBox, /<Modal visible=\{!!open\}/, 'the tempo box is back in the page, where the keyboard covers it')
+  /* The write is the screen's to hand down and the box's to call, so both ends
+     of that are checked: a box wired to nothing looks identical to one that
+     works until somebody types into it. */
+  assert.match(stage, /onSet=\{writeTempo\}/, 'the tempo box is handed no way to write a tempo')
+  assert.match(tempoBox, /await onSet\(checked\.bpm\)/, 'a typed tempo on the phone goes nowhere')
   const sync = readSrc(new URL('../scripts/sync-relay-rules.mjs', import.meta.url), 'utf8')
   assert.match(sync, /shared\/tempo\.mjs.*mobile\/src\/lib\/tempo\.js/, 'the phone’s copy of the tempo rule is not generated')
 })

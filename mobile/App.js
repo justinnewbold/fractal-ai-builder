@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, Text, View } from 'react-native'
+import { ActivityIndicator, View } from 'react-native'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 
-import { color, font, space } from './src/lib/theme'
+import { color, space } from './src/lib/theme'
 import { haveSession, linkState, probeNow, startLink, stopLink, subscribeLink } from './src/lib/link'
 import { signOut } from './src/lib/relay'
-import Lamp from './src/components/Lamp'
 import Note from './src/components/Note'
+import TopBar from './src/components/TopBar'
 import Settings from './src/screens/Settings'
 import SignIn from './src/screens/SignIn'
 import Edit from './src/screens/Edit'
 import Gear from './src/screens/Gear'
+import Log from './src/screens/Log'
 import Presets from './src/screens/Presets'
 import Setlists from './src/screens/Setlists'
 import Stage from './src/screens/Stage'
@@ -19,7 +20,7 @@ import Tone from './src/screens/Tone'
 import { loadPlayMode, toneWayIn } from './src/lib/playMode'
 import { hydrate } from './src/lib/store'
 import { keepSetlistsInStep } from './src/lib/cloudSetlists'
-import { AI } from './src/lib/features'
+import { AI, BENCH } from './src/lib/features'
 
 /**
  * Fractal Remote.
@@ -151,16 +152,18 @@ export default function App() {
           <SignIn onSignedIn={() => setAuth('in')} />
         ) : (
           <>
-            <LinkBar link={link} />
+            <TopBar link={link} onOpenSettings={() => setScreen('settings')} />
             {picked ? <Arrived picked={picked} /> : null}
             {screen === 'presets' ? (
               <Presets onBack={() => setScreen('stage')} />
             ) : screen === 'setlists' ? (
               <Setlists onBack={() => setScreen('stage')} />
-            ) : screen === 'edit' ? (
+            ) : BENCH && screen === 'edit' ? (
               <Edit onBack={() => setScreen('stage')} />
             ) : screen === 'gear' ? (
               <Gear onBack={() => setScreen('settings')} />
+            ) : screen === 'log' ? (
+              <Log onBack={() => setScreen('settings')} />
             ) : AI && screen === 'tone' ? (
               <Tone onBack={() => setScreen('stage')} />
             ) : screen === 'settings' ? (
@@ -173,6 +176,8 @@ export default function App() {
                 /* Works with the Mac off: it is a reference sheet, not a
                    question for the unit. */
                 onOpenGear={() => setScreen('gear')}
+                /* Works with the Mac off, and is most wanted when it is off. */
+                onOpenLog={() => setScreen('log')}
                 onReconnect={probeNow}
                 onSignOut={async () => {
                   /*
@@ -190,7 +195,6 @@ export default function App() {
               />
             ) : (
               <Stage
-                onOpenSettings={() => setScreen('settings')}
                 /* Absent rather than disabled when play mode is on, so the row
                    closes up instead of keeping a dead button. */
                 onOpenTone={
@@ -212,11 +216,14 @@ export default function App() {
                  */
                 onOpenSetlists={() => setScreen('setlists')}
                 /*
-                 * The bench. Only once the Mac is answering: every control on
-                 * that screen is read off the unit, so with nothing on the
-                 * other end it is a screen of empty knobs.
+                 * The bench, behind the switch in lib/features for this release.
+                 * Only once the Mac is answering either way: every control on
+                 * that screen is read off the unit, so with nothing on the other
+                 * end it is a screen of empty knobs.
                  */
-                onOpenEdit={link.link === 'connected' ? () => setScreen('edit') : null}
+                onOpenEdit={
+                  BENCH && link.link === 'connected' ? () => setScreen('edit') : null
+                }
               />
             )}
           </>
@@ -245,48 +252,6 @@ function Arrived({ picked }) {
   return (
     <View style={{ paddingHorizontal: space.lg, paddingTop: space.sm }}>
       <Note>{`Picked up ${parts.join(' and ')} from ${picked.from || 'your other device'}.`}</Note>
-    </View>
-  )
-}
-
-/**
- * One line, always in the same place, saying whether what you are looking at is
- * still true.
- *
- * Nothing here says channel, relay, or the name of the account service. The
- * question a player has is "is this thing still driving my rig", and these are
- * the four honest answers to it.
- */
-function LinkBar({ link }) {
-  const said =
-    link.link === 'connected'
-      ? `Connected to ${link.macName || 'your Mac'}`
-      : link.link === 'joining'
-        ? 'Finding your Mac…'
-        : link.link === 'no-answer'
-          ? 'Your Mac isn’t answering'
-          : 'Not connected'
-
-  return (
-    <View
-      accessibilityLiveRegion="polite"
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: space.sm,
-        paddingHorizontal: space.lg,
-        paddingVertical: space.sm,
-        borderBottomWidth: 1,
-        borderBottomColor: color.rule,
-        backgroundColor: color.panel
-      }}
-    >
-      <Lamp
-        state={link.link === 'connected' ? 'live' : link.link === 'no-answer' ? 'fault' : 'idle'}
-      />
-      <Text numberOfLines={1} style={{ color: color.silkDim, fontSize: font.small, flex: 1 }}>
-        {said}
-      </Text>
     </View>
   )
 }

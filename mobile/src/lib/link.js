@@ -15,6 +15,7 @@
  * against the same failure: a green lamp that is lying is worse than a red one.
  */
 import { AppState } from 'react-native'
+import { logDebug } from './debugLog'
 
 import {
   censusHosts,
@@ -67,7 +68,19 @@ const set = (patch) => {
   ) {
     return
   }
+  /*
+   * Every change of mind about the Mac, in the log.
+   *
+   * This is the spine of a bad evening: joining, connected, no-answer,
+   * connected again. The screen only ever shows the latest one, and "it kept
+   * dropping" is unanswerable without the sequence. Only when the STATE moved —
+   * the guard above has already thrown away the no-ops.
+   */
+  const was = state.link
   state = next
+  if (next.link !== was) {
+    logDebug('link', `${was} → ${next.link}`, next.macName || undefined)
+  }
   for (const fn of watchers) fn(state)
 }
 

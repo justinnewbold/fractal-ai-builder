@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { describeLink } from '../lib/link'
+import { linkTone, linkWord } from '../../shared/link-word.mjs'
 import { useDismiss } from '../lib/dismiss'
 
 /**
@@ -84,24 +85,14 @@ export default function LinkChip({
    * something. Red is for a link that should be up and is not; a link nobody
    * has turned on is grey, and says what it is.
    */
-  const mark =
-    said.tone === 'good' ? 'ok' : said.tone === 'busy' ? 'wait' : said.tone === 'bad' ? 'no' : 'off'
+  const mark = linkTone(said.tone)
   /*
    * In the bar, one word in the colour of the state. This was a round green
    * tick or red cross for a while — "the same size as the settings gear" —
    * and then asked to be the word again: "just the word connected (green),
    * disconnected (red)". Three states, because a link on its way is neither.
    */
-  const state =
-    mark === 'ok'
-      ? 'connected'
-      : mark === 'wait'
-        ? 'connecting'
-        : mark === 'no'
-          ? 'disconnected'
-          : link.role === 'remote'
-            ? 'no Mac'
-            : 'no phone'
+  const state = linkWord(said.tone, link.role)
   const word = sayMac && mark !== 'off' ? `Mac ${state}` : state
 
   return (

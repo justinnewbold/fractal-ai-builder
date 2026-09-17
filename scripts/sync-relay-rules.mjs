@@ -42,6 +42,27 @@ export const FILES = [
   { source: '../shared/tempo.mjs', target: '../mobile/src/lib/tempo.js' },
   { source: '../shared/tone-steps.mjs', target: '../mobile/src/lib/tone-steps.js' },
   { source: '../shared/play-mode.mjs', target: '../mobile/src/lib/play-mode.js' },
+  /*
+   * When a garbled preset dump is asked for again rather than shown.
+   *
+   * The browser has had this since the day the message first appeared. The
+   * phone did not, and so the phone showed
+   * "PRESET_DUMP_HEADER: expected func 0x77 at offset 0, got 0x78" on a stage
+   * — a sentence in the codec's own words about a read that arrived while the
+   * unit was still loading, and which a second attempt four hundred
+   * milliseconds later would have answered. The rule about which requests may
+   * be asked twice is the same rule on both ends; it is not one worth writing
+   * out twice.
+   */
+  { source: '../src/lib/retry.js', target: '../mobile/src/lib/retry.js' },
+  /*
+   * The word at the top of both screens. "Make sure the iOS app shows this
+   * exact header." Four states, one set of words, one place they are decided —
+   * a phone saying DISCONNECTED beside a Mac saying CONNECTED about the same
+   * link is a difference nobody can debug from a photograph.
+   */
+  { source: '../shared/link-word.mjs', target: '../mobile/src/lib/link-word.js' },
+
   { source: '../src/lib/guardrails.js', target: '../mobile/src/lib/guardrails.js' },
   { source: '../src/lib/validate.js', target: '../mobile/src/lib/validate.js' },
   /*
@@ -204,7 +225,45 @@ export const FILES = [
    * same key, so a phone and a laptop signed into one account do not argue
    * about it.
    */
-  { source: '../src/lib/gigSize.js', target: '../mobile/src/lib/gigSize.js' }
+  { source: '../src/lib/gigSize.js', target: '../mobile/src/lib/gigSize.js' },
+  /*
+   * One log for everything, in the order it happened.
+   *
+   * "Make a unified debug log with a copy log button to send back to you for
+   * debugging." The phone needs it MORE than the browser does and had none at
+   * all: a browser has a console somebody can open, and a phone on a stage has
+   * nowhere for a failure to go. Every bad evening was unreconstructable.
+   *
+   * Shared so the two logs read the same, because the whole point of the copy
+   * button is that what gets pasted back is a format somebody already knows how
+   * to read. No imports at all in it — the crash capture is guarded on
+   * `addEventListener` and simply does nothing where there is no window.
+   */
+  { source: '../src/lib/debugLog.js', target: '../mobile/src/lib/debugLog.js' },
+  /*
+   * What this build of the phone app is.
+   *
+   * Not a copy but a rendering: the repository's version, made into a module the
+   * About page can import. Typed by hand it would be the version somebody last
+   * remembered to type, which is worse than none — a wrong one sends people
+   * hunting for a bug in a build they are not running. Every change here needs a
+   * new version number anyway, so this moves on its own.
+   */
+  {
+    source: '../package.json',
+    target: '../mobile/src/lib/version.js',
+    render: (text) => `/**
+ * What this build of the phone app is.
+ *
+ * Generated from the repository's package.json by \`npm run sync:rules\`, for the
+ * plainest reason there is: the version on the About page has to be the version
+ * that was built. Typed by hand it is the version somebody last remembered to
+ * type, which is worse than no version at all — a wrong one sends people
+ * hunting for a bug in a build they are not running.
+ */
+export const APP_VERSION = '${JSON.parse(text).version}'
+`
+  }
 ]
 
 /** Where a copy says it came from, so nobody edits the copy by mistake. */
@@ -223,8 +282,13 @@ export const banner = (source) =>
  * are still copied and still held to being identical — only the note saying so
  * has nowhere to live, which is why nothing but data is allowed to be raw.
  */
-export const generate = (source, sourcePath, raw = false) =>
-  raw ? source : banner(sourcePath) + source
+export const generate = (source, sourcePath, raw = false, render = null) => {
+  /* A rendered file is neither a copy nor raw: its content is DERIVED from the
+     source, so the banner would be lying about what to edit. The doc comment
+     the renderer writes says where it came from instead. */
+  if (render) return render(source)
+  return raw ? source : banner(sourcePath) + source
+}
 
 const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
 
@@ -244,7 +308,7 @@ export const state = () =>
     } catch {
       // A copy that does not exist yet is stale, not a crash.
     }
-    return { ...file, sourceText, copyText, expected: generate(sourceText, file.source, file.raw) }
+    return { ...file, sourceText, copyText, expected: generate(sourceText, file.source, file.raw, file.render) }
   })
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -17,6 +17,7 @@ import {
 import { sync, useStored } from '../lib/store'
 import { SIZES, loadSize } from '../lib/gigSize'
 import {
+  clearError,
   loadPreset,
   refreshAll,
   tapTempo,
@@ -27,7 +28,6 @@ import {
   writeTempo,
   writeTuner
 } from '../lib/rig'
-import { checkBpm } from '../lib/tempo'
 import { nope, thud } from '../lib/feedback'
 import { blockColor } from '../lib/blockColors'
 import { sceneColor } from '../lib/sceneColors'
@@ -35,15 +35,15 @@ import { shortBlock } from '../lib/shortName'
 import Note from '../components/Note'
 import Press from '../components/Press'
 import Tile from '../components/Tile'
+import Sheet from '../components/Sheet'
+import TempoBox from '../components/TempoBox'
 import Tuner from '../components/Tuner'
-import Volume from '../components/Volume'
 
 const face = Platform.select(mono)
 
 /* Hoisted: a selector rebuilt each render re-reads the store on every notify. */
 const ofPreset = (s) => s.preset
 const ofBlocks = (s) => s.blocks
-const ofAllBlocks = (s) => s.allBlocks
 const ofScene = (s) => s.sceneIndex
 const ofSceneNames = (s) => s.sceneNames
 const ofCaps = (s) => s.capabilities
@@ -66,7 +66,7 @@ const ofSlug = (s) => s.deviceSlug
  * button within reach of a stage tap is a hazard, and saving to a slot is
  * refused by the Mac anyway.
  */
-export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpenSetlists, onOpenEdit }) {
+export default function Stage({ onOpenTone, onOpenPresets, onOpenSetlists, onOpenEdit }) {
   // The screen is the instrument panel for as long as this is open. A phone
   // that locks itself between songs is a phone you have to wake and unlock
   // while the count-in is happening.
@@ -74,9 +74,6 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
 
   const preset = useRig(ofPreset)
   const blocks = useRig(ofBlocks)
-  /* Everything, because the output block is one of the four the stage list
-     hides — and it is the one the volume lives on. */
-  const everything = useRig(ofAllBlocks)
   const scene = useRig(ofScene)
   const sceneNames = useRig(ofSceneNames)
   const caps = useRig(ofCaps)
@@ -98,39 +95,15 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
   const lists = listsFor(device)
   const source = sourceFor(device)
   const order = orderFor(source, { favourites, lists })
-  /* The tempo box under Tap, open only while somebody is typing into it. */
+  /*
+   * Whether somebody is typing a tempo. The box itself, what is in it and what
+   * it refuses all live in components/TempoBox — it is an overlay, and holding
+   * its state out here is how the keyboard came to be covering it.
+   */
   const [typing, setTyping] = useState(false)
-  const [typed, setTyped] = useState('')
-  const [typedError, setTypedError] = useState(null)
-  useEffect(() => {
-    if (typing) {
-      setTyped(Number.isFinite(bpm) ? String(Math.round(bpm)) : '')
-      setTypedError(null)
-    }
-  }, [typing]) // eslint-disable-line react-hooks/exhaustive-deps
-  const commitTyped = async () => {
-    const checked = checkBpm(typed)
-    setTyping(false)
-    if (checked.error) {
-      setTypedError(checked.error)
-      return
-    }
-    if (checked.bpm !== undefined && checked.bpm !== Math.round(bpm)) {
-      try {
-        await writeTempo(checked.bpm)
-      } catch (err) {
-        setTypedError(err.message)
-      }
-    }
-  }
   const error = useRig(ofError)
 
   const [refreshing, setRefreshing] = useState(false)
-  /* Said under the slider rather than at the top of the screen, beside the
-     control that caused it. */
-  const [volumeError, setVolumeError] = useState(null)
-  /** Whether the volume is showing. Closed by default — see the speaker below. */
-  const [showVolume, setShowVolume] = useState(false)
   /*
    * How wide a row of tiles actually is. Measured rather than assumed, because
    * the answer is the phone's width less this screen's padding, and neither is
@@ -192,7 +165,9 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
       return
     }
     thud()
-    await loadPreset(next)
+    /* Not awaited: the rig puts the new slot on screen immediately and confirms
+       it behind that. Waiting here would make Next feel like it missed. */
+    loadPreset(next)
   }
 
   /*
@@ -216,7 +191,11 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
       }
     >
       {conflict ? <Note tone="fault">{conflict}</Note> : null}
-      {error ? <Note tone="fault">{error}</Note> : null}
+      {error ? (
+        <Note tone="fault" onDismiss={clearError}>
+          {error}
+        </Note>
+      ) : null}
 
       {/* ---------------------------------------------------------- preset */}
       <View style={{ gap: space.sm }}>
@@ -229,13 +208,17 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
           </Text>
           <View style={{ flexDirection: 'row', gap: space.sm }}>
             {/*
-              The way to the tone screen, beside Setup rather than down among
-              the scenes.
+              The way to the tone screen, up in the corner rather than down
+              among the scenes.
 
               Both of the things up here take you OFF this screen, which is the
               honest grouping: everything below the preset name acts on the rig
               you are playing, and neither of these does. It is also the corner
               furthest from where a thumb rests during a song.
+
+              The speaker and Setup used to be in this row too. They are on the
+              bar at the top of the app now, where the browser keeps them — see
+              components/TopBar.
 
               Absent, not disabled, when play mode is on — and absent until the
               setting has been read back, because a button that appears late is
@@ -267,31 +250,6 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
                 onPress={onOpenEdit}
               />
             ) : null}
-            {/*
-              The speaker, and what it opens is not on this screen until it is
-              asked for.
-
-              "Put a sound button that looks like a speaker in the header, and
-              when it's tapped you can slide the volume left or right or do the
-              plus minus thing that's already set up, but it's not there on the
-              main screen." The same trade the browser made: the control is
-              wanted twice in a night and was holding a strip of the stage open
-              for the rest of it.
-            */}
-            <Press
-              label={showVolume ? '🔊 ✕' : '🔊'}
-              height={36}
-              style={{ paddingHorizontal: space.md }}
-              accessibilityLabel={showVolume ? 'Close volume' : 'Volume'}
-              on={showVolume}
-              onPress={() => setShowVolume((v) => !v)}
-            />
-            <Press
-              label="Setup"
-              height={36}
-              style={{ paddingHorizontal: space.md }}
-              onPress={onOpenSettings}
-            />
           </View>
         </View>
 
@@ -303,21 +261,19 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
           because they are the mid-song controls and a list is not — but
           "get me to SCHISM" was unanswerable on this screen until now.
         */}
+        {/*
+          "…" rather than "Untitled" for the one round trip between pressing a
+          preset and the unit saying what it is called. The slot is already in
+          the line above, so nothing here is a guess. See rig.loadPreset.
+        */}
         <Press
-          label={presetLabel(preset)}
+          label={preset?.pending && !preset?.name ? '…' : presetLabel(preset)}
           sub={onOpenPresets ? 'Tap for all presets' : undefined}
           height={TAP + 12}
           disabled={!onOpenPresets}
           onPress={onOpenPresets}
           style={{ paddingHorizontal: space.lg }}
         />
-
-        {showVolume ? (
-          <>
-            <Volume blocks={everything} onError={setVolumeError} />
-            {volumeError ? <Note tone="fault">{volumeError}</Note> : null}
-          </>
-        ) : null}
 
       </View>
 
@@ -433,30 +389,6 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
           })}
         </View>
 
-        {/* The channel picker, under the grid rather than inline, so opening it
-            cannot reflow the tiles out from under a thumb. */}
-        {picking !== null && channels?.length > 1 ? (
-          <View style={{ gap: space.sm }}>
-            <Label>
-              {shortBlock(blocks.find((b) => sameBlock(b, picking)) || {})} — channel
-            </Label>
-            <View style={{ flexDirection: 'row', gap: space.sm }}>
-              {channels.map((name) => (
-                <Press
-                  key={name}
-                  grow
-                  label={name}
-                  tone="signal"
-                  on={blocks.find((b) => sameBlock(b, picking))?.channel === name}
-                  onPress={() => {
-                    writeChannel(picking, name)
-                    setPicking(null)
-                  }}
-                />
-              ))}
-            </View>
-          </View>
-        ) : null}
       </View>
 
       {/* ------------------------------------------------------------ foot */}
@@ -527,46 +459,57 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
           />
         </View>
 
-        {typing ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-            <TextInput
-              autoFocus
-              selectTextOnFocus
-              value={typed}
-              onChangeText={(t) => setTyped(t.replace(/[^0-9]/g, ''))}
-              keyboardType="number-pad"
-              returnKeyType="done"
-              accessibilityLabel="Tempo in beats per minute"
-              placeholder="BPM"
-              placeholderTextColor={color.silkFaint}
-              onSubmitEditing={commitTyped}
-              onBlur={() => setTyping(false)}
-              style={{
-                flexGrow: 1,
-                minHeight: TAP,
-                backgroundColor: color.panel,
-                borderWidth: 1,
-                borderColor: color.live,
-                borderRadius: 10,
-                paddingHorizontal: space.md,
-                color: color.silk,
-                fontSize: font.hero,
-                fontFamily: face,
-                textAlign: 'center'
-              }}
-            />
-            <Press label="Set" tone="signal" on onPress={commitTyped} />
-          </View>
-        ) : null}
-        {typedError ? <Note tone="fault">{typedError}</Note> : null}
 
-        <Tuner on={tunerOn} reading={tuning} />
       </View>
 
       <Text style={{ color: color.silkFaint, fontSize: font.micro, fontFamily: face }}>
         Everything you change here happens on the unit at the Mac. Saving to a slot happens there
         too.
       </Text>
+
+      {/*
+        The two things that cover the screen rather than sitting in it, drawn
+        last and outside the foot because both are modals.
+
+        The volume is not among them any more: the speaker moved to the bar at
+        the top of the app, which is where the browser keeps it, and the sheet
+        moved with the button that opens it. See components/TopBar.
+      */}
+      {/*
+        The channel picker, over the screen rather than inside it.
+
+        "When holding a block to change channel have it be an overlay on the
+        screen instead of inserting itself into the screen like the web
+        version." It opened underneath the chain, which pushed everything below
+        it down — so the tiles a thumb was aimed at moved while the thumb was on
+        its way, on the one screen where that can happen mid-song.
+      */}
+      {/*
+        Typing a tempo, high on the screen.
+
+        "When holding tap button to manually enter tempo the keyboard blocks the
+        numbers so you can see what your typing." It was in the foot — which is
+        where a thumb rests and therefore exactly where the keyboard opens.
+      */}
+      <TempoBox
+        open={typing}
+        bpm={bpm}
+        onSet={writeTempo}
+        onClose={() => setTyping(false)}
+      />
+
+      <ChannelSheet
+        block={blocks.find((b) => sameBlock(b, picking)) || null}
+        channels={channels}
+        onClose={() => setPicking(null)}
+        onPick={(ch) => {
+          writeChannel(picking, ch)
+          setPicking(null)
+        }}
+      />
+
+      {/* Closing the tuner stops it at the unit, which is what the button does. */}
+      <Tuner on={tunerOn} reading={tuning} onClose={() => writeTuner(false)} />
     </ScrollView>
   )
 }
@@ -597,6 +540,43 @@ const tileWidth = (width, n) => {
   const cols = Math.max(1, n)
   if (!width) return undefined
   return (width - space.sm * (cols - 1)) / cols
+}
+
+/**
+ * Which channel a block is on.
+ *
+ * Each channel keeps its own model and settings, and the SCENE remembers which
+ * one this block plays — which is the fact worth having in front of somebody
+ * before they change it, because it is the difference between "this sounds
+ * different now" and "scene 2 sounds different now".
+ *
+ * The same words the browser uses, because they are the same fact.
+ */
+function ChannelSheet({ block, channels, onClose, onPick }) {
+  const name = block?.name || block?.slug || ''
+  return (
+    <Sheet open={!!block && channels?.length > 1} onClose={onClose} title={name} note="Channel">
+      <View style={{ flexDirection: 'row', gap: space.sm }} accessibilityRole="radiogroup">
+        {(channels || []).map((ch) => (
+          <Press
+            key={ch}
+            grow
+            label={ch}
+            height={TAP + 28}
+            tone="live"
+            on={block?.channel === ch}
+            accessibilityLabel={`Channel ${ch}`}
+            onPress={() => onPick(ch)}
+          />
+        ))}
+      </View>
+      <Text style={{ color: color.silkDim, fontSize: font.small, lineHeight: 20 }}>
+        {block?.channel ? `${name} is on channel ${block.channel}. ` : ''}
+        Each channel keeps its own model and settings; the scene remembers which one this block
+        plays.
+      </Text>
+    </Sheet>
+  )
 }
 
 function Label({ children }) {

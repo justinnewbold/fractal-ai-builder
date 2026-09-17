@@ -60,6 +60,16 @@ const ofChain = (s) => s.chain
  * floor changes every value on this screen without touching anything in it.
  */
 export default function Edit({ onBack }) {
+  /*
+   * Whether a knob has the finger, and the screen therefore must not scroll.
+   *
+   * On iOS the scroll view's gesture recogniser is native and does not lose to
+   * a JavaScript responder — it takes the touch and terminates the drag. That
+   * is the whole of "the knobs just scroll the screen up and down when trying
+   * to change them", and turning scrolling off while a knob is held is the only
+   * thing that reliably stops it. See components/Knob.
+   */
+  const [held, setHeld] = useState(false)
   const blocks = useRig(ofBlocks)
   const scene = useRig(ofScene)
   const sceneNames = useRig(ofSceneNames)
@@ -83,6 +93,7 @@ export default function Edit({ onBack }) {
       style={{ flex: 1 }}
       contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxl }}
       keyboardShouldPersistTaps="handled"
+      scrollEnabled={!held}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
         <View style={{ flexShrink: 1 }}>
@@ -98,7 +109,11 @@ export default function Edit({ onBack }) {
         <Press label="Done" height={40} onPress={onBack} />
       </View>
 
-      {error ? <Note tone="fault">{error}</Note> : null}
+      {error ? (
+        <Note tone="fault" onDismiss={() => setError(null)}>
+          {error}
+        </Note>
+      ) : null}
 
       {chain === 'reading' && !blocks.length ? (
         <Note>Reading what’s in this preset…</Note>
@@ -155,6 +170,7 @@ export default function Edit({ onBack }) {
           channels={caps?.channelNames}
           focus={focus}
           onError={setError}
+          onScrollLock={setHeld}
         />
       ) : blocks.length ? (
         <Note>Tap a block to open its controls.</Note>
@@ -176,7 +192,7 @@ export default function Edit({ onBack }) {
  * identity, and keying on that threw the knobs away and read them again for
  * nothing, once per knob.
  */
-function BlockPanel({ block, channels, focus, onError }) {
+function BlockPanel({ block, channels, focus, onError, onScrollLock }) {
   /* Read once and used everywhere below: see unit.mjs on why this is not
      `block.eid`, and what it cost to find out. */
   const eid = idOf(block)
@@ -514,6 +530,7 @@ function BlockPanel({ block, channels, focus, onError }) {
                 value={valueOf(p)}
                 onChange={(v) => setLocal((prev) => ({ ...prev, [p.id]: v }))}
                 onCommit={() => commit(p)}
+                onScrollLock={onScrollLock}
               />
               <ValueBox param={p} value={valueOf(p)} onCommit={(v) => commit(p, v)} />
             </View>

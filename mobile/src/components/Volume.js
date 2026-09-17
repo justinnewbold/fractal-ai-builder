@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { PanResponder, Platform, Text, View } from 'react-native'
+import { Modal, PanResponder, Platform, Pressable, Text, View, useWindowDimensions } from 'react-native'
+import { BlurView } from 'expo-blur'
 
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
+import Note from './Note'
 import { blockParams, idOf, setParam, setParamConfirmed } from '../lib/device'
 import {
   latestWriter,
@@ -47,7 +49,27 @@ const face = Platform.select(mono)
  * a whole one is the smallest change worth a press: the slider is for the
  * sweep, the buttons for landing on a number.
  */
-export default function Volume({ blocks, onError }) {
+/*
+ * IT IS A POP-UP, and that is not decoration — it is the fix.
+ *
+ * "Volume slider also tries to scroll the screen when sliding the volume. Just
+ * an overlay that pops up on the screen separately would be cool… whatever we
+ * gotta do to fix that so that when you tap the volume button, the volume
+ * slider pops up and is able to be slid without scrolling or moving anything
+ * else."
+ *
+ * A slider drags across a screen that scrolls, and on iOS the scroll view's pan
+ * gesture recogniser is NATIVE: it takes the touch back and terminates the drag
+ * rather than losing to a JavaScript responder. There are fixes that fight
+ * that — the bench's knobs use one — but for a control that is wanted twice a
+ * night the better answer is to take the fight away entirely. In a modal there
+ * is no scroll view behind it and nothing to argue with.
+ *
+ * The browser reached the same place from the other direction: "put a sound
+ * button that looks like a speaker in the header, and when it's tapped you can
+ * slide the volume left or right… but it's not there on the main screen."
+ */
+export default function Volume({ blocks, open, onClose, onError }) {
   const output = (blocks || []).find((b) => b.slug === 'output')
   const eid = idOf(output)
 
@@ -57,6 +79,8 @@ export default function Volume({ blocks, onError }) {
   /* Measured, because the thumb's position has to be a fraction of the real
      track rather than of a number typed here. */
   const [width, setWidth] = useState(0)
+  /* And the window, for how wide the panel itself should be. */
+  const { width: width0 } = useWindowDimensions()
 
   const live = useRef({ param: null, value: null, width: 0 })
   useEffect(() => {
@@ -154,21 +178,50 @@ export default function Volume({ blocks, onError }) {
     await land()
   }
 
-  /* No slider at all on a unit whose output block has no level this app can
-     move — a control that can only disappoint is worse than none. */
-  if (!Number.isInteger(eid) || !param) return null
-
   const pct = volumePercent(value, param)
+  const panel = Math.min(width0 - space.xl * 2, 460)
 
   return (
-    <View style={{ gap: space.sm }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.5 }}>VOLUME</Text>
-        <Text style={{ color: color.silk, fontSize: font.body, fontFamily: face }}>
-          {volumeLabel(value, param)}
-        </Text>
-      </View>
+    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+      <Pressable accessibilityRole="button" accessibilityLabel="Close the volume" onPress={onClose} style={{ flex: 1 }}>
+        <BlurView
+          intensity={70}
+          tint="dark"
+          experimentalBlurMethod="dimezisBlurView"
+          style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.xl }}
+        >
+          {/*
+            The panel swallows presses so a thumb that slips off the slider does
+            not close the thing it is holding. Only the glass around it closes.
+          */}
+          <Pressable
+            onPress={() => {}}
+            style={{
+              width: panel,
+              gap: space.lg,
+              paddingVertical: space.xl,
+              paddingHorizontal: space.lg,
+              borderRadius: radius.lg * 2,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.14)',
+              backgroundColor: 'rgba(255,255,255,0.04)'
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+              <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.5 }}>VOLUME</Text>
+              <Text style={{ color: color.silk, fontSize: font.hero, fontFamily: face }}>
+                {param ? volumeLabel(value, param) : '—'}
+              </Text>
+            </View>
 
+            {/* No slider at all on a unit whose output block has no level this
+                app can move — a control that can only disappoint is worse than
+                none. The panel still opens and says so. */}
+            {!Number.isInteger(eid) || !param ? (
+              <Note tone="warn">
+                This unit’s output block has no level this app can move. Use the knob on the unit.
+              </Note>
+            ) : (
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
         <Press
           label="−"
@@ -232,7 +285,16 @@ export default function Volume({ blocks, onError }) {
           onPress={() => nudge(1)}
         />
       </View>
-    </View>
+            )}
+
+            <Press label="Done" height={TAP} tone="signal" onPress={onClose} />
+            <Text style={{ color: color.silkFaint, fontSize: font.micro, textAlign: 'center' }}>
+              Tap outside to close
+            </Text>
+          </Pressable>
+        </BlurView>
+      </Pressable>
+    </Modal>
   )
 }
 

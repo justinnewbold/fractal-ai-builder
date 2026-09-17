@@ -46,23 +46,43 @@ const ROTOR = [{ name: 'increment' }, { name: 'decrement' }]
  * `live` holds the current props for the responder, which is created once. Not
  * a micro-optimisation — a responder rebuilt mid-drag is a drag that stops.
  */
-export default function Knob({ param, value, onChange, onCommit, size = 64, label }) {
+export default function Knob({ param, value, onChange, onCommit, size = 64, label, onScrollLock }) {
   const [dragging, setDragging] = useState(false)
 
   const norm = clamp01(toNormalized(value, param) ?? 0)
 
-  const live = useRef({ norm, param, onChange, onCommit })
+  const live = useRef({ norm, param, onChange, onCommit, onScrollLock })
   useEffect(() => {
-    live.current = { norm, param, onChange, onCommit }
+    live.current = { norm, param, onChange, onCommit, onScrollLock }
   })
+
+  /* A screen left locked by a drag that never released will not scroll again. */
+  useEffect(() => () => onScrollLock?.(false), [onScrollLock])
 
   /** Where the value was when the finger landed. */
   const origin = useRef(0)
 
   const pan = useRef(
     PanResponder.create({
+      /*
+       * THE LOCK GOES ON HERE, IN THE CAPTURE PHASE, and that is the whole
+       * difference between a knob that turns and one that scrolls the page.
+       *
+       * Claiming the responder is not enough. On iOS the scroll view's pan
+       * gesture recogniser is NATIVE: it takes the touch back and terminates
+       * the drag rather than losing to a JavaScript responder. "The knobs just
+       * scroll the screen up and down when trying to change them."
+       *
+       * Capture runs on touch-down, from the root inward, before anything has
+       * been granted and before the scroll view has decided this is a scroll.
+       * Doing it in onPanResponderGrant is one hop later and one re-render
+       * closer to the first move — which is a race this does not need to be in.
+       */
+      onStartShouldSetPanResponderCapture: () => {
+        live.current.onScrollLock?.(true)
+        return true
+      },
       onStartShouldSetPanResponder: () => true,
-      onStartShouldSetPanResponderCapture: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
         origin.current = live.current.norm
@@ -82,10 +102,12 @@ export default function Knob({ param, value, onChange, onCommit, size = 64, labe
       },
       onPanResponderRelease: () => {
         setDragging(false)
+        live.current.onScrollLock?.(false)
         live.current.onCommit?.()
       },
       onPanResponderTerminate: () => {
         setDragging(false)
+        live.current.onScrollLock?.(false)
         live.current.onCommit?.()
       }
     })

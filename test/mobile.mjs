@@ -1065,11 +1065,26 @@ export function run(test) {
     assert.match(vol, /latestWriter\(\(v\) => \{[\s\S]{0,200}?setParam\(eid, p\.id, v, p\)/, 'a drag confirms every value, which doubles the traffic it was written to avoid')
     assert.match(vol, /await setParamConfirmed\(eid, p\.id, v, p\)/, 'the value the thumb stops on is never confirmed')
 
-    /* A speaker in the header, not a strip on the stage screen: "but it's not
-       there on the main screen". */
-    const stage = read('mobile/src/screens/Stage.js')
-    assert.match(stage, /showVolume \? '🔊 ✕' : '🔊'/, 'the volume is not behind a speaker button')
-    assert.match(stage, /\{showVolume \? \(/, 'the volume is on the stage screen all the time')
+    /*
+     * A speaker in the header, and what it opens is a POP-UP: "just an overlay
+     * that pops up on the screen separately… able to be slid without scrolling
+     * or moving anything else."
+     *
+     * That is the fix rather than the styling. A slider inside a scroll view
+     * loses its drag to the scroll view's native gesture; in a modal there is
+     * no scroll view behind it and nothing to argue with.
+     */
+    const bar = read('mobile/src/components/TopBar.js')
+    assert.match(bar, /accessibilityLabel="Volume"/, 'the volume is not behind a speaker button')
+    assert.match(bar, /onPress=\{\(\) => setVolume\(true\)\}/, 'the speaker opens nothing')
+    assert.match(bar, /<Volume blocks=\{blocks\} open=\{volume\}/, 'the bar does not carry the volume it opens')
+    /* And the stage screen no longer has a second one. Two speakers on one
+       screen is the clutter moving it up was meant to end. */
+    assert.ok(!/🔊/.test(read('mobile/src/screens/Stage.js')), 'the stage screen kept its own speaker')
+    assert.match(vol, /<Modal visible=\{open\}/, 'the volume is back in the page flow, where the scroll view takes its drag')
+    assert.match(vol, /from 'expo-blur'/, 'the volume pop-up is not glass like the tuner')
+    /* A thumb that slips off the slider must not close the thing it is holding. */
+    assert.match(vol, /onPress=\{\(\) => \{\}\}/, 'the panel does not swallow presses, so a slip off the slider closes it')
   })
 
   test('a setting that says it changed something has changed something', () => {
@@ -1197,7 +1212,13 @@ export function run(test) {
      * the last song's names on this song's tiles, which is worse than the
      * numbers — a number is never wrong.
      */
-    assert.match(rig, /chain: 'reading', sceneNames: \[\]/, 'the last preset’s scene names stay on the new preset’s tiles')
+    /* Whitespace-flattened: the call wraps across lines now, and a check that
+       breaks when a line reflows is a check nobody can edit around. */
+    assert.match(
+      rig.replace(/\s+/g, ' '),
+      /chain: 'reading', sceneNames: \[\]/,
+      'the last preset’s scene names stay on the new preset’s tiles'
+    )
 
     /*
      * The host serves this from whatever the unit last dumped, and a slow unit
@@ -1243,6 +1264,412 @@ export function run(test) {
 
     /* A unit with no tuner is not offered one. */
     assert.match(stage, /caps\?\.tuner !== false \?/, 'a unit that says it has no tuner is still given the button')
+  })
+
+  test('the tuner covers the screen instead of hiding under the button that opens it', () => {
+    /*
+     * "Tuner displays under the tuner button and isn't visible without
+     * scrolling."
+     *
+     * It was drawn in the flow of a screen that scrolls, at the bottom, under
+     * the button that turns it on — so switching the tuner on did nothing you
+     * could see. Nothing here failed: the needle rendered perfectly, off the
+     * bottom of the phone.
+     *
+     * Tuning is not something you do alongside something else. For as long as
+     * it is on it is the only thing on the screen, and it is the size of it.
+     */
+    const tuner = read('mobile/src/components/Tuner.js')
+    const stage = read('mobile/src/screens/Stage.js')
+
+    assert.match(tuner, /<Modal visible=\{on\}/, 'the tuner is drawn in the page flow again, where it scrolls out of sight')
+    assert.match(tuner, /from 'expo-blur'/, 'the glass is gone')
+    assert.match(tuner, /tint="dark"/, 'the overlay is not tinted, so the rig behind it reads through at full brightness')
+
+    /* Closing it stops the tuner at the unit. An overlay that closes and leaves
+       the unit tuning is a rig muted by a screen nobody is looking at. */
+    assert.match(stage, /onClose=\{\(\) => writeTuner\(false\)\}/, 'closing the tuner leaves it running on the unit')
+    assert.match(tuner, /onPress=\{onClose\}[\s\S]{0,200}?style=\{\{ flex: 1 \}\}/, 'tapping the overlay does not close it')
+
+    /* And it is outside the foot, so the foot does not reserve space for it. */
+    assert.ok(
+      !/<Tuner on=\{tunerOn\} reading=\{tuning\} \/>/.test(stage),
+      'the tuner is still rendered inline without a way to close it'
+    )
+  })
+
+  test('Setup is a short list of doors, not everything at once', () => {
+    /*
+     * "Setup screen needs to be fixed. It's showing rename scenes and not set
+     * up like the web app."
+     *
+     * The browser arrived at this the hard way — "I wanna overhaul this whole
+     * settings set-up screen" — and the phone had exactly the pile it replaced:
+     * one long scroll with eight empty scene-name boxes as the FIRST thing on
+     * it. Nobody opens Setup to rename scene 6.
+     *
+     * A list of rows, each carrying the one fact you would have opened it to
+     * learn, each opening its own page. Renaming lives on the Unit page, which
+     * is where the browser put it: "move the rename presets and scenes button
+     * to the settings menu".
+     */
+    const settings = read('mobile/src/screens/Settings.js')
+
+    for (const row of ['Unit', 'Phone & Mac', 'Play screen', 'About']) {
+      assert.match(
+        settings,
+        new RegExp(`title="${row.replace('&', '&')}"`),
+        `Setup has no ${row} row`
+      )
+    }
+    assert.match(settings, /const \[page, setPage\] = useState\(null\)/, 'Setup is one scroll again rather than a list of pages')
+
+    /*
+     * The renaming boxes are behind the Unit row, not in front of everything.
+     * Checked by position: what is drawn for `page === null` must not contain
+     * them.
+     */
+    const root = settings.slice(settings.indexOf('{page === null ? ('), settings.indexOf("{page === 'unit' ?"))
+    assert.ok(root.length > 200, 'the Setup root moved; this check reads it')
+    assert.ok(!/UnitBits/.test(root), 'the scene-name boxes are back on the front page of Setup')
+    assert.ok(!/TileSize/.test(root), 'the tile size buttons are on the front page rather than behind Play screen')
+
+    const unit = settings.slice(settings.indexOf("{page === 'unit' ?"), settings.indexOf("{page === 'link' ?"))
+    assert.match(unit, /<UnitBits \/>/, 'renaming is not on the Unit page')
+
+    /* Each row says something true about the state it leads to, which is the
+       whole point of the list: it answers most questions without a tap. */
+    assert.match(settings, /status=\{link === 'connected' \? `\$\{deviceName \|\| 'Unit'\} · connected`/)
+    assert.match(settings, /status=\{SIZES\[loadSize\(sync\)\]\?\.name/)
+  })
+
+  test('the version on the About page is the version that was built', async () => {
+    /*
+     * Typed by hand it is the version somebody last remembered to type, which
+     * is worse than none: a wrong one sends people hunting for a bug in a build
+     * they are not running. So it is rendered from the repository's own
+     * package.json by sync:rules, and held to it by the same staleness check as
+     * every other shared file.
+     */
+    const { APP_VERSION } = await import('../mobile/src/lib/version.js')
+    const pkg = JSON.parse(read('package.json'))
+    assert.equal(APP_VERSION, pkg.version, 'the phone reports a version the repository is not on')
+    assert.match(read('mobile/src/screens/Settings.js'), /v\$\{APP_VERSION\}/, 'Setup does not show the version')
+  })
+
+  test('a tap moves the number on the button, not just the unit', async () => {
+    /*
+     * "Tap tempo isn't changing (or it's extremely slow) on the phone screen,
+     * but it does update the unit."
+     *
+     * The tap worked. The phone then sat waiting to be TOLD the new tempo by a
+     * `tempo` event — and over the relay that event is not reliably carried,
+     * the same filtering that keeps the tuner's readings at the Mac. So the
+     * unit changed and the screen did not, until something else happened to
+     * cause a read.
+     *
+     * THE TAP AND THE READ-BACK MUST NOT BE FOLDED TOGETHER, which is why this
+     * is a delay and not an await. The unit works the tempo out from the
+     * SPACING between taps, so a tap held back by a debounce is a different
+     * rhythm; and reading mid-burst answers with the tempo of the taps before
+     * this one, putting a stale number on the button still under your thumb.
+     */
+    const { TAP_REREAD_MS } = await import('../mobile/src/lib/tempo.js')
+    const web = await import('../shared/tempo.mjs')
+
+    assert.equal(TAP_REREAD_MS, web.TAP_REREAD_MS, 'the two apps wait different lengths before reading the tempo back')
+    assert.ok(TAP_REREAD_MS >= 600 && TAP_REREAD_MS <= 2000, `${TAP_REREAD_MS}ms is outside a tap burst`)
+
+    const rig = read('mobile/src/lib/rig.js')
+    const tap = rig.slice(rig.indexOf('export async function tapTempo'), rig.indexOf('export function writeTempo'))
+    assert.ok(tap.length > 100, 'tapTempo moved; this check reads it')
+
+    assert.match(tap, /clearTimeout\(reread\)/, 'each tap does not cancel the read-back the one before it scheduled')
+    assert.match(tap, /setTimeout\(\(\) => refreshTempo\(\), TAP_REREAD_MS\)/, 'the tempo is never read back after a tap')
+    assert.ok(
+      !/await refreshTempo\(\)/.test(tap),
+      'the read-back is awaited inside the tap, which makes the tap itself late and the rhythm wrong'
+    )
+
+    /* Both apps do it the same way. */
+    assert.match(read('src/components/Gig.jsx'), /setTimeout\(\(\) => refreshTempo\(\), TAP_REREAD_MS\)/)
+  })
+
+  test('the phone keeps a log of what went wrong, and can hand it over', async () => {
+    /*
+     * "I need a debug log with a copy log button so I can paste the log for you
+     * to debug."
+     *
+     * A browser has a console somebody can open. A phone on a dark stage has
+     * nowhere at all for a failure to go, so every bad evening was
+     * unreconstructable: the screen shows the latest state and nothing about
+     * the sequence that produced it. "It kept dropping" cannot be answered from
+     * a screen that says "Connected".
+     */
+    const { logDebug, getDebugLog, clearDebugLog, formatDebugLog } = await import(
+      '../mobile/src/lib/debugLog.js'
+    )
+
+    clearDebugLog()
+    logDebug('wire', 'GET /preset/blocks failed', 'Your Mac didn’t answer.')
+    logDebug('link', 'connected → no-answer')
+    const lines = getDebugLog()
+    assert.equal(lines.length, 2, 'the log does not keep what it is told')
+    assert.equal(lines[0].message, 'GET /preset/blocks failed', 'the log is newest-first; a story reads in order')
+
+    /* The copy carries a header, because the first three questions about any
+       report are which build, which unit and which end of the link — and none
+       of them can be read off the lines. */
+    const text = formatDebugLog({ app: 'Fractal Remote (phone) v9.9.9', unit: 'FM3', link: 'no-answer' })
+    assert.match(text, /app: Fractal Remote \(phone\) v9\.9\.9/)
+    assert.match(text, /unit: FM3/)
+    assert.match(text, /GET \/preset\/blocks failed/)
+    clearDebugLog()
+
+    /* It is written at the choke points every trip passes through, rather than
+       sprinkled: one place for the wire, one for the link. */
+    const relay = read('mobile/src/lib/relay.js')
+    assert.match(relay, /logDebug\('wire', `\$\{method\} \$\{path\} failed`/, 'a failed request is not logged')
+    assert.match(relay, /logDebug\('wire', `\$\{method\} \$\{path\} refused here`/, 'a refusal by this app is not logged')
+    assert.match(read('mobile/src/lib/link.js'), /logDebug\('link', `\$\{was\} → \$\{next\.link\}`/, 'the link changing its mind is not logged')
+
+    /*
+     * And bodies stay out of it. This gets pasted into a chat: a preset dump is
+     * neither readable nor anybody else's business.
+     */
+    assert.ok(!/logDebug\([^)]*options\.body/.test(relay), 'request bodies are being written into a log meant for pasting')
+
+    /* The screen that hands it over. */
+    const log = read('mobile/src/screens/Log.js')
+    assert.match(log, /Clipboard\.setStringAsync\(text\)/, 'there is no way to get the log off the phone')
+    assert.match(log, /label="Copy the log"/)
+    assert.match(read('mobile/src/screens/Settings.js'), /title="Help & fixes"/, 'Setup has no way into the log')
+  })
+
+  test('the bench is reachable, and the switch that could take it away still works', async () => {
+    /*
+     * It was off for twenty minutes on the strength of "just remove edit for
+     * now", then: "actually just fix the edit screen I actually like it."
+     *
+     * What was wrong was never the screen. "The knobs just scroll the screen up
+     * and down" is a gesture problem — see the check below — and switching a
+     * screen off would have been hiding a two-line fix behind a feature flag.
+     *
+     * The switch stays, because it is the honest way to take something out if
+     * it ever needs taking out again. So this checks both halves: that it is on,
+     * and that both doors still read it rather than having been hard-wired open
+     * while it was off.
+     */
+    const { BENCH } = await import('../mobile/src/lib/features.js')
+    assert.equal(BENCH, true, 'the bench is switched off; Justin asked for it back')
+
+    const app = read('mobile/App.js')
+    assert.match(app, /BENCH && screen === 'edit'/, 'the route no longer reads the switch, so turning it off would leave the screen reachable')
+    assert.match(app, /BENCH && link\.link === 'connected'/, 'the Edit button no longer reads the switch')
+
+    /* Absent rather than disabled when there is nowhere to go. */
+    assert.match(read('mobile/src/screens/Stage.js'), /\{onOpenEdit \? \(/, 'the Edit button is drawn whether or not there is anywhere to go')
+  })
+
+  test('a knob keeps the finger the scroll view would otherwise take', () => {
+    /*
+     * "The knobs just scroll the screen up and down when trying to change them."
+     *
+     * WHY CLAIMING THE RESPONDER IS NOT ENOUGH, which is the thing to know
+     * before touching any of this again. A knob turns on a vertical drag and it
+     * lives on a screen that scrolls vertically. The JS responder system grants
+     * the knob the touch — and then iOS's scroll view, whose pan gesture
+     * recogniser is NATIVE, takes it back and terminates the drag. The screen
+     * moves and the control does not.
+     *
+     * The lock goes on in the CAPTURE phase, on touch-down, before anything has
+     * been granted and before the scroll view has decided this is a scroll.
+     * Doing it on grant is one hop later and one re-render closer to the first
+     * move, which is a race this does not need to be in.
+     *
+     * The volume took the other road and became a modal, where there is no
+     * scroll view to argue with at all — so it is not checked here.
+     */
+    const knob = read('mobile/src/components/Knob.js')
+    const edit = read('mobile/src/screens/Edit.js')
+
+    assert.match(
+      knob,
+      /onStartShouldSetPanResponderCapture: \(\) => \{\s*\n\s*live\.current\.onScrollLock\?\.\(true\)/,
+      'the lock is not set in the capture phase, so the scroll view can start scrolling first'
+    )
+    assert.equal(
+      (knob.match(/live\.current\.onScrollLock\?\.\(false\)/g) || []).length,
+      2,
+      'the knob does not release the screen on both the end and the termination of a drag'
+    )
+    /* A screen left locked by a drag that never released will not scroll again
+       — worse than the bug being fixed. */
+    assert.match(knob, /useEffect\(\(\) => \(\) => onScrollLock\?\.\(false\), \[onScrollLock\]\)/, 'a torn-down knob can leave the screen stuck')
+
+    /* And the screen it lives on honours it. */
+    assert.match(edit, /scrollEnabled=\{!held\}/, 'the bench scrolls under its own knobs')
+    assert.match(edit, /onScrollLock=\{onScrollLock\}/, 'the knobs are not wired to the lock')
+    assert.match(edit, /onScrollLock=\{setHeld\}/, 'the block panel is not wired to the lock')
+  })
+
+  test('what pops up comes over the screen, never into it', () => {
+    /*
+     * "When holding a block to change channel have it be an overlay on the
+     * screen instead of inserting itself into the screen like the web version."
+     *
+     * WHY INSERTING IS WORSE THAN IT SOUNDS, and it is not a matter of taste. A
+     * panel that opens inside a scrolling page pushes everything below it down —
+     * so the tiles a thumb was aimed at MOVE while the thumb is on its way, on
+     * the one screen where that happens mid-song. The browser learned this and
+     * made every one of these a sheet.
+     *
+     * Four things come up over the stage screen now: the tuner, the volume, the
+     * channel picker and anything added later. Each is checked the same way,
+     * because the failure is silent — an inline panel looks fine in a
+     * screenshot taken while nothing is moving.
+     */
+    const stage = read('mobile/src/screens/Stage.js')
+
+    /* The channel picker is a sheet, and the sheet is a modal. */
+    assert.match(stage, /<ChannelSheet/, 'the channel picker is not a sheet')
+    assert.match(read('mobile/src/components/Sheet.js'), /<Modal visible=\{!!open\}/, 'the sheet is not a modal, so it takes room in the page')
+    assert.ok(
+      !/DRV — CHANNEL|— channel<\/Label>|<Label>\s*\{shortBlock\([^)]*\)\} — channel/.test(stage),
+      'the channel picker is drawn inline again, which reflows the tiles under a thumb'
+    )
+
+    /* Everything that pops up is drawn AFTER the content, outside the scrolling
+       part of the screen — an overlay nested in the flow is an overlay that can
+       still push things around. */
+    const scroll = stage.indexOf('</ScrollView>')
+    for (const tag of ['<ChannelSheet', '<Tuner']) {
+      const at = stage.indexOf(tag)
+      assert.ok(at > 0, `${tag} is gone from the stage screen`)
+      assert.ok(at < scroll, `${tag} escaped the screen entirely`)
+    }
+    /* The volume is no longer one of them: its speaker moved to the bar at the
+       top of the app, and the sheet went with the button that opens it. It is
+       still a modal, which is the part that mattered — checked above. */
+
+    /* And each one keeps a press that lands on it, so a thumb slipping off a
+       control does not dismiss the thing it is holding. */
+    for (const file of ['mobile/src/components/Sheet.js', 'mobile/src/components/Volume.js']) {
+      assert.match(read(file), /onPress=\{\(\) => \{\}\}/, `${file} closes when a press lands on the panel itself`)
+    }
+  })
+
+  test('the preset list opens on the preset you are playing', () => {
+    /*
+     * "I'm on preset 99. When preset button is tapped have it go to the current
+     * preset on the list in the middle of the screen and have the current
+     * preset highlighted in yellow to show what preset it's on."
+     *
+     * It opened at slot 0 every time, so the first thing the list did was hide
+     * the one row anybody already knew they wanted — five hundred slots away.
+     * The current row WAS marked; nobody had ever seen the mark.
+     *
+     * The arithmetic is the part that can go quietly wrong. Jumping to a row in
+     * a five-hundred-row list means telling the list how tall a row is, and a
+     * row that grows taller than that number without it moving sends the jump
+     * to somewhere NEAR slot 99 — which is worse than not jumping, because it
+     * looks like it worked.
+     */
+    const presets = read('mobile/src/screens/Presets.js')
+
+    assert.match(presets, /const ROW = TAP/, 'the row height is no longer written down, so the jump cannot be computed')
+    assert.match(presets, /const STRIDE = ROW \+ GAP/, 'the gap between rows is not counted, so the jump drifts down the list')
+    assert.match(
+      presets,
+      /getItemLayout=\{\(_, i\) => \(\{ length: STRIDE, offset: STRIDE \* i, index: i \}\)\}/,
+      'the list cannot be told to go to a row without drawing every row before it'
+    )
+    assert.match(presets, /initialScrollIndex=/, 'the list renders from the top and scrolls afterwards')
+    assert.match(presets, /viewPosition: 0\.5/, 'the current preset lands at the top of the screen rather than the middle of it')
+
+    /*
+     * The gap is a margin, not the container's `gap`: getItemLayout cannot see
+     * `gap`, so the error would compound down the list — fine at the top and
+     * useless at the bottom.
+     */
+    assert.match(presets, /marginBottom: GAP/, 'the rows are spaced by something the jump cannot account for')
+    assert.ok(
+      !/contentContainerStyle=\{\{[^}]*gap:/.test(presets),
+      'the list is spaced with `gap`, which getItemLayout cannot see'
+    )
+
+    /* Once, on opening. Re-centring whenever the preset changed would yank the
+       list out from under a thumb that is scrolling it. */
+    assert.match(presets, /if \(centred\.current \|\| hunting\) return/, 'the list re-centres itself while somebody is scrolling or searching')
+
+    /* And every row stays two lines, so ROW stays true. */
+    assert.match(presets, /sub=\{here \? `\$\{slotLabel\(n, addressing\)\} · Playing`/, 'the current row is not marked in words')
+    assert.match(presets, /tone="signal"[\s\S]{0,40}?on=\{here\}/, 'the current row is not marked in the colour this app uses for live')
+  })
+
+  test('pressing a preset shows it now, and confirms it behind that', () => {
+    /*
+     * "When tapping a preset there is about a 2 second delay before it
+     * highlights it and goes back to the main screen."
+     *
+     * It waited for the lot: the select, then the preset, the scene, the scene
+     * names and the whole chain — six round trips, two of them among the SLOW
+     * reads that make the unit dump a preset over serial. Only then did
+     * anything move.
+     *
+     * A control that waits that long before acknowledging a press reads as a
+     * control that did not register it, which is how a preset gets loaded
+     * twice. Everything else in rig.js is optimistic for exactly this reason;
+     * this was the one write that was not.
+     */
+    const rig = read('mobile/src/lib/rig.js')
+    /* To the end of the file: loadPreset is the last thing in it, and slicing
+       to a name that appears EARLIER gives an empty string that quietly passes
+       every check below. */
+    const load = rig.slice(rig.indexOf('export async function loadPreset'))
+    assert.ok(load.length > 200, 'loadPreset moved; this check reads it')
+
+    /* The new slot is on screen before the unit is asked. */
+    assert.ok(
+      load.indexOf('preset: {') < load.indexOf('await device.selectPreset'),
+      'the preset is still shown only after the unit has answered'
+    )
+    /* And put back if the unit refuses — captured before the change rather
+       than rebuilt from a state that has already moved. */
+    assert.match(load, /const was = state\.preset/, 'nothing remembers the preset to go back to')
+    assert.match(load, /set\(\{ error: err\.message, chain: 'ok', preset: was \}\)/, 'a refused select leaves the wrong preset on screen')
+
+    /* Neither screen waits on it. */
+    for (const file of ['mobile/src/screens/Presets.js', 'mobile/src/screens/Stage.js']) {
+      assert.ok(
+        !/await loadPreset\(/.test(read(file)),
+        `${file} waits for the whole read before it does anything, which is the two seconds`
+      )
+    }
+    assert.match(read('mobile/src/screens/Presets.js'), /loadPreset\(n\)\s*\n\s*onBack\?\.\(\)/, 'the picker does not close on the press')
+
+    /*
+     * The chain before the scene names. The chain is most of what the stage
+     * screen draws and the names are the least urgent thing on it; reading the
+     * names first left the tiles saying "reading" for a slow read nobody was
+     * waiting on.
+     */
+    assert.ok(
+      load.indexOf('await refreshBlocks()') < load.indexOf('await refreshSceneNames()'),
+      'the chain waits behind a slow read of the scene names'
+    )
+
+    /*
+     * And the gap is not filled with a guess. "Untitled" for the one round trip
+     * before the unit says what the preset is called would be wrong more often
+     * than right — the slot number is already on screen above it.
+     */
+    assert.match(load, /pending: typeof known !== 'string'/, 'nothing marks a preset whose name is not known yet')
+    assert.match(
+      read('mobile/src/screens/Stage.js'),
+      /preset\?\.pending && !preset\?\.name \? '…' : presetLabel\(preset\)/,
+      'the stage screen shows Untitled while it waits to be told the name'
+    )
   })
 
   test('every component the phone draws is one that exists', () => {
@@ -1575,5 +2002,119 @@ export function run(test) {
       !/function mergeUnits?\b/.test(web),
       'the browser kept a second copy of the merge'
     )
+  })
+
+  test('a garbled preset dump is asked for again on the phone, not shown', () => {
+    /*
+     * "PRESET_DUMP_HEADER: expected func 0x77 at offset 0, got 0x78", on a
+     * stage, in a red bar above the preset being played. The browser has never
+     * shown that sentence, because forgefx.js has wrapped its requests in the
+     * retry since the day the message first appeared. The phone had no retry at
+     * all — the same read, the same unit, a different app, and only one of them
+     * asked again.
+     *
+     * Wrapped at remoteRequest rather than in device.js because every read that
+     * makes the unit dump a preset passes through there: the block list, the
+     * scene names, the volume slider's level.
+     */
+    const relay = read('mobile/src/lib/relay.js')
+    assert.match(relay, /import \{ withRetry \} from '\.\/retry'/, 'the phone does not import the retry')
+    assert.match(
+      relay.replace(/\s+/g, ' '),
+      /export async function remoteRequest\(path, options = \{\}\) \{.*?return withRetry\(\(\) => requestOnce\(path, method, options\), \{ method, path \}\)/,
+      'the phone sends requests without going through the retry'
+    )
+    /* And it is the shared rule, not a second opinion about which requests may
+       be asked twice. A phone that retried a write would send it twice. */
+    assert.ok(
+      !/PRESET_DUMP_HEADER/.test(relay),
+      'the phone has its own copy of what a garbled dump looks like'
+    )
+  })
+
+  test('an error on the phone can be put away', () => {
+    /*
+     * "See the error banner at top of screen. It also has no way to dismiss
+     * it." A fault sat above the preset being played until something else
+     * happened to replace it, which on a rig that had recovered could be the
+     * rest of the song.
+     *
+     * The cross is on the Note itself so every caller gets the same one, and
+     * only appears when the caller passed something for it to do — the notes
+     * describing a live condition have nothing to put away.
+     */
+    const note = read('mobile/src/components/Note.js')
+    assert.match(note, /onDismiss/, 'a Note cannot be dismissed')
+    assert.match(note, /accessibilityLabel="Dismiss"/, 'the cross has no name for VoiceOver')
+    assert.ok(
+      /onDismiss \? \(/.test(note),
+      'the cross is drawn whether or not there is anything for it to do'
+    )
+
+    const rig = read('mobile/src/lib/rig.js')
+    assert.match(rig, /export const clearError = \(\) => set\(\{ error: null \}\)/, 'the store cannot be told to forget an error')
+
+    const stage = rig && read('mobile/src/screens/Stage.js')
+    assert.match(
+      stage.replace(/\s+/g, ' '),
+      /\{error \? \( <Note tone="fault" onDismiss=\{clearError\}>/,
+      'the play screen’s error still cannot be dismissed'
+    )
+    /* And the volume's, which lives on the bar now that the speaker does. It
+       is not a Note — the bar is one line and has to stay one — but it is
+       dismissible for the same reason. */
+    assert.match(
+      read('mobile/src/components/TopBar.js').replace(/\s+/g, ' '),
+      /\{failed \? <Reported said=\{failed\} onClear=\{\(\) => setFailed\(null\)\}/,
+      'a volume error still cannot be dismissed'
+    )
+    assert.match(
+      read('mobile/src/screens/Edit.js').replace(/\s+/g, ' '),
+      /\{error \? \( <Note tone="fault" onDismiss=\{\(\) => setError\(null\)\}>/,
+      'the edit screen’s error still cannot be dismissed'
+    )
+  })
+
+  test('the phone wears the browser\u2019s header', () => {
+    /*
+     * "Make sure the iOS app shows this exact header." What it had was a
+     * sentence — "Connected to MacBook Pro SG 566" — which named the one fact
+     * on that bar nobody needs mid-song, and left out the three they do: what
+     * the unit is, what version this is, and whether the link is live. The
+     * speaker and Setup were down in the slot row, fighting Edit for a corner.
+     *
+     * Five things, left to right, the same order as the browser: lamp, unit,
+     * version, the state in one word, volume, setup.
+     */
+    const bar = read('mobile/src/components/TopBar.js')
+    const flat = bar.replace(/\s+/g, ' ')
+
+    const order = ['<Lamp state=', '{named}', 'v${APP_VERSION}', '{word.toUpperCase()}', 'accessibilityLabel="Volume"', 'accessibilityLabel="Connection and setup"']
+    let last = -1
+    for (const piece of order) {
+      const at = bar.indexOf(piece)
+      assert.ok(at > 0, `the header is missing ${piece}`)
+      assert.ok(at > last, `${piece} is out of order against the browser's bar`)
+      last = at
+    }
+
+    /* The unit's own short name, not the Mac's. */
+    assert.match(bar, /const ofDeviceName = \(s\) => s\.deviceName/, 'the header does not say what the unit is')
+    /* The version, off the build rather than typed. */
+    assert.match(bar, /from '\.\.\/lib\/version'/, 'the version on the bar is not the one that was built')
+    /* And the word is the shared one, so the two apps cannot drift. */
+    assert.match(bar, /from '\.\.\/lib\/link-word'/, 'the phone decides the word for itself')
+    assert.match(flat, /linkWord\(tone, 'remote'\)/, 'the phone is not using the shared word')
+
+    /* The old bar is gone rather than stacked above the new one. */
+    const app = read('mobile/App.js')
+    assert.match(app, /<TopBar link=\{link\} onOpenSettings=/, 'the app does not draw the header')
+    assert.ok(!/function LinkBar/.test(app), 'the old sentence bar is still there, under the new one')
+    assert.ok(!/Connected to \$\{/.test(app), 'the app still writes out which Mac it found')
+
+    /* And the stage screen gave up the two buttons the bar now carries. */
+    const stage = read('mobile/src/screens/Stage.js')
+    assert.ok(!/label="Setup"/.test(stage), 'Setup is on the stage screen as well as the bar')
+    assert.ok(!/onOpenSettings/.test(stage), 'the stage screen still takes a way to Setup it no longer draws')
   })
 }

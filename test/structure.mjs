@@ -18,6 +18,8 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 /* The grid rules both apps share, so the checks below can RUN them rather than
    read them out of whichever file happens to hold them this month. */
 import { cableColumns, doubtfulWrite, toWireCell as wireCell } from '../shared/grid-plan.mjs'
+import { linkTone, linkWord, toneOfRemote } from '../shared/link-word.mjs'
+import { describeLink } from '../src/lib/link.js'
 
 const src = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
 /* The Ask button's rule lives in a module so it can be asserted as behaviour
@@ -2302,15 +2304,43 @@ export function run(test) {
      * three states the mark did, in the state's colour, and the button keeps
      * the gear's height so it is still something a thumb can hit.
      */
-    assert.match(chip, /said\.tone === 'good' \? 'ok' : said\.tone === 'busy' \? 'wait' : said\.tone === 'bad' \? 'no' : 'off'/, 'the word no longer follows the link tone')
-    assert.match(chip, /mark === 'no'\s*\? 'disconnected'/, 'the chip does not say disconnected')
-    assert.match(chip, /mark === 'ok'\s*\? 'connected'/, 'the chip does not say connected')
+    /*
+     * The four words moved out to shared/link-word.mjs when the phone was asked
+     * for "this exact header" — one set of words, decided once, because a phone
+     * saying DISCONNECTED beside a Mac saying CONNECTED about the same link is
+     * a difference nobody can debug from a photograph. So the chip is checked
+     * for using them, and the words themselves are checked where they live.
+     */
+    assert.match(chip, /import \{ linkTone, linkWord \} from '\.\.\/\.\.\/shared\/link-word\.mjs'/, 'the chip has its own copy of the words again')
+    assert.match(chip, /const mark = linkTone\(said\.tone\)/, 'the chip decides the mark for itself')
+    assert.match(chip, /const state = linkWord\(said\.tone, link\.role\)/, 'the chip decides the word for itself')
+    assert.equal(linkTone('good'), 'ok')
+    assert.equal(linkTone('busy'), 'wait')
+    assert.equal(linkTone('bad'), 'no')
+    assert.equal(linkTone('dim'), 'off')
+    assert.equal(linkWord('bad', 'remote'), 'disconnected', 'the chip does not say disconnected')
+    assert.equal(linkWord('good', 'remote'), 'connected', 'the chip does not say connected')
+    assert.equal(linkWord('busy', 'remote'), 'connecting', 'a link on its way is called something else')
     /*
      * Quiet is not broken. A remote that is off, or never set up, was a red
      * DISCONNECTED beside the version number — in the demo, for good — and
      * read as the app having lost something. Grey, and it says what it is.
      */
-    assert.match(chip, /link\.role === 'remote'\s*\? 'no Mac'\s*: 'no phone'/, 'a remote nobody turned on is called disconnected')
+    assert.equal(linkWord('dim', 'remote'), 'no Mac', 'a remote nobody turned on is called disconnected')
+    assert.equal(linkWord('dim', 'mac'), 'no phone', 'a Mac with no phone on it is called disconnected')
+    /*
+     * And the phone reads the same four states off its own link module, which
+     * has no describeLink in it at all. This is the join between the two: if
+     * the browser ever re-tones one of these states, the phone's bar is drawn
+     * from the stale half and nothing else would notice.
+     */
+    for (const link of ['connected', 'joining', 'no-answer', 'signed-out']) {
+      assert.equal(
+        toneOfRemote(link),
+        describeLink({ role: 'remote', link }).tone,
+        `the phone and the browser disagree about a remote that is ${link}`
+      )
+    }
     const quiet = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
     assert.match(quiet, /\.phone-word\.off \{\s*color: var\(--silk-faint\)/, 'the quiet word is not grey')
     /*

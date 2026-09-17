@@ -36,3 +36,28 @@
  * only thing that ever did was the screen this takes the door away from.
  */
 export const AI = false
+
+/**
+ * The bench — the Edit screen — and it is ON.
+ *
+ * It was off for about twenty minutes, on the strength of "just remove edit for
+ * now", and then: "actually just fix the edit screen I actually like it."
+ *
+ * WHAT WAS ACTUALLY WRONG WAS NOT THE SCREEN. "The knobs just scroll the screen
+ * up and down when trying to change them" is a gesture problem, not a missing
+ * feature — a knob turns on a vertical drag and lives on a screen that scrolls
+ * vertically, and on iOS the scroll view's pan gesture recogniser is NATIVE: it
+ * takes the touch back and terminates the drag rather than losing to a
+ * JavaScript responder. Switching the screen off would have been hiding a
+ * two-line fix behind a feature flag.
+ *
+ * The fix is `onScrollLock` — see components/Knob, which stops the screen
+ * scrolling at the earliest hook there is, the capture phase of the touch,
+ * before the scroll view has been asked anything.
+ *
+ * The switch stays because it is the honest way to take something out if it
+ * ever needs taking out again, and because the AI one above proves the pattern
+ * works. Turning it off puts the route and the button back behind it, in
+ * App.js and Stage.js, with no other change anywhere.
+ */
+export const BENCH = true

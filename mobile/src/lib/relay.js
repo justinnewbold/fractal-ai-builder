@@ -21,9 +21,11 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { createClient } from '@supabase/supabase-js'
+import { logDebug } from './debugLog'
 
 import { DEFAULT_PROJECT } from './project'
 import { decode } from './decode'
+import { withRetry } from './retry'
 import {
   RELAY_GRACE,
   explainAuth,
@@ -623,7 +625,20 @@ export async function waitForRelay(
  */
 export async function remoteRequest(path, options = {}) {
   const method = (options.method || 'GET').toUpperCase()
+  /*
+   * A dump that arrived in the wrong order is asked for again, not shown.
+   *
+   * See lib/retry.js for what that message is and why it happens. The browser
+   * has wrapped its requests this way for as long as the message has existed;
+   * the phone showed it raw, on stage, in the codec's own words. Wrapped here
+   * rather than in device.js because every read that wants a preset dump —
+   * the block list, the scene names, the volume slider's level — passes
+   * through this one function.
+   */
+  return withRetry(() => requestOnce(path, method, options), { method, path })
+}
 
+async function requestOnce(path, method, options) {
   /*
    * Nothing is changed while two Macs are listening. A write is not sent to the
    * wrong unit — it is carried out on both. Reads are left alone deliberately:
@@ -645,6 +660,7 @@ export async function remoteRequest(path, options = {}) {
     const err = new Error(`You can't ${why} from your phone — do that at the Mac.`)
     err.status = 403
     err.remoteBlocked = true
+    logDebug('wire', `${method} ${path} refused here`, why)
     throw err
   }
 
@@ -656,19 +672,40 @@ export async function remoteRequest(path, options = {}) {
   const graceUntil = Date.now() + (options.graceMs ?? RELAY_GRACE)
   const attempts = repeatable(path) ? 2 : 1
 
+  /*
+   * Every request passes here, which is why the log is written here and nowhere
+   * else. A phone has no console to open — a failure on a stage had nowhere at
+   * all to go, and a bad evening could not be reconstructed afterwards.
+   *
+   * What is kept is the shape of the trip, not its contents: the method, the
+   * path, how long it took, and what went wrong. Bodies are deliberately left
+   * out — this log is written to be pasted into a chat, and a preset dump is
+   * neither readable nor anybody else's business.
+   */
+  const began = Date.now()
   let last = null
   for (let attempt = 0; attempt < attempts; attempt++) {
     try {
       await relayReady(graceUntil - Date.now())
-      return await relaySend(method, path, options)
+      const answer = await relaySend(method, path, options)
+      const took = Date.now() - began
+      /* Only the slow ones. Logging every read would bury the one line that
+         matters under four hundred that do not. */
+      if (took > 1500) logDebug('wire', `${method} ${path} — ${took}ms`)
+      return answer
     } catch (err) {
       // Only a relay that went missing is worth repeating. A 403, a 409, a unit
       // that answered "no" — those are answers, and asking again gets the same
       // one a second slower.
-      if (!err?.linkDown) throw err
+      if (!err?.linkDown) {
+        logDebug('wire', `${method} ${path} failed`, err?.message)
+        throw err
+      }
       last = err
+      logDebug('wire', `${method} ${path} — link down, attempt ${attempt + 1} of ${attempts}`)
     }
   }
+  logDebug('wire', `${method} ${path} gave up`, last?.message)
   throw last
 }
 
