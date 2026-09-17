@@ -772,6 +772,10 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
    * answer means nothing on this hardware, and undoing a move because of it
    * is the bug this panel was reported for.
    */
+  /* Whether the unit sent a rejection frame for a write. Counted and said,
+     never acted on: see doubtfulWrite for why that answer undoes nothing. */
+  const refusedAnswer = (r) => !!r && r.ok === false
+
   const reorder = async (lane, fromItem, toItem) => {
     const items = laneItems(lane)
     const pos = blockPositions(items, fromItem, toItem)
@@ -786,15 +790,33 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
     setIssue(null)
     beginChainWrite()
     let last = null
+    /*
+     * EVERY ANSWER IS WRITTEN DOWN. The server only calls a write refused
+     * when the unit sends a rejection frame within a tenth of a second; a
+     * unit that quietly ignores a command answers exactly like one that took
+     * it. So each clear and each placement is logged with what the unit
+     * said, and a "refused" anywhere in the six is said on screen too.
+     */
+    const answers = []
+    const said = (r) => (refusedAnswer(r) ? 'refused' : r?.ok === true ? 'ok' : 'no answer')
     try {
-      for (const m of moves) await clearCell(lane.row, m.from)
+      for (const m of moves) {
+        const r = await clearCell(lane.row, m.from)
+        answers.push(r)
+        logDebug('chain', `clear ${m.block.name} from column ${m.from + 1}`, said(r))
+      }
       try {
-        for (const m of moves) last = await placeBlock(lane.row, m.to, idOf(m.block))
+        for (const m of moves) {
+          last = await placeBlock(lane.row, m.to, idOf(m.block))
+          answers.push(last)
+          logDebug('chain', `place ${m.block.name} at column ${m.to + 1}`, said(last))
+        }
       } catch (err) {
         for (const m of moves) await placeBlock(lane.row, m.from, idOf(m.block)).catch(() => {})
         throw err
       }
       await after(last)
+      const refused = answers.filter(refusedAnswer).length
       /*
        * And checked, in numbers, against the unit's own answer. A move the
        * unit did not keep used to look exactly like one that was never made:
@@ -812,7 +834,11 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
         setIssue(
           `The unit did not keep the move: ${astray
             .map((m) => `${m.block.name} is ${colOf(m) === undefined ? 'not in this row' : `still in column ${colOf(m) + 1}`}`)
-            .join(', ')}.`
+            .join(', ')}. ${
+            refused
+              ? `The unit answered “refused” to ${refused} of the ${answers.length} steps.`
+              : `The unit answered every step without refusing it. Copy the log from Setup — it has each answer.`
+          }`
         )
       }
     } catch (err) {

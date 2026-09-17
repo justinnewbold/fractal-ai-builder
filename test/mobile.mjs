@@ -1006,6 +1006,12 @@ export function run(test) {
     assert.match(flat, /const astray = moves\.filter\(\(m\) => colOf\(m\) !== m\.to\)/, 'a move is not checked against the unit\'s answer')
     assert.match(flat, /logDebug\('chain', `\$\{m\.block\.name\}: column \$\{m\.from\} → \$\{m\.to\}`/, 'a move leaves nothing in the log')
     assert.match(flat, /The unit did not keep the move: /, 'a move the unit dropped is silent')
+    /* Every clear and every placement is logged with the unit's answer, and
+       a refusal anywhere in the six is said on screen — a unit that quietly
+       ignores a command answers exactly like one that took it. */
+    assert.match(flat, /logDebug\('chain', `clear \$\{m\.block\.name\} from column \$\{m\.from \+ 1\}`, said\(r\)\)/, 'a clear is not logged with the unit\'s answer')
+    assert.match(flat, /logDebug\('chain', `place \$\{m\.block\.name\} at column \$\{m\.to \+ 1\}`, said\(last\)\)/, 'a placement is not logged with the unit\'s answer')
+    assert.match(flat, /The unit answered “refused” to \$\{refused\} of the \$\{answers\.length\} steps\./, 'a refusal in the middle of a move is not said')
   })
 
   test('a burst of volume presses is confirmed once, and a chain write is not re-read per announcement', () => {
