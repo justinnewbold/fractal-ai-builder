@@ -3198,6 +3198,19 @@ export function run(test) {
     assert.doesNotMatch(stage, /tight \? (4[0-3]|[0-3]\d) :/, 'something pressable goes below 44 at the smallest size')
   })
 
+  test('the button that looks for the computer again is only there while one is missing', () => {
+    /*
+     * "The Try now button is there and if you click it it does — I'm not sure
+     * why it's even there if we're already all connected." It was on the page
+     * in every state, and on a live link it is a button that does nothing you
+     * can see. It reads as what it does, and only while there is something
+     * to do.
+     */
+    const flat = read('mobile/src/screens/Settings.js').replace(/\s+/g, ' ')
+    assert.doesNotMatch(flat, /label="Try now"/, 'the button still says Try now, which says nothing about what it tries')
+    assert.match(flat, /\{link !== 'connected' \? <Press label="Look for the computer again" onPress=\{onReconnect\} \/> : null\}/, 'the reconnect button is shown on a live link')
+  })
+
   test('a dead account service is given twelve seconds, not the whole evening', async () => {
     /*
      * "I can't log into supper base anymore. It says server error, so now I
