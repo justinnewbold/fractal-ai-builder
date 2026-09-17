@@ -1207,7 +1207,13 @@ export function run(test) {
      * the last song's names on this song's tiles, which is worse than the
      * numbers — a number is never wrong.
      */
-    assert.match(rig, /chain: 'reading', sceneNames: \[\]/, 'the last preset’s scene names stay on the new preset’s tiles')
+    /* Whitespace-flattened: the call wraps across lines now, and a check that
+       breaks when a line reflows is a check nobody can edit around. */
+    assert.match(
+      rig.replace(/\s+/g, ' '),
+      /chain: 'reading', sceneNames: \[\]/,
+      'the last preset’s scene names stay on the new preset’s tiles'
+    )
 
     /*
      * The host serves this from whatever the unit last dumped, and a slow unit
@@ -1591,6 +1597,71 @@ export function run(test) {
     /* And every row stays two lines, so ROW stays true. */
     assert.match(presets, /sub=\{here \? `\$\{slotLabel\(n, addressing\)\} · Playing`/, 'the current row is not marked in words')
     assert.match(presets, /tone="signal"[\s\S]{0,40}?on=\{here\}/, 'the current row is not marked in the colour this app uses for live')
+  })
+
+  test('pressing a preset shows it now, and confirms it behind that', () => {
+    /*
+     * "When tapping a preset there is about a 2 second delay before it
+     * highlights it and goes back to the main screen."
+     *
+     * It waited for the lot: the select, then the preset, the scene, the scene
+     * names and the whole chain — six round trips, two of them among the SLOW
+     * reads that make the unit dump a preset over serial. Only then did
+     * anything move.
+     *
+     * A control that waits that long before acknowledging a press reads as a
+     * control that did not register it, which is how a preset gets loaded
+     * twice. Everything else in rig.js is optimistic for exactly this reason;
+     * this was the one write that was not.
+     */
+    const rig = read('mobile/src/lib/rig.js')
+    /* To the end of the file: loadPreset is the last thing in it, and slicing
+       to a name that appears EARLIER gives an empty string that quietly passes
+       every check below. */
+    const load = rig.slice(rig.indexOf('export async function loadPreset'))
+    assert.ok(load.length > 200, 'loadPreset moved; this check reads it')
+
+    /* The new slot is on screen before the unit is asked. */
+    assert.ok(
+      load.indexOf('preset: {') < load.indexOf('await device.selectPreset'),
+      'the preset is still shown only after the unit has answered'
+    )
+    /* And put back if the unit refuses — captured before the change rather
+       than rebuilt from a state that has already moved. */
+    assert.match(load, /const was = state\.preset/, 'nothing remembers the preset to go back to')
+    assert.match(load, /set\(\{ error: err\.message, chain: 'ok', preset: was \}\)/, 'a refused select leaves the wrong preset on screen')
+
+    /* Neither screen waits on it. */
+    for (const file of ['mobile/src/screens/Presets.js', 'mobile/src/screens/Stage.js']) {
+      assert.ok(
+        !/await loadPreset\(/.test(read(file)),
+        `${file} waits for the whole read before it does anything, which is the two seconds`
+      )
+    }
+    assert.match(read('mobile/src/screens/Presets.js'), /loadPreset\(n\)\s*\n\s*onBack\?\.\(\)/, 'the picker does not close on the press')
+
+    /*
+     * The chain before the scene names. The chain is most of what the stage
+     * screen draws and the names are the least urgent thing on it; reading the
+     * names first left the tiles saying "reading" for a slow read nobody was
+     * waiting on.
+     */
+    assert.ok(
+      load.indexOf('await refreshBlocks()') < load.indexOf('await refreshSceneNames()'),
+      'the chain waits behind a slow read of the scene names'
+    )
+
+    /*
+     * And the gap is not filled with a guess. "Untitled" for the one round trip
+     * before the unit says what the preset is called would be wrong more often
+     * than right — the slot number is already on screen above it.
+     */
+    assert.match(load, /pending: typeof known !== 'string'/, 'nothing marks a preset whose name is not known yet')
+    assert.match(
+      read('mobile/src/screens/Stage.js'),
+      /preset\?\.pending && !preset\?\.name \? '…' : presetLabel\(preset\)/,
+      'the stage screen shows Untitled while it waits to be told the name'
+    )
   })
 
   test('every component the phone draws is one that exists', () => {

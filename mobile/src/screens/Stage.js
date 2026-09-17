@@ -174,7 +174,9 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
       return
     }
     thud()
-    await loadPreset(next)
+    /* Not awaited: the rig puts the new slot on screen immediately and confirms
+       it behind that. Waiting here would make Next feel like it missed. */
+    loadPreset(next)
   }
 
   /*
@@ -285,8 +287,13 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
           because they are the mid-song controls and a list is not — but
           "get me to SCHISM" was unanswerable on this screen until now.
         */}
+        {/*
+          "…" rather than "Untitled" for the one round trip between pressing a
+          preset and the unit saying what it is called. The slot is already in
+          the line above, so nothing here is a guess. See rig.loadPreset.
+        */}
         <Press
-          label={presetLabel(preset)}
+          label={preset?.pending && !preset?.name ? '…' : presetLabel(preset)}
           sub={onOpenPresets ? 'Tap for all presets' : undefined}
           height={TAP + 12}
           disabled={!onOpenPresets}

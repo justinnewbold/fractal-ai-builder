@@ -20,7 +20,7 @@ import * as device from './device'
 import { idOf, sameBlock } from './unit.mjs'
 import { TAP_REREAD_MS } from './tempo'
 import { DEFAULT_SLUG, deviceSlug } from './device-slug'
-import { forget as forgetNames } from './presetNames'
+import { forget as forgetNames, nameOf } from './presetNames'
 import { forget as forgetControls } from './paramIndex'
 import { subscribeRemoteEvents } from './relay'
 
@@ -198,8 +198,10 @@ export async function refreshAll() {
   })
   await refreshPreset()
   await refreshScene()
-  await refreshSceneNames()
+  /* The chain first: it is most of what the stage screen draws, and the scene
+     names are a slow read nobody is waiting on. */
   await refreshBlocks()
+  await refreshSceneNames()
   await refreshTempo()
 }
 
@@ -408,28 +410,70 @@ export async function writeTuner(on) {
  * patched — including the name, which is the one thing on this screen read from
  * arm's length.
  */
+/**
+ * Load a stored slot, and show it before the unit has finished saying so.
+ *
+ * "When tapping a preset there is about a 2 second delay before it highlights
+ * it and goes back to the main screen."
+ *
+ * It waited for the lot: the select, then the preset, the scene, the scene
+ * names and the whole chain — six round trips, two of them among the SLOW reads
+ * that make the unit dump a preset over serial. Only then did anything move. A
+ * control that waits that long before acknowledging a press reads as a control
+ * that did not register it, which is how a preset gets loaded twice.
+ *
+ * So it is optimistic, like every other write in this file. The new slot is on
+ * screen on the press; the reads that confirm it happen behind that. If the
+ * unit refuses the select, the old preset goes back — captured before the
+ * change rather than rebuilt after the failure, for the reason `optimistic`
+ * gives above.
+ *
+ * THE NAME COMES FROM WHAT HAS ALREADY BEEN READ. The picker has it — it is
+ * drawn on the row somebody just tapped — and lib/presetNames is where it is
+ * kept, so this looks there rather than taking it as an argument. When nothing
+ * is known, `pending` says so and the screen shows the slot rather than
+ * inventing "Untitled" for the one round trip it takes to find out.
+ */
 export async function loadPreset(number) {
+  const was = state.preset
   /*
    * The control index is about the preset that was loaded, not this one. Slot
    * 45's Presence is not slot 46's, and a search box answering from the last
    * preset sends somebody to a control that is not there.
    */
   forgetControls()
+  const known = nameOf(number)
   /*
-   * And the scene names go with it. They belong to the preset being left, so
+   * The scene names go with it too. They belong to the preset being left, so
    * carrying them across would put the last song's names on this song's tiles —
    * which is worse than the numbers, because numbers are never wrong.
    */
-  set({ error: null, chain: 'reading', sceneNames: [] })
+  set({
+    error: null,
+    chain: 'reading',
+    sceneNames: [],
+    preset: {
+      number,
+      name: typeof known === 'string' ? known : '',
+      empty: false,
+      pending: typeof known !== 'string'
+    }
+  })
   try {
     await device.selectPreset(number)
   } catch (err) {
-    set({ error: err.message, chain: 'ok' })
+    set({ error: err.message, chain: 'ok', preset: was })
     return false
   }
   await refreshPreset()
   await refreshScene()
-  await refreshSceneNames()
+  /*
+   * The chain before the scene names, and the order is the point: the chain is
+   * most of what the stage screen draws, and the names are the least urgent
+   * thing on it. Reading the names first left the tiles saying "reading" for a
+   * slow read nobody was waiting on.
+   */
   await refreshBlocks()
+  await refreshSceneNames()
   return true
 }

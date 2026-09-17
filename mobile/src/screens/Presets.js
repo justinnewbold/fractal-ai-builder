@@ -233,8 +233,13 @@ export default function Presets({ onBack }) {
                 tone="signal"
                 on={here}
                 haptic={thud}
-                onPress={async () => {
-                  await loadPreset(n)
+                /*
+                 * Not awaited, deliberately. The rig shows the new slot on the
+                 * press and confirms it behind this screen; waiting here is
+                 * what put two seconds between the tap and anything happening.
+                 */
+                onPress={() => {
+                  loadPreset(n)
                   onBack?.()
                 }}
               />
