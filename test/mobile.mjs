@@ -1995,4 +1995,72 @@ export function run(test) {
       'the browser kept a second copy of the merge'
     )
   })
+
+  test('a garbled preset dump is asked for again on the phone, not shown', () => {
+    /*
+     * "PRESET_DUMP_HEADER: expected func 0x77 at offset 0, got 0x78", on a
+     * stage, in a red bar above the preset being played. The browser has never
+     * shown that sentence, because forgefx.js has wrapped its requests in the
+     * retry since the day the message first appeared. The phone had no retry at
+     * all — the same read, the same unit, a different app, and only one of them
+     * asked again.
+     *
+     * Wrapped at remoteRequest rather than in device.js because every read that
+     * makes the unit dump a preset passes through there: the block list, the
+     * scene names, the volume slider's level.
+     */
+    const relay = read('mobile/src/lib/relay.js')
+    assert.match(relay, /import \{ withRetry \} from '\.\/retry'/, 'the phone does not import the retry')
+    assert.match(
+      relay.replace(/\s+/g, ' '),
+      /export async function remoteRequest\(path, options = \{\}\) \{.*?return withRetry\(\(\) => requestOnce\(path, method, options\), \{ method, path \}\)/,
+      'the phone sends requests without going through the retry'
+    )
+    /* And it is the shared rule, not a second opinion about which requests may
+       be asked twice. A phone that retried a write would send it twice. */
+    assert.ok(
+      !/PRESET_DUMP_HEADER/.test(relay),
+      'the phone has its own copy of what a garbled dump looks like'
+    )
+  })
+
+  test('an error on the phone can be put away', () => {
+    /*
+     * "See the error banner at top of screen. It also has no way to dismiss
+     * it." A fault sat above the preset being played until something else
+     * happened to replace it, which on a rig that had recovered could be the
+     * rest of the song.
+     *
+     * The cross is on the Note itself so every caller gets the same one, and
+     * only appears when the caller passed something for it to do — the notes
+     * describing a live condition have nothing to put away.
+     */
+    const note = read('mobile/src/components/Note.js')
+    assert.match(note, /onDismiss/, 'a Note cannot be dismissed')
+    assert.match(note, /accessibilityLabel="Dismiss"/, 'the cross has no name for VoiceOver')
+    assert.ok(
+      /onDismiss \? \(/.test(note),
+      'the cross is drawn whether or not there is anything for it to do'
+    )
+
+    const rig = read('mobile/src/lib/rig.js')
+    assert.match(rig, /export const clearError = \(\) => set\(\{ error: null \}\)/, 'the store cannot be told to forget an error')
+
+    const stage = rig && read('mobile/src/screens/Stage.js')
+    assert.match(
+      stage.replace(/\s+/g, ' '),
+      /\{error \? \( <Note tone="fault" onDismiss=\{clearError\}>/,
+      'the play screen’s error still cannot be dismissed'
+    )
+    assert.match(
+      stage.replace(/\s+/g, ' '),
+      /\{volumeError \? \( <Note tone="fault" onDismiss=\{\(\) => setVolumeError\(null\)\}>/,
+      'a volume error still cannot be dismissed'
+    )
+    assert.match(
+      read('mobile/src/screens/Edit.js').replace(/\s+/g, ' '),
+      /\{error \? \( <Note tone="fault" onDismiss=\{\(\) => setError\(null\)\}>/,
+      'the edit screen’s error still cannot be dismissed'
+    )
+  })
 }

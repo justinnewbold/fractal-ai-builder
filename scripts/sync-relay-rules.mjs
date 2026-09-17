@@ -42,6 +42,19 @@ export const FILES = [
   { source: '../shared/tempo.mjs', target: '../mobile/src/lib/tempo.js' },
   { source: '../shared/tone-steps.mjs', target: '../mobile/src/lib/tone-steps.js' },
   { source: '../shared/play-mode.mjs', target: '../mobile/src/lib/play-mode.js' },
+  /*
+   * When a garbled preset dump is asked for again rather than shown.
+   *
+   * The browser has had this since the day the message first appeared. The
+   * phone did not, and so the phone showed
+   * "PRESET_DUMP_HEADER: expected func 0x77 at offset 0, got 0x78" on a stage
+   * — a sentence in the codec's own words about a read that arrived while the
+   * unit was still loading, and which a second attempt four hundred
+   * milliseconds later would have answered. The rule about which requests may
+   * be asked twice is the same rule on both ends; it is not one worth writing
+   * out twice.
+   */
+  { source: '../src/lib/retry.js', target: '../mobile/src/lib/retry.js' },
   { source: '../src/lib/guardrails.js', target: '../mobile/src/lib/guardrails.js' },
   { source: '../src/lib/validate.js', target: '../mobile/src/lib/validate.js' },
   /*

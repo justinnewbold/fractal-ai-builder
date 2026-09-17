@@ -17,6 +17,7 @@ import {
 import { sync, useStored } from '../lib/store'
 import { SIZES, loadSize } from '../lib/gigSize'
 import {
+  clearError,
   loadPreset,
   refreshAll,
   tapTempo,
@@ -200,7 +201,11 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
       }
     >
       {conflict ? <Note tone="fault">{conflict}</Note> : null}
-      {error ? <Note tone="fault">{error}</Note> : null}
+      {error ? (
+        <Note tone="fault" onDismiss={clearError}>
+          {error}
+        </Note>
+      ) : null}
 
       {/* ---------------------------------------------------------- preset */}
       <View style={{ gap: space.sm }}>
@@ -541,7 +546,11 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
         onClose={() => setShowVolume(false)}
         onError={setVolumeError}
       />
-      {volumeError ? <Note tone="fault">{volumeError}</Note> : null}
+      {volumeError ? (
+        <Note tone="fault" onDismiss={() => setVolumeError(null)}>
+          {volumeError}
+        </Note>
+      ) : null}
 
       {/* Closing the tuner stops it at the unit, which is what the button does. */}
       <Tuner on={tunerOn} reading={tuning} onClose={() => writeTuner(false)} />

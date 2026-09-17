@@ -25,6 +25,7 @@ import { logDebug } from './debugLog'
 
 import { DEFAULT_PROJECT } from './project'
 import { decode } from './decode'
+import { withRetry } from './retry'
 import {
   RELAY_GRACE,
   explainAuth,
@@ -624,7 +625,20 @@ export async function waitForRelay(
  */
 export async function remoteRequest(path, options = {}) {
   const method = (options.method || 'GET').toUpperCase()
+  /*
+   * A dump that arrived in the wrong order is asked for again, not shown.
+   *
+   * See lib/retry.js for what that message is and why it happens. The browser
+   * has wrapped its requests this way for as long as the message has existed;
+   * the phone showed it raw, on stage, in the codec's own words. Wrapped here
+   * rather than in device.js because every read that wants a preset dump —
+   * the block list, the scene names, the volume slider's level — passes
+   * through this one function.
+   */
+  return withRetry(() => requestOnce(path, method, options), { method, path })
+}
 
+async function requestOnce(path, method, options) {
   /*
    * Nothing is changed while two Macs are listening. A write is not sent to the
    * wrong unit — it is carried out on both. Reads are left alone deliberately:

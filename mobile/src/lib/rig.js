@@ -71,6 +71,16 @@ export function set(patch) {
 export const getState = () => state
 export const reset = () => set(initial)
 
+/**
+ * Put the last failure away.
+ *
+ * Nothing else clears an error until the next thing goes wrong or the next
+ * write succeeds, and on a rig that is working again neither may happen for a
+ * song — so the red bar stays above the preset being played, about a read that
+ * has since been answered. The ✕ on it comes here.
+ */
+export const clearError = () => set({ error: null })
+
 function subscribe(fn) {
   subscribers.add(fn)
   return () => subscribers.delete(fn)

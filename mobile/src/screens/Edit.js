@@ -109,7 +109,11 @@ export default function Edit({ onBack }) {
         <Press label="Done" height={40} onPress={onBack} />
       </View>
 
-      {error ? <Note tone="fault">{error}</Note> : null}
+      {error ? (
+        <Note tone="fault" onDismiss={() => setError(null)}>
+          {error}
+        </Note>
+      ) : null}
 
       {chain === 'reading' && !blocks.length ? (
         <Note>Reading what’s in this preset…</Note>
