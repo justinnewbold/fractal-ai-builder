@@ -2701,7 +2701,9 @@ export function run(test) {
     /* And on screen, where somebody can act on it. */
     const settings = read('mobile/src/screens/Settings.js').replace(/\s+/g, ' ')
     assert.match(settings, /The app on the computer is v\$\{hostVersion\}/, 'Setup never says the computer’s version')
-    assert.match(settings, /const behind = !hostVersion \|\| isOlder\(hostVersion, APP_VERSION\) === true/, 'nothing works out whether the computer is behind')
+    assert.match(settings, /const behind = !!hostVersion && isOlder\(hostVersion, APP_VERSION\) === true/, 'a computer that did not say its version is told it is behind')
+    /* A missing version is said as missing, with where to look, not as "behind". */
+    assert.match(settings, /link === 'connected' && !demo && !hostVersion \? \( <Note> If the computer is on 7\.295\.0 or newer, its menu bar icon has a line saying what the phones hear about its version/, 'a missing version does not point at the Mac’s own menu line')
 
     /*
      * The comparison is strict about what it will answer, and that is the
