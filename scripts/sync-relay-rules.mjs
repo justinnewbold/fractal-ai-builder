@@ -124,7 +124,28 @@ export const FILES = [
    * Supabase and hands them to syncStage, because the two reach Supabase
    * through different modules and that difference is harmless.
    */
-  { source: '../src/lib/setlistMerge.js', target: '../mobile/src/lib/setlistMerge.js' }
+  { source: '../src/lib/setlistMerge.js', target: '../mobile/src/lib/setlistMerge.js' },
+  /*
+   * What each model is modelled on.
+   *
+   * "Search for the real life names that each AMP and all other effects are
+   * based off of and list them next to the name." Scrolling two hundred model
+   * names looking for a Rectifier, every one of them is a code word — so the
+   * list says the amp beside the name, on both screens, or the phone's picker
+   * is the code words on their own.
+   *
+   * The unit is the better authority on its own models and anything it supplies
+   * wins; this only fills in the nulls, which on an AM4 is all of them. Both
+   * apps have to fill them in the same way or the same amp is two amps.
+   *
+   * The four data files ride along `raw` — a JSON file with a JavaScript
+   * comment on the front of it is not JSON.
+   */
+  { source: '../src/lib/lineage.js', target: '../mobile/src/lib/lineage.js' },
+  { source: '../src/data/amp-types.json', target: '../mobile/src/data/amp-types.json', raw: true },
+  { source: '../src/data/drive-types.json', target: '../mobile/src/data/drive-types.json', raw: true },
+  { source: '../src/data/amp-lineage.json', target: '../mobile/src/data/amp-lineage.json', raw: true },
+  { source: '../src/data/effect-lineage.json', target: '../mobile/src/data/effect-lineage.json', raw: true }
 ]
 
 /** Where a copy says it came from, so nobody edits the copy by mistake. */
@@ -135,8 +156,16 @@ export const banner = (source) =>
 
 `
 
-/** What a copy should contain, given what its source contains. */
-export const generate = (source, sourcePath) => banner(sourcePath) + source
+/**
+ * What a copy should contain, given what its source contains.
+ *
+ * `raw` is for the files that cannot carry the banner: a JSON file with a
+ * JavaScript comment on the front of it is not JSON, and Metro refuses it. They
+ * are still copied and still held to being identical — only the note saying so
+ * has nowhere to live, which is why nothing but data is allowed to be raw.
+ */
+export const generate = (source, sourcePath, raw = false) =>
+  raw ? source : banner(sourcePath) + source
 
 const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
 
@@ -156,7 +185,7 @@ export const state = () =>
     } catch {
       // A copy that does not exist yet is stale, not a crash.
     }
-    return { ...file, sourceText, copyText, expected: generate(sourceText, file.source) }
+    return { ...file, sourceText, copyText, expected: generate(sourceText, file.source, file.raw) }
   })
 
 if (import.meta.url === `file://${process.argv[1]}`) {

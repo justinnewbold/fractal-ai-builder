@@ -833,6 +833,213 @@ export function run(test) {
     assert.match(read('mobile/App.js'), /screen === 'setlists'/, 'there is no setlist screen to open')
   })
 
+  test('the phone addresses a block by the name the unit actually uses', async () => {
+    /*
+     * THIS ONE SHIPPED, and it is the reason the rule is now a function with a
+     * test under it rather than a field name typed at six call sites.
+     *
+     * The unit calls a block's address `effectId`. The phone read `eid`, which
+     * nothing sends. Every read was undefined, so a tap on the drive sent
+     * `/preset/blocks/undefined/bypass` — and the optimistic update that
+     * matched on it flipped EVERY tile in the chain, because undefined equals
+     * undefined. A whole chain lighting up at once, and a unit that changed
+     * nothing.
+     *
+     * Checked against a block the browser's own mock produces, so the two apps
+     * cannot disagree about the shape either: the mock answers as ForgeFX does.
+     */
+    const { idOf, sameBlock } = await import('../mobile/src/lib/unit.mjs')
+    const { createMockDevice } = await import('../src/lib/mockDevice.js')
+
+    const blocks = await createMockDevice().presetBlocks()
+    const drive = blocks.find((b) => b.slug === 'drive')
+    assert.ok(drive, 'the mock stopped reporting a chain; this check reads it')
+
+    assert.equal(idOf(drive), drive.effectId, 'the phone reads a field the unit does not send')
+    assert.ok(Number.isInteger(idOf(drive)), 'a block address that is not a number cannot be a URL')
+    assert.ok(sameBlock(drive, drive.effectId))
+    assert.ok(!sameBlock(drive, blocks.find((b) => b.slug === 'amp').effectId))
+
+    /*
+     * And the half that turns the next version of this from "every block" into
+     * "no block", which is a bug somebody notices.
+     */
+    assert.equal(sameBlock(drive, undefined), false, 'a missing id still matches a block')
+    assert.equal(sameBlock(drive, null), false)
+    assert.equal(sameBlock({}, undefined), false, 'two blocks with no address match each other')
+
+    /*
+     * Nothing addresses a block by the field that was never there. Comments are
+     * stripped first: the one place `.eid` is still written down is the note in
+     * unit.mjs explaining why it must not be, and a check that forbids its own
+     * explanation is a check nobody can document around.
+     */
+    const files = [
+      'mobile/src/lib/rig.js',
+      ...[...walk(new URL('../mobile/src/screens/', import.meta.url))].map(
+        (f) => `mobile/${f.split('/mobile/')[1]}`
+      )
+    ]
+    for (const file of files) {
+      const code = read(file)
+        .replace(/\/\*[\s\S]*?\*\//g, ' ')
+        .replace(/^\s*\/\/.*$/gm, ' ')
+      assert.ok(
+        !/\bb(?:lock)?\.eid\b/.test(code),
+        `${file} addresses a block by .eid, which the unit does not send`
+      )
+    }
+  })
+
+  test('the stage hides the blocks nobody kicks; the bench shows the whole chain', async () => {
+    /*
+     * The same list, read by two screens that want different things from it.
+     *
+     * Nobody kicks an input block between two bars, so the stage screen hides
+     * the four. The edit screen shows them — that screen is the chain being
+     * LOOKED at, and a diagram that silently drops two of its blocks disagrees
+     * with the unit about what the preset is.
+     *
+     * One read, though. It is a slow read and the relay is one channel, so
+     * asking twice to get two lists would cost a second full preset dump.
+     */
+    const { EXCLUDED_BLOCKS } = await import('../mobile/src/lib/unit.mjs')
+    const { createMockDevice } = await import('../src/lib/mockDevice.js')
+    const device = read('mobile/src/lib/device.js')
+
+    const all = await createMockDevice().presetBlocks()
+    assert.ok(
+      all.some((b) => EXCLUDED_BLOCKS.includes(b.slug)),
+      'the mock has no input or output block, so this check proves nothing'
+    )
+
+    /* device.js imports react-native, so the filter is read rather than run —
+       but what it filters is checked against the real list above. */
+    assert.match(
+      device,
+      /export const stageBlocks = \(blocks\) =>\s*\(blocks \|\| \[\]\)\.filter\(\(b\) => !EXCLUDED_BLOCKS\.includes\(b\.slug\)\)/,
+      'the stage list is no longer the chain less the four you never kick'
+    )
+    assert.match(
+      device,
+      /export async function presetBlocks\(\) \{[\s\S]*?return list\.filter\(\(b\) => b\?\.slug\)\s*\}/,
+      'the read itself is filtering again, so the edit screen cannot see the ends of the chain'
+    )
+
+    const rig = read('mobile/src/lib/rig.js')
+    assert.match(
+      rig,
+      /set\(\{ allBlocks: all, blocks: device\.stageBlocks\(all\), chain: 'ok' \}\)/,
+      'the two lists no longer come from one read'
+    )
+    assert.match(read('mobile/src/screens/Stage.js'), /const ofBlocks = \(s\) => s\.blocks/)
+    assert.match(read('mobile/src/screens/Edit.js'), /const ofBlocks = \(s\) => s\.allBlocks/)
+  })
+
+  test('a knob on the phone writes the way the browser does, and costs the unit no more', () => {
+    /*
+     * THREE RULES, all of them about what a knob does BESIDES move.
+     *
+     * It goes through the verified write. The unit accepts a write it then
+     * ignores and reports success either way, so confirming is the only way to
+     * know it landed — and which of the two encodings to try first is recorded
+     * rather than guessed, because starting on the wrong one slams every AM4
+     * knob to its minimum before the retry corrects it. Audibly.
+     *
+     * It does not re-read the rig. Every commit in the browser used to end in a
+     * full read — the preset, the block list, the scene, its names and the
+     * tempo — for a knob that changed none of them. On a phone that is five
+     * round trips down one channel per knob, competing with the writes for the
+     * same serial port.
+     *
+     * And it is never a level. A block level set to -60 dB makes a preset that
+     * looks right and is silent, and a knob under a thumb is the easiest place
+     * to do that by accident. The number is still shown, because gain staging
+     * is something you need to read.
+     */
+    const edit = read('mobile/src/screens/Edit.js')
+
+    assert.match(edit, /setParamConfirmed\(eid, p\.id, next, p\)/, 'a knob writes without confirming it landed')
+    assert.ok(
+      !/refreshAll\(|refreshBlocks\(/.test(edit),
+      'a knob commit re-reads the whole rig, which is four round trips it does not need'
+    )
+    assert.match(
+      edit,
+      /params\.filter\(\(p\) => !isSilencingParam\(p\.name\)\)/,
+      'the knob deck is no longer keeping levels out'
+    )
+    assert.match(edit, /read-only/, 'the level is not shown at all now, so gain staging cannot be read')
+
+    /* The same rule the browser holds, from the same file. */
+    assert.match(read('src/components/Console.jsx'), /params\.filter\(\(p\) => !isSilencingParam\(p\.name\)\)/)
+  })
+
+  test('a model is named after the amp it is modelled on, on both screens', async () => {
+    /*
+     * "Search for the real life names that each AMP and all other effects are
+     * based off of and list them next to the name."
+     *
+     * Scrolling three hundred model names looking for a Rectifier, every one of
+     * them is a code word. The browser answers that from a catalog; the phone
+     * asked the unit and got the code words, because an AM4 carries no lineage
+     * at all and an FM3 only sometimes does.
+     *
+     * So the phone fills in the same nulls from the same catalog. Two screens
+     * that filled them differently would make one amp into two amps.
+     */
+    const { withLineage } = await import('../mobile/src/lib/lineage.js')
+    const { createMockDevice } = await import('../src/lib/mockDevice.js')
+    const web = await import('../src/lib/lineage.js')
+
+    const models = await createMockDevice().blockTypes('amp')
+    const named = withLineage('amp', models)
+    assert.equal(named.length, models.length, 'putting the catalog on lost or gained a model')
+
+    const known = named.filter((m) => m.basedOn)
+    assert.ok(known.length > 20, `only ${known.length} models say what they are; the catalog is not landing`)
+
+    /* Character for character with the browser's answer, model by model. */
+    assert.deepEqual(named, web.withLineage('amp', models))
+
+    /* And the unit stays the authority on its own models. */
+    const supplied = [{ value: 1, name: '59 Bassguy Bright', basedOn: 'what the unit said' }]
+    assert.equal(withLineage('amp', supplied)[0].basedOn, 'what the unit said')
+
+    /* The phone actually asks for it — a catalog nothing calls is a catalog
+       that ships 50KB and changes nothing on screen. */
+    assert.match(
+      read('mobile/src/lib/device.js'),
+      /withLineage\(slug, \(await remoteRequest\(`\/blocks\/\$\{slug\}\/types`\)\) \|\| \[\]\)/,
+      'the phone reads the model list without the catalog on it'
+    )
+  })
+
+  test('a knob claims the gesture, because the screen under it scrolls', () => {
+    /*
+     * A knob lives on a screen that scrolls vertically and turns on a vertical
+     * drag. A control that waits to see which way the finger is going has
+     * already lost the gesture to the scroll view — which is exactly how the
+     * browser's knobs shipped twice not turning at all on an iPhone.
+     *
+     * So the drag is claimed on touch, not on the first movement. The cost is
+     * that a finger landing on a knob cannot then scroll the page, which is the
+     * right way round: the knobs are what that screen is for.
+     */
+    const knob = read('mobile/src/components/Knob.js')
+
+    assert.match(knob, /onStartShouldSetPanResponder: \(\) => true/, 'a knob waits for movement before claiming the drag')
+    assert.match(knob, /onPanResponderRelease/, 'a knob never commits what it was turned to')
+    assert.ok(
+      !/onMoveShouldSetPanResponder: \(_, [a-z]+\) =>[^\n]*Math\.abs/.test(knob),
+      'the drag is gated on a movement threshold, which hands the gesture to the scroll view'
+    )
+    /* Vertical only. Circular tracking sounds right and isn't: the finger
+       leaves the knob, and small movements near the centre jump. */
+    assert.match(knob, /gesture\.dy/, 'the knob no longer turns on a vertical drag')
+    assert.ok(!/gesture\.dx/.test(knob), 'the knob turns on horizontal movement, which no hardware editor does')
+  })
+
   test('which setlist survives a sync is decided in one place, not two', () => {
     /*
      * The merge is the part that can lose somebody's work: a running order

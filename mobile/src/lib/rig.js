@@ -17,6 +17,7 @@
 import { useSyncExternalStore } from 'react'
 
 import * as device from './device'
+import { idOf, sameBlock } from './unit.mjs'
 import { DEFAULT_SLUG, deviceSlug } from './device-slug'
 import { forget as forgetNames } from './presetNames'
 import { subscribeRemoteEvents } from './relay'
@@ -39,7 +40,10 @@ const initial = {
    */
   deviceSlug: DEFAULT_SLUG,
   preset: null,
+  /** What the stage screen draws: everything but the four you never kick. */
   blocks: [],
+  /** What the edit screen draws: the chain as the unit reports it, ends and all. */
+  allBlocks: [],
   sceneIndex: 0,
   sceneNames: [],
   bpm: null,
@@ -237,7 +241,13 @@ export async function refreshTempo() {
 export async function refreshBlocks({ quiet = false } = {}) {
   if (!quiet) set({ chain: 'reading' })
   try {
-    set({ blocks: await device.presetBlocks(), chain: 'ok' })
+    /*
+     * One read, two lists. The unit is asked once — it is a slow read and the
+     * relay is one channel — and each screen is handed the blocks it is for.
+     * See device.presetBlocks for why the two differ.
+     */
+    const all = await device.presetBlocks()
+    set({ allBlocks: all, blocks: device.stageBlocks(all), chain: 'ok' })
     return true
   } catch (err) {
     // The last chain stays on screen. It is the best thing anyone knows, and a
@@ -281,16 +291,26 @@ export function writeScene(index) {
   })
 }
 
-export function writeBypass(eid, bypassed) {
-  const was = state.blocks
-  const now = was.map((b) => (b.eid === eid ? { ...b, bypassed } : b))
-  return optimistic({ blocks: now }, { blocks: was }, () => device.setBypass(eid, bypassed))
+/*
+ * Both lists move together, because they are one chain seen by two screens.
+ * Toggling a drive on the stage screen and then opening it on the edit screen
+ * must not show it still engaged.
+ */
+const patchBlock = (id, patch) => ({
+  blocks: state.blocks.map((b) => (sameBlock(b, id) ? { ...b, ...patch } : b)),
+  allBlocks: state.allBlocks.map((b) => (sameBlock(b, id) ? { ...b, ...patch } : b))
+})
+
+const asWas = () => ({ blocks: state.blocks, allBlocks: state.allBlocks })
+
+export function writeBypass(id, bypassed) {
+  const was = asWas()
+  return optimistic(patchBlock(id, { bypassed }), was, () => device.setBypass(id, bypassed))
 }
 
-export function writeChannel(eid, channel) {
-  const was = state.blocks
-  const now = was.map((b) => (b.eid === eid ? { ...b, channel } : b))
-  return optimistic({ blocks: now }, { blocks: was }, () => device.setChannel(eid, channel))
+export function writeChannel(id, channel) {
+  const was = asWas()
+  return optimistic(patchBlock(id, { channel }), was, () => device.setChannel(id, channel))
 }
 
 /**

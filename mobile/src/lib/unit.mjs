@@ -70,3 +70,22 @@ export function stepSlot(number, by, capabilities) {
   if (count !== null && next >= count) return null
   return next
 }
+
+/**
+ * Which block this is, and whether a given id names it.
+ *
+ * ONE LINE, AND IT IS HERE BECAUSE GETTING IT WRONG WAS SILENT. The unit calls
+ * a block's address `effectId`; the phone spent three releases reading `eid`,
+ * which nothing sends. Every read was `undefined`, so the write went to
+ * `/preset/blocks/undefined/bypass` — and worse, the optimistic update that
+ * matched on it flipped EVERY tile in the chain, because `undefined` equals
+ * `undefined`. A chain that lights up all at once and a unit that changed
+ * nothing.
+ *
+ * `sameBlock` refuses a missing id on purpose. That is the half that turns the
+ * next version of this mistake from "every block" into "no block", which is a
+ * bug somebody notices.
+ */
+export const idOf = (block) => block?.effectId
+
+export const sameBlock = (block, id) => Number.isInteger(id) && idOf(block) === id

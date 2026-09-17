@@ -4,7 +4,7 @@ import { useKeepAwake } from 'expo-keep-awake'
 
 import { color, font, mono, space, TAP } from '../lib/theme'
 import { hostConflict, remoteChosenHost, remoteHosts } from '../lib/relay'
-import { presetLabel, sceneShape, slotCount, slotLabel, stepSlot } from '../lib/device'
+import { idOf, presetLabel, sameBlock, sceneShape, slotCount, slotLabel, stepSlot } from '../lib/device'
 import {
   listsFor,
   marksFor,
@@ -63,7 +63,7 @@ const ofSlug = (s) => s.deviceSlug
  * button within reach of a stage tap is a hazard, and saving to a slot is
  * refused by the Mac anyway.
  */
-export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpenSetlists }) {
+export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpenSetlists, onOpenEdit }) {
   // The screen is the instrument panel for as long as this is open. A phone
   // that locks itself between songs is a phone you have to wake and unlock
   // while the count-in is happening.
@@ -231,6 +231,19 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
                 onPress={onOpenTone}
               />
             ) : null}
+            {/*
+              The way to the bench, beside the other thing that takes you off
+              this screen. Everything below the preset name acts on the rig you
+              are playing; neither of these does.
+            */}
+            {onOpenEdit ? (
+              <Press
+                label="Edit"
+                height={36}
+                style={{ paddingHorizontal: space.md }}
+                onPress={onOpenEdit}
+              />
+            ) : null}
             <Press
               label="Setup"
               height={36}
@@ -360,17 +373,17 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
             const state = engaged ? 'On' : 'Off'
             return (
               <Tile
-                key={block.eid}
+                key={idOf(block)}
                 label={shortBlock(block)}
                 sub={block.channel ? `${state}  ${block.channel}` : state}
                 fill={hue.fill}
                 ink={hue.ink}
                 on={engaged}
                 height={TAP + 8}
-                onPress={() => writeBypass(block.eid, !block.bypassed)}
+                onPress={() => writeBypass(idOf(block), !block.bypassed)}
                 onLongPress={
                   channels?.length > 1
-                    ? () => setPicking(picking === block.eid ? null : block.eid)
+                    ? () => setPicking(picking === idOf(block) ? null : idOf(block))
                     : undefined
                 }
                 style={{ flexGrow: 1, flexBasis: '22%' }}
@@ -384,7 +397,7 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
         {picking !== null && channels?.length > 1 ? (
           <View style={{ gap: space.sm }}>
             <Label>
-              {shortBlock(blocks.find((b) => b.eid === picking) || {})} — channel
+              {shortBlock(blocks.find((b) => sameBlock(b, picking)) || {})} — channel
             </Label>
             <View style={{ flexDirection: 'row', gap: space.sm }}>
               {channels.map((name) => (
@@ -393,7 +406,7 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
                   grow
                   label={name}
                   tone="signal"
-                  on={blocks.find((b) => b.eid === picking)?.channel === name}
+                  on={blocks.find((b) => sameBlock(b, picking))?.channel === name}
                   onPress={() => {
                     writeChannel(picking, name)
                     setPicking(null)
