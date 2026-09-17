@@ -17,6 +17,32 @@ import assert from 'node:assert/strict'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { parse } from '@babel/parser'
+import babelTraverse from '@babel/traverse'
+
+/* CommonJS interop: @babel/traverse's default export is on `.default` under
+   some resolutions and is the module itself under others. */
+const traverse = babelTraverse.default || babelTraverse
+
+/**
+ * What a phone actually has without importing it.
+ *
+ * Deliberately a LIST rather than a rule. Every name here was read off the app
+ * as it stands and kept because it is real; anything new has to be added on
+ * purpose, which is the whole point — the failure this guards against looks
+ * exactly like a global nobody has heard of.
+ *
+ * `window` and `localStorage` are on it because three of the modules the phone
+ * carries are copies of the browser's, and each of them reaches for those
+ * inside a try. The phone has neither, which is why the try is there.
+ */
+const PHONE_GLOBALS = new Set([
+  'AbortController', 'Array', 'Boolean', 'Date', 'Error', 'Event', 'Infinity', 'JSON', 'Map',
+  'Math', 'NaN', 'Number', 'Object', 'Promise', 'RegExp', 'Set', 'String', 'Symbol',
+  'TextDecoder', 'TextEncoder', 'Uint8Array', 'WeakMap', 'WeakSet',
+  'cancelAnimationFrame', 'clearInterval', 'clearTimeout', 'console', 'decodeURIComponent',
+  'encodeURIComponent', 'fetch', 'globalThis', 'isNaN', 'localStorage', 'parseFloat', 'parseInt',
+  'requestAnimationFrame', 'setInterval', 'setTimeout', 'undefined', 'window'
+])
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
 
@@ -1672,89 +1698,64 @@ export function run(test) {
     )
   })
 
-  test('every component the phone draws is one that exists', () => {
+  test('every name the phone uses is one that exists', () => {
     /*
-     * THE HOLE THIS FILLS, found the hard way.
+     * THE HOLE THIS FILLS, dug twice, and the second one reached a stage.
      *
-     * A screen used <Label> without defining or importing it. Nothing caught
-     * it: `<Label>` compiles to a call on an identifier, so Metro bundles it
-     * happily, `expo export` succeeds, and the app installs. The crash arrives
-     * when somebody opens the fold that draws it — on a phone, which is the
-     * one place in this project nothing here can run.
+     * First: a screen used <Label> without defining or importing it. Nothing
+     * caught it — <Label> compiles to a reference to an identifier, so Metro
+     * bundles it happily, `expo export` succeeds, and the app installs. That
+     * one was found by reading the file.
+     *
+     * Then the preset list called `useEffect` and imported `useCallback`,
+     * `useRef` and `useState` — the line was one word short. It bundled. It
+     * exported. It passed every check here. It went to TestFlight and it
+     * crashed the app dead the moment the preset button was pressed:
+     *
+     *   Exception Type: EXC_CRASH (SIGABRT)
+     *   React  RCTFatal + 568 (RCTAssert.m:147)
+     *
+     * A ReferenceError thrown while rendering is not an error message on a
+     * screen. It is the process aborting, mid-set, on the one screen somebody
+     * would be opening between two songs.
      *
      * There is no linter in this repository, and CI runs the tests and two
-     * bundles. None of the three has an opinion about an identifier that is
-     * used and never declared, so this does: every capitalised thing any screen
-     * or component draws must be imported into that file, declared in it, or
-     * bound by it.
+     * bundles. Not one of the three has an opinion about an identifier that is
+     * used and never declared — which is the entire class of failure both of
+     * these belong to. So this does, and it is no longer only about JSX: Babel
+     * resolves every reference in the file against every scope it is nested
+     * in, and whatever is left over is a global. Anything not on the list of
+     * globals a phone actually has is a name that does not exist.
      *
-     * Capitalised only, because that is JSX's own rule — a lowercase tag is a
-     * host element and means nothing to this check.
+     * That one pass covers both, which is worth saying because it was checked
+     * rather than assumed — an element's name is a reference like any other, so
+     * <Ghost /> comes out of the same list `useEffect` does. The hand-written
+     * tag walk this replaced is gone, and a mutation for each of the two
+     * failures above proves the one that is left still catches both.
      */
     const files = [
-      ...walk(new URL('../mobile/src/screens/', import.meta.url)),
-      ...walk(new URL('../mobile/src/components/', import.meta.url)),
-      fileURLToPath(new URL('../mobile/App.js', import.meta.url))
+      ...walk(new URL('../mobile/src/', import.meta.url)),
+      fileURLToPath(new URL('../mobile/App.js', import.meta.url)),
+      fileURLToPath(new URL('../mobile/index.js', import.meta.url))
     ]
-    assert.ok(files.length >= 8, `only ${files.length} phone files were read; this check found nothing`)
+    assert.ok(files.length >= 30, `only ${files.length} phone files were read; this check found nothing`)
 
     for (const file of files) {
       const name = file.split('/mobile/')[1] || file
-      const ast = parse(readFileSync(file, 'utf8'), {
-        sourceType: 'module',
-        plugins: ['jsx']
+      const ast = parse(readFileSync(file, 'utf8'), { sourceType: 'module', plugins: ['jsx'] })
+
+      let loose = []
+      traverse(ast, {
+        Program(path) {
+          loose = Object.keys(path.scope.globals)
+        }
       })
 
-      /* Everything this file brings into scope at the top level. */
-      const declared = new Set()
-      const bind = (node) => {
-        if (!node) return
-        if (node.type === 'Identifier') declared.add(node.name)
-        else if (node.type === 'ObjectPattern') for (const pr of node.properties) bind(pr.value || pr.argument)
-        else if (node.type === 'ArrayPattern') for (const el of node.elements) bind(el)
-        else if (node.type === 'AssignmentPattern') bind(node.left)
-        else if (node.type === 'RestElement') bind(node.argument)
-      }
-      for (const node of ast.program.body) {
-        if (node.type === 'ImportDeclaration') for (const sp of node.specifiers) declared.add(sp.local.name)
-        else if (node.type === 'FunctionDeclaration') declared.add(node.id?.name)
-        else if (node.type === 'ClassDeclaration') declared.add(node.id?.name)
-        else if (node.type === 'VariableDeclaration') for (const d of node.declarations) bind(d.id)
-        else if (node.type === 'ExportNamedDeclaration' && node.declaration) {
-          const d = node.declaration
-          if (d.type === 'FunctionDeclaration' || d.type === 'ClassDeclaration') declared.add(d.id?.name)
-          else if (d.type === 'VariableDeclaration') for (const one of d.declarations) bind(one.id)
-        } else if (node.type === 'ExportDefaultDeclaration' && node.declaration?.id) {
-          declared.add(node.declaration.id.name)
-        }
-      }
-
-      /* Every capitalised tag it draws. Walked by hand rather than with a
-         traverse dependency: the shape being looked for is one field deep. */
-      const drawn = new Set()
-      const seen = new Set()
-      const walkNode = (node) => {
-        if (!node || typeof node !== 'object' || seen.has(node)) return
-        seen.add(node)
-        if (node.type === 'JSXOpeningElement') {
-          let tag = node.name
-          /* <Foo.Bar> is Foo's business, so only the head of it is checked. */
-          while (tag?.type === 'JSXMemberExpression') tag = tag.object
-          const named = tag?.type === 'JSXIdentifier' ? tag.name : null
-          if (named && /^[A-Z]/.test(named)) drawn.add(named)
-        }
-        for (const key of Object.keys(node)) {
-          const value = node[key]
-          if (Array.isArray(value)) for (const v of value) walkNode(v)
-          else if (value && typeof value === 'object' && value.type) walkNode(value)
-        }
-      }
-      walkNode(ast.program)
-
-      for (const tag of drawn) {
+      for (const word of loose) {
         assert.ok(
-          declared.has(tag),
-          `${name} draws <${tag}> without importing or defining it — it bundles, installs, and crashes when that part of the screen opens`
+          PHONE_GLOBALS.has(word),
+          `${name} uses ${word}, which is neither imported, declared, nor a global a phone has — ` +
+            'it bundles, it installs, and it crashes the app when that code runs'
         )
       }
     }
