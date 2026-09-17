@@ -20,6 +20,7 @@ import * as device from './device'
 import { idOf, sameBlock } from './unit.mjs'
 import { DEFAULT_SLUG, deviceSlug } from './device-slug'
 import { forget as forgetNames } from './presetNames'
+import { forget as forgetControls } from './paramIndex'
 import { subscribeRemoteEvents } from './relay'
 
 const initial = {
@@ -362,6 +363,12 @@ export async function writeTuner(on) {
  * arm's length.
  */
 export async function loadPreset(number) {
+  /*
+   * The control index is about the preset that was loaded, not this one. Slot
+   * 45's Presence is not slot 46's, and a search box answering from the last
+   * preset sends somebody to a control that is not there.
+   */
+  forgetControls()
   set({ error: null, chain: 'reading' })
   try {
     await device.selectPreset(number)
