@@ -39,6 +39,7 @@ const ofDeviceName = (s) => s.deviceName
    under "Unit" in its own Setup: renaming is bench work, not something a thumb
    crosses between songs, which is exactly why neither app puts it on Play. */
 export default function Settings({
+  onOpenConnect,
   link,
   macName,
   playing,
@@ -90,11 +91,11 @@ export default function Settings({
 
   const linkWord =
     link === 'connected'
-      ? `Connected to ${macName || 'your Mac'}`
+      ? `Connected to ${macName || 'your computer'}`
       : link === 'joining'
-        ? 'Finding your Mac'
+        ? 'Finding your computer'
         : link === 'no-answer'
-          ? 'Your Mac isn’t answering'
+          ? 'Your computer isn’t answering'
           : 'Not connected'
 
   const head = (title, onDone) => (
@@ -134,7 +135,14 @@ export default function Settings({
               status={link === 'connected' ? `${deviceName || 'Unit'} · connected` : 'Not connected'}
               onPress={() => setPage('unit')}
             />
-            <SetupRow title="Phone & Mac" status={linkWord} onPress={() => setPage('link')} />
+            <SetupRow title="Phone & computer" status={linkWord} onPress={() => setPage('link')} />
+            {onOpenConnect ? (
+              <SetupRow
+                title="Connecting a computer"
+                status="Mac app, Windows, or ForgeFX by hand"
+                onPress={onOpenConnect}
+              />
+            ) : null}
             <SetupRow
               title="Play screen"
               status={SIZES[loadSize(sync)]?.name || 'Small'}
@@ -168,7 +176,7 @@ export default function Settings({
             <Text style={{ color: color.silk, fontSize: font.body, flex: 1 }}>
               {link === 'connected'
                 ? `${deviceName || 'Your unit'} — answering`
-                : 'No unit, because the Mac isn’t answering.'}
+                : 'No unit, because the computer isn’t answering.'}
             </Text>
           </View>
           {/*
@@ -178,14 +186,14 @@ export default function Settings({
             which is eight empty fields in front of everything anybody actually
             opened Setup for.
           */}
-          {link === 'connected' ? <UnitBits /> : <Note>Connect to the Mac to rename anything.</Note>}
+          {link === 'connected' ? <UnitBits /> : <Note>Connect to the computer to rename anything.</Note>}
         </>
       ) : null}
 
       {/* ------------------------------------------------------ phone & mac */}
       {page === 'link' ? (
         <>
-          {head('Phone & Mac', 'back')}
+          {head('Phone & computer', 'back')}
 
           <View style={{ gap: space.md }}>
             <Section>The link</Section>
@@ -193,16 +201,22 @@ export default function Settings({
               <Lamp state={lamp} />
               <Text style={{ color: color.silk, fontSize: font.body, flex: 1 }}>
                 {link === 'connected'
-                  ? `Connected to ${macName || 'your Mac'}${deviceName ? ` — ${deviceName}` : ''}`
+                  ? `Connected to ${macName || 'your computer'}${deviceName ? ` — ${deviceName}` : ''}`
                   : `${linkWord}.`}
               </Text>
             </View>
 
             {link === 'no-answer' ? (
               <Note tone="warn">
-                Open the Fractal app on the Mac and make sure the Mac is awake. This keeps trying on
+                Open the Fractal app on the computer and make sure the computer is awake. This keeps trying on
                 its own.
               </Note>
+            ) : null}
+
+            {/* Nothing connected is the one state where the rest of this page
+                can do nothing at all, so the way in is offered right here. */}
+            {onOpenConnect && link !== 'connected' ? (
+              <Press label="How do I connect a computer?" onPress={onOpenConnect} />
             ) : null}
 
             <Press label="Try now" onPress={onReconnect} />
@@ -210,7 +224,7 @@ export default function Settings({
 
           {hosts.length > 1 ? (
             <View style={{ gap: space.md }}>
-              <Section>Which Mac</Section>
+              <Section>Which computer</Section>
               {conflict ? <Note tone="fault">{conflict}</Note> : null}
               {hosts.map((name, i) => (
                 <Press
@@ -231,7 +245,7 @@ export default function Settings({
             <Section>Account</Section>
             <Text style={{ color: color.silkDim, fontSize: font.small }}>
               {isPairAccount(account?.email)
-                ? 'Paired with your Mac, no account. What you save stays on this phone.'
+                ? 'Paired with your computer, no account. What you save stays on this phone.'
                 : account?.email
                   ? `Signed in as ${account.email}.`
                   : 'Signed in.'}
@@ -281,7 +295,7 @@ export default function Settings({
 
             <Press label="Sign out on this phone" onPress={onSignOut} />
             <Text style={{ color: color.silkFaint, fontSize: font.micro, lineHeight: 18 }}>
-              The Mac stays signed in — signing out here must not drop the link mid-set.
+              The computer stays signed in — signing out here must not drop the link mid-set.
             </Text>
           </View>
         </>
@@ -334,10 +348,10 @@ export default function Settings({
             {`Fractal Remote v${APP_VERSION}`}
           </Text>
           <View style={{ gap: space.md }}>
-            <Section>What stays at the Mac</Section>
+            <Section>What stays at the computer</Section>
             <Note>
               Saving to a slot, backups, restores, firmware and raw SysEx are refused from a
-              distance — by your Mac, not by this app. A phone on a dark stage should not be able to
+              distance — by your computer, not by this app. A phone on a dark stage should not be able to
               overwrite a preset you spent a week on.
             </Note>
           </View>
@@ -464,7 +478,7 @@ function UnitBits() {
       {said ? <Note>{said}</Note> : null}
       <Note>
         A new name is on the unit straight away. It becomes permanent when the preset is saved to a
-        slot, which happens at the Mac.
+        slot, which happens at the computer.
       </Note>
     </View>
   )

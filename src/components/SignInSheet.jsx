@@ -14,14 +14,14 @@ export default function SignInSheet({ open, role, email, busy, onClose, onSubmit
     <Sheet
       open={open}
       onClose={onClose}
-      title={phone ? 'Connect to your Mac' : 'Set up phone remote'}
-      note={phone ? 'Sign in once — this phone stays signed in' : 'Once, on this Mac'}
+      title={phone ? 'Connect to your computer' : 'Set up phone remote'}
+      note={phone ? 'Sign in once — this phone stays signed in' : 'Once, on this computer'}
     >
       <div className="signin-sheet">
         <p className="hint">
           {phone
-            ? 'Use the same account you set up on the Mac.'
-            : 'Your phone will sign in with these same details to reach this Mac.'}
+            ? 'Use the same account you set up on the computer.'
+            : 'Your phone will sign in with these same details to reach this computer.'}
         </p>
         <SignIn
           email={email}

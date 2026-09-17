@@ -34,7 +34,7 @@ export function SaveFooter({ preset, slot, onSave, busy, saving, remote, queued,
     <div className="save-foot">
       {queued ? (
         <p className="hint">
-          Slot {queued.slot} is queued &mdash; the Mac writes it and this says so the moment it lands.
+          Slot {queued.slot} is queued &mdash; the computer writes it and this says so the moment it lands.
         </p>
       ) : elsewhere ? (
         <p className="hint">
@@ -86,7 +86,7 @@ export default function SaveSheet({
     <div className="save-sheet">
       {queued ? (
         <p className="hint">
-          Slot {queued.slot} is queued. The page at your Mac writes it &mdash; open there if it
+          Slot {queued.slot} is queued. The page at your computer writes it &mdash; open there if it
           isn&rsquo;t, and this says so the moment it lands.
         </p>
       ) : null}

@@ -86,7 +86,7 @@ export default function DeviceDetail({ status, device, onRetry, busy, onRename }
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && save()}
-              aria-label="Address of the Fractal app on your Mac"
+              aria-label="Address of the Fractal app on your computer"
             />
             <button onClick={save}>Use this address</button>
           </>

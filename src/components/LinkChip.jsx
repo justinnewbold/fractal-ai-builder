@@ -93,7 +93,7 @@ export default function LinkChip({
    * disconnected (red)". Three states, because a link on its way is neither.
    */
   const state = linkWord(said.tone, link.role)
-  const word = sayMac && mark !== 'off' ? `Mac ${state}` : state
+  const word = sayMac && mark !== 'off' ? `computer ${state}` : state
 
   return (
     <span className="phone-link" ref={wrap}>

@@ -169,8 +169,8 @@ export default function Tuner({ reading, on, onClose }) {
             {stalled ? (
               <Note tone="warn">
                 The tuner is running on the unit, but the readings aren’t reaching this phone — your
-                Mac keeps them to itself over a remote link. Use the unit’s own display, or tune at
-                the Mac.
+                computer keeps them to itself over a remote link. Use the unit’s own display, or tune at
+                the computer.
               </Note>
             ) : null}
 

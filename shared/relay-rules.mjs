@@ -90,7 +90,7 @@ export const REMOTE_FORBIDDEN = [
   { match: (m, p) => p.startsWith('/preset/restore'), why: 'restore a preset' },
   { match: (m, p) => p.startsWith('/backup'), why: 'back up the device' },
   { match: (m, p) => p.startsWith('/version'), why: 'load or restore a version' },
-  { match: (m, p) => p.startsWith('/local'), why: 'reach the library on your Mac' },
+  { match: (m, p) => p.startsWith('/local'), why: 'reach the library on your computer' },
   { match: (m, p) => m !== 'GET' && p.startsWith('/ports'), why: 'change which port is used' },
   { match: (m, p) => p.startsWith('/firmware'), why: 'touch firmware' },
   { match: (m, p) => p.startsWith('/debug/raw'), why: 'send raw SysEx' }
@@ -107,7 +107,7 @@ export function forbiddenRemotely(method, path) {
   // The host will refuse it; say why in words if we have them.
   return (
     REMOTE_FORBIDDEN.find((r) => r.match(m, clean))?.why ||
-    'do that from a distance — it only works at the Mac'
+    'do that from a distance — it only works at the computer'
   )
 }
 
@@ -223,7 +223,7 @@ export async function hostNamesFrom(answers, read) {
     } catch {
       // Unreadable, but present. See above.
     }
-    named.push(typeof name === 'string' && name.trim() ? name.trim() : 'a Mac')
+    named.push(typeof name === 'string' && name.trim() ? name.trim() : 'a computer')
   }
   return named
 }

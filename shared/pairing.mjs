@@ -86,7 +86,7 @@ export const isPairCode = (text) => normalizePairCode(text) !== null
  */
 export function pairCredentials(code) {
   const clean = normalizePairCode(code)
-  if (!clean) throw new Error('That isn’t a pairing code. It’s 16 letters and numbers, shown on your Mac.')
+  if (!clean) throw new Error('That isn’t a pairing code. It’s 16 letters and numbers, shown on your computer.')
   return {
     email: `pair-${clean.slice(0, 8).toLowerCase()}@${PAIR_DOMAIN}`,
     password: `pair-${clean}`

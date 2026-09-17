@@ -163,13 +163,13 @@ export function nextDelay(previous) {
  */
 export function describeLink(state) {
   const { role, link, account, macName } = state
-  const who = macName || 'your Mac'
+  const who = macName || 'your computer'
   const email = account?.email || ''
 
   if (role === 'wifi') {
     return {
       word: 'wifi',
-      sentence: 'Connected to your Mac over wifi',
+      sentence: 'Connected to your computer over wifi',
       note: 'Connected over wifi',
       tone: 'good'
     }
@@ -209,17 +209,17 @@ export function describeLink(state) {
       return { word: 'connected', sentence: `Connected to ${who}`, note: `Connected to ${who}`, tone: 'good' }
     }
     if (link === 'joining') {
-      return { word: 'connecting', sentence: 'Connecting to your Mac', note: 'Connecting…', tone: 'busy' }
+      return { word: 'connecting', sentence: 'Connecting to your computer', note: 'Connecting…', tone: 'busy' }
     }
     if (link === 'no-answer') {
       return {
         word: 'no answer',
-        sentence: 'Your Mac isn’t answering',
-        note: 'Your Mac isn’t answering',
+        sentence: 'Your computer isn’t answering',
+        note: 'Your computer isn’t answering',
         tone: 'bad'
       }
     }
-    return { word: 'off', sentence: 'Not connected to your Mac', note: 'Not connected', tone: 'dim' }
+    return { word: 'off', sentence: 'Not connected to your computer', note: 'Not connected', tone: 'dim' }
   }
 
   return { word: '', sentence: '', note: '', tone: 'dim' }
@@ -285,7 +285,7 @@ export function whySafari({ secure, userAgent }) {
   const ua = String(userAgent || '')
   const webkit =
     /Safari/i.test(ua) && !/Chrome|CriOS|Chromium|Edg|OPR|FxiOS|Android|iPhone|iPad|iPod/i.test(ua)
-  return webkit ? 'Using Safari? Try Chrome — Safari won’t let this page talk to the Fractal app on your Mac.' : ''
+  return webkit ? 'Using Safari? Try Chrome — Safari won’t let this page talk to the Fractal app on your computer.' : ''
 }
 
 /**
@@ -344,8 +344,8 @@ export function faultCopy({
   if (reason === 'unit-gone') {
     if (role === 'remote' || role === 'wifi') {
       return {
-        title: 'Your Mac has lost the unit',
-        body: 'The Fractal app on your Mac is running, but nothing it sends is reaching your unit, so what was on screen can no longer be trusted. At the Mac: check the unit is switched on and its cable is in, and that nothing else has taken it — another editor, or a second copy of the Fractal app.'
+        title: 'Your computer has lost the unit',
+        body: 'The Fractal app on your computer is running, but nothing it sends is reaching your unit, so what was on screen can no longer be trusted. At the computer: check the unit is switched on and its cable is in, and that nothing else has taken it — another editor, or a second copy of the Fractal app.'
       }
     }
     return {
@@ -355,14 +355,14 @@ export function faultCopy({
   }
   if (role === 'remote' && reason === 'no-answer') {
     return {
-      title: 'Your Mac stopped answering',
-      body: 'The phone is on the line but the Mac is not replying. Check the Fractal app is still open on the Mac and that it hasn’t gone to sleep — nothing needs unplugging at the unit.'
+      title: 'Your computer stopped answering',
+      body: 'The phone is on the line but the computer is not replying. Check the Fractal app is still open on the computer and that it hasn’t gone to sleep — nothing needs unplugging at the unit.'
     }
   }
   if (role === 'remote' && reason === 'unreadable') {
     return {
-      title: 'Your Mac answered, but the unit wouldn’t read',
-      body: 'The Mac is there and replying; the unit didn’t finish answering it. Usually something else is holding the port — another editor, or a second copy of the Fractal app.'
+      title: 'Your computer answered, but the unit wouldn’t read',
+      body: 'The computer is there and replying; the unit didn’t finish answering it. Usually something else is holding the port — another editor, or a second copy of the Fractal app.'
     }
   }
   if (device && device.connected === false) {
@@ -383,34 +383,34 @@ export function faultCopy({
     if (role === 'remote') {
       const said = timesWord(asks)
       return {
-        title: 'The Mac can’t see your unit',
+        title: 'The computer can’t see your unit',
         body: `${
           said ? `It asked ${said} over a few seconds and got no answer.` : 'It asked and got no answer.'
-        } At the Mac: check the unit is on and plugged in, and that nothing else is talking to it — another editor, or a second copy of the Fractal app.`
+        } At the computer: check the unit is on and plugged in, and that nothing else is talking to it — another editor, or a second copy of the Fractal app.`
       }
     }
     return {
       title: 'No unit found',
-      body: 'Your Mac is connected, but no Fractal is plugged into it. Check the cable, and that nothing else is using it, then tap Try again.'
+      body: 'Your computer is connected, but no Fractal is plugged into it. Check the cable, and that nothing else is using it, then tap Try again.'
     }
   }
   if (role === 'mac') {
     const safari = whySafari({ secure, userAgent })
     return {
       title: 'Can’t find your Fractal',
-      body: `Open the Fractal app on this Mac — it’s what talks to the unit.${safari ? ` ${safari}` : ''}`
+      body: `Open the Fractal app on this computer — it’s what talks to the unit.${safari ? ` ${safari}` : ''}`
     }
   }
   if (role === 'wifi') {
     return {
-      title: 'Lost the Mac',
-      body: 'Make sure the Fractal app is still open on the Mac and this phone is on the same wifi, then tap Try again.'
+      title: 'Lost the computer',
+      body: 'Make sure the Fractal app is still open on the computer and this phone is on the same wifi, then tap Try again.'
     }
   }
   if (role === 'remote') {
     return {
-      title: 'Your Mac answered, but the unit didn’t',
-      body: 'Check the Fractal app is open on the Mac and the unit is plugged in and switched on, then tap Try again.'
+      title: 'Your computer answered, but the unit didn’t',
+      body: 'Check the Fractal app is open on the computer and the unit is plugged in and switched on, then tap Try again.'
     }
   }
   return null
@@ -924,7 +924,7 @@ export async function pairMac() {
   const { needsConfirmation } = await remoteSignUp({ url: config.url, anonKey: config.anonKey, email, password })
   if (needsConfirmation) {
     throw new Error(
-      'This Mac couldn’t pair without an account, because the account service is set to confirm every new account by email. Sign in with an account instead, or turn off “Confirm email” for the project.'
+      'This computer couldn’t pair without an account, because the account service is set to confirm every new account by email. Sign in with an account instead, or turn off “Confirm email” for the project.'
     )
   }
   await remoteSignIn({ url: config.url, anonKey: config.anonKey, email, password })
@@ -947,7 +947,7 @@ export const savedPairCode = () => {
  */
 export async function pairPhone(code) {
   const clean = normalizePairCode(code)
-  if (!clean) throw new Error('That isn’t a pairing code. It’s 16 letters and numbers, shown on your Mac.')
+  if (!clean) throw new Error('That isn’t a pairing code. It’s 16 letters and numbers, shown on your computer.')
   set({ pairError: null })
   try {
     await connectPhone(pairCredentials(clean))
@@ -955,7 +955,7 @@ export async function pairPhone(code) {
     // The sign-in failed because there is no such account — a mistyped code,
     // or a Mac that was paired again since. Say that, not "invalid login".
     if (/didn’t match|invalid login/i.test(err.message || '')) {
-      throw new Error('No Mac is paired with that code. Check it against the code your Mac shows.')
+      throw new Error('No computer is paired with that code. Check it against the code your computer shows.')
     }
     throw err
   }
@@ -970,7 +970,7 @@ async function turnOnMac({ email, password }) {
   if (res?.error) throw new Error("Signed in, but couldn't turn the phone remote on. Try again.")
   await writeHostDoc('remote.host', { wanted: true, at: Date.now() })
   if (!(await readHostDoc('host.name'))?.name) {
-    await writeHostDoc('host.name', { name: 'your Mac' })
+    await writeHostDoc('host.name', { name: 'your computer' })
   }
   await readMac()
   return state
@@ -980,7 +980,7 @@ async function turnOnMac({ email, password }) {
 export async function setMacRemote(on) {
   const { remoteEnable, writeHostDoc } = await device()
   const res = await remoteEnable(!!on)
-  if (on && res?.error) throw new Error("Couldn't turn it on. Check this Mac is online, then try again.")
+  if (on && res?.error) throw new Error("Couldn't turn it on. Check this computer is online, then try again.")
   await writeHostDoc('remote.host', { wanted: !!on, at: Date.now() })
   await readMac()
   return state

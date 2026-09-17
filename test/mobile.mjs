@@ -322,7 +322,7 @@ export function run(test) {
     ])
   })
 
-  test('a scene name the Mac refuses is said out loud, not swallowed', async () => {
+  test('a scene name the computer refuses is said out loud, not swallowed', async () => {
     /*
      * This was an empty catch once. Naming was refused outright over a remote
      * session for months and, because nothing said so, it read as the feature
@@ -406,16 +406,16 @@ export function run(test) {
     }
   })
 
-  test('the phone signs into the project the Mac hosts on', () => {
+  test('the phone signs into the project the computer hosts on', () => {
     const url = (text) => text.match(/url:\s*'([^']+)'/)?.[1]
     const key = (text) => text.match(/anonKey:\s*\n?\s*'([^']+)'/)?.[1]
 
     const mac = read('desktop/lib/project.mjs')
     const phone = read('mobile/src/lib/project.js')
 
-    assert.ok(url(mac), 'the Mac project url moved')
-    assert.equal(url(phone), url(mac), 'the phone would sign into a different project than the Mac')
-    assert.equal(key(phone), key(mac), 'the phone carries a different key than the Mac')
+    assert.ok(url(mac), 'the computer project url moved')
+    assert.equal(url(phone), url(mac), 'the phone would sign into a different project than the computer')
+    assert.equal(key(phone), key(mac), 'the phone carries a different key than the computer')
   })
 
   test('never a service-role key on a phone', () => {
@@ -528,7 +528,7 @@ export function run(test) {
     )
     assert.ok(
       !/Promise\.all/.test(names),
-      'the name reader fires reads together, which queues them behind each other at the Mac'
+      'the name reader fires reads together, which queues them behind each other at the computer'
     )
     assert.ok(
       !/for\s*\([^)]*slots[^)]*\)[^{]*\{[^}]*presetName/.test(screen + names),
@@ -617,7 +617,7 @@ export function run(test) {
       assert.equal(
         num(text, name),
         num(web, name),
-        `${name} disagrees, so the two apps decide a Mac is gone at different moments`
+        `${name} disagrees, so the two apps decide a computer is gone at different moments`
       )
     }
   })
@@ -645,6 +645,19 @@ export function run(test) {
      * acted on.
      */
     const jargon = /supabase|realtime|websocket|\brelay\b|\bchannel\b|anon key|\buid\b|forgefx/i
+    /*
+     * ONE SCREEN MAY SAY ForgeFX, and only that word, and only there.
+     *
+     * Connect.js is the page that tells somebody what to install. On the
+     * terminal route ForgeFX is not jargon, it is the NAME OF THE THING — the
+     * repository they have to go and find. A page that described it without
+     * naming it would be a page nobody could follow.
+     *
+     * Everything else in the list still applies to it, so the screen cannot use
+     * the carve-out to start talking about relays and channels, and no other
+     * screen gets it at all.
+     */
+    const installer = /supabase|realtime|websocket|\brelay\b|\bchannel\b|anon key|\buid\b/i
     for (const file of walk(new URL('../mobile/src/screens/', import.meta.url))) {
       const text = readFileSync(file, 'utf8')
       /*
@@ -659,12 +672,13 @@ export function run(test) {
         // "Channel A" is the unit's own word for a block channel, and the one
         // a player reads off the hardware.
         if (/^Channel [A-D]$/.test(line) || /channel \$\{/i.test(line)) continue
-        assert.ok(!jargon.test(line), `${file.split('/mobile/')[1]}: "${line}"`)
+        const rule = file.endsWith('/screens/Connect.js') ? installer : jargon
+        assert.ok(!rule.test(line), `${file.split('/mobile/')[1]}: "${line}"`)
       }
     }
   })
 
-  test('the phone cannot ask for anything the Mac refuses', async () => {
+  test('the phone cannot ask for anything the computer refuses', async () => {
     /*
      * Both ends read the same rule, so this is really a check that the phone
      * asks for things inside it — a route that looks reasonable and is refused
@@ -695,7 +709,7 @@ export function run(test) {
     assert.equal(rules.forbiddenRemotely('POST', '/backup'), 'back up the device')
   })
 
-  test('the phone stores nothing it should be asking the Mac for', () => {
+  test('the phone stores nothing it should be asking the computer for', () => {
     /*
      * localStorage was the wrong shape for a fact the Mac learns and the phone
      * needs, and AsyncStorage is the same shape. Only two things are kept in
@@ -713,7 +727,7 @@ export function run(test) {
     assert.deepEqual([...new Set(keys)], ['HOST_KEY'], 'the phone started keeping device state locally')
   })
 
-  test('the phone and the Mac file a setlist under the same unit', async () => {
+  test('the phone and the computer file a setlist under the same unit', async () => {
     /*
      * THE FAILURE THIS STOPS IS SILENT, which is why it is worth a test that
      * looks slightly paranoid.
@@ -876,7 +890,7 @@ export function run(test) {
     const edit = read('mobile/src/screens/Edit.js')
 
     assert.match(index, /for \(const block of editable\)[\s\S]{0,200}?await blockParams/, 'the index no longer reads one block at a time')
-    assert.ok(!/Promise\.all/.test(index), 'the index fires its reads together, which queues them behind each other at the Mac')
+    assert.ok(!/Promise\.all/.test(index), 'the index fires its reads together, which queues them behind each other at the computer')
     assert.match(index, /if \(cached\?\.key === key\) return cached\.index/, 'the index is rebuilt every time, so every search re-reads the preset')
     assert.match(edit, /if \(text\.trim\(\)\.length < 2 \|\| index\) return/, 'the find box reads the unit before anybody has asked it to')
     assert.match(edit, /Reading block \$\{progress\.done \+ 1\} of \$\{progress\.total\}/, 'the find box says nothing while it reads the whole preset')
@@ -1358,7 +1372,7 @@ export function run(test) {
      */
     const settings = read('mobile/src/screens/Settings.js')
 
-    for (const row of ['Unit', 'Phone & Mac', 'Play screen', 'About']) {
+    for (const row of ['Unit', 'Phone & computer', 'Play screen', 'About']) {
       assert.match(
         settings,
         new RegExp(`title="${row.replace('&', '&')}"`),
@@ -1454,7 +1468,7 @@ export function run(test) {
     )
 
     clearDebugLog()
-    logDebug('wire', 'GET /preset/blocks failed', 'Your Mac didn’t answer.')
+    logDebug('wire', 'GET /preset/blocks failed', 'Your computer didn’t answer.')
     logDebug('link', 'connected → no-answer')
     const lines = getDebugLog()
     assert.equal(lines.length, 2, 'the log does not keep what it is told')
@@ -2128,7 +2142,7 @@ export function run(test) {
     const app = read('mobile/App.js')
     assert.match(app, /<TopBar link=\{link\} onOpenSettings=/, 'the app does not draw the header')
     assert.ok(!/function LinkBar/.test(app), 'the old sentence bar is still there, under the new one')
-    assert.ok(!/Connected to \$\{/.test(app), 'the app still writes out which Mac it found')
+    assert.ok(!/Connected to \$\{/.test(app), 'the app still writes out which computer it found')
 
     /* And the stage screen gave up the two buttons the bar now carries. */
     const stage = read('mobile/src/screens/Stage.js')
@@ -2405,7 +2419,7 @@ export function run(test) {
     assert.match(flat, /!readFailed/, 'a failed read leaves the app waiting on a spinner with the error behind it')
     assert.ok(
       !/settling && screen !== 'settings'/.test(flat),
-      'the wait covers Setup as well, so a Mac that never answers cannot be fixed from here'
+      'the wait covers Setup as well, so a computer that never answers cannot be fixed from here'
     )
     /* And the bar stays up through it, which is what makes the wait safe at
        all: whatever happens, the gear is one tap away. */
@@ -2415,6 +2429,98 @@ export function run(test) {
 
     /* It says which thing it is waiting for, not "Loading…" — the one a person
        can act on is usually the Mac. */
-    assert.match(flat, /Finding \$\{link\.macName \|\| 'your Mac'\}/, 'the wait does not say what it is waiting for')
+    assert.match(flat, /Finding \$\{link\.macName \|\| 'your computer'\}/, 'the wait does not say what it is waiting for')
+  })
+
+  test('the phone can teach somebody how to connect a computer', () => {
+    /*
+     * "We also need to make instructions that teach people how to connect by
+     * either downloading the Mac app, installing forgefx with a helper file for
+     * terminal or a windows app (after we build those ones later)."
+     *
+     * What this is for is the person holding a phone that says NO COMPUTER and
+     * has no idea a computer was ever part of the arrangement. The sign-in
+     * screen asked for a code "your computer shows" and offered no way at all
+     * to find out which computer, or how to make one show anything.
+     *
+     * ONLY ONE OF THE THREE EXISTS TODAY, which is why each says where it
+     * stands. A page that dressed all three up as equals would send somebody
+     * hunting a download that has not been built.
+     */
+    const src = read('mobile/src/screens/Connect.js')
+
+    assert.match(src, /The Mac app/, 'the route that actually works is not offered')
+    assert.match(src, /github\.com\/justinnewbold\/fractal-ai-builder\/releases\/latest/, 'there is nowhere to get the Mac app from')
+    assert.match(src, /The Windows app/, 'Windows is not mentioned at all')
+    assert.match(src, /Not built yet/, 'the Windows app is offered as though it exists')
+    assert.match(src, /ForgeFX in a terminal/, 'the only route a Windows or Linux machine has today is missing')
+    assert.match(src, /github\.com\/sKuhLight\/ForgeFX/, 'the terminal route names no repository to go and find')
+
+    /*
+     * AND NO COMMAND IS INVENTED. There is no one-line installer yet; printing
+     * one that does not work is worse than saying so, because it fails at the
+     * far end of somebody's evening with nothing to go on.
+     */
+    assert.match(src, /no one-file installer for this yet/, 'the page claims an installer that does not exist')
+
+    /* The thing nobody knows and everything else depends on. */
+    assert.match(src, /Your unit plugs into a computer with a USB cable/, 'the page never says why a computer is involved')
+    /* And the trap that eats an evening: two programs, one port. */
+    assert.match(src, /Only one program can hold the USB port/, 'nothing warns about the editor already holding the port')
+
+    /* Reachable from both ends: Setup, and the sign-in screen — which is where
+       somebody is stuck when they have no computer to get a code from. */
+    assert.match(
+      read('mobile/App.js').replace(/\s+/g, ' '),
+      /screen === 'connect' \? \( <Connect onBack=/,
+      'the app cannot open the page'
+    )
+    assert.match(read('mobile/src/screens/Settings.js'), /onPress=\{onOpenConnect\}/, 'Setup has no door to it')
+    const signIn = read('mobile/src/screens/SignIn.js')
+    assert.match(signIn, /if \(helping\) return <Connect onBack=/, 'the sign-in screen cannot reach it')
+    assert.match(signIn, /How do I connect a computer\?/, 'the sign-in screen does not offer it')
+  })
+
+  test('the app talks about a computer, not a Mac', () => {
+    /*
+     * "Go through the app and change any of the words Mac to computer. Some
+     * people might be using a different device."
+     *
+     * Fair, and it was about to get worse rather than better: a Windows app is
+     * on the list, and every sentence in here would have been wrong for it.
+     *
+     * COMMENTS ARE NOT TOUCHED, deliberately, and this check knows it. Several
+     * of them quote Justin verbatim and several of those quotes say Mac — a
+     * quote you have edited is not a quote. What a person reads is what had to
+     * change.
+     */
+    const files = [
+      ...walk(new URL('../mobile/src/', import.meta.url)),
+      fileURLToPath(new URL('../mobile/App.js', import.meta.url))
+    ]
+    for (const file of files) {
+      /*
+       * ONE EXCEPTION, and it is the point rather than a hole in the rule.
+       * Connect.js tells somebody what to install, and one of the three things
+       * they can install is the Mac app. Calling it "the computer app" there
+       * would be describing a download by a name it does not have.
+       */
+      if (file.endsWith('/screens/Connect.js')) continue
+      const text = readFileSync(file, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, ' ')
+        .replace(/^\s*\/\/.*$/gm, ' ')
+      for (const [, line] of text.matchAll(/'([^'\n]{8,})'/g)) {
+        /* A real machine's own name is data, not copy: "MacBook Pro SG 566"
+           comes off the host and is not ours to rewrite. */
+        if (/MacBook/.test(line)) continue
+        assert.ok(
+          !/\bMac\b/.test(line),
+          `${file.split('/mobile/')[1]}: "${line}" still says Mac`
+        )
+      }
+    }
+
+    /* And the word the top bar shows when there is nothing on the other end. */
+    assert.match(read('shared/link-word.mjs'), /'no computer' : 'no phone'/, 'the bar still says NO MAC')
   })
 }

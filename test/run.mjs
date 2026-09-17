@@ -955,7 +955,7 @@ test('the Windows installer keeps the layout the server needs', () => {
   assert.match(ps, /^Install-FractalRemote$/m, 'nothing calls the installer, so pasting it does nothing')
 })
 
-test('a phone that cannot reach the Mac is told the likely reason', async () => {
+test('a phone that cannot reach the computer is told the likely reason', async () => {
   /*
    * The address in the menu works from the Mac and fails from a phone, and
    * nothing said why. macOS asks separately about connections arriving from
@@ -1069,7 +1069,7 @@ test('the app refuses to serve from a port something else already holds', async 
   })
   assert.deepEqual(stranger, { free: false, forgefx: false })
 
-  assert.match(host.PORT_TAKEN(5056), /already running on this Mac, on port 5056/)
+  assert.match(host.PORT_TAKEN(5056), /already running on this computer, on port 5056/)
   assert.match(host.PORT_TAKEN(), /serial port/, 'the reason two cannot share is not explained')
 })
 
@@ -1253,7 +1253,7 @@ test('the memory is kept on the device, counts what was said, and knows when it 
   assert.equal(m.MEMORY_EVERY, 10)
 })
 
-test('two Macs on one account cannot quietly write to two units', async () => {
+test('two computers on one account cannot quietly write to two units', async () => {
   /*
    * "If I have one Mac connected to an AM4 and one Mac connected to an FM3 and
    * I try to do a remote connection on my phone, how does the app differentiate
@@ -1277,16 +1277,16 @@ test('two Macs on one account cannot quietly write to two units', async () => {
   const read = async (p) => p.body
 
   const two = await hostNamesFrom(
-    [answer('Justins MacBook Pro'), answer('Studio Mac')],
+    [answer('Justins MacBook Pro'), answer('Studio computer')],
     read
   )
-  assert.deepEqual(two, ['Justins MacBook Pro', 'Studio Mac'])
+  assert.deepEqual(two, ['Justins MacBook Pro', 'Studio computer'])
 
   // A Mac that answered in a shape we did not expect is still a Mac that would
   // carry out the next write, so it counts. Dropping it turns the fault back
   // into the silence this whole thing exists to end.
-  const odd = await hostNamesFrom([answer('Studio Mac'), { id: 'x', body: 'not json' }], read)
-  assert.deepEqual(odd, ['Studio Mac', 'a Mac'], 'a Mac that answered was not counted')
+  const odd = await hostNamesFrom([answer('Studio computer'), { id: 'x', body: 'not json' }], read)
+  assert.deepEqual(odd, ['Studio computer', 'a computer'], 'a computer that answered was not counted')
 
   // The census still counts them. What it no longer does is refuse — see the
   // test below, and hostConflict in shared/relay-rules.mjs.
@@ -1294,7 +1294,7 @@ test('two Macs on one account cannot quietly write to two units', async () => {
   assert.equal(hostConflict([]), null)
 })
 
-test('more than one Mac answering is not a reason to refuse', () => {
+test('more than one computer answering is not a reason to refuse', () => {
   /*
    * This used to be the guard rail: two Macs answering meant a write might
    * land on two units, so the app refused until one was chosen and the choice
@@ -1315,15 +1315,15 @@ test('more than one Mac answering is not a reason to refuse', () => {
    * guard is a deliberate act rather than something that comes back by
    * accident on the next edit.
    */
-  const two = ['Justins MacBook Pro', 'Studio Mac']
+  const two = ['Justins MacBook Pro', 'Studio computer']
 
-  assert.equal(hostConflict(two, null, false), null, 'two Macs still refuse a write')
-  assert.equal(hostConflict(two, 'Studio Mac', false), null, 'an unproved choice still refuses')
-  assert.equal(hostConflict(two, 'Studio Mac', true), null)
+  assert.equal(hostConflict(two, null, false), null, 'two computers still refuse a write')
+  assert.equal(hostConflict(two, 'Studio computer', false), null, 'an unproved choice still refuses')
+  assert.equal(hostConflict(two, 'Studio computer', true), null)
   assert.equal(hostConflict(['MacBook Pro', 'MacBook Pro'], null, false), null, 'a name clash still refuses')
   assert.equal(hostConflict(['MacBook Pro', 'MacBook Pro'], 'MacBook Pro', true), null)
-  assert.equal(hostConflict(['a', 'b', 'c'], null, false), null, 'three Macs still refuse')
-  assert.equal(hostConflict(['Studio Mac'], null, false), null)
+  assert.equal(hostConflict(['a', 'b', 'c'], null, false), null, 'three computers still refuse')
+  assert.equal(hostConflict(['Studio computer'], null, false), null)
   assert.equal(hostConflict([]), null)
 
   // The phone carries its own copy of this rule and the two must not drift:
@@ -1332,7 +1332,7 @@ test('more than one Mac answering is not a reason to refuse', () => {
   assert.equal(typeof hostConflict, 'function', 'the signature callers rely on is gone')
 })
 
-test('nothing is written while two Macs are listening', () => {
+test('nothing is written while two computers are listening', () => {
   /*
    * The sentence above is the explanation; this is the guarantee. A write is
    * refused at the one place every write goes through, so it holds for the
@@ -1353,14 +1353,14 @@ test('nothing is written while two Macs are listening', () => {
   assert.match(
     src,
     /if \(method !== 'GET'\) \{[\s\S]{0,80}const clash = await conflictNow\(\)/,
-    'a write can travel again while two Macs are answering'
+    'a write can travel again while two computers are answering'
   )
   assert.match(src, /export async function conflictNow\(maxAgeMs = 4000\)/)
   assert.match(src, /if \(!clash\) return null/, 'the ordinary case pays for a roll call it does not need')
   assert.match(
     src,
     /if \(Date\.now\(\) - countedAt < maxAgeMs\) return clash/,
-    'a burst of writes re-counts the Macs on every one of them'
+    'a burst of writes re-counts the computers on every one of them'
   )
   // The collector has to run before the resolve, because `waiting.delete` is
   // what makes the second answer invisible.
@@ -1374,12 +1374,12 @@ test('nothing is written while two Macs are listening', () => {
   assert.match(
     src,
     /if \(hosts\.length > 1 && chosen && targeted\) ask\.host = chosen/,
-    'a request is sent to every Mac again, or to one that cannot understand being addressed'
+    'a request is sent to every computer again, or to one that cannot understand being addressed'
   )
   assert.match(
     src,
     /targeted = answers\.length === 1/,
-    'addressing a Mac is taken on trust instead of proved'
+    'addressing a computer is taken on trust instead of proved'
   )
   // The count, the choice and the proof all belong to the channel they were
   // taken on.
@@ -1395,7 +1395,7 @@ test('nothing is written while two Macs are listening', () => {
   assert.match(link, /export async function chooseHost/, 'there is no way to choose between them')
 })
 
-test('each Mac advertises itself under its own name', async () => {
+test('each computer advertises itself under its own name', async () => {
   /*
    * The other half, and it bites even when the two Macs are on different
    * accounts. Every Mac asked to be `fractal.local`. bonjour-service probes
@@ -1408,13 +1408,13 @@ test('each Mac advertises itself under its own name', async () => {
   assert.equal(host.mdnsName('Studio Mac'), 'fractal-studio-mac')
   // A DNS label carries letters, digits and hyphens, and nothing else.
   assert.equal(host.mdnsName('MacBook Air (2)'), 'fractal-macbook-air-2')
-  assert.ok(!/[^a-z0-9-]/.test(host.mdnsName('Åsa’s Mac!!')), 'an illegal character reached a DNS label')
+  assert.ok(!/[^a-z0-9-]/.test(host.mdnsName('Åsa’s computer!!')), 'an illegal character reached a DNS label')
   assert.ok(!/-$/.test(host.mdnsName('x'.repeat(60))), 'a truncated name can end in a hyphen')
   // Nothing to go on is the one case where the old constant is still right.
   assert.equal(host.mdnsName(''), 'fractal')
 
   const main = readSrc(new URL('../desktop/main.js', import.meta.url), 'utf8')
-  assert.match(main, /FRACTAL_MDNS_NAME \|\| mdnsName\(\)/, 'the Mac app still advertises a constant')
+  assert.match(main, /FRACTAL_MDNS_NAME \|\| mdnsName\(\)/, 'the computer app still advertises a constant')
 })
 
 test('a model roster with no lineage on it gets one', () => {
@@ -1852,7 +1852,7 @@ test('an update never depends on the quit working', () => {
   assert.match(main, /async function stopServing\(\)/, 'the teardown is not shared with the quit')
 })
 
-test('the update offers a restart in the words every other Mac app uses', () => {
+test('the update offers a restart in the words every other computer app uses', () => {
   /*
    * "On most Mac apps that update it usually says refresh app to update and
    * they click one button and it closes the app for them. Is it possible for
@@ -1987,7 +1987,7 @@ test('the web app and the launchers name the same project', async () => {
 test('a hostname reads like a name', () => {
   assert.equal(host.prettyHostname('Justins-MacBook-Pro.local'), 'Justins MacBook Pro')
   assert.equal(host.prettyHostname('studio_mac'), 'studio mac')
-  assert.equal(host.prettyHostname(''), 'your Mac')
+  assert.equal(host.prettyHostname(''), 'your computer')
 })
 
 /**
@@ -2017,7 +2017,7 @@ function fakeForgeFX({ healthzFails = 0, cloud = { enabled: true, user: { email:
   return { fetch, calls }
 }
 const arm = (unit, extra = {}) =>
-  host.armHost({ port: 5056, fetch: unit.fetch, hostname: 'Studio Mac', sleep: async () => {}, ...extra })
+  host.armHost({ port: 5056, fetch: unit.fetch, hostname: 'Studio computer', sleep: async () => {}, ...extra })
 
 test('the launcher turns the phone remote on once the server is up', async () => {
   const unit = fakeForgeFX({ healthzFails: 2 })
@@ -2027,7 +2027,7 @@ test('the launcher turns the phone remote on once the server is up', async () =>
     'GET /healthz',
     'GET /healthz',
     'GET /healthz',
-    'PUT /store/config/host.name {"data":{"name":"Studio Mac"},"origin":"fractal"}',
+    'PUT /store/config/host.name {"data":{"name":"Studio computer"},"origin":"fractal"}',
     'GET /cloud/status',
     'GET /remote/status',
     'GET /store/config/remote.host',
@@ -2114,7 +2114,7 @@ test('a preset can be renamed by hand, and the save sheet follows a rename', () 
   assert.match(app, /setPreset\(p\)\n\s*followUnitName\(p\)/, 'the unit’s name is not followed on a read')
 })
 
-test('the debug report carries the Mac’s own account of its port', async () => {
+test('the debug report carries the computer’s own account of its port', async () => {
   /*
    * "port not open" on the phone, live tuner readings at the same time, a
    * preset change that reached the unit — and nothing to read on the Mac,
@@ -2137,7 +2137,7 @@ test('the debug report carries the Mac’s own account of its port', async () =>
     reopens: [{ at: '2026-09-12T15:34:10.000Z', label: '/dev/cu.usbmodem1019', reason: 'the device went away (Disconnected)' }],
     recent: ['2026-09-12T15:34:10.000Z warn [forgefx] serial /dev/cu.usbmodem1019 closed — the device went away (Disconnected)']
   })
-  assert.match(out, /^MAC'S DEVICE SERVER/)
+  assert.match(out, /^COMPUTER'S DEVICE SERVER/)
   assert.match(out, /port to the unit: NOT OPEN · \/dev\/cu\.usbmodem1019/)
   assert.match(out, /serial ports: \/dev\/cu\.usbmodem1019 \(Fractal\), \/dev\/cu\.Bluetooth/)
   assert.match(out, /server up: 10 min/)
@@ -2148,19 +2148,19 @@ test('the debug report carries the Mac’s own account of its port', async () =>
   assert.equal(formatMacDiag(null), '')
   assert.match(formatMacDiag({}), /port to the unit: NOT OPEN\nresolved: no unit found\nserial ports: none/)
   // An older Mac app has no port history to give, and "0 times" is not what that means.
-  assert.match(formatMacDiag({}), /port lost and reopened: this Mac app does not say/)
-  assert.match(formatMacDiag({}), /server log: this Mac app does not keep one/)
+  assert.match(formatMacDiag({}), /port lost and reopened: this computer app does not say/)
+  assert.match(formatMacDiag({}), /server log: this computer app does not keep one/)
   assert.match(formatMacDiag({ reopens: [], recent: [] }), /port lost and reopened: 0 times\nserver log: nothing said yet/)
 
   const panel = readSrc(new URL('../src/components/DebugLog.jsx', import.meta.url), 'utf8')
-  assert.match(panel, /const t = text\(await macReport\(\)\)/, 'Copy log does not ask the Mac')
+  assert.match(panel, /const t = text\(await macReport\(\)\)/, 'Copy log does not ask the computer')
   assert.match(panel, /formatMacDiag\(await serverDiag\(\)\)/)
-  assert.match(panel, /could not be asked/, 'a Mac that does not answer is not said so')
+  assert.match(panel, /could not be asked/, 'a computer that does not answer is not said so')
   const fx = readSrc(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
   assert.match(fx, /export const serverDiag = \(\) => request\('\/diag'/, 'the diag has to travel the relay like every other GET, so a phone can ask')
 })
 
-test('the Mac app says which version it is, where the phone already looks', async () => {
+test('the computer app says which version it is, where the phone already looks', async () => {
   /*
    * A phone on today's web build against a Mac still running last week's
    * app is the shape of every "the fix didn't work", and the debug report
@@ -2170,15 +2170,15 @@ test('the Mac app says which version it is, where the phone already looks', asyn
   const unit = fakeForgeFX()
   await arm(unit, { version: '7.190.0' })
   assert.ok(
-    unit.calls.includes('PUT /store/config/host.name {"data":{"name":"Studio Mac","version":"7.190.0"},"origin":"fractal"}'),
+    unit.calls.includes('PUT /store/config/host.name {"data":{"name":"Studio computer","version":"7.190.0"},"origin":"fractal"}'),
     'the version did not reach the host doc'
   )
   const main = readSrc(new URL('../desktop/main.js', import.meta.url), 'utf8')
-  assert.match(main, /armHost\(\{ port, version: app\.getVersion\(\) \}\)/, 'the Mac app does not say which version it is')
+  assert.match(main, /armHost\(\{ port, version: app\.getVersion\(\) \}\)/, 'the computer app does not say which version it is')
   const link = readSrc(new URL('../src/lib/link.js', import.meta.url), 'utf8')
   assert.match(link, /macVersion: doc\.version \? String\(doc\.version\) : null/, 'the phone does not read the version back')
   const report = readSrc(new URL('../src/components/DebugLog.jsx', import.meta.url), 'utf8')
-  assert.match(report, /Mac app \$\{link\.macVersion \? `v\$\{link\.macVersion\}` : 'older than 7\.190\.0/, 'the report does not say which Mac app answered')
+  assert.match(report, /computer app \$\{link\.macVersion \? `v\$\{link\.macVersion\}` : 'older than 7\.190\.0/, 'the report does not say which computer app answered')
 })
 
 test('the name is written even when there is nobody to host for', async () => {
@@ -2189,7 +2189,7 @@ test('the name is written even when there is nobody to host for', async () => {
   assert.ok(unit.calls.some((c) => c.startsWith('PUT /store/config/host.name')))
 })
 
-test('the advert answers for its own name, never for the Mac’s', async () => {
+test('the advert answers for its own name, never for the computer’s', async () => {
   /*
    * "This computer's local hostname 'Justins-MacBook-Pro-958.local' is
    * already in use on this network. The name has been changed to
@@ -2209,7 +2209,7 @@ test('the advert answers for its own name, never for the Mac’s', async () => {
   }
   const ad = host.publish(FakeBonjour, { port: 5056, name: 'fractal-justins-macbook-pro' })
   assert.equal(published.length, 1)
-  assert.equal(published[0].host, 'fractal-justins-macbook-pro.local', 'the advert is answering for the Mac’s own hostname')
+  assert.equal(published[0].host, 'fractal-justins-macbook-pro.local', 'the advert is answering for the computer’s own hostname')
   assert.equal(published[0].name, 'fractal-justins-macbook-pro')
   assert.equal(published[0].port, 5056)
   await ad.stop()
@@ -2222,7 +2222,7 @@ test('publishing without mDNS available still gives a usable stop', async () => 
   await ad.stop()
 })
 
-console.log('\nkeeping the Mac app up to date')
+console.log('\nkeeping the computer app up to date')
 
 const updates = await import('../desktop/lib/updates.mjs')
 
@@ -3291,7 +3291,7 @@ test('backing up a preset needs no confirmation', () => {
   assert.ok(!r.actions[0].destructive)
 })
 
-test('a slot save asked for from the phone is parked for the Mac, not refused', () => {
+test('a slot save asked for from the phone is parked for the computer, not refused', () => {
   /*
    * "Please make it so that anything can be saved from the phone. It's kind of
    * the whole purpose of this."
@@ -3313,14 +3313,14 @@ test('a slot save asked for from the phone is parked for the Mac, not refused', 
   assert.equal(save.actions.length, 1, 'a slot save was refused over the relay')
   assert.deepEqual(save.problems, [], save.problems.join(' | '))
   const asked = save.actions[0]
-  assert.match(asked.label, /Ask the Mac/, 'the label does not say who is holding the pen')
+  assert.match(asked.label, /Ask the computer/, 'the label does not say who is holding the pen')
   assert.match(asked.label, /67/)
   assert.equal(asked.destructive, true, 'overwriting a slot stopped asking first')
   // What the caller watches for. Parking is all this action can do; whether it
   // landed is decided on another machine seconds later.
   assert.equal(asked.parksSave.slot, 67)
   assert.equal(asked.parksSave.name, 'Dimebag')
-  assert.ok(asked.parksSave.id, 'the Mac answer could never be matched to the ask')
+  assert.ok(asked.parksSave.id, 'the computer answer could never be matched to the ask')
 
   // Backing up writes a file onto whichever machine asked for it, and the host
   // refuses the dump from a distance. Still said before anything is written.
@@ -3330,7 +3330,7 @@ test('a slot save asked for from the phone is parked for the Mac, not refused', 
     away
   )
   assert.deepEqual(backup.actions, [], 'a backup was proposed over the relay')
-  assert.match(backup.problems[0] || '', /only works at the Mac/, backup.problems.join(' | '))
+  assert.match(backup.problems[0] || '', /only works at the computer/, backup.problems.join(' | '))
 
   // Keeping a preset as a file asks the unit for a dump the host will not send
   // over the relay AND writes into a folder a phone does not have. Refused
@@ -3341,7 +3341,7 @@ test('a slot save asked for from the phone is parked for the Mac, not refused', 
     away
   )
   assert.deepEqual(keep.actions, [], 'a file write was proposed over the relay')
-  assert.match(keep.problems[0] || '', /only works at the Mac/, keep.problems.join(' | '))
+  assert.match(keep.problems[0] || '', /only works at the computer/, keep.problems.join(' | '))
 
   // Everything else travels as it did, and the save goes last — the order is
   // the whole point of "load 12, drop the gain and save it back".
@@ -3377,11 +3377,11 @@ test('a slot save asked for from the phone is parked for the Mac, not refused', 
   assert.equal(
     home.actions.find((a) => a.kind === 'savePreset').parksSave,
     undefined,
-    'the Mac asked itself to do what it was already doing'
+    'the computer asked itself to do what it was already doing'
   )
 })
 
-test('the Mac answer to a parked save reaches the chat that asked for it', () => {
+test('the computer answer to a parked save reaches the chat that asked for it', () => {
   const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
   /*
    * Parking is all the action can do. Without picking the request back up
@@ -3390,7 +3390,7 @@ test('the Mac answer to a parked save reaches the chat that asked for it', () =>
    */
   const run = app.slice(app.indexOf('const landed = landedOf(actions, failures)'))
   assert.match(run.slice(0, 1200), /const parked = landed\.find\(\(a\) => a\.parksSave\)\?\.parksSave/)
-  assert.match(run.slice(0, 1200), /setQueuedSave\(\{/, 'nothing watches for the Mac answer')
+  assert.match(run.slice(0, 1200), /setQueuedSave\(\{/, 'nothing watches for the computer answer')
   assert.match(run.slice(0, 1200), /scenes: Array\.isArray\(sceneNames\)/)
 })
 
@@ -4180,17 +4180,17 @@ console.log('\nsaving')
 
 // What the bar offers, given where the app is running and what it's waiting on.
 const saveButton = (remote, busy, queued) =>
-  queued ? 'waiting' : busy ? 'working' : remote ? 'ask the Mac' : 'save'
+  queued ? 'waiting' : busy ? 'working' : remote ? 'ask the computer' : 'save'
 
 test('a slot write is offered when the cable is on this machine', () => {
   assert.equal(saveButton(false, false, null), 'save')
 })
 
-test('a remote session saves through the Mac rather than refusing', () => {
+test('a remote session saves through the computer rather than refusing', () => {
   // ForgeFX refuses POST /preset/store over the relay — correctly, and still.
   // The request goes by the road that IS open, and the page at the Mac writes
   // it; the button says who does the writing instead of being dead.
-  assert.equal(saveButton(true, false, null), 'ask the Mac')
+  assert.equal(saveButton(true, false, null), 'ask the computer')
   assert.ok(forbiddenRemotely('POST', '/preset/store'))
   // The road: config docs are the one write the host takes from a distance.
   assert.equal(forbiddenRemotely('PUT', '/store/config/fractal.pendingSave.fm3'), null)
@@ -4909,7 +4909,7 @@ test('a write nobody could check is not written again on a guess', async () => {
     assert.equal(
       seen.filter((c) => c === 'DELETE /device/cache').length,
       1,
-      'reconnecting to a Mac that may have been updated still never asks it'
+      'reconnecting to a computer that may have been updated still never asks it'
     )
   } finally {
     const fx = await import('../src/lib/forgefx.js')
@@ -5142,7 +5142,7 @@ test('a request caught between one channel and the next waits for the next one',
    * coming back, and coming back because of the very drop it was reacting to.
    */
   const src = readSrc(new URL('../src/lib/remote.js', import.meta.url), 'utf8')
-  assert.match(src, /if \(!session && !connecting\) throw linkDown\('Not connected to your Mac\.'\)/)
+  assert.match(src, /if \(!session && !connecting\) throw linkDown\('Not connected to your computer\.'\)/)
   assert.match(src, /connecting = true\n  try \{\n    return await joinChannel\(\)\n  \} finally \{\n    connecting = false\n  \}/)
 })
 
@@ -5219,7 +5219,7 @@ test('the save guard asks the unit which preset is loaded, not the screen', () =
   )
   // And the sentence names what is actually loaded, rather than the stale
   // number it used to accuse the Mac of having moved to.
-  assert.match(scope, /The Mac had moved to slot \$\{loaded \?\? 'another preset'\}/)
+  assert.match(scope, /The computer had moved to slot \$\{loaded \?\? 'another preset'\}/)
   assert.ok(
     !/moved to slot \$\{preset\?\.number/.test(scope),
     'the message still reports the number that was wrong in the first place'
@@ -5388,7 +5388,7 @@ test('a save writes down what the slot is called, on every route to one', () => 
   const note = fx.slice(fx.indexOf('export function notePresetName('), fx.indexOf('export function forgetPresetName('))
   assert.match(note, /nameCache\.set\(number, kept\)/)
   assert.match(note, /persistNames\(\)/, 'the name is gone again on the next launch')
-  assert.match(note, /publishNames\(\)/, 'the Mac keeps the new name to itself')
+  assert.match(note, /publishNames\(\)/, 'the computer keeps the new name to itself')
 
   // All three routes, and each one says which name it is asserting.
   assert.equal(
@@ -5399,7 +5399,7 @@ test('a save writes down what the slot is called, on every route to one', () => 
   for (const route of [
     /await storePreset\(number\)[\s\S]{0,400}?keepSavedName\(number, name \|\| preset\?\.name\)/,
     /await storePreset\(req\.slot\)[\s\S]{0,400}?keepSavedName\(req\.slot, name \|\| preset\?\.name\)/,
-    /keepSavedName\(res\.slot, queuedSave\.name\)[\s\S]{0,300}?The Mac saved it to slot/
+    /keepSavedName\(res\.slot, queuedSave\.name\)[\s\S]{0,300}?The computer saved it to slot/
   ]) {
     assert.match(app, route)
   }
@@ -5417,7 +5417,7 @@ test('a save writes down what the slot is called, on every route to one', () => 
    * when the Mac says it landed, that is the only description of the slot the
    * phone will ever have.
    */
-  const park = app.slice(app.indexOf('setQueuedSave({'), app.indexOf('record(\'save\', `Asked the Mac to save'))
+  const park = app.slice(app.indexOf('setQueuedSave({'), app.indexOf('record(\'save\', `Asked the computer to save'))
   assert.match(park, /name: saveName\.trim\(\) \|\| preset\?\.name \|\| ''/)
   assert.match(park, /scenes: Array\.isArray\(sceneNames\) \? \[\.\.\.sceneNames\] : \[\]/)
 
@@ -5455,7 +5455,7 @@ test('the list can be read off the unit again from nothing, and the loaded slot 
   assert.match(all, /nameCache = new Map\(\)/)
   assert.match(all, /resetNameRoutes\(\)/, 'a re-read still trusts what the last unit taught it about the routes')
   assert.match(all, /persistNames\(\)/, 'the old names would be back on the next launch')
-  assert.match(all, /publishNames\(\)/, 'a phone would take the old names straight back off the Mac')
+  assert.match(all, /publishNames\(\)/, 'a phone would take the old names straight back off the computer')
 
   // The app forgets, then reads eagerly — and a scan already running is restarted, not joined.
   const again = app.slice(app.indexOf('const rereadNames = '), app.indexOf('useEffect(() => {', app.indexOf('const rereadNames = ')))
@@ -5482,7 +5482,7 @@ test('the list can be read off the unit again from nothing, and the loaded slot 
   assert.match(app, /setPreset\(p\)\n[\s\S]{0,900}?if \(!dirtyRef\.current\) noteLoadedName\(p\)/)
 })
 
-test('the Mac wins where the two disagree about a slot', () => {
+test('the computer wins where the two disagree about a slot', () => {
   /*
    * The other half, and what heals a phone that already has a wrong name in
    * it. The Mac is the end with the cable; the phone only ever knows what the
@@ -5496,7 +5496,7 @@ test('the Mac wins where the two disagree about a slot', () => {
    */
   const fx = readSrc(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
   const imp = fx.slice(fx.indexOf('export async function importHostNames'), fx.indexOf('/** One slot\'s name'))
-  assert.ok(!/nameCache\.has\(number\)/.test(imp), 'a name this browser already has still wins over the Mac\'s')
+  assert.ok(!/nameCache\.has\(number\)/.test(imp), 'a name this browser already has still wins over the computer\'s')
   assert.match(imp, /if \(nameCache\.get\(number\) === name\) continue/, 'every import counts every slot as changed')
   assert.match(imp, /if \(!doc \|\| typeof doc !== 'object'\) return 0/, 'a missing host copy is treated as an answer')
 })
@@ -5846,9 +5846,9 @@ test('the later transcript wins, and an empty one never wins', () => {
 
 test('the other device is named in words, not in a user agent', () => {
   const { deviceName } = cloudChatMod
-  assert.equal(deviceName('Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) Safari'), 'iPhone')
+  assert.equal(deviceName('Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like computer OS X) Safari'), 'iPhone')
   assert.equal(deviceName('Mozilla/5.0 (iPad; CPU OS 17_5) Safari'), 'iPad')
-  assert.equal(deviceName('Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) Safari'), 'Mac')
+  assert.equal(deviceName('Mozilla/5.0 (Macintosh; Intel computer OS X 14_5) Safari'), 'computer')
   assert.equal(deviceName('Mozilla/5.0 (Linux; Android 14) Chrome'), 'Android')
   assert.equal(deviceName(''), 'a browser')
   assert.equal(deviceName(undefined), 'a browser')
@@ -5897,7 +5897,7 @@ test('the account copy is pulled once and pushed on a debounce', () => {
   assert.match(
     app,
     /if \(!turns\.length && !saidSomething\.current\) return undefined/,
-    'an empty chat is pushed over the one on the Mac at boot'
+    'an empty chat is pushed over the one on the computer at boot'
   )
   assert.match(app, /if \(turns\.length\) saidSomething\.current = true/)
   assert.match(app, /const saidSomething = useRef\(!!restored\?\.clearedAt\)/)
@@ -6836,24 +6836,24 @@ test('a saved sign-in is known before the client is loaded', () => {
 })
 
 test('the fault notice speaks to the end it is on', () => {
-  const ios = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
-  const crios = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/126.0 Mobile/15E148 Safari/604.1'
-  const macSafari = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15'
-  const chrome = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'
+  const ios = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like computer OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
+  const crios = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like computer OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/126.0 Mobile/15E148 Safari/604.1'
+  const macSafari = 'Mozilla/5.0 (Macintosh; Intel computer OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15'
+  const chrome = 'Mozilla/5.0 (Macintosh; Intel computer OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'
 
   assert.equal(link.faultCopy({ role: 'unknown' }), null, 'a notice was written before anyone knew which end this is')
 
   const mac = link.faultCopy({ role: 'mac', secure: true, userAgent: macSafari })
-  assert.match(mac.body, /this Mac/)
-  assert.match(mac.body, /Safari/, 'Safari on an https page at the Mac is the one case the advice is for')
+  assert.match(mac.body, /this computer/)
+  assert.match(mac.body, /Safari/, 'Safari on an https page at the computer is the one case the advice is for')
   assert.ok(!/Safari/.test(link.faultCopy({ role: 'mac', secure: true, userAgent: chrome }).body), 'Chrome was told to try Chrome')
-  assert.ok(!/Safari/.test(link.faultCopy({ role: 'mac', secure: false, userAgent: macSafari }).body), 'Safari over plain http can talk to the Mac fine')
+  assert.ok(!/Safari/.test(link.faultCopy({ role: 'mac', secure: false, userAgent: macSafari }).body), 'Safari over plain http can talk to the computer fine')
   assert.equal(link.whySafari({ secure: true, userAgent: ios }), '', 'an iPhone was told to try Chrome, which is Safari underneath')
   assert.equal(link.whySafari({ secure: true, userAgent: crios }), '')
 
   const phone = link.faultCopy({ role: 'remote', secure: true, userAgent: ios })
-  assert.ok(phone && !/this Mac|Safari/.test(phone.body), 'a phone was told to open an app on "this Mac"')
-  assert.match(link.faultCopy({ role: 'wifi' }).title, /Lost the Mac/)
+  assert.ok(phone && !/this computer|Safari/.test(phone.body), 'a phone was told to open an app on "this computer"')
+  assert.match(link.faultCopy({ role: 'wifi' }).title, /Lost the computer/)
   /*
    * A unit that answered "not connected" wins over the role copy — but not
    * with the same words at every end. At the Mac the cable is an arm's length
@@ -6889,7 +6889,7 @@ test('the fault notice speaks to the end it is on', () => {
   )
 })
 
-test('a Mac that answered and has no port to the unit says exactly that', () => {
+test('a computer that answered and has no port to the unit says exactly that', () => {
   /*
    * "When I tap one of the buttons it will turn it off on the unit, but
    * there's no way to turn it back on, and the buttons always say on." The
@@ -6900,15 +6900,15 @@ test('a Mac that answered and has no port to the unit says exactly that', () => 
    */
   const phone = link.faultCopy({ role: 'remote', reason: 'unit-gone' })
   assert.match(phone.title, /lost the unit/i)
-  assert.match(phone.body, /At the Mac/, 'the phone was not told which end to go to')
+  assert.match(phone.body, /At the computer/, 'the phone was not told which end to go to')
   assert.ok(
     !/stopped answering|hasn’t gone to sleep/i.test(phone.body),
-    'the Mac answering is what raised this — it cannot also be the thing to fix'
+    'the computer answering is what raised this — it cannot also be the thing to fix'
   )
 
   const here = link.faultCopy({ role: 'mac', reason: 'unit-gone' })
   assert.match(here.title, /Lost the unit/)
-  assert.ok(!/At the Mac/.test(here.body), 'the Mac was told to go to the Mac it is already at')
+  assert.ok(!/At the computer/.test(here.body), 'the computer was told to go to the computer it is already at')
 
   // It wins over a stale device, the same way every other reason does.
   assert.match(
@@ -6924,10 +6924,10 @@ test('a Mac that answered and has no port to the unit says exactly that', () => 
  */
 test('a question that never came back is not blamed on the unit', () => {
   const gone = link.faultCopy({ role: 'remote', reason: 'no-answer' })
-  assert.match(gone.title, /stopped answering/, 'a silent Mac is still described as a Mac that answered')
+  assert.match(gone.title, /stopped answering/, 'a silent computer is still described as a computer that answered')
   assert.ok(
     !/plugged in|cable|unit is on/i.test(gone.body),
-    'a phone is sent to check a cable when it was the Mac that went quiet'
+    'a phone is sent to check a cable when it was the computer that went quiet'
   )
 
   const unread = link.faultCopy({ role: 'remote', reason: 'unreadable' })
@@ -6952,7 +6952,7 @@ test('a question that never came back is not blamed on the unit', () => {
 test('the bar names what is missing, not always the unit', () => {
   const bar = (reason) =>
     link.describeUnit({ role: 'remote', link: 'connected', status: 'fault', reason }).unit
-  assert.equal(bar('no-answer'), 'No answer', 'a silent Mac reads as an empty rig')
+  assert.equal(bar('no-answer'), 'No answer', 'a silent computer reads as an empty rig')
   assert.equal(bar('unreadable'), 'Can’t read')
   assert.equal(bar('no-unit'), 'No unit')
   assert.equal(bar(null), 'No unit', 'the old reading stands where no reason was given')
@@ -6965,7 +6965,7 @@ test('a phone restoring its sign-in reads as connecting, never as signed out', (
   const restored = boot.indexOf('await restoreSession(')
   assert.ok(
     published !== -1 && restored !== -1 && published < restored,
-    'bootLink withholds the role until the session round-trip is done — a phone gets the Mac’s error in the meantime'
+    'bootLink withholds the role until the session round-trip is done — a phone gets the computer’s error in the meantime'
   )
   assert.match(linkSrc, /restoring = role === 'remote' && hasSavedSession\(/, 'a phone that signed in last time is asked to Connect while its session is picked up')
   assert.match(linkSrc, /hasSession: !!merged\.account \|\| restoring/)
@@ -7922,7 +7922,7 @@ const retry = await import('../src/lib/retry.js')
 test('the words the codec uses for a garbled dump are recognised, and nothing else is', () => {
   assert.ok(retry.isGarbledDump('PRESET_DUMP_HEADER: expected func 0x77 at offset 0, got 0x78'))
   assert.ok(retry.isGarbledDump('expected func 0x77 at offset 0, got 0x78'))
-  assert.ok(!retry.isGarbledDump('Can’t reach the Fractal app on your Mac.'))
+  assert.ok(!retry.isGarbledDump('Can’t reach the Fractal app on your computer.'))
   assert.ok(!retry.isGarbledDump('No unit'))
   assert.ok(!retry.isGarbledDump(undefined))
 })
@@ -7986,7 +7986,7 @@ test('a different failure, or a write, is not asked again', async () => {
   assert.equal(calls, 1, 'a write was re-sent on a garbled read-back')
 })
 
-test('every request the app makes passes through the retry, at the Mac and over the relay', () => {
+test('every request the app makes passes through the retry, at the computer and over the relay', () => {
   const src = readSrc(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
   assert.match(src, /import \{ withRetry \} from '\.\/retry\.js'/, 'forgefx.js does not import the retry')
   assert.match(
@@ -8306,7 +8306,7 @@ test('the block list is remembered per unit, and a failed read says so', async (
   const good = await paletteFor('am4', async () => [{ slug: 'amp', name: 'Amp', page: 1 }], store)
   assert.equal(good.fromCache, false)
   assert.equal(cachedPalette('am4', store)[0].slug, 'amp')
-  const bad = await paletteFor('am4', async () => { throw new Error('Your Mac didn’t answer.') }, store)
+  const bad = await paletteFor('am4', async () => { throw new Error('Your computer didn’t answer.') }, store)
   assert.equal(bad.fromCache, true)
   assert.equal(bad.list[0].slug, 'amp')
   assert.match(bad.error, /didn’t answer/)
@@ -8484,7 +8484,7 @@ test('a chain read that fails because the unit has gone is asked once, not five 
    * Asking again is for a port that was busy for a moment. A port that is gone
    * gives the same answer instantly, so the first one is the answer.
    */
-  const gone = Object.assign(new Error('The Mac has lost the unit'), { unitGone: true })
+  const gone = Object.assign(new Error('The computer has lost the unit'), { unitGone: true })
   fresh(fakeUnit({ presetBlocks: () => Promise.reject(gone) }))
   let asks = 0
   const list = await ds.confirmedChain({
@@ -9052,7 +9052,7 @@ test('a failure every time is the caller own to report, not a quiet null', async
   await assert.rejects(
     ds.confirmedDetect({
       detect: async () => {
-        throw new Error('the Mac stopped answering')
+        throw new Error('the computer stopped answering')
       },
       wait: async () => {},
       wasLive: true
@@ -9217,14 +9217,14 @@ test('every read after a save asks with the longer patience', () => {
   // Each of the three sits under the record() line for the save it follows.
   for (const after of [
     /Saved "\$\{name \|\| preset\?\.name\}" to slot \$\{req\.slot\}[\s\S]{0,200}?read\(\{ settling: true \}\)/,
-    /The Mac saved it to slot \$\{res\.slot\}[\s\S]{0,200}?read\(\{ settling: true \}\)/,
+    /The computer saved it to slot \$\{res\.slot\}[\s\S]{0,200}?read\(\{ settling: true \}\)/,
     /Saved "\$\{name \|\| preset\?\.name\}" to slot \$\{number\}[\s\S]{0,300}?read\(\{ settling: true \}\)/
   ]) {
     assert.match(app, after)
   }
 })
 
-test('at the Mac the first no still stands', async () => {
+test('at the computer the first no still stands', async () => {
   /*
    * The other half. There is no relay and no second client on the port, so a
    * no is a no — and putting several seconds in front of everybody who opens
@@ -9240,7 +9240,7 @@ test('at the Mac the first no still stands', async () => {
     wasLive: false,
     remote: false
   })
-  assert.equal(n, 1, 'the Mac now waits out a retry loop for an empty rig')
+  assert.equal(n, 1, 'the computer now waits out a retry loop for an empty rig')
 })
 
 /*
@@ -9309,7 +9309,7 @@ test('from a phone the chain read gets the relay allowance', async () => {
     wait: async () => {},
     remote: true
   })
-  assert.deepEqual(list, [], 'the phone gave up before the Mac was free to answer')
+  assert.deepEqual(list, [], 'the phone gave up before the computer was free to answer')
   assert.equal(n, 4)
 })
 
@@ -9341,7 +9341,7 @@ test('nothing was live, so the first answer stands', async () => {
  * and no unit was plugged into it. Every one of them was true about a
  * different thing, and together they were nonsense.
  */
-test('a Mac that answered with no unit on it does not read as not connected', () => {
+test('a computer that answered with no unit on it does not read as not connected', () => {
   const said = link.describeUnit({
     role: 'remote',
     link: 'connected',
@@ -9352,7 +9352,7 @@ test('a Mac that answered with no unit on it does not read as not connected', ()
   assert.equal(said.lamp, 'fault', 'a cable the player can go and check is not a quiet state')
 })
 
-test('a phone that has not reached the Mac stays quiet about it', () => {
+test('a phone that has not reached the computer stays quiet about it', () => {
   // The reason the bar went quiet in the first place: red over a screen that
   // is calmly asking you to connect is the loud wrong answer.
   for (const state of ['off', 'joining', 'no-answer']) {
@@ -9380,7 +9380,7 @@ test('a live unit is named, wherever the app is running', () => {
   )
 })
 
-test('at the Mac, a missing unit is still a missing device', () => {
+test('at the computer, a missing unit is still a missing device', () => {
   // Nothing above changes the end with the cable in it.
   const said = link.describeUnit({ role: 'mac', link: 'connected', status: 'fault' })
   assert.equal(said.unit, 'No device')
@@ -9395,7 +9395,7 @@ test('the demo lamp outranks whatever the unit is doing', () => {
   )
 })
 
-test('connected means the Mac answered, never merely that a channel was joined', () => {
+test('connected means the computer answered, never merely that a channel was joined', () => {
   const base = { role: 'remote', hasSession: true, joining: false, channelUp: true }
   assert.equal(
     link.deriveLink({ ...base, hostSeen: false }),
@@ -9409,7 +9409,7 @@ test('connected means the Mac answered, never merely that a channel was joined',
   assert.equal(
     link.deriveLink({ ...base, hostSeen: true, wantsAuto: false }),
     'off',
-    'a deliberate Disconnect was reported as the Mac not answering'
+    'a deliberate Disconnect was reported as the computer not answering'
   )
 })
 
@@ -9428,7 +9428,7 @@ test('connected means answered recently, not answered once', () => {
   assert.equal(
     link.deriveLink({ ...base, answeredAgo: link.STALE_MS + 1 }),
     'no-answer',
-    'a Mac that has said nothing for twenty seconds is still being called connected'
+    'a computer that has said nothing for twenty seconds is still being called connected'
   )
   // The keepalive asks every eight seconds and gives up after six, so anything
   // inside that plus slack has genuinely been answered and must not flicker.
@@ -9436,7 +9436,7 @@ test('connected means answered recently, not answered once', () => {
   assert.ok(link.STALE_MS > link.KEEPALIVE + 6000, 'the window is tighter than one unanswered question')
 })
 
-test('a Mac that never heard the question is asked once, not five times', async () => {
+test('a computer that never heard the question is asked once, not five times', async () => {
   /*
    * Five attempts at twenty seconds each is a hundred seconds in which the
    * screen can say nothing true — it goes on showing the last thing it knew,
@@ -9445,7 +9445,7 @@ test('a Mac that never heard the question is asked once, not five times', async 
    * The asking is for a unit that answers "no" while it loads a preset. A Mac
    * that is off does not answer at all, and one attempt is enough to learn it.
    */
-  const silent = Object.assign(new Error('Your Mac didn’t answer.'), {})
+  const silent = Object.assign(new Error('Your computer didn’t answer.'), {})
   assert.equal(ds.macSilent(silent), true, 'a question that was never answered reads as the unit refusing')
   assert.equal(ds.macSilent(Object.assign(new Error('nope'), { linkDown: true })), true)
   assert.equal(ds.macSilent(new Error('port not open')), false, 'a unit that answered is treated as a dead line')
@@ -9484,14 +9484,14 @@ test('a Mac that never heard the question is asked once, not five times', async 
   assert.equal(busy, ds.RELAY_TRIES, 'a busy port lost the asking it needs')
 })
 
-test('the Mac is connected when it is listening, and wifi always is', () => {
+test('the computer is connected when it is listening, and wifi always is', () => {
   assert.equal(link.deriveLink({ role: 'mac', cloudUser: null, hostOn: true }), 'signed-out')
   assert.equal(link.deriveLink({ role: 'mac', cloudUser: { email: 'j@x' }, hostOn: false }), 'off')
   assert.equal(link.deriveLink({ role: 'mac', cloudUser: { email: 'j@x' }, hostOn: true }), 'connected')
   assert.equal(link.deriveLink({ role: 'wifi', hasSession: false, hostSeen: false }), 'connected')
 })
 
-test('a wifi phone is not mistaken for the Mac', () => {
+test('a wifi phone is not mistaken for the computer', () => {
   /*
    * A page served from the Mac has the helper as its own origin, so the
    * "is the helper at localhost" probe answers yes on the phone too. Only
@@ -9499,10 +9499,10 @@ test('a wifi phone is not mistaken for the Mac', () => {
    * the QR.
    */
   assert.equal(link.detectRole({ demo: false, served: true, hostname: 'localhost', helperAlive: true }), 'mac')
-  assert.equal(link.detectRole({ demo: false, served: true, hostname: '10.0.0.5', helperAlive: true }), 'wifi', 'a phone on wifi was told it is the Mac')
+  assert.equal(link.detectRole({ demo: false, served: true, hostname: '10.0.0.5', helperAlive: true }), 'wifi', 'a phone on wifi was told it is the computer')
   assert.equal(link.detectRole({ demo: false, served: false, hostname: 'fractal.newbold.cloud', helperAlive: true }), 'mac')
   assert.equal(link.detectRole({ demo: false, served: false, hostname: 'fractal.newbold.cloud', helperAlive: false }), 'remote')
-  assert.equal(link.detectRole({ demo: true, served: false, hostname: 'x', helperAlive: false }), 'mac', 'demo simulates the Mac')
+  assert.equal(link.detectRole({ demo: true, served: false, hostname: 'x', helperAlive: false }), 'mac', 'demo simulates the computer')
 })
 
 test('asking again backs off but never stops', () => {
@@ -9521,7 +9521,7 @@ test('what the link says contains no plumbing', () => {
   for (const role of ['mac', 'wifi', 'remote']) {
     for (const l of ['off', 'signed-out', 'joining', 'no-answer', 'connected']) {
       states.push({ role, link: l, account: { email: 'j@x.com' }, macName: null })
-      states.push({ role, link: l, account: null, macName: 'Studio Mac' })
+      states.push({ role, link: l, account: null, macName: 'Studio computer' })
     }
   }
   for (const st of states) {
@@ -9530,7 +9530,7 @@ test('what the link says contains no plumbing', () => {
       assert.ok(!jargon.test(said[key]), `${st.role}/${st.link} ${key}: "${said[key]}"`)
     }
   }
-  assert.match(link.describeLink({ role: 'remote', link: 'connected', macName: 'Studio Mac' }).sentence, /Connected to Studio Mac/)
+  assert.match(link.describeLink({ role: 'remote', link: 'connected', macName: 'Studio computer' }).sentence, /Connected to Studio computer/)
   assert.equal(link.describeLink({ role: 'remote', link: 'connected' }).tone, 'good')
   assert.equal(link.describeLink({ role: 'remote', link: 'no-answer' }).tone, 'bad', 'no answer must read as a fault, not as connected')
   // The Mac's chip names the thing, not the chore: "set up" beside Save read as another verb.
@@ -9616,8 +9616,8 @@ test('a scanned code pairs before the connect screen can ask for anything', () =
   assert.match(boot, /await pairPhone\(scanned\)/, 'a scanned code is found and not acted on')
   assert.match(src, /set\(\{ pairError: err\.message \}\)/, 'a bad scanned code fails silently')
   // The Mac's pairing and a person's sign-in are the same three steps after the account.
-  assert.match(src, /export async function pairMac\(\)[\s\S]*?await turnOnMac\(/, 'pairing the Mac does not turn the host on')
-  assert.match(src, /export async function setUpMac\([\s\S]*?await turnOnMac\(/, 'signing the Mac in no longer turns the host on')
+  assert.match(src, /export async function pairMac\(\)[\s\S]*?await turnOnMac\(/, 'pairing the computer does not turn the host on')
+  assert.match(src, /export async function setUpMac\([\s\S]*?await turnOnMac\(/, 'signing the computer in no longer turns the host on')
   assert.match(src, /needsConfirmation[\s\S]*?Confirm email/, 'a project that confirms every account fails pairing with no words about why')
 })
 
@@ -9690,7 +9690,7 @@ test('the Tap button opens the tempo box on a hold or a right-click, at both end
 })
 
 
-console.log('\nthe Mac app closes, updates, and reopens')
+console.log('\nthe computer app closes, updates, and reopens')
 /*
  * "It does say that there's an update available and then it says install.
  * After installing it says to close the app or you clicked the button and it
@@ -9723,7 +9723,7 @@ test('a device server this app left behind is stopped, not reported', async () =
     throw new Error(`unexpected ${cmd}`)
   }
   assert.deepEqual(host.listeners({ port: 5056, run }).map((p) => p.pid), [4242, 5151])
-  assert.deepEqual(host.listeners({ port: 5056, run: () => { throw new Error('no lsof') } }), [], 'a Mac without lsof is a crash instead of a no-op')
+  assert.deepEqual(host.listeners({ port: 5056, run: () => { throw new Error('no lsof') } }), [], 'a computer without lsof is a crash instead of a no-op')
 
   const signals = []
   let living = new Set([4242, 5151])

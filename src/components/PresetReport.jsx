@@ -84,7 +84,7 @@ export default function PresetReport({ device, link }) {
             platform: platform(),
             values: fresh
               ? 'read fresh from the unit'
-              : 'from the unit’s cache — clearing it only works at the Mac',
+              : 'from the unit’s cache — clearing it only works at the computer',
             at: new Date().toISOString()
           },
           preset,

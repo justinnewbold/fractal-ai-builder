@@ -11,6 +11,7 @@ import TopBar from './src/components/TopBar'
 import Settings from './src/screens/Settings'
 import SignIn from './src/screens/SignIn'
 import Edit from './src/screens/Edit'
+import Connect from './src/screens/Connect'
 import Gear from './src/screens/Gear'
 import Log from './src/screens/Log'
 import Presets from './src/screens/Presets'
@@ -198,6 +199,8 @@ export default function App() {
               <Setlists onBack={() => setScreen('stage')} />
             ) : BENCH && screen === 'edit' ? (
               <Edit onBack={() => setScreen('stage')} />
+            ) : screen === 'connect' ? (
+              <Connect onBack={() => setScreen('settings')} />
             ) : screen === 'gear' ? (
               <Gear onBack={() => setScreen('settings')} />
             ) : screen === 'log' ? (
@@ -214,6 +217,9 @@ export default function App() {
                 /* Works with the Mac off: it is a reference sheet, not a
                    question for the unit. */
                 onOpenGear={() => setScreen('gear')}
+                /* The screen somebody needs most when nothing is connected,
+                   which is exactly when the rest of Setup can do nothing. */
+                onOpenConnect={() => setScreen('connect')}
                 /* Works with the Mac off, and is most wanted when it is off. */
                 onOpenLog={() => setScreen('log')}
                 onReconnect={probeNow}
@@ -308,7 +314,7 @@ function Waking({ link }) {
   const said =
     link.link === 'connected'
       ? 'Asking your unit what it is\u2026'
-      : `Finding ${link.macName || 'your Mac'}\u2026`
+      : `Finding ${link.macName || 'your computer'}\u2026`
   return (
     <View
       accessibilityLiveRegion="polite"

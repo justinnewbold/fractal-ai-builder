@@ -13,6 +13,7 @@ import { sendPasswordReset, signIn, signUp } from '../lib/relay'
 import { formatPairCode, isPairCode, pairCredentials } from '../lib/pairing'
 import Note from '../components/Note'
 import Press from '../components/Press'
+import Connect from './Connect'
 
 /**
  * One account, two ends — and a way in that never mentions it.
@@ -25,6 +26,15 @@ import Press from '../components/Press'
  */
 export default function SignIn({ onSignedIn }) {
   const [mode, setMode] = useState('code') // 'code' | 'in' | 'up'
+  /*
+   * The instructions, from the one screen that needs them most.
+   *
+   * This screen asks for "the code your computer shows" — which is a fine
+   * sentence for somebody who has the app open on a computer two feet away, and
+   * a dead end for everybody else. There was no way from here to find out which
+   * computer, or how to make one show a code at all.
+   */
+  const [helping, setHelping] = useState(false)
   const [code, setCode] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -45,7 +55,7 @@ export default function SignIn({ onSignedIn }) {
         } catch (err) {
           // No such account is a mistyped code, or a Mac paired again since.
           if (/didn’t match|invalid login/i.test(err.message || '')) {
-            throw new Error('No Mac is paired with that code. Check it against the code your Mac shows.')
+            throw new Error('No computer is paired with that code. Check it against the code your computer shows.')
           }
           throw err
         }
@@ -101,6 +111,8 @@ export default function SignIn({ onSignedIn }) {
     fontSize: font.lead
   }
 
+  if (helping) return <Connect onBack={() => setHelping(false)} />
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -116,8 +128,8 @@ export default function SignIn({ onSignedIn }) {
           </Text>
           <Text style={{ color: color.silkDim, fontSize: font.body, lineHeight: 22 }}>
             {mode === 'code'
-              ? 'Type the code your Mac shows under Set up phone remote, and this phone becomes its remote — from anywhere, with no account.'
-              : 'Sign in with the same account as the Mac your unit is plugged into. Your presets and what the AI has learned about your taste follow you to any device.'}
+              ? 'Type the code your computer shows under Set up phone remote, and this phone becomes its remote — from anywhere, with no account.'
+              : 'Sign in with the same account as the computer your unit is plugged into. Your presets and what the AI has learned about your taste follow you to any device.'}
           </Text>
         </View>
 
@@ -128,7 +140,7 @@ export default function SignIn({ onSignedIn }) {
             onChangeText={(text) => setCode(formatPairCode(text))}
             placeholder="XXXX-XXXX-XXXX-XXXX"
             placeholderTextColor={color.silkFaint}
-            accessibilityLabel="The pairing code your Mac shows"
+            accessibilityLabel="The pairing code your computer shows"
             autoCapitalize="characters"
             autoCorrect={false}
             autoComplete="one-time-code"
@@ -195,12 +207,14 @@ export default function SignIn({ onSignedIn }) {
                 <Press grow label="Forgot password" disabled={busy} onPress={reset} />
               ) : null}
             </View>
-            <Press label="Use the code from the Mac instead" disabled={busy} onPress={() => switchTo('code')} />
+            <Press label="Use the code from the computer instead" disabled={busy} onPress={() => switchTo('code')} />
           </View>
         )}
 
+        <Press label="How do I connect a computer?" disabled={busy} onPress={() => setHelping(true)} />
+
         <Text style={{ color: color.silkFaint, fontSize: font.micro, lineHeight: 18 }}>
-          Saving to a slot, backups and firmware stay at the Mac. Your Mac refuses them from a
+          Saving to a slot, backups and firmware stay at the computer. Your computer refuses them from a
           distance, and it is right to.
         </Text>
       </ScrollView>

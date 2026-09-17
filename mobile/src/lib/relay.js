@@ -376,7 +376,7 @@ async function joinChannel() {
     const timer = setTimeout(() => {
       if (settled) return
       settled = true
-      reject(new Error('Finding your Mac timed out.'))
+      reject(new Error('Finding your computer timed out.'))
     }, 12000)
 
     chan.subscribe((status) => {
@@ -398,7 +398,7 @@ async function joinChannel() {
         if (channel === chan) {
           channel = null
           seen(false)
-          failWaiting('The connection dropped before your Mac answered.')
+          failWaiting('The connection dropped before your computer answered.')
         }
         if (!settled) {
           settled = true
@@ -657,7 +657,7 @@ async function requestOnce(path, method, options) {
 
   const why = forbiddenRemotely(method, path)
   if (why) {
-    const err = new Error(`You can't ${why} from your phone — do that at the Mac.`)
+    const err = new Error(`You can't ${why} from your phone — do that at the computer.`)
     err.status = 403
     err.remoteBlocked = true
     logDebug('wire', `${method} ${path} refused here`, why)
@@ -718,9 +718,9 @@ async function relayReady(grace) {
   }
   // Nothing was ever set up, and nothing is coming: say so now rather than
   // making someone watch a grace period elapse over an empty session.
-  if (!session && !connecting) throw linkDown('Not connected to your Mac.')
+  if (!session && !connecting) throw linkDown('Not connected to your computer.')
   if (grace > 0 && (await waitForRelay(grace))) return
-  throw linkDown('The connection to your Mac dropped.')
+  throw linkDown('The connection to your computer dropped.')
 }
 
 /** One trip: shout the question, match the answer by id, unwrap it. */
@@ -732,7 +732,7 @@ async function relaySend(method, path, options) {
       // Nothing came back: whatever we last believed about the Mac being there,
       // this is better evidence.
       seen(false)
-      reject(new Error('Your Mac didn’t answer.'))
+      reject(new Error('Your computer didn’t answer.'))
     }, options.timeoutMs || timeoutFor(method, path))
     waiting.set(id, {
       resolve: (v) => {
@@ -765,7 +765,7 @@ async function relaySend(method, path, options) {
      */
     waiting.delete(id)
     throw linkDown(
-      err?.message ? `Couldn’t reach your Mac — ${err.message}` : 'Couldn’t reach your Mac.'
+      err?.message ? `Couldn’t reach your computer — ${err.message}` : 'Couldn’t reach your computer.'
     )
   }
 

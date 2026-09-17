@@ -157,7 +157,7 @@ export function prettyHostname(name = osHostname()) {
   return String(name || '')
     .replace(/\.local$/i, '')
     .replace(/[-_]+/g, ' ')
-    .trim() || 'your Mac'
+    .trim() || 'your computer'
 }
 
 /**
@@ -292,7 +292,7 @@ export async function armHost({
       }
       if (i < 2) await sleep(5000)
     }
-    log(`Phone remote: couldn't turn it on (${last}). Open the app on this Mac to try again.`)
+    log(`Phone remote: couldn't turn it on (${last}). Open the app on this computer to try again.`)
     return { on: false, reason: 'failed', email, error: last }
   } catch (err) {
     log(`Phone remote: left alone (${err.message}).`)
@@ -509,7 +509,7 @@ export async function reclaimPort({
 
 /** What to say when the port is held by a ForgeFX we did not start. */
 export const PORT_TAKEN = (port = DEFAULT_PORT) =>
-  `ForgeFX is already running on this Mac, on port ${port}.\n\n` +
+  `ForgeFX is already running on this computer, on port ${port}.\n\n` +
   'This app carries its own copy and cannot share the unit with another one — two of\n' +
   'them cannot both hold the serial port. Quit the ForgeFX you have running (a Terminal\n' +
   'window, a Docker container, or another copy of this app) and open this again.'

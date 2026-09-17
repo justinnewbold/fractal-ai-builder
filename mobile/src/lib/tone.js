@@ -304,7 +304,7 @@ export async function buildTone({
 
   if (!schema.length) {
     throw new Error(
-      'Nothing came back from the unit to design against. Check the Mac is still answering, then try again.'
+      'Nothing came back from the unit to design against. Check the computer is still answering, then try again.'
     )
   }
 

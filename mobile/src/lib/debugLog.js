@@ -157,7 +157,7 @@ export function formatMacDiag(d) {
   const recent = Array.isArray(d.recent) ? d.recent : null
   const traffic = d.traffic
   return [
-    "MAC'S DEVICE SERVER",
+    "COMPUTER'S DEVICE SERVER",
     `port to the unit: ${d.transportOpen ? 'open' : 'NOT OPEN'}${d.transportLabel ? ` · ${d.transportLabel}` : ''}`,
     `resolved: ${d.resolved ? `${d.resolved.transport} ${d.resolved.id}` : 'no unit found'}`,
     `serial ports: ${ports}`,
@@ -167,9 +167,9 @@ export function formatMacDiag(d) {
     d.listError ? `port listing error: ${d.listError}` : null,
     reopens
       ? `port lost and reopened: ${reopens.length} time${reopens.length === 1 ? '' : 's'}`
-      : 'port lost and reopened: this Mac app does not say (older than 7.191.0)',
+      : 'port lost and reopened: this computer app does not say (older than 7.191.0)',
     ...(reopens || []).map((r) => `  ${r.at} ${r.label} — ${r.reason}`),
-    ...(recent ? (recent.length ? ['', `server log, last ${recent.length} lines:`, ...recent] : ['server log: nothing said yet']) : ['server log: this Mac app does not keep one (older than 7.191.0)'])
+    ...(recent ? (recent.length ? ['', `server log, last ${recent.length} lines:`, ...recent] : ['server log: nothing said yet']) : ['server log: this computer app does not keep one (older than 7.191.0)'])
   ]
     .filter((l) => l !== null)
     .join('\n')

@@ -371,7 +371,7 @@ export default function Setlists({ onBack }) {
         one that is always true here.
       */}
       <Note>
-        Setlists and stars are kept with your account, so one built here is on the Mac too.
+        Setlists and stars are kept with your account, so one built here is on the computer too.
       </Note>
     </ScrollView>
   )

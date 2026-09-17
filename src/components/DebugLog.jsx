@@ -48,7 +48,7 @@ export default function DebugLog({ device, link }) {
     try {
       return formatMacDiag(await serverDiag())
     } catch (e) {
-      return `MAC'S DEVICE SERVER — could not be asked: ${e?.message || e}`
+      return `COMPUTER'S DEVICE SERVER — could not be asked: ${e?.message || e}`
     }
   }
 
@@ -68,7 +68,7 @@ export default function DebugLog({ device, link }) {
         link: link?.role
           ? `${link.role} · ${describeLink(link).note || ''}${
               link.role === 'remote' && link.link === 'connected'
-                ? ` · Mac app ${link.macVersion ? `v${link.macVersion}` : 'older than 7.190.0 (does not say)'}`
+                ? ` · computer app ${link.macVersion ? `v${link.macVersion}` : 'older than 7.190.0 (does not say)'}`
                 : ''
             }`
           : undefined,
