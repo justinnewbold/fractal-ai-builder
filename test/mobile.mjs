@@ -978,7 +978,12 @@ export function run(test) {
     const rig = read('mobile/src/lib/rig.js').replace(/\s+/g, ' ')
     assert.match(rig, /unsaved: null,/, 'the store has no idea of an unsaved rename')
     assert.match(rig, /if \(patch\.preset && state\.unsaved && patch\.preset\.number !== state\.unsaved\.number\) \{ patch = \{ \.\.\.patch, unsaved: null \} discardUnsaved\(state\.unsaved\) \}/, 'a preset change keeps an unsaved rename')
-    assert.match(rig, /function discardUnsaved\(unsaved\) \{[^}]*rememberSceneNames\(device\.nameOwner\(slug\), unsaved\.number, unsaved\.sceneNames\) if \(typeof unsaved\.presetName === 'string'\) learnName\(unsaved\.number, unsaved\.presetName\) \}/, 'a dropped rename does not put the old names back')
+    assert.match(rig, /if \(!rememberSceneNames\(device\.nameOwner\(slug\), unsaved\.number, unsaved\.sceneNames\)\) \{ forgetSceneNames\(device\.nameOwner\(slug\), unsaved\.number\) \}/, 'a dropped rename on a slot that had no names leaves the renamed ones on disk')
+    assert.match(rig, /if \(typeof unsaved\.presetName === 'string'\) learnName\(unsaved\.number, unsaved\.presetName\)/, 'a dropped preset rename does not put the old name back')
+    /* A pending preset name outranks a re-read of the preset, which can come
+       out of the computer's copy from before the rename — and the next Save
+       carries whatever name the phone holds. */
+    assert.match(rig, /if \(fresh && pending && pending\.number === fresh\.number && typeof pending\.presetName === 'string'\) \{ fresh\.name = state\.preset\?\.name \?\? fresh\.name \}/, 'a re-read can put the old preset name back over a pending rename')
     assert.match(rig, /export function savedToSlot\(slot\) \{ const unsaved = state\.unsaved if \(!unsaved \|\| unsaved\.number !== slot\) return const slug = state\.deviceSlug if \(slug\) device\.keepSceneNames\(slug, slot, state\.sceneNames\) set\(\{ unsaved: null \}\) \}/, 'a save does not settle the pending names or send them to the computer')
     assert.ok(!/noteSceneName[\s\S]*?device\.keepSceneNames\(slug, number, names\)/.test(rig.slice(rig.indexOf('export function noteSceneName'), rig.indexOf('function pendingFor'))), 'an unsaved scene name still goes to the computer\'s store')
     /* The save button settles it, and the names section says it is pending. */
@@ -3208,6 +3213,11 @@ export function run(test) {
       assert.equal(cache.rememberSceneNames('fm3', 97, [' Rhythm ', 'Lead', '', '', '', '', '', '']), true)
       assert.deepEqual(await cache.recallSceneNames('fm3', 97), ['Rhythm', 'Lead', '', '', '', '', '', ''], 'what was written is not what is read back, trimmed')
       assert.deepEqual(await cache.recallSceneNames('am4', 97), [], 'an FM3 slot’s names are shown over an AM4’s')
+      /* And forgotten, for a rename dropped on a slot that had no names. */
+      assert.equal(cache.forgetSceneNames('fm3', 98), false, 'forgetting a slot never written claims to have written')
+      assert.equal(cache.forgetSceneNames('fm3', 97), true)
+      assert.deepEqual(await cache.recallSceneNames('fm3', 97), [], 'a forgotten slot still has names')
+      assert.equal(cache.rememberSceneNames('fm3', 97, [' Rhythm ', 'Lead', '', '', '', '', '', '']), true)
       /* The browser’s key and shape, so the two apps’ disks read the same. */
       const disk = JSON.parse(store.sync.getItem('fractal.sceneNames'))
       assert.deepEqual(Object.keys(disk), ['fm3:97'])
@@ -3557,7 +3567,7 @@ export function run(test) {
     assert.match(flat, /import Grip from '\.\.\/components\/Grip'/, 'the setlist does not use the shared grip')
     assert.match(flat, /import \{ landingIndex \} from '\.\.\/lib\/laneOrder'/, 'the setlist decides where a drag lands its own way')
     assert.match(flat, /scrollEnabled=\{!held\}/, 'the page still scrolls under a dragged song')
-    assert.match(flat, /to: landingIndex\(rowHeights\.current, i, dy, space\.sm\)/, 'the landing row is not measured')
+    assert.match(flat, /const heights = rowHeights\.current\.slice\(0, chosen\?\.presets\?\.length \|\| 0\) setDrag\(\{ index: i, dy, to: landingIndex\(heights, i, dy, space\.sm\) \}\)/, 'a removed song\'s height still counts in where a drag lands')
     assert.match(flat, /if \(to !== i\) setPresets\(moveIn\(chosen\.presets, i, to\)\)/, 'a drop does not reorder the setlist')
     assert.ok(!/▲|▼/.test(flat), 'the arrows are still there')
     /* The chain editor and the setlist share one grip. */

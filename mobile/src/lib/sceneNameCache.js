@@ -38,6 +38,16 @@ export async function recallSceneNames(owner, number) {
   return hit.some((n) => n) ? hit : []
 }
 
+/** Forget a slot's names: a rename that was dropped before it was saved, on a slot that had none before. */
+export function forgetSceneNames(owner, number) {
+  if (!owner || !Number.isInteger(number)) return false
+  const all = readAll()
+  if (!(sceneNameKey(owner, number) in all)) return false
+  delete all[sceneNameKey(owner, number)]
+  sync.setItem(KEY, JSON.stringify(all))
+  return true
+}
+
 /** Write a slot's names down. Nothing is written for a slot with no names. */
 export function rememberSceneNames(owner, number, names) {
   if (!owner || !Number.isInteger(number)) return false
