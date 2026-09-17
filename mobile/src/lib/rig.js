@@ -197,6 +197,7 @@ export async function refreshAll() {
   })
   await refreshPreset()
   await refreshScene()
+  await refreshSceneNames()
   await refreshBlocks()
   await refreshTempo()
 }
@@ -214,7 +215,13 @@ export async function refreshScene() {
     const res = await device.getScene()
     const index = typeof res === 'number' ? res : res?.index
     if (Number.isInteger(index)) set({ sceneIndex: index })
-    if (Array.isArray(res?.names)) set({ sceneNames: res.names })
+    /*
+     * Some units hand the names over with the scene. A gen-3 does not — see
+     * device.sceneNames, which is why the tiles were numbered squares.
+     */
+    if (Array.isArray(res?.names) && res.names.some((n) => (n || '').trim())) {
+      set({ sceneNames: res.names })
+    }
   } catch {
     // A unit that won't report its scene still gets buttons; it just starts on
     // the one the app last saw rather than pretending to know.
@@ -239,6 +246,21 @@ export async function refreshTempo() {
  * no buttons, no explanation. They are not the same, and the difference matters
  * most where you can't see the unit.
  */
+/**
+ * What this preset's scenes are called, when the unit did not volunteer them.
+ *
+ * Its own read because it belongs to the PRESET rather than to the scene: it is
+ * worth doing once when a preset loads and not again when somebody steps
+ * between scenes with a footswitch. Never fails a screen — a unit with no scene
+ * names gets numbered tiles, which is what it had before.
+ */
+export async function refreshSceneNames() {
+  const number = state.preset?.number
+  if (!Number.isInteger(number)) return
+  const names = await device.sceneNames(number)
+  if (names.length) set({ sceneNames: names })
+}
+
 export async function refreshBlocks({ quiet = false } = {}) {
   if (!quiet) set({ chain: 'reading' })
   try {
@@ -369,7 +391,12 @@ export async function loadPreset(number) {
    * preset sends somebody to a control that is not there.
    */
   forgetControls()
-  set({ error: null, chain: 'reading' })
+  /*
+   * And the scene names go with it. They belong to the preset being left, so
+   * carrying them across would put the last song's names on this song's tiles —
+   * which is worse than the numbers, because numbers are never wrong.
+   */
+  set({ error: null, chain: 'reading', sceneNames: [] })
   try {
     await device.selectPreset(number)
   } catch (err) {
@@ -378,6 +405,7 @@ export async function loadPreset(number) {
   }
   await refreshPreset()
   await refreshScene()
+  await refreshSceneNames()
   await refreshBlocks()
   return true
 }

@@ -86,6 +86,46 @@ export async function presetBlocks() {
 export const stageBlocks = (blocks) =>
   (blocks || []).filter((b) => !EXCLUDED_BLOCKS.includes(b.slug))
 
+/**
+ * What this preset's scenes are called.
+ *
+ * WHY THIS IS NOT JUST `getScene().names`, which is what the phone used to ask
+ * and why its scene tiles were numbered squares with nothing on them.
+ *
+ * A gen-3 unit does not hand over scene names with the current scene. They live
+ * in the preset, and the host will read them out of it — `/presets/{n}/summary`
+ * answers with a `scenes` array — but only if somebody asks. The browser has
+ * always asked. The phone never did, so it drew "1" through "8" while the Mac
+ * two feet away drew DETUNERS, TRI CHORUS, WALL DELAY.
+ *
+ * Which matters more on the phone than on the Mac: the whole reason the tiles
+ * are two across rather than four is to leave room for the NAME, because a name
+ * is what a player thinks in between two bars. Without it the extra width buys
+ * nothing.
+ *
+ * Empty rather than a throw. A unit that has no scene names — an AM4 has none —
+ * gets numbered tiles, which is the honest answer and the one they had before.
+ */
+export async function sceneNames(number) {
+  if (!Number.isInteger(number)) return []
+  try {
+    const summary = await remoteRequest(`/presets/${number}/summary`)
+    /*
+     * The answer has to be about the preset we asked for. The host serves this
+     * from whatever the unit last dumped, and a slow unit can answer for the
+     * preset before this one — which would put the last song's scene names on
+     * this song's tiles.
+     */
+    if (Number.isInteger(summary?.number) && summary.number !== number) return []
+    const names = summary?.scenes
+    if (!Array.isArray(names)) return []
+    const clean = names.map((n) => (typeof n === 'string' ? n.trim() : ''))
+    return clean.some((n) => n) ? clean : []
+  } catch {
+    return []
+  }
+}
+
 /** Which scene is live. Bypass states are per-scene, so this changes what else is true. */
 export const getScene = () => remoteRequest('/scene')
 

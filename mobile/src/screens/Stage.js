@@ -132,6 +132,12 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
   /** Whether the volume is showing. Closed by default — see the speaker below. */
   const [showVolume, setShowVolume] = useState(false)
   /*
+   * How wide a row of tiles actually is. Measured rather than assumed, because
+   * the answer is the phone's width less this screen's padding, and neither is
+   * a number worth writing down twice.
+   */
+  const [grid, setGrid] = useState(0)
+  /*
    * How big the tiles are, chosen in Setup and kept under the browser's own
    * key. Read here rather than passed down, because `useStored` above already
    * re-renders this screen on every write to storage.
@@ -313,21 +319,6 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
           </>
         ) : null}
 
-        <View style={{ flexDirection: 'row', gap: space.sm }}>
-          <Press grow label="‹ Prev" disabled={landing(-1) === null} onPress={() => step(-1)} />
-          <Press
-            grow
-            caption="Source"
-            label={order ? sourceLabel(source, { favourites, lists }) : 'All'}
-            sub={where || undefined}
-            tone="signal"
-            on={Boolean(order)}
-            height={TAP}
-            disabled={!onOpenSetlists}
-            onPress={onOpenSetlists}
-          />
-          <Press grow label="Next ›" disabled={landing(1) === null} onPress={() => step(1)} />
-        </View>
       </View>
 
       {/* ---------------------------------------------------------- scenes */}
@@ -347,7 +338,10 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
       {scenes.hasScenes ? (
         <View style={{ gap: space.sm }}>
           <Label>Scenes</Label>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+          <View
+            onLayout={(e) => setGrid(e.nativeEvent.layout.width)}
+            style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}
+          >
             {Array.from({ length: scenes.count }, (_, i) => {
               const hue = sceneColor(i)
               return (
@@ -361,7 +355,7 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
                   height={size.tile}
                   haptic={thud}
                   onPress={() => writeScene(i)}
-                  style={{ flexGrow: 1, flexBasis: across(size.scenes) }}
+                  style={{ width: tileWidth(grid, size.scenes) }}
                 />
               )
             })}
@@ -405,7 +399,12 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
           and onto a hold, because a separate square per block doubled the
           number of targets on the busiest part of the screen.
         */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+        <View
+          /* Both grids measure, because a unit that reports no scenes never
+             draws the other one and these tiles would have no width. */
+          onLayout={(e) => setGrid(e.nativeEvent.layout.width)}
+          style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}
+        >
           {blocks.map((block) => {
             const hue = blockColor(block.slug)
             /* Named here rather than inline: the word the unit uses for this is
@@ -428,7 +427,7 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
                     ? () => setPicking(picking === idOf(block) ? null : idOf(block))
                     : undefined
                 }
-                style={{ flexGrow: 1, flexBasis: across(size.fx) }}
+                style={{ width: tileWidth(grid, size.fx) }}
               />
             )
           })}
@@ -460,30 +459,74 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
         ) : null}
       </View>
 
-      {/* ----------------------------------------------------------- tempo */}
+      {/* ------------------------------------------------------------ foot */}
+      {/*
+        Previous / Next, then Tuner and Tap. One block at the bottom, which is
+        the browser's own arrangement and was Justin's correction to it:
+
+        "Move Previous / Next directly above the bottom tap bar."
+
+        They sat up by the preset name, which is where you READ, not where your
+        thumb rests. The phone had them there too — the same mistake, made a
+        second time — so stepping presets was at the top of the screen and the
+        tuner was off the bottom of it.
+      */}
       <View style={{ gap: space.sm }}>
-        <Label>Tempo</Label>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-          <Text
-            accessibilityLabel={Number.isFinite(bpm) ? `${Math.round(bpm)} beats per minute` : 'tempo unknown'}
-            style={{ color: color.silk, fontSize: font.hero, fontFamily: face, minWidth: 92 }}
-          >
-            {Number.isFinite(bpm) ? Math.round(bpm) : '—'}
-          </Text>
-          {/*
-            * The one thing in this app that must never be sent twice. A
-            * parameter arriving twice leaves the unit where it was; a beat
-            * arriving twice is a beat that never happened, so the relay
-            * excludes this route from its retry.
-            */}
-          {/*
-            * Hold Tap to type the tempo. "On the tap button, let's do where
-            * they hold the tap button they can manually enter in the beats per
-            * minute they want." The field opens beneath with the current
-            * tempo selected; the keyboard's Done sets it.
-            */}
-          <Press grow label="Tap" tone="signal" onPress={tapTempo} onLongPress={() => setTyping(true)} />
+        <View style={{ flexDirection: 'row', gap: space.sm }}>
+          <Press grow label="‹ Previous" disabled={landing(-1) === null} onPress={() => step(-1)} />
+          <Press
+            grow
+            caption="Source"
+            label={order ? sourceLabel(source, { favourites, lists }) : 'All'}
+            sub={where || undefined}
+            tone="signal"
+            on={Boolean(order)}
+            height={TAP}
+            disabled={!onOpenSetlists}
+            onPress={onOpenSetlists}
+          />
+          <Press grow label="Next ›" disabled={landing(1) === null} onPress={() => step(1)} />
         </View>
+
+        {/*
+          Tuner and Tap on one row, and the tempo ON the Tap button rather than
+          beside it as its own heading with a forty-point number. That number
+          was answering "what is this preset at" with a third of the screen; on
+          the button it answers the same question and costs nothing.
+
+          Tuner only where the unit has one. Absent means unknown — an older
+          host predating the flag — and unknown still gets to try.
+        */}
+        <View style={{ flexDirection: 'row', gap: space.sm }}>
+          {caps?.tuner !== false ? (
+            <Press
+              grow
+              label={tunerOn ? 'Stop tuner' : 'Tuner'}
+              tone="live"
+              on={tunerOn}
+              onPress={() => writeTuner(!tunerOn)}
+            />
+          ) : null}
+          {/*
+            The one thing in this app that must never be sent twice. A parameter
+            arriving twice leaves the unit where it was; a beat arriving twice is
+            a beat that never happened, so the relay excludes this route from its
+            retry.
+
+            Hold it to type a tempo: "on the tap button, let's do where they hold
+            the tap button they can manually enter in the beats per minute they
+            want."
+          */}
+          <Press
+            grow
+            label="Tap"
+            sub={Number.isFinite(bpm) ? String(Math.round(bpm)) : undefined}
+            tone="signal"
+            onPress={tapTempo}
+            onLongPress={() => setTyping(true)}
+          />
+        </View>
+
         {typing ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
             <TextInput
@@ -516,16 +559,7 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
           </View>
         ) : null}
         {typedError ? <Note tone="fault">{typedError}</Note> : null}
-      </View>
 
-      {/* ----------------------------------------------------------- tuner */}
-      <View style={{ gap: space.md }}>
-        <Press
-          label={tunerOn ? 'Stop tuner' : 'Tuner'}
-          tone="live"
-          on={tunerOn}
-          onPress={() => writeTuner(!tunerOn)}
-        />
         <Tuner on={tunerOn} reading={tuning} />
       </View>
 
@@ -545,7 +579,25 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
  * puts the last tile of every row on a line of its own. Two points of slack per
  * tile is what leaves room for the gaps at every one of the five sizes.
  */
-const across = (n) => `${Math.floor(100 / Math.max(1, n)) - 2}%`
+/**
+ * How wide one tile is when `n` share a row of `width` points.
+ *
+ * MEASURED RATHER THAN A PERCENTAGE, for two reasons that only show up on
+ * hardware. `flexGrow: 1` fills the row, which is right until the last row is
+ * short — nine blocks four across leaves one on its own, and it stretched the
+ * whole width of the screen: a reverb the size of the preset name beside four
+ * normal tiles. And a percentage cannot pay for the gaps, so four at 22% leave
+ * a ragged strip down the right.
+ *
+ * The browser gets both for free from a CSS grid, which has real columns. This
+ * is a wrapped row, so the arithmetic is done here: the row less its gaps,
+ * divided by the tiles in it.
+ */
+const tileWidth = (width, n) => {
+  const cols = Math.max(1, n)
+  if (!width) return undefined
+  return (width - space.sm * (cols - 1)) / cols
+}
 
 function Label({ children }) {
   return (

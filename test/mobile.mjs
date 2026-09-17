@@ -1084,8 +1084,16 @@ export function run(test) {
     const stage = read('mobile/src/screens/Stage.js')
     assert.match(stage, /const size = SIZES\[loadSize\(sync\)\]/, 'the stage screen never reads the tile size')
     assert.match(stage, /height=\{size\.tile\}/, 'the scene tiles ignore the size setting')
-    assert.match(stage, /flexBasis: across\(size\.scenes\)/, 'the scenes are a fixed number across whatever the setting says')
-    assert.match(stage, /flexBasis: across\(size\.fx\)/, 'the chain is a fixed number across whatever the setting says')
+    /* The tiles are measured rather than given a percentage now — a percentage
+       cannot pay for the gaps, and the last tile of a short row stretched the
+       width of the screen. The rule being checked is the same: how many go
+       across comes from the setting. */
+    assert.match(stage, /width: tileWidth\(grid, size\.scenes\)/, 'the scenes are a fixed number across whatever the setting says')
+    assert.match(stage, /width: tileWidth\(grid, size\.fx\)/, 'the chain is a fixed number across whatever the setting says')
+    assert.ok(
+      !/flexGrow: 1[\s\S]{0,40}flexBasis/.test(stage),
+      'a tile can grow into the spare room again, so the last one in a short row fills the screen'
+    )
 
     const settings = read('mobile/src/screens/Settings.js')
     assert.match(settings, /saveSize\(i, sync\)/, 'the size buttons do not save anything')
@@ -1146,6 +1154,95 @@ export function run(test) {
     const groups = searchAll('tube screamer')
     assert.ok(groups.some((g) => g.hits.length === 0), 'every group matches everything; the search is not filtering')
     assert.ok(groups.some((g) => g.hits.length > 0))
+  })
+
+  test('the scene tiles say what the scenes are called', async () => {
+    /*
+     * FOUND BY LOOKING AT THE TWO SCREENS SIDE BY SIDE, which is the only way
+     * it could have been found: nothing here fails when a name is missing, the
+     * tile just draws its number.
+     *
+     * The Mac showed DETUNERS, TRI CHORUS, WALL DELAY. The phone showed 1, 2,
+     * 4. A gen-3 unit does not hand scene names over with the current scene —
+     * they live in the preset, and the host will read them out of it if asked.
+     * The browser has always asked. The phone only ever looked at
+     * `getScene().names`, which on that unit is empty.
+     *
+     * It matters more on the phone than on the Mac: the whole reason those
+     * tiles are two across instead of four is to leave room for the name.
+     * Without it the extra width buys nothing at all.
+     */
+    const device = read('mobile/src/lib/device.js')
+    const rig = read('mobile/src/lib/rig.js')
+    const stage = read('mobile/src/screens/Stage.js')
+
+    assert.match(
+      device,
+      /remoteRequest\(`\/presets\/\$\{number\}\/summary`\)/,
+      'the phone never asks the preset what its scenes are called'
+    )
+    /* And that read is one the Mac will actually carry out. */
+    const rules = await import('../shared/relay-rules.mjs')
+    assert.equal(rules.forbiddenRemotely('GET', '/presets/99/summary'), null)
+
+    /* Asked for when a preset arrives, both ways in. */
+    assert.equal(
+      (rig.match(/await refreshSceneNames\(\)/g) || []).length,
+      2,
+      'scene names are read on one path in and not the other'
+    )
+
+    /*
+     * And thrown away when the preset changes. Carrying them across would put
+     * the last song's names on this song's tiles, which is worse than the
+     * numbers — a number is never wrong.
+     */
+    assert.match(rig, /chain: 'reading', sceneNames: \[\]/, 'the last preset’s scene names stay on the new preset’s tiles')
+
+    /*
+     * The host serves this from whatever the unit last dumped, and a slow unit
+     * can answer for the preset before this one.
+     */
+    assert.match(
+      device,
+      /summary\.number !== number\) return \[\]/,
+      'an answer about a different preset is accepted, so one song’s names land on another'
+    )
+
+    /* A unit with no scene names gets numbers, not a broken screen. */
+    assert.match(device, /return clean\.some\(\(n\) => n\) \? clean : \[\]/)
+    assert.match(stage, /label=\{sceneNames\[i\] \|\| ''\}/, 'the tile stopped drawing the name')
+  })
+
+  test('Previous and Next sit where a thumb rests, not where the eye reads', () => {
+    /*
+     * "Move Previous / Next directly above the bottom tap bar."
+     *
+     * That was Justin's correction to the browser, and the phone made the same
+     * mistake a second time: the two buttons were under the preset name at the
+     * top of the screen, and the tuner was off the bottom of it. The screenshot
+     * of the two side by side is what showed it.
+     *
+     * One foot at the bottom: step the preset, then tune and tap.
+     */
+    const stage = read('mobile/src/screens/Stage.js')
+
+    const nav = stage.indexOf('‹ Previous')
+    const scenes = stage.indexOf('<Label>Scenes</Label>')
+    const chain = stage.indexOf("chain === 'reading' ?")
+    assert.ok(nav > 0 && scenes > 0 && chain > 0, 'the stage screen moved; this check reads it')
+    assert.ok(nav > scenes, 'Previous and Next are above the scenes, where you read rather than where your thumb is')
+    assert.ok(nav > chain, 'Previous and Next are above the chain')
+
+    /* Tuner and Tap on one row under them, with the tempo on the Tap button
+       rather than as its own heading and a forty-point number. */
+    const tuner = stage.indexOf("label={tunerOn ? 'Stop tuner' : 'Tuner'}")
+    assert.ok(tuner > nav, 'the tuner is not in the foot under the step buttons')
+    assert.match(stage, /sub=\{Number\.isFinite\(bpm\) \? String\(Math\.round\(bpm\)\) : undefined\}/, 'the tempo is not on the Tap button')
+    assert.ok(!/<Label>Tempo<\/Label>/.test(stage), 'the tempo is a section with a heading again, which costs a third of the screen')
+
+    /* A unit with no tuner is not offered one. */
+    assert.match(stage, /caps\?\.tuner !== false \?/, 'a unit that says it has no tuner is still given the button')
   })
 
   test('every component the phone draws is one that exists', () => {
