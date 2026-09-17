@@ -1422,6 +1422,13 @@ export function run(test) {
     const pkg = JSON.parse(read('package.json'))
     assert.equal(APP_VERSION, pkg.version, 'the phone reports a version the repository is not on')
     assert.match(read('mobile/src/screens/Settings.js'), /v\$\{APP_VERSION\}/, 'Setup does not show the version')
+    /* And the stores. "It says version 1.0.0 with an 11 in parentheses" —
+       TestFlight shows app.json's version, which was typed once and never
+       moved, so no build there could be told from another. */
+    const app = JSON.parse(read('mobile/app.json'))
+    assert.equal(app.expo.version, pkg.version, 'TestFlight and Play are told a version the repository is not on')
+    assert.equal(app.expo.slug, 'fractal-remote', 'the sync rewrote more of app.json than the version')
+    assert.equal(app.expo.ios.bundleIdentifier, 'cloud.newbold.fractalremote', 'the sync rewrote more of app.json than the version')
   })
 
   test('a tap moves the number on the button, not just the unit', async () => {
