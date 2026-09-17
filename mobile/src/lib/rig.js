@@ -20,7 +20,7 @@ import * as device from './device'
 import { idOf, sameBlock } from './unit.mjs'
 import { TAP_REREAD_MS } from './tempo'
 import { DEFAULT_SLUG, deviceSlug } from './device-slug'
-import { forget as forgetNames, nameOf } from './presetNames'
+import { adopt as adoptNames, forget as forgetNames, nameOf } from './presetNames'
 import { forget as forgetControls } from './paramIndex'
 import { subscribeRemoteEvents } from './relay'
 
@@ -206,6 +206,12 @@ export async function refreshAll() {
     deviceName: caps?.short || caps?.name || '',
     deviceSlug: slug
   })
+  /*
+   * The preset names, from disk now and from the computer's list when it
+   * answers — one small request that never touches the unit, so it is not
+   * waited on and not in the port's queue. See presetNames.adopt.
+   */
+  adoptNames(device.nameOwner(slug)).catch(() => {})
   await refreshPreset()
   await refreshScene()
   /* The chain first: it is most of what the stage screen draws, and the scene
