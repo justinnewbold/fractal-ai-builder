@@ -93,11 +93,37 @@ const cleanGone = (g) =>
  */
 export const TOMBSTONE_MS = 60 * 24 * 60 * 60 * 1000
 
-/** The deletes worth still remembering. */
-export const cleanGoneList = (list, now = Date.now()) =>
-  (Array.isArray(list) ? list : [])
-    .map(cleanGone)
-    .filter((g) => g && now - g.at < TOMBSTONE_MS)
+/**
+ * The deletes worth still remembering — ONE PER SETLIST.
+ *
+ * The dedupe is the whole of this function's reason to exist, and it was not
+ * here. A sync merges the two copies of this list by running them together,
+ * so every round put another copy of each tombstone in, and the next round
+ * doubled that. One setlist called "Hello" was deleted once; by the time
+ * anybody looked, the account was holding:
+ *
+ *   109,508 tombstones, 1 distinct id, 5 MB of JSON
+ *
+ * Five megabytes, read and written back by every device every few seconds,
+ * thousands of times. That is what spent the database's whole disk allowance
+ * and left the app unable to sign in — and what a phone was parsing, over and
+ * over, while being called laggy.
+ *
+ * Running this on every read means a device carrying the 109,508 heals itself
+ * the first time it looks, without anybody clearing anything.
+ */
+export const cleanGoneList = (list, now = Date.now()) => {
+  const keep = new Map()
+  for (const raw of Array.isArray(list) ? list : []) {
+    const g = cleanGone(raw)
+    if (!g || now - g.at >= TOMBSTONE_MS) continue
+    /* The latest delete of an id wins: an older one would let a copy of that
+       setlist made in between come back from another device. */
+    const had = keep.get(g.id)
+    if (!had || g.at > had.at) keep.set(g.id, g)
+  }
+  return [...keep.values()]
+}
 
 /**
  * The slot Previous or Next lands on, walking `list` from `current`.
