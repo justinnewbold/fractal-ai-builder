@@ -276,7 +276,14 @@ export default function Settings({
               <Press label="How do I connect a computer?" onPress={onOpenConnect} />
             ) : null}
 
-            <Press label="Try now" onPress={onReconnect} />
+            {/*
+              Only while there is something to try. "The Try now button is
+              there and if you click it it does — I'm not sure why it's even
+              there if we're already all connected." It looks for the computer
+              again, which on a live link is a button that does nothing you
+              can see. Said as what it does, too.
+            */}
+            {link !== 'connected' ? <Press label="Look for the computer again" onPress={onReconnect} /> : null}
           </View>
 
           {hosts.length > 1 ? (
