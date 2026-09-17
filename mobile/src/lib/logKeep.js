@@ -83,8 +83,18 @@ export function keepLog() {
          It is a diagnostic, and the app still runs without one. */
     }
   }
-  const off = onDebugLog(() => {
+  const off = onDebugLog((entry) => {
     dirty = true
+    /* The one line that cannot wait its two seconds. A fatal error ends the
+       app a quarter of a second after it is logged (CRASH_FLUSH_MS, in
+       debugLog), so the crash line goes now. This is still not a crash
+       handler: it is the same write the timer would have made, made sooner,
+       and it carries the run that led up to the crash along with it. */
+    if (entry?.source === 'crash') {
+      if (timer) clearTimeout(timer)
+      write()
+      return
+    }
     if (timer) return
     timer = setTimeout(write, EVERY_MS)
   })

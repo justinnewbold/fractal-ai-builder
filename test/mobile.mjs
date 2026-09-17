@@ -2705,6 +2705,142 @@ export function run(test) {
     }
   })
 
+  test('a crash on the phone writes a line before the phone goes', async () => {
+    /*
+     * THE CRASH HAS NEVER ONCE SHOWN UP IN A LOG, across a dozen builds — and
+     * this is why. installCrashCapture listened on `window.addEventListener`,
+     * which is the browser's way. React Native has a `window` (an alias of
+     * the global) but no `addEventListener` on it, so on every phone the
+     * install returned a no-op; and the phone never even called it. The log
+     * survived the crash from 7.268.0 on and had nothing in it about the
+     * crash, because nothing was ever told.
+     *
+     * A phone routes an uncaught error through ErrorUtils.setGlobalHandler
+     * and a dropped promise through Hermes's rejection tracker, which React
+     * Native only switches on in development. RUN, not read: a fake phone
+     * runtime, an error thrown through it, and the line looked for.
+     */
+    const { installCrashCapture, getDebugLog, clearDebugLog, CRASH_FLUSH_MS } = await import(
+      '../mobile/src/lib/debugLog.js'
+    )
+
+    let handled = []
+    let tracker = null
+    const phone = {
+      ErrorUtils: {
+        _h: (e, fatal) => handled.push([e.message, fatal]),
+        getGlobalHandler() { return this._h },
+        setGlobalHandler(fn) { this._h = fn }
+      },
+      HermesInternal: {
+        enablePromiseRejectionTracker(opts) { tracker = opts }
+      }
+    }
+    const phonesOwn = phone.ErrorUtils._h
+
+    clearDebugLog()
+    const off = installCrashCapture(phone)
+    assert.notEqual(phone.ErrorUtils._h, phonesOwn, 'the phone was not given a handler')
+    assert.ok(tracker?.allRejections, 'dropped promises are not tracked in a release build')
+
+    /* Not fatal: logged, and handed straight on. */
+    phone.ErrorUtils._h(new Error('setlist has no lists'), false)
+    let lines = getDebugLog()
+    assert.equal(lines.length, 1, 'the error was not logged')
+    assert.equal(lines[0].source, 'crash')
+    assert.equal(lines[0].message, 'setlist has no lists')
+    assert.match(lines[0].detail, /^not fatal/)
+    assert.deepEqual(handled, [['setlist has no lists', false]], 'the phone did not get its own turn')
+
+    /* Fatal: logged now, the phone's own handler only after the line has had
+       its head start to disk. In between is the whole point. */
+    handled = []
+    phone.ErrorUtils._h(new Error('Cannot read property of undefined'), true)
+    lines = getDebugLog()
+    assert.equal(lines.length, 2)
+    assert.match(lines[1].detail, /^fatal\n/, 'a fatal crash is not marked as one, with its stack')
+    assert.deepEqual(handled, [], 'the phone was told before the line could reach disk')
+    await new Promise((r) => setTimeout(r, CRASH_FLUSH_MS + 30))
+    assert.deepEqual(handled, [['Cannot read property of undefined', true]], 'the phone never got its turn, so it never crashed the way it should')
+
+    /* A promise nobody caught. */
+    tracker.onUnhandled(1, new Error('sync failed quietly'))
+    assert.equal(getDebugLog()[2].message, 'unhandled promise')
+    assert.match(getDebugLog()[2].detail, /sync failed quietly/)
+
+    off()
+    assert.equal(phone.ErrorUtils._h, phonesOwn, 'uninstalling does not give the phone back its handler')
+    assert.equal(tracker.allRejections, false, 'uninstalling leaves the tracker on')
+    clearDebugLog()
+
+    /* Neither a browser nor a phone: a no-op, and not "installed" — so the
+       next call on a real runtime still works. */
+    assert.equal(typeof installCrashCapture({}), 'function')
+    const again = installCrashCapture(phone)
+    assert.notEqual(phone.ErrorUtils._h, phonesOwn, 'a no-op install used up the one install')
+    again()
+
+    /* And the phone actually starts it, at launch, next to the log keeper. */
+    assert.match(read('mobile/App.js'), /useEffect\(\(\) => installCrashCapture\(\), \[\]\)/, 'the phone never installs the capture, which is the bug this test was written for')
+  })
+
+  test('a crash line goes to disk at once, not two seconds later', async () => {
+    /*
+     * The keeper writes on a two-second timer, which is right for a working
+     * evening and wrong for the one line that matters: a fatal error ends
+     * the app a quarter of a second after it is logged. So that line is
+     * written the moment it lands. Run with the timer set far off, so the
+     * only way the line reaches storage is the crash path.
+     */
+    const STORAGE = `
+      let store = {}
+      export const __get = (k) => store[k] ?? null
+      export default {
+        getItem: (k) => Promise.resolve(store[k] ?? null),
+        setItem: (k, v) => { store[k] = v; return Promise.resolve() },
+        removeItem: (k) => { delete store[k]; return Promise.resolve() }
+      }
+    `
+    const DEBUG_LOG = `
+      const lines = []
+      const watchers = new Set()
+      export const getDebugLog = () => lines
+      export const formatLine = (l) => l.message
+      export const onDebugLog = (fn) => { watchers.add(fn); return () => watchers.delete(fn) }
+      export const __say = (l) => { lines.push(l); for (const fn of watchers) fn(l) }
+    `
+    const src = read('mobile/src/lib/logKeep.js')
+    const dir = mkdtempSync(join(tmpdir(), 'logkeep-crash-'))
+    try {
+      const slow = src
+        .replace(/'@react-native-async-storage\/async-storage'/, "'./storage.mjs'")
+        .replace(/'\.\/debugLog'/, "'./debugLog.mjs'")
+        .replace(/const EVERY_MS = \d+/, 'const EVERY_MS = 100000')
+      assert.match(slow, /const EVERY_MS = 100000/, 'the write timer could not be pushed out, so this proves nothing')
+      writeFileSync(join(dir, 'storage.mjs'), STORAGE)
+      writeFileSync(join(dir, 'debugLog.mjs'), DEBUG_LOG)
+      writeFileSync(join(dir, 'logKeep.mjs'), slow)
+      const at = (f) => pathToFileURL(join(dir, f)).href
+      const store = await import(at('storage.mjs'))
+      const log = await import(at('debugLog.mjs'))
+      const keep = await import(at('logKeep.mjs'))
+
+      const off = keep.keepLog()
+      log.__say({ source: 'wire', message: 'GET /preset ok' })
+      await new Promise((r) => setTimeout(r, 30))
+      assert.equal(store.__get('fractal.log.lastrun'), null, 'an ordinary line was written at once, which is the cost this app already died of')
+
+      log.__say({ source: 'crash', message: 'Cannot read property of undefined' })
+      await new Promise((r) => setTimeout(r, 30))
+      const kept = JSON.parse(store.__get('fractal.log.lastrun') || 'null')
+      off()
+      assert.ok(kept, 'the crash line waited for the timer, and the app was gone by then')
+      assert.deepEqual(kept.lines, ['GET /preset ok', 'Cannot read property of undefined'], 'the crash went to disk without the run that led up to it')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   test('a dead account service is given twelve seconds, not the whole evening', async () => {
     /*
      * "I can't log into supper base anymore. It says server error, so now I
