@@ -2140,6 +2140,16 @@ export function run(test) {
       last = at
     }
 
+    /* And the gear can be seen. "The settings icon is too dark to even see" —
+       on Android, where ⚙ is a text character drawn in the text colour, and
+       the text colour was never set, so it was black on black. The iPhone
+       swaps that character for a picture and hid the bug. */
+    assert.match(
+      flat,
+      /<Text style=\{\{ color: color\.silk, fontSize: font\.lead \}\}>⚙<\/Text>/,
+      'the gear has no colour of its own, so Android draws it black on a black bar'
+    )
+
     /* The unit's own short name, not the Mac's. */
     assert.match(bar, /const ofDeviceName = \(s\) => s\.deviceName/, 'the header does not say what the unit is')
     /* The version, off the build rather than typed. */
