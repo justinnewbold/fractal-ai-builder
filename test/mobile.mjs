@@ -1502,6 +1502,49 @@ export function run(test) {
     assert.match(edit, /onScrollLock=\{setHeld\}/, 'the block panel is not wired to the lock')
   })
 
+  test('what pops up comes over the screen, never into it', () => {
+    /*
+     * "When holding a block to change channel have it be an overlay on the
+     * screen instead of inserting itself into the screen like the web version."
+     *
+     * WHY INSERTING IS WORSE THAN IT SOUNDS, and it is not a matter of taste. A
+     * panel that opens inside a scrolling page pushes everything below it down —
+     * so the tiles a thumb was aimed at MOVE while the thumb is on its way, on
+     * the one screen where that happens mid-song. The browser learned this and
+     * made every one of these a sheet.
+     *
+     * Four things come up over the stage screen now: the tuner, the volume, the
+     * channel picker and anything added later. Each is checked the same way,
+     * because the failure is silent — an inline panel looks fine in a
+     * screenshot taken while nothing is moving.
+     */
+    const stage = read('mobile/src/screens/Stage.js')
+
+    /* The channel picker is a sheet, and the sheet is a modal. */
+    assert.match(stage, /<ChannelSheet/, 'the channel picker is not a sheet')
+    assert.match(read('mobile/src/components/Sheet.js'), /<Modal visible=\{!!open\}/, 'the sheet is not a modal, so it takes room in the page')
+    assert.ok(
+      !/DRV — CHANNEL|— channel<\/Label>|<Label>\s*\{shortBlock\([^)]*\)\} — channel/.test(stage),
+      'the channel picker is drawn inline again, which reflows the tiles under a thumb'
+    )
+
+    /* Everything that pops up is drawn AFTER the content, outside the scrolling
+       part of the screen — an overlay nested in the flow is an overlay that can
+       still push things around. */
+    const scroll = stage.indexOf('</ScrollView>')
+    for (const tag of ['<ChannelSheet', '<Volume', '<Tuner']) {
+      const at = stage.indexOf(tag)
+      assert.ok(at > 0, `${tag} is gone from the stage screen`)
+      assert.ok(at < scroll, `${tag} escaped the screen entirely`)
+    }
+
+    /* And each one keeps a press that lands on it, so a thumb slipping off a
+       control does not dismiss the thing it is holding. */
+    for (const file of ['mobile/src/components/Sheet.js', 'mobile/src/components/Volume.js']) {
+      assert.match(read(file), /onPress=\{\(\) => \{\}\}/, `${file} closes when a press lands on the panel itself`)
+    }
+  })
+
   test('every component the phone draws is one that exists', () => {
     /*
      * THE HOLE THIS FILLS, found the hard way.

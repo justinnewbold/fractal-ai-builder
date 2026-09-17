@@ -35,6 +35,7 @@ import { shortBlock } from '../lib/shortName'
 import Note from '../components/Note'
 import Press from '../components/Press'
 import Tile from '../components/Tile'
+import Sheet from '../components/Sheet'
 import Tuner from '../components/Tuner'
 import Volume from '../components/Volume'
 
@@ -426,30 +427,6 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
           })}
         </View>
 
-        {/* The channel picker, under the grid rather than inline, so opening it
-            cannot reflow the tiles out from under a thumb. */}
-        {picking !== null && channels?.length > 1 ? (
-          <View style={{ gap: space.sm }}>
-            <Label>
-              {shortBlock(blocks.find((b) => sameBlock(b, picking)) || {})} — channel
-            </Label>
-            <View style={{ flexDirection: 'row', gap: space.sm }}>
-              {channels.map((name) => (
-                <Press
-                  key={name}
-                  grow
-                  label={name}
-                  tone="signal"
-                  on={blocks.find((b) => sameBlock(b, picking))?.channel === name}
-                  onPress={() => {
-                    writeChannel(picking, name)
-                    setPicking(null)
-                  }}
-                />
-              ))}
-            </View>
-          </View>
-        ) : null}
       </View>
 
       {/* ------------------------------------------------------------ foot */}
@@ -569,6 +546,25 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
         wanted twice a night is better taken out of that fight than armed for
         it. See components/Volume.
       */}
+      {/*
+        The channel picker, over the screen rather than inside it.
+
+        "When holding a block to change channel have it be an overlay on the
+        screen instead of inserting itself into the screen like the web
+        version." It opened underneath the chain, which pushed everything below
+        it down — so the tiles a thumb was aimed at moved while the thumb was on
+        its way, on the one screen where that can happen mid-song.
+      */}
+      <ChannelSheet
+        block={blocks.find((b) => sameBlock(b, picking)) || null}
+        channels={channels}
+        onClose={() => setPicking(null)}
+        onPick={(ch) => {
+          writeChannel(picking, ch)
+          setPicking(null)
+        }}
+      />
+
       <Volume
         blocks={everything}
         open={showVolume}
@@ -609,6 +605,43 @@ const tileWidth = (width, n) => {
   const cols = Math.max(1, n)
   if (!width) return undefined
   return (width - space.sm * (cols - 1)) / cols
+}
+
+/**
+ * Which channel a block is on.
+ *
+ * Each channel keeps its own model and settings, and the SCENE remembers which
+ * one this block plays — which is the fact worth having in front of somebody
+ * before they change it, because it is the difference between "this sounds
+ * different now" and "scene 2 sounds different now".
+ *
+ * The same words the browser uses, because they are the same fact.
+ */
+function ChannelSheet({ block, channels, onClose, onPick }) {
+  const name = block?.name || block?.slug || ''
+  return (
+    <Sheet open={!!block && channels?.length > 1} onClose={onClose} title={name} note="Channel">
+      <View style={{ flexDirection: 'row', gap: space.sm }} accessibilityRole="radiogroup">
+        {(channels || []).map((ch) => (
+          <Press
+            key={ch}
+            grow
+            label={ch}
+            height={TAP + 28}
+            tone="live"
+            on={block?.channel === ch}
+            accessibilityLabel={`Channel ${ch}`}
+            onPress={() => onPick(ch)}
+          />
+        ))}
+      </View>
+      <Text style={{ color: color.silkDim, fontSize: font.small, lineHeight: 20 }}>
+        {block?.channel ? `${name} is on channel ${block.channel}. ` : ''}
+        Each channel keeps its own model and settings; the scene remembers which one this block
+        plays.
+      </Text>
+    </Sheet>
+  )
 }
 
 function Label({ children }) {
