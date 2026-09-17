@@ -916,6 +916,20 @@ export function run(test) {
     assert.match(read('src/lib/paramIndex.js'), /filter\(\(p\) => !isSilencingParam\(p\.name\)\)/)
   })
 
+  test('a preset search says whether it has every name to search', () => {
+    /*
+     * "Search for Recto preset, but it didn't show it." On a phone that had
+     * only read the names it had scrolled past, the search covered those and
+     * said "scroll the full list to read more" — which is not how the rest
+     * arrive any more: the computer hands them over, and Refresh asks again.
+     */
+    const flat = read('mobile/src/screens/Presets.js').replace(/\s+/g, ' ')
+    assert.match(flat, /knownCount\(\) >= slots \? `Searching all \$\{slots\} names\.`/, 'a complete list still says "read so far"')
+    assert.match(flat, /Tap Refresh to get the rest from the computer/, 'an incomplete list does not say how to complete it')
+    assert.ok(!/Scroll the full list to read more/.test(flat), 'the search still tells you to scroll for names the computer already has')
+    assert.match(flat, /Nothing matches that among the names known so far/, 'a miss on an incomplete list looks the same as a miss on a complete one')
+  })
+
   test('tapping a found control brings the page to the block it opened', () => {
     /*
      * "It'll pull up the parameters but then clicking on it does nothing." It
