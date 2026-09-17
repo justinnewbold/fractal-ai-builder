@@ -1074,8 +1074,13 @@ export function run(test) {
      * loses its drag to the scroll view's native gesture; in a modal there is
      * no scroll view behind it and nothing to argue with.
      */
-    const stage = read('mobile/src/screens/Stage.js')
-    assert.match(stage, /showVolume \? '🔊 ✕' : '🔊'/, 'the volume is not behind a speaker button')
+    const bar = read('mobile/src/components/TopBar.js')
+    assert.match(bar, /accessibilityLabel="Volume"/, 'the volume is not behind a speaker button')
+    assert.match(bar, /onPress=\{\(\) => setVolume\(true\)\}/, 'the speaker opens nothing')
+    assert.match(bar, /<Volume blocks=\{blocks\} open=\{volume\}/, 'the bar does not carry the volume it opens')
+    /* And the stage screen no longer has a second one. Two speakers on one
+       screen is the clutter moving it up was meant to end. */
+    assert.ok(!/🔊/.test(read('mobile/src/screens/Stage.js')), 'the stage screen kept its own speaker')
     assert.match(vol, /<Modal visible=\{open\}/, 'the volume is back in the page flow, where the scroll view takes its drag')
     assert.match(vol, /from 'expo-blur'/, 'the volume pop-up is not glass like the tuner')
     /* A thumb that slips off the slider must not close the thing it is holding. */
@@ -1538,11 +1543,14 @@ export function run(test) {
        part of the screen — an overlay nested in the flow is an overlay that can
        still push things around. */
     const scroll = stage.indexOf('</ScrollView>')
-    for (const tag of ['<ChannelSheet', '<Volume', '<Tuner']) {
+    for (const tag of ['<ChannelSheet', '<Tuner']) {
       const at = stage.indexOf(tag)
       assert.ok(at > 0, `${tag} is gone from the stage screen`)
       assert.ok(at < scroll, `${tag} escaped the screen entirely`)
     }
+    /* The volume is no longer one of them: its speaker moved to the bar at the
+       top of the app, and the sheet went with the button that opens it. It is
+       still a modal, which is the part that mattered — checked above. */
 
     /* And each one keeps a press that lands on it, so a thumb slipping off a
        control does not dismiss the thing it is holding. */
@@ -2052,9 +2060,12 @@ export function run(test) {
       /\{error \? \( <Note tone="fault" onDismiss=\{clearError\}>/,
       'the play screen’s error still cannot be dismissed'
     )
+    /* And the volume's, which lives on the bar now that the speaker does. It
+       is not a Note — the bar is one line and has to stay one — but it is
+       dismissible for the same reason. */
     assert.match(
-      stage.replace(/\s+/g, ' '),
-      /\{volumeError \? \( <Note tone="fault" onDismiss=\{\(\) => setVolumeError\(null\)\}>/,
+      read('mobile/src/components/TopBar.js').replace(/\s+/g, ' '),
+      /\{failed \? <Reported said=\{failed\} onClear=\{\(\) => setFailed\(null\)\}/,
       'a volume error still cannot be dismissed'
     )
     assert.match(
@@ -2062,5 +2073,48 @@ export function run(test) {
       /\{error \? \( <Note tone="fault" onDismiss=\{\(\) => setError\(null\)\}>/,
       'the edit screen’s error still cannot be dismissed'
     )
+  })
+
+  test('the phone wears the browser\u2019s header', () => {
+    /*
+     * "Make sure the iOS app shows this exact header." What it had was a
+     * sentence — "Connected to MacBook Pro SG 566" — which named the one fact
+     * on that bar nobody needs mid-song, and left out the three they do: what
+     * the unit is, what version this is, and whether the link is live. The
+     * speaker and Setup were down in the slot row, fighting Edit for a corner.
+     *
+     * Five things, left to right, the same order as the browser: lamp, unit,
+     * version, the state in one word, volume, setup.
+     */
+    const bar = read('mobile/src/components/TopBar.js')
+    const flat = bar.replace(/\s+/g, ' ')
+
+    const order = ['<Lamp state=', '{named}', 'v${APP_VERSION}', '{word.toUpperCase()}', 'accessibilityLabel="Volume"', 'accessibilityLabel="Connection and setup"']
+    let last = -1
+    for (const piece of order) {
+      const at = bar.indexOf(piece)
+      assert.ok(at > 0, `the header is missing ${piece}`)
+      assert.ok(at > last, `${piece} is out of order against the browser's bar`)
+      last = at
+    }
+
+    /* The unit's own short name, not the Mac's. */
+    assert.match(bar, /const ofDeviceName = \(s\) => s\.deviceName/, 'the header does not say what the unit is')
+    /* The version, off the build rather than typed. */
+    assert.match(bar, /from '\.\.\/lib\/version'/, 'the version on the bar is not the one that was built')
+    /* And the word is the shared one, so the two apps cannot drift. */
+    assert.match(bar, /from '\.\.\/lib\/link-word'/, 'the phone decides the word for itself')
+    assert.match(flat, /linkWord\(tone, 'remote'\)/, 'the phone is not using the shared word')
+
+    /* The old bar is gone rather than stacked above the new one. */
+    const app = read('mobile/App.js')
+    assert.match(app, /<TopBar link=\{link\} onOpenSettings=/, 'the app does not draw the header')
+    assert.ok(!/function LinkBar/.test(app), 'the old sentence bar is still there, under the new one')
+    assert.ok(!/Connected to \$\{/.test(app), 'the app still writes out which Mac it found')
+
+    /* And the stage screen gave up the two buttons the bar now carries. */
+    const stage = read('mobile/src/screens/Stage.js')
+    assert.ok(!/label="Setup"/.test(stage), 'Setup is on the stage screen as well as the bar')
+    assert.ok(!/onOpenSettings/.test(stage), 'the stage screen still takes a way to Setup it no longer draws')
   })
 }

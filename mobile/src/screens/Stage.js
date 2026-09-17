@@ -38,14 +38,12 @@ import Tile from '../components/Tile'
 import Sheet from '../components/Sheet'
 import TempoBox from '../components/TempoBox'
 import Tuner from '../components/Tuner'
-import Volume from '../components/Volume'
 
 const face = Platform.select(mono)
 
 /* Hoisted: a selector rebuilt each render re-reads the store on every notify. */
 const ofPreset = (s) => s.preset
 const ofBlocks = (s) => s.blocks
-const ofAllBlocks = (s) => s.allBlocks
 const ofScene = (s) => s.sceneIndex
 const ofSceneNames = (s) => s.sceneNames
 const ofCaps = (s) => s.capabilities
@@ -68,7 +66,7 @@ const ofSlug = (s) => s.deviceSlug
  * button within reach of a stage tap is a hazard, and saving to a slot is
  * refused by the Mac anyway.
  */
-export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpenSetlists, onOpenEdit }) {
+export default function Stage({ onOpenTone, onOpenPresets, onOpenSetlists, onOpenEdit }) {
   // The screen is the instrument panel for as long as this is open. A phone
   // that locks itself between songs is a phone you have to wake and unlock
   // while the count-in is happening.
@@ -76,9 +74,6 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
 
   const preset = useRig(ofPreset)
   const blocks = useRig(ofBlocks)
-  /* Everything, because the output block is one of the four the stage list
-     hides — and it is the one the volume lives on. */
-  const everything = useRig(ofAllBlocks)
   const scene = useRig(ofScene)
   const sceneNames = useRig(ofSceneNames)
   const caps = useRig(ofCaps)
@@ -109,11 +104,6 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
   const error = useRig(ofError)
 
   const [refreshing, setRefreshing] = useState(false)
-  /* Said under the slider rather than at the top of the screen, beside the
-     control that caused it. */
-  const [volumeError, setVolumeError] = useState(null)
-  /** Whether the volume is showing. Closed by default — see the speaker below. */
-  const [showVolume, setShowVolume] = useState(false)
   /*
    * How wide a row of tiles actually is. Measured rather than assumed, because
    * the answer is the phone's width less this screen's padding, and neither is
@@ -218,13 +208,17 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
           </Text>
           <View style={{ flexDirection: 'row', gap: space.sm }}>
             {/*
-              The way to the tone screen, beside Setup rather than down among
-              the scenes.
+              The way to the tone screen, up in the corner rather than down
+              among the scenes.
 
               Both of the things up here take you OFF this screen, which is the
               honest grouping: everything below the preset name acts on the rig
               you are playing, and neither of these does. It is also the corner
               furthest from where a thumb rests during a song.
+
+              The speaker and Setup used to be in this row too. They are on the
+              bar at the top of the app now, where the browser keeps them — see
+              components/TopBar.
 
               Absent, not disabled, when play mode is on — and absent until the
               setting has been read back, because a button that appears late is
@@ -256,31 +250,6 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
                 onPress={onOpenEdit}
               />
             ) : null}
-            {/*
-              The speaker, and what it opens is not on this screen until it is
-              asked for.
-
-              "Put a sound button that looks like a speaker in the header, and
-              when it's tapped you can slide the volume left or right or do the
-              plus minus thing that's already set up, but it's not there on the
-              main screen." The same trade the browser made: the control is
-              wanted twice in a night and was holding a strip of the stage open
-              for the rest of it.
-            */}
-            <Press
-              label={showVolume ? '🔊 ✕' : '🔊'}
-              height={36}
-              style={{ paddingHorizontal: space.md }}
-              accessibilityLabel={showVolume ? 'Close volume' : 'Volume'}
-              on={showVolume}
-              onPress={() => setShowVolume((v) => !v)}
-            />
-            <Press
-              label="Setup"
-              height={36}
-              style={{ paddingHorizontal: space.md }}
-              onPress={onOpenSettings}
-            />
           </View>
         </View>
 
@@ -502,10 +471,9 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
         The two things that cover the screen rather than sitting in it, drawn
         last and outside the foot because both are modals.
 
-        The volume is one for a reason worth keeping: a slider inside a scroll
-        view loses its drag to the scroll view's native gesture, and a control
-        wanted twice a night is better taken out of that fight than armed for
-        it. See components/Volume.
+        The volume is not among them any more: the speaker moved to the bar at
+        the top of the app, which is where the browser keeps it, and the sheet
+        moved with the button that opens it. See components/TopBar.
       */}
       {/*
         The channel picker, over the screen rather than inside it.
@@ -539,18 +507,6 @@ export default function Stage({ onOpenSettings, onOpenTone, onOpenPresets, onOpe
           setPicking(null)
         }}
       />
-
-      <Volume
-        blocks={everything}
-        open={showVolume}
-        onClose={() => setShowVolume(false)}
-        onError={setVolumeError}
-      />
-      {volumeError ? (
-        <Note tone="fault" onDismiss={() => setVolumeError(null)}>
-          {volumeError}
-        </Note>
-      ) : null}
 
       {/* Closing the tuner stops it at the unit, which is what the button does. */}
       <Tuner on={tunerOn} reading={tuning} onClose={() => writeTuner(false)} />

@@ -55,6 +55,14 @@ export const FILES = [
    * out twice.
    */
   { source: '../src/lib/retry.js', target: '../mobile/src/lib/retry.js' },
+  /*
+   * The word at the top of both screens. "Make sure the iOS app shows this
+   * exact header." Four states, one set of words, one place they are decided —
+   * a phone saying DISCONNECTED beside a Mac saying CONNECTED about the same
+   * link is a difference nobody can debug from a photograph.
+   */
+  { source: '../shared/link-word.mjs', target: '../mobile/src/lib/link-word.js' },
+
   { source: '../src/lib/guardrails.js', target: '../mobile/src/lib/guardrails.js' },
   { source: '../src/lib/validate.js', target: '../mobile/src/lib/validate.js' },
   /*
