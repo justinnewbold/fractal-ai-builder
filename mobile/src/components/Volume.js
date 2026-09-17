@@ -7,6 +7,7 @@ import Note from './Note'
 import { blockParams, idOf, setParam, setParamConfirmed } from '../lib/device'
 import {
   latestWriter,
+  NUDGE_SETTLE_MS,
   nudged,
   outputLevelParam,
   volumeLabel,
@@ -163,6 +164,10 @@ export default function Volume({ blocks, open, onClose, onError }) {
       const failed = await writer.current.settled()
       if (failed) onError?.(failed.message)
       const res = await setParamConfirmed(eid, p.id, v, p)
+      /* A newer value arrived while this one was being checked: its own
+         check follows, and a miss against a value nobody wants any more is
+         not a miss. */
+      if (live.current.value !== v) return
       if (!res.ok) {
         /* Say what the unit is holding, and show it: a slider left pointing
            at a number the unit refused is a slider lying about the volume. */
@@ -179,13 +184,38 @@ export default function Volume({ blocks, open, onClose, onError }) {
     }
   }
 
-  const nudge = async (direction) => {
+  /*
+   * A press goes to the unit now, through the same coalescing writer as a
+   * drag; the careful read-back waits until the presses stop, and runs one
+   * at a time. See NUDGE_SETTLE_MS for the evening that taught this.
+   */
+  const settle = useRef({ timer: null, landing: false, again: false })
+  useEffect(() => () => clearTimeout(settle.current.timer), [])
+  const settleNow = async () => {
+    if (settle.current.landing) {
+      settle.current.again = true
+      return
+    }
+    settle.current.landing = true
+    try {
+      await land()
+    } finally {
+      settle.current.landing = false
+      if (settle.current.again) {
+        settle.current.again = false
+        settleNow()
+      }
+    }
+  }
+  const nudge = (direction) => {
     const p = live.current.param
     if (!p) return
     const next = nudged(live.current.value, p, volumeNudge(p) * direction)
     setValue(next)
     live.current = { ...live.current, value: next }
-    await land()
+    writer.current.send(next)
+    clearTimeout(settle.current.timer)
+    settle.current.timer = setTimeout(settleNow, NUDGE_SETTLE_MS)
   }
 
   const pct = volumePercent(value, param)

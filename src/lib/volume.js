@@ -75,6 +75,17 @@ export function volumeNudge(param) {
   return volumeStep(param) * 10
 }
 
+/**
+ * How long after the last press of − or + the value is confirmed.
+ *
+ * Four presses in half a second each wrote and read back on their own, so
+ * four write-and-check rounds ran at once over the relay and each read back
+ * a value that belonged to a different press: "The volume didn't take. The
+ * unit is holding it at +0.8 dB." Every press still goes to the unit at once
+ * (coalesced, newest wins); the careful read-back waits for the burst to end.
+ */
+export const NUDGE_SETTLE_MS = 350
+
 /** A value the − or + lands on: moved, rounded to the notch, and kept in range. */
 export function nudged(value, param, delta) {
   if (!usable(param)) return value

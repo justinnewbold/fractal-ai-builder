@@ -1003,6 +1003,36 @@ export function run(test) {
     assert.match(flat, /The unit did not keep the move: /, 'a move the unit dropped is silent')
   })
 
+  test('a burst of volume presses is confirmed once, and a chain write is not re-read per announcement', () => {
+    /*
+     * From one log: four presses of + in half a second, each its own
+     * write-and-check over the relay, reading back each other's values —
+     * "The unit is holding it at +0.8 dB". And a chain move whose six writes
+     * each made the unit announce a change, each announcement a 2.7-second
+     * dump on the same port, until the screen locked and the pending write
+     * came back as "your computer didn't answer".
+     */
+    const vol = read('mobile/src/components/Volume.js').replace(/\s+/g, ' ')
+    assert.match(vol, /writer\.current\.send\(next\) clearTimeout\(settle\.current\.timer\) settle\.current\.timer = setTimeout\(settleNow, NUDGE_SETTLE_MS\)/, 'a press still checks itself on its own')
+    assert.match(vol, /if \(settle\.current\.landing\) \{ settle\.current\.again = true return \}/, 'two checks can run at once')
+    assert.match(vol, /if \(live\.current\.value !== v\) return if \(!res\.ok\)/, 'a check against a value nobody wants any more can still say didn’t take')
+    assert.ok(!/const nudge = async/.test(vol), 'a press waits on its own read-back')
+
+    const rig = read('mobile/src/lib/rig.js').replace(/\s+/g, ' ')
+    assert.match(rig, /if \(event\.type === 'scene' \|\| event\.type === 'changed'\) \{ if \(chainWrites\) chainAsked = true else refreshBlocks\(\{ quiet: true \}\) \}/, 'the chain is re-read on every announcement during a chain write')
+    assert.match(rig, /export function endChainWrite\(\{ refresh = true \} = \{\}\) \{ if \(!chainWrites\) return chainWrites -= 1 if \(chainWrites\) return const asked = chainAsked chainAsked = false if \(asked && refresh\) refreshBlocks\(\{ quiet: true \}\) \}/, 'announcements held during a write are lost, or read twice')
+
+    const edit = read('mobile/src/screens/Edit.js').replace(/\s+/g, ' ')
+    assert.match(edit, /const after = async \(res\) => \{ .*?endChainWrite\(\{ refresh: false \}\) await dropReadCache\(\) await refreshBlocks/, 'the write’s own read does not stand in for the held announcements')
+    assert.equal((edit.match(/beginChainWrite\(\)/g) || []).length, 3, 'not every chain write (move, add, remove) is bracketed')
+    assert.match(edit, /useKeepAwake\(\)/, 'the Edit screen lets the phone lock mid-write')
+
+    /* A unit mid-switch reports slot -1, and nothing is filed under it. */
+    const dev = read('mobile/src/lib/device.js').replace(/\s+/g, ' ')
+    assert.match(dev, /export async function storedSceneNames\(slug, number\) \{ .*?number < 0 \|\| demoDevice\(\)\) return null/)
+    assert.match(dev, /export function keepSceneNames\(slug, number, names\) \{ if \(!slug \|\| !Number\.isInteger\(number\) \|\| number < 0/)
+  })
+
   test('tapping a found control brings the page to the block it opened', () => {
     /*
      * "It'll pull up the parameters but then clicking on it does nothing." It

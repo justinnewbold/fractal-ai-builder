@@ -175,7 +175,38 @@ export function handleEvent(event) {
 
   // A scene change or an edit made anywhere else changes which blocks are
   // engaged. One refresh, from one place, rather than one per listening screen.
-  if (event.type === 'scene' || event.type === 'changed') refreshBlocks({ quiet: true })
+  if (event.type === 'scene' || event.type === 'changed') {
+    if (chainWrites) chainAsked = true
+    else refreshBlocks({ quiet: true })
+  }
+}
+
+/*
+ * WHILE THIS PHONE IS WRITING THE CHAIN, ITS OWN WRITES ARE NOT NEWS.
+ *
+ * A move is six cell writes, and the unit announces every one; each
+ * announcement asked for the chain, and each of those is a preset dump down
+ * the same serial port the writes are waiting on. A log showed the read after
+ * a move taking thirty seconds, the phone locking its screen while it waited,
+ * and the pending write coming back as "your computer didn't answer" — so
+ * the move was rolled back: "it just put it right back where it was."
+ *
+ * So the screen doing the writing says when it starts and when it is done,
+ * announcements in between are noted rather than acted on, and the chain is
+ * read once at the end — by the writer, which drops the computer's copy first.
+ */
+let chainWrites = 0
+let chainAsked = false
+export function beginChainWrite() {
+  chainWrites += 1
+}
+export function endChainWrite({ refresh = true } = {}) {
+  if (!chainWrites) return
+  chainWrites -= 1
+  if (chainWrites) return
+  const asked = chainAsked
+  chainAsked = false
+  if (asked && refresh) refreshBlocks({ quiet: true })
 }
 
 let stopEvents = null

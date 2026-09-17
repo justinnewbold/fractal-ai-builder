@@ -7979,6 +7979,12 @@ test('the buttons either side of the slider move it one dB, and stop at the ends
   assert.equal(volume.nudged(0.37, { min: 0, max: 10 }, 1), 1.4, 'the landing is not on a notch')
 })
 
+test('the read-back after a burst of presses waits for the burst to end', () => {
+  /* Four presses in half a second, each checked on its own, read back each
+     other's values. The presses go now; the check waits. */
+  assert.equal(volume.NUDGE_SETTLE_MS, 350)
+})
+
 test('a Level the unit sends with no unit still moves one dB a press', () => {
   // The FM3's Output Level arrives with no unit at all. "When adjusting the
   // volume, it's going up by 10 decibels. It should just go up one decibel at

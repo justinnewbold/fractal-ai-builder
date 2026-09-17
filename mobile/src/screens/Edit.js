@@ -20,7 +20,8 @@ import { colLabel, doubtfulWrite, gridShape, laneItems, lanesShown } from '../li
 import { blockPositions, landingIndex, reorderPlan } from '../lib/laneOrder'
 import { isSilencingParam } from '../lib/guardrails'
 import { buildParamIndex, findControls, indexFor } from '../lib/paramIndex'
-import { getState, refreshBlocks, useRig, writeBypass, writeChannel } from '../lib/rig'
+import { beginChainWrite, endChainWrite, getState, refreshBlocks, useRig, writeBypass, writeChannel } from '../lib/rig'
+import { useKeepAwake } from 'expo-keep-awake'
 import { logDebug } from '../lib/debugLog'
 import { blockColor } from '../lib/blockColors'
 import { shortBlock } from '../lib/shortName'
@@ -111,6 +112,10 @@ export default function Edit({ onBack }) {
    * thing that reliably stops it. See components/Knob.
    */
   const [held, setHeld] = useState(false)
+  /* Bench work takes minutes and a chain move takes long enough for the
+     screen to lock — which suspended the app mid-write. The stage screen
+     already stays awake; so does this one. */
+  useKeepAwake()
   const blocks = useRig(ofBlocks)
   const scene = useRig(ofScene)
   const sceneNames = useRig(ofSceneNames)
@@ -717,6 +722,7 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
      * slider and moved it up, it didn't take, it just put it right back where
      * it was." The copy is dropped first, so the read is off the unit.
      */
+    endChainWrite({ refresh: false })
     await dropReadCache()
     await refreshBlocks({ quiet: true })
     setIssue(doubtfulWrite(res))
@@ -727,10 +733,12 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
     if (page === null || page === undefined) return
     setBusy(true)
     setIssue(null)
+    beginChainWrite()
     try {
       await after(await placeBlock(row, col, Number(page)))
       setAddAfter(null)
     } catch (err) {
+      endChainWrite()
       setIssue(err.message)
       onError(err.message)
     } finally {
@@ -776,6 +784,7 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
     if (!moves.length) return
     setBusy(true)
     setIssue(null)
+    beginChainWrite()
     let last = null
     try {
       for (const m of moves) await clearCell(lane.row, m.from)
@@ -810,6 +819,7 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
       setIssue(err.message)
       onError(err.message)
     } finally {
+      endChainWrite()
       setBusy(false)
     }
   }
@@ -817,12 +827,14 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
   const remove = async (row, col) => {
     setBusy(true)
     setIssue(null)
+    beginChainWrite()
     try {
       await after(await clearCell(row, col))
     } catch (err) {
       setIssue(err.message)
       onError(err.message)
     } finally {
+      endChainWrite()
       setBusy(false)
     }
   }
