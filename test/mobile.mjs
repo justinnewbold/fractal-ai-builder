@@ -1052,6 +1052,23 @@ export function run(test) {
     assert.match(dev, /export function keepSceneNames\(slug, number, names\) \{ if \(!slug \|\| !Number\.isInteger\(number\) \|\| number < 0/)
   })
 
+  test('a failed join closes the socket, the heartbeat is short, and the log says why', () => {
+    /*
+     * "connected → joining" and then nothing for two and a half minutes, and
+     * once for six. A join that failed handed the next attempt the same
+     * socket, and a socket that died quietly when the phone changed networks
+     * stays dead until a heartbeat finds it out — one every twenty-five
+     * seconds by default. Each attempt waited twelve seconds on it and
+     * backed off.
+     */
+    const relay = read('mobile/src/lib/relay.js').replace(/\s+/g, ' ')
+    assert.match(relay, /export const HEARTBEAT_MS = 10000/)
+    assert.match(relay, /realtime: \{ heartbeatIntervalMs: HEARTBEAT_MS \}/, 'the relay socket keeps the twenty-five second heartbeat')
+    assert.match(relay, /await c\.removeChannel\(chan\)\.catch\(\(\) => \{\}\) .*?await c\.realtime\?\.disconnect\?\.\(\)\.catch\?\.\(\(\) => \{\}\) throw err/, 'a failed join hands the next attempt the same dead socket')
+    const link = read('mobile/src/lib/link.js').replace(/\s+/g, ' ')
+    assert.match(link, /logDebug\('link', `join failed after \$\{Math\.round\(\(Date\.now\(\) - began\) \/ 100\) \/ 10\}s`, err\?\.message \|\| String\(err\)\)/, 'a failed join leaves nothing in the log')
+  })
+
   test('tapping a found control brings the page to the block it opened', () => {
     /*
      * "It'll pull up the parameters but then clicking on it does nothing." It

@@ -165,10 +165,14 @@ async function tick() {
 
 async function join() {
   set({ link: 'joining' })
+  const began = Date.now()
   try {
     await remoteConnect()
-  } catch {
+  } catch (err) {
     // A join that failed is a Mac that isn't there yet. The loop is the retry.
+    // Said in the log with why and how long, because "joining" for minutes
+    // with nothing between the state lines was a log that could not be read.
+    logDebug('link', `join failed after ${Math.round((Date.now() - began) / 100) / 10}s`, err?.message || String(err))
     refresh()
     return
   }
