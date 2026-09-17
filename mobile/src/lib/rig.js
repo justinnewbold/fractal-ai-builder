@@ -43,6 +43,11 @@ const initial = {
    */
   deviceSlug: DEFAULT_SLUG,
   preset: null,
+  /**
+   * Names renamed on this phone and not yet saved to a slot: which preset,
+   * and what the names were before. See noteSceneName.
+   */
+  unsaved: null,
   /** What the stage screen draws: everything but the four you never kick. */
   blocks: [],
   /** What the edit screen draws: the chain as the unit reports it, ends and all. */
@@ -65,6 +70,15 @@ const emit = () => {
 }
 
 export function set(patch) {
+  /*
+   * A preset change drops a rename that was never saved — on the unit, which
+   * throws its edit buffer away, so here too. Caught at the one place every
+   * change of preset passes through, whichever route it came by.
+   */
+  if (patch.preset && state.unsaved && patch.preset.number !== state.unsaved.number) {
+    patch = { ...patch, unsaved: null }
+    discardUnsaved(state.unsaved)
+  }
   state = { ...state, ...patch }
   emit()
 }
@@ -240,22 +254,59 @@ export async function refreshAll() {
 export function notePresetName(name) {
   const preset = state.preset
   if (!preset || typeof name !== 'string') return
-  set({ preset: { ...preset, name } })
+  const unsaved = pendingFor(preset.number)
+  if (unsaved && unsaved.presetName === null) unsaved.presetName = preset.name || ''
+  set({ preset: { ...preset, name }, unsaved })
   if (Number.isInteger(preset.number)) learnName(preset.number, name)
 }
 
-/** The same for a scene: on the tiles now, and kept where the next read looks. */
+/**
+ * The same for a scene: on the tiles now, and kept on this phone so the
+ * tiles still say it after a trip to another screen.
+ *
+ * NOT KEPT FOR GOOD UNTIL IT IS SAVED. "I renamed two scenes, then switched
+ * to a different preset without saving, and when I went back it still showed
+ * those names." The unit had dropped them with its edit buffer; the phone
+ * had written them to its disk and to the computer's store as if they were
+ * the preset's. So a rename is pending: what the names were is remembered,
+ * a preset change puts them back (see set), and only a save that succeeds
+ * sends them to the computer's store, where every phone reads them from.
+ */
 export function noteSceneName(index, name) {
   if (!Number.isInteger(index) || index < 0 || typeof name !== 'string') return
   const names = [...(state.sceneNames || [])]
   while (names.length <= index) names.push('')
   names[index] = name
-  set({ sceneNames: names })
   const number = state.preset?.number
+  const unsaved = pendingFor(number)
+  set({ sceneNames: names, unsaved })
   const slug = state.deviceSlug
   if (!Number.isInteger(number) || !slug) return
   rememberSceneNames(device.nameOwner(slug), number, names)
-  device.keepSceneNames(slug, number, names)
+}
+
+/** The pending record for this preset, started from what the names are now. */
+function pendingFor(number) {
+  if (!Number.isInteger(number)) return state.unsaved
+  if (state.unsaved && state.unsaved.number === number) return state.unsaved
+  return { number, sceneNames: [...(state.sceneNames || [])], presetName: null }
+}
+
+/** The preset moved on without a save: the names go back to what they were. */
+function discardUnsaved(unsaved) {
+  const slug = state.deviceSlug
+  if (!unsaved || !slug) return
+  rememberSceneNames(device.nameOwner(slug), unsaved.number, unsaved.sceneNames)
+  if (typeof unsaved.presetName === 'string') learnName(unsaved.number, unsaved.presetName)
+}
+
+/** A save landed in `slot`: what was pending there is the preset's now. */
+export function savedToSlot(slot) {
+  const unsaved = state.unsaved
+  if (!unsaved || unsaved.number !== slot) return
+  const slug = state.deviceSlug
+  if (slug) device.keepSceneNames(slug, slot, state.sceneNames)
+  set({ unsaved: null })
 }
 
 export async function refreshPreset() {
