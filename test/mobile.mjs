@@ -966,6 +966,28 @@ export function run(test) {
     assert.match(rig, /expect\('bpm', bpm\) tempoSetAt = Date\.now\(\)/, 'a typed tempo is not held')
   })
 
+  test('a rename is pending until it is saved, and a preset change drops it', () => {
+    /*
+     * "I renamed two scenes, then switched to a different preset without
+     * saving, and when I went back it still showed those names." The unit
+     * had dropped them with its edit buffer; the phone had kept them as if
+     * they were the preset's. A rename is pending: a preset change puts the
+     * old names back, and only a save that lands sends the new ones to the
+     * computer's store.
+     */
+    const rig = read('mobile/src/lib/rig.js').replace(/\s+/g, ' ')
+    assert.match(rig, /unsaved: null,/, 'the store has no idea of an unsaved rename')
+    assert.match(rig, /if \(patch\.preset && state\.unsaved && patch\.preset\.number !== state\.unsaved\.number\) \{ patch = \{ \.\.\.patch, unsaved: null \} discardUnsaved\(state\.unsaved\) \}/, 'a preset change keeps an unsaved rename')
+    assert.match(rig, /function discardUnsaved\(unsaved\) \{[^}]*rememberSceneNames\(device\.nameOwner\(slug\), unsaved\.number, unsaved\.sceneNames\) if \(typeof unsaved\.presetName === 'string'\) learnName\(unsaved\.number, unsaved\.presetName\) \}/, 'a dropped rename does not put the old names back')
+    assert.match(rig, /export function savedToSlot\(slot\) \{ const unsaved = state\.unsaved if \(!unsaved \|\| unsaved\.number !== slot\) return const slug = state\.deviceSlug if \(slug\) device\.keepSceneNames\(slug, slot, state\.sceneNames\) set\(\{ unsaved: null \}\) \}/, 'a save does not settle the pending names or send them to the computer')
+    assert.ok(!/noteSceneName[\s\S]*?device\.keepSceneNames\(slug, number, names\)/.test(rig.slice(rig.indexOf('export function noteSceneName'), rig.indexOf('function pendingFor'))), 'an unsaved scene name still goes to the computer\'s store')
+    /* The save button settles it, and the names section says it is pending. */
+    assert.match(read('mobile/src/components/SaveToSlot.js').replace(/\s+/g, ' '), /if \(res\.ok\) savedToSlot\(res\.slot\)/, 'a save that landed does not settle the names')
+    const settings = read('mobile/src/screens/Settings.js').replace(/\s+/g, ' ')
+    assert.match(settings, /const pending = !!unsaved && unsaved\.number === preset\?\.number/)
+    assert.match(settings, /Renamed, not saved\. Tap Save to keep the new names\. Changing preset drops them, on the unit and here\./, 'nothing says a rename is not saved yet')
+  })
+
   test('tapping a found control brings the page to the block it opened', () => {
     /*
      * "It'll pull up the parameters but then clicking on it does nothing." It
@@ -3573,9 +3595,9 @@ export function run(test) {
     assert.ok(!/await refreshScene\(\)/.test(settings), 'the scene is re-read after a rename, which never carried the names')
 
     const rig = read('mobile/src/lib/rig.js').replace(/\s+/g, ' ')
-    assert.match(rig, /export function notePresetName\(name\) \{ const preset = state\.preset if \(!preset \|\| typeof name !== 'string'\) return set\(\{ preset: \{ \.\.\.preset, name \} \}\) if \(Number\.isInteger\(preset\.number\)\) learnName\(preset\.number, name\)/, 'the rename does not reach the screen and the name list')
-    assert.match(rig, /names\[index\] = name set\(\{ sceneNames: names \}\)/, 'a scene rename does not reach the tiles')
-    assert.match(rig, /rememberSceneNames\(device\.nameOwner\(slug\), number, names\) device\.keepSceneNames\(slug, number, names\)/, 'a scene rename is not kept for the next read')
+    assert.match(rig, /set\(\{ preset: \{ \.\.\.preset, name \}, unsaved \}\) if \(Number\.isInteger\(preset\.number\)\) learnName\(preset\.number, name\)/, 'the rename does not reach the screen and the name list')
+    assert.match(rig, /names\[index\] = name const number = state\.preset\?\.number const unsaved = pendingFor\(number\) set\(\{ sceneNames: names, unsaved \}\)/, 'a scene rename does not reach the tiles')
+    assert.match(rig, /rememberSceneNames\(device\.nameOwner\(slug\), number, names\) \}/, 'a scene rename is not kept on this phone for the next screen')
 
     const names = read('mobile/src/lib/presetNames.js').replace(/\s+/g, ' ')
     assert.match(names, /export function learn\(n, name\) \{ if \(!Number\.isInteger\(n\) \|\| typeof name !== 'string'\) return names\.set\(n, cleanPresetName\(name\)\) persist\(\) announce\(\)/, 'a learned name is not kept or announced')

@@ -528,7 +528,9 @@ function UnitBits() {
   const preset = useRig((st) => st.preset)
   const scenes = useRig((st) => st.sceneNames)
   const caps = useRig((st) => st.capabilities)
+  const unsaved = useRig((st) => st.unsaved)
   const shape = sceneShape(caps)
+  const pending = !!unsaved && unsaved.number === preset?.number
 
   const [said, setSaid] = useState(null)
   const [failed, setFailed] = useState(null)
@@ -585,6 +587,12 @@ function UnitBits() {
         : null}
 
       {said ? <Note>{said}</Note> : null}
+      {pending ? (
+        <Note tone="warn">
+          Renamed, not saved. Tap Save to keep the new names. Changing preset drops them, on the
+          unit and here.
+        </Note>
+      ) : null}
       <SaveNotes s={saveTo} />
       <SaveButton s={saveTo} height={TAP} grow />
       <Note>

@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { colLabel } from '../lib/grid-plan'
 import { parkSave, readSaveResult } from '../lib/device'
 import { askComputerToSave } from '../lib/saveViaComputer'
-import { useRig } from '../lib/rig'
+import { savedToSlot, useRig } from '../lib/rig'
 import Note from './Note'
 import Press from './Press'
 
@@ -51,6 +51,7 @@ export function useSaveToSlot() {
       name: preset?.name || ''
     })
     setSaving(false)
+    if (res.ok) savedToSlot(res.slot)
     setSaid(res.ok ? { tone: 'hint', text: `Saved to slot ${res.slot}.` } : { tone: 'warn', text: res.error })
   }
 
