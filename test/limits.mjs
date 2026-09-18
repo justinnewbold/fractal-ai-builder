@@ -1,23 +1,21 @@
 /**
- * The two clocks, kept in agreement.
+ * What the Mac app is made of, and what it is allowed to claim.
  *
- * A generation is bounded twice: the serverless function has a ceiling set in
- * `vercel.json`, and the browser has its own stall timeout and hard cap in
- * `src/lib/stream.js`. Nothing connects the two files, and for a while they
- * disagreed badly — the function was cut off at 60 seconds while the client
- * sat waiting for 240.
+ * Packaging is the part of this project with no way to check itself at
+ * runtime. A missing entitlement, a certificate that is present but empty, a
+ * file the bundle references and does not ship, a device server pinned to a
+ * commit that moved — every one of them builds cleanly and fails on somebody
+ * else's machine, usually as "it won't open" with nothing to read.
  *
- * What made that expensive is how it presented. The server writes an `error`
- * frame for anything it catches, so a function killed by the platform sends no
- * frame at all: the stream just ends. The client saw partial blocks and then
- * silence, and reported that *the model* had stopped — so every instinct was
- * to go and look at the model, the prompt, the schema. The cause was a number
- * in a config file.
+ * So these read the build config rather than the app: electron-builder.yml,
+ * the entitlements, the workflow that signs it, and the lock file that says
+ * which ForgeFX is inside.
  *
- * The invariant that prevents it: the server must be able to run for at least
- * as long as the client is prepared to wait. Then the client's own cap is
- * always the binding one, it fails with a message it can actually explain, and
- * a truncated stream goes back to meaning something genuinely unusual.
+ * THIS FILE USED TO OPEN ON A DIFFERENT SUBJECT — the two clocks around a
+ * generation, the serverless function's ceiling in vercel.json against the
+ * browser's own cap in lib/stream.js, which disagreed badly enough that a
+ * function killed at 60 seconds looked like the model going quiet. Both files
+ * went with the AI, and so did the tests that held them together.
  */
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
