@@ -41,6 +41,17 @@ const tidy = (s) => s.replace(/&rsquo;/g, '’').replace(/\s+/g, ' ').trim()
 /** "Removing…" is the same button mid-press, not a second button. */
 const isBusy = (s) => /…$/.test(s)
 
+/**
+ * A word standing in for something that has no name yet is a name, not a
+ * button.
+ *
+ * `{entry.name || 'Untitled'}` inside a button is what an unnamed preset is
+ * called in the row you press, and it arrived in the survey looking exactly
+ * like a control the phone was missing. The same shape covers `?? 'Empty'`.
+ * Read the operator before the quote and the two are told apart.
+ */
+const isFallbackName = (text, at) => /(\|\||\?\?)\s*$/.test(text.slice(Math.max(0, at - 6), at))
+
 function wordsIn(text) {
   const out = new Set()
   const keep = (raw) => {
@@ -48,7 +59,10 @@ function wordsIn(text) {
     if (!isBusy(t) && LOOKS_LIKE_A_BUTTON.test(t)) out.add(t)
   }
   for (const m of text.matchAll(/>([^<>{}]+)</g)) keep(m[1])
-  for (const m of text.matchAll(/'([^']{1,24})'|"([^"]{1,24})"/g)) keep(m[1] ?? m[2])
+  for (const m of text.matchAll(/'([^']{1,24})'|"([^"]{1,24})"/g)) {
+    if (isFallbackName(text, m.index)) continue
+    keep(m[1] ?? m[2])
+  }
   return out
 }
 
@@ -96,6 +110,29 @@ export function webButtons(src) {
 }
 
 /**
+ * The text of a `{...}` beginning at `open`, or null if it never closes.
+ *
+ * Quotes are tracked as well as depth, because a brace inside a string is not
+ * a brace — and a label is one of the few places a `}` shows up in prose.
+ */
+function braced(src, open) {
+  let depth = 0
+  let quote = null
+  for (let i = open; i < src.length; i++) {
+    const c = src[i]
+    if (quote) {
+      if (c === '\\') i++
+      else if (c === quote) quote = null
+      continue
+    }
+    if (c === '"' || c === "'" || c === '`') quote = c
+    else if (c === '{') depth++
+    else if (c === '}' && --depth === 0) return src.slice(open + 1, i)
+  }
+  return null
+}
+
+/**
  * What the phone's buttons say.
  *
  * `<Press label="Add" />` — the phone puts the word in an attribute because
@@ -103,12 +140,22 @@ export function webButtons(src) {
  */
 export function phoneButtons(src) {
   const found = new Set()
-  for (const m of src.matchAll(/\blabel=(?:"([^"]{1,40})"|\{([^}]{1,160})\})/g)) {
+  for (const m of src.matchAll(/\blabel=(?:"([^"]{1,40})"|\{)/g)) {
     if (m[1] !== undefined) {
       for (const w of wordsIn(`>${m[1]}<`)) found.add(w)
       continue
     }
-    for (const w of wordsIn(m[2])) found.add(w)
+    /*
+     * The braces are counted rather than read up to the first `}`.
+     *
+     * A label built from a template — `` label={`${songs(l)} · tap to rename`} ``
+     * — closes one brace early, and a scan that stops there carries on eating
+     * the file. That is how "Empty", a word for a setlist with no songs in it
+     * forty lines further down, arrived in the survey as a button the browser
+     * was missing. Unbalanced is worse than unread: it invents findings.
+     */
+    const body = braced(src, m.index + m[0].length - 1)
+    if (body !== null) for (const w of wordsIn(body)) found.add(w)
   }
   return found
 }
@@ -150,6 +197,11 @@ export const AREAS = [
         why: 'the phone has Add and Remove and no single Replace — two taps for what the browser does in one'
       },
       { does: 'take a block out of the chain', web: 'Remove', phone: 'Remove' },
+      {
+        does: 'the empty slot you press to put something in it',
+        web: 'Empty — tap to add',
+        phone: 'Empty'
+      },
       {
         does: 'move a block to another slot from a button',
         web: 'Move',
@@ -238,10 +290,16 @@ export const AREAS = [
       { does: 'ask the app for a tone', web: 'Ask', phone: '✦ Tone', unreadable: ['phone'] },
       {
         does: 'choose what Previous and Next step through',
+        /* Both ends name the button after the list it is stepping through, and
+           both say "All" when that is every preset on the unit. */
+        web: 'All',
+        phone: 'All'
+      },
+      {
+        does: 'the word "Source" above that button',
         web: 'Source',
-        also: ['All'],
-        phone: 'the name of the list it is stepping through',
-        unreadable: ['phone']
+        phone: null,
+        why: 'a lone list name between Previous and Next reads as a caption rather than the button that picks what those two walk; the phone’s is wide enough not to need telling'
       },
       {
         does: 'show whether a block is bypassed',
@@ -255,6 +313,52 @@ export const AREAS = [
         web: 'Try again',
         phone: null,
         why: 'only in the browser — nobody has decided whether the phone should offer it'
+      }
+    ]
+  },
+  {
+    /*
+     * The one place a survey of this went wrong, and worth saying why.
+     *
+     * The browser has a button that says "Star this preset"; the phone stars
+     * from an icon whose label is built out of the preset's name, and an
+     * earlier pass read that as a phone with no way to star anything. It has
+     * had one all along. So every entry below was checked against the other
+     * end's whole app rather than the one file that looked like its opposite
+     * number — which is also why the file lists here are lists.
+     */
+    area: 'the setlists and the preset list',
+    web: ['src/components/Setlists.jsx', 'src/components/CloudPresets.jsx', 'src/components/Recent.jsx'],
+    phone: ['mobile/src/screens/Setlists.js', 'mobile/src/screens/Presets.js'],
+    buttons: [
+      {
+        does: 'make a preset one of the starred ones',
+        web: 'Star this preset',
+        also: ['Starred', 'Star', 'Unstar'],
+        phone: 'Star',
+        /* The phone's says "Star <name>" / "Unstar <name>" — the same button,
+           named after what it is about to star, because on a list of forty
+           rows a button that only says "Star" says nothing about which. */
+        unreadable: ['web']
+      },
+      {
+        does: 'take a preset out of the list it is in',
+        web: 'Remove',
+        phone: 'Remove <name>',
+        unreadable: ['phone']
+      },
+      {
+        does: 'read the preset list off the unit again',
+        web: null,
+        phone: 'Refresh',
+        why: 'the browser re-reads the list by itself, on opening it and after every change; the phone offers it by hand as well, for a list that went stale in a pocket'
+      },
+      {
+        does: 'close the setlist sheet',
+        web: null,
+        phone: 'Done',
+        also: ['Done adding'],
+        why: 'setlists are a page in the browser, with nothing to close'
       }
     ]
   }
