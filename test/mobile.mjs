@@ -1352,6 +1352,100 @@ export function run(test) {
     }
   })
 
+  test('there is a guide to what to try, and an error that can name a fix offers it', async () => {
+    /*
+     * "Link to this section from every error toast in the app."
+     *
+     * A message that says what went wrong and offers nothing to do next is the
+     * whole reason this exists. So the guide is one shared list — the browser
+     * and the phone show the same four fixes, because a fix that exists on one
+     * end and not the other is a fix somebody cannot find from wherever they
+     * happen to be standing — and the error notices link INTO it by id.
+     *
+     * The three things that can quietly go wrong here:
+     *
+     *  - a fix with no steps, which is a heading that helps nobody
+     *  - fixFor placing a message on the wrong fix, or on any fix at all when
+     *    it cannot tell. A wrong fix offered confidently costs more than no fix
+     *    offered, so an unplaceable message must return null
+     *  - the version check claiming agreement it has not checked. It can
+     *    compare the app and the computer; the unit's FIRMWARE is not
+     *    something either end can read, and saying nothing about that would
+     *    leave a row that looks like a check nobody ran
+     */
+    const guide = await import('../shared/troubleshooting.mjs')
+
+    assert.ok(guide.FIXES.length >= 4, 'the guide lost most of itself')
+    const ids = guide.FIXES.map((f) => f.id)
+    assert.equal(new Set(ids).size, ids.length, 'two fixes share an id, so a link lands on either')
+    for (const want of ['frozen', 'connect', 'versions', 'preset']) {
+      assert.ok(ids.includes(want), `the guide has nothing about "${want}"`)
+    }
+    for (const fix of guide.FIXES) {
+      assert.ok(fix.title && fix.when, `${fix.id} has no title or no "when"`)
+      assert.ok(fix.steps.length >= 2, `${fix.id} is a heading with no steps`)
+      for (const step of fix.steps)
+        assert.ok(step.length > 20 && /[a-z]/.test(step), `a step of ${fix.id} says nothing`)
+      assert.equal(guide.fixById(fix.id), fix, `${fix.id} cannot be looked up by id`)
+    }
+    assert.equal(guide.fixById('nonsense'), null, 'an unknown id resolves to something')
+
+    /* The power cycle is the first thing to try on a unit that stopped
+       answering, because it is the thing that usually works and it costs
+       nothing. It being anywhere else is a real regression. */
+    assert.match(guide.fixById('frozen').steps[0], /turn the unit off/i, 'the power cycle is not the first thing offered')
+    /* And a charge-only USB cable is the single most common reason a unit is
+       never found at all. */
+    assert.ok(
+      guide.fixById('connect').steps.some((s) => /charge-only|data cable/i.test(s)),
+      'the guide never mentions the cable, which is the most common cause'
+    )
+
+    for (const [message, want] of [
+      ['Not connected to a unit', 'connect'],
+      ['The computer is not answering', 'connect'],
+      ['The unit timed out', 'frozen'],
+      ['That preset would not load', 'preset'],
+      ['The computer app is older than this one', 'versions'],
+      ['Something nobody has seen before', null],
+      ['', null],
+      [null, null],
+      [undefined, null]
+    ]) {
+      assert.equal(guide.fixFor(message), want, `"${message}" was placed on ${guide.fixFor(message)}`)
+    }
+
+    const sync = (app, host) => guide.versionsInSync({ app, host })
+    assert.equal(sync('7.1.0', '7.1.0').state, 'ok')
+    assert.equal(sync('7.2.0', '7.1.0').state, 'behind', 'a computer behind the app is not reported')
+    assert.equal(sync('7.1.0', '7.2.0').state, 'ahead', 'an app behind the computer is not reported')
+    assert.equal(sync('7.1.0', null).state, 'unknown', 'a computer that said nothing is reported as agreeing')
+    assert.equal(sync(null, '7.1.0').state, 'unknown')
+    assert.equal(sync('7.1.0', 'banana').state, 'unknown', 'an unreadable version is read as a verdict')
+    for (const [app, host] of [['7.2.0', '7.1.0'], ['7.1.0', '7.2.0'], ['7.1.0', null]])
+      assert.ok(sync(app, host).says.length > 20, 'a verdict with nothing to read')
+    assert.ok(/firmware/i.test(guide.FIRMWARE_NOTE), 'nothing says the firmware is unreadable')
+
+    /* Both ends show it, and both ends link into it. */
+    const web = read('src/App.jsx')
+    assert.match(web, /fixFor\(error\)/, 'the browser error notice offers no fix')
+    assert.match(web, /FIXES\.map/, 'the browser does not draw the guide')
+    assert.match(web, /versionsInSync\(\{ app: VERSION, host: link\.macVersion \}\)/, 'the browser runs no version check')
+
+    const stage = read('mobile/src/screens/Stage.js')
+    assert.match(stage, /fixFor\(error\)/, 'the phone error note offers no fix')
+    const screen = read('mobile/src/screens/Fixes.js')
+    assert.match(screen, /FIXES\.map/, 'the phone does not draw the guide')
+    assert.match(screen, /versionsInSync/, 'the phone runs no version check')
+    /* Reachable with the computer off, which is exactly when it is wanted. */
+    const app = read('mobile/App.js')
+    assert.match(app, /onOpenFixes=\{/, 'Setup has no way to reach the guide')
+    assert.ok(
+      !/link\.link === 'connected' \? \(\) => setScreen\('fixes'\)/.test(app),
+      'the guide is gated on the computer answering, which is when it is least useful'
+    )
+  })
+
   test('a write the unit calls refused is never undone by the phone', () => {
     /*
      * THE BUG THIS PANEL WAS REPORTED FOR, in the browser: "delete works, the

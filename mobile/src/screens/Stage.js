@@ -33,6 +33,7 @@ import { blockColor } from '../lib/blockColors'
 import { sceneColor } from '../lib/sceneColors'
 import { shortBlock } from '../lib/shortName'
 import Note from '../components/Note'
+import { fixById, fixFor } from '../lib/troubleshooting'
 import Press from '../components/Press'
 import Tile from '../components/Tile'
 import Sheet from '../components/Sheet'
@@ -64,7 +65,7 @@ const ofSlug = (s) => s.deviceSlug
  * button within reach of a stage tap is a hazard, and saving to a slot is
  * refused by the Mac anyway.
  */
-export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit }) {
+export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpenFix }) {
   // The screen is the instrument panel for as long as this is open. A phone
   // that locks itself between songs is a phone you have to wake and unlock
   // while the count-in is happening.
@@ -229,6 +230,26 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit }) {
         <Note tone="fault" onDismiss={clearError}>
           {error}
         </Note>
+      ) : null}
+      {/*
+        And what to do about it, when this app can tell.
+
+        A message that says what went wrong and offers nothing to do next is
+        where the guide came from. fixFor reads the message for a handful of
+        plain signals; anything it cannot place gets no button, which is the
+        honest answer — a wrong fix offered confidently costs more than no fix
+        offered at all.
+
+        Its own conditional rather than a fragment inside the note's: the note
+        above is read by a test for the exact shape that makes it dismissible,
+        and wrapping it was how that broke.
+      */}
+      {error && onOpenFix && fixFor(error) ? (
+        <Press
+          label={fixById(fixFor(error)).title}
+          sub="What to try"
+          onPress={() => onOpenFix(fixFor(error))}
+        />
       ) : null}
 
       {/* ---------------------------------------------------------- preset */}

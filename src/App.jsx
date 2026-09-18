@@ -21,7 +21,7 @@ import Ports from './components/Ports'
 import LocalLibrary from './components/LocalLibrary'
 import GearNames from './components/GearNames'
 import SetupRow from './components/SetupRow'
-import { FULL, BUILT_AT } from './lib/version'
+import { FULL, BUILT_AT, VERSION } from './lib/version'
 import Theme from './components/Theme'
 import Section from './components/Section'
 import Sheet from './components/Sheet'
@@ -58,6 +58,7 @@ import Screens, { viewsFor } from './components/Screens'
 import { useAsks } from './lib/asks'
 import { SIZES, loadSize, saveSize, clampSize, loadFit, saveFit } from './lib/gigSize'
 import { editButtonShows } from './lib/playMode'
+import { FIXES, FIRMWARE_NOTE, fixById, fixFor, versionsInSync } from '../shared/troubleshooting.mjs'
 import { remember as rememberPreset, CHANGED as MARKS_CHANGED } from './lib/presetMarks'
 import { CHANGED as SETLISTS_CHANGED } from './lib/setlists'
 import { syncSetlists, setlistCloudReady } from './lib/cloudSetlists'
@@ -1011,6 +1012,9 @@ export default function App() {
   const [fit, setFit] = useState(loadFit)
   /* Which page of Setup is open; null is the list of rows. */
   const [setupPage, setSetupPage] = useState(null)
+  /* Which fix the guide opens on, when an error notice sent you there. Null is
+     the guide with everything folded shut, which is what Setup opens on. */
+  const [fix, setFix] = useState(null)
   /*
    * Named rather than written inline in the tab row.
    *
@@ -2977,14 +2981,29 @@ export default function App() {
           <h2>Didn&rsquo;t work</h2>
           <p>{error}</p>
           {/*
-            What the run that just failed cost, because it cost something.
-            A model that was asked and thought about it has been paid for
-            whether or not a tone came back, and an error that says nothing
-            about it is the reason the app's own total kept coming in under the
-            bill. Where there is genuinely no count, it says that instead of
-            leaving a blank that reads as zero.
+            And what to do about it, when this app can tell.
+
+            A message that says what went wrong and offers nothing to do next
+            is where the troubleshooting guide came from. fixFor reads the
+            message for a handful of plain signals and names one of four
+            fixes; anything it cannot place gets no button, which is the
+            honest answer — a wrong fix offered confidently costs more than no
+            fix offered at all.
           */}
           <div className="history-actions">
+            {fixFor(error) ? (
+              <button
+                className="chip"
+                onClick={() => {
+                  setFix(fixFor(error))
+                  setError(null)
+                  setSheet('settings')
+                  setSetupPage('help')
+                }}
+              >
+                {fixById(fixFor(error)).title}
+              </button>
+            ) : null}
             <button
               className="chip"
               onClick={() => {
@@ -3748,6 +3767,48 @@ export default function App() {
               ‹ Setup
             </button>
             <p className="setup-page-title">{SETUP_PAGES.help}</p>
+<Section
+            key="fixes"
+            title="Fixes"
+            note="What to try, in the order worth trying it"
+            defaultOpen={!!fix}
+          >
+            {/*
+              The guide is shared with the phone — see shared/troubleshooting.mjs
+              — so a fix reads the same wherever somebody standing in front of a
+              dead rig happens to look it up.
+            */}
+            <div className="fixes">
+              {FIXES.map((entry) => (
+                <details key={entry.id} className="fix" open={fix === entry.id}>
+                  <summary>
+                    {entry.title}
+                    <span className="hint">{entry.when}</span>
+                  </summary>
+                  <ol className="fix-steps">
+                    {entry.steps.map((step, i) => (
+                      <li key={i}>{step}</li>
+                    ))}
+                  </ol>
+                  {entry.id === 'versions' ? (
+                    <div className="fix-versions">
+                      {/*
+                        The check itself, rather than a step telling somebody to
+                        go and compare two numbers by hand. Two of the three:
+                        the unit's firmware is not something either end can
+                        read, and this says so rather than leaving a row that
+                        looks like a check nobody ran.
+                      */}
+                      <p className="mono" data-sync={versionsInSync({ app: VERSION, host: link.macVersion }).state}>
+                        {versionsInSync({ app: VERSION, host: link.macVersion }).says}
+                      </p>
+                      <p className="hint">{FIRMWARE_NOTE}</p>
+                    </div>
+                  ) : null}
+                </details>
+              ))}
+            </div>
+          </Section>
 <Section
             key="preset-check"
             title="This preset"

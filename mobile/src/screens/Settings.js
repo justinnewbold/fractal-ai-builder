@@ -52,7 +52,8 @@ export default function Settings({
   onReconnect,
   onSignOut,
   onOpenGear,
-  onOpenLog
+  onOpenLog,
+  onOpenFixes
 }) {
   const deviceName = useRig(ofDeviceName)
   const unitState = useRig(ofUnitState)
@@ -190,6 +191,16 @@ export default function Settings({
                 title="Amp & pedal names"
                 status="What each model on your unit really is"
                 onPress={onOpenGear}
+              />
+            ) : null}
+            {/* Above the log, because it is the one somebody is looking for
+                when something is wrong; the log is what they send afterwards
+                if it did not help. */}
+            {onOpenFixes ? (
+              <SetupRow
+                title="Fixes"
+                status="What to try when it isn’t working"
+                onPress={onOpenFixes}
               />
             ) : null}
             {onOpenLog ? (
