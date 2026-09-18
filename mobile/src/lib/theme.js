@@ -28,7 +28,8 @@ export const color = {
   onSignal: '#14161a', // ink on an amber ground
   signalWash: 'rgba(240, 167, 60, 0.12)',
   liveHalo: 'rgba(95, 191, 209, 0.2)',
-  faultHalo: 'rgba(224, 104, 79, 0.2)'
+  faultHalo: 'rgba(224, 104, 79, 0.2)',
+  okHalo: 'rgba(99, 198, 140, 0.2)'
 }
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 }
