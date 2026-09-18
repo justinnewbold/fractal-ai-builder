@@ -778,6 +778,34 @@ export async function loadPreset(number) {
     set({ error: err.message, chain: 'ok', preset: was })
     return false
   }
+  /*
+   * THE COMPUTER'S COPY IS OLDER THAN THE PRESET NOW LOADED, so it is dropped
+   * before anything is read back.
+   *
+   * "I clicked a preset name, in this case it was Drop D Chug, then it went to
+   * the preset screen, shows Drop D Chug for a split second, and then goes to
+   * Metallica." On two phones, and Refresh put it right on each of them
+   * separately.
+   *
+   * Both halves of that are this. The split second is the name this app
+   * already knew, shown at once so the screen is not blank; what replaces it
+   * is the answer to "what preset is loaded", and the computer holds that
+   * answer for fifteen seconds. A read inside the window describes the preset
+   * you just LEFT — so the stage settled on the old name, the old scene names,
+   * and the old chain, all of them consistent with each other and with nothing
+   * on the unit. Two phones asking the same computer got the same stale
+   * answer, which is why one of them refreshing did nothing for the other.
+   *
+   * The preset list was right throughout, because it is drawn from names this
+   * app read off the unit rather than from that copy. The one on screen was
+   * the one that came from the computer.
+   *
+   * The chain editor has dropped this copy after a write since the day it was
+   * written, for the same reason in the other direction — see `after()` in
+   * screens/Edit.js. Changing which preset is loaded is the larger change of
+   * the two and was not doing it.
+   */
+  await device.dropReadCache()
   await refreshPreset()
   await refreshScene()
   /* What is already known about this slot's scenes, at once. See quickSceneNames. */

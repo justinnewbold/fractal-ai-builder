@@ -1218,6 +1218,45 @@ export function run(test) {
     )
   })
 
+  test('changing preset drops the computer’s copy before reading the new one back', () => {
+    /*
+     * "I clicked a preset name, in this case it was Drop D Chug, then it went
+     * to the preset screen, shows Drop D Chug for a split second, and then goes
+     * to Metallica." On an iPhone and an Android, and Refresh put it right on
+     * each of them separately.
+     *
+     * Both halves are the same thing. The split second is the name this app
+     * already knew, shown at once so the screen is not blank. What replaced it
+     * was the answer to "what preset is loaded" — and the computer holds that
+     * answer for fifteen seconds, so a read inside the window describes the
+     * preset just LEFT. The stage settled on the old name, the old scene names
+     * and the old chain, all agreeing with each other and with nothing on the
+     * unit. Two phones asking one computer got one stale answer, which is why
+     * refreshing on one did nothing for the other.
+     *
+     * The preset list stayed right the whole time, because it is drawn from
+     * names read off the unit rather than from that copy.
+     */
+    const rig = read('mobile/src/lib/rig.js')
+    /* Where each happens, rather than one regex spanning all three: a comment
+       between them should not be able to break this, and the only thing it is
+       really saying is the ORDER. */
+    const chose = rig.indexOf('await device.selectPreset(number)')
+    const dropped = rig.indexOf('await device.dropReadCache()', chose)
+    const readBack = rig.indexOf('await refreshPreset()', chose)
+    assert.ok(chose > 0, 'nothing selects a preset any more')
+    assert.ok(readBack > chose, 'nothing reads the preset back after choosing one')
+    assert.ok(dropped > chose && dropped < readBack, 'the preset is read back through a copy taken before it was loaded')
+
+    /*
+     * The chain editor has dropped this copy after a write since the day it
+     * was written. Changing which preset is loaded is the larger change of the
+     * two, and was the one not doing it — so both are held here, together,
+     * rather than one of them quietly losing it again.
+     */
+    assert.match(read('mobile/src/screens/Edit.js').replace(/\s+/g, ' '), /await dropReadCache\(\)/, 'a chain write no longer drops the computer’s copy')
+  })
+
   test('the speaker and the slider ask the same question about the Output block', () => {
     /*
      * "No Output block known yet — the chain has not been read", twice, twenty
