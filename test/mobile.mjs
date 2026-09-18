@@ -1025,7 +1025,11 @@ export function run(test) {
     assert.match(flat, /if \(put\) return `\$\{m\.block\.name\} is in \$\{where\(put\.row, put\.col\)\}`/, 'a move that landed in another row is called "not in this row"')
     /* And the volume never writes to a block it has not found. */
     const vol = read('mobile/src/components/Volume.js').replace(/\s+/g, ' ')
-    assert.equal((vol.match(/No output level to move yet — the chain is still loading\./g) || []).length, 2, 'the volume writes to block "undefined" when the Output block is not known')
+    /* Both ways in — the drag landing and the − / + nudge — still refuse
+       before writing, and both now go through one place that says WHICH of the
+       two reasons it is. Counted rather than matched, because one guard
+       silently losing its check is the whole failure. */
+    assert.equal((vol.match(/if \(!Number\.isInteger\(eid\)\) \{ noOutput\(!!output, onError\) return \}/g) || []).length, 2, 'the volume writes to block "undefined" when the Output block is not known')
   })
 
   test('a burst of volume presses is confirmed once, and a chain write is not re-read per announcement', () => {
@@ -1207,7 +1211,43 @@ export function run(test) {
     /* And the two notes that were only ever on screen — "Chain — out of
        date" and "No output level to move yet" — are lines as well. */
     assert.match(read('mobile/src/lib/rig.js'), /logDebug\('chain', 'the chain could not be read — buttons kept from the last read', err\.message\)/, 'a failed chain read leaves no line')
-    assert.equal((read('mobile/src/components/Volume.js').match(/logDebug\('set', 'volume: no Output block known yet'/g) || []).length, 2, 'the volume refusing to move leaves no line')
+    assert.match(
+      read('mobile/src/components/Volume.js').replace(/\s+/g, ' '),
+      /logDebug\('set', 'volume: no Output block known yet', why\)/,
+      'the volume refusing to move leaves no line'
+    )
+  })
+
+  test('the speaker and the slider ask the same question about the Output block', () => {
+    /*
+     * "No Output block known yet — the chain has not been read", twice, twenty
+     * seconds apart, about a chain that had just been edited block by block and
+     * was plainly there.
+     *
+     * The two ends disagreed. The bar showed its speaker when a block called
+     * "output" was in the chain; the slider wrote to that block's id. A unit
+     * that reports the block without an id satisfies the first and fails the
+     * second, so the button was drawn and every press of it refused — which
+     * reads exactly like a broken volume, because it is one.
+     *
+     * One question, asked in one place. The bar's own note has said since it
+     * was written that "a speaker that opens an empty sheet is worse than no
+     * speaker", and a speaker that opens a sheet which cannot write is the
+     * same thing wearing the sheet.
+     */
+    const bar = read('mobile/src/components/TopBar.js').replace(/\s+/g, ' ')
+    assert.match(
+      bar,
+      /const hasOutput = connected && Number\.isInteger\(idOf\(\(blocks \|\| \[\]\)\.find\(\(b\) => b\?\.slug === 'output'\)\)\)/,
+      'the speaker still appears for an Output block the slider cannot write to'
+    )
+    assert.match(bar, /import \{ idOf \} from '\.\.\/lib\/device'/, 'the bar reads the id by its own rule rather than the one the slider uses')
+
+    /* And the two reasons are told apart rather than both blamed on a read
+       that has already finished — waiting is not the answer to one of them. */
+    const vol = read('mobile/src/components/Volume.js').replace(/\s+/g, ' ')
+    assert.match(vol, /the unit reported an Output block with no id to write to/, 'a block with no id is still reported as a chain still loading')
+    assert.match(vol, /'the chain has not been read'/, 'the genuinely-still-loading case lost its words')
   })
 
   test('the volume writes to the block it has now, and a scene change does not dump the preset', () => {
