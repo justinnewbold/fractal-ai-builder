@@ -221,7 +221,35 @@ export default function Edit({ onBack }) {
       />
 
       {/* ----------------------------------------------------------- chain */}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+      {/*
+        THE CHAIN READS LEFT TO RIGHT, the way the signal goes and the way the
+        browser has always drawn it.
+        
+        "The chain shows up differently from the web version compared to on the
+        phone. I'd like the web version better, where it shows the chain and you
+        can swipe left to right to view it."
+        
+        It was a wrapped grid — four across, then a new line, then a new line —
+        which fits more on a screen and throws away the one thing the row is
+        for. A chain is an ORDER: what the guitar hits first and what it hits
+        last. Wrapped, the block after the fourth is underneath the first, and
+        nothing on screen says the rows join up. The unit draws it in a line,
+        the browser draws it in a line, and there is no reason a phone cannot
+        scroll.
+        
+        The input, the output, the looper and the gate stay IN the row, where
+        this screen has always put them — see the note at the top of this file
+        about why the bench shows the ends and the stage hides them. The
+        browser lifts them out of the strip; here they are part of it, and
+        scrolling is what makes that affordable.
+      */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        /* The chain is wider than the phone by design now, so the last tile
+           needs somewhere to end that is not flush against the bezel. */
+        contentContainerStyle={{ flexDirection: 'row', gap: space.sm, paddingRight: space.lg }}
+      >
         {blocks.map((b) => {
           const hue = blockColor(b.slug)
           const open = sameBlock(b, openEid)
@@ -242,11 +270,14 @@ export default function Edit({ onBack }) {
               height={TAP}
               haptic={thud}
               onPress={() => setOpenEid(open ? null : idOf(b))}
-              style={{ flexGrow: 1, flexBasis: '22%', opacity: engaged ? 1 : 0.55 }}
+              /* Fixed rather than shared out across the width: in a row that
+                 scrolls there is no width to share, and tiles that sized
+                 themselves to their own label would make a ragged strip. */
+              style={{ width: 84, opacity: engaged ? 1 : 0.55 }}
             />
           )
         })}
-      </View>
+      </ScrollView>
 
       {block ? (
         <View onLayout={panelLaid}>
