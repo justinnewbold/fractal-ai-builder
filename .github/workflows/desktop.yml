@@ -1,8 +1,13 @@
-# Build the Mac app.
+# Build the desktop apps.
 #
-# This is the only place it can be built. macOS binaries need a macOS runner,
-# and the app carries native modules (serial, MIDI) that are compiled per
-# platform.
+# TWO JOBS, ONE APP. macOS binaries need a macOS runner and Windows ones need a
+# Windows runner — the app carries native modules (serial, MIDI) that are
+# compiled per platform, so neither can be cross-built from the other.
+#
+# Everything above the runner is shared: the same main.js, the same vendored
+# device server at the same pinned commit, the same update channel. What
+# differs is the installer, the tray icon and the certificate. See the `win`
+# block in desktop/electron-builder.yml for the whole of it.
 #
 # The device server is no longer checked out beside the app and then thrown
 # away — scripts/vendor-forgefx.mjs fetches it at the pinned commit and builds
@@ -257,4 +262,140 @@ jobs:
         with:
           name: fractal-ai-builder-mac
           path: desktop/release/*.dmg
+          if-no-files-found: error
+
+  # ------------------------------------------------------------------ windows
+  #
+  # The same app on a Windows runner. It cannot be built on the Mac one: the
+  # device server's native modules are compiled for the platform they run on,
+  # which is the whole reason there are two jobs rather than two targets in one.
+  #
+  # UNSIGNED UNLESS THERE IS A CERTIFICATE, and the difference is visible to
+  # whoever downloads it. An unsigned installer runs, and SmartScreen puts
+  # "Windows protected your PC" in front of it with a More info → Run anyway
+  # behind that. Nothing here can remove that warning: a Windows code-signing
+  # certificate is bought rather than generated. WIN_CERT_P12 and
+  # WIN_CERT_PASSWORD are read the moment they exist, and nothing else changes.
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      SIGNABLE: ${{ secrets.WIN_CERT_P12 != '' }}
+    # bash on the Windows runner, for every step that runs a command: the
+    # heredoc below, the loops over release/, and `${PUBLISH:-never}` in the
+    # Package steps.
+    #
+    # THAT LAST ONE USED TO LIVE IN THE DIST SCRIPT, and this is the shape of
+    # the bug it caused, because it is not the one it looks like. `shell: bash`
+    # governs the step's own command and nothing further: npm runs a script's
+    # BODY through its own shell, which on Windows is cmd.exe whatever the
+    # workflow asked for. So `--publish ${PUBLISH:-never}` inside the script
+    # reached electron-builder verbatim and it failed with
+    #   Argument: publish, Given: "${PUBLISH:-never}"
+    # — a message that names the right argument and gives no hint that a shell
+    # is involved at all.
+    #
+    # dist:win carries no shell syntax now. The expansion happens here, where
+    # bash is real, and npm is handed a word.
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: The web app, and the logic the launchers share
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+      - name: Vendor the device server
+        env:
+          FORGEFX_TOKEN: ${{ secrets.FORGEFX_TOKEN }}
+        run: npm run vendor:forgefx
+
+      - name: Install the shell
+        working-directory: desktop
+        run: npm install
+
+      # The same question the Mac job asks, and it is worth asking twice: the
+      # modules are built against the runner's Node and loaded under Electron's,
+      # whose ABI differs. N-API modules do not care; anything else does, and
+      # the symptom would be an app that opens perfectly and never sees the
+      # unit.
+      - name: The native modules load under Electron
+        working-directory: desktop/vendor/forgefx/server
+        run: |
+          ELECTRON="$(cd "$GITHUB_WORKSPACE/desktop" && node -p 'require("electron")')"
+          echo "electron: $ELECTRON"
+          ELECTRON_RUN_AS_NODE=1 "$ELECTRON" -e "
+            require('serialport');
+            require('@julusian/midi');
+            console.log('serial and MIDI both load under Electron-as-Node');
+          "
+
+      # UNSIGNED WINDOWS BUILDS STILL PUBLISH, and that is the one place this
+      # job deliberately differs from the Mac one above.
+      #
+      # An unsigned macOS app is not worth releasing: Gatekeeper refuses it
+      # outright and the person who downloaded it has no way through that a
+      # normal person would find. Windows is not like that. SmartScreen shows
+      # a blue "Windows protected your PC" box with More info -> Run anyway
+      # underneath it, and the installer then works exactly as a signed one
+      # would. Holding the Windows release back until a certificate exists
+      # would mean no Windows app at all, for a warning the connect screen
+      # already tells people to expect.
+      #
+      # A certificate is still worth buying — it is the difference between
+      # "Run anyway" and no box at all — but it is not what stands between a
+      # PC and this app.
+      - name: Package
+        if: ${{ github.event_name == 'pull_request' || env.SIGNABLE != 'true' }}
+        working-directory: desktop
+        env:
+          PUBLISH: >-
+            ${{ (github.event_name != 'pull_request'
+                 && (startsWith(github.ref, 'refs/tags/desktop-v')
+                     || (inputs.publish && github.ref == 'refs/heads/main')))
+                && 'always' || 'never' }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run dist:win -- --publish "${PUBLISH:-never}"
+
+      - name: Package, signed
+        if: ${{ github.event_name != 'pull_request' && env.SIGNABLE == 'true' }}
+        working-directory: desktop
+        env:
+          PUBLISH: >-
+            ${{ (startsWith(github.ref, 'refs/tags/desktop-v')
+                 || (inputs.publish && github.ref == 'refs/heads/main'))
+                && 'always' || 'never' }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.WIN_CERT_P12 }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
+        run: npm run dist:win -- --publish "${PUBLISH:-never}"
+
+      # An installer and the zip beside it. The zip is not for people: it is
+      # what electron-updater downloads, exactly as on macOS, and without it
+      # the app finds a release it can never install.
+      - name: Both halves of a release are there
+        working-directory: desktop
+        run: |
+          ls -la release/
+          seen=0
+          for exe in release/*.exe; do [ -e "$exe" ] && seen=1; done
+          [ "$seen" = 1 ] || { echo "no installer was produced"; exit 1; }
+          seen=0
+          for z in release/*.zip; do [ -e "$z" ] && seen=1; done
+          [ "$seen" = 1 ] || { echo "no zip was produced, so nothing can update itself"; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fractal-ai-builder-windows
+          path: desktop/release/*.exe
           if-no-files-found: error

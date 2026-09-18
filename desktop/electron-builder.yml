@@ -27,6 +27,8 @@ files:
   - preload.js
   - lib/**
   - trayTemplate*.png
+  # Windows gets the artwork rather than a template image; see buildTray.
+  - trayWin.png
   - package.json
 # The server's watchdog is run by the Electron binary as a plain Node script,
 # which needs a real path rather than one inside the archive. See main.js.
@@ -101,3 +103,51 @@ mac:
 # killed the job. electron-builder's own default is "<product> <version>" plus
 # an arch suffix, which is exactly the uniqueness this needs, so the fix is to
 # stop overriding it rather than to invent a new name.
+
+# ---------------------------------------------------------------- windows
+#
+# The same app, the same Electron, a different installer. Everything above
+# this — the server it carries, the allowlist, the update channel — is shared,
+# which is the whole reason the Windows app is a target rather than a project.
+#
+# WHAT IS NOT SHARED, and it is worth being plain about it:
+#
+#   The tray icon. macOS wants a template image and inverts it; Windows wants
+#   the artwork. Two files, one drawing. See buildTray in main.js.
+#
+#   Code signing. macOS signs from MAC_CERT_P12; Windows wants its own
+#   certificate and this build has none. An unsigned installer RUNS, and
+#   SmartScreen shows "Windows protected your PC" with a More info → Run
+#   Anyway behind it. That is a real cost to a person downloading it, and it
+#   is a cost that only money removes: a code-signing certificate is bought,
+#   not generated. The job below signs when WIN_CERT_P12 exists and builds
+#   without it otherwise, so the day one is bought nothing here changes.
+#
+#   The device layer does not differ. serialport and @julusian/midi are the
+#   same N-API modules on both, and ForgeFX opens a named port rather than a
+#   /dev path — see desktop/README.md. What Windows adds is the firewall
+#   prompt on first run, which is a thing the person says yes to rather than a
+#   thing this app can do anything about.
+win:
+  icon: build/icon.png
+  target:
+    # NSIS is the installer; the zip is what electron-updater actually
+    # downloads, exactly as on macOS. Without it the app checks, finds a
+    # release, and can never install it.
+    - target: nsis
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+
+nsis:
+  # One click, no directory page, per user. It installs without an
+  # administrator, which is the difference between "I'll do it later" and
+  # done — and this app needs no machine-wide anything.
+  oneClick: true
+  perMachine: false
+  # It is a service you leave running: starting it after the install is what
+  # somebody expects, and it goes to the tray rather than opening a window.
+  runAfterFinish: true
+  # Removing it should remove it. The app keeps nothing a person would miss
+  # that is not in their account.
+  deleteAppDataOnUninstall: false

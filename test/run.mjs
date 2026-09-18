@@ -21,6 +21,17 @@ import * as marks from '../src/lib/presetMarks.js'
 import * as setlists from '../src/lib/setlists.js'
 import * as palette from '../src/lib/palette.js'
 import { readFileSync as readSrc } from 'node:fs'
+/*
+ * The platform's own join, used by the findForgeFX tests below.
+ *
+ * Those tests hand in POSIX paths and compared against POSIX strings, which
+ * made them fail on Windows for a reason that has nothing to do with the app:
+ * findForgeFX builds its guesses with join(), and on Windows join gives
+ * backslashes. The app is right either way — a Windows machine's HOME is
+ * C:\Users\x and the result is a path Windows can open. Joining the expected
+ * value the same way asks about the behaviour rather than about separators.
+ */
+import { join as joinPath } from 'node:path'
 import {
   patchSchemaValue,
   invalidateSchema,
@@ -622,8 +633,9 @@ test('ForgeFX is only found where the server actually is', () => {
    * later, further from the cause. So the check is for server/package.json,
    * not for the directory.
    */
-  const exists = (p) => p === '/Users/x/src/forgefx/server/package.json'
-  assert.equal(host.findForgeFX({ env: { HOME: '/Users/x' }, exists }), '/Users/x/src/forgefx')
+  const found = joinPath('/Users/x', 'src/forgefx')
+  const exists = (p) => p === joinPath(found, 'server', 'package.json')
+  assert.equal(host.findForgeFX({ env: { HOME: '/Users/x' }, exists }), found)
   assert.equal(host.findForgeFX({ env: { HOME: '/Users/x' }, exists: () => false }), null)
 })
 
@@ -673,6 +685,33 @@ test('the serve script actually asks for that, at both places it starts npm', ()
   for (const call of calls) {
     assert.match(call, /npmSpawn\(\)/, `a spawn in serve.mjs skips npmSpawn: ${call.slice(0, 60)}`)
   }
+})
+
+test('and so does the script that puts the server inside the app', () => {
+  /*
+   * THE SAME BUG, IN A SECOND PLACE, and it survived here because nothing on
+   * this side of the project had ever run on Windows. The first Windows build
+   * got through the entire test suite and died in the vendor script with
+   * `spawnSync npm ENOENT` — npm being npm.cmd, which Node will not spawn.
+   *
+   * npm has its own runner there rather than the option being folded into the
+   * general one, because that one also starts git, and a shell would change
+   * how git's arguments are parsed on the two platforms this has always
+   * worked on — the credential helper in particular.
+   */
+  const src = readSrc(new URL('../scripts/vendor-forgefx.mjs', import.meta.url), 'utf8')
+  const code = src.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ' ')
+  assert.match(
+    code,
+    /import \{ npmSpawn \} from '\.\.\/desktop\/lib\/host\.mjs'/,
+    'the vendor script no longer imports npmSpawn, so vendoring fails on Windows'
+  )
+  assert.match(code, /npmSpawn\(\)/, 'the vendor script imports npmSpawn and never asks for it')
+  /* And npm is never started through the runner that also starts git. */
+  assert.ok(
+    !/run\(\s*'npm'/.test(code),
+    'npm is started through the git runner again, which spawns no shell and fails on Windows'
+  )
 })
 
 test('the Windows installer keeps the layout the server needs', () => {
@@ -1500,7 +1539,7 @@ test('an installed app uses the server it shipped with', () => {
     'pointing FORGEFX_PATH at a checkout no longer overrides the bundled copy'
   )
   // And with nothing bundled, the old behaviour is untouched.
-  assert.equal(host.findForgeFX({ env: { HOME: '/Users/x' }, exists }), '/Users/x/src/forgefx')
+  assert.equal(host.findForgeFX({ env: { HOME: '/Users/x' }, exists }), joinPath('/Users/x', 'src/forgefx'))
 })
 
 test('FORGEFX_PATH wins over the guesses', () => {

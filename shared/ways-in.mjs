@@ -11,24 +11,49 @@
  * was no way from there to find out which computer, or how to make one show
  * anything.
  *
- * FOUR ROUTES, AND ONE OF THEM EXISTS TODAY, which is the whole reason this is
- * written the way it is. The Mac app is real and downloadable now. Running
- * ForgeFX by hand is real and genuinely technical, and is the only thing a
- * Windows or Linux machine can do until the apps are built. The Windows app is
- * not written, and neither are the one-line helpers. A page that dressed all
- * four up as equals would send somebody looking for a download that does not
- * exist, so each one carries its own `status` and says plainly where it
- * stands.
+ * FOUR ROUTES AND ALL FOUR EXIST NOW, which is new. The page was written when
+ * only the Mac app was real, and each route carries a `status` for exactly
+ * that reason — so nobody is sent looking for a download that was never built.
+ * The Windows app and the two one-line helpers have since been built, so what
+ * is left is the honest difference between them: the Mac app is signed by
+ * Apple and opens without argument, the Windows app is not signed yet and
+ * Windows says so in a blue box, and the terminal route builds the server from
+ * source and asks real effort of you.
  *
- * NO COMMANDS ARE INVENTED HERE. The terminal routes name the two repositories
- * and the Node version they need, because those are true. There is no
- * one-line installer yet, and saying so is better than printing a command that
- * does not work on the other end of somebody's evening.
+ * NO COMMANDS ARE INVENTED HERE. The one-liners below are the two setup
+ * scripts in `public/`, served from the app's own domain, and they are the
+ * same two commands written at the top of those files. If one of them moves,
+ * a test fails.
+ *
+ * AND BOTH TERMINAL ROUTES NEED A TOKEN, which is the part that has to be said
+ * before somebody pastes a line and watches it stop. They fetch three private
+ * repositories — the app and the two projects the device server is made of —
+ * so there is no tokenless version of this route, and a page that did not say
+ * so up front would be sending people at a wall.
  */
 
-export const RELEASES = 'https://github.com/justinnewbold/fractal-ai-builder/releases/latest'
+/*
+ * The list, not `/releases/latest`.
+ *
+ * `/latest` means "the newest release of any kind", and this repository also
+ * publishes an Android build on nearly every merge — so the download link
+ * aimed at the Mac app landed on an .apk. The list page shows all of them with
+ * their names, and the step below says which file to take.
+ */
+export const RELEASES = 'https://github.com/justinnewbold/fractal-ai-builder/releases'
 export const FORGEFX = 'https://github.com/sKuhLight/ForgeFX'
 export const CODEC = 'https://github.com/sKuhLight/forgefx-midi'
+
+/*
+ * Served from the app's own domain rather than from raw.githubusercontent.
+ *
+ * Both files live in `public/`, which Vite copies to the root of the deployed
+ * site, so these are short enough to read down a phone to somebody and they do
+ * not go stale when a branch is renamed.
+ */
+const SITE = 'https://fractal.newbold.cloud'
+export const HELPER_SH = `curl -fsSL ${SITE}/mac.sh | bash`
+export const HELPER_PS1 = `irm ${SITE}/windows.ps1 | iex`
 
 /**
  * `ready` is a thing you can download and run today.
@@ -43,7 +68,7 @@ export const WAYS = [
     status: 'ready',
     note: 'Ready now — this is the easy one',
     steps: [
-      'On the Mac, open the download page below and get the latest Fractal Remote.',
+      'On the Mac, open the download page below and take the newest file ending in .dmg.',
       'Drag it to Applications and open it.',
       'Plug your unit into the Mac with its USB cable.',
       'Quit FM3-Edit or Axe-Edit if either is open. Only one program can hold the USB port, and whichever got there first keeps it.',
@@ -56,14 +81,17 @@ export const WAYS = [
     id: 'windows-app',
     os: 'windows',
     title: 'The Windows app',
-    status: 'planned',
-    note: 'Not built yet',
+    status: 'ready',
+    note: 'Ready now — Windows will warn about it, and that is expected',
     steps: [
-      'There is no Windows app to download at the moment.',
-      'When there is, it will be the same handful of steps as the Mac one: install it, plug the unit in, and type the code it shows on your phone.',
-      'Until then, a Windows machine can run ForgeFX itself — below.'
+      'On the PC, open the download page below and take the newest file ending in .exe.',
+      'Open it. Windows shows a blue box that says "Windows protected your PC" — click More info, then Run anyway. It says that because the installer is not signed yet, not because anything is wrong with it.',
+      'Plug your unit into the PC with its USB cable.',
+      'Quit any Fractal editor if one is open. Only one program can hold the USB port, and whichever got there first keeps it.',
+      'The first time it starts its server, Windows asks whether to allow it through the firewall. Say yes, or your phone cannot reach this computer over wifi.',
+      'In the app, choose Set up phone remote, and type the code it shows into your phone. Same as the Mac — no account needed.'
     ],
-    links: []
+    links: [{ label: 'Download Fractal Remote for Windows', url: RELEASES }]
   },
   {
     id: 'mac-terminal',
@@ -71,12 +99,27 @@ export const WAYS = [
     title: 'ForgeFX in a terminal, on a Mac',
     status: 'manual',
     note: 'Works today, and is properly technical',
+    /*
+     * The line to paste, named as well as listed.
+     *
+     * It appears in `steps` because that is where it belongs in the reading
+     * order — after "open Terminal", before "it downloads". It appears here
+     * too so both screens can tell that one step apart from the prose around
+     * it and draw it as something you copy rather than something you read.
+     * Matching on `steps.includes(way.command)` rather than on what the text
+     * looks like: a guess about which lines are commands would eventually
+     * dress a sentence up as one.
+     */
+    command: HELPER_SH,
     steps: [
-      'Only worth doing if you do not want the Mac app. The app carries this same server inside it and sets it up for you.',
-      'It needs Node 20 installed, and two repositories checked out next to each other: ForgeFX, and the codec it depends on.',
-      'Build the codec first, then start the server inside ForgeFX. It listens on port 5056 on that machine.',
-      'With it running and the unit plugged in, sign in on your phone with the same account and it will find it.',
-      'There is no one-file installer for this yet. When there is, it will be here.'
+      'Only worth doing if you do not want the Mac app. The app carries this same server inside it and sets it up for you. This is also the only route a Linux machine has.',
+      'It needs git, Node 20, and a GitHub token that can read the project — the repositories are private, so ask Justin for one. Then open Terminal and paste both lines:',
+      'export FORGEFX_TOKEN="the-token"',
+      HELPER_SH,
+      'It fetches the app and the two projects the device server is made of, builds them, and starts everything. The first run takes a few minutes; after that it is quick.',
+      'It finishes by printing a QR code. Scan it with your phone on the same wifi — no account, nothing to sign into, same as the Mac app.',
+      'macOS asks whether to let node accept incoming connections the first time. Say yes, or the phone cannot reach this machine.',
+      'Everything lands in ~/src, and running the same line again updates it rather than starting over.'
     ],
     links: [
       { label: 'ForgeFX', url: FORGEFX },
@@ -88,14 +131,17 @@ export const WAYS = [
     os: 'windows',
     title: 'ForgeFX in a terminal, on Windows',
     status: 'manual',
-    note: 'The only thing a Windows machine can do today',
+    note: 'Works today, and skips the installer entirely',
+    command: HELPER_PS1,
     steps: [
-      'ForgeFX is the part that actually talks to the unit, and it runs anywhere Node does.',
-      'It needs Node 20 installed, and two repositories checked out next to each other: ForgeFX, and the codec it depends on.',
-      'Build the codec first, then start the server inside ForgeFX. It listens on port 5056 on that machine.',
-      'Windows will ask whether to let it through the firewall the first time. Say yes, or the phone cannot reach it over wifi.',
-      'With it running and the unit plugged in, sign in on your phone with the same account and it will find it.',
-      'There is no one-file installer for this yet. When there is, it will be here.'
+      'Only worth doing if you would rather not install the Windows app. The app carries this same server inside it and sets it up for you.',
+      'It needs git, Node 20, and a GitHub token that can read the project — the repositories are private, so ask Justin for one. Then open PowerShell and paste both lines:',
+      '$env:FORGEFX_TOKEN = "the-token"',
+      HELPER_PS1,
+      'It fetches the app and the two projects the device server is made of, builds them, and starts everything. The first run takes a few minutes; after that it is quick.',
+      'It finishes by printing a QR code. Scan it with your phone on the same wifi — no account, nothing to sign into, same as the apps.',
+      'Windows will ask whether to let node through the firewall. Say yes, or the phone cannot reach this PC over wifi.',
+      'Everything lands in your user folder under src, and running the same lines again updates it rather than starting over.'
     ],
     links: [
       { label: 'ForgeFX', url: FORGEFX },
@@ -148,10 +194,10 @@ export function waysFor(os = null) {
    *
    * Sorting on the operating system alone put "The Windows app — not built
    * yet" at the top of the page for every Windows visitor, which is a page
-   * that opens by telling you it cannot help you. The thing they can actually
-   * do today goes first; the one that does not exist keeps its place in the
-   * list, because "when will there be a Windows app" is a real question and
-   * silence is a worse answer than "not yet".
+   * that opens by telling you it cannot help you. Both Windows routes work
+   * now, so the sort no longer changes their order — it stays because the
+   * next route to be written will start out `planned` too, and the page
+   * should not open on it.
    */
   const works = (w) => (w.status === 'planned' ? 1 : 0)
   const mine = WAYS.filter((w) => w.os === os).sort((a, b) => works(a) - works(b))

@@ -18,17 +18,30 @@
  * went with the AI, and so did the tests that held them together.
  */
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
 
 /** Every .js/.jsx under a directory, so a new file cannot quietly opt out. */
+/*
+ * Forward slashes, on every platform.
+ *
+ * `fileURLToPath` gives back the platform's own separators, and on Windows
+ * that is a backslash — so `file.endsWith('/screens/Connect.js')` silently
+ * stopped matching and `f.split('/mobile/')[1]` became undefined. Both are
+ * real uses below, and both failed as something else: a screen that was meant
+ * to be skipped got scanned, and a path came out as `mobile/undefined`.
+ *
+ * Node reads a forward-slash path perfectly well on Windows, so normalising
+ * here costs nothing and means no caller has to think about it.
+ */
 function* walk(dir) {
   for (const entry of readdirSync(fileURLToPath(dir))) {
     const path = fileURLToPath(new URL(entry, dir))
     if (statSync(path).isDirectory()) yield* walk(new URL(`${entry}/`, dir))
-    else if (/\.(js|jsx)$/.test(entry)) yield path
+    else if (/\.(js|jsx)$/.test(entry)) yield path.replaceAll('\\', '/')
   }
 }
 
@@ -380,6 +393,240 @@ export function run(test) {
       wf.includes('stapler staple'),
       'the disk image is notarised but its ticket is never attached, so the check only passes with a network and a stranger offline still sees a warning'
     )
+  })
+
+  test('the Windows app is built, and ships both halves of a release', async () => {
+    /*
+     * "Build a Windows desktop app matching the existing framework."
+     *
+     * Same Electron shell, same ForgeFX, same host.mjs — the differences are
+     * all in packaging, and packaging is the part with no way to check itself
+     * at runtime. Each of the things below builds cleanly when it is wrong and
+     * fails on a PC that is not this one.
+     */
+    const yml = read('desktop/electron-builder.yml')
+    const win = yml.slice(yml.indexOf('\nwin:'))
+    assert.ok(yml.includes('\nwin:'), 'there is no Windows target at all')
+
+    /*
+     * TWO ARTEFACTS, AND BOTH ARE REQUIRED. The .exe is what a person
+     * downloads; the .zip is what electron-updater downloads, exactly as on
+     * macOS. Ship only the installer and the app finds an update it can never
+     * install and says so every time it starts.
+     */
+    assert.match(win, /nsis/, 'no installer is produced')
+    assert.match(win, /zip/, 'no zip is produced, so the app can never update itself')
+
+    /* Not an administrator install. A PC at a venue is not always one somebody
+       has the password for, and perMachine would ask for it. */
+    assert.match(yml, /\nnsis:/, 'the installer has no settings of its own')
+    assert.match(yml, /perMachine: false/, 'the installer asks for an administrator it does not need')
+
+    /*
+     * AND THE TRAY ICON IS THE ONE PLACE THE TWO PLATFORMS DIFFER ON PURPOSE.
+     * macOS wants a template image — a silhouette it recolours for the menu
+     * bar — and that same file on a Windows taskbar is a black square on a
+     * black background. Two files, and the bundle has to carry the second.
+     */
+    assert.match(yml, /trayWin\.png/, 'the Windows build does not carry its own tray icon')
+    const trayWin = readFileSync(new URL('../desktop/trayWin.png', import.meta.url))
+    assert.deepEqual(
+      [...trayWin.subarray(0, 8)],
+      [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+      'the Windows tray icon is not a PNG'
+    )
+    const main = read('desktop/main.js')
+    assert.match(main, /process\.platform === 'darwin'/, 'the tray icon is chosen without asking which platform this is')
+    assert.match(main, /trayWin\.png/, 'the app never reaches for the Windows tray icon')
+    assert.match(main, /setTemplateImage\(true\)/, 'the Mac tray icon is no longer a template, so it will not recolour')
+    /* And drawn at tray size rather than downscaled from 1024, which is how a
+       menu-bar icon ends up a grey smudge. */
+    assert.match(read('scripts/icon.mjs'), /TRAY_WIN/, 'nothing generates the Windows tray icon, so it cannot be regenerated from the artwork')
+
+    const wf = read('.github/workflows/desktop.yml')
+    const job = wf.slice(wf.indexOf('\n  windows:'))
+    assert.ok(wf.includes('\n  windows:'), 'nothing builds it')
+    assert.match(job, /runs-on: windows-latest/, 'the Windows app is being built somewhere that is not Windows')
+    /* bash for every step in that job: the heredoc, the loops over release/,
+       and the publish flag below. */
+    assert.match(job, /defaults:\n\s+run:\n\s+shell: bash/, 'the Windows job is not pinned to bash')
+
+    /*
+     * AND NO SHELL SYNTAX INSIDE THE DIST SCRIPT, which is a different rule
+     * from that one and the reason this test exists.
+     *
+     * `--publish ${PUBLISH:-never}` lived in dist:win, and `shell: bash` did
+     * not save it: that governs the STEP's command and nothing further, and
+     * npm runs a script's body through its own shell — cmd.exe on Windows,
+     * whatever the workflow asked for. electron-builder was handed the six
+     * characters `${PUBL…` and failed with
+     *   Argument: publish, Given: "${PUBLISH:-never}"
+     * which names the right argument and never mentions a shell.
+     *
+     * The expansion belongs in the step, where bash is real. The Mac script
+     * keeps its own copy and is fine — npm runs that one through sh.
+     */
+    const scripts = JSON.parse(read('desktop/package.json')).scripts
+    assert.ok(
+      !/[$][{]/.test(scripts['dist:win']),
+      'dist:win carries shell syntax again, and npm will run it through cmd.exe on Windows'
+    )
+    for (const step of job.split('- name: ').filter((s) => s.startsWith('Package'))) {
+      assert.match(
+        step,
+        /npm run dist:win -- --publish "\$\{PUBLISH:-never\}"/,
+        'a Windows Package step no longer passes the publish flag, so it falls back to electron-builder\'s own default'
+      )
+    }
+
+    /* The same question the Mac job asks: modules built against the runner's
+       Node, loaded under Electron's. The symptom of getting it wrong is an app
+       that opens perfectly and never sees the unit. */
+    assert.match(job, /ELECTRON_RUN_AS_NODE=1/, 'nothing checks the native modules load under Electron on Windows')
+    /* And that both halves of a release exist before one is published. */
+    assert.match(job, /no zip was produced/, 'a release can go out with no way for the app to update itself')
+
+    /*
+     * AND THE UNSIGNED WINDOWS BUILD PUBLISHES, which is the one place this
+     * job deliberately differs from the Mac one.
+     *
+     * An unsigned macOS app is not worth releasing — Gatekeeper refuses it and
+     * a normal person has no way through. Windows is not like that: SmartScreen
+     * shows a blue box with "More info → Run anyway" under it and the installer
+     * then works exactly as a signed one would. Gating the Windows release on a
+     * certificate would mean no Windows app at all, over a warning the connect
+     * screen already tells people to expect.
+     */
+    const unsigned = job.slice(job.indexOf('- name: Package\n'), job.indexOf('- name: Package, signed'))
+    assert.ok(unsigned.includes('PUBLISH:'), 'the unsigned Windows build cannot publish, so there is no Windows download until a certificate is bought')
+    assert.ok(
+      !/CSC_LINK/.test(unsigned),
+      'the unsigned step names CSC_LINK — GitHub turns a missing secret into an empty string, which is not null, so electron-builder tries to sign with nothing'
+    )
+    /* And it still only ever publishes deliberately, from the default branch. */
+    assert.match(unsigned, /github\.event_name != 'pull_request'/, 'a pull request could publish a release')
+    assert.match(unsigned, /github\.ref == 'refs\/heads\/main'/, "a build from any branch could publish under main's name")
+  })
+
+  test('the two one-paste installers are real files, and say the same things', async () => {
+    /*
+     * "Create terminal helper scripts — a shell script for Mac and a
+     * PowerShell one for Windows — that print connection status and the local
+     * URL."
+     *
+     * ONE OF THE TWO ALREADY EXISTED, which is worth writing down because it
+     * was nearly missed. `public/windows.ps1` had been written, is referenced
+     * by MISSING_FORGEFX in host.mjs, and does more than the brief asked: it
+     * fetches the app as well as the server and finishes by running
+     * `npm run serve`, so the page and the device API are the same origin and
+     * a phone scans a QR instead of signing in. A second Windows script was
+     * written beside it and thrown away; what shipped was the Mac counterpart
+     * that had been the actual gap.
+     *
+     * So what this holds is the pair. Two files, two platforms, the same
+     * decisions — because the way they FAIL is where they would drift, and a
+     * person meeting a missing token on one platform should read what the
+     * other would have said.
+     */
+    const ways = await import('../shared/ways-in.mjs')
+    const commands = ways.WAYS.filter((w) => w.command)
+    assert.equal(commands.length, 2, 'there are not two one-paste installers')
+
+    const scripts = []
+    for (const way of commands) {
+      /* The command is in the steps too, in reading order, and the screens
+         tell it apart from the prose by matching this exact string. */
+      assert.ok(way.steps.includes(way.command), `${way.id} names a command it never shows`)
+
+      /*
+       * THE RULE THIS HOLDS is that the app never prints a command that does
+       * not work. The URL is taken apart and the file it points at has to
+       * exist in this repository — `public/` is copied to the root of the
+       * deployed site, so a file there is reachable at that address.
+       */
+      const url = way.command.match(/https:\/\/\S+/)
+      assert.ok(url, `${way.id}'s command fetches nothing`)
+      const path = url[0].replace('https://fractal.newbold.cloud/', 'public/')
+      assert.notEqual(path, url[0], `${way.id} fetches from somewhere that is not this site`)
+      /* Throws, loudly and by filename, if the app prints a URL for a file
+         nobody wrote. */
+      const script = read(path)
+
+      /* And the file says the same line at the top of itself, so the two
+         cannot drift and leave a working script nobody can find. */
+      assert.ok(
+        script.includes(way.command),
+        `${path} does not begin with the command the app tells people to paste`
+      )
+      scripts.push([path, script])
+    }
+
+    for (const [path, script] of scripts) {
+      /*
+       * A TOKEN, AND SAYING SO BEFORE ANYTHING IS DOWNLOADED. The three
+       * repositories are private; there is no tokenless version of this route.
+       * Both scripts stop on a missing token with the same sentence rather
+       * than letting git fail with "could not read Username for
+       * 'https://github.com'", which sends people to look at everything except
+       * the token.
+       */
+      assert.match(script, /FORGEFX_TOKEN/, `${path} never mentions the token it cannot work without`)
+      assert.match(script, /A GitHub token is needed/, `${path} does not stop on a missing token with the shared wording`)
+      assert.match(
+        script,
+        /credential\.helper/,
+        `${path} no longer passes the token through a credential helper, so it can end up in .git/config and in git's error messages`
+      )
+      assert.ok(
+        !/https:\/\/[^\s'"]*\$\{?(FORGEFX_)?[Tt]oken/.test(script),
+        `${path} puts the token in a URL, where git writes it into .git/config`
+      )
+
+      /* Node 20 exactly, because the device server carries compiled USB and
+         MIDI code built against it. Both scripts check before cloning
+         anything — an evening spent on a clone that cannot build is the
+         failure this prevents. */
+      assert.match(script, /Node 20/, `${path} never says which Node it needs`)
+
+      /* Siblings, not nested: the server depends on the codec by relative
+         path, and flattening the layout makes that link dangle. */
+      assert.match(script, /forgefx-midi/, `${path} never fetches the codec the server needs`)
+      /* Pinned by commit, read from the lock file the Mac build also reads. */
+      assert.match(script, /forgefx\.lock\.json/, `${path} picks its own versions instead of the pinned ones`)
+      assert.match(script, /FETCH_HEAD/, `${path} no longer checks out the commit it asked for`)
+
+      /* And it ends by serving, which is what makes this local mode rather
+         than a bare server somebody still has to sign in to reach. */
+      assert.match(script, /run.{0,3} serve/, `${path} sets everything up and never starts it`)
+
+      /* The two things that are silent when wrong: the firewall prompt, and
+         something else already holding the USB port. */
+      assert.match(script, /firewall|incoming connections/i, `${path} never warns about the firewall prompt`)
+      assert.match(script, /Axe-Edit/, `${path} never says to quit the editor that holds the port`)
+    }
+
+    /* And the connect screen says the token part before somebody pastes a
+       line and watches it stop. */
+    for (const way of commands) {
+      assert.match(
+        way.steps.join(' '),
+        /token/i,
+        `${way.id} sends somebody at a command that will stop on a token it never mentioned`
+      )
+    }
+
+    /*
+     * The shell one is served, not run from a checkout, so it carries no
+     * shebang and needs no executable bit — `curl … | bash` names the shell.
+     * What it does need is to be safe when the download is cut off: piping
+     * into bash feeds the shell as it arrives, so a dropped connection would
+     * otherwise run the first half of a setup script. Everything lives in a
+     * function and the call is the last line, so a truncated file does
+     * nothing at all.
+     */
+    const mac = read('public/mac.sh')
+    assert.match(mac, /^fractal_remote_setup\(\) \{/m, 'mac.sh is not wrapped in a function')
+    assert.match(mac.trimEnd(), /fractal_remote_setup$/, 'mac.sh does not call itself on its last line, so a truncated download would run half of it')
   })
 
   test('the Mac app has a face, and claims only entitlements it uses', () => {

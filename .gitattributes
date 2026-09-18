@@ -1,0 +1,30 @@
+# Line endings, decided here rather than by whichever machine checked the repo
+# out.
+#
+# THIS WAS FOUND BY BUILDING ON WINDOWS. git's default on Windows is to convert
+# every text file to CRLF on checkout, and sixteen tests failed on the first
+# Windows run — none of them about the app. The suite reads its own source and
+# asserts on it, so patterns like /- from: vendor\n\s+to: vendor/ simply stop
+# matching, and the generated-file check compares text built with \n against a
+# file on disk that now has \r\n and reports every one of them stale.
+#
+# LF everywhere also matters outside the tests: helpers/fractal-remote.sh is a
+# shell script, and a shell script with CRLF fails on macOS and Linux with
+# "bad interpreter: /usr/bin/env bash^M" — a message that tells you nothing
+# about line endings.
+#
+# `text=auto` still detects binaries and leaves them alone; the PNGs below are
+# named anyway, because being wrong about one of those corrupts it silently.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.icns binary
+*.p12 binary
+*.hbc binary
+
+# Windows does not record an executable bit, so git is the only place it is
+# kept. The helper is meant to be run, not sourced.
+helpers/fractal-remote.sh text eol=lf

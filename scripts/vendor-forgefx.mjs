@@ -38,6 +38,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { npmSpawn } from '../desktop/lib/host.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const vendor = join(root, 'desktop', 'vendor')
@@ -46,6 +47,23 @@ const fetchOnly = process.argv.includes('--fetch-only')
 
 const run = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, stdio: 'inherit' })
 const capture = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, encoding: 'utf8' }).trim()
+
+/*
+ * npm, on the one operating system where npm is not a program.
+ *
+ * This is the same bug `npm run serve` had, in a second place, and it was
+ * found the same way: the first Windows build got through the whole test suite
+ * and died here with `spawnSync npm ENOENT`. On Windows `npm` is `npm.cmd`, a
+ * batch file, and Node will not spawn one — CVE-2024-27980's fix made it
+ * refuse. npmSpawn asks for a shell on that platform and nowhere else; see
+ * desktop/lib/host.mjs.
+ *
+ * Its own runner rather than folding the option into `run`, because `run` also
+ * starts git, and a shell would change how git's arguments are parsed on the
+ * two platforms this has always worked on. The credential helper alone is
+ * reason enough not to risk it.
+ */
+const npm = (args, cwd) => execFileSync('npm', args, { cwd, stdio: 'inherit', ...npmSpawn() })
 
 /*
  * Credentials without putting them in argv. git spawns the helper in a shell,
@@ -168,9 +186,9 @@ if (fetchOnly) {
  */
 const build = (dir, what) => {
   console.log(`\n· building ${what}`)
-  run('npm', ['ci'], dir)
-  run('npm', ['run', 'build'], dir)
-  run('npm', ['prune', '--omit=dev'], dir)
+  npm(['ci'], dir)
+  npm(['run', 'build'], dir)
+  npm(['prune', '--omit=dev'], dir)
 }
 
 // The codec first: the server's build reads its types.
