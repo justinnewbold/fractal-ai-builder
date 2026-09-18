@@ -5951,7 +5951,7 @@ export default function App() {
             }}
           />
 
-          <Section key="chain" title="Chain" note="Add, remove and move blocks">
+          <Section key="chain" title="Chain" note="Add, remove and move blocks" defaultOpen>
             <GridEditor
               blocks={blocks}
               capabilities={device?.capabilities}
@@ -6110,7 +6110,7 @@ export default function App() {
               }}
             />
 
-            <Section key="chain-blocks" title="Add, remove and move blocks">
+            <Section key="chain-blocks" title="Add, remove and move blocks" defaultOpen>
               <GridEditor
                 blocks={blocks}
                 capabilities={device?.capabilities}

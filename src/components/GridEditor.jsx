@@ -50,7 +50,6 @@ const STARTER_ORDER = ['drive', 'amp', 'cab', 'delay', 'reverb']
  * lets you look.
  */
 export default function GridEditor({ blocks, capabilities, busy, onError, onChanged }) {
-  const [armed, setArmed] = useState(false)
   // Which card's actions are open, as "row:col". One at a time.
   const [open, setOpen] = useState(null)
   const [moving, setMoving] = useState(null)
@@ -585,30 +584,14 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
    * behind an explicit mode means you can always see the chain, and have to say
    * so before you can move anything in it.
    */
-  if (!armed) {
-    return (
-      <section className="grid-editor">
-        <div className="history-head">
-          <p className="silk-label">The chain</p>
-          <div className="history-actions">
-            <button className="chip" onClick={() => setArmed(true)}>
-              Edit the chain
-            </button>
-          </div>
-        </div>
-
-        {laneList(false)}
-
-        <p className="hint">
-          Placing blocks writes the preset&rsquo;s structure, not just its settings, and that part
-          of the write is worked out from the protocol rather than confirmed on hardware &mdash; a
-          bad write here mangles a preset rather than mis-setting a knob. Back up all slots first,
-          and work on a slot you don&rsquo;t care about.
-        </p>
-      </section>
-    )
-  }
-
+  /*
+   * No gate any more. This used to draw the lanes read-only behind an "Edit
+   * the chain" button, inside a section that started folded, so the grips
+   * were three taps deep and nobody found them: "Where do I grab it? It's
+   * not set up like the phone." The phone opens straight onto the cards and
+   * their grips; so does this. The caution about structure writes stays, as
+   * a sentence at the foot rather than a door at the top.
+   */
   return (
     <section className="grid-editor">
       <div className="history-head">
@@ -616,16 +599,6 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
         <div className="history-actions">
           <button className="chip" onClick={buildStarter} disabled={busy || !!working || paletteFailed}>
             {working === 'starter' ? 'Building…' : 'Starter chain'}
-          </button>
-          <button
-            className="chip"
-            onClick={() => {
-              setArmed(false)
-              setMoving(null)
-              close()
-            }}
-          >
-            Done
           </button>
         </div>
       </div>
@@ -637,6 +610,10 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
 
       {laneList(true)}
 
+      <p className="hint">
+        Placing blocks writes the preset&rsquo;s structure, not just its settings. Work on a slot
+        you don&rsquo;t care about until the move has proved itself on your unit.
+      </p>
     </section>
   )
 }
