@@ -218,6 +218,9 @@ export const FILES = [
    * which the browser learned by rolling back moves that had worked.
    */
   { source: '../shared/grid-plan.mjs', target: '../mobile/src/lib/grid-plan.js' },
+  /* Dragging a block up or down a lane, as grid cells: one copy of the maths, so the
+     browser's chain editor and the phone's move the same block to the same column. */
+  { source: '../shared/lane-order.mjs', target: '../mobile/src/lib/laneOrder.js' },
   /*
    * The volume slider: which control it drives, how it reads, and how a drag
    * becomes writes a serial port can keep up with.
