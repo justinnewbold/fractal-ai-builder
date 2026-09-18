@@ -629,6 +629,91 @@ export function run(test) {
     assert.match(mac.trimEnd(), /fractal_remote_setup$/, 'mac.sh does not call itself on its last line, so a truncated download would run half of it')
   })
 
+  test('the licences of what we ship travel with it', () => {
+    /*
+     * THIS IS THE ONE THAT BECOMES A PROBLEM ONLY ONCE MONEY IS INVOLVED, which
+     * is why it was missing: the app has been free and private, and neither
+     * licence has ever been shipped anywhere.
+     *
+     * The desktop apps bundle two separate projects and they are not under the
+     * same terms. ForgeFX is MIT — its copyright notice "shall be included in
+     * all copies or substantial portions" — and we put a copy inside a signed
+     * installer. forgefx-midi is Apache-2.0, which asks for three things: the
+     * licence, the contents of its NOTICE file (section 4(d)), and prominent
+     * notices stating that we changed the files (section 4(b)). We changed
+     * both, heavily.
+     *
+     * So this checks that the texts are present and that the generated file
+     * carries them, rather than that somebody remembered.
+     */
+    for (const [file, mustSay] of [
+      ['licences/forgefx-MIT.txt', /MIT License/],
+      ['licences/forgefx-midi-APACHE-2.0.txt', /Apache License/],
+      ['licences/forgefx-midi-NOTICE.txt', /Apache License, Version 2\.0/]
+    ]) {
+      const text = read(file)
+      assert.ok(text.trim().length > 200, `${file} is empty or a stub`)
+      assert.match(text, mustSay, `${file} is not the licence it claims to be`)
+      /* A licence with its copyright line stripped is the one failure mode
+         that looks fine and satisfies nothing. */
+      assert.match(text, /Copyright/i, `${file} has lost its copyright line`)
+    }
+
+    /* Section 4(b): say what we changed. The lock file records every change
+       with the symptom that caused it; this is the notice that points at it. */
+    const mods = read('licences/MODIFICATIONS.md')
+    assert.match(mods, /forgefx-midi/, 'the modifications notice does not mention the codec')
+    assert.match(mods, /Apache-2\.0 requires it|section 4\(b\)|Section 4\(b\)/, 'nothing says why the notice exists')
+    for (const branch of ['claude/address-one-host', 'claude/huffman-guard']) {
+      assert.ok(
+        read('desktop/forgefx.lock.json').includes(branch),
+        `the lock no longer pins ${branch}, so MODIFICATIONS.md describes something we do not ship`
+      )
+    }
+
+    /*
+     * And the generated file carries all of it. Checked by content rather than
+     * by regenerating: the walk reads node_modules, which differs between a
+     * machine that has vendored the device server and one that has not, so a
+     * byte-for-byte staleness check would fail for a reason that is not a
+     * fault.
+     */
+    const notices = read('NOTICES.md')
+    assert.match(notices, /MIT License/, 'the notices file carries no MIT licence')
+    assert.match(notices, /Apache License/, 'the notices file carries no Apache licence')
+    assert.match(notices, /Stephen Staker/, "the codec's copyright holder is not named")
+    assert.match(notices, /sKuhLight/, "the server's copyright holder is not named")
+
+    /*
+     * The trademark line, which is the upstream author's own and now ours. An
+     * app sold under a name that includes somebody else's mark says plainly
+     * that it is not theirs.
+     */
+    assert.match(
+      notices,
+      /not affiliated with, endorsed by, or sponsored by/i,
+      'nothing disclaims affiliation with Fractal Audio Systems'
+    )
+
+    /*
+     * EVERY PLACE THAT INSTALLS SOMETHING A USER RECEIVES, and the desktop
+     * shell is the one that was missed: `desktop/package.json` brings
+     * bonjour-service and electron-updater into the signed installer and
+     * neither appeared in the first generated file. Electron itself is a
+     * devDependency that ships anyway.
+     */
+    const gen = read('scripts/notices.mjs')
+    for (const manifest of ['package.json', 'desktop/package.json', 'mobile/package.json']) {
+      assert.ok(gen.includes(`'${manifest}'`), `the notices generator never walks ${manifest}`)
+    }
+    assert.match(notices, /### Electron/, 'Electron ships inside the apps and is not named')
+    assert.match(notices, /serialport/, 'the compiled USB addon is not named')
+
+    /* And it is reachable as a plain URL, which is what a store listing and an
+       About screen can both be given. `public/` is served at the site root. */
+    assert.ok(read('public/notices.txt').length > 1000, 'there is no plain-text copy to link to')
+  })
+
   test('the Mac app has a face, and claims only entitlements it uses', () => {
     /*
      * The first real Mac build reported "default Electron icon is used —
