@@ -2935,11 +2935,16 @@ export function run(test) {
      * screen asked for a code "your computer shows" and offered no way at all
      * to find out which computer, or how to make one show anything.
      *
-     * ONLY ONE OF THE THREE EXISTS TODAY, which is why each says where it
-     * stands. A page that dressed all three up as equals would send somebody
+     * ONLY ONE OF THE FOUR EXISTS TODAY, which is why each carries its own
+     * status. A page that dressed all four up as equals would send somebody
      * hunting a download that has not been built.
      */
-    const src = read('mobile/src/screens/Connect.js')
+    /* The routes themselves are the list both ends share; what is in
+       Connect.js is the phone's way of drawing them. Both are read, because
+       either one going missing takes the page down. */
+    const src = read('shared/ways-in.mjs')
+    const screen = read('mobile/src/screens/Connect.js')
+    assert.match(screen, /WAYS\.map/, 'the phone no longer draws the routes')
 
     assert.match(src, /The Mac app/, 'the route that actually works is not offered')
     assert.match(src, /github\.com\/justinnewbold\/fractal-ai-builder\/releases\/latest/, 'there is nowhere to get the Mac app from')
@@ -2956,7 +2961,7 @@ export function run(test) {
     assert.match(src, /no one-file installer for this yet/, 'the page claims an installer that does not exist')
 
     /* The thing nobody knows and everything else depends on. */
-    assert.match(src, /Your unit plugs into a computer with a USB cable/, 'the page never says why a computer is involved')
+    assert.match(screen, /Your unit plugs into a computer with a USB cable/, 'the page never says why a computer is involved')
     /* And the trap that eats an evening: two programs, one port. */
     assert.match(src, /Only one program can hold the USB port/, 'nothing warns about the editor already holding the port')
 
@@ -2971,6 +2976,100 @@ export function run(test) {
     const signIn = read('mobile/src/screens/SignIn.js')
     assert.match(signIn, /if \(helping\) return <Connect onBack=/, 'the sign-in screen cannot reach it')
     assert.match(signIn, /How do I connect a computer\?/, 'the sign-in screen does not offer it')
+  })
+
+  test('the four ways in are sorted for this computer, and never guessed at on a phone', async () => {
+    /*
+     * "Detect the user's OS and surface the matching option first."
+     *
+     * Straightforward in a browser and a trap on a handset, which is the whole
+     * of what this holds. A browser is running ON the computer in question, so
+     * its own user agent answers the question. A phone is not: knowing the app
+     * is running on an iPhone says nothing about whether there is a Mac or a
+     * PC on the desk, and putting the Mac routes first because somebody owns
+     * an iPhone would be a guess dressed as an answer.
+     *
+     * So the phone takes the list as it comes and the browser sorts it — and
+     * osGuess takes the user agent rather than reaching for `navigator`, which
+     * a phone does not have and which would throw the first time that line ran.
+     */
+    const ways = await import('../shared/ways-in.mjs')
+
+    assert.equal(ways.WAYS.length, 4, 'there are not four ways in')
+    const ids = ways.WAYS.map((w) => w.id)
+    assert.equal(new Set(ids).size, 4, 'two routes share an id')
+    for (const want of ['mac-app', 'windows-app', 'mac-terminal', 'windows-terminal']) {
+      assert.ok(ids.includes(want), `there is no route for ${want}`)
+    }
+    for (const way of ways.WAYS) {
+      assert.ok(['ready', 'manual', 'planned'].includes(way.status), `${way.id} has no honest status`)
+      assert.ok(way.title && way.note, `${way.id} says nothing about itself`)
+      assert.ok(way.steps.length >= 3, `${way.id} is a heading with no steps`)
+      assert.ok(Array.isArray(way.links), `${way.id} has no links list`)
+      /* A route that exists has to say where to get it. */
+      if (way.status !== 'planned') assert.ok(way.links.length, `${way.id} names nowhere to go`)
+      assert.equal(ways.wayById(way.id), way)
+    }
+    assert.equal(ways.wayById('nope'), null)
+
+    /* Exactly one is downloadable today, and it is the Mac app. Saying more
+       than that would send somebody hunting a build that does not exist. */
+    assert.deepEqual(
+      ways.WAYS.filter((w) => w.status === 'ready').map((w) => w.id),
+      ['mac-app'],
+      'something other than the Mac app claims to be ready'
+    )
+    assert.equal(ways.wayById('windows-app').status, 'planned', 'the Windows app is offered as though it exists')
+
+    const UA = {
+      windows: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      mac: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+      iphone: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+      /* An iPad's user agent says Macintosh, which is exactly the trap. */
+      ipad: 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) Macintosh',
+      android: 'Mozilla/5.0 (Linux; Android 14)'
+    }
+    assert.equal(ways.osGuess(UA.windows), 'windows')
+    assert.equal(ways.osGuess(UA.mac), 'mac')
+    for (const handset of ['iphone', 'ipad', 'android'])
+      assert.equal(ways.osGuess(UA[handset]), null, `a ${handset} was read as a computer`)
+    assert.equal(ways.osGuess(''), null)
+    assert.equal(ways.osGuess(), null, 'osGuess reaches for a user agent of its own')
+
+    /* Sorted for this computer, and within it the thing that WORKS first — a
+       Windows visitor used to open on "The Windows app — not built yet", which
+       is a page that begins by saying it cannot help you. */
+    assert.deepEqual(ways.waysFor('windows').map((w) => w.id), [
+      'windows-terminal',
+      'windows-app',
+      'mac-app',
+      'mac-terminal'
+    ])
+    assert.equal(ways.waysFor('mac')[0].id, 'mac-app')
+    /* And nothing is reordered when nobody knows. */
+    assert.deepEqual(ways.waysFor(null).map((w) => w.id), ways.WAYS.map((w) => w.id))
+    assert.deepEqual(ways.waysFor().map((w) => w.id), ways.WAYS.map((w) => w.id))
+
+    /* A module the phone bundles must not name a global the phone lacks. */
+    assert.ok(
+      !/navigator/.test(read('shared/ways-in.mjs').replace(/\/\*[\s\S]*?\*\//g, ' ')),
+      'ways-in reaches for navigator, which a phone does not have'
+    )
+
+    /* Both ends draw it, and only the browser sorts it. */
+    const web = read('src/App.jsx')
+    assert.match(web, /waysFor\(thisComputer\)/, 'the browser does not sort the routes for this computer')
+    assert.match(web, /osGuess\(typeof navigator === 'undefined' \? '' : navigator\.userAgent\)/, 'the browser never reads its own user agent')
+    const phone = read('mobile/src/screens/Connect.js')
+    assert.match(phone, /WAYS\.map/, 'the phone does not draw the routes')
+    /* Comments stripped first. The screen's own note EXPLAINS why it does not
+       sort, and naming the function it is not calling is the clearest way to
+       say that — reading it as a call is the mistake CLAUDE.md warns about,
+       one file along. */
+    assert.ok(
+      !/waysFor|osGuess/.test(phone.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ')),
+      'the phone sorts the routes, which means it guessed which computer somebody owns'
+    )
   })
 
   test('the app talks about a computer, not a Mac', () => {
@@ -2993,11 +3092,16 @@ export function run(test) {
     for (const file of files) {
       /*
        * ONE EXCEPTION, and it is the point rather than a hole in the rule.
-       * Connect.js tells somebody what to install, and one of the three things
+       * The guide tells somebody what to install, and one of the four things
        * they can install is the Mac app. Calling it "the computer app" there
        * would be describing a download by a name it does not have.
+       *
+       * It used to be Connect.js alone. The routes moved into the list both
+       * ends share (shared/ways-in.mjs, copied to lib/ways-in.js), so the
+       * exception moved with the words — Connect.js is now only the phone's
+       * way of drawing them.
        */
-      if (file.endsWith('/screens/Connect.js')) continue
+      if (file.endsWith('/screens/Connect.js') || file.endsWith('/lib/ways-in.js')) continue
       const text = readFileSync(file, 'utf8')
         .replace(/\/\*[\s\S]*?\*\//g, ' ')
         .replace(/^\s*\/\/.*$/gm, ' ')

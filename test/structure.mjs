@@ -1042,7 +1042,10 @@ export function run(test) {
     }
     for (const [page, panels] of [
       ['unit', ['connection']],
-      ['link', ['phone-remote', 'link-details']],
+      /* The guide to getting a computer on the other end sits above the
+         details about the line to it: it is the question somebody has when
+         there is nothing on the other end at all. */
+      ['link', ['phone-remote', 'ways-in', 'link-details']],
       /* 'playing' was the play-mode switch, whose only job was hiding the
                  ✦ Ask button. Both went with the AI. */
       ['play', ['size', 'appearance']],
