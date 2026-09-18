@@ -382,6 +382,180 @@ export function run(test) {
     )
   })
 
+  test('the Windows app is built, and ships both halves of a release', async () => {
+    /*
+     * "Build a Windows desktop app matching the existing framework."
+     *
+     * Same Electron shell, same ForgeFX, same host.mjs — the differences are
+     * all in packaging, and packaging is the part with no way to check itself
+     * at runtime. Each of the things below builds cleanly when it is wrong and
+     * fails on a PC that is not this one.
+     */
+    const yml = read('desktop/electron-builder.yml')
+    const win = yml.slice(yml.indexOf('\nwin:'))
+    assert.ok(yml.includes('\nwin:'), 'there is no Windows target at all')
+
+    /*
+     * TWO ARTEFACTS, AND BOTH ARE REQUIRED. The .exe is what a person
+     * downloads; the .zip is what electron-updater downloads, exactly as on
+     * macOS. Ship only the installer and the app finds an update it can never
+     * install and says so every time it starts.
+     */
+    assert.match(win, /nsis/, 'no installer is produced')
+    assert.match(win, /zip/, 'no zip is produced, so the app can never update itself')
+
+    /* Not an administrator install. A PC at a venue is not always one somebody
+       has the password for, and perMachine would ask for it. */
+    assert.match(yml, /\nnsis:/, 'the installer has no settings of its own')
+    assert.match(yml, /perMachine: false/, 'the installer asks for an administrator it does not need')
+
+    /*
+     * AND THE TRAY ICON IS THE ONE PLACE THE TWO PLATFORMS DIFFER ON PURPOSE.
+     * macOS wants a template image — a silhouette it recolours for the menu
+     * bar — and that same file on a Windows taskbar is a black square on a
+     * black background. Two files, and the bundle has to carry the second.
+     */
+    assert.match(yml, /trayWin\.png/, 'the Windows build does not carry its own tray icon')
+    const trayWin = readFileSync(new URL('../desktop/trayWin.png', import.meta.url))
+    assert.deepEqual(
+      [...trayWin.subarray(0, 8)],
+      [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+      'the Windows tray icon is not a PNG'
+    )
+    const main = read('desktop/main.js')
+    assert.match(main, /process\.platform === 'darwin'/, 'the tray icon is chosen without asking which platform this is')
+    assert.match(main, /trayWin\.png/, 'the app never reaches for the Windows tray icon')
+    assert.match(main, /setTemplateImage\(true\)/, 'the Mac tray icon is no longer a template, so it will not recolour')
+    /* And drawn at tray size rather than downscaled from 1024, which is how a
+       menu-bar icon ends up a grey smudge. */
+    assert.match(read('scripts/icon.mjs'), /TRAY_WIN/, 'nothing generates the Windows tray icon, so it cannot be regenerated from the artwork')
+
+    const wf = read('.github/workflows/desktop.yml')
+    const job = wf.slice(wf.indexOf('\n  windows:'))
+    assert.ok(wf.includes('\n  windows:'), 'nothing builds it')
+    assert.match(job, /runs-on: windows-latest/, 'the Windows app is being built somewhere that is not Windows')
+    /*
+     * bash for every step in that job, which is not decoration. The dist
+     * script ends in `${PUBLISH:-never}` — shell syntax that PowerShell passes
+     * through as a literal, so electron-builder reads "${PUBLISH:-never}" as
+     * the name of a publish provider and dies on a line that looks nothing
+     * like the cause.
+     */
+    assert.match(job, /defaults:\n\s+run:\n\s+shell: bash/, 'the Windows job is not pinned to bash, and the dist script is shell syntax')
+
+    /* The same question the Mac job asks: modules built against the runner's
+       Node, loaded under Electron's. The symptom of getting it wrong is an app
+       that opens perfectly and never sees the unit. */
+    assert.match(job, /ELECTRON_RUN_AS_NODE=1/, 'nothing checks the native modules load under Electron on Windows')
+    /* And that both halves of a release exist before one is published. */
+    assert.match(job, /no zip was produced/, 'a release can go out with no way for the app to update itself')
+
+    /*
+     * AND THE UNSIGNED WINDOWS BUILD PUBLISHES, which is the one place this
+     * job deliberately differs from the Mac one.
+     *
+     * An unsigned macOS app is not worth releasing — Gatekeeper refuses it and
+     * a normal person has no way through. Windows is not like that: SmartScreen
+     * shows a blue box with "More info → Run anyway" under it and the installer
+     * then works exactly as a signed one would. Gating the Windows release on a
+     * certificate would mean no Windows app at all, over a warning the connect
+     * screen already tells people to expect.
+     */
+    const unsigned = job.slice(job.indexOf('- name: Package\n'), job.indexOf('- name: Package, signed'))
+    assert.ok(unsigned.includes('PUBLISH:'), 'the unsigned Windows build cannot publish, so there is no Windows download until a certificate is bought')
+    assert.ok(
+      !/CSC_LINK/.test(unsigned),
+      'the unsigned step names CSC_LINK — GitHub turns a missing secret into an empty string, which is not null, so electron-builder tries to sign with nothing'
+    )
+    /* And it still only ever publishes deliberately, from the default branch. */
+    assert.match(unsigned, /github\.event_name != 'pull_request'/, 'a pull request could publish a release')
+    assert.match(unsigned, /github\.ref == 'refs\/heads\/main'/, "a build from any branch could publish under main's name")
+  })
+
+  test('the two one-line helpers are real files', async () => {
+    /*
+     * "Create terminal helper scripts — a shell script for Mac and a
+     * PowerShell one for Windows — that print connection status and the local
+     * URL."
+     *
+     * THE RULE THIS HOLDS is that the app never prints a command that does not
+     * work. The connect screen used to say "there is no one-file installer for
+     * this yet", which was true and was better than a command that fails at
+     * the far end of somebody's evening with nothing to go on. Now there are
+     * two, and what keeps that promise is this: the URL the app prints is
+     * taken apart and the file it points at has to exist in this repository.
+     */
+    const ways = await import('../shared/ways-in.mjs')
+    const commands = ways.WAYS.filter((w) => w.command)
+    assert.equal(commands.length, 2, 'there are not two one-line helpers')
+
+    for (const way of commands) {
+      /* The command is in the steps too, in reading order, and the screens
+         tell it apart from the prose by matching this exact string. */
+      assert.ok(way.steps.includes(way.command), `${way.id} names a command it never shows`)
+
+      const url = way.command.match(/https:\/\/\S+/)
+      assert.ok(url, `${way.id}'s command fetches nothing`)
+      const path = url[0].replace(
+        'https://raw.githubusercontent.com/justinnewbold/fractal-ai-builder/main/',
+        ''
+      )
+      assert.notEqual(path, url[0], `${way.id} fetches from somewhere that is not this repository`)
+      /* Throws, loudly and by filename, if the app prints a URL for a file
+         nobody wrote. */
+      const script = read(path)
+
+      /* And the file says the same line at the top of itself, so the two
+         cannot drift and leave a working script nobody can find. */
+      assert.ok(
+        script.includes(way.command),
+        `${path} does not begin with the command the app tells people to paste`
+      )
+
+      /*
+       * What both of them must say out loud. The desktop apps vendor a PINNED
+       * PRIVATE FORK of ForgeFX with fixes that are not upstream; these clone
+       * the public upstream, because that is the one anybody can clone without
+       * a token. It is the same project and it works, but a bug that appears
+       * only on this route may simply be a fix the fork already carries — and
+       * somebody debugging that deserves to know before they start.
+       */
+      assert.match(script, /FORGEFX_REPO/, `${path} offers no way to point at a different ForgeFX`)
+      assert.match(script, /PUBLIC upstream/, `${path} does not say it runs a different ForgeFX from the app`)
+
+      /* Nothing system-wide, and no administrator. Everything in one folder,
+         and deleting that folder is the uninstall. */
+      assert.ok(!/\bsudo\b/.test(script), `${path} asks for an administrator`)
+      assert.match(script, /fractal-remote/, `${path} does not keep its files in one named place`)
+
+      /* Node 20 is the floor, checked before anything is downloaded — a script
+         that clones two repositories and then finds no usable Node has wasted
+         an evening and left a directory behind to explain. */
+      assert.match(script, /20/, `${path} never says which Node it needs`)
+
+      /* The two things a person needs on screen, which is what these were
+         asked for: is it connected, and what do I open. */
+      assert.match(script, /localhost:/, `${path} never prints an address for this computer`)
+      assert.match(script, /USB cable/, `${path} never says to plug the unit in`)
+      assert.match(script, /Ctrl-C/, `${path} never says how to stop it`)
+    }
+
+    /* The shell one has to be executable, or `bash script.sh` is the only way
+       to run it and the printed one-liner is the only way anybody will. */
+    const mode = statSync(fileURLToPath(new URL('../helpers/fractal-remote.sh', import.meta.url))).mode
+    assert.ok(mode & 0o111, 'the shell helper is not executable')
+
+    /* And Windows gets its firewall warning, which is the failure that looks
+       like nothing: the server starts, the unit is found, and the phone across
+       the room silently cannot reach any of it. */
+    assert.match(read('helpers/fractal-remote.ps1'), /firewall/i, 'nothing warns a PC about the firewall prompt')
+    assert.match(
+      ways.wayById('windows-terminal').steps.join(' '),
+      /firewall/i,
+      'the connect screen never mentions the firewall prompt a PC will show'
+    )
+  })
+
   test('the Mac app has a face, and claims only entitlements it uses', () => {
     /*
      * The first real Mac build reported "default Electron icon is used —

@@ -2935,9 +2935,11 @@ export function run(test) {
      * screen asked for a code "your computer shows" and offered no way at all
      * to find out which computer, or how to make one show anything.
      *
-     * ONLY ONE OF THE FOUR EXISTS TODAY, which is why each carries its own
-     * status. A page that dressed all four up as equals would send somebody
-     * hunting a download that has not been built.
+     * ALL FOUR EXIST NOW, and each still carries its own status — the page was
+     * written when only the Mac app was real, and the statuses are what kept
+     * it from sending somebody hunting a download that had not been built.
+     * What they now carry is the honest difference between a signed app, an
+     * unsigned one Windows argues about, and a route that builds from source.
      */
     /* The routes themselves are the list both ends share; what is in
        Connect.js is the phone's way of drawing them. Both are read, because
@@ -2947,18 +2949,50 @@ export function run(test) {
     assert.match(screen, /WAYS\.map/, 'the phone no longer draws the routes')
 
     assert.match(src, /The Mac app/, 'the route that actually works is not offered')
-    assert.match(src, /github\.com\/justinnewbold\/fractal-ai-builder\/releases\/latest/, 'there is nowhere to get the Mac app from')
+    assert.match(src, /github\.com\/justinnewbold\/fractal-ai-builder\/releases/, 'there is nowhere to get the Mac app from')
+    /*
+     * The list, not `/releases/latest`.
+     *
+     * `/latest` is the newest release of ANY kind, and this repository
+     * publishes an Android build on nearly every merge — so the link that
+     * said "Download Fractal Remote for Mac" landed a person on an .apk.
+     *
+     * Comments stripped first: the file EXPLAINS why it is not /latest, and
+     * naming the thing it is not is the clearest way to write that down.
+     * Reading a comment as code is the mistake CLAUDE.md warns about.
+     */
+    assert.ok(
+      !/releases\/latest/.test(src.replace(/\/\*[\s\S]*?\*\//g, ' ')),
+      'the download link points at /latest, which on this repository is usually the Android build'
+    )
     assert.match(src, /The Windows app/, 'Windows is not mentioned at all')
-    assert.match(src, /Not built yet/, 'the Windows app is offered as though it exists')
+    /*
+     * And the blue box, said before it appears. An unsigned installer makes
+     * Windows show "Windows protected your PC", and somebody who meets that
+     * with no warning assumes they downloaded something bad and stops.
+     */
+    assert.match(src, /Windows protected your PC/, 'nothing warns about the SmartScreen box the unsigned installer causes')
+    assert.match(src, /Run anyway/, 'the SmartScreen warning is named with no way past it')
     assert.match(src, /ForgeFX in a terminal/, 'the only route a Windows or Linux machine has today is missing')
     assert.match(src, /github\.com\/sKuhLight\/ForgeFX/, 'the terminal route names no repository to go and find')
 
     /*
-     * AND NO COMMAND IS INVENTED. There is no one-line installer yet; printing
-     * one that does not work is worse than saying so, because it fails at the
-     * far end of somebody's evening with nothing to go on.
+     * AND NO COMMAND IS INVENTED, which is the rule that has not changed —
+     * only the answer has. The page used to say there was no one-line
+     * installer, because there was not. There are two now, they are files in
+     * this repository, and `the two one-line helpers are real files` below
+     * holds each printed command to the file it fetches. A command that fails
+     * at the far end of somebody's evening with nothing to go on is worse
+     * than no command at all, which is why that test exists rather than this
+     * one merely asserting a string is present.
      */
-    assert.match(src, /no one-file installer for this yet/, 'the page claims an installer that does not exist')
+    assert.ok(
+      !/no one-file installer for this yet/.test(src),
+      'the page still says there is no installer, and there are two'
+    )
+    assert.match(src, /raw\.githubusercontent\.com/, 'neither terminal route fetches anything')
+    assert.match(src, /fractal-remote\.sh/, 'the Mac terminal route prints no command')
+    assert.match(src, /fractal-remote\.ps1/, 'the Windows terminal route prints no command')
 
     /* The thing nobody knows and everything else depends on. */
     assert.match(screen, /Your unit plugs into a computer with a USB cable/, 'the page never says why a computer is involved')
@@ -3012,14 +3046,23 @@ export function run(test) {
     }
     assert.equal(ways.wayById('nope'), null)
 
-    /* Exactly one is downloadable today, and it is the Mac app. Saying more
-       than that would send somebody hunting a build that does not exist. */
+    /* Two are downloadable now — the app for each computer. The terminal
+       routes stay `manual`, because building a server from source is not the
+       same offer as an installer and should not read like one. */
     assert.deepEqual(
       ways.WAYS.filter((w) => w.status === 'ready').map((w) => w.id),
-      ['mac-app'],
-      'something other than the Mac app claims to be ready'
+      ['mac-app', 'windows-app'],
+      'the downloadable routes are not the two apps'
     )
-    assert.equal(ways.wayById('windows-app').status, 'planned', 'the Windows app is offered as though it exists')
+    assert.deepEqual(
+      ways.WAYS.filter((w) => w.status === 'manual').map((w) => w.id),
+      ['mac-terminal', 'windows-terminal'],
+      'a terminal route is being offered as though it were an installer'
+    )
+    /* Nothing is `planned` any more, and the status stays in the vocabulary
+       on purpose: the next route written will start out that way, and
+       `waysFor` still has to sort it down the page. */
+    assert.equal(ways.WAYS.filter((w) => w.status === 'planned').length, 0)
 
     const UA = {
       windows: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
@@ -3040,11 +3083,23 @@ export function run(test) {
        Windows visitor used to open on "The Windows app — not built yet", which
        is a page that begins by saying it cannot help you. */
     assert.deepEqual(ways.waysFor('windows').map((w) => w.id), [
-      'windows-terminal',
       'windows-app',
+      'windows-terminal',
       'mac-app',
       'mac-terminal'
     ])
+    /*
+     * Both Windows routes work now, so that order is the list's own and the
+     * sort no longer moves anything. The rule the sort exists for is checked
+     * against a route pretended `planned` rather than against whichever
+     * statuses happen to be true today — the day it stopped being checked is
+     * the day somebody's page opens on a download that is not built.
+     */
+    const pretend = ways.WAYS.map((w) => (w.id === 'windows-app' ? { ...w, status: 'planned' } : w))
+    const worksFirst = pretend
+      .filter((w) => w.os === 'windows')
+      .sort((a, b) => (a.status === 'planned' ? 1 : 0) - (b.status === 'planned' ? 1 : 0))
+    assert.equal(worksFirst[0].id, 'windows-terminal', 'a route that does not exist would open the page')
     assert.equal(ways.waysFor('mac')[0].id, 'mac-app')
     /* And nothing is reordered when nobody knows. */
     assert.deepEqual(ways.waysFor(null).map((w) => w.id), ways.WAYS.map((w) => w.id))

@@ -43,6 +43,22 @@ const outputs = [
 ].map((rel) => resolve(root, rel))
 const SIZE = 1024
 
+/*
+ * And the Windows tray icon, which is a different job at a different size.
+ *
+ * macOS gets `desktop/trayTemplate.png`, a TEMPLATE image: black on
+ * transparent, which the system inverts for a light or a dark menu bar.
+ * Windows does not do that. Handing it the same file paints a black shape on
+ * a taskbar that is black by default, and the icon is simply not there —
+ * the app looks like it failed to start.
+ *
+ * So Windows gets the artwork itself, rendered small. 32px because that is
+ * what the notification area asks for at 200% scaling, which is most laptops;
+ * Windows downsamples it for 100% far better than it upsamples 16.
+ */
+const TRAY_WIN = resolve(root, 'desktop/trayWin.png')
+const TRAY_SIZE = 32
+
 // createRequire rather than a bare import so an installation outside the
 // project (a global, or NODE_PATH) resolves too.
 const require = createRequire(import.meta.url)
@@ -70,4 +86,18 @@ for (const out of outputs) {
   await page.locator('svg').screenshot({ path: out, omitBackground: true })
   console.log(`${out.slice(root.length + 1)} — ${SIZE}x${SIZE} from ${source.slice(root.length + 1)}`)
 }
+
+/* The same drawing, rendered at tray size rather than scaled down from 1024:
+   a 1024→32 downsample of round joins and caps is mush. */
+const small = await browser.newPage({
+  viewport: { width: TRAY_SIZE, height: TRAY_SIZE },
+  deviceScaleFactor: 1
+})
+await small.setContent(
+  `<style>html,body{margin:0;padding:0;background:transparent}svg{display:block;width:${TRAY_SIZE}px;height:${TRAY_SIZE}px}</style>${svg}`
+)
+mkdirSync(dirname(TRAY_WIN), { recursive: true })
+await small.locator('svg').screenshot({ path: TRAY_WIN, omitBackground: true })
+console.log(`${TRAY_WIN.slice(root.length + 1)} — ${TRAY_SIZE}x${TRAY_SIZE} from ${source.slice(root.length + 1)}`)
+
 await browser.close()

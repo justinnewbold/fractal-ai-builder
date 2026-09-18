@@ -1,4 +1,4 @@
-import { Linking, ScrollView, Text, View } from 'react-native'
+import { Linking, Platform, ScrollView, Text, View } from 'react-native'
 
 import { color, font, radius, space } from '../lib/theme'
 import Note from '../components/Note'
@@ -116,7 +116,24 @@ function Way({ number, way }) {
             <Text style={{ color: color.silkFaint, fontSize: font.small, minWidth: 18 }}>
               {`${i + 1}.`}
             </Text>
-            <Text style={{ color: color.silk, fontSize: font.small, lineHeight: 20, flex: 1 }}>
+            {/*
+              The one step that is a command is drawn as one — monospace, and
+              selectable so it can be held and copied. It is identified by
+              matching `way.command` rather than by what the text looks like;
+              see shared/ways-in.mjs.
+            */}
+            <Text
+              selectable={step === way.command}
+              style={{
+                color: color.silk,
+                fontSize: font.small,
+                lineHeight: 20,
+                flex: 1,
+                ...(step === way.command
+                  ? { fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', color: color.signal }
+                  : null)
+              }}
+            >
               {step}
             </Text>
           </View>

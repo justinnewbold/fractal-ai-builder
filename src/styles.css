@@ -9871,3 +9871,19 @@ button.setup-back {
   gap: var(--s-2);
   line-height: 1.5;
 }
+
+/* The step that is a command. Selectable and wrapping rather than scrolling:
+   somebody is about to drag across it and copy it, and a line that has to be
+   scrolled sideways first gets copied halfway. */
+.way-command {
+  display: block;
+  font-family: var(--mono);
+  font-size: var(--f-2);
+  background: var(--panel-hi);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  padding: var(--s-2) var(--s-3);
+  margin-top: var(--s-1);
+  overflow-wrap: anywhere;
+  user-select: all;
+}

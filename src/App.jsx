@@ -3733,7 +3733,8 @@ export default function App() {
                   </summary>
                   <ol className="way-steps">
                     {way.steps.map((step, n) => (
-                      <li key={n}>{step}</li>
+                      /* The one step that is a command gets drawn as one. See ways-in.mjs. */
+                      <li key={n}>{step === way.command ? <code className="way-command">{step}</code> : step}</li>
                     ))}
                   </ol>
                   {way.links.length ? (

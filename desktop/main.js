@@ -348,9 +348,21 @@ app.on('activate', () => {
  */
 function buildTray() {
   if (!tray) {
-    // A template image lets macOS invert it for light and dark menu bars.
-    const icon = nativeImage.createFromPath(join(__dirname, 'trayTemplate.png'))
-    icon.setTemplateImage(true)
+    /*
+     * TWO ICONS, BECAUSE THE TWO SYSTEMS WANT OPPOSITE THINGS.
+     *
+     * macOS takes a TEMPLATE image — black on transparent — and inverts it
+     * itself for a light or a dark menu bar. Windows does not. Handing it the
+     * same file paints a black shape onto a taskbar that is black by default,
+     * and the icon is simply not there: the app looks like it failed to start
+     * and there is nothing to click to find out otherwise.
+     *
+     * So Windows gets the artwork, rendered at tray size from the same
+     * drawing — see scripts/icon.mjs, which makes both from public/icon.svg.
+     */
+    const mac = process.platform === 'darwin'
+    const icon = nativeImage.createFromPath(join(__dirname, mac ? 'trayTemplate.png' : 'trayWin.png'))
+    if (mac) icon.setTemplateImage(true)
     tray = new Tray(icon)
     tray.setToolTip('Fractal Remote')
     // The menu is where everything is, but the obvious thing to do with an
