@@ -33,6 +33,7 @@ import Sheet from '../components/Sheet'
 const face = Platform.select(mono)
 
 const ofDeviceName = (s) => s.deviceName
+const ofUnitState = (s) => s.unit
 
 /**
  * Everything that isn't playing.
@@ -58,6 +59,7 @@ export default function Settings({
   onOpenLog
 }) {
   const deviceName = useRig(ofDeviceName)
+  const unitState = useRig(ofUnitState)
   const [account, setAccount] = useState(null)
   const [hosts, setHosts] = useState(remoteHosts())
   const [chosen, setChosen] = useState(remoteChosenHost())
@@ -87,7 +89,8 @@ export default function Settings({
   }, [link])
 
   const conflict = hostConflict(hosts, chosen)
-  const lamp = link === 'connected' ? 'live' : link === 'no-answer' ? 'fault' : 'idle'
+  const unitDown = link === 'connected' && (unitState === 'missing' || unitState === 'silent')
+  const lamp = unitDown ? 'fault' : link === 'connected' ? 'live' : link === 'no-answer' ? 'fault' : 'idle'
 
   /**
    * Which page of Setup is open, or null for the list of them.
@@ -158,7 +161,15 @@ export default function Settings({
           <View style={{ gap: 0 }}>
             <SetupRow
               title="Unit"
-              status={link === 'connected' ? `${deviceName || 'Unit'} · connected` : 'Not connected'}
+              status={
+                link !== 'connected'
+                  ? 'Not connected'
+                  : unitState === 'missing'
+                    ? 'No unit found on the computer'
+                    : unitState === 'silent'
+                      ? `${deviceName || 'Unit'} · not answering`
+                      : `${deviceName || 'Unit'} · connected`
+              }
               onPress={() => setPage('unit')}
             />
             <SetupRow
@@ -204,9 +215,13 @@ export default function Settings({
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
             <Lamp state={lamp} />
             <Text style={{ color: color.silk, fontSize: font.body, flex: 1 }}>
-              {link === 'connected'
-                ? `${deviceName || 'Your unit'} — answering`
-                : 'No unit, because the computer isn’t answering.'}
+              {link !== 'connected'
+                ? 'No unit, because the computer isn’t answering.'
+                : unitState === 'missing'
+                  ? 'The computer has no unit. Check the FM3 is on and its cable is in.'
+                  : unitState === 'silent'
+                    ? `${deviceName || 'Your unit'} — not answering the computer. A frozen unit looks like this; turn it off and on.`
+                    : `${deviceName || 'Your unit'} — answering`}
             </Text>
           </View>
           {/*
