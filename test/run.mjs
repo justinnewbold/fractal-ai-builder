@@ -21,6 +21,17 @@ import * as marks from '../src/lib/presetMarks.js'
 import * as setlists from '../src/lib/setlists.js'
 import * as palette from '../src/lib/palette.js'
 import { readFileSync as readSrc } from 'node:fs'
+/*
+ * The platform's own join, used by the findForgeFX tests below.
+ *
+ * Those tests hand in POSIX paths and compared against POSIX strings, which
+ * made them fail on Windows for a reason that has nothing to do with the app:
+ * findForgeFX builds its guesses with join(), and on Windows join gives
+ * backslashes. The app is right either way — a Windows machine's HOME is
+ * C:\Users\x and the result is a path Windows can open. Joining the expected
+ * value the same way asks about the behaviour rather than about separators.
+ */
+import { join as joinPath } from 'node:path'
 import {
   patchSchemaValue,
   invalidateSchema,
@@ -622,8 +633,9 @@ test('ForgeFX is only found where the server actually is', () => {
    * later, further from the cause. So the check is for server/package.json,
    * not for the directory.
    */
-  const exists = (p) => p === '/Users/x/src/forgefx/server/package.json'
-  assert.equal(host.findForgeFX({ env: { HOME: '/Users/x' }, exists }), '/Users/x/src/forgefx')
+  const found = joinPath('/Users/x', 'src/forgefx')
+  const exists = (p) => p === joinPath(found, 'server', 'package.json')
+  assert.equal(host.findForgeFX({ env: { HOME: '/Users/x' }, exists }), found)
   assert.equal(host.findForgeFX({ env: { HOME: '/Users/x' }, exists: () => false }), null)
 })
 
@@ -1500,7 +1512,7 @@ test('an installed app uses the server it shipped with', () => {
     'pointing FORGEFX_PATH at a checkout no longer overrides the bundled copy'
   )
   // And with nothing bundled, the old behaviour is untouched.
-  assert.equal(host.findForgeFX({ env: { HOME: '/Users/x' }, exists }), '/Users/x/src/forgefx')
+  assert.equal(host.findForgeFX({ env: { HOME: '/Users/x' }, exists }), joinPath('/Users/x', 'src/forgefx'))
 })
 
 test('FORGEFX_PATH wins over the guesses', () => {
