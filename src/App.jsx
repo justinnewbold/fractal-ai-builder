@@ -1,32 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import TopBar from './components/TopBar'
-import { Preview } from './components/Generate'
 import { ChangeLog } from './components/ChangeLog'
 import Diagnostics from './components/Diagnostics'
 import Volume from './components/Volume'
 import DebugLog from './components/DebugLog'
-import BandBook from './components/BandBook'
 import PresetReport from './components/PresetReport'
 import { installCrashCapture, logDebug, getDebugLog } from './lib/debugLog'
-import Cost from './components/Cost'
 import Scenes from './components/Scenes'
-import History from './components/History'
 import { CabPicker, Backup } from './components/Hardware'
 import Gig from './components/Gig'
 import SaveBar from './components/SaveBar'
 import SaveSheet, { SaveFooter } from './components/SaveSheet'
-import CloudPresets from './components/CloudPresets'
-import { LiveGeneration, LiveSteps, Thinking, THINKING } from './components/LiveGeneration'
-import { progressFor } from './lib/liveProgress'
-import { streamSpec } from './lib/stream'
-import { recordUsage, today } from './lib/ledger'
 import { getMode } from './lib/theme'
-import TokenLog from './components/TokenLog'
-import { askPlan } from './lib/command'
 import { Modifiers, SceneMatrix } from './components/Modifiers'
 import Feedback from './components/Feedback'
-import DevTrace, { TraceSwitch } from './components/DevTrace'
-import { traceEnabled } from './lib/devtrace'
 import { platform } from './lib/platform'
 import { Versions, DeviceBackup } from './components/Versions'
 import GridEditor from './components/GridEditor'
@@ -60,42 +47,17 @@ import {
   writeTuner
 } from './lib/deviceState'
 import ParamSearch from './components/ParamSearch'
-import Assistant from './components/Assistant'
 import UpdateNotice from './components/UpdateNotice'
-import MemorySettings from './components/MemorySettings'
-import { loadMemory, syncMemory, saveMemory, memoryForRequest, refreshProfile, saidCount, dueForUpdate } from './lib/memory'
 import Updates, { UpdateReadyNotice } from './components/Updates'
-import { validatePlan, replyFor, runPlan, resolvePlaceable, landedOf, whereOf, scopedActions } from './lib/actions'
-import { listPresets, newestFirst } from './lib/history'
-import {
-  profileFrom,
-  describeProfile,
-  suggestionsFrom,
-  summariseProfile,
-  tasteEnabled,
-  setTasteEnabled
-} from './lib/taste'
-import {
-  clearCorrections,
-  describeCorrections,
-  listCorrections,
-  patternsFrom,
-  rememberCorrection,
-  rememberNote,
-  summariseCorrections
-} from './lib/corrections'
-import { matchLocal, matchRename, matchVolume, matchQuestion, plainDesignRequest } from './lib/localCommands'
-import { setParamConfirmed, blockParams } from './lib/forgefx'
-import { outputLevelParam } from './lib/volume'
 import RenamePreset from './components/RenamePreset'
 import { countFromRefusal, slotCount, slotOutside, slotsForChat, timeLeft } from './lib/slots'
 import { inDesktopApp } from './lib/desktop'
 import { createNameScan } from './lib/nameScan'
 import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
 import Screens, { viewsFor } from './components/Screens'
+import { useAsks } from './lib/asks'
 import { SIZES, loadSize, saveSize, clampSize, loadFit, saveFit } from './lib/gigSize'
-import { loadChatOn, saveChatOn, loadModelOn, saveModelOn } from './lib/aiSwitch'
-import { loadPlayMode, savePlayMode, askButtonShows, editButtonShows } from './lib/playMode'
+import { editButtonShows } from './lib/playMode'
 import { remember as rememberPreset, CHANGED as MARKS_CHANGED } from './lib/presetMarks'
 import { CHANGED as SETLISTS_CHANGED } from './lib/setlists'
 import { syncSetlists, setlistCloudReady } from './lib/cloudSetlists'
@@ -127,8 +89,6 @@ import {
   setTelemetryMode,
   placeableBlocks
 } from './lib/forgefx'
-import { savePreset, buildEntry, deletePreset, typicalMs, notOnAccount } from './lib/history'
-import { costOf, formatCost, formatTokens } from './lib/cost'
 import { isDemo, setDemo, resetCacheClear } from './lib/forgefx'
 import {
   detect,
@@ -155,11 +115,7 @@ import {
   getHost,
   servedLocally
 } from './lib/forgefx'
-import { aiUrl } from './lib/ai'
-import { saveCloudPreset, cloudReady, listCloudPresets, deleteCloudPreset } from './lib/cloudPresets'
 import Tour, { tourSeen, markTourSeen } from './components/Tour'
-import Recent from './components/Recent'
-import Past from './components/Past'
 import ConnectScreen from './components/ConnectScreen'
 import PhoneRemote from './components/PhoneRemote'
 import LinkDetails from './components/LinkDetails'
@@ -184,29 +140,9 @@ import {
   faultCopy,
   nextDelay
 } from './lib/link'
-import { keepAwake } from './lib/awake'
 import { loadSession, saveSession, interrupted } from './lib/session'
-import { knownRigs, localRigs, pickRig, rememberRig } from './lib/rigCache'
-import { knownDesigns, pickDesign, replay, rememberDesign } from './lib/bandBook'
-import { loadCloudChat, saveCloudChat, pickChat, chatCloudReady } from './lib/cloudChat'
-import {
-  archiveChat,
-  deleteChat,
-  listLocalChats,
-  listCloudChats,
-  mergeChats,
-  liftChatsToCloud,
-  newChatId,
-  worthKeeping
-} from './lib/chatLog'
-import { keepsName, sceneChoices, sceneNumbers, scenesAskedFor, songsWanted } from '../api/_scenes.js'
-import SceneFit from './components/SceneFit'
-import { scenesOverflowing, fitScenes, describeFit } from './lib/sceneFit'
 import { pushEntry, replaceEntry } from './lib/nav'
-import { useAsks } from './lib/asks'
 import { useDismiss } from './lib/dismiss'
-import { validateSpec, countWrites, countSceneWrites } from './lib/validate'
-import { beatFlash, bringIntoView } from './lib/feedback'
 import {
   remoteActive,
   remoteHostSeen,
@@ -215,7 +151,6 @@ import {
   subscribeRemoteState
 } from './lib/remote'
 import { newEntry, append } from './lib/log'
-import { EXCLUDED_BLOCKS } from './lib/guardrails'
 
 
 /**
@@ -259,11 +194,7 @@ const ofPreset = (s) => s.preset
 const ofBlocks = (s) => s.blocks
 const ofScene = (s) => s.sceneIndex
 const ofSceneNames = (s) => s.sceneNames
-const ofBpm = (s) => s.bpm
-const ofTunerOn = (s) => s.tunerOn
-const ofTuning = (s) => s.tuning
 
-const PREVIEW_ABOVE = 4
 
 /** How long the "Done" card stays on a screen before it takes itself off. */
 const DID_STAYS_MS = 20000
@@ -333,7 +264,6 @@ function keepSavedScenes(number, names) {
  * permanently overwrites is local-only. Mirroring the list here is what lets the
  * app explain itself instead of relaying a 403.
  */
-const REMOTE_BLOCKED_KINDS = new Set(['savePreset', 'backupPreset', 'keepInLibrary'])
 
 /**
  * Kinds that leave the preset holding unsaved changes.
@@ -392,11 +322,6 @@ const SETUP_PAGES = {
 }
 const THEME_WORD = { auto: 'Auto', light: 'Light', dark: 'Dark' }
 /** What the chat says when a request needed the model and the model is off. */
-const MODEL_OFF =
-  'The AI model is off and that one needs it, so I did nothing. Turn it on in Setup › AI & cost, or ask for ' +
-  'something the app does by itself: a scene, the tempo, a block on or off, a channel, a control to a number ' +
-  'or up or down, a model by name, add or remove a block, the volume, a rename, save, load, back up. ' +
-  'Say "help" for the whole list.'
 
 export default function App() {
   const [status, setStatus] = useState('idle')
@@ -444,11 +369,7 @@ export default function App() {
    * the unit's word for Amp 1 and nobody else's, and it was being printed
    * straight onto the screen while a tone was building.
    */
-  const blockNameFor = useCallback(
-    (eid) => blocks.find((b) => b.effectId === eid)?.name || null,
-    [blocks]
-  )
-  const [error, setErrorText] = useState(null)
+    const [error, setErrorText] = useState(null)
   /*
    * WHEN the message on screen was raised, as well as what it says.
    *
@@ -551,8 +472,7 @@ export default function App() {
    * cleared by the next design, a reload, or a Leave it. This survives all
    * three so the conversation can answer from the record. See designMemory.
    */
-  const [lastDesign, setLastDesign] = useState(() => designMemory(restored?.result ?? null))
-  /*
+    /*
    * The tones asked for earlier in this conversation.
    *
    * There was one slot for a design, so a second tone destroyed the first —
@@ -565,9 +485,7 @@ export default function App() {
    * said. Each entry keeps the tone exactly as it was, where it was asked for,
    * the two choices that were on it, and what became of it.
    */
-  const [past, setPast] = useState([])
-  const pastId = useRef(0)
-  /*
+      /*
    * Whether to write the scene plan too. Off by default: it is the one part of
    * a generation that walks the unit through every scene, and someone who
    * asked for a sound has not asked for their scene layout to be rearranged.
@@ -603,22 +521,19 @@ export default function App() {
    * box back to where it was makes this true again, which is right — that plan
    * really was sent.
    */
-  const [sentPlan, setSentPlan] = useState(null)
-  /*
+    /*
    * A build waiting on one question. A preset where no scene has a name has
    * nothing to lose, so this is the moment to ask whether they want one sound
    * or a set of them — before the model runs, rather than after, when the
    * answer would cost a second generation.
    */
-  const [sceneAsk, setSceneAsk] = useState(null)
-  /*
+    /*
    * A saved tone waiting on the same kind of question, asked the other way
    * round. A tone made on an eight-scene unit holds scenes the unit in front
    * of you may not have, and which of them come across is the player's call —
    * see lib/sceneFit.js. Null whenever the tone fits, which is most of them.
    */
-  const [sceneFit, setSceneFit] = useState(null)
-  const [progress, setProgress] = useState(null)
+    const [progress, setProgress] = useState(null)
   const [applied, setApplied] = useState(null)
   /*
    * What a request in words just did, for the screen it takes you to.
@@ -661,26 +576,7 @@ export default function App() {
   // where the tap happened, and on a phone the banner is off-screen above it.
   const [saveError, setSaveError] = useState(null)
   const [log, setLog] = useState([])
-  const [spend, setSpend] = useState({ total: 0, runs: 0 })
-  /*
-   * One place every model call is counted, and it counts all of them.
-   *
-   * The session total only ever added up DESIGNS. Every message on the Ask
-   * screen came back with its own token count attached and went into a field
-   * nothing read — and those are not small, because a chat turn carries the
-   * whole model roster and the transcript so far. So the screen could show a
-   * few cents while most of the money went somewhere it never mentioned.
-   *
-   * A failed call goes in too, with nothing in it where the numbers should be.
-   * It spent something; what it cannot say is how much, and a row saying that
-   * is what turns a gap against the bill into an explanation.
-   */
-  const noteSpend = useCallback((kind, usage, extra = {}) => {
-    setLastCall(recordUsage(kind, usage, extra))
-    const runCost = usage ? costOf(usage, usage.model) : null
-    if (runCost !== null) setSpend((p) => ({ total: p.total + runCost, runs: p.runs + 1 }))
-  }, [])
-  /*
+      /*
    * The last call, so a failure can still say what it spent.
    *
    * "When there's errors and it doesn't write, it doesn't show me any tokens
@@ -688,8 +584,7 @@ export default function App() {
    * has no card — so the error says it instead, including when the honest
    * answer is that nothing was reported.
    */
-  const [lastCall, setLastCall] = useState(null)
-  const [lastPrompt, setLastPrompt] = useState(restored?.lastPrompt || '')
+    const [lastPrompt, setLastPrompt] = useState(restored?.lastPrompt || '')
   /*
    * A failed generation, kept so it can be asked again with one tap.
    *
@@ -728,9 +623,7 @@ export default function App() {
    * background for a request, not a value the request depends on, and a round
    * trip to Supabase in front of every "make it brighter" would be felt.
    */
-  const [cloudSaves, setCloudSaves] = useState([])
-  const [tasteOn, setTasteOn] = useState(() => tasteEnabled())
-  const [tour, setTour] = useState(false)
+      const [tour, setTour] = useState(false)
 
   /*
    * What this player tends to like, read off what they have kept.
@@ -744,19 +637,7 @@ export default function App() {
    * their account holds every one of them twice, and profileFrom dedupes for
    * exactly that reason.
    */
-  /*
-   * Everything generated on this account, from both stores, newest first.
-   *
-   * One list feeding two things: what Create shows under the box, and what
-   * the taste profile is read from. Deliberately the same list — a profile
-   * built from presets the player cannot see is a profile they cannot check,
-   * and the dedupe matters to both for the same reason.
-   */
-  const library = useMemo(
-    () => newestFirst(listPresets(), cloudSaves, folderSaves),
-    [historyKey, cloudSaves, folderSaves]
-  )
-
+  
 
   /*
    * Read the folder's designs whenever the history moves.
@@ -795,52 +676,9 @@ export default function App() {
     }
   }, [historyKey])
 
-  /*
-   * Everything kept on THIS device, and how to fetch each one whole.
-   *
-   * The copy-to-account button read browser storage and nothing else, which is
-   * the wrong half on the machine it exists for: when a folder is chosen a
-   * design is written to disk INSTEAD of browser storage, so a Mac with a
-   * folder set had, by that button's reckoning, nothing to copy — while
-   * holding the entire library the button was written to rescue.
-   *
-   * A folder listing is a name and a time, so what is handed over is a way to
-   * read the file rather than the tone itself. Nothing opens forty files to
-   * draw a list; the copy opens only what it is about to send.
-   */
-  const onThisDevice = useMemo(
-    () => [
-      ...listPresets(),
-      ...folderSaves.map((f) => ({
-        name: f.name,
-        at: f.at,
-        load: async () => {
-          const { savedFolder, readDesignFile } = await import('./lib/localFolder')
-          const folder = await savedFolder()
-          if (!folder || folder.needsPermission) throw new Error('The folder is not open.')
-          return readDesignFile(folder.handle || folder, f.file)
-        }
-      }))
-    ],
-    [historyKey, folderSaves]
-  )
-
-  /*
-   * How many of those are not on the account.
-   *
-   * A count, not a list: it goes in a panel heading that is folded shut, which
-   * is the only place someone learns there is anything to do without having to
-   * open it first. The rule itself lives beside the list's dedupe and the
-   * copy-up's, because three places asking this question three ways is how a
-   * panel comes to say "12 to copy" over a button that copies nothing.
-   */
-  const stranded = useMemo(() => notOnAccount(onThisDevice, cloudSaves), [cloudSaves, onThisDevice])
-
-  const taste = useMemo(
-    () => (tasteOn ? profileFrom(library) : null),
-    [library, tasteOn]
-  )
-  /*
+  
+  
+    /*
    * The habits behind the values this player fixes by hand.
    *
    * Re-read on a counter rather than on every render, because it comes out of
@@ -849,12 +687,7 @@ export default function App() {
    * counter. Same shape as taste: computed from the record, never stored, so
    * forgetting the record genuinely un-learns it.
    */
-  const [correctionKey, setCorrectionKey] = useState(0)
-  const corrections = useMemo(
-    () => (tasteOn ? patternsFrom(listCorrections()) : null),
-    [tasteOn, correctionKey]
-  )
-  const [turns, setTurns] = useState(() => {
+      const [turns, setTurns] = useState(() => {
     const back = restored?.turns || []
     // A generation that was in flight died with the page. Say so where the
     // question was asked, rather than coming back looking as if nothing had
@@ -922,8 +755,7 @@ export default function App() {
    * in it means the Mac answered, never merely that a channel was joined.
    */
   const [link, setLink] = useState(() => linkState())
-  const atTheMac = link.role === 'mac'
-  const [signIn, setSignIn] = useState(false)
+    const [signIn, setSignIn] = useState(false)
   /*
    * Whether the phone has ever had the Mac answer this session. A blip after
    * that keeps the screen (the chip goes red; the loop retries); before it,
@@ -972,33 +804,26 @@ export default function App() {
       : errorDetail || (faultReason === null || faultReason === 'unreadable' ? error : null)
   // Where "Leave gig" returns to. Gig takes the screen over, so coming back out
   // should land where you were rather than at a fixed default.
-  const [runningPlan, setRunningPlan] = useState(false)
-  const [partial, setPartial] = useState(null)
-  /*
+      /*
    * Whether the step list under Thinking is open. Open to begin with: the
    * list was asked for so the scenes could be watched being written, and a
    * chevron that starts closed hides the thing that was asked for behind a
    * tap nobody knows to make. Closing it is one tap and sticks for the
    * session.
    */
-  const [liveOpen, setLiveOpen] = useState(true)
-  /* The full feed of every control and value, offered by its own chip once
+    /* The full feed of every control and value, offered by its own chip once
      the run has finished. Its own state, so opening the steps mid-run does
      not pop this panel open the moment the run ends. */
-  const [feedOpen, setFeedOpen] = useState(false)
-  const [thinking, setThinking] = useState(false)
+    const [thinking, setThinking] = useState(false)
   // The live request, and when it started — what Stop acts on and what the
   // elapsed clock counts from.
-  const generationAbort = useRef(null)
-  const [genStarted, setGenStarted] = useState(null)
-  /*
+      /*
    * Where the design sits in the conversation.
    *
    * How many turns had been said when this generation began, so the chat can
    * put the design there rather than always last. See Assistant.jsx.
    */
-  const [genAt, setGenAt] = useState(null)
-  /*
+    /*
    * How long the conversation is right now, as opposed to when this function
    * was made.
    *
@@ -1019,35 +844,9 @@ export default function App() {
   /* A request in words just wrote to the unit and nothing has kept it. Shown
      beside Save until a save lands or the preset is clean again. */
   const [askedUnsaved, setAskedUnsaved] = useState(false)
-  /*
-   * Who the agent is talking to — see lib/memory.js. Read from this device
-   * for the first paint, then brought together with the account's copy when
-   * there is one, and again whenever who is signed in changes.
-   */
-  const [memory, setMemory] = useState(() => loadMemory())
-  useEffect(() => {
-    let stop = false
-    syncMemory().then((m) => {
-      if (!stop) setMemory(m)
-    })
-    return () => {
-      stop = true
-    }
-  }, [link.account?.id])
   /* The count the profile was last updated at, so ten more messages mean one
      more update and not one per render. */
-  const memoryUpdatedAt = useRef(0)
-  const learn = useCallback(
-    async (fromTurns) => {
-      const said = saidCount(fromTurns)
-      if (!said || said === memoryUpdatedAt.current) return
-      memoryUpdatedAt.current = said
-      const next = await refreshProfile(memory, fromTurns, { host: getHost() })
-      setMemory(next)
-    },
-    [memory]
-  )
-  /* Whether the line explaining the demo has been put away. */
+      /* Whether the line explaining the demo has been put away. */
   const [demoNoteSeen, setDemoNoteSeen] = useState(() => demoNoteWasSeen())
   const dismissDemoNote = () => {
     setDemoNoteSeen(true)
@@ -1056,8 +855,7 @@ export default function App() {
   /* The blocks the last plan was checked against, kept so a plan re-made
      from a question in the chat (see scopeTurn) is checked against the same
      chain without another read. */
-  const lastPlanBlocks = useRef(null)
-  useEffect(() => {
+    useEffect(() => {
     if (!dirty) setAskedUnsaved(false)
   }, [dirty])
   // Read inside read(), which is built once and never sees state change.
@@ -1157,28 +955,14 @@ export default function App() {
   /*
    * Which screens this viewport reaches.
    *
-   * Ask and Edit are bench work and a phone is not a bench: designing a tone
-   * is a conversation to read, and rebuilding a chain is a drag around a 4x12
-   * grid. Both sat one sideways swipe from the stage screen, which put a
-   * generate button and a grid editor within reach of a thumb mid-song.
+   * Edit is bench work and a phone is not a bench: rebuilding a chain is a
+   * drag around a 4x12 grid, and it sat one sideways swipe from the stage
+   * screen, which put a grid editor within reach of a thumb mid-song.
    *
    * Hidden on a phone rather than deleted, because a desktop browser is
-   * exactly where both belong.
+   * exactly where it belongs.
    */
-  /*
-   * The two switches over the AI — see lib/aiSwitch.js. Chat: whether the
-   * conversation is offered. Model: whether a request may go to the model.
-   *
-   * Declared ABOVE the screen list, which reads them. It was declared below, and
-   * the live site opened on "Cannot access 'xa' before initialization" — a
-   * const read before its line runs is a crash, and no test renders App.
-   */
-  const [chatOn, setChatOn] = useState(loadChatOn)
-  const [modelOn, setModelOn] = useState(loadModelOn)
-
-  /* With the chat off the Ask tab is not a screen; a view that leaves the list
-     falls back to Play below. */
-  const views = useMemo(() => viewsFor(narrow).filter((v) => chatOn || v !== 'ask'), [narrow, chatOn])
+  const views = useMemo(() => viewsFor(narrow), [narrow])
 
   /*
    * How big the buttons on Play are.
@@ -1218,16 +1002,8 @@ export default function App() {
    * The rule itself lives in lib/playMode.js — testable without a browser, and
    * out of reach of a comment in this file impersonating it.
    */
-  /*
-   * Whether asking is on offer from the stage screen: the ✦ Ask and Edit
-   * buttons in its bar. There was a floating ✦ Ask pinned over the bottom
-   * right of every wide screen as well; it is gone. On a wide window the
-   * ✦ Ask tab is in the row above and does the same thing, and the corner it
-   * floated over is where the last control in every grid lands.
-   */
-  const askShows = askButtonShows({ status, view, playing, aiOn: chatOn })
-  /* Edit is not Ask: the chain editor is there whenever there is a unit,
-     play mode or not, AI or not. See editButtonShows. */
+  /* The chain editor is there whenever there is a unit, play mode or not.
+     A ✦ Ask button stood beside it until the chat came out. */
   const chainShows = editButtonShows({ status, view })
 
   const [size, setSize] = useState(loadSize)
@@ -1247,8 +1023,7 @@ export default function App() {
    * it: quoting it put a third hit above both of them, and the test then
    * measured the chrome from a comment.
    */
-  const onPlay = view === 'play'
-  /* A row of tabs is worth a row of the screen only when it can take you
+    /* A row of tabs is worth a row of the screen only when it can take you
      somewhere. On a phone it cannot: Play is the only screen there is. */
   const tabsWorthShowing = status === 'live' && views.length > 1
   const resize = (by) => {
@@ -1277,17 +1052,11 @@ export default function App() {
   const sceneNames = useDevice(ofSceneNames)
   // How many scenes this unit actually has. Eight is the gen-3 answer and the
   // safe fallback, but it is a capability, not a constant.
-  const sceneCount = device?.capabilities?.sceneCount || 8
-  // Which channels a block can be put on. A scene remembers one per block, so
+    // Which channels a block can be put on. A scene remembers one per block, so
   // a generated scene plan can name them and this is what a name is checked
   // against.
-  const channelNames = device?.capabilities?.channelNames || ['A', 'B', 'C', 'D']
-  const bpm = useDevice(ofBpm)
-  // One tempo read per burst of taps, not one per tap.
-  const tapReadback = useRef(null)
-  const tunerOn = useDevice(ofTunerOn)
-  const tuning = useDevice(ofTuning)
-
+      // One tempo read per burst of taps, not one per tap.
+      
   /*
    * Setter-shaped writers over the store, for the two facts App still reads
    * and writes directly. Scene, tempo and the tuner have proper writers on the
@@ -1722,144 +1491,9 @@ export default function App() {
    * the Mac. See saidSomething — an empty box after a conversation is a
    * different thing entirely, and it does go up.
    */
-  /*
-   * Whether this device has had a conversation to push at all.
-   *
-   * An empty box at boot is a device that has nothing to say, and pushing it
-   * would wipe the chat on the Mac. An empty box AFTER one is New chat, and
-   * that has to go up or the conversation is still sitting on the account
-   * waiting to come back. A session that was cleared and then lost the page
-   * counts too — the account may never have heard about it.
-   */
-  const saidSomething = useRef(!!restored?.clearedAt)
-  useEffect(() => {
-    if (turns.length) saidSomething.current = true
-    if (!turns.length && !saidSomething.current) return undefined
-    const timer = setTimeout(() => {
-      if (chatCloudReady()) {
-        saveCloudChat(turns).catch(() => {
-          // Offline. The local copy is whole and the next change tries again.
-        })
-      }
-      /*
-       * And onto the shelf, under this conversation's own id.
-       *
-       * Not only when New chat is pressed. A phone that is killed by iOS, a
-       * browser that is closed, a tab that crashes — none of those press
-       * anything, and a history that only holds conversations somebody
-       * deliberately ended is a history missing most of them. Signed in this
-       * is a row on the account; signed out it is this browser, which is the
-       * rule everywhere in here.
-       */
-      if (chatId) {
-        archiveChat(turns, chatId).catch(() => {
-          // Same reasoning: the next change tries again.
-        })
-      }
-    }, 2000)
-    return () => clearTimeout(timer)
-  }, [turns, chatId])
 
-  /*
-   * What the account was holding, once there is an account to ask.
-   *
-   * After the link has signed in, not on mount: `supabaseClient()` is null
-   * until restoreSession has run, so asking earlier would always answer "signed
-   * out" and this would never happen at all.
-   */
-  const pulledChat = useRef(false)
-  useEffect(() => {
-    if (pulledChat.current || !link.account || !chatCloudReady()) return
-    pulledChat.current = true
-    let live = true
-    loadCloudChat().then((cloud) => {
-      if (!live || !cloud) return
-      const here = { turns, at: restored?.at || 0, clearedAt: chatClearedAt }
-      const winner = pickChat(here, cloud)
-      // Only when it is actually the other copy. Setting the same turns again
-      // would push them back up and restart this on the other device.
-      if (winner.from !== 'cloud') return
-      setTurns(winner.turns)
-      record('chat', `Picked up the conversation from ${cloud.device || 'your other device'}`)
-    })
-    return () => {
-      live = false
-    }
-  }, [link.account, turns, restored, chatClearedAt, record])
 
-  /*
-   * The shelf of finished conversations, and how many of them there are.
-   *
-   * Read once when the account settles and again whenever a chat is put down
-   * or picked up, rather than on a timer: this list only changes when
-   * something in this app changes it.
-   */
-  const [chatLog, setChatLog] = useState(() => listLocalChats())
-  const [chatLogKey, setChatLogKey] = useState(0)
-  useEffect(() => {
-    let live = true
-    ;(async () => {
-      /*
-       * Signed in means the account, so anything this browser was holding goes
-       * up before the list is read — otherwise a week of chats started signed
-       * out stays stranded on one machine for ever. Ids survive the lift, so
-       * running it again does nothing.
-       */
-      if (link.account && chatCloudReady()) await liftChatsToCloud()
-      const cloud = link.account && chatCloudReady() ? await listCloudChats() : []
-      if (!live) return
-      setChatLog(mergeChats(cloud, listLocalChats()))
-    })()
-    return () => {
-      live = false
-    }
-  }, [link.account, chatLogKey])
-
-  /*
-   * Put this conversation down and start an empty one.
-   *
-   * "The current chat is getting along in the app. Can we create a way to
-   * create a fresh chat?" — and the reason a fresh one is safe to start is
-   * that the old one lands on the shelf first, whole.
-   *
-   * The tone on screen and the last design go with it. They are the context
-   * the next request would have been answered against, and a fresh chat that
-   * still remembered the last tone would not be a fresh chat — it would be the
-   * same conversation with its transcript hidden.
-   */
-  /*
-   * Every ten things said, the profile learns from the conversation so far —
-   * and again when the chat is put down (newChat, below), which is the other
-   * moment a conversation ends. Neither waits on the answer: the next request
-   * carries whatever the profile is by then.
-   */
-  useEffect(() => {
-    if (dueForUpdate(saidCount(turns))) learn(turns)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [turns.length])
-
-  const newChat = useCallback(async () => {
-    if (worthKeeping(turns)) {
-      learn(turns)
-      await archiveChat(turns, chatId)
-      setChatLogKey((k) => k + 1)
-    }
-    /*
-     * Written down before anything else, and before the account hears about
-     * it. The empty transcript goes up on the next debounce; if the phone
-     * loses the page first, this is the only record that the conversation
-     * still on the account is one that was deliberately put down.
-     */
-    setChatClearedAt(Date.now())
-    setChatId(null)
-    setTurns([])
-    setResult(null)
-    setLastDesign(null)
-    setLastPrompt('')
-    pending.current = null
-    memoryUpdatedAt.current = 0
-  }, [turns, chatId, learn])
-
+  
   /*
    * Pick an old conversation back up.
    *
@@ -1867,27 +1501,8 @@ export default function App() {
    * by looking — and the one being opened keeps its id, so saying one more
    * thing in it updates that row rather than laying down a copy.
    */
-  const openChat = useCallback(
-    async (entry) => {
-      if (!entry?.id) return
-      if (worthKeeping(turns) && entry.id !== chatId) await archiveChat(turns, chatId)
-      setChatId(entry.id)
-      setTurns(Array.isArray(entry.turns) ? entry.turns : [])
-      setResult(null)
-      setLastDesign(null)
-      setLastPrompt('')
-      pending.current = null
-      setChatLogKey((k) => k + 1)
-      record('chat', `Opened an earlier chat: ${entry.title || 'Untitled chat'}`)
-    },
-    [turns, chatId, record]
-  )
-
-  const forgetChat = useCallback(async (entry) => {
-    await deleteChat(entry)
-    setChatLogKey((k) => k + 1)
-  }, [])
-
+  
+  
   /*
    * A conversation that has never been shelved still gets an id the moment it
    * has something in it, so the debounced cloud write below and the shelf agree
@@ -2498,33 +2113,6 @@ export default function App() {
     return listenToDevice()
   }, [status])
 
-  /*
-   * The account's presets, pulled in so the taste profile spans machines.
-   *
-   * The whole point of a profile is that it survives the move to a new Mac —
-   * the loss that started this — so it cannot read only what this browser
-   * happens to hold. Failure is silent on purpose: a profile is an
-   * improvement to a generation, never a precondition for one, and someone
-   * signed out or offline should notice nothing beyond slightly less
-   * personal results.
-   */
-  useEffect(() => {
-    if (!cloudReady()) {
-      setCloudSaves([])
-      return undefined
-    }
-    let live = true
-    listCloudPresets()
-      .then((rows) => {
-        if (live) setCloudSaves(rows)
-      })
-      .catch(() => {})
-    return () => {
-      live = false
-    }
-    // The account is what there is to read presets from; historyKey covers a
-    // preset saved here since the last read.
-  }, [historyKey, link.account?.email])
 
   /*
    * The introduction, once, and only when there is something to introduce.
@@ -2545,220 +2133,7 @@ export default function App() {
     setTour(true)
   }, [status])
 
-  /** One path to the model, so generate and refine can't drift apart. */
-  const requestSpec = async (schema, description, previous, extra = {}) => {
-    // The one door to the designer. Shut, it says so rather than knocking —
-    // and the band book has already had its turn by the time this is reached.
-    if (!modelOn) throw new Error(MODEL_OFF)
-    /*
-     * What this app already knows about the band being asked about.
-     *
-     * "Isn't there a band database we can download?" There is not — nobody
-     * publishes what amp a band plays — but a rig found once is that database,
-     * so it is sent back and the server skips the search entirely. The second
-     * request for a band costs no tokens, no searching and no waiting. See
-     * lib/rigCache.js.
-     */
-    const songs = songsWanted({
-      wantScenes: extra.wantScenes,
-      sceneBudget: extra.sceneBudget,
-      sceneCount
-    })
-    const already = pickRig(await knownRigs().catch(() => []), description, songs)
-    setPartial(null)
-    // A new run replaces whatever the last failure was offering to repeat.
-    setRetryAsk(null)
-    setThinking(true)
-    /*
-     * A handle on the request while it runs, so Stop can actually stop it.
-     * Without one the only way out of a stuck generation was reloading the
-     * page, which also throws away the conversation.
-     */
-    const control = new AbortController()
-    generationAbort.current = control
-    setGenStarted(Date.now())
-    /* Whether this run is on its second attempt. The heartbeat line reads
-       it, so a retry keeps saying so after the rig lookup has had its turn
-       on the line — "Thinking… · 3m 24s" with no word of the first try
-       having died is how a wait reads as one that never ended. */
-    const secondTry = { current: false }
-    /* Read through the ref, not the closure — see turnsNow. */
-    setGenAt(turnsNow.current)
-    try {
-      return await streamSpec(
-        {
-          description,
-          // Who is asking. Goes in front of the instructions — api/_memory.js.
-          memory: memoryForRequest(memory),
-          device,
-          blocks: schema,
-          sceneNames,
-          // So one scene asked for lands where the player is standing.
-          activeScene: scene,
-          previous: previous || null,
-          mode: previous ? 'refine' : 'design',
-          // Only when someone has asked to see it — see lib/devtrace.js.
-          trace: traceEnabled(),
-          /*
-           * Sent on a refine too. A refinement is a reaction to a tone the
-           * player has just heard, so their habits are exactly the thing that
-           * settles what "warmer" means to them in numbers.
-           */
-          taste: describeProfile(taste),
-          /*
-           * What this player fixes by hand after a generation.
-           *
-           * Kept apart from taste because it answers a different question.
-           * Taste is what they choose; this is what the model keeps getting
-           * wrong for them, which is the more useful of the two and was being
-           * thrown away entirely.
-           */
-          corrections: tasteOn ? describeCorrections(corrections) : '',
-          // Known already, so nothing is looked up. See above.
-          ...(already?.rig ? { rig: already.rig } : {}),
-          ...extra
-        },
-        {
-          /*
-           * And say what it is, not how many of it there are.
-           *
-           * "Just a little bit more information on what's happening, like
-           * choosing an amp or deciding on delay, what song it's designing at
-           * the moment." Every one of those is in the partial already; the
-           * line was counting blocks and throwing the rest away.
-           */
-          onPartial: (p) => {
-            setPartial(p)
-            const line = progressFor(p, blockNameFor)
-            if (line) setProgress(line)
-          },
-          signal: control.signal,
-          host: getHost(),
-          /*
-           * Say what is actually happening rather than what a timer guesses.
-           * "Nearly there" was a scripted line that arrived 26 seconds in and
-           * then stayed forever, saying the same thing whether the model was
-           * one token from done or had died two minutes ago.
-           */
-          onEvent: (e) => {
-            /*
-             * Said to a guitarist waiting on their tone, not to whoever wrote
-             * this. "Sent to the model — waiting for the first line" was every
-             * word true and none of it anyone's business but mine: it names
-             * machines a player has no reason to know about and describes a
-             * milestone — the first line of the answer — that means nothing
-             * from the outside.
-             *
-             * Each line still marks a real event, so none of it is a guess.
-             * The exact names go to the generation log in Technical details,
-             * which is where they belong and where they are still precise.
-             */
-            if (e.kind === 'request') setProgress('Sending your description…')
-            // The far end answers before the AI is asked anything, so this
-            // line changing at all means the round trip works — which is most
-            // of what someone staring at a long wait wants to know, even if
-            // they would never put it that way.
-            /*
-             * Which attempt this is, kept on screen.
-             *
-             * The retry announced itself and this line overwrote it a second
-             * later, so two long waits read as one that never ended: "said
-             * working on tone for over 3 minutes then just disappeared".
-             */
-            /*
-             * The model has been asked and has not answered yet, which is
-             * genuinely all that is known at this point. The line that used to
-             * sit here filled the space without adding to it; the lines above
-             * and below say what was sent and what is coming back, and those
-             * are the ones worth reading. The attempt still shows, because two
-             * ninety-second waits otherwise read as one that never ended.
-             */
-            /*
-             * And WHAT it is thinking about. "It just says thinking" — a bare
-             * word for four minutes is a word nobody can act on. Which kind of
-             * run this is has been known since the request was built, so the
-             * line says it: designing a tone from nothing, or adjusting the
-             * one on screen. The attempt still shows, in words rather than a
-             * bracket — "second try" read as a label, not a fact.
-             */
-            else if (e.kind === 'open')
-              setProgress(e.attempt ? `${THINKING} — second try, the first got no answer…` : `${THINKING} — ${previous ? 'adjusting the tone' : 'designing your tone'}…`)
-            /*
-             * The wait is counted out loud — once. <Thinking> keeps a live
-             * clock of its own, to the second, from when the request began.
-             * This event used to write the server's coarser count into the
-             * line beside it, so the screen read "Thinking… 30s · 37s": two
-             * numbers for one wait, one of them jumping by tens. "Only show it
-             * counting the actual amount of seconds." The heartbeat still
-             * matters — it is what proves the model is still there — but the
-             * line it keeps alive already says everything it would add.
-             */
-            else if (e.kind === 'waiting')
-              setProgress((was) =>
-                was && was.startsWith(THINKING) ? was : `${THINKING}${secondTry.current ? ' — second try' : ''}…`
-              )
-            /* The partial itself already wrote the line — onPartial runs first
-               and says what the model is deciding, which beats a count of how
-               many things it has decided. */
-            else if (e.kind === 'partial') {
-              setProgress((was) => was || 'Building your chain…')
-            } else if (e.kind === 'fallback') setProgress('Trying another way…')
-            else if (e.kind === 'retrying') {
-              /*
-               * A second attempt starts its own clock. The first ran to the
-               * stall limit and was given up on; carrying its minutes into
-               * the retry's count made "over 3 minutes" out of two waits
-               * nobody could tell apart. The line says which try this is.
-               */
-              secondTry.current = true
-              setGenStarted(Date.now())
-              setProgress('No answer yet — asking again…')
-            }
-            /*
-             * The rig lookup, which happens before the model is asked anything
-             * and used to happen before the stream opened at all — a minute of
-             * blank screen that nothing accounted for, ending in a tone built
-             * from memory that nothing said had been built from memory.
-             *
-             * Said in the conversation when it does not land, not only in the
-             * log: a tone designed without the lookup is a tone worth knowing
-             * was designed without it.
-             */
-            else if (e.kind === 'rig') {
-              /*
-               * Filed away as it arrives, so the next request for this band
-               * skips the search. Never awaited and never allowed to throw: a
-               * note that failed to file costs one lookup next time, and the
-               * tone on screen does not depend on it at all.
-               */
-              if (e.rig) {
-                rememberRig(e.rig, songs).catch(() => {})
-              }
-              if (e.state === 'looking') setProgress('Looking up the band and the songs…')
-              else if (e.state === 'cached') setProgress('Already know this band — designing…')
-              else if (e.state === 'found') setProgress('Got the rig — designing…')
-              else if (e.state === 'timeout' || e.state === 'failed') {
-                setProgress(`${THINKING}…`)
-                setTurns((prev) => [
-                  ...prev,
-                  {
-                    role: 'system',
-                    text: `${e.note}. The tone below is built on what the model already knew rather than on anything looked up, so check the amp against the real one before you keep it.`
-                  }
-                ])
-              }
-            }
-          }
-        }
-      )
-    } finally {
-      generationAbort.current = null
-      setGenStarted(null)
-      setThinking(false)
-      setProgress(null)
-    }
-  }
-
+  
   /**
    * Nothing here is named yet, so nothing here can be overwritten.
    *
@@ -2767,8 +2142,7 @@ export default function App() {
    * strings. That is the difference between "build this over what is there"
    * and "there is nothing here yet — what do you want?"
    */
-  const nothingLaidOut = () => !sceneNames.some((n) => (n || '').trim())
-
+  
   /**
    * The tone on screen, as it will be kept in the conversation.
    *
@@ -2778,33 +2152,9 @@ export default function App() {
    * came next: a line saying "replaced" would be a lie if the generation that
    * was supposed to replace it then failed.
    */
-  const shelved = () => {
-    if (!result) return null
-    return {
-      id: (pastId.current += 1),
-      result,
-      withScenes,
-      renamePreset,
-      /* The scene names as they were when this was asked for. A card saying
-         "replaces Rhythm" is describing the unit at that moment; reading it
-         off the live names would rewrite the record every time a scene is
-         renamed afterwards. */
-      sceneNames,
-      sceneCount,
-      scene,
-      outcome: applied
-        ? `Sent — ${applied.count} change${applied.count === 1 ? '' : 's'} written${
-            applied.savedTo !== undefined ? `, saved to slot ${applied.savedTo}` : ''
-          }.`
-        : 'Not sent.'
-    }
-  }
-
+  
   /** Put a tone into the conversation for good. */
-  const keep = (entry) => {
-    if (entry) setPast((list) => [...list, entry])
-  }
-
+  
   /**
    * Has this exact plan already been written?
    *
@@ -2820,592 +2170,9 @@ export default function App() {
    * error boundary caught it and replaced the whole app with "The app couldn't
    * draw"; every test still passed.
    */
-  const sent =
-    !!result &&
-    sentPlan?.result === result &&
-    sentPlan.withScenes === withScenes &&
-    sentPlan.renamePreset === renamePreset &&
-    sentPlan.scene === scene
-
-  /**
-   * Throw a design away, from whichever store it is actually in.
-   *
-   * "Add a way for them to delete generations that have been generated
-   * previously." Three stores feed one list, and an entry knows which one it
-   * came from — `where` is set by whoever read it, and absent means this
-   * browser's own storage. Deleting from the wrong one leaves the row on screen
-   * and looks like the button not working.
-   *
-   * A failure is reported rather than swallowed: a delete that silently did
-   * nothing is worse than one that says it could not.
-   */
-  const forget = async (entry) => {
-    if (!entry) return
-    try {
-      if (entry.where === 'cloud') await deleteCloudPreset(entry.id)
-      else if (entry.where === 'folder') {
-        const { savedFolder, deletePresetFile } = await import('./lib/localFolder')
-        const folder = await savedFolder()
-        if (folder && !folder.needsPermission) await deletePresetFile(folder, entry.file)
-      } else deletePreset(entry.id)
-      setHistoryKey((k) => k + 1)
-    } catch (err) {
-      setError(`Couldn't delete “${entry.name || 'Untitled'}” — ${err.message}`)
-    }
-  }
-
-  /**
-   * Keep a tone the moment it is designed, wherever this player's presets live.
-   *
-   * "I'm logged in to the account so it should be saving all of my presets that
-   * I've ever generated instead of just a local browser."
-   *
-   * Half of that was a misreading and half was a real fault, and the real half
-   * is the timing. This ran off the back of a successful write, on the argument
-   * that "a spec that was never sent isn't a preset, it's a draft". That
-   * argument is wrong about how the app is actually used: tones get designed,
-   * compared, and half of them never sent — and every one of those was gone the
-   * moment the next one arrived, from the account as much as from the browser.
-   * Three rows in the table after weeks of use is what that policy looks like
-   * from the outside, and it looks like cloud saving being broken.
-   *
-   * So it happens at generation now. Sending is a separate decision and no
-   * longer the price of keeping anything.
-   *
-   * The two stores are not alternatives. Local (or the chosen folder) is what
-   * makes this work with no account at all; the account copy is what makes a
-   * new phone not a fresh start. A failure to reach the account must not lose
-   * the tone, so it is caught and reported to the log rather than thrown.
-   */
-  const keepGeneration = async (designed) => {
-    if (!designed?.spec) return
-    const fields = {
-      name: designed.presetName || preset?.name || 'Untitled',
-      description: designed.description || lastPrompt,
-      summary: designed.summary,
-      spec: designed.spec,
-      usage: designed.usage,
-      device: device?.name,
-      blockNames: (designed.changes || []).map((c) => c.name),
-      /*
-       * How long this one took. Measured so that "longer than usual" can be a
-       * comparison against something rather than a literal sixty seconds
-       * inherited from a server ceiling that has since moved. See typicalMs.
-       */
-      ms: genStarted ? Date.now() - genStarted : null
-    }
-    /*
-     * The folder is the home when one is chosen; this browser's storage is the
-     * fallback, not a second copy. Writing both would show every design twice
-     * on the Mac and leave the question "which one is real" — files on disk are
-     * the answer, because backups reach them and browsers get reinstalled.
-     */
-    try {
-      const { savedFolder, writeDesignFile } = await import('./lib/localFolder')
-      const folder = await savedFolder().catch(() => null)
-      if (folder && !folder.needsPermission) {
-        try {
-          await writeDesignFile(folder, buildEntry(fields))
-        } catch {
-          savePreset(fields)
-        }
-      } else {
-        savePreset(fields)
-      }
-    } catch {
-      savePreset(fields)
-    }
-
-    if (cloudReady()) {
-      try {
-        await saveCloudPreset(buildEntry(fields))
-      } catch (err) {
-        // The app talking about itself, not a hand on the unit.
-        record('library', `Kept on this device, but not to your account — ${err.message}`, [], true)
-      }
-    }
-    setHistoryKey((k) => k + 1)
-  }
-
-  /**
-   * Put the blocks a design asked for onto the grid, by name.
-   *
-   * Names arrive as the designer wrote them — "delay", "pitch shifter /
-   * whammy" — and resolve against the unit's own list, aliases included, so
-   * "whammy" becomes the Pitch block. Anything the unit does not offer, or
-   * that has no free slot, is left for the note under the design. Returns
-   * the labels of what landed. The same verbatim copy of the slot is taken
-   * before the first structural write as the chain build takes, for the
-   * same reason; over the link a backup is refused and the edit buffer is
-   * still undone by reloading the preset.
-   */
-  const placeWanted = async (wanted, placed) => {
-    let list = []
-    try {
-      list = await placeableBlocks()
-    } catch {
-      return []
-    }
-    const slugs = []
-    for (const name of wanted) {
-      const hit = resolvePlaceable(list, name)
-      if (hit && !slugs.includes(hit.slug) && !placed.some((b) => b.slug === hit.slug)) slugs.push(hit.slug)
-    }
-    if (!slugs.length) return []
-
-    if (!safety && typeof preset?.number === 'number') {
-      try {
-        const dump = await backupPreset(preset.number)
-        if (dump?.bytes?.length) setSafety({ number: preset.number, name: preset.name, bytes: dump.bytes })
-      } catch {
-        // Not every device exposes the dump path, and the link refuses it.
-      }
-    }
-
-    const plan = validatePlan(
-      {
-        actions: slugs.map((slug) => ({
-          kind: 'placeBlock',
-          text: slug,
-          value: null,
-          row: null,
-          col: null,
-          why: 'the tone wanted it'
-        }))
-      },
-      placed,
-      { ...(device?.capabilities || {}), remote: remoteActive() }
-    )
-    const failed = new Set(
-      await runPlan(plan.actions, (done, total, label) => setProgress(`${done} of ${total} - ${label}`))
-    )
-    // runPlan reports failures by label; what is not in that list landed.
-    const landed = plan.actions
-      .map((a) => a.label)
-      .filter((label) => ![...failed].some((f) => String(f).includes(label)))
-      .map((label) => label.replace(/^Add a /, ''))
-    if (landed.length) record('grid', `Added ${landed.join(', ')} for the tone`, [], true)
-    return landed
-  }
-
-  /**
-   * File a finished design under its band, for lib/bandBook.js.
-   *
-   * The band is whatever the designer said it was voicing, or failing that a
-   * band the rig cache recognises in the words. A design that names no band
-   * is a sound, not an entry, and is not filed.
-   */
-  const fileDesign = (validated, schema, description) => {
-    const artist = validated?.artist || pickRig(localRigs(), description, 0)?.artist || null
-    if (!artist) return
-    rememberDesign(validated, schema, { artist, device: device?.name || null }).catch(() => {})
-  }
-
-  /**
-   * A band this app has already designed is not designed again.
-   *
-   * The rig cache spared the second request for a band the search; it still
-   * paid for the design — every roster sent again, the model thinking again,
-   * the same scenes coming back a second time. The band book keeps the
-   * finished tone itself, by block family and control name so it fits
-   * whatever is loaded, and the next request naming that band is rebuilt
-   * from it with nothing sent to the model at all. Null when the book has
-   * nothing for these words; lib/bandBook.js says when it stands aside.
-   */
-  const fromBandBook = async (description, schema, opts) => {
-    const songs = songsWanted({ wantScenes: opts.wantScenes, sceneBudget: opts.sceneBudget, sceneCount })
-    const noted = pickDesign(await knownDesigns().catch(() => []), description, {
-      songs,
-      wantScenes: opts.wantScenes
-    })
-    const spec = noted ? replay(noted.design, schema, { scenes: songs || undefined }) : null
-    return spec ? { artist: noted.artist, spec } : null
-  }
-
-  const generate = async (description, against = null, opts = {}) => {
-    /*
-     * A number of scenes in the request itself is the answer to the question
-     * below, so it is not asked and not guessed. "Full Tool preset" on an FM3
-     * whose scenes were already named went straight to the model with no count
-     * attached and came back with four — the question is only put on a preset
-     * with nothing laid out, and rule 11 filled the silence. See
-     * scenesAskedFor in api/_scenes.js: the same shape the buttons produce, so
-     * the two cannot disagree.
-     */
-    if (opts.wantScenes === undefined) {
-      const named = scenesAskedFor(description, sceneCount)
-      if (named) opts = { ...opts, ...named }
-    }
-    /* "Do not create a preset name" — read from the words, so the rename box
-       starts unticked rather than ticked with a name nobody asked for. */
-    if (opts.keepName === undefined && keepsName(description)) opts = { ...opts, keepName: true }
-    /*
-     * Ask once, before the model runs. Asking afterwards would mean paying for
-     * a second generation to act on the answer.
-     *
-     * Asked whenever the words did not say. This used to ask only on a preset
-     * with nothing laid out, and on every other preset the count was left to
-     * the model — which is how "a full Tool rig" came back with four scenes
-     * and nobody was consulted. "If it doesn't understand how many scenes to
-     * create, it can pull up a question box and ask." One tap, and a number
-     * in the request skips it entirely.
-     */
-    if (opts.wantScenes === undefined && sceneCount > 1) {
-      setSceneAsk({ description, against })
-      return
-    }
-    setBusy(true)
-    setError(null)
-    /* The tone being cleared off the screen goes into the log rather than
-       nowhere. Shelved here, before the clear, because after it there is
-       nothing left to read it from. */
-    keep(shelved())
-    setResult(null)
-    setWithScenes(false)
-    setRenamePreset(!opts.keepName)
-    setApplied(null)
-    /*
-     * Reading a whole preset over the relay is as long as writing one and just
-     * as untouched, so the same lock covers it. Without it a phone locks
-     * during the read, the relay drops, and the tone is designed against
-     * whatever half of the preset made it back.
-     */
-    const release = keepAwake()
-    /*
-     * On disk before the first round trip, so a page that dies during the
-     * minutes this takes comes back knowing an answer was owed. Cleared in
-     * `finally`, so a generation that finished — or failed in a way the app
-     * already reported — leaves nothing behind to apologise for.
-     */
-    pending.current = { description, at: Date.now() }
-    saveSession({
-      turns,
-      chatId,
-      clearedAt: chatClearedAt,
-      result,
-      withScenes,
-      renamePreset,
-      saveName,
-      lastPrompt,
-      pending: pending.current
-    })
-    try {
-      setProgress('Reading what the unit has loaded...')
-      const schema = await readSchema(
-        against || blocks,
-        (done, total, name) => setProgress(`Reading ${name} - ${done} of ${total}`),
-        // Designing or rebuilding a whole preset starts from the unit, not from
-        // what we last wrote to it.
-        { force: true }
-      )
-
-      if (!schema.length) {
-        throw new Error(
-          'Nothing to design against — this preset has no editable blocks. Ask again and a chain will be built first.'
-        )
-      }
-
-      setProgress(null)
-      // Known already, so not designed again — see fromBandBook above.
-      const noted = await fromBandBook(description, schema, opts)
-      const fromBook = noted?.spec || null
-      const spec = fromBook
-        ? fromBook
-        : await requestSpec(schema, description, null, {
-            wantScenes: opts.wantScenes,
-            sceneBudget: opts.sceneBudget
-          })
-
-      const validated = validateSpec(spec, schema, sceneCount, channelNames)
-      validated.spec = spec
-      validated.description = description
-      if (fromBook) {
-        setTurns((prev) => [
-          ...prev,
-          {
-            role: 'system',
-            text:
-              `Already knew ${noted.artist} — this is the last ${noted.artist} tone this app designed, ` +
-              `rebuilt onto what is loaded. Nothing was sent to the AI and it cost nothing. ` +
-              `Ask for "${noted.artist}, fresh take" to have it designed again from scratch.`
-          }
-        ])
-      }
-
-      /*
-       * A tone that wanted a block the preset lacks gets the block.
-       *
-       * The designer is told to work with what is placed and to list the gaps
-       * — so "Killswitch Militia" came back dialled around a Whammy it could
-       * not reach, with a note to go and add a pitch block by hand and ask
-       * again. "I thought it can change blocks out freely." It can: placing
-       * is the chat's job, and this is the app doing it on the design's
-       * behalf. The wanted blocks that the unit offers go into free slots,
-       * and the tone is designed once more against the chain it asked for.
-       * Once — a second round that still wants something is shown as it is,
-       * with the note, rather than looping.
-       */
-      if (!opts.placedWanted && validated.wanted?.length) {
-        const added = await placeWanted(validated.wanted, against || blocks)
-        if (added.length) {
-          setTurns((prev) => [
-            ...prev,
-            {
-              role: 'system',
-              text: `Added ${added.join(', ')} — the tone wanted ${
-                added.length === 1 ? 'it' : 'them'
-              } — and designing again against the new chain.`
-            }
-          ])
-          const fresh = (await read()) || []
-          return await generate(description, fresh, { ...opts, placedWanted: true })
-        }
-      }
-
-      /*
-       * Carried up beside the result rather than left buried in the spec, so
-       * the panel that explains a tone reads it from one place whether the
-       * generation streamed or fell back. Absent unless someone asked for it.
-       */
-      if (spec?._trace) validated._trace = spec._trace
-      setResult(validated)
-      setLastDesign(designMemory(validated))
-      // Kept here, not on the way out of a write: a tone you never send is
-      // still a tone you asked for, and it used to vanish with the next one.
-      keepGeneration(validated)
-      /*
-       * Scenes are opt-in — unless they are the whole proposal. A plan that
-       * changes no block and only lays out scenes would otherwise arrive with
-       * its one useful half switched off and a button offering zero writes.
-       */
-      setWithScenes(
-        validated.scenes.length > 0 && (opts.wantScenes === true || validated.changes.length === 0)
-      )
-      setLastPrompt(description)
-      revealResult()
-
-      setSaveName(validated.presetName || preset?.name?.trim() || '')
-
-      /*
-       * Written down against the band, when there is one, for the next time.
-       * Not when it came from the book — it is already there — and never
-       * awaited: the tone on screen does not depend on the note being filed.
-       */
-      if (!fromBook) fileDesign(validated, schema, description)
-      if (!fromBook) noteSpend('design', validated.usage)
-      const source = fromBook ? ' (from the band book)' : ''
-      record('generate', `Designed "${validated.presetName || 'untitled'}" from: ${description}${source}`, [
-        `${countWrites(validated.changes)} changes proposed`,
-        ...validated.problems
-      ])
-      sayDesigned('Designed', validated)
-    } catch (err) {
-      // A run that failed leaves no half chain on screen beside its error.
-      setPartial(null)
-      /* The model being off is a refusal, not a failure: one line in the
-         chat, no banner, no ledger row, no offer to try again. */
-      if (err?.message === MODEL_OFF) {
-        setTurns((prev) => [...prev, { role: 'assistant', text: MODEL_OFF }])
-        return
-      }
-      setError(err.message)
-      /* And it goes in the ledger anyway. The model was asked, it thought, and
-         in some of these it answered — all of that was paid for, and until now
-         the error replaced the count along with everything else. */
-      noteSpend('design', err?.usage || null, { failed: err.message })
-      // Nothing reached the unit, so asking again is safe to offer.
-      setRetryAsk({ description, against, opts })
-    } finally {
-      pending.current = null
-      release()
-      setProgress(null)
-      setBusy(false)
-    }
-  }
-
-  const apply = async () => {
-    setBusy(true)
-    setError(null)
-    /*
-     * A send is minutes of round trips with nobody touching the screen, which
-     * is exactly what auto-lock is for — and a locked phone suspends the page
-     * and closes the socket underneath the relay. Held for the whole write and
-     * released in `finally`, so a send that fails does not leave the screen on
-     * for the rest of the night.
-     */
-    const release = keepAwake()
-    try {
-      // A verbatim copy of the slot as it stands, taken before the first write.
-      // Revert covers unsaved edits; this covers changing your mind after
-      // saving, which revert cannot reach.
-      if (!safety && typeof preset?.number === 'number') {
-        try {
-          const dump = await backupPreset(preset.number)
-          if (dump?.bytes?.length) {
-            setSafety({ number: preset.number, name: preset.name, bytes: dump.bytes })
-          }
-        } catch {
-          // Not every device exposes the dump path. Revert still works.
-        }
-      }
-
-      const failures = await applyChanges(result.changes, (done, total, label) =>
-        setProgress(`${done} of ${total} - ${label}`)
-      )
-
-      /*
-       * ForgeFX caches block parameters with no invalidation hook, so a read can
-       * report a value the hardware doesn't hold. Check what actually stuck.
-       *
-       * Before the scenes, not after. Checking a channel means standing on it,
-       * and which channel a block is on is part of the scene, not of the block
-       * — so this pass ends by putting every block back on the channel the
-       * write pass left it on. Run after the scenes, that landed in whichever
-       * scene the player was returned to and overwrote what the plan had just
-       * written for it: one scene came out with every block on the last channel
-       * dialled instead of the one it was designed to play. Nothing here reads
-       * or writes a scene, and values belong to channels rather than to scenes,
-       * so checking first checks exactly the same things.
-       */
-      setProgress('Checking what landed...')
-      const mismatches = await verifyChanges(result.changes, (done, total, name) =>
-        setProgress(`Verifying ${name} - ${done} of ${total}`)
-      )
-
-      /*
-       * Scenes go on after the rig, never with it.
-       *
-       * A scene records which blocks are on; it does not record what they sound
-       * like, because parameters belong to the block (and to its channel). So
-       * the models and values have to be in place before the states over them
-       * mean anything — write them the other way round and every scene is a
-       * pattern over a preset that has not been dialled yet.
-       *
-       * Last, so that nothing after it moves a block off the channel its scene
-       * plays.
-       */
-      const sceneFailures =
-        withScenes && result.scenes?.length
-          ? await applyScenes(
-              result.scenes,
-              (done, total, label) => setProgress(`Scenes — ${done} of ${total} · ${label}`),
-              // Which slot these names belong to, so a phone can read them back.
-              // Scene names live in a preset dump and dumps do not travel the
-              // relay, so what is written down here is the only copy a handset
-              // will ever see. See noteSceneNames.
-              preset?.number ?? null
-            )
-          : []
-      failures.push(...sceneFailures)
-
-      // Name it now rather than at save. The name is part of the preset in the
-      // edit buffer, so writing it here means the unit's screen shows what was
-      // just built — which is also the quickest confirmation the write landed.
-      const generatedName = (saveName || result.presetName || '').trim()
-      // Renaming the preset is its own decision, made on the preview. Scene
-      // names are written either way — they are part of the plan that was
-      // agreed to, and they are what the footswitch shows.
-      if (renamePreset && generatedName && generatedName !== preset?.name?.trim()) {
-        try {
-          const res = await setPresetName(generatedName)
-          // The AM4 answers {ok:false} rather than erroring when it can't
-          // resolve the stored location — a refusal wearing a success shape.
-          if (res && res.ok === false) throw new Error('The unit refused the rename.')
-        } catch (err) {
-          /*
-           * This used to be swallowed whole, and over a remote session it fails
-           * EVERY time — ForgeFX's relay refuses renames by design — so every
-           * generated preset silently kept its old name and the feature looked
-           * broken. The name is part of what was generated: keep the intent in
-           * the save options, where the save flow will write it, and say what
-           * happened next to the button that will finish the job.
-           */
-          setSaveName(generatedName)
-          /*
-           * Park it on the host so it isn't lost. Renames are refused over the
-           * relay by design, but writes to ForgeFX's document store are not —
-           * the same crossing scene names already use. The app at the Mac picks
-           * this up on its next read and writes it, so a preset designed from
-           * the phone ends up named without anyone retyping it.
-           */
-          const parked =
-            typeof preset?.number === 'number' &&
-            (await parkPresetName(preset.number, generatedName).catch(() => false))
-          setSaveError(
-            err.remoteBlocked
-              ? parked
-                ? `Renaming happens at the computer, so the unit still shows the old name. “${generatedName}” is waiting there — open this app on the computer and it gets written automatically.`
-                : `Renaming happens at the computer, so the unit still shows the old name. “${generatedName}” is kept in the save options here — rename at the computer to put it on the unit.`
-              : `Couldn't write the name “${generatedName}” to the unit — it's kept in the save options and will be applied on save.`
-          )
-        }
-      }
-
-      const count = countWrites(result.changes)
-      setApplied({ failures, count, mismatches })
-      // The plan as it stands is now on the unit, so the button stops offering
-      // to write it again until one of the tick boxes changes what "it" means.
-      setSentPlan({ result, withScenes, renamePreset, scene })
-      setDirty(true)
-      // The chat is told the difference between a tone on screen and one on
-      // the unit, and this is the moment it crosses.
-      setLastDesign((prev) => (prev ? { ...prev, applied: true } : prev))
-      setTurns((prev) => [
-        ...prev,
-        {
-          role: 'system',
-          text: `Wrote "${result.presetName || preset?.name || 'the tone'}" to the unit — ${count} changes${
-            failures.length ? `, ${failures.length} failed` : ''
-          }.`
-        }
-      ])
-
-      /*
-       * Keeping it is `keepGeneration`'s job now, and it happened the moment
-       * this tone was designed — see there for why it moved off the back of a
-       * successful write.
-       */
-      record(
-        'write',
-        `Wrote ${count} changes to ${preset?.name || 'the working preset'}`,
-        [
-          ...result.changes.flatMap((c) => [
-            ...(c.typeName ? [`${c.name} model -> ${c.typeName}`] : []),
-            ...c.params.map((p) => `${c.name} - ${p.name} ${p.from} -> ${p.to}${p.unit}`)
-          ]),
-          ...failures,
-          ...mismatches.map(
-            (m) =>
-              `did not stick: ${m.block}${m.channel ? ` ch ${m.channel}` : ''} ${m.param} wanted ${m.wanted}, reads ${m.got}`
-          )
-        ]
-      )
-      await read()
-    } catch (err) {
-      setError(err.message)
-      if (err.linkDown) {
-        /*
-         * Half a preset is on the unit and the link is gone. Two things follow
-         * and both matter more than the message: the edit buffer really has
-         * been changed, so it is dirty whatever happens next; and the plan is
-         * NOT marked as sent, so the button still offers to write it — sending
-         * again after reconnecting rewrites the ones that landed to the same
-         * values and finishes the ones that never left.
-         */
-        setDirty(true)
-        record('write', `Send stopped early — ${err.done} of ${err.total} written`, [
-          'The link to the computer dropped part-way through.',
-          'Reconnect and send again: the writes that landed are written to the same values, so nothing is doubled.',
-          ...(err.failures || [])
-        ])
-      }
-    } finally {
-      release()
-      setProgress(null)
-      setBusy(false)
-    }
-  }
-
+  
+  
+  
   const save = async () => {
     // An empty slot field means "the one that's loaded" — the save bar shows
     // that number, so the button does what it says without anything typed.
@@ -3592,391 +2359,16 @@ export default function App() {
    * Marked `tone` so the transcript can draw those buttons on the newest one
    * while the design is still unsent, and drop them once it has gone.
    */
-  const sayDesigned = (verb, validated) => {
-    const changes = countWrites(validated.changes)
-    const scenes = (validated.scenes || []).length
-    const parts = [`${changes} change${changes === 1 ? '' : 's'}`]
-    if (scenes) parts.push(`${scenes} scene${scenes === 1 ? '' : 's'}`)
-    setTurns((prev) => [
-      ...prev,
-      {
-        role: 'assistant',
-        text:
-          `${verb} "${validated.presetName || preset?.name || 'the tone'}" — ${parts.join(' and ')}. ` +
-          `Nothing has been sent to your unit yet. Send it from here, or look it over below first.`,
-        tone: true
-      }
-    ])
-  }
-
-  const revealResult = () => {
-    /*
-     * Two scrolls, because the preview sits inside the assistant's own
-     * scrollbox: moving the page to the panel doesn't help if the panel is
-     * scrolled to an older turn, and scrolling the box doesn't help if the
-     * panel is off screen. So the box goes to the top of the result — where
-     * its name and the Send button are — and the page goes to the panel.
-     *
-     * Two frames, not one: recording the change adds a turn, and the log pins
-     * itself to its newest turn on that commit. One frame lands before that
-     * and gets overwritten, leaving the box showing the END of a long preview.
-     */
-    const run = () => {
-      /*
-       * One scroll now, not two. The preview used to sit inside the
-       * conversation's own scrollbox, so being shown it meant moving the box
-       * and the page. It is its own panel below the conversation, and a tone
-       * on a screen whose conversation is a full viewport tall is otherwise
-       * entirely below the fold — which is exactly the "button that does
-       * nothing" this exists to prevent.
-       */
-      bringIntoView(document.querySelector('.tones'), { block: 'start' })
-    }
-    requestAnimationFrame(() => requestAnimationFrame(run))
-  }
-
-  const reload = async (entry, picked = null) => {
-    /*
-     * MORE SOUNDS THAN THE UNIT HOLDS, ASKED ABOUT BEFORE ANYTHING IS READ.
-     *
-     * "I am currently on the AM4, which only allows four scenes per preset.
-     * But most of these presets were created on the FM3."
-     *
-     * The load used to go ahead and let the validator throw the extra scenes
-     * out — first four kept, rest listed in the rejected panel, no say in it.
-     * Both halves of the spec are known here without touching the hardware, so
-     * the question is asked first and costs nothing when the answer is no
-     * question at all, which it is for every tone that fits. See lib/sceneFit.
-     */
-    if (!picked && scenesOverflowing(entry?.spec, sceneCount)) {
-      setSceneFit(entry)
-      return
-    }
-    const fit = picked ? fitScenes(entry.spec, picked, sceneCount) : null
-    const spec = fit ? fit.spec : entry.spec
-
-    setBusy(true)
-    setError(null)
-    setApplied(null)
-    /* Taken now and kept only if the load succeeds: a failed read leaves the
-       tone that was on screen still on screen, and it would be in the log
-       twice. */
-    const replacing = shelved()
-
-    /*
-     * OUT OF THE SHEET IT WAS ASKED FOR FROM, AND INTO THE ONE THAT SHOWS IT.
-     *
-     * "Tapping a preset saved to my account doesn't do anything... the one
-     * saved in the browser, you click reload, it looks like it's gonna reload
-     * and then says nothing and does nothing."
-     *
-     * It was doing all of it. A reload re-reads the unit, re-checks the saved
-     * spec against what is loaded now, and puts the result on the tone card —
-     * and the tone card lives inside the Ask sheet, which is not the sheet you
-     * pressed the button in. So the progress, the result, the Send button and
-     * the error banner were all behind the Presets sheet still covering the
-     * screen. The button did everything except show it.
-     *
-     * So the load takes you where it lands, and says so on the way: one line
-     * when it starts, because reading a preset over the relay is not instant,
-     * and one when it arrives, naming what came back and what to press. The
-     * card under it carries the changes and the Send button.
-     */
-    setSheet('chat')
-    setPresetMenu(false)
-    setTurns((prev) => [
-      ...prev,
-      { role: 'system', text: `Loading "${entry.name}" — reading what the unit has now…` }
-    ])
-    try {
-      setProgress('Reading what the unit has loaded...')
-
-      /*
-       * A SAVED TONE LANDING ON AN EMPTY SLOT BUILDS ITS OWN CHAIN.
-       *
-       * Asking for a tone on an empty preset has built one first since 7.140 —
-       * "ask for a tone on an empty preset and the chain gets built first,
-       * because that is plainly what you meant". Reloading a tone you already
-       * made is the same sentence and never learned it: the spec was checked
-       * against a preset with nothing in it, every change was dropped for
-       * naming a block that was not there, and the app told the player to go
-       * and type "add an amp and a cab" themselves.
-       *
-       * That is what happened here, verbatim: 9 changes proposed, 9 dropped,
-       * 0 written, and a preset saved to slot 478 with nothing in it — then
-       * Chain, correctly, showing an empty chain.
-       *
-       * The blocks come from the design's own record of what it was made of,
-       * so what gets placed is what this tone actually needs rather than a
-       * generic starter chain.
-       */
-      /*
-       * Judged from the store rather than a fresh read, the same way the
-       * design path judges it. The store is what the chain strip and the Play
-       * screen are already drawn from; asking the unit again here would put a
-       * round trip over the relay in front of every reload to answer a
-       * question the app can already answer.
-       *
-       * "Empty" means nothing you can EDIT, not nothing at all — an empty slot
-       * still reports its input and output rows, and counting those was the
-       * gap that made both of the earlier hardware failures.
-       */
-      const editable = (blocks || []).filter((b) => !EXCLUDED_BLOCKS.includes(b.slug))
-      let ground = blocks
-      if (!editable.length) {
-        /*
-         * A verbatim copy before the first structural write, the same
-         * precaution the design path takes for the same reason: "empty" is
-         * this app's own read, and this is a path that changes what blocks
-         * exist. Best effort — a phone is refused the dump, and the unsaved
-         * buffer can still be thrown away by reloading the preset.
-         */
-        if (!safety && typeof preset?.number === 'number') {
-          try {
-            const dump = await backupPreset(preset.number)
-            if (dump?.bytes?.length) {
-              setSafety({ number: preset.number, name: preset.name, bytes: dump.bytes })
-            }
-          } catch {
-            // Not every device, and never from a phone. See above.
-          }
-        }
-
-        setProgress('Empty slot — putting the chain in first...')
-        setTurns((prev) => [
-          ...prev,
-          { role: 'system', text: `Empty slot — putting "${entry.name}"'s blocks in first.` }
-        ])
-        const built = validatePlan(
-          {
-            actions: [
-              {
-                kind: 'buildChain',
-                /* The design's own blocks, in the order it recorded them.
-                   Empty falls through to the default chain, which is better
-                   than refusing. */
-                text: (entry.blockNames || []).join(', ') || null,
-                why: 'empty preset'
-              }
-            ]
-          },
-          [],
-          { ...(device?.capabilities || {}), remote: remoteActive() }
-        )
-        const failures = await runPlan(built.actions, (done, total, label) =>
-          setProgress(`${done} of ${total} - ${label}`)
-        )
-        if (failures.length) throw new Error(failures.join(' · '))
-        record('grid', `Built "${entry.name}"'s chain into the empty slot`, [], true)
-        /* Taken from read's return rather than state, which has not caught up
-           — and busy goes back on, because read hands it back on its way out
-           and the rest of this is still running. */
-        ground = (await read()) || blocks
-        setBusy(true)
-        const landed = (ground || []).filter((b) => !EXCLUDED_BLOCKS.includes(b.slug))
-        if (landed.length) {
-          setTurns((prev) => [
-            ...prev,
-            {
-              role: 'system',
-              text: `Chain in: ${landed.map((b) => `${b.name || b.slug} (${b.effectId})`).join(', ')}`
-            }
-          ])
-        }
-      }
-
-      setProgress('Reading what the unit has loaded...')
-      const schema = await readSchema(
-        ground,
-        (done, total, name) => setProgress(`Reading ${name} - ${done} of ${total}`),
-        // Designing or rebuilding a whole preset starts from the unit, not from
-        // what we last wrote to it.
-        { force: true }
-      )
-
-      const validated = validateSpec(spec, schema, sceneCount, channelNames)
-      validated.spec = spec
-      validated.description = entry.description
-      if (!validated.presetName) validated.presetName = entry.name
-
-      keep(replacing)
-      setResult(validated)
-      /*
-       * And its scenes, which are the reason a saved tone has eight of
-       * anything.
-       *
-       * Scenes are opt-in on a fresh design — see generate — and this path
-       * never said anything about them at all, so a reload sent whatever the
-       * switch happened to be left on from earlier in the session, which after
-       * clearing a tone is off. The result was a saved eight-scene tone that
-       * reloaded as the sound only: every value landed, every scene kept the
-       * name and the layout of whatever preset was underneath it, and nothing
-       * on the card said so. "I believe this was supposed to name eight scenes
-       * with song names and it didn't."
-       *
-       * A reload is not a proposal about scenes, it is the tone that was
-       * saved, and its scenes are part of it — this app has just asked which
-       * of them should come across when there were too many, and answered in
-       * the conversation which ones made it. Asking that and then writing none
-       * of them is the contradiction this fixes.
-       */
-      setWithScenes(validated.scenes.length > 0)
-      setLastDesign(designMemory(validated))
-      setSaveName(validated.presetName || entry.name)
-      revealResult()
-      const ready = countWrites(validated.changes)
-      const loaded = validated.presetName || entry.name
-      /* Said in the conversation as well as in the picker, because the picker
-         is gone by the time the tone is on screen. */
-      if (fit) {
-        setTurns((prev) => [
-          ...prev,
-          { role: 'system', text: describeFit(fit, sceneCount) }
-        ])
-      }
-      setTurns((prev) => [
-        ...prev,
-        {
-          role: 'system',
-          /*
-           * What the card under it actually offers.
-           *
-           * A saved tone is re-checked against the preset that is loaded NOW,
-           * and everything in it can be dropped — a different amp, a block
-           * that isn't there any more. Promising a Send button in that case
-           * is the same broken promise this whole change is about: the card
-           * says "nothing to apply" and there is no button under it.
-           */
-          text: ready
-            ? `"${loaded}" is loaded — ${ready} change${
-                ready === 1 ? '' : 's'
-              } ready. Nothing has been written yet: send it to the ${
-                device?.short || device?.name || 'unit'
-              } with the button under it.`
-            : `"${loaded}" came back, but none of it fits the preset on the unit right now, so there is nothing to send.${
-                validated.problems?.length ? ` ${validated.problems[0]}` : ''
-              }`
-        }
-      ])
-      record('reload', `Loaded saved preset "${entry.name}"`, [
-        `${countWrites(validated.changes)} changes proposed`,
-        ...(fit ? [describeFit(fit, sceneCount)] : []),
-        ...validated.problems
-      ])
-    } catch (err) {
-      setError(err.message)
-      /* Where the press was, not only in the banner behind it. */
-      setTurns((prev) => [
-        ...prev,
-        { role: 'system', text: `Couldn't load "${entry.name}" — ${err.message}` }
-      ])
-    } finally {
-      setProgress(null)
-      setBusy(false)
-    }
-  }
-
+  
+  
+  
   /**
    * Adjust the tone that's currently proposed or written.
    *
    * Sends the previous spec as the subject rather than a fresh brief, so the
    * model moves one thing instead of redesigning around a new sentence.
    */
-  const refine = async (instruction, against = null, opts = {}) => {
-    const previous = result?.spec
-    if (!previous) return
-    /*
-     * A refinement can be about the COUNT. "It should be eight scenes not
-     * four" went to the designer as an adjustment with no scene count on it,
-     * beside an instruction to change as little as possible — so it kept four,
-     * twice. A number in the words reaches the model as the same instruction a
-     * tapped "All 8" would have, and the rig lookup goes hunting for that many
-     * songs to fill them with.
-     */
-    const scenesWanted =
-      opts.wantScenes !== undefined
-        ? { wantScenes: opts.wantScenes, sceneBudget: opts.sceneBudget }
-        : scenesAskedFor(instruction, sceneCount) || {}
-    /* The version being adjusted, taken before the run and kept only if a new
-       one arrives. A refinement that fails leaves the old tone live — and a
-       tone that is both live and in the log is the same tone drawn twice. */
-    const replacing = shelved()
-
-    /*
-     * What they say when a first attempt is wrong.
-     *
-     * Every refinement is the model being told, in the player's own words,
-     * what it should have done in the first place. Said three times, "darker"
-     * stops being a correction and becomes an instruction for the next first
-     * attempt — which is the whole point of collecting it.
-     */
-    if (tasteOn && rememberNote(instruction)) setCorrectionKey((n) => n + 1)
-
-    setBusy(true)
-    setError(null)
-    try {
-      setProgress('Reading what the unit has loaded...')
-      const schema = await readSchema(
-        against || blocks,
-        (done, total, name) => setProgress(`Reading ${name} - ${done} of ${total}`),
-        // Designing or rebuilding a whole preset starts from the unit, not from
-        // what we last wrote to it.
-        { force: true }
-      )
-
-      if (!schema.length) {
-        // The generic server refusal for an empty schema reads like a device
-        // fault. This is not one: the preset simply has nothing editable to
-        // adjust, and saying so keeps the person off a debugging goose chase.
-        throw new Error(
-          'Nothing here to refine — this preset has no editable blocks. Ask for a tone and a chain will be built first.'
-        )
-      }
-
-      setProgress(null)
-      const spec = await requestSpec(schema, instruction, previous, scenesWanted)
-
-      const validated = validateSpec(spec, schema, sceneCount, channelNames)
-      validated.spec = spec
-      validated.description = instruction
-      keep(replacing)
-      setResult(validated)
-      setLastDesign(designMemory(validated))
-      // A refinement is its own tone — a different spec, asked for separately —
-      // so it is kept like one. Restoring from the library is NOT: that entry
-      // is already saved, and keeping it again would grow a duplicate each time
-      // someone opened an old design to look at it.
-      keepGeneration(validated)
-      setApplied(null)
-      setSaveName(validated.presetName || preset?.name?.trim() || '')
-      revealResult()
-
-      // The adjusted tone is the better note for this band than the first take.
-      fileDesign(validated, schema, instruction)
-      noteSpend('refine', validated.usage)
-
-      record('refine', `Adjusted: ${instruction}`, [
-        `${countWrites(validated.changes)} changes proposed`,
-        ...validated.problems
-      ])
-      sayDesigned('Adjusted', validated)
-    } catch (err) {
-      // A run that failed leaves no half chain on screen beside its error.
-      setPartial(null)
-      /* The model being off is a refusal, not a failure: one line in the
-         chat, no banner, no ledger row, no offer to try again. */
-      if (err?.message === MODEL_OFF) {
-        setTurns((prev) => [...prev, { role: 'assistant', text: MODEL_OFF }])
-        return
-      }
-      setError(err.message)
-      noteSpend('refine', err?.usage || null, { failed: err.message })
-    } finally {
-      setProgress(null)
-      setBusy(false)
-    }
-  }
-
+  
   /** Reload the current slot from flash, discarding anything unsaved. */
   const revert = async () => {
     resetSchemaCache()
@@ -4026,640 +2418,8 @@ export default function App() {
   /* How often the local matcher could have answered, this session. Refs, not
      state: nothing renders from them and a re-render per chat turn would be a
      re-render for a number only the debug log reads. */
-  const localSeen = useRef(0)
-  const localHits = useRef(0)
-
-  const askFor = async (instruction) => {
-    setBusy(true)
-    setError(null)
-    setTurns((prev) => [...prev, { role: 'user', text: instruction }])
-    /* Whether this turn's tokens have already gone in the ledger. Anything that
-       throws AFTER the answer landed must not be written down a second time. */
-    let counted = false
-
-    // Parameters are cached between turns, which is what makes conversation
-    // quick. The cache cannot see a knob turned on the unit itself, so asking
-    // for a re-read is sayable rather than something only a hidden button does.
-    const wantsFresh = /\b(re-?read|refresh|reload|check again|what changed)\b/i.test(instruction)
-
-    try {
-      setProgress('Reading the preset...')
-      const schema = await readSchema(
-        blocks,
-        (done, total, name) => setProgress(`Reading ${name} - ${done} of ${total}`),
-        { force: wantsFresh }
-      )
-
-      // Grid positions come from the placed-block list, not the schema, since
-      // the schema drops blocks the generator must not touch.
-      const withPositions = schema.map((entry) => {
-        const placed = blocks.find((b) => b.effectId === entry.eid)
-        return { ...entry, row: placed?.row, col: placed?.col }
-      })
-
-      /*
-        Watching, and doing nothing about it.
-
-        "Scene 3." "Bypass the delay." "Tempo 120." Every one of those goes to
-        the model, costs real money and takes a round trip, for a sentence with
-        one reading and no judgement in it. lib/localCommands.js can answer
-        them without asking anybody — but how MANY of the things this player
-        actually types are that shape is not something either of us can guess,
-        and a matcher switched on against a guess is one that writes to a unit
-        on the strength of a guess.
-
-        So it runs and reports and never acts. Every line it writes is a
-        request it would have handled: read a week of them and the hit rate is
-        measured rather than estimated, and any match that reads wrong is found
-        while it is still only a line in a log.
-
-        Free to run — readSchema above has already been paid for, so the
-        controls it needs are to hand, and a miss is a few microseconds.
-      */
-      let would = null
-      try {
-        const controls = withPositions.flatMap((entry) =>
-          (entry.params || []).map((param) => ({ block: entry, param }))
-        )
-        /*
-         * Everything the matcher may read, and all of it already in hand: the
-         * schema just read, where the unit is (scene, preset, tempo), what
-         * the slots are called, and the grid it has to fit a move into. No
-         * device call is made to build this.
-         */
-        const known = {
-          blocks: withPositions,
-          controls,
-          sceneCount: device?.capabilities?.sceneCount ?? 8,
-          sceneNames,
-          activeScene: scene,
-          presetNumber: preset?.number,
-          presetName: preset?.name,
-          slots: slots.length ? slots : cachedPresetNames(),
-          slotCount: device?.capabilities?.slotCount ?? null,
-          bpm,
-          grid: device?.capabilities?.grid || null,
-          /* The placed list, input and output included: a cell the schema
-             does not show is still not a free cell. */
-          occupied: blocks.map((b) => ({ row: b.row, col: b.col, eid: b.effectId })),
-          /* The player's own usual move on that control, when there is one —
-             a median of what they have reached for before beats a share of
-             the range for "a bit more treble". */
-          learnedStep: (name) =>
-            corrections?.controls?.find((c) => c.name === name)?.by ?? null
-        }
-        would =
-          matchQuestion(instruction, known) ||
-          matchRename(instruction, known) ||
-          matchLocal(instruction, known)
-        localSeen.current += 1
-        if (would) localHits.current += 1
-        /*
-          Both outcomes, and the miss is the one that was missing.
-          
-          The first version logged only hits, which cannot measure anything: a
-          session with no line in it reads identically whether the matcher
-          caught nothing or was never asked. A real log came back with two chat
-          requests and no local lines at all, and the only way to tell which
-          had happened was to read the "ask" entries beside them and try the
-          words by hand. Both had missed, and both for reasons worth fixing —
-          "change X to channel B" and "rename scene 2 to Lithium" — which is
-          exactly what watching is for and exactly what it failed to say.
-          
-          One line per request, either way, with the tally on both. Chat turns
-          are a handful a session, so this is a rounding error in a log that
-          already carries a line per parameter written.
-        */
-        logDebug(
-          'local',
-          would ? `caught here: ${would.why || would.text || would.topic}` : 'left to the model',
-          `"${instruction}"${would ? ` → ${would.kind}` : ''} · ${localHits.current} of ${localSeen.current} this session`
-        )
-      } catch (err) {
-        /* A matcher that throws is a matcher that did not match, and it must
-           not be able to stop a request that was going to the model anyway. */
-        logDebug('local', 'the local matcher threw and was ignored', err?.message)
-      }
-
-      /*
-       * Two requests that do not go to the model at all.
-       *
-       * Both are exceptions to the watch-only rule above, and both for the
-       * same reason: the sentence has one reading, the app already owns the
-       * action, and the model turn was pure cost. "Make a Breaking Benjamin
-       * rig" spent a thirteen-cent chat turn deciding it was a design before
-       * the designer got the same words; "turn up the volume by 4 dB" spent
-       * one deciding to move the amp's Level on one channel, which is not the
-       * volume of the preset. See plainDesignRequest and matchVolume in
-       * lib/localCommands.js for exactly what is and is not caught.
-       */
-      const plain = plainDesignRequest(instruction, { blocks: withPositions })
-      if (plain && blocks.some((b) => !EXCLUDED_BLOCKS.includes(b.slug))) {
-        logDebug('local', 'handled here: a plain design request, straight to the designer', `"${instruction}"`)
-        setTurns((prev) => [
-          ...prev,
-          { role: 'assistant', text: 'Designing that — I\u2019ll show you the whole thing before anything is written.' }
-        ])
-        const scenesWanted = {
-          ...(scenesAskedFor(instruction, sceneCount) || {}),
-          ...(keepsName(instruction) ? { keepName: true } : {})
-        }
-        await generate(plain.text, null, scenesWanted)
-        return
-      }
-
-      const volume = matchVolume(instruction)
-      if (volume) {
-        /*
-         * The Output block's Level — the control the speaker slider moves and
-         * the one every scene passes through. Read fresh, moved by the dB
-         * asked for, held inside its own range, and read back the way every
-         * write is.
-         *
-         * A volume request this cannot carry out is SAID here. It used to fall
-         * through to the model — and with the model off, to "the AI model is
-         * off", which is not why the volume did not move.
-         */
-        if (outputEid === null) {
-          const text = 'I can\u2019t find the Output block on this preset, so there is no whole-preset level to move. The speaker slider on Play needs it too.'
-          logDebug('local', 'a volume request with no Output block to move', `"${instruction}"`)
-          setTurns((prev) => [...prev, { role: 'assistant', text }])
-          return
-        }
-        setProgress('Moving the volume…')
-        const level = outputLevelParam((await blockParams(outputEid))?.named)
-        const now = Number(level?.value)
-        if (!level || !Number.isFinite(now)) {
-          const text = 'The Output block has no level control I can read on this unit, so I can\u2019t move the volume from here.'
-          logDebug('local', 'a volume request, but the Output block gave no level', `"${instruction}"`)
-          setTurns((prev) => [...prev, { role: 'assistant', text }])
-          return
-        }
-        {
-          const target = Math.round((now + volume.by) * 10) / 10
-          const to = Math.max(level.min ?? -Infinity, Math.min(level.max ?? Infinity, target))
-          const res = await setParamConfirmed(outputEid, level.id, to, { ...level, name: level.name || 'Level' })
-          const unit = level.unit || ' dB'
-          const line = `${volume.by > 0 ? 'Up' : 'Down'} ${Math.abs(volume.by)} dB on the whole preset — Output level ${now}${unit} → ${to}${unit}`
-          logDebug('local', 'handled here: whole-preset volume on the Output block', `"${instruction}" → ${line}`)
-          record('edit', line, [], false)
-          setTurns((prev) => [
-            ...prev,
-            {
-              role: 'assistant',
-              text: res.ok
-                ? `${line}. Every scene moves together, because that is the level everything leaves through.${
-                    to !== target ? ` Stopped at the end of the control's range.` : ''
-                  }`
-                : `Sent ${line}, but the unit read back something else — check the speaker slider.`
-            }
-          ])
-          setDirty(true)
-          return
-        }
-      }
-
-      /*
-       * What the app does by itself, before any model is asked.
-       *
-       * "The app should be able to handle local commands like adjusting
-       * settings on controls and knobs and things like that without using the
-       * AI model." The matcher above watched for months and never acted; now
-       * a match IS the answer, model on or off. A question is answered in
-       * words from what was just read. A change goes through exactly the path
-       * a model's plan takes below — checked against the unit by validatePlan,
-       * confirmed first if it can lose work, run by the same runner, said in
-       * the same Done line. Nothing here costs a token.
-       *
-       * With the model off, a sentence the matcher does not know gets one
-       * line saying so and where the list is. With it on, that sentence goes
-       * to the model as it always has.
-       */
-      if (would?.kind === 'answer') {
-        counted = true // nothing was spent, so a failure below must not go in the ledger as a chat turn
-        let text = would.text
-        if (would.topic === 'model') {
-          /* The one fact the schema does not carry: which model a block is on. */
-          setProgress(`Reading ${would.block}…`)
-          const read = await blockParams(would.eid).catch(() => null)
-          const type = read?.type
-          const value = typeof type === 'object' && type ? type.value : type
-          const name = typeof type === 'object' && type ? type.name : null
-          const entry = withPositions.find((b) => b.eid === would.eid)
-          const model = entry?.models?.find((m) => m.value === value)
-          const shown = name || model?.name || null
-          const gear = model?.basedOn || model?.manufacturer || null
-          text = shown
-            ? `${would.block} is on ${shown}${gear ? ` (${gear})` : ''}.`
-            : `I couldn\u2019t read which model ${would.block} is on.`
-        }
-        logDebug('local', 'answered here: a question about what is loaded', `"${instruction}" → ${text}`)
-        record('ask', `Asked: ${instruction}`, [text], true)
-        setTurns((prev) => [...prev, { role: 'assistant', text }])
-        return
-      }
-
-      let body = null
-      if (would) {
-        counted = true // no model turn, so nothing to write in the ledger if the write fails
-        logDebug('local', 'handled here: no model needed', `"${instruction}" → ${would.kind}`)
-        body = { understood: would.why, actions: [would] }
-      } else if (!modelOn) {
-        setTurns((prev) => [...prev, { role: 'assistant', text: MODEL_OFF }])
-        return
-      } else {
-      /* ── the model half. Kept at its old indentation: it is long, it is
-            unchanged, and the diff should say so. It ends where the shared
-            plan check begins, at "Which scenes share a channel". ── */
-      setProgress(`${THINKING}…`)
-      /*
-       * The placeable palette rides along so "add a reverb" is sayable: the
-       * model can only speak in names it has been shown, and type codes differ
-       * per unit.
-       *
-       * This called blockCatalog() without ever importing it. The call threw
-       * "blockCatalog is not defined", the catch below swallowed it, and the
-       * chat was handed an empty list on every request from every device —
-       * which is why it told a player "this preset's placeable-block list is
-       * coming through empty" and declined to add a Pitch block an FM3 has
-       * always had. The read is imported now, remembered per unit (see
-       * lib/palette) so a phone whose read fails still has last time's list,
-       * and a failure with nothing remembered is SAID rather than emptied.
-       */
-      let palette = []
-      let placeableProblem = null
-      try {
-        palette = (await placeableBlocks()).map((b) => ({ slug: b.slug, name: b.name }))
-      } catch (err) {
-        placeableProblem = `The block list could not be read from the ${
-          remoteActive() ? 'computer over the link' : 'unit'
-        }: ${err?.message || 'no answer'}.`
-      }
-
-      /*
-       * Streamed, so a long think is a wait rather than a dropped call.
-       *
-       * This was a plain fetch on a route that says nothing until it has the
-       * whole answer, and a request that made the model think for two and a
-       * half minutes came back as "That didn't work: Load failed" — the phone
-       * hanging up on a silent connection. askPlan reads the same answer off a
-       * line the server keeps alive, gives up on our clock rather than the
-       * browser's, and asks once more if the line really did die.
-       */
-      body = await askPlan(
-        {
-          instruction,
-          memory: memoryForRequest(memory), // who is asking — api/_memory.js
-          device,
-          grid: { ...(device?.capabilities?.grid || {}), palette },
-          placeableProblem,
-          blocks: withPositions,
-          scene,
-          sceneNames,
-          sceneCount: device?.capabilities?.sceneCount,
-          presetName: preset?.name,
-          presetNumber: preset?.number,
-          /*
-           * What the unit holds, so the conversation can answer for it.
-           *
-           * "What presets do we have named Metallica?" — "I don't have a way
-           * to browse your slot list or library by name from here." The list
-           * was on screen at the time. See slotsForChat: names, empties and,
-           * most of all, which slots nobody has read yet.
-           */
-          slots: slotsForChat(
-            slots.length ? slots : cachedPresetNames(),
-            device?.capabilities,
-            preset
-          ),
-          /*
-           * What the conversation has to know to answer for itself: the last
-           * design with its reasoning, and the same taste and corrections the
-           * designer already gets. The roles travel as they are — the route
-           * labels app notes and hand edits so the model knows who said what.
-           */
-          design: lastDesign,
-          taste: describeProfile(taste),
-          corrections: tasteOn ? describeCorrections(corrections) : '',
-          history: turns.map((t) => ({ role: t.role, text: t.text }))
-        },
-        {
-          host: getHost(),
-          /* The same one line the designer uses, so a chat turn that is thinking
-             for a minute says so instead of sitting blank. */
-          onEvent: (e) => {
-            if (e.kind === 'retrying') setProgress('The line dropped — asking again')
-            else if (e.kind === 'waiting') setProgress(`${THINKING}…`)
-          }
-        }
-      )
-
-      /*
-       * Counted the moment it lands, before anything branches on what it says.
-       *
-       * Every chat turn has always come back with its own token count and the
-       * app read it into a field nothing looked at — so the money spent on the
-       * conversation was invisible, and a turn that went on to ask for a design
-       * would have lost the count at the next return even if something had.
-       */
-      noteSpend('chat', body?._usage || null)
-      counted = true
-
-      /*
-       * A tone description is not a list of changes. It gets designed and shown
-       * before anything is written — describing a sound and having the unit
-       * silently become something else is the opposite of useful.
-       */
-      const design = (body?.actions || []).find((a) => a.kind === 'designTone')
-      if (design) {
-        setTurns((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            text:
-              body.understood ||
-              'Designing that — I\u2019ll show you the whole thing before anything is written.'
-          }
-        ])
-        // No view to switch to — the design appears in this conversation.
-        let builtBlocks = null
-
-        /*
-         * An empty slot used to be a dead end: design refused and told you to go
-         * place blocks yourself, which meant leaving the conversation to get out
-         * of it. Ask for a tone on an empty preset and the chain gets built
-         * first, because that is plainly what you meant.
-         */
-        /*
-         * Empty means nothing you can edit — not nothing at all.
-         *
-         * An empty AM4 slot still reports its input and output rows, so the
-         * raw count said "two blocks", the chain build was skipped as
-         * unnecessary, and the schema then filtered those two rows out and
-         * sent the generator nothing. Both hardware failures so far were this
-         * one gap wearing different errors.
-         */
-        const editableBlocks = blocks.filter((b) => !EXCLUDED_BLOCKS.includes(b.slug))
-        if (editableBlocks.length === 0) {
-          /*
-           * A verbatim copy of the slot before the first structural write.
-           *
-           * "Empty" is this app's own read, and this is the one path that
-           * changes what blocks exist. If that read were ever wrong — and AM4
-           * placement is the least hardware-proven part of the stack — these
-           * writes would land on someone's real preset. The apply path has
-           * taken this exact precaution all along; the build path just never
-           * did, and it's the riskier of the two.
-           */
-          if (!safety && typeof preset?.number === 'number') {
-            try {
-              const dump = await backupPreset(preset.number)
-              if (dump?.bytes?.length) {
-                setSafety({ number: preset.number, name: preset.name, bytes: dump.bytes })
-              }
-            } catch {
-              // Not every device exposes the dump path; the unsaved buffer can
-              // still be discarded by reloading the preset.
-            }
-          }
-
-          setTurns((prev) => [
-            ...prev,
-            { role: 'system', text: 'Empty slot — putting a chain in first.' }
-          ])
-          const built = validatePlan(
-            { actions: [{ kind: 'buildChain', text: null, why: 'empty preset' }] },
-            [],
-            { ...(device?.capabilities || {}), remote: remoteActive() }
-          )
-          const failures = await runPlan(built.actions, (done, total, label) =>
-            setProgress(`${done} of ${total} - ${label}`)
-          )
-          if (failures.length) {
-            setError(failures.join(' · '))
-            setTurns((prev) => [
-              ...prev,
-              { role: 'assistant', text: `Couldn't build a chain: ${failures.join(' · ')}` }
-            ])
-            return
-          }
-          // Design computes against what is on the grid, so it has to see it.
-          // Taken from read's return rather than state, which hasn't caught up.
-          // The app's own step inside a design, not a hand edit.
-          record('grid', 'Built a chain into the empty slot', [], true)
-          builtBlocks = (await read()) || []
-          // The same raw-count trap as above: input and output rows would pass
-          // this guard even if placement wrote nothing. Count what's editable.
-          const landed = (builtBlocks || []).filter((b) => !EXCLUDED_BLOCKS.includes(b.slug))
-          // Say what landed, ids included. When the generation then references
-          // ids the preset doesn't hold, this line is the other half of the
-          // diagnosis, already on screen.
-          if (landed.length) {
-            setTurns((prev) => [
-              ...prev,
-              {
-                role: 'system',
-                text: `Chain in: ${landed.map((b) => `${b.name || b.slug} (${b.effectId})`).join(', ')}`
-              }
-            ])
-          }
-          /*
-           * And whether the unit says the blocks are joined up.
-           *
-           * A block that is on the grid and wired to nothing is a block that
-           * makes no sound, and until now nothing in this app could tell the
-           * two apart: the values landed, the reads agreed, the preset saved,
-           * and every tone built into an empty slot came back silent. The
-           * chain is wired when it is placed now — this is the check that the
-           * wiring took.
-           *
-           * `fromRows` is what the unit reports feeding each block. Only the
-           * blocks past the first column are asked about, because the first
-           * one is fed by the input rather than by a row. A unit that doesn't
-           * report the field is not accused of anything.
-           */
-          const wired = landed.filter((b) => Array.isArray(b.fromRows))
-          const orphans = wired.filter((b) => b.col > 0 && !b.fromRows.length)
-          if (wired.length && orphans.length) {
-            setTurns((prev) => [
-              ...prev,
-              {
-                role: 'assistant',
-                text: `The blocks are on the grid but ${
-                  orphans.length === 1 ? 'one of them is' : `${orphans.length} of them are`
-                } not connected to anything, so this preset won't make a sound until the row is joined up on the unit: ${orphans
-                  .map((b) => b.name || b.slug)
-                  .join(', ')}.`
-              }
-            ])
-          }
-          if (!landed.length) {
-            setTurns((prev) => [
-              ...prev,
-              { role: 'assistant', text: 'The chain went in but the unit reports nothing on the grid.' }
-            ])
-            return
-          }
-        }
-
-        // With a design already on screen and not yet written, adjust that spec
-        // rather than starting over: "warmer" means warmer than the thing you
-        // are looking at, and redesigning from scratch would throw away
-        // everything else about it.
-        /*
-         * A chain that was just built has no history to refine. The lingering
-         * spec that sent us to refine here belonged to whatever was loaded
-         * before — including a failed attempt, which stores its spec too — and
-         * refine reads its schema from state that hasn't caught up with the
-         * build. That exact combination turned a successful chain build into
-         * "No blocks were read from the device": the chain landed, then a
-         * stale spec was refined against a stale empty schema, and the error
-         * buried the success.
-         */
-        /*
-         * Unless it is a different tone altogether. "Make a full Metallica
-         * preset" with a Killswitch design still on screen went down the
-         * refine path — adjusted the Killswitch tone into something else,
-         * kept its name on the card, and read as the app having lost the
-         * plot. The chat model is asked which it is (see api/command.js:
-         * `flag` on designTone), and a new sound starts over: the old design
-         * is shelved into the log as "Not sent", and the card under the chat
-         * is the tone that was actually asked for.
-         */
-        const startOver = design.flag === true
-        /*
-         * How many scenes they asked for, read from what they actually typed
-         * rather than from the chat model's retelling of it — a count that
-         * survives one rewrite may not survive the next.
-         */
-        const scenesWanted = {
-          ...(scenesAskedFor(instruction, sceneCount) || {}),
-          ...(keepsName(instruction) ? { keepName: true } : {})
-        }
-        if (builtBlocks) {
-          setResult(null)
-          await generate(design.text || instruction, builtBlocks, scenesWanted)
-        } else if (result?.changes?.length && !startOver) {
-          // Refining means adjusting a design that produced something. A spec
-          // whose every change was rejected is not a thing to build on.
-          await refine(design.text || instruction, null, scenesWanted)
-        } else {
-          await generate(design.text || instruction, builtBlocks, scenesWanted)
-        }
-        return
-      }
-
-      } // end of the model half
-
-      /*
-       * Which scenes share a channel, where that can be known silently — the
-       * demo answers, a real unit says null. What turns "brighten scene 2"
-       * into either a write scoped to that scene or a question first.
-       */
-      const channelMap = await sceneChannels().catch(() => null)
-      lastPlanBlocks.current = withPositions
-      const checked = validatePlan(body, withPositions, {
-        ...(device?.capabilities || {}),
-        activeScene: scene,
-        sceneNames,
-        sceneChannels: channelMap,
-        // Over the relay the host refuses a backup, so the plan must not
-        // propose one — and a slot write goes the way the Save button's does,
-        // parked for the Mac to carry out. See validatePlan's `remote`.
-        remote: remoteActive()
-      })
-      record(
-        'ask',
-        `Asked: ${instruction}`,
-        [checked.understood, `${checked.actions.length} actions proposed`, ...checked.problems],
-        true
-      )
-
-      const reply = {
-        role: 'assistant',
-        text: replyFor(checked),
-        actions: checked.actions,
-        problems: checked.problems
-      }
-
-      /*
-       * What runs on arrival and what waits.
-       *
-       * Setting a named control is a thing you asked for by name, so it just
-       * happens — a confirmation click there is the ceremony that sends people
-       * back to the knobs. Anything that can lose work waits. So does anything
-       * broad: past a handful of changes you are no longer nudging a control,
-       * you are reshaping the sound, and you should see that first.
-       */
-      /*
-       * Some things the host refuses from a distance, deliberately: saving to a
-       * slot, backups, the library. Say so before running anything rather than
-       * letting the player watch a plan half-succeed and then throw a 403.
-       */
-      if (remote) {
-        const blocked = checked.actions.filter((a) => REMOTE_BLOCKED_KINDS.has(a.kind))
-        if (blocked.length) {
-          setTurns((prev) => [
-            ...prev,
-            {
-              role: 'assistant',
-              text: `${blocked
-                .map((a) => a.label)
-                .join(', ')} — that has to happen at the computer. A phone can't overwrite a preset, which is the right call mid-set.`
-            }
-          ])
-          return
-        }
-      }
-
-      const broad = checked.actions.length > PREVIEW_ABOVE
-      /*
-       * A value the player aimed at one scene that lands on a channel other
-       * scenes play too. Written straight away it reads as "brighten scene 2"
-       * having brightened the whole preset, which is what it did. So it waits,
-       * with the sentence from the plan check saying which scenes it reaches.
-       */
-      const shared = checked.actions.some((a) => a.shared)
-      if (checked.actions.some((a) => a.destructive) || shared || broad) {
-        /*
-         * And the way out of the shared-channel question that is not homework:
-         * a button that gives the scene its own channel and then makes the
-         * change. Offered only when a free channel can be found, which needs
-         * the channel map the demo has and a real unit does not give.
-         */
-        const scoped = shared
-          ? scopedActions(checked.actions, {
-              sceneChannels: channelMap,
-              channelNames: device?.capabilities?.channelNames
-            })
-          : null
-        setTurns((prev) => [
-          ...prev,
-          {
-            ...reply,
-            pending: true,
-            reason: checked.actions.some((a) => a.destructive) ? null : shared ? 'shared' : 'broad',
-            scopeOffer: scoped ? scoped.label : null
-          }
-        ])
-        return
-      }
-
-      setTurns((prev) => [...prev, reply])
-      if (checked.actions.length) await perform(checked.actions)
-    } catch (err) {
-      setError(err.message)
-      setTurns((prev) => [...prev, { role: 'assistant', text: `That didn't work: ${err.message}` }])
-      /* A chat turn that died after the model had answered was still paid for,
-         and a turn that died before it started still spent the thinking. Both
-         go down, with no count where there is none to report. */
-      if (!counted) noteSpend('chat', null, { failed: err.message })
-    } finally {
-      setProgress(null)
-      setBusy(false)
-    }
-  }
-
+    
+  
   /**
    * Run a checked list and report back into the conversation.
    *
@@ -4694,110 +2454,7 @@ export default function App() {
     return () => clearTimeout(t)
   }, [justDid])
 
-  const perform = async (actions) => {
-    setRunningPlan(true)
-    // Whatever the last one did is no longer what is happening.
-    setJustDid(null)
-    try {
-      const failures = await runPlan(actions, (done, total, label) =>
-        setProgress(`${done} of ${total} - ${label}`)
-      )
-      /*
-       * What happened, not everything that was attempted plus everything that
-       * wasn't. The count and the list used to be the whole plan with the
-       * refusals stapled on, so two changes the unit turned down read as "Did 2
-       * things" followed by those same two changes twice — once as done, once
-       * as refused. In the debug log, which is where a session is read back.
-       */
-      const landed = landedOf(actions, failures)
-      /*
-       * A save the Mac was asked to carry out, now that it has been asked.
-       *
-       * Parking is all the action itself can do — whether it landed is decided
-       * on another machine a few seconds later. This is the same watcher the
-       * Save button's parked save uses, so "asked the Mac" becomes "the Mac
-       * saved it" in the one place either route would say it.
-       */
-      const parked = landed.find((a) => a.parksSave)?.parksSave
-      if (parked) {
-        setQueuedSave({
-          id: parked.id,
-          slot: parked.slot,
-          name: parked.name || preset?.name || '',
-          /*
-           * Carried with the request rather than read back later: an AM4 will
-           * not dump a preset over the relay, so when the Mac says this landed
-           * this is the only description of that slot the phone will have.
-           */
-          scenes: Array.isArray(sceneNames) ? [...sceneNames] : []
-        })
-      }
-      record(
-        'edit',
-        landed.length === actions.length
-          ? `Did ${actions.length} things`
-          : `Did ${landed.length} of ${actions.length} things`,
-        [...landed.map((a) => a.label), ...failures],
-        true
-      )
-      if (failures.length) {
-        setError(failures.join(' · '))
-        setTurns((prev) => {
-          const next = [...prev]
-          for (let i = next.length - 1; i >= 0; i--) {
-            if (next[i].role === 'assistant' && next[i].actions?.length) {
-              next[i] = { ...next[i], failed: failures }
-              break
-            }
-          }
-          return next
-        })
-      }
-      /*
-       * Say what happened, in the conversation.
-       *
-       * Otherwise a request ends in silence and you have to go and look at a
-       * panel to find out whether it worked — which is the same "the answer is
-       * somewhere else" problem the design preview had.
-       */
-      if (!failures.length) {
-        const done = actions.map((a) => a.label)
-        setTurns((prev) => [
-          ...prev,
-          {
-            role: 'system',
-            text: done.length === 1 ? `Done — ${done[0]}.` : `Done — ${done.length} changes.`
-          }
-        ])
-        /*
-         * And the same thing again, for the screen showWhatChanged is about to
-         * move to. The turn above lands in a conversation nobody is looking at
-         * a moment later, which is how a request answered in full arrives as
-         * an unexplained jump to another tab.
-         */
-        setJustDid({ labels: done, where: whereOf(actions) })
-      }
-
-      // Saving is what makes things permanent, so a plan containing one leaves
-      // the preset clean rather than still flagged as unsaved.
-      const saved = actions.some((a) => a.kind === 'savePreset')
-      setDirty(!saved)
-      /*
-       * And a word beside Save saying so. The gold button was the only sign
-       * that a change made in words would be gone on the next preset change,
-       * and a button that has been gold since the first knob turn is not news.
-       */
-      setAskedUnsaved(!saved)
-      showWhatChanged(actions)
-      await read()
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setProgress(null)
-      setRunningPlan(false)
-    }
-  }
-
+  
   /**
    * Put the thing that just changed on screen.
    *
@@ -4806,52 +2463,8 @@ export default function App() {
    * follows the work, and the relevant section is scrolled to rather than left
    * somewhere below the fold.
    */
-  const showWhatChanged = (actions) => {
-    const kinds = new Set(actions.map((a) => a.kind))
-    /*
-     * Where the thing that changed now lives. Two of these are sheets rather
-     * than screens, so "show me" opens the sheet instead of switching a tab —
-     * and the anchor is inside it, which is why the scroll waits a frame for
-     * it to exist. The class names are checked by a test: an anchor nothing
-     * renders scrolls to nothing, silently, which is what `.local-library`
-     * did for three releases.
-     */
-    const target = kinds.has('keepInLibrary')
-      ? { sheet: 'presets', anchor: '.local-library' }
-      : kinds.has('placeBlock') || kinds.has('clearCell') || kinds.has('moveBlock')
-        ? { view: 'shape', anchor: '.grid-editor' }
-        : kinds.has('setSceneBlock') || kinds.has('setScene')
-          ? { sheet: 'scenes', anchor: '.scenes' }
-          : kinds.has('setParam') || kinds.has('setModel') || kinds.has('setChannel')
-            ? { view: 'shape', anchor: '.chain-strip' }
-            : null
-    if (!target) return
-    // The anchor lives on a screen a phone no longer reaches: there is nothing
-    // to move to and nothing to scroll to once there.
-    if (target.view && !views.includes(target.view)) return
-    if (target.view) setView(target.view)
-    if (target.sheet) setSheet(target.sheet)
-    // After the surface exists, not before — two frames, because a sheet
-    // mounts closed for one so it has somewhere to animate from.
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        bringIntoView(document.querySelector(target.anchor), { block: 'start' })
-      })
-    )
-  }
-
-  const confirmTurn = async (index) => {
-    const turn = turns[index]
-    if (!turn?.actions?.length) return
-    setTurns((prev) => prev.map((t, i) => (i === index ? { ...t, pending: false } : t)))
-    setBusy(true)
-    try {
-      await perform(turn.actions)
-    } finally {
-      setBusy(false)
-    }
-  }
-
+  
+  
   /**
    * Do it, but with the scene on its own channel first.
    *
@@ -4860,58 +2473,9 @@ export default function App() {
    * was, and run. The re-check is what turns "shared with scenes 1, 3 and 4"
    * into "this scene only" on the labels, so the Done card tells the truth.
    */
-  const scopeTurn = async (index) => {
-    const turn = turns[index]
-    if (!turn?.actions?.length || !lastPlanBlocks.current) return
-    setBusy(true)
-    try {
-      const channelMap = await sceneChannels().catch(() => null)
-      const scoped = scopedActions(turn.actions, {
-        sceneChannels: channelMap,
-        channelNames: device?.capabilities?.channelNames
-      })
-      if (!scoped) {
-        setError('No channel is free for that block any more — every one is in use by a scene.')
-        return
-      }
-      const checked = validatePlan({ actions: scoped.actions }, lastPlanBlocks.current, {
-        ...(device?.capabilities || {}),
-        activeScene: scene,
-        sceneNames,
-        sceneChannels: scoped.after,
-        remote: remoteActive()
-      })
-      setTurns((prev) =>
-        prev.map((t, i) =>
-          i === index
-            ? {
-                ...t,
-                pending: false,
-                scopeOffer: null,
-                actions: checked.actions,
-                problems: checked.problems,
-                text: `${t.text} — with scene ${scoped.scene + 1} on its own channel.`
-              }
-            : t
-        )
-      )
-      if (checked.actions.length) await perform(checked.actions)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const cancelTurn = (index) => {
-    setTurns((prev) =>
-      prev.map((t, i) =>
-        i === index ? { ...t, pending: false, actions: [], text: `${t.text} — left alone.` } : t
-      )
-    )
-  }
-
-  const writeCount = result ? countWrites(result.changes) : 0
-  const sceneWriteCount = result ? countSceneWrites(result.scenes) : 0
-
+  
+  
+    
   const hasScenes = device?.capabilities?.hasScenes !== false
 
   /*
@@ -4954,8 +2518,7 @@ export default function App() {
    * storage to a person who has never used it, which is a panel for nobody.
    * Re-read on the key that changes when something moves out of it.
    */
-  const hasBrowserSaves = useMemo(() => listPresets().length > 0, [historyKey])
-
+  
   /*
    * The names read themselves.
    *
@@ -5154,287 +2717,6 @@ export default function App() {
   const openBlock = selectedBlock ? blocks.find((b) => b.effectId === selectedBlock) : null
 
 
-  /*
-   * The conversation, built once and shown in two places.
-   *
-   * Create is its home and gives it the whole screen. Everywhere else it
-   * arrives in a sheet from a button, because a tone you want to change is
-   * usually one you are listening to right now — and walking off the screen
-   * you are playing on to go and ask was the wrong shape.
-   *
-   * One element, rendered into whichever place is open, rather than two
-   * call sites. The props here are numerous, and the failure mode of a
-   * second copy is a conversation that behaves subtly differently depending
-   * on how it was opened — which nobody would think to check.
-   *
-   * A button, never a pinned input. A fixed bar carrying a text field is the
-   * configuration iOS Safari handles worst, Assistant.submit already carries
-   * 30 lines of hard-won keyboard scroll-holding, and this app removed a
-   * pinned bottom bar once already.
-   */
-  /*
-   * The tone, under the conversation rather than inside it.
-   *
-   * "Don't show the preset generation inside of the chat box — show it below it
-   * separately, just like the LP Meteora. Have it in a collapsible drop-down,
-   * but expanded by default after the tone is generated, and have buttons to
-   * send it in there. The chat box should pretty much be just the chats going
-   * back and forth."
-   *
-   * Which is what the first report asked for — "maybe we can just list those
-   * under it after they generate" — and I answered by making the card smaller
-   * and leaving it between the turns. Smaller was worth doing. It was not the
-   * thing asked for.
-   *
-   * So the conversation carries what was said and what is happening, and every
-   * tone is an entry below it: the newest open with its buttons, the ones
-   * before it folded down to a name and what became of them. Nothing is
-   * destroyed by asking for another one, which is the part of this that has to
-   * keep being true.
-   */
-  const tones =
-    status === 'live' && (result || past.length) ? (
-      <div className="tones">
-        {result ? (
-          /*
-           * Re-keyed per generation so it opens for each one.
-           *
-           * <details open> is a starting state, not a binding — a second tone
-           * would otherwise arrive inside a panel somebody had folded away and
-           * be invisible. The key moves when a tone is shelved (past grows) or
-           * a new run starts (genAt moves), which is every case that produces
-           * one.
-           */
-          <Section
-            key={`tone-${genAt}-${past.length}`}
-            title={result.presetName || 'The tone'}
-            note={`${writeCount} change${writeCount === 1 ? '' : 's'}${
-              withScenes && sceneWriteCount ? ` · ${sceneWriteCount} scene writes` : ''
-            }${
-              /* Still on screen while an adjustment to it runs — the old tone
-                 stays live in case the new one fails — so say that is what is
-                 happening to it, or the card looks like the app building the
-                 wrong thing. A tone from scratch clears this card instead. */
-              thinking ? ' · being adjusted' : ''
-            }`}
-            defaultOpen
-          >
-        <Preview
-          result={result}
-          writeCount={writeCount}
-          sceneWriteCount={sceneWriteCount}
-          withScenes={withScenes}
-          onWithScenes={setWithScenes}
-          scene={scene}
-          sceneNames={sceneNames}
-          sceneCount={sceneCount}
-          renamePreset={renamePreset}
-          onRenamePreset={setRenamePreset}
-          presetNow={preset?.name}
-          /* Once sent, the button offers to keep it: the same Save sheet the
-             bar opens, which over the link queues the save at the Mac. */
-          onSave={() => setSheet('save')}
-          saveTo={device?.short || device?.name || 'unit'}
-          /* Choosing a scene switches to it rather than remembering it for
-             later. Bypass is written into whatever scene is live, so making
-             the choice real immediately is both simpler and honest — and you
-             hear it, which is the confirmation that it took. */
-          onScene={async (index) => {
-            try {
-              await writeScene(index)
-            } catch (err) {
-              setError(err.message)
-            }
-          }}
-          busy={busy}
-          /* The same line Thinking shows, so the Writing button can count the
-             writes down and move while they land. */
-          progress={progress}
-          sent={sent}
-          onApply={apply}
-          /* Discard clears the panel; it has never undone anything on the unit.
-             So the tone still goes into the log — turning one down is part of
-             what happened, and "the first one was better" needs the first one to
-             still be readable. */
-          onDiscard={() => {
-            keep(shelved())
-            setResult(null)
-          }}
-          /*
-            What it cost, at the top where it is read.
-            It used to ride in with the trace, behind the fold and under the
-            whole diff. The trace is for when a tone surprises you; the price is
-            checked every run, and burying it made a number people wanted into
-            two taps and a long scroll.
-          */
-          cost={<Cost usage={result?.usage} sessionTotal={spend.total} runs={spend.runs} />}
-        >
-          {/* And why it came out the way it did, which does belong with the
-              detail rather than on the face of the card. */}
-          {result?._trace || result?.spec ? (
-            <DevTrace trace={result._trace} spec={result.spec} problems={result.problems} />
-          ) : null}
-        </Preview>
-          </Section>
-        ) : null}
-
-        {/* Newest first: the one before this is the one worth reaching for. */}
-        {[...past].reverse().map((entry) => (
-          <Section
-            key={entry.id}
-            title={entry.result.presetName || 'Untitled'}
-            note={entry.outcome}
-          >
-            <Preview
-              result={entry.result}
-              writeCount={countWrites(entry.result.changes)}
-              sceneWriteCount={countSceneWrites(entry.result.scenes)}
-              withScenes={entry.withScenes}
-              renamePreset={entry.renamePreset}
-              sceneNames={entry.sceneNames}
-              sceneCount={entry.sceneCount}
-              scene={entry.scene}
-              outcome={entry.outcome}
-              cost={<Cost usage={entry.result.usage} />}
-            >
-              {entry.result._trace || entry.result.spec ? (
-                <DevTrace
-                  trace={entry.result._trace}
-                  spec={entry.result.spec}
-                  problems={entry.result.problems}
-                />
-              ) : null}
-            </Preview>
-          </Section>
-        ))}
-      </div>
-    ) : null
-
-  const chat = status === 'live' ? (
-    <Assistant
-      turns={turns}
-      onAsk={askFor}
-      onConfirm={confirmTurn}
-      onScope={scopeTurn}
-      onCancel={cancelTurn}
-      busy={busy || runningPlan}
-      /* Not drawn there — Thinking below draws it. Passed so the transcript
-         scrolls with each tick, which is the one thing Assistant needs it for. */
-      progress={progress}
-      suggestions={suggestionsFrom(taste)}
-      onNew={newChat}
-      /*
-       * The Send on the "designed" line. Offered while there is a tone on
-       * screen that has not gone to the unit; the same write the card's own
-       * button does. Gone once it has been sent, or while another run is
-       * adjusting it.
-       */
-      onSend={result && !sent && !applied && !thinking ? apply : null}
-      sendCount={writeCount + (withScenes ? sceneWriteCount : 0)}
-      onReveal={revealResult}
-      onStop={
-        genStarted
-          ? () => {
-              generationAbort.current?.abort()
-              setTurns((prev) => [
-                ...prev,
-                { role: 'system', text: 'Stopped. Nothing was written to the unit.' }
-              ])
-            }
-          : null
-      }
-    >
-      {/*
-        What the conversation carries: what was said, and what is happening now.
-
-        "The chat box should pretty much be just the chats going back and
-        forth, saying creating tone, what the AI is doing and things like
-        that." The tone itself moved out from between the turns — see
-        `tones` below.
-      */}
-      {/* What a run usually costs in seconds HERE, from the runs already kept.
-          Null until there are a few, and Thinking says nothing about "usual"
-          until there are — the honest answer with no data is silence. */}
-      <Thinking
-        message={progress}
-        active={thinking}
-        startedAt={genStarted}
-        typicalMs={typicalMs(past)}
-        /* Tappable only once the model has actually written something, so the
-           chevron never opens an empty list. */
-        live={!!partial}
-        open={liveOpen}
-        onToggle={() => setLiveOpen((was) => !was)}
-      >
-        {/*
-          Each step as it lands — every block, then every scene with the line
-          the designer wrote about it — in the same flow as the line above,
-          under its chevron. One thing, opened and closed in one place.
-        */}
-        {thinking ? <LiveSteps partial={partial} nameOf={blockNameFor} /> : null}
-      </Thinking>
-
-      <LiveGeneration
-        partial={partial}
-        open={feedOpen}
-        onToggle={() => setFeedOpen(!feedOpen)}
-        /* Offered once the run is over. While it is live the Thinking line
-           and its steps are the account of it, and a second panel saying the
-           same thing in more detail is the clutter this replaced. */
-        chip={!thinking}
-        nameOf={blockNameFor}
-      />
-
-
-      {/*
-        What applying actually did, including anything that read back
-        different from what was sent. This lived in the Design view; without
-        it here, applying a design would finish in silence.
-      */}
-      {applied ? (
-        <div className="notice">
-          <h2>{applied.savedTo !== undefined ? 'Saved' : 'Written to the unit'}</h2>
-          <p>
-            {applied.count} changes sent.
-            {applied.savedTo !== undefined
-              ? ` Stored to slot ${applied.savedTo}.`
-              : ' It\u2019s in the edit buffer \u2014 play it now. Nothing is permanent until you save it, and Revert puts the saved version back.'}
-          </p>
-          {applied.failures?.length
-            ? applied.failures.map((f, i) => (
-                <p key={i} className="mono problem">
-                  {f}
-                </p>
-              ))
-            : null}
-          {applied.mismatches?.length ? (
-            <>
-              <p className="mono problem">
-                {applied.mismatches.length} value
-                {applied.mismatches.length > 1 ? 's' : ''} read back different from what was
-                sent:
-              </p>
-              {/* Field by field. A mismatch is an object — {block, param,
-                  wanted, got} — and rendering it bare took the whole page
-                  down with React #31 the first time a value actually
-                  failed to stick. */}
-              {applied.mismatches.map((m, i) => (
-                <p key={i} className="mono problem">
-                  {/*
-                    The channel, where there is one. A preset that dials a
-                    rhythm and a lead out of one amp reports "Amp 1 Gain 1"
-                    twice, and without saying which channel each line is about
-                    they read as one control failing repeatedly.
-                  */}
-                  {`${m.block}${m.channel ? ` ch ${m.channel}` : ''} ${m.param} — wanted ${m.wanted}, reads ${m.got ?? '—'}`}
-                </p>
-              ))}
-            </>
-          ) : null}
-        </div>
-      ) : null}
-    </Assistant>
-  ) : null
 
   /*
    * The picker, written once and shown in one of two places: a popover under
@@ -5493,7 +2775,7 @@ export default function App() {
   )
 
   return (
-    <div className={`shell ${status === 'live' && view === 'ask' ? 'shell-chat' : ''}`}>
+    <div className="shell">
       {/*
         NOTHING RENDERS ABOVE THE BAR, which is what lets the bar be pinned.
 
@@ -5702,40 +2984,7 @@ export default function App() {
             bill. Where there is genuinely no count, it says that instead of
             leaving a blank that reads as zero.
           */}
-          {lastCall?.failed ? (
-            <p className="mono hint">
-              {lastCall.total === null || lastCall.total === undefined
-                ? 'No token count came back for that one — it is in Setup › Token usage as an uncounted call.'
-                : `That run used ${formatTokens(lastCall.fresh)} in · ${formatTokens(
-                    lastCall.output
-                  )} out${
-                    lastCall.cost === null ? '' : ` · ${formatCost(lastCall.cost)}`
-                  } — kept in Setup › Token usage.`}
-            </p>
-          ) : null}
           <div className="history-actions">
-            {/*
-              Asking again, without typing it again.
-
-              Offered only where the app knows nothing was written — a design
-              run that failed — because that is the one case where repeating
-              the request cannot do any harm. Three minutes of waiting used to
-              end at a Dismiss button and a blank chat box.
-            */}
-            {retryAsk ? (
-              <button
-                className="chip"
-                disabled={busy}
-                onClick={() => {
-                  const again = retryAsk
-                  setRetryAsk(null)
-                  setError(null)
-                  generate(again.description, again.against, again.opts)
-                }}
-              >
-                Try again
-              </button>
-            ) : null}
             <button
               className="chip"
               onClick={() => {
@@ -5768,31 +3017,14 @@ export default function App() {
       */}
       {tabsWorthShowing ? (
         <nav className="views" aria-label="Screens">
-          {/* The ids are the app's own vocabulary and stay put — showWhatChanged
-              and revealResult anchor to them. Only the words a player reads
-              change: "Shape" and "Ask" described what the screen was to the
-              person building it, not what you go there to do. */}
-          {/*
-            One conversation, one name.
-            There used to be four tabs here: Create, and then a separate ✦ Ask
-            that opened `chat` and `tones` — the same two elements Create
-            renders — in a sheet. Not two assistants; one, listed twice, and the
-            second entry greyed itself out whenever you were on the first
-            because there was nothing left for it to open. "It says Create, and
-            then Ask on the same page, which kind of defeats the purpose of
-            having multiple chat bots."
+          {/* The ids are the app's own vocabulary and stay put. Only the
+              words a player reads change: "Shape" described what the screen
+              was to the person building it, not what you go there to do.
 
-            So the screen carries the ✦ and the name the floating button
-            already used, and the fourth tab is gone. The sheet stays: on Play
-            and Edit the same conversation is still one tap away, without
-            leaving the screen you are working on.
-
-            The id is still 'ask' — it always was. Only the word a player reads
-            has changed, and it has changed to the one used everywhere else.
-          */}
+              There were three tabs. The middle one was the conversation, and
+              it went with the AI. */}
           {[
             ['play', 'Play'],
-            ['ask', '✦ Ask'],
             ['shape', 'Edit']
           ].filter(([id]) => views.includes(id)).map(([id, label]) => (
             <button
@@ -5821,7 +3053,7 @@ export default function App() {
         already saying it — an answer repeated beside itself reads as two
         different answers.
       */}
-      {justDid && view !== 'ask' ? (
+      {justDid ? (
         <div className="notice" data-kind="did" role="status">
           <h2>
             {justDid.labels.length === 1
@@ -5840,11 +3072,6 @@ export default function App() {
               changes" on Play could not be told from a preset-wide edit. */}
           {justDid.where ? <p className="did-where">{justDid.where}</p> : null}
           <div className="history-actions">
-            {views.includes('ask') ? (
-              <button className="chip" onClick={() => setView('ask')}>
-                Back to the chat
-              </button>
-            ) : null}
             <button className="chip" onClick={() => setJustDid(null)}>
               Got it
             </button>
@@ -5872,9 +3099,6 @@ export default function App() {
           onError={setError}
           onChanged={read}
           onPickPreset={() => setPresetMenu(true)}
-          /* Absent, not disabled, when play mode is on: the bar closes up to
-             two buttons rather than keeping a dead third. */
-          onAsk={askShows ? () => setSheet('chat') : null}
           /*
            * On a phone this opens the chain in a sheet, because the Edit
            * screen is not reachable there on purpose. On a screen wide enough
@@ -5981,90 +3205,12 @@ export default function App() {
         </>
       ) : null}
 
-      {/*
-        Create is the conversation's home and, as the comment above says, gives
-        it the whole screen. It did not: the log was capped at 340 pixels (260
-        on a phone), so a chat with the run of a 900-pixel window happened in a
-        letterbox with the page scrolling behind it. "Right now it feels
-        clunky" — this is the other half of that.
-      */}
-      {view === 'ask' ? <div className="chat-screen">{chat}</div> : null}
-
-      {/*
-        And the tone under it, outside that column deliberately.
-        The conversation was given the height of the screen and keeps it; a
-        card folded into the same column would take that back from the thing it
-        was given to. Below it the page scrolls, which is where Earlier
-        generations has always been.
-      */}
-      {view === 'ask' ? tones : null}
-
-      {/*
-        What you have made, under the box you make it in — and only there.
-        `chat` is one element rendered in two places, so this sits outside it:
-        in the Ask sheet, which is for a quick change to the tone playing now,
-        a library would be the longest thing in a surface that exists to be
-        short.
-      */}
-      {status === 'live' && view === 'ask' ? (
-        <Recent
-          entries={library}
-          busy={busy}
-          onRestore={reload}
-          onDelete={forget}
-          onSeeAll={() => setSheet('presets')}
-        />
-      ) : null}
       </Screens>
 
       {/* ---------------------------------------------------------------
           Sheets. Things you open, act on and dismiss — not places you go.
           --------------------------------------------------------------- */}
 
-      {/*
-        Everything you have made, in one sheet, whichever store it landed in.
-
-        "Create a dedicated button in the settings menu for history where you
-        can view previous chats and reload them as well as the history of
-        previously generated presets."
-
-        Deliberately not the Presets sheet. That one answers "where is this
-        kept" and has a panel per store, because moving a library between them
-        is a real job. This answers "what have I made", which has no business
-        knowing about stores — so the presets arrive as one merged list, the
-        same one Earlier generations is drawn from, and where things live is
-        one line at the top rather than three headings.
-      */}
-      <Sheet
-        open={sheet === 'history'}
-        /* Only Setup's AI page opens it, so closing it is going back there. */
-        onClose={() => setSheet('settings')}
-        title="History"
-        note={link.account ? link.account.email : 'Saved in this browser'}
-      >
-        {sheet === 'history' ? (
-          <Past
-            chats={chatLog}
-            presets={library}
-            chatId={chatId}
-            busy={busy}
-            signedIn={!!link.account}
-            unit={device?.short || device?.name}
-            onOpenChat={async (entry) => {
-              await openChat(entry)
-              /* Out of the sheet and into the conversation it just loaded —
-                 the same lesson the preset reload learned: a thing that opens
-                 behind the sheet you pressed the button in looks like a button
-                 that did nothing. */
-              setSheet(views.includes('ask') ? null : 'chat')
-              if (views.includes('ask')) changeView('ask')
-            }}
-            onDeleteChat={forgetChat}
-            onRestore={reload}
-            onDelete={forget}
-          />
-        ) : null}
-      </Sheet>
 
       {/*
         The chain, and everything that changes it, on a phone.
@@ -6179,9 +3325,6 @@ export default function App() {
              * would teach the model about their rig rather than about its own
              * misses.
              */
-            if (applied && change && tasteOn) {
-              if (rememberCorrection(change)) setCorrectionKey((n) => n + 1)
-            }
             setDirty(true)
             // A knob is not a change to the chain: the panel has already read
             // the new value back, and a full re-read of the unit per knob is
@@ -6245,21 +3388,6 @@ export default function App() {
         onClose={() => setSignIn(false)}
         onSubmit={signInSubmit}
       />
-
-      <Sheet
-        open={sheet === 'chat'}
-        onClose={() => setSheet(null)}
-        title="Ask"
-        note={preset?.name?.trim() || null}
-        tall
-      >
-        {sheet === 'chat' ? (
-          <>
-            {chat}
-            {tones}
-          </>
-        ) : null}
-      </Sheet>
 
       <Sheet
         open={sheet === 'save'}
@@ -6336,57 +3464,21 @@ export default function App() {
           }}
         />
 
-        {/* Three places a design can live, and they are different things: the
-            account follows you between machines, the folder survives a browser
-            being reinstalled, and browser storage is the fallback that needs
-            neither. Listed in that order because that is the order of how
-            much they survive. */}
-        {/* The note carries the number on purpose. This panel is folded shut,
-            so without it the only way to find out that a library is stranded on
-            one machine is to open a panel you had no reason to open. */}
-        <Section
-          key="account-presets"
-          title="Kept with your account"
-          note={
-            cloudReady() && stranded
-              ? `${stranded} here ${stranded === 1 ? 'is' : 'are'} not on your account yet`
-              : 'On any machine you sign in from'
-          }
-        >
-          <CloudPresets
-            onLoad={reload}
-            onError={setError}
-            busy={busy}
-            local={onThisDevice}
-            missing={stranded}
-          />
-        </Section>
+        {/* The folder, which survives a browser being reinstalled.
 
-        <Section key="saved-presets" title="Saved presets" note="Captures and designs, as files in a folder you choose">
+            There were three panels here: the account, the folder and browser
+            storage. The other two held DESIGNS — tones the AI had made — and
+            went with it. What is left is the one that was always about the
+            unit: preset files you captured, in a folder you chose. */}
+        <Section key="saved-presets" title="Saved presets" note="Captures, as files in a folder you choose">
           <LocalLibrary
             preset={preset}
             busy={busy}
             remote={remote}
             onError={setError}
-            onReload={reload}
             onChanged={(summary) => record('library', summary)}
           />
         </Section>
-
-        {/* Only when there is something in there. It holds real work, so it is
-            kept — but an empty panel explaining browser storage to someone who
-            never used it is a panel for nobody. */}
-        {hasBrowserSaves ? (
-          <Section key="older-saves" title="Older saves in this browser" note="Move these into the folder — files survive, browser storage doesn't">
-            <History
-              key={historyKey}
-              onReload={reload}
-              busy={busy}
-              onError={setError}
-              onMoved={() => setHistoryKey((k) => k + 1)}
-            />
-          </Section>
-        ) : null}
 
         <Section key="backups" title="Backups" note="This preset, and every slot at once">
           <Backup
@@ -6417,106 +3509,7 @@ export default function App() {
         </Section>
       </Sheet>
 
-      {/*
-        One question, asked once, on a preset with nothing laid out in it.
 
-        The player's own question was what happens to the other scenes on a new
-        empty preset. The honest answer depends on what they wanted, and the
-        app never asked — it built one sound into whichever scene was live and
-        left seven blank. Asking here costs one tap and saves a second
-        generation, because the answer goes into the request rather than being
-        applied to a reply that already exists.
-      */}
-      <Sheet
-        open={!!sceneAsk}
-        onClose={() => setSceneAsk(null)}
-        title="How many scenes?"
-        note={`This ${device?.short || device?.name || 'unit'} holds ${sceneCount}`}
-      >
-        <div className="scene-ask">
-          <p className="hint">
-            {nothingLaidOut()
-              ? 'This preset has no scenes set up, so there is nothing here to write over. '
-              : 'The request did not say how many, so nothing has been assumed. '}
-            What are you building? Say a number in the request next time and this is not asked.
-          </p>
-          {/*
-            The options come from the unit, not from this file. A set used to
-            mean three or four whatever was plugged in, which is a fine default
-            and was also a ceiling: somebody laying out a whole set on an FM3
-            wanted all eight and had no way to ask. On a unit with four scenes
-            "a few" and "all four" are the same answer twice, so the third
-            button is not offered there. See api/_scenes.js.
-          */}
-          {sceneChoices(sceneCount).map((choice, i) => (
-            <button
-              key={choice.key}
-              className={i === 0 ? 'primary' : undefined}
-              onClick={() => {
-                const ask = sceneAsk
-                setSceneAsk(null)
-                generate(ask.description, ask.against, {
-                  wantScenes: choice.budget !== 0,
-                  // Absent for "a few": the model judges, as it always did.
-                  sceneBudget: choice.budget || undefined
-                })
-              }}
-            >
-              {choice.label}
-              <span className="hint">{choice.hint}</span>
-            </button>
-          ))}
-          {/* Every number in between, one tap each. "Anywhere from 1 to 8
-              depending on what the user asked for." */}
-          {sceneNumbers(sceneCount).length ? (
-            <div className="scene-ask-numbers">
-              <span className="hint">Or exactly</span>
-              {sceneNumbers(sceneCount).map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => {
-                    const ask = sceneAsk
-                    setSceneAsk(null)
-                    generate(ask.description, ask.against, { wantScenes: true, sceneBudget: n })
-                  }}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      </Sheet>
-
-      {/*
-        The other scene question: a tone with more sounds in it than the unit
-        in front of you has scenes.
-
-        Asked before the load rather than reported after it, and asked exactly
-        once — a tone that fits, which is every tone made on this unit and most
-        tones with no scene plan at all, never sees this sheet.
-      */}
-      <Sheet
-        open={!!sceneFit}
-        onClose={() => setSceneFit(null)}
-        title="Which sounds?"
-        note={`This ${device?.short || device?.name || 'unit'} holds ${sceneCount}`}
-      >
-        {sceneFit ? (
-          <SceneFit
-            entry={sceneFit}
-            sceneCount={sceneCount}
-            unit={device?.short || device?.name || 'unit'}
-            onLoad={(keep) => {
-              const entry = sceneFit
-              setSceneFit(null)
-              reload(entry, keep)
-            }}
-            onCancel={() => setSceneFit(null)}
-          />
-        ) : null}
-      </Sheet>
 
       <Sheet
         open={sheet === 'scenes'}
@@ -6637,7 +3630,6 @@ export default function App() {
               <SetupRow key="unit" title="Unit" status={status === 'live' ? `${device?.short || device?.name || 'Unit'} · connected` : 'Not connected'} onClick={() => setSetupPage('unit')} />
               <SetupRow key="link" title="Phone & computer" status={describeLink(link).note || 'Phone remote off'} onClick={() => setSetupPage('link')} />
               <SetupRow key="play" title="Play screen" status={[fit ? 'Fit to screen' : SIZES[size].name, playing ? 'Play mode' : null, THEME_WORD[getMode()] || null].filter(Boolean).join(' · ')} onClick={() => setSetupPage('play')} />
-              <SetupRow key="ai" title="AI & cost" status={!chatOn ? 'Chat off' : !modelOn ? 'AI model off · local only' : today()?.cost ? `${formatCost(today().cost)} today` : 'Nothing spent today'} onClick={() => setSetupPage('ai')} />
               <SetupRow key="gear-names" title="Amp & pedal names" status="What each model on your unit really is" onClick={() => setSheet('gear')} />
               <SetupRow key="help" title="Help & fixes" status={`${getDebugLog().length} line${getDebugLog().length === 1 ? '' : 's'} in the log`} onClick={() => setSetupPage('help')} />
               <SetupRow key="about" title="About" status={FULL} onClick={() => setSetupPage('about')} />
@@ -6743,203 +3735,12 @@ export default function App() {
               </span>
             </label>
           </Section>
-<Section key="playing" title="Playing" note={playing ? 'Ask is hidden' : 'Ask is available'}>
-            <label className="rename-choice">
-              <input
-                type="checkbox"
-                checked={playing}
-                onChange={(e) => {
-                  const on = e.target.checked
-                  setPlaying(on)
-                  savePlayMode(on)
-                }}
-              />
-              <span>
-                Play mode
-                <span className="hint">
-                  Takes the ✦ Ask button off the Play screen, so nothing on it can start
-                  building a tone. Everything else works the same. This phone remembers it.
-                </span>
-              </span>
-            </label>
-          </Section>
           <Section key="appearance" title="Appearance" note={THEME_WORD[getMode()] || 'Auto'}>
             <Theme />
           </Section>
           </div>
         ) : null}
 
-        {setupPage === 'ai' ? (
-          <div className="setup-page">
-            <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
-              ‹ Setup
-            </button>
-            <p className="setup-page-title">{SETUP_PAGES.ai}</p>
-            {/*
-              "Can we add a toggle on settings to turn the AI on and off?"
-              First on the page, because it decides whether the rest of the
-              page can spend anything. See lib/aiSwitch.js for what off means.
-            */}
-            <Section key="ai-switch" title="AI" note={`Chat ${chatOn ? 'on' : 'off'} · model ${modelOn ? 'on' : 'off'}`} defaultOpen>
-              <label className="rename-choice">
-                <input
-                  type="checkbox"
-                  checked={chatOn}
-                  onChange={(e) => {
-                    const on = e.target.checked
-                    setChatOn(on)
-                    saveChatOn(on)
-                    record('ai', on ? 'Chat turned on' : 'Chat turned off')
-                  }}
-                />
-                <span>
-                  Chat
-                  <span className="hint">
-                    The ✦ Ask button on Play and the Ask tab. Off, they are gone. Play mode, under
-                    Play screen, hides just the button.
-                  </span>
-                </span>
-              </label>
-              <label className="rename-choice">
-                <input
-                  type="checkbox"
-                  checked={modelOn}
-                  onChange={(e) => {
-                    const on = e.target.checked
-                    setModelOn(on)
-                    saveModelOn(on)
-                    record('ai', on ? 'AI model turned on' : 'AI model turned off')
-                  }}
-                />
-                <span>
-                  AI model
-                  <span className="hint">
-                    Whether a request may go to the model and cost tokens. Plain commands never do,
-                    either way — scenes, tempo, blocks on or off, channels, a control to a number or up
-                    or down, a model by name, add or remove a block, volume, renames, save, load, back up,
-                    and questions about what is loaded; type “help” in the chat for the list. Off, that is
-                    all the chat does, and it says plainly when a request needs the model. This device
-                    remembers both.
-                  </span>
-                </span>
-              </label>
-            </Section>
-            <div className="history-actions">
-              <button className="chip" onClick={() => setSheet('history')}>
-                History — every tone designed
-              </button>
-            </div>
-<Section
-            key="token-usage"
-            title="Token usage"
-            note="Every call, by day — compare with your bill"
-          >
-            <TokenLog />
-          </Section>
-<Section key="what-it-has-learned" title="What it has learned from you" note={taste ? `${taste.presets} presets` : 'Nothing yet'}>
-            <p className="hint">{summariseProfile(taste)}</p>
-            {/*
-              Say what actually happens, including the part that is a
-              disclosure. The summary above does travel — it goes to the model
-              with every request, which is the whole mechanism — and writing
-              "nothing leaves your device" here would have been a comfortable
-              sentence that was not true. What is worth saying instead is that
-              nothing is kept: no profile is stored, it is rebuilt from the
-              presets each time, and deleting a preset genuinely un-learns it.
-            */}
-            <p className="hint">
-              This summary &mdash; not your presets &mdash; is sent with each request, so a tone you
-              ask for lands nearer what you usually choose. Nothing is trained and no profile is
-              stored: it is worked out fresh from your own presets each time, so deleting one
-              un-learns it and turning this off stops it being sent at all.
-            </p>
-            {taste ? (
-              <ul className="cloud-list taste-list">
-                {taste.models.length ? (
-                  <li className="hint">Models you pick: {taste.models.map((m) => m.name).join(', ')}</li>
-                ) : null}
-                {taste.controls.length ? (
-                  <li className="hint">
-                    Where you land: {taste.controls.map((c) => `${c.name} ${c.typical}`).join(' · ')}
-                  </li>
-                ) : null}
-                {taste.words.length ? (
-                  <li className="hint">You ask for: {taste.words.map((w) => w.name).join(', ')}</li>
-                ) : null}
-              </ul>
-            ) : null}
-            {/*
-              The other half, and the more useful one.
-
-              What someone keeps says the whole tone was good enough. What they
-              reach over and change says which part was wrong — and it comes with
-              the number they actually wanted. That was being thrown away, so the
-              same correction was needed again on the next generation and the one
-              after. Shown separately from taste because it reads differently: it
-              is a list of the app's own repeated misses, in this player's hands.
-            */}
-            <p className="silk-label">What you keep fixing afterwards</p>
-            <p className="hint">{summariseCorrections(corrections)}</p>
-            {corrections ? (
-              <ul className="cloud-list taste-list">
-                {corrections.controls.map((c) => (
-                  <li className="hint" key={c.name}>
-                    {c.name}: you usually turn it {c.way} ({c.count} of {c.of} times, by about {c.by})
-                  </li>
-                ))}
-                {corrections.words.length ? (
-                  <li className="hint">
-                    You often ask for: {corrections.words.map((w) => w.text).join(', ')}
-                  </li>
-                ) : null}
-              </ul>
-            ) : null}
-            <div className="history-actions">
-              <button
-                className="chip"
-                onClick={() => setTasteOn(setTasteEnabled(!tasteOn))}
-                aria-pressed={tasteOn}
-              >
-                {tasteOn ? 'Stop using my history' : 'Use my history again'}
-              </button>
-              {corrections ? (
-                <button
-                  className="chip"
-                  onClick={() => {
-                    clearCorrections()
-                    setCorrectionKey((n) => n + 1)
-                  }}
-                >
-                  Forget what I keep fixing
-                </button>
-              ) : null}
-            </div>
-          </Section>
-<Section
-            key="about-you"
-            title="About you"
-            note={memory?.profile || memory?.preferences ? 'Told to the agent with every request' : 'Nothing yet'}
-          >
-            <MemorySettings
-              memory={memory}
-              busy={busy}
-              onSave={async (next) => {
-                setMemory(await saveMemory(next))
-                record('memory', 'Updated what the agent knows about you')
-              }}
-            />
-          </Section>
-<Section key="band-book" title="Band book" note="Bands designed once, rebuilt for free">
-            {/*
-              The book was invisible — it filed every band-named design and
-              answered for it on the next request, and the only trace was a
-              parenthesis in the chat. A thing that decides whether a request
-              costs money needs a page where it can be read and pruned.
-            */}
-            <BandBook />
-          </Section>
-          </div>
-        ) : null}
 
         {setupPage === 'help' ? (
           <div className="setup-page">
@@ -7027,9 +3828,6 @@ export default function App() {
               <Updates />
             </Section>
           ) : null}
-<Section key="developer" title="Developer" note="See what the AI was given">
-            <TraceSwitch />
-          </Section>
           </div>
         ) : null}
       </Sheet>

@@ -65,13 +65,15 @@ export function run(test) {
     assert.match(screens, /if \(!touch\.still\) page\.style\.transform/, 'reduced motion still drags the page under the finger')
   })
 
-  test('all three screens sit inside the swipe surface', () => {
+  test('both screens sit inside the swipe surface', () => {
     const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
     const open = app.indexOf('<Screens ')
     const shut = app.indexOf('</Screens>')
     assert.ok(open !== -1 && shut > open, 'the screens are no longer wrapped')
     const inside = app.slice(open, shut)
-    for (const v of ['play', 'shape', 'ask']) {
+    /* There were three. The middle one was the conversation, and it went
+       with the AI. */
+    for (const v of ['play', 'shape']) {
       assert.ok(inside.includes(`view === '${v}'`), `the ${v} screen is outside the swipe surface`)
     }
     assert.ok(!/<Sheet\b/.test(inside), 'a sheet is inside the swipe surface — it would travel with the page')

@@ -20,8 +20,6 @@ import { notePresetName, noteSceneName, useRig } from '../lib/rig'
 import { dropReadCache, sceneShape, setPresetName, setSceneName } from '../lib/device'
 import { SIZES, loadSize, saveSize } from '../lib/gigSize'
 import { sync, useStored } from '../lib/store'
-import { savePlayMode } from '../lib/playMode'
-import { AI } from '../lib/features'
 import { isPairAccount } from '../lib/pairing'
 import Lamp from '../components/Lamp'
 import Note from '../components/Note'
@@ -50,8 +48,6 @@ export default function Settings({
   link,
   macName,
   hostVersion,
-  playing,
-  onPlayMode,
   onBack,
   onReconnect,
   onSignOut,
@@ -425,33 +421,6 @@ export default function Settings({
             <TileSize />
           </View>
 
-          {/*
-            Gone with the AI, because hiding the ✦ Tone button is the only thing
-            this switch has ever done and there is no such button in this build.
-            A switch that takes away something already absent is a switch that
-            reports success and changes nothing. See lib/features.js.
-          */}
-          {AI ? (
-            <View style={{ gap: space.md }}>
-              <Section>Playing</Section>
-              <Press
-                label={playing ? 'Play mode is on' : 'Play mode is off'}
-                sub={playing ? 'The Tone button is hidden' : 'The Tone button is on the stage screen'}
-                on={!!playing}
-                tone="signal"
-                disabled={playing === null}
-                onPress={() => {
-                  const next = !playing
-                  onPlayMode?.(next)
-                  savePlayMode(next)
-                }}
-              />
-              <Note>
-                Play mode takes the ✦ Tone button off the stage screen, so nothing there can start
-                building a sound. Everything else works the same. This phone remembers it.
-              </Note>
-            </View>
-          ) : null}
         </>
       ) : null}
 

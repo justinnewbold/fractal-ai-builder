@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { listVersions, loadVersion, restoreVersion, backupDevice } from '../lib/forgefx'
-import { formatWhen } from '../lib/history'
+import { formatWhen } from '../lib/when'
 
 /**
  * Undo, for the hardware.

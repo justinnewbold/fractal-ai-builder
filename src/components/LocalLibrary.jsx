@@ -14,7 +14,6 @@ import {
   listPresetFiles,
   writePresetFile,
   readPresetFile,
-  readDesignFile,
   deletePresetFile,
   versionsFolder,
   syncedVersionIds,
@@ -33,7 +32,7 @@ import {
  * folder lives, so there is no path to hand anyone, and going direct means
  * there is nothing for two sides to disagree about.
  */
-export default function LocalLibrary({ preset, busy, onError, onChanged, onReload, remote }) {
+export default function LocalLibrary({ preset, busy, onError, onChanged, remote }) {
   const [folder, setFolder] = useState(null)
   const [needsPermission, setNeedsPermission] = useState(false)
   const [entries, setEntries] = useState([])
@@ -158,23 +157,11 @@ export default function LocalLibrary({ preset, busy, onError, onChanged, onReloa
   const load = async (entry) => {
     setWorking(entry.file)
     try {
-      if (entry.kind === 'design') {
-        /*
-         * A design is a recipe, not a photograph. It goes back through the
-         * same validation as a fresh generation — against whatever is on the
-         * unit right now — and lands as a preview, because a tone designed for
-         * one preset can meet a different layout or different ranges.
-         */
-        const saved = await readDesignFile(folder, entry.file)
-        onReload?.(saved)
-        setNote(`"${entry.name}" is being re-checked against the unit — the preview appears above.`)
-      } else {
-        const bytes = await readPresetFile(folder, entry.file)
-        if (!bytes.length) throw new Error('That file is empty.')
-        await loadPresetBytes(bytes)
-        setNote(`Loaded "${entry.name}". Play it, then save it to a slot to keep it.`)
-        onChanged(`Loaded "${entry.name}" from the preset folder`)
-      }
+      const bytes = await readPresetFile(folder, entry.file)
+      if (!bytes.length) throw new Error('That file is empty.')
+      await loadPresetBytes(bytes)
+      setNote(`Loaded "${entry.name}". Play it, then save it to a slot to keep it.`)
+      onChanged(`Loaded "${entry.name}" from the preset folder`)
     } catch (err) {
       onError(err.message)
     } finally {
@@ -315,7 +302,6 @@ export default function LocalLibrary({ preset, busy, onError, onChanged, onReloa
             <div className="library-row" key={entry.file}>
               <span className="library-name">{entry.name}</span>
               <span className="library-path mono">
-                {entry.kind === 'design' ? 'design · ' : ''}
                 {new Date(entry.at).toLocaleDateString()}
               </span>
               {entry.kind === 'capture' && !remote ? (

@@ -19,8 +19,25 @@
  * somebody's work, so it is the part that is tested without a network.
  */
 import { supabaseClient } from './remote.js'
-import { deviceName } from './cloudChat.js'
 import { localUnits, syncStage } from './setlistMerge.js'
+
+/**
+ * Something a person would recognise, for "last written from …".
+ *
+ * A user agent string is not that. This is the coarse shape of the device and
+ * nothing identifying, because the only question it answers is "was that me on
+ * the other thing?". It lived in lib/cloudChat.js, which synced the AI
+ * conversation between machines; the setlists it was shared with outlived it.
+ */
+export function deviceName(ua = typeof navigator !== 'undefined' ? navigator.userAgent : '') {
+  const s = String(ua || '')
+  if (/iPhone/i.test(s)) return 'iPhone'
+  if (/iPad/i.test(s)) return 'iPad'
+  if (/Android/i.test(s)) return 'Android'
+  if (/Macintosh|computer OS X/i.test(s)) return 'computer'
+  if (/Windows/i.test(s)) return 'Windows'
+  return 'a browser'
+}
 
 export {
   applyUnits,

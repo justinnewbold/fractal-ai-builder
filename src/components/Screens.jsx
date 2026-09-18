@@ -22,22 +22,21 @@ import { useEffect, useRef, useState } from 'react'
  * them: React registers touch listeners as passive, so a preventDefault inside
  * one is ignored and the page scrolls under the drag.
  */
-export const ORDER = ['play', 'ask', 'shape']
+export const ORDER = ['play', 'shape']
 
 /**
  * The bench screens, as opposed to the stage one.
  *
- * Ask designs a sound and Edit rebuilds a chain. Both are sit-down work: a
- * conversation to read and reply to, and a 4x12 grid to drag blocks around on.
+ * Edit rebuilds a chain: sit-down work, a 4x12 grid to drag blocks around on.
  * Play is the other kind — what preset, which scene, that block off, am I in
  * tune — and it is the only one worth having under a thumb in the dark.
  *
- * The phone apps in `mobile/` have never carried either, and say why in
- * Stage.js: "a generate button within reach of a stage tap is a hazard". The
- * web app on a phone had both, one sideways swipe from the stage screen. This
- * is that same rule, applied to the surface that was missing it.
+ * Ask, the conversation, was the other bench screen until the tone designer
+ * came out of all four apps. The rule it was here to serve is unchanged: a
+ * screen you work at does not belong one sideways swipe from the screen you
+ * play from.
  */
-export const BENCH = ['ask', 'shape']
+export const BENCH = ['shape']
 
 /**
  * Which screens a viewport reaches.

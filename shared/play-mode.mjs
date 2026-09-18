@@ -1,76 +1,26 @@
 /**
- * When a generate button is allowed on a stage screen.
+ * Which buttons the stage screen offers.
  *
- * Both apps ask this and both apps answer it differently in the details, so
- * the answers live together rather than apart — the failure this prevents is
- * one of them quietly becoming more permissive than the other, which nobody
- * would notice until a tone started building mid-song.
+ * THIS FILE USED TO BE PLAY MODE. Play mode was a switch that took the ✦ Ask
+ * button off the Play screen, so that nothing within reach of a thumb mid-song
+ * could start the AI building a tone. The AI is gone from all four apps, and a
+ * switch that takes away something already absent is a switch that reports
+ * success and changes nothing — so the switch went with it, on the phone and
+ * in the browser, along with toneWayIn and the stored setting.
  *
- * WHY THERE IS A BUTTON AT ALL. Tone generation was off the phone entirely,
- * for a reason that was right about accidents: "a generate button within reach
- * of a stage tap is a hazard". What that reasoning did not account for is what
- * an accident COSTS on a phone. A handset cannot save to a slot — the host
- * refuses it, see REMOTE_FORBIDDEN in relay-rules — so everything a tone writes
- * lands in the edit buffer and re-selecting the preset puts the stored version
- * back. The worst an accidental tap can do is make the sound wrong until it is
- * undone, which is smaller than never being able to ask for a tone away from
- * the desk.
- *
- * So the button comes back, and a switch takes it away for as long as somebody
- * says they are playing. Not a heuristic about what the app thinks is
- * happening — a switch that is set, and stays set.
- *
- * Pure, and shared as a copy into the phone app by
- * scripts/sync-relay-rules.mjs. No storage here: the browser reads
- * localStorage synchronously and the phone cannot read AsyncStorage at all
- * without waiting, and that difference is the whole of `toneWayIn`'s third
- * state below.
+ * What is left is the one rule that was never about the AI.
  */
 
 /**
- * Anything unreadable is "not playing".
+ * Whether the Edit button shows on the stage screen.
  *
- * One-sided on purpose. A value nobody can parse must never come back as "hide
- * the button": a missing button reads as the feature being gone, while an extra
- * one is a button somebody can ignore.
+ * The chain editor is there whenever there is a unit to edit — it was never
+ * gated on play mode, because rebuilding a chain is not asking anyone for
+ * anything: "the edit button on the stage screen should just always be there
+ * as long as we are connected, I don't want to have to spend ANOTHER expo
+ * build slot."
+ *
+ * On a wide window Edit is also a screen of its own, and the button is the way
+ * in from Play. There is nowhere else it needs to be absent from.
  */
-export const clampMode = (v) => v === true || v === 'true' || v === '1'
-
-/**
- * The browser's rule, for the ✦ Ask and Edit buttons in the stage bar.
- *
- * Three parts, and the first two are the ones easy to lose: there is nothing to
- * ask about before a unit has answered, and offering to open the conversation
- * you are already reading is a button that does nothing.
- *
- * `aiOn` is the bigger switch (lib/aiSwitch.js in the browser): with the AI
- * off there is nothing for the button to open onto. Absent means on.
- */
-export const askButtonShows = ({ status, view, playing, aiOn = true }) =>
-  status === 'live' && view !== 'ask' && !playing && aiOn !== false
-
-/**
- * Whether the Edit button is drawn on the stage screen: the way to the chain
- * and its knobs. It used to come and go with Ask, so play mode or the AI
- * switch being off took the chain editor off the web version entirely --
- * the one place it could be tried without spending a phone build: "add edit
- * to the web version so I can test the chain editor there first before
- * spending ANOTHER expo build slot." Editing the chain is not asking the AI
- * for anything, so it is on whenever there is a unit to edit.
- */
-export const editButtonShows = ({ status, view }) => status === 'live' && view !== 'ask'
-
-/**
- * The phone app's rule, for the ✦ Tone button on the stage screen.
- *
- * `playing` is a TRI-STATE here, unlike the browser's: `null` means the setting
- * has not been read back yet, which AsyncStorage makes unavoidable, and it is
- * not the same as "not playing".
- *
- * Hidden during that gap. Both choices flicker; only one of them flickers
- * dangerously. A button that appears a beat late is one nobody has reached for
- * yet. A button that vanishes out from under a thumb already on its way down
- * becomes a press on whatever the layout put there instead — which, in a row of
- * stage controls, is a scene change mid-song.
- */
-export const toneWayIn = ({ connected, playing }) => connected === true && playing === false
+export const editButtonShows = ({ status }) => status === 'live'
