@@ -7,6 +7,7 @@ import {
   colLabel,
   doubtfulWrite,
   gridShape,
+  isSplitChain,
   laneItems,
   lanesShown,
   rowLabel
@@ -133,6 +134,21 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
    * because there is nowhere there to put anything.
    */
   const shown = lanesShown(blocks, capabilities)
+
+  /*
+   * A SPLIT CHAIN, SAID OUT LOUD.
+   *
+   * Where every block sits is read from the unit. How the rows are JOINED is
+   * not — there is no read for the cables anywhere in this app, only a write —
+   * so on a preset running down two rows this editor can describe half of what
+   * is there and cannot tell a deliberate split from two unrelated rows.
+   *
+   * Drawing that silently is the problem: two lanes with no comment read as an
+   * editor that understands the routing and is showing it to you. Moving blocks
+   * WITHIN a row stays available and stays safe — cells and cables are separate
+   * writes, and shuffling a row cannot disturb what joins it to another.
+   */
+  const splitChain = isSplitChain(blocks, capabilities)
 
   const close = () => {
     setOpen(null)
@@ -607,6 +623,13 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
         Hold ≡ and drag a block up or down to move it. Tap a block for Add and Remove, or an empty
         slot to put something in it.
       </p>
+
+      {splitChain ? (
+        <p className="chain-issue">
+          This preset uses more than one row. Moving blocks within a row is fine, but this app
+          can&rsquo;t see or change how the rows are joined &mdash; do that on your unit.
+        </p>
+      ) : null}
 
       {laneList(true)}
 

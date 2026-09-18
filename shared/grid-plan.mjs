@@ -106,20 +106,51 @@ export const rowLabel = (row) => row + 1
  */
 export function lanesFor(blocks, capabilities) {
   const { rows, cols } = gridShape(capabilities)
+  const here = blocks || []
+  /*
+   * NEVER FEWER ROWS THAN THE PRESET ACTUALLY USES.
+   *
+   * The count comes from what the unit reports, and falls back to four when it
+   * reports nothing. Either can be short: a bigger unit than the fallback
+   * assumes, or a computer that does not pass the grid size through. Whatever
+   * the reason, a block on a row past the end used to be dropped here — not
+   * drawn, not movable, and not mentioned. The chain on screen would simply be
+   * missing some of the preset, which is the one thing a diagram of a chain
+   * must never be.
+   *
+   * So the grid is at least as big as what is in it. The unit's own numbers
+   * still decide where the EMPTY cells are, because a gap you can tap has to be
+   * a cell the unit really has; this only stops a block from having nowhere to
+   * be drawn.
+   */
+  const lastRow = here.reduce((n, b) => (Number.isInteger(b?.row) ? Math.max(n, b.row) : n), -1)
+  const lastCol = here.reduce((n, b) => (Number.isInteger(b?.col) ? Math.max(n, b.col) : n), -1)
   const lanes = []
   /* Rows count from zero, like columns: a chain on the top row is row 0,
      and it used to be drawn nowhere at all. */
-  for (let row = 0; row < rows; row++) {
-    const inRow = (blocks || [])
+  for (let row = 0; row < Math.max(rows, lastRow + 1); row++) {
+    const inRow = here
       .filter((b) => b.row === row && typeof b.col === 'number')
       .sort((a, b) => a.col - b.col)
     const taken = new Set(inRow.map((b) => b.col))
     const gaps = []
-    for (let col = 0; col < cols; col++) if (!taken.has(col)) gaps.push(col)
+    for (let col = 0; col < Math.max(cols, lastCol + 1); col++) if (!taken.has(col)) gaps.push(col)
     lanes.push({ row, blocks: inRow, gaps })
   }
   return lanes
 }
+
+/**
+ * Whether this preset runs down more than one row — a split chain.
+ *
+ * Said rather than guessed at, because the app cannot see the cables: there is
+ * no read for them anywhere, only a write. So it knows WHERE blocks sit and not
+ * how they are joined, and a preset with two busy rows is one it can only half
+ * describe. That is worth admitting on screen rather than drawing two rows as
+ * though they were one chain, or as though they were unrelated.
+ */
+export const isSplitChain = (blocks, capabilities) =>
+  lanesFor(blocks, capabilities).filter((l) => l.blocks.length).length > 1
 
 /**
  * The lanes worth drawing: the ones holding something, then the first empty
