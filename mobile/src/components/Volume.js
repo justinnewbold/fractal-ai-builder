@@ -84,17 +84,30 @@ export default function Volume({ blocks, open, onClose, onError }) {
   /* And the window, for how wide the panel itself should be. */
   const { width: width0 } = useWindowDimensions()
 
-  const live = useRef({ param: null, value: null, width: 0 })
+  const live = useRef({ param: null, value: null, width: 0, eid: null })
   useEffect(() => {
-    live.current = { param, value, width }
+    live.current = { param, value, width, eid }
   })
 
-  /* One write on the wire at a time; see the note above. */
+  /*
+   * One write on the wire at a time; see the note above.
+   *
+   * THE WRITER READS THE BLOCK OFF THE REF, NOT THE RENDER. It is made once,
+   * on the first render, and the first render is before the chain has been
+   * read, so the Output block it closed over was nothing at all -- and stayed
+   * nothing for the life of the screen. Every press of − and + after that
+   * went out as a write to block "undefined": twenty-seven of them in one
+   * log, each refused with a sentence about doing it at the computer, while
+   * the guard on the button saw the block it had by then and let them
+   * through. The ref is what the guard looks at, so the writer looks there
+   * too.
+   */
   const writer = useRef(null)
   if (!writer.current) {
     writer.current = latestWriter((v) => {
-      const { param: p } = live.current
-      return setParam(eid, p.id, v, p)
+      const { param: p, eid: block } = live.current
+      if (!Number.isInteger(block)) return Promise.reject(new Error('The chain has not been read yet, so there is no output level to write.'))
+      return setParam(block, p.id, v, p)
     })
   }
 

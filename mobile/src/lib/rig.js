@@ -570,9 +570,34 @@ export function writeScene(index) {
   return optimistic({ sceneIndex: index }, { sceneIndex: was }, async () => {
     await device.setScene(index)
     // Bypass states belong to the scene, so the chain on screen is about the
-    // one we just left until this comes back.
-    await refreshBlocks({ quiet: true })
+    // one we just left until this comes back. A scene moves no block, so this
+    // is the small status read, not a dump of the whole preset -- see
+    // device.sceneState for what the dump did here.
+    await refreshSceneState()
   })
+}
+
+/**
+ * Re-read each block's bypass and channel and lay them over the chain on
+ * screen. Falls back to the full read when the computer cannot answer the
+ * small one, so an older Mac still gets the right picture, just slower.
+ */
+export async function refreshSceneState() {
+  let states = []
+  try {
+    states = await device.sceneState()
+  } catch (err) {
+    logDebug('chain', 'scene state could not be read — reading the whole chain instead', err.message)
+    return refreshBlocks({ quiet: true })
+  }
+  if (!states.length) return refreshBlocks({ quiet: true })
+  const byId = new Map(states.map((s) => [s.effectId, s]))
+  const lay = (b) => {
+    const s = byId.get(idOf(b))
+    return s ? { ...b, bypassed: s.bypassed ?? b.bypassed, channel: s.channel ?? b.channel } : b
+  }
+  set({ blocks: state.blocks.map(lay), allBlocks: state.allBlocks.map(lay) })
+  return true
 }
 
 /*

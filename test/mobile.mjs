@@ -1210,6 +1210,27 @@ export function run(test) {
     assert.equal((read('mobile/src/components/Volume.js').match(/logDebug\('set', 'volume: no Output block known yet'/g) || []).length, 2, 'the volume refusing to move leaves no line')
   })
 
+  test('the volume writes to the block it has now, and a scene change does not dump the preset', () => {
+    /*
+     * Twenty-seven writes to block "undefined" in one log: the volume's
+     * writer was made on the first render, before the chain was read, and
+     * kept the Output block it had then -- nothing -- for good. And every
+     * scene tap re-read the whole preset, a dump that takes seconds and,
+     * right after a scene switch, came back headless four times in a row.
+     */
+    const vol = read('mobile/src/components/Volume.js').replace(/\s+/g, ' ')
+    assert.match(vol, /live\.current = \{ param, value, width, eid \}/, 'the block is not on the ref the writer reads')
+    assert.match(vol, /const \{ param: p, eid: block \} = live\.current/, 'the writer still closes over the first render\'s block')
+    assert.match(vol, /return setParam\(block, p\.id, v, p\)/)
+    assert.ok(!/setParam\(eid,/.test(vol), 'a write still goes to the render-time block')
+    const rig = read('mobile/src/lib/rig.js').replace(/\s+/g, ' ')
+    assert.match(rig, /await device\.setScene\(index\) .*? await refreshSceneState\(\) \}\)/, 'a scene change still dumps the whole preset')
+    assert.match(rig, /export async function refreshSceneState\(\)/)
+    assert.match(rig, /if \(!states\.length\) return refreshBlocks\(\{ quiet: true \}\)/, 'an older Mac that cannot answer gets no chain at all')
+    assert.match(read('mobile/src/lib/device.js'), /remoteRequest\('\/preset\/scene-state'\)/)
+    assert.match(read('mobile/src/lib/demoWire.js'), /path === '\/preset\/scene-state'/, 'the demo cannot change scene')
+  })
+
   test('a chain drawn on a phone shows what is there, and the gaps between', async () => {
     /*
      * The browser drew forty-eight cells of which five held anything: on a
@@ -1337,7 +1358,7 @@ export function run(test) {
     /* And mid-drag writes are NOT confirmed — a read-back per frame is the
        same jam by another name — while the one you stop on is. */
     const vol = read('mobile/src/components/Volume.js')
-    assert.match(vol, /latestWriter\(\(v\) => \{[\s\S]{0,200}?setParam\(eid, p\.id, v, p\)/, 'a drag confirms every value, which doubles the traffic it was written to avoid')
+    assert.match(vol, /latestWriter\(\(v\) => \{[\s\S]{0,400}?setParam\(block, p\.id, v, p\)/, 'a drag confirms every value, which doubles the traffic it was written to avoid')
     assert.match(vol, /await setParamConfirmed\(eid, p\.id, v, p\)/, 'the value the thumb stops on is never confirmed')
 
     /*
