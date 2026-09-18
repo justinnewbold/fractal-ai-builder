@@ -24,6 +24,7 @@ import { adopt as adoptNames, forget as forgetNames, learn as learnName, nameOf 
 import { forget as forgetControls } from './paramIndex'
 import { forgetSceneNames, recallSceneNames, rememberSceneNames } from './sceneNameCache'
 import { subscribeRemoteEvents } from './relay'
+import { logDebug } from './debugLog'
 
 const initial = {
   /** null until the unit has said what it is. */
@@ -533,6 +534,9 @@ async function readBlocks(quiet) {
     // The last chain stays on screen. It is the best thing anyone knows, and a
     // row of buttons vanishing mid-song is worse than a row that is a moment
     // out of date and says so.
+    /* Said in the log as well as on screen: "Chain — out of date" and the
+       note under it used to be the only record that this read failed. */
+    logDebug('chain', 'the chain could not be read — buttons kept from the last read', err.message)
     set({ chain: 'failed', error: err.message })
     return false
   }
