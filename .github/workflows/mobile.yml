@@ -68,7 +68,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       # The suite that holds the two clients in agreement — the relay rules,
@@ -101,8 +101,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Node 22 here, and 20 everywhere else in this repository. The difference
-      # is deliberate and the reason it is safe is the whole point.
+      # Node 24 here and everywhere else in this repository, which it was not
+      # always. This job ran ahead of the rest on 22 for a while, and the
+      # reason is worth keeping because it is what eventually moved the whole
+      # repository.
       #
       # eas-cli 24.6.0 will not install on Node 20 — one of its dependencies
       # refuses outright:
@@ -111,25 +113,24 @@ jobs:
       #   incompatible with this module. Expected version ">=22.0.0".
       #   Got "20.20.2"
       #
-      # That is one of the two things the repository has been watching for, and
-      # it has now happened: something needed will not install on Node 20.
+      # That was one of the two triggers the repository had been watching for,
+      # and it fired: something needed would not install on Node 20. This job
+      # went to 22 alone because it compiles no native module and never runs
+      # the unit — it installs a CLI and hands a directory to Expo's build
+      # servers.
       #
-      # It does NOT mean the repository moves off Node 20. The reason that
-      # question is difficult belongs entirely to the Mac app: it runs the
-      # device server on Electron's bundled Node, so moving Node means moving
-      # Electron, which means rebuilding serialport and @julusian/midi — native
-      # addons bound to the runtime, and the one change that can stop the app
-      # finding the FM3. None of that is in reach from here. This job installs
-      # a CLI and hands a directory to Expo's build servers; it compiles no
-      # native module and it never runs the unit.
+      # The rest followed in 7.334.0, once the fear the watching brief was
+      # written around had been measured rather than assumed. See CLAUDE.md:
+      # serialport and @julusian/midi both declare N-API, which is ABI-stable
+      # on purpose, and desktop.yml already proves they load under Electron on
+      # every build.
       #
-      # The `check` job above stays on 20 on purpose, because it runs the test
-      # suite and that suite should run on the same version as web.yml and
-      # desktop.yml. A bug that appears on one Node version and not another has
-      # already cost a day here once.
+      # The Node the packaged Mac app runs is still NOT this one. That comes
+      # from whatever Electron bundles, and Electron 33 bundles Node 20.18.
+      # Moving it is a separate change with a hardware check at the end.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       # Never reads the `secrets` context as a whole, and that is the point.

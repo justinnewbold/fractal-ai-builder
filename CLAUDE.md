@@ -81,28 +81,45 @@ replacement. Reach for it before reaching for Build.
 base branch and fails if they match. `desktop/package.json` has to move with
 it — a test holds the two to each other.
 
-**Node 20 is past end of life, and that is a watching brief, not a job.**
-Justin has decided not to upgrade until it actually costs something, and the
-reasoning is sound: the packaged Mac app runs the device server on Electron's
-bundled Node (`desktop/main.js` spawns `process.execPath` with
-`ELECTRON_RUN_AS_NODE`), so moving off Node 20 means moving Electron, which
-means rebuilding `serialport` and `@julusian/midi` — compiled addons bound to
-the runtime. That is the one change that can stop the app finding the FM3, and
-it can only be proven with the hardware plugged in.
+**CI runs Node 24, and the Mac app does not — yet.** The runners moved off
+Node 20 in 7.334.0. What did NOT move is the Node the packaged Mac app runs
+the device server on: that one comes from Electron (`desktop/main.js` spawns
+`process.execPath` with `ELECTRON_RUN_AS_NODE`), so it is whatever the
+pinned Electron bundles. Electron 33 carries Node 20.18; Node 24 first
+appears in Electron 40.
 
-Two things are the trigger, and TELL HIM when either happens:
+The watching brief that used to live here is discharged. Both of its
+triggers had fired — GitHub forces the build actions onto Node 24 now, and
+eas-cli 24.6.0 refuses to install on Node 20 at all, which is why
+`mobile.yml`'s build job went to 22 ahead of everything else.
 
-- GitHub actually drops Node 20 from its runners, so the test suite stops
-  running. The deprecation warning is already in every run's log.
-- Something he needs will not install on Node 20.
+The fear it was written around turned out to be smaller than it read. The
+two compiled addons are `serialport` (`@serialport/bindings-cpp`) and
+`@julusian/midi`, and BOTH declare N-API: `napi_versions` 8 and 7. N-API is
+ABI-stable by design — it is the whole reason those packages publish it — so
+a module built for one Node loads under another, and under Electron, without
+being rebuilt. Node 24 offers N-API 10 and everything below it.
 
-Neither is an emergency and neither breaks the app on its own.
+And half of what the note called unprovable is already automated.
+`.github/workflows/desktop.yml` has a step, "The native modules load under
+Electron", that loads both addons under Electron-as-Node on every desktop
+build. A move that broke them goes red there, before it reaches his machine.
+What that step still cannot answer is whether the app FINDS the FM3 — that
+needs the unit plugged in, and that is the one part to ask him about.
 
-**CI runs Node 20; a dev machine may not.** A bug that only appears on one
-Node version will pass locally and fail on CI, which has already happened
-once (a `localStorage` read that threw only because the two versions drain
-the test queue in a different order). When a test passes here and fails
-there, suspect the runtime before suspecting the test.
+So an Electron bump is an ordinary change with one hardware check at the end,
+not a change to be avoided. Nothing forces it today: nothing is broken on
+Electron 33.
+
+**A test that a Node version can hide.** Two `test(...)` calls once sat
+inside another test's body, so they registered while the queue was draining
+rather than while the file was read — which put one of them past the point
+`settle()` counts the score. The tally printed "808 passed" on a run whose
+809th test had FAILED, and the count moved with the runtime (809 on Node 22,
+808 on Node 20 and 24). `settle()` now re-awaits until the chain stops
+growing, and a structural check fails on any `test(` registered inside
+another test's callback. If the count ever disagrees with itself across two
+Node versions again, that is the shape of the bug to look for.
 
 **`test/structure.mjs` reads App.jsx as text, not as code.** It finds screens
 by searching for the literal conditional that opens them and takes the first
