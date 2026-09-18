@@ -1950,7 +1950,19 @@ export function run(test) {
     const log = read('mobile/src/screens/Log.js')
     assert.match(log, /Clipboard\.setStringAsync\(text\)/, 'there is no way to get the log off the phone')
     assert.match(log, /label="Copy Logs"/)
-    assert.match(read('mobile/src/screens/Settings.js'), /title="Help & fixes"/, 'Setup has no way into the log')
+    /*
+     * A door into the log, asked for as a door rather than as a caption.
+     *
+     * This matched the words on the row — and the words were wrong: the row
+     * that opens the log was called "Help & fixes", which is the name of the
+     * row directly above it that opens something else. Renaming it to "Log"
+     * failed a test that had no opinion about the log at all. What Setup has
+     * to have is a way in, so that is what is checked.
+     */
+    const setup = read('mobile/src/screens/Settings.js')
+    assert.match(setup, /onPress=\{onOpenLog\}/, 'Setup has no way into the log')
+    assert.match(setup, /onPress=\{onOpenFixes\}/, 'Setup has no way into the fixes')
+    assert.match(setup, /onPress=\{onOpenReport\}/, 'Setup has no way to send a report')
   })
 
   test('the bench is reachable, and the switch that could take it away still works', async () => {
@@ -3022,6 +3034,184 @@ export function run(test) {
     const signIn = read('mobile/src/screens/SignIn.js')
     assert.match(signIn, /if \(helping\) return <Connect onBack=/, 'the sign-in screen cannot reach it')
     assert.match(signIn, /How do I connect a computer\?/, 'the sign-in screen does not offer it')
+  })
+
+  test('a report carries the log only when it is a bug, and only the useful end of it', async () => {
+    /*
+     * "Keep the last 200 lines plus the last 10 errors, only when they press
+     * send, cap it around 100KB." And separately: the feature-suggestion box
+     * is "separate from bug reports, with no debug log".
+     *
+     * THE SECOND OF THOSE IS THE ONE WITH TEETH. Somebody writing "it would be
+     * nice if the tuner were bigger" has not offered a transcript of their
+     * evening, and would be right to be annoyed to find they had sent one. So
+     * the rule lives in one place, both apps ask it rather than each deciding,
+     * and the table refuses a row that breaks it.
+     */
+    const r = await import('../shared/report-rules.mjs')
+
+    assert.equal(r.carriesLog('bug'), true)
+    assert.equal(r.carriesLog('idea'), false, 'a feature suggestion would carry the log')
+    assert.deepEqual(r.KINDS, ['bug', 'idea'])
+
+    const line = (i, source = 'app') => ({ at: i, source, message: `line ${i}`, detail: '' })
+
+    /* A short log goes whole — nothing to choose between. */
+    assert.equal(r.pickForReport([line(1), line(2)]).length, 2)
+    assert.deepEqual(r.pickForReport([]), [])
+    assert.deepEqual(r.pickForReport(), [], 'a missing log throws instead of being nothing')
+
+    /*
+     * A long one keeps the END. The lines just before a failure are the ones
+     * that explain it; the ones an hour earlier are context somebody might
+     * like. Taking the front is what a naive slice does and is the wrong way
+     * round.
+     */
+    const long = [...Array(500)].map((_, i) => line(i))
+    const tail = r.pickForReport(long)
+    assert.equal(tail.length, r.LOG_LINES, 'the window is not the length it says')
+    assert.equal(tail.at(-1).message, 'line 499', 'the newest line was dropped')
+    assert.equal(tail[0].message, `line ${500 - r.LOG_LINES}`)
+
+    /*
+     * AND THE EARLY CRASH COMES BACK WITH IT, which is the case the window
+     * alone gets wrong. A crash at the start of a long session, followed by an
+     * hour of ordinary traffic, is exactly the report worth having and exactly
+     * the one a 200-line tail loses.
+     */
+    const early = long.map((l, i) => (i === 3 || i === 7 ? line(i, 'crash') : l))
+    const picked = r.pickForReport(early)
+    assert.equal(picked.length, r.LOG_LINES + 2, 'the early crashes were not pulled back in')
+    assert.deepEqual(picked.slice(0, 2).map((l) => l.message), ['line 3', 'line 7'])
+    /* In the order they happened, and never twice. */
+    assert.equal(new Set(picked).size, picked.length, 'a line is in the report twice')
+
+    /* No more than ten of them, however many there were. */
+    const many = [...Array(400)].map((_, i) => line(i, i < 50 ? 'error' : 'app'))
+    assert.equal(r.pickForReport(many).length, r.LOG_LINES + r.LOG_ERRORS)
+
+    /*
+     * The cap, in bytes rather than characters — a log full of arrows and
+     * em-dashes is not the length it looks — and it says what it left out. A
+     * reader who cannot tell a short log from a trimmed one reads the first
+     * surviving line as the beginning of the story.
+     */
+    const bytes = (v) => new TextEncoder().encode(v).length
+    const fat = [...Array(5000)].map((_, i) => `${i} ${'x'.repeat(50)}`).join('\n')
+    const cut = r.trimToBytes(fat)
+    assert.ok(bytes(cut) <= r.LOG_BYTES, `trimmed to ${bytes(cut)}, over the ${r.LOG_BYTES} cap`)
+    assert.match(cut.split('\n')[0], /earlier lines? left out to fit/, 'it trims silently')
+    assert.match(cut.split('\n').at(-1), /^4999 /, 'it kept the front and dropped the answer')
+    /* And leaves a log that fits completely alone. */
+    assert.equal(r.trimToBytes('one\ntwo'), 'one\ntwo')
+
+    /* The last thing that went wrong, for the top of the report. The message
+       only — a stack belongs in the log, in order, not repeated in the one
+       place meant to be readable at a glance. */
+    assert.equal(r.lastErrorFrom(early), 'line 7')
+    assert.equal(r.lastErrorFrom([line(1)]), '', 'a clean session invents an error')
+
+    /*
+     * And the whole row. `log` is null rather than "" when no log goes: a null
+     * column says "no log was sent" and an empty one says "a log was sent and
+     * it was empty", and a reader is asking the first question.
+     */
+    const format = (l) => `${l.source}: ${l.message}`
+    const bug = r.buildReport({ kind: 'bug', message: ' it broke ', lines: [line(1)], format })
+    assert.equal(bug.message, 'it broke', 'the message is not trimmed')
+    assert.equal(bug.log, 'app: line 1')
+    assert.equal(bug.contact, null, 'an empty contact is sent as a string')
+
+    const idea = r.buildReport({ kind: 'idea', message: 'bigger tuner', lines: [line(1)], format })
+    assert.equal(idea.log, null, 'a feature suggestion carried the log after all')
+
+    /* Turning it off is the same as having none. */
+    assert.equal(r.buildReport({ kind: 'bug', message: 'x', lines: [], format: null }).log, null)
+
+    for (const [args, why] of [
+      [{ kind: 'rant', message: 'x' }, 'an unknown kind was accepted'],
+      [{ kind: 'bug', message: '   ' }, 'an empty message was accepted'],
+      [{ kind: 'bug', message: 'x'.repeat(r.MAX_MESSAGE + 1) }, 'an over-long message was accepted']
+    ]) {
+      assert.throws(() => r.buildReport(args), why)
+    }
+  })
+
+  test('both ends send a report the same way, and gather the log only on the press', async () => {
+    /*
+     * Two surfaces, one shape. The phone is where the bad evenings happen and
+     * the browser is where they get read; a phone that trimmed differently
+     * would produce reports nobody could compare with anything else.
+     *
+     * Read as text rather than run, because running either one means a
+     * Supabase client and a React tree, and what is worth holding here is the
+     * handful of decisions that are silent when wrong.
+     */
+    const web = read('src/lib/reports.js')
+    const phone = read('mobile/src/lib/reports.js')
+
+    for (const [where, src] of [['the browser', web], ['the phone', phone]]) {
+      /* The rules come from the shared file, not from a second opinion. */
+      assert.match(src, /report-rules/, `${where} decides for itself what a report carries`)
+      assert.match(src, /buildReport/, `${where} assembles a report by hand`)
+
+      /*
+       * READ AT SEND AND AT NO OTHER MOMENT. "Only when they press send." The
+       * log is fetched inside sendReport, so a report abandoned half-written
+       * leaves no copy of anything anywhere.
+       */
+      const send = src.slice(src.indexOf('export async function sendReport'))
+      assert.match(send, /lines: withLog \? getDebugLog\(\) : \[\]/, `${where} does not read the log at send`)
+
+      /* And a report that says no log sends none, rather than sending one and
+         hoping the far end ignores it. */
+      assert.match(send, /format: withLog \? formatLine : null/, `${where} formats a log it was told not to send`)
+
+      /*
+       * The preview is the same two functions in the same order, so what
+       * somebody is shown cannot drift from what goes. A preview built a
+       * second way is a preview that is eventually a lie.
+       */
+      const preview = src.slice(src.indexOf('export function logPreview'))
+      assert.match(
+        preview,
+        /trimToBytes\(pickForReport\(getDebugLog\(\)\)\.map\(formatLine\)\.join\('\\n'\)\)/,
+        `${where} previews the log differently from how it sends it`
+      )
+      assert.match(preview, /if \(!carriesLog\(kind\)\) return ''/, `${where} previews a log for a kind that sends none`)
+
+      /* What goes with it, and what must not. The context is built by the
+         shared function, so neither end can quietly add a field. */
+      assert.match(src, /contextFrom\(\{/, `${where} builds its own context`)
+      assert.match(src, /lastError: lastErrorFrom\(getDebugLog\(\)\)/, `${where} does not say what last went wrong`)
+    }
+
+    /* The browser knows it is a browser and the phone knows it is a phone —
+       the one place they are meant to differ. */
+    assert.match(web, /navigator\.userAgent/, 'the browser never says which browser it is')
+    assert.match(phone, /Platform\.OS/, 'the phone never says which OS it is on')
+    assert.match(phone, /macVersion: link\?\.hostVersion/, 'the phone does not send the computer’s version')
+
+    /*
+     * And both screens draw the switch only where it means something. The
+     * idea side does not get a log toggle it could leave on by accident.
+     */
+    for (const [where, src] of [
+      ['the browser', read('src/components/Feedback.jsx')],
+      ['the phone', read('mobile/src/screens/Report.js')]
+    ]) {
+      assert.match(src, /carriesLog\(kind\)/, `${where} decides for itself which kinds carry a log`)
+      assert.match(src, /No log goes with this one/, `${where} never says that an idea sends no log`)
+      assert.match(src, /logPreview\(kind\)/, `${where} offers no way to see what would be sent`)
+      /* Switching kinds drops the preview: a log shown beside a form that is
+         not sending one is worse than showing nothing. */
+      assert.match(src, /setPreview\(null\)/, `${where} keeps a preview across a change of kind`)
+    }
+
+    /* Setup and the log screen both reach it on the phone, which is where the
+       log is being looked at when somebody decides to send it. */
+    assert.match(read('mobile/App.js'), /screen === 'report'/, 'the phone cannot open the report screen')
+    assert.match(read('mobile/src/screens/Log.js'), /onReport/, 'the log screen offers no way to send it')
   })
 
   test('the four ways in are sorted for this computer, and never guessed at on a phone', async () => {

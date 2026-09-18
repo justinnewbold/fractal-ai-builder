@@ -3917,7 +3917,10 @@ export default function App() {
               most people driving a unit from their own Mac never sign in and
               are exactly the ones who find the bugs.
             */}
-            <Feedback device={device} link={link} platform={platform()} />
+            {/* macVersion too: "the phone is on 7.344 and the Mac is on 7.191"
+                is the answer to a surprising number of reports, and it is the
+                one fact nobody would think to type. */}
+            <Feedback device={device} link={link} platform={platform()} macVersion={link.macVersion} />
           </Section>
 <Section key="what-s-changed-this-session" title="What's changed this session">
             <ChangeLog log={log} onClear={() => setLog([])} />

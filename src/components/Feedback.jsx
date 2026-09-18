@@ -5,33 +5,63 @@
  * reproduce, or an account — every one of those is a reason not to bother, and
  * the report nobody sends is worth nothing. What the app knows about itself is
  * attached automatically, which is the part a person could not supply anyway.
+ *
+ * THE LOG IS THE PART TO BE CAREFUL WITH, and the care is all in the shape of
+ * this screen rather than in any warning:
+ *
+ * - It goes with a bug and never with an idea. Somebody asking for a bigger
+ *   tuner has not offered a transcript of their evening, and the form does not
+ *   quietly take one. The switch is not even drawn on that side.
+ * - It is gathered when Send is pressed and at no other moment. Nothing is
+ *   collected while somebody types, so a report half-written and abandoned
+ *   leaves no copy of anything anywhere.
+ * - It can be looked at first, in full, by the same two functions that send
+ *   it — so what is shown cannot drift from what goes.
+ * - And it can be turned off, on the one screen where it would otherwise be a
+ *   thing that happens to you rather than a thing you did.
  */
 import { useState } from 'react'
-import { KINDS, MAX_MESSAGE, context, sendReport } from '../lib/reports'
+import { KINDS, MAX_MESSAGE, carriesLog, context, logPreview, sendReport } from '../lib/reports'
 
-export default function Feedback({ device, link, platform }) {
+export default function Feedback({ device, link, platform, macVersion }) {
   const [kind, setKind] = useState('bug')
   const [message, setMessage] = useState('')
   const [contact, setContact] = useState('')
+  const [withLog, setWithLog] = useState(true)
+  const [preview, setPreview] = useState(null)
   const [busy, setBusy] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState(null)
+
+  const logGoes = carriesLog(kind) && withLog
 
   const send = async () => {
     setBusy(true)
     setError(null)
     try {
-      await sendReport({ kind, message, contact, context: context({ device, link, platform }) })
+      await sendReport({
+        kind,
+        message,
+        contact,
+        context: context({ device, link, platform, macVersion }),
+        withLog
+      })
       // The text goes only once it is actually gone.
       setSent(true)
       setMessage('')
       setContact('')
+      setPreview(null)
     } catch (err) {
       setError(err.message)
     } finally {
       setBusy(false)
     }
   }
+
+  /* Built on the press rather than kept in step with every keystroke: it is
+     the whole log as text, and re-making it on each character typed would be
+     work nobody asked for. */
+  const look = () => setPreview(preview === null ? logPreview(kind) : null)
 
   if (sent) {
     return (
@@ -51,7 +81,13 @@ export default function Feedback({ device, link, platform }) {
           <button
             key={k}
             className={`chip ${kind === k ? 'active' : ''}`}
-            onClick={() => setKind(k)}
+            onClick={() => {
+              setKind(k)
+              /* A preview belongs to the kind it was made for. Leaving it up
+                 while switching to the side that sends no log would show a log
+                 next to a form that is not sending one. */
+              setPreview(null)
+            }}
             aria-pressed={kind === k}
             disabled={busy}
           >
@@ -89,6 +125,30 @@ export default function Feedback({ device, link, platform }) {
         spellCheck={false}
       />
 
+      {carriesLog(kind) ? (
+        <div className="feedback-log">
+          <label className="feedback-log-switch">
+            <input
+              type="checkbox"
+              checked={withLog}
+              onChange={(e) => setWithLog(e.target.checked)}
+              disabled={busy}
+            />
+            <span>Send the log of what the app just did</span>
+          </label>
+          <button className="chip" onClick={look} disabled={busy || !withLog} type="button">
+            {preview === null ? 'See what that is' : 'Hide it'}
+          </button>
+          {preview !== null ? (
+            <pre className="feedback-log-preview mono" aria-label="What the log contains">
+              {preview || '(nothing has been logged yet this session)'}
+            </pre>
+          ) : null}
+        </div>
+      ) : (
+        <p className="hint">No log goes with this one — just what you wrote.</p>
+      )}
+
       {error ? <p className="hint problem">{error}</p> : null}
 
       <div className="feedback-actions">
@@ -96,7 +156,8 @@ export default function Feedback({ device, link, platform }) {
           {busy ? 'Sending…' : 'Send'}
         </button>
         <p className="hint">
-          Your version and which unit you&rsquo;re on are sent too, so it can be looked into. Nothing
+          Your version and which unit you&rsquo;re on are sent too, so it can be looked into.
+          {logGoes ? ' The log goes as well — you can read it above first.' : ''} Nothing
           you&rsquo;ve built and no account details go with it.
         </p>
       </div>

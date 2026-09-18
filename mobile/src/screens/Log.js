@@ -63,7 +63,7 @@ function Line({ text, hot }) {
  * are which build, which unit and which end of the link — and none of them can
  * be read off the lines themselves.
  */
-export default function Log({ onBack }) {
+export default function Log({ onBack, onReport }) {
   const [lines, setLines] = useState(() => getDebugLog())
   const [said, setSaid] = useState(null)
   const deviceName = useRig(ofDeviceName)
@@ -222,6 +222,12 @@ export default function Log({ onBack }) {
             you want the thing that just happened; reading a paste you want the
             story in order.
           */}
+          {/* Sending beats copying, and until now copying was all there was:
+              the log went into the clipboard and then had to survive being
+              pasted somewhere, from a phone, after the thing that went wrong.
+              Copy stays — a log pasted into a message to a bandmate is a real
+              use — but this is the one that reaches the person who can fix it. */}
+          {onReport ? <Press label="Send this to the person who builds it" tone="signal" onPress={onReport} /> : null}
           <Press label="Clear Logs" onPress={() => { clearDebugLog(); setLines([]) }} />
         </View>
       ) : null}

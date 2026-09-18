@@ -15,6 +15,7 @@ import Connect from './src/screens/Connect'
 import Fixes from './src/screens/Fixes'
 import Gear from './src/screens/Gear'
 import Log from './src/screens/Log'
+import Report from './src/screens/Report'
 import Presets from './src/screens/Presets'
 import Setlists from './src/screens/Setlists'
 import Stage from './src/screens/Stage'
@@ -45,6 +46,10 @@ export default function App() {
   /* Which fix the guide opens on, and which screen Done goes back to. */
   const [fixOpen, setFixOpen] = useState(null)
   const [fixFrom, setFixFrom] = useState('settings')
+  /* Where Done goes back to, for the same reason `fixFrom` exists: this screen
+     is reached from Setup and from the log, and returning somebody to Setup
+     from the log they were reading is the wrong room. */
+  const [reportFrom, setReportFrom] = useState('settings')
   const [link, setLink] = useState(linkState())
   /** The last "picked up 2 setlists from your Mac", until it has been read. */
   const [picked, setPicked] = useState(null)
@@ -231,7 +236,19 @@ export default function App() {
             ) : screen === 'gear' ? (
               <Gear onBack={() => setScreen('settings')} />
             ) : screen === 'log' ? (
-              <Log onBack={() => setScreen('settings')} />
+              /* And a way to send it from the one screen where somebody is
+                 already looking at the thing worth sending. Copying the log
+                 and pasting it into a message later, from another device,
+                 after the gig, was the only route there had ever been. */
+              <Log
+                onBack={() => setScreen('settings')}
+                onReport={() => {
+                  setReportFrom('log')
+                  setScreen('report')
+                }}
+              />
+            ) : screen === 'report' ? (
+              <Report onBack={() => setScreen(reportFrom)} />
             ) : screen === 'fixes' ? (
               /* Works with the computer off, which is exactly when it is
                  wanted. The version it can check is the one the computer last
@@ -260,6 +277,12 @@ export default function App() {
                 onOpenConnect={() => setScreen('connect')}
                 /* Works with the Mac off, and is most wanted when it is off. */
                 onOpenLog={() => setScreen('log')}
+                /* Works signed out and with the Mac off, which is when most of
+                   what people want to complain about happens. */
+                onOpenReport={() => {
+                  setReportFrom('settings')
+                  setScreen('report')
+                }}
                 /* Same, and more so: a guide to what to try is the one screen
                    that has to work when nothing else does. */
                 onOpenFixes={() => {
