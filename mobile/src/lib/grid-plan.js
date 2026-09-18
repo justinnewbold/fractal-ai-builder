@@ -126,13 +126,20 @@ export function lanesFor(blocks, capabilities) {
 }
 
 /**
- * The lanes worth drawing: the ones holding something, plus the first empty
+ * The lanes worth drawing: the ones holding something, then the first empty
  * one — so a bare preset can be started and a parallel row can be begun.
+ *
+ * THE CHAIN FIRST, THE SPARE ROW AFTER. A preset whose chain is on the second
+ * row of the grid was drawn under twelve empty cells of the first, and the
+ * blocks somebody opened the editor to move were a screen's scroll away:
+ * "Move the empty row under the active row." The rows keep their numbers;
+ * only the order they are drawn in changes.
  */
 export function lanesShown(blocks, capabilities) {
   const lanes = lanesFor(blocks, capabilities)
-  const firstEmpty = lanes.findIndex((l) => !l.blocks.length)
-  return lanes.filter((l, i) => l.blocks.length || i === firstEmpty)
+  const held = lanes.filter((l) => l.blocks.length)
+  const spare = lanes.find((l) => !l.blocks.length)
+  return spare ? [...held, spare] : held
 }
 
 /** Cards and gaps in one list, in column order, so a lane reads as a chain. */
