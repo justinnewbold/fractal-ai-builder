@@ -3957,6 +3957,18 @@ export default function App() {
               <Updates />
             </Section>
           ) : null}
+            {/* Reachable from inside the app, which is the point of writing
+                them. Same two links as the phone's About page. */}
+            <Section key="small-print" title="The small print" note="Worth knowing, once">
+              <div className="history-actions">
+                <a className="chip" href="/privacy.html" target="_blank" rel="noreferrer">
+                  Privacy
+                </a>
+                <a className="chip" href="/notices.txt" target="_blank" rel="noreferrer">
+                  Licences
+                </a>
+              </div>
+            </Section>
           </div>
         ) : null}
       </Sheet>

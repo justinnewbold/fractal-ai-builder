@@ -629,6 +629,88 @@ export function run(test) {
     assert.match(mac.trimEnd(), /fractal_remote_setup$/, 'mac.sh does not call itself on its last line, so a truncated download would run half of it')
   })
 
+  test('the privacy policy describes what the app actually does', () => {
+    /*
+     * A store will not take a paid app without a privacy policy at a URL, and
+     * a policy that is wrong is worse than the missing one it replaced —
+     * it is a published claim nobody checked.
+     *
+     * SO THIS IS TIED TO THE CODE RATHER THAN TO A MEMO. The set of tables the
+     * apps write to is read out of the source here; if a new one appears, this
+     * fails until somebody has decided what the policy says about it. That is
+     * the whole mechanism — it does not know what is private, it refuses to
+     * let the question go unasked.
+     *
+     * It was written by reading that set rather than from memory, which is how
+     * `rig_lookups` turned out to be a table the app had stopped writing to
+     * when the tone builder came out: dead code whose test still passed.
+     */
+    const policy = read('public/privacy.html')
+
+    const sources = [...walk(new URL('../src/', import.meta.url))]
+      .concat([...walk(new URL('../mobile/src/', import.meta.url))])
+      .map((f) => readFileSync(f, 'utf8'))
+      .join('\n')
+
+    /* `.from('x')` and `.from(TABLE)` with a const above it: both are used. */
+    const tables = new Set()
+    for (const m of sources.matchAll(/\.from\('([a-z_]+)'\)/g)) tables.add(m[1])
+    for (const m of sources.matchAll(/const TABLE = '([a-z_]+)'/g)) tables.add(m[1])
+
+    assert.deepEqual(
+      [...tables].sort(),
+      ['feedback', 'stage_lists'],
+      'the apps write to a table the privacy policy has never been checked against'
+    )
+
+    /* And each of those is described, in the words a person would search for
+       rather than the table's name. */
+    assert.match(policy, /setlist/i, 'nothing is said about the setlists that sync')
+    assert.match(policy, /[Bb]ug reports? and suggestions|Something is broken/, 'nothing is said about reports')
+    assert.match(policy, /email address/i, 'nothing is said about the account')
+
+    /*
+     * THE LEAD, because it is the true and reassuring thing and it is what most
+     * people do: on your own wifi, nothing leaves the room.
+     */
+    assert.match(policy, /sends nothing anywhere|nothing leaves the room/i, 'the policy buries the local-mode answer')
+
+    /* No analytics, said plainly — and true, which is checked rather than
+       claimed. A tracking SDK arriving later fails this. */
+    assert.match(policy, /[Nn]o analytics and no tracking/, 'the policy does not say there is no tracking')
+    for (const sdk of ['@sentry', 'mixpanel', 'amplitude', 'posthog', 'segment', 'react-ga']) {
+      for (const manifest of ['package.json', 'mobile/package.json']) {
+        assert.ok(
+          !JSON.stringify(JSON.parse(read(manifest)).dependencies || {}).includes(sdk),
+          `${manifest} installs ${sdk}, and the privacy policy claims there is no analytics`
+        )
+      }
+    }
+
+    /* The two things a regulator and a store both look for. */
+    assert.match(policy, /justinnewbold@gmail\.com/, 'there is no way to ask for deletion')
+    assert.match(policy, /children|under 13/i, 'nothing is said about children')
+
+    /* And the debug log, which is the one thing here somebody might be
+       surprised by — so the policy has to be straight about when it goes and
+       that a suggestion never carries one. */
+    assert.match(policy, /debug log/i, 'the log is not mentioned at all')
+    assert.match(policy, /never/, 'the policy does not say a suggestion never carries the log')
+
+    /*
+     * Reachable from inside both apps. A policy at a URL nobody can find from
+     * the thing it describes satisfies a form and nobody else.
+     */
+    assert.match(read('src/App.jsx'), /privacy\.html/, 'the browser never links its privacy policy')
+    assert.match(read('mobile/src/screens/Settings.js'), /privacy\.html/, 'the phone never links its privacy policy')
+    for (const [where, src] of [
+      ['the browser', read('src/App.jsx')],
+      ['the phone', read('mobile/src/screens/Settings.js')]
+    ]) {
+      assert.match(src, /notices\.txt/, `${where} never links the licences it ships under`)
+    }
+  })
+
   test('the licences of what we ship travel with it', () => {
     /*
      * THIS IS THE ONE THAT BECOMES A PROBLEM ONLY ONCE MONEY IS INVOLVED, which
