@@ -10,7 +10,8 @@ import {
 
 import { color, font, radius, space, TAP } from '../lib/theme'
 import { sendPasswordReset, signIn, signUp } from '../lib/relay'
-import { formatPairCode, isPairCode, pairCredentials } from '../lib/pairing'
+import { formatPairCode, isPairCode, pairCredentials, PAIR_LENGTH, PAIR_LENGTHS } from '../lib/pairing'
+import ScanCode from '../components/ScanCode'
 import Note from '../components/Note'
 import Press from '../components/Press'
 import Connect from './Connect'
@@ -37,6 +38,7 @@ export default function SignIn({ onSignedIn, onDemo }) {
    */
   const [helping, setHelping] = useState(false)
   const [code, setCode] = useState('')
+  const [scanning, setScanning] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -119,6 +121,13 @@ export default function SignIn({ onSignedIn, onDemo }) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={{ flex: 1 }}
     >
+      {/*
+        A scanned code is typed code: it lands in the same box, formatted the
+        same way, and Connect does the same thing with it. So a scan that read
+        the wrong square is still something you can see and correct, rather
+        than a sign-in that happens to you.
+      */}
+      <ScanCode open={scanning} onClose={() => setScanning(false)} onCode={(c) => setCode(formatPairCode(c))} />
       <ScrollView
         contentContainerStyle={{ padding: space.lg, gap: space.lg, flexGrow: 1, justifyContent: 'center' }}
         keyboardShouldPersistTaps="handled"
@@ -129,26 +138,37 @@ export default function SignIn({ onSignedIn, onDemo }) {
           </Text>
           <Text style={{ color: color.silkDim, fontSize: font.body, lineHeight: 22 }}>
             {mode === 'code'
-              ? 'Type the code your computer shows under Set up phone remote, and this phone becomes its remote — from anywhere, with no account.'
+              ? 'Scan the square your computer shows under Set up phone remote — or type the code under it — and this phone becomes its remote, from anywhere, with no account.'
               : 'Sign in with the same account as the computer your unit is plugged into. Your presets and what the AI has learned about your taste follow you to any device.'}
           </Text>
         </View>
 
         {mode === 'code' ? (
-          <TextInput
+          <View style={{ gap: space.md }}>
+            {/*
+              The camera first, because it is the one that always works: the
+              code is 8 characters of a deliberately unambiguous alphabet, and
+              reading it off a screen across the room and typing it is still
+              the part people get wrong.
+            */}
+            <Press label="Scan a code" tone="signal" disabled={busy} onPress={() => setScanning(true)} />
+            <TextInput
             style={{ ...field, textAlign: 'center', letterSpacing: 2, fontVariant: ['tabular-nums'] }}
             value={code}
             onChangeText={(text) => setCode(formatPairCode(text))}
-            placeholder="XXXX-XXXX-XXXX-XXXX"
+            placeholder={formatPairCode('X'.repeat(PAIR_LENGTH))}
             placeholderTextColor={color.silkFaint}
             accessibilityLabel="The pairing code your computer shows"
             autoCapitalize="characters"
             autoCorrect={false}
             autoComplete="one-time-code"
-            maxLength={19}
+            /* Room for the longest code still accepted, dashes and all, so a
+               phone paired before codes got shorter can still be re-typed. */
+            maxLength={Math.max(...PAIR_LENGTHS) + Math.ceil(Math.max(...PAIR_LENGTHS) / 4) - 1}
             returnKeyType="go"
             onSubmitEditing={() => ready && !busy && go()}
-          />
+            />
+          </View>
         ) : (
           <View style={{ gap: space.md }}>
             <TextInput

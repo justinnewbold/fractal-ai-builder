@@ -3,6 +3,7 @@ import { Linking, ScrollView, Text, View } from 'react-native'
 import { color, font, radius, space } from '../lib/theme'
 import Note from '../components/Note'
 import Press from '../components/Press'
+import { PAIR_LENGTH } from '../lib/pairing'
 
 const RELEASES = 'https://github.com/justinnewbold/fractal-ai-builder/releases/latest'
 const FORGEFX = 'https://github.com/sKuhLight/ForgeFX'
@@ -83,8 +84,8 @@ export default function Connect({ onBack }) {
           'Drag it to Applications and open it.',
           'Plug your unit into the Mac with its USB cable.',
           'Quit FM3-Edit or Axe-Edit if either is open. Only one program can hold the USB port, and whichever got there first keeps it.',
-          'In the app, choose Set up phone remote. It shows a code of 16 letters and numbers.',
-          'Type that code on this phone, on the sign-in screen. That is the whole of it — no account needed.'
+          `In the app, choose Set up phone remote. It shows a code of ${PAIR_LENGTH} letters and numbers, and a QR you can scan.`,
+          'On this phone, scan that QR with Scan a code — or type the code in. That is the whole of it — no account needed.'
         ]}
         link={{ label: 'Download Fractal Remote for Mac', url: RELEASES }}
       />

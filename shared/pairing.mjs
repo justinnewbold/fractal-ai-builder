@@ -29,14 +29,44 @@
 
 /** Letters and digits that cannot be misread for each other: no 0/O, no 1/I. */
 export const PAIR_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-/** 16 symbols from a 32-symbol alphabet is 80 bits, which nobody guesses. */
-export const PAIR_LENGTH = 16
+/**
+ * How long a new code is.
+ *
+ * "16 digits is a lot for something like this that isn't extremely secure,
+ * where they just need a number that will make sure they're connecting to the
+ * computer." Half of that is fair — the camera does the typing now, and this
+ * is the fallback for a lens that will not focus.
+ *
+ * But it is not a label, and shortening it is not a cosmetic change. THE CODE
+ * IS THE PASSWORD: pairCredentials below turns it into the account both ends
+ * sign in as, and the relay carries a channel named after that account. So the
+ * number that matters is how many codes there are, and it has to stay past the
+ * point where anyone would try them all.
+ *
+ * 8 symbols from a 32-symbol alphabet is 40 bits — about 1.1 trillion codes.
+ * A thousand guesses a second is eleven hundred years. Four digits, which is
+ * what was asked for, is ten thousand: minutes, by a script, against a sign-in
+ * service that answers from anywhere. Getting to four needs a different design
+ * — a short code that expires and is traded for this one — and not a smaller
+ * number here.
+ */
+export const PAIR_LENGTH = 8
+/**
+ * The lengths that still open a door. New codes are PAIR_LENGTH; the 16 that
+ * came before it keep working, because a Mac and a phone that are paired today
+ * should not be unpaired by an app update. A longer code is a stronger one, so
+ * there is nothing to take away.
+ */
+export const PAIR_LENGTHS = [PAIR_LENGTH, 16]
+
+/** Said in one place, because the browser and the phone both say it. */
+export const NOT_A_PAIR_CODE = `That isn’t a pairing code. It’s ${PAIR_LENGTH} letters and numbers, shown on your computer.`
 /** Where the hidden account's address lives. Nothing is ever mailed to it. */
 export const PAIR_DOMAIN = 'pair.fractal.newbold.cloud'
 /** The one place the QR points, wherever the Mac is serving from. */
 export const HOSTED_ORIGIN = 'https://fractal.newbold.cloud'
 
-const pairPattern = new RegExp(`^[${PAIR_ALPHABET}]{${PAIR_LENGTH}}$`)
+const pairPattern = new RegExp(`^[${PAIR_ALPHABET}]{${PAIR_LENGTHS.join('}$|^[' + PAIR_ALPHABET + ']{')}}$`)
 
 /**
  * A fresh code. `random` fills a byte array, the way `crypto.getRandomValues`
@@ -81,21 +111,32 @@ export const isPairCode = (text) => normalizePairCode(text) !== null
 /**
  * The account a code stands for. Same code, same account, at both ends.
  *
- * The address carries only half the code, so a screen that shows who is signed
- * in never shows enough to sign in with. The password carries all of it.
+ * The address carries only HALF the code, so a screen that shows who is signed
+ * in never shows enough to sign in with. The password carries all of it. Half
+ * of whatever length it is: at 16 that was the first eight, and hard-coding
+ * eight would have handed the whole of an 8-symbol code to anyone who read the
+ * address off a settings screen.
+ *
+ * WHAT HALF AN ADDRESS COSTS, since it is worth knowing rather than
+ * discovering. Four symbols is about a million addresses, so two codes can
+ * share one. They do not share an account: the passwords differ, so the second
+ * Mac's sign-in is refused and its phone says no computer is paired with that
+ * code. Irritating, and safe — it fails shut. Two rigs never land on one
+ * channel, which is the failure worth designing against.
  */
 export function pairCredentials(code) {
   const clean = normalizePairCode(code)
-  if (!clean) throw new Error('That isn’t a pairing code. It’s 16 letters and numbers, shown on your computer.')
+  if (!clean) throw new Error(NOT_A_PAIR_CODE)
   return {
-    email: `pair-${clean.slice(0, 8).toLowerCase()}@${PAIR_DOMAIN}`,
+    email: `pair-${clean.slice(0, clean.length / 2).toLowerCase()}@${PAIR_DOMAIN}`,
     password: `pair-${clean}`
   }
 }
 
 /** Whether an account is one of these, rather than one a person made. */
 export function isPairAccount(email) {
-  return new RegExp(`^pair-[a-z2-9]{8}@${PAIR_DOMAIN.replace(/\./g, '\\.')}$`).test(String(email || ''))
+  const halves = PAIR_LENGTHS.map((n) => n / 2).join(',')
+  return new RegExp(`^pair-[a-z2-9]{${halves}}@${PAIR_DOMAIN.replace(/\./g, '\\.')}$`).test(String(email || ''))
 }
 
 /**
