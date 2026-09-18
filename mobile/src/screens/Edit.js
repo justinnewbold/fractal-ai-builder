@@ -17,7 +17,7 @@ import {
   setType
 } from '../lib/device'
 import { colLabel, doubtfulWrite, gridShape, laneItems, lanesShown, rowLabel } from '../lib/grid-plan'
-import { blockPositions, landingIndex, reorderPlan } from '../lib/laneOrder'
+import { blockPositions, landingIndex, reorderPlan, settledItems } from '../lib/laneOrder'
 import { isSilencingParam } from '../lib/guardrails'
 import { buildParamIndex, findControls, indexFor } from '../lib/paramIndex'
 import { beginChainWrite, endChainWrite, getState, refreshBlocks, useRig, writeBypass, writeChannel } from '../lib/rig'
@@ -690,6 +690,12 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
    * card and a free space are different heights and a lane can hold both.
    */
   const [drag, setDrag] = useState(null)
+  /*
+   * A move that has been let go of and is being written: which row, and the
+   * block positions it is going between. The lane is drawn in its new order
+   * from this until the unit has been asked again — see settledItems.
+   */
+  const [settling, setSettling] = useState(null)
   const heights = useRef({})
 
   const { linear } = gridShape(caps)
@@ -819,6 +825,8 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
       pos.to
     )
     if (!moves.length) return
+    /* Where the finger left it, held on screen through the writes below. */
+    setSettling({ row: lane.row, from: pos.from, to: pos.to })
     setBusy(true)
     setIssue(null)
     beginChainWrite()
@@ -849,6 +857,11 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
         throw err
       }
       await after(last)
+      /* The unit has been asked again, so the lane is drawn from its answer
+         rather than from where the finger left it. Dropped here rather than in
+         the `finally` below: by this line the two agree, and holding it any
+         longer would deal the move a second time on top of itself. */
+      setSettling(null)
       const refused = answers.filter(refusedAnswer).length
       /*
        * And checked, in numbers, against the unit's own answer. A move the
@@ -889,6 +902,10 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
       setIssue(err.message)
       onError(err.message)
     } finally {
+      /* A throw on the way past the line above leaves it set, and a lane drawn
+         for ever in an order the unit never took is worse than one that snaps
+         back. The truth wins whenever this ends badly. */
+      setSettling(null)
       endChainWrite()
       setBusy(false)
     }
@@ -1000,7 +1017,11 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
       </Text>
 
       {lanes.map((lane) => {
-        const items = laneItems(lane)
+        /* While a move is being written the lane is drawn where the finger
+           left it, not where the unit last said it was. */
+        const resting = laneItems(lane)
+        const items =
+          settling && settling.row === lane.row ? settledItems(resting, settling.from, settling.to) : resting
         const dragging = drag && drag.row === lane.row ? drag : null
         const lift = dragging ? (heights.current[lane.row] || [])[dragging.index] || 0 : 0
         return (

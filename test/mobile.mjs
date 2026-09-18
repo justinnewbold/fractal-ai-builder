@@ -3536,6 +3536,35 @@ export function run(test) {
     assert.doesNotMatch(edit, /Add or move blocks/)
   })
 
+  test('a move that has been let go of stays where it was put while it is written', () => {
+    /*
+     * The arithmetic above is only half of it: the screen has to actually draw
+     * from it. Without this, settledItems could be deleted from the render and
+     * every assertion about the maths would still pass while the card went on
+     * snapping back for three seconds.
+     */
+    const edit = read('mobile/src/screens/Edit.js').replace(/\s+/g, ' ')
+    assert.match(edit, /const \[settling, setSettling\] = useState\(null\)/, 'nothing holds the move while it is written')
+    assert.match(
+      edit,
+      /setSettling\(\{ row: lane\.row, from: pos\.from, to: pos\.to \}\)/,
+      'the move is not held from the moment the writes start'
+    )
+    assert.match(
+      edit,
+      /settling && settling\.row === lane\.row \? settledItems\(resting, settling\.from, settling\.to\) : resting/,
+      'the lane is still drawn only from what the unit last said'
+    )
+
+    /*
+     * And let go of once the unit has been asked again. Held any longer and
+     * the move is dealt a second time on top of an answer that already has it;
+     * never let go of at all and a failed write leaves the lane lying for ever.
+     */
+    assert.match(edit, /await after\(last\) \/\* The unit has been asked again[^*]*\*\/ setSettling\(null\)/, 'the preview outlives the read that replaces it')
+    assert.match(edit, /finally \{ \/\*[^*]*\*\/ setSettling\(null\) endChainWrite\(\)/, 'a throw leaves the lane drawn in an order the unit never took')
+  })
+
   test('a drag up or down the lane deals the blocks back into the same columns', async () => {
     /*
      * "Drag and drop with a little hamburger icon, where you can hold it and
@@ -3560,6 +3589,49 @@ export function run(test) {
     assert.deepEqual(reorderPlan(lane, 2, 2), [], 'a drag that lands where it started writes something')
     assert.deepEqual(reorderPlan(lane, 9, 1), [], 'a position off the end writes something')
     assert.deepEqual(reorderPlan([B(0, 'Only')], 0, 0), [])
+
+    /*
+     * AND WHAT IS ON SCREEN WHILE THOSE WRITES GO OUT. "Move blocks in the
+     * chain works but it jumps back to where the block was for a few seconds
+     * before actually moving to its final spot." Six writes and a re-read is
+     * about three seconds on an FM3, and the lane is drawn from the last thing
+     * the unit said — which, until the re-read, is still the old order. So the
+     * card was released, snapped back, and sat there.
+     *
+     * The preview has to agree with the plan exactly, or the card moves twice:
+     * once to a guess and again to the truth. Same columns, new order.
+     */
+    const { settledItems } = await import('../mobile/src/lib/laneOrder.js')
+    const shown = (items) => items.map((it) => `${it.col}:${it.kind === 'block' ? it.block.name : 'gap'}`)
+    const withKind = lane.map((b) => ({ kind: 'block', col: b.col, block: b.block }))
+
+    assert.deepEqual(
+      shown(settledItems(withKind, 2, 1)),
+      ['0:In', '1:Drive', '3:Comp', '4:Amp'],
+      'the lane is not drawn where the finger left it'
+    )
+    /* Which is the same answer reorderPlan writes to the unit. */
+    const planned = new Map(reorderPlan(lane, 2, 1).map((m) => [m.block.name, m.to]))
+    for (const it of settledItems(withKind, 2, 1)) {
+      if (planned.has(it.block.name)) {
+        assert.equal(it.col, planned.get(it.block.name), `${it.block.name} is previewed somewhere it is not being written`)
+      }
+    }
+
+    /* A gap stays a gap, in its own column, while the blocks move around it. */
+    const holey = [
+      { kind: 'block', col: 0, block: { name: 'In' } },
+      { kind: 'gap', col: 1 },
+      { kind: 'block', col: 2, block: { name: 'Drive' } },
+      { kind: 'block', col: 3, block: { name: 'Amp' } }
+    ]
+    assert.deepEqual(shown(settledItems(holey, 2, 0)), ['0:Amp', '1:gap', '2:In', '3:Drive'])
+
+    /* Nothing to preview is the lane exactly as it was — the same array back,
+       so a re-render over a move that changes nothing costs nothing. */
+    assert.equal(settledItems(withKind, 2, 2), withKind)
+    assert.equal(settledItems(withKind, 9, 1), withKind)
+    assert.equal(settledItems(withKind, 0, null), withKind)
 
     /* Where the finger is, over cards and gaps of different heights. */
     const heights = [80, 80, 48, 80]
