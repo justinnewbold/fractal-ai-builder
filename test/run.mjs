@@ -77,8 +77,40 @@ const test = (name, fn) => {
   }
 }
 
-/** Every queued test, settled, before anything counts the score. */
-const settle = () => queue
+/**
+ * Every queued test, settled, before anything counts the score.
+ *
+ * It awaits the queue AGAIN for as long as the queue keeps moving, and that
+ * loop is not paranoia — it is a bug this file shipped with.
+ *
+ * `test()` appends to `queue`. Every call is meant to happen while this file is
+ * being read, so by the time anything is awaited the chain is complete. But a
+ * missing `})` once left two `test(...)` calls sitting INSIDE another test's
+ * body, where they ran when that test ran — appending to the chain after this
+ * function had already handed its promise over. The await finished, the tally
+ * printed, and the stray async test settled afterwards.
+ *
+ * What that cost was the summary line. A run with a genuine failure in that
+ * test printed "808 passed", with no mention of the failure, and the FAIL line
+ * appeared below it — which is precisely the thing the tally at the foot of
+ * this file was rewritten to stop. The exit code stayed right throughout, so
+ * CI was never fooled; a person reading the log was.
+ *
+ * It also made the count depend on the Node version. The straggler landed
+ * before the summary on Node 22 and after it on Node 20 and 24, so the same
+ * commit reported 809 on one and 808 on another, and an upgrade looked like it
+ * had eaten a test.
+ *
+ * Re-awaiting until the chain stops growing costs one extra microtask on a
+ * healthy run and cannot be got wrong by a future stray brace.
+ */
+const settle = async () => {
+  let seen
+  do {
+    seen = queue
+    await seen
+  } while (queue !== seen)
+}
 
 const close = (a, b, tol = 0.0005) =>
   assert.ok(Math.abs(a - b) <= tol, `expected ${b}, got ${a}`)
@@ -3641,6 +3673,57 @@ test('every unit the server can detect is addressed on its own terms', async () 
    * stay null all the way through: no jumps, no bound to refuse a save
    * against, and no bank letters on a unit that has no banks.
    */
+
+  const { slotCount, slotLabel, slotOutside } = await import('../src/lib/slots.js')
+  const { jumpsFor } = await import('../src/lib/presetJumps.js')
+
+  const grid = (rows, cols, count) => ({
+    slotModel: 'grid',
+    grid: { rows, cols },
+    sceneCount: 8,
+    presets: { count, addressing: 'numeric' }
+  })
+
+  const units = {
+    'Axe-Fx III': grid(6, 14, 512),
+    FM3: grid(4, 12, 512),
+    FM9: grid(6, 14, 512),
+    'Axe-Fx II': grid(4, 12, 384),
+    AM4: { slotModel: 'linear', slotCount: 4, sceneCount: 4, presets: { count: 104, addressing: 'bankLetter' } },
+    VP4: { slotModel: 'linear', slotCount: 4, sceneCount: 4, presets: { count: null, addressing: 'numeric' } }
+  }
+
+  // The count each unit actually holds, taken from what it says rather than
+  // from the gen-3 number the app used to assume.
+  assert.equal(slotCount(units['Axe-Fx III']), 512)
+  assert.equal(slotCount(units.FM9), 512)
+  assert.equal(slotCount(units['Axe-Fx II']), 384)
+  assert.equal(slotCount(units.AM4), 104)
+  assert.equal(slotCount(units.VP4), null, 'a VP4 is being told how many presets it has')
+
+  // Banks only where there are banks. A gen-3 unit numbers its slots and has
+  // none; the AM4 shows A01..Z04 on its own display.
+  assert.equal(slotLabel(0, units.FM9.presets.addressing), '000')
+  assert.equal(slotLabel(103, units.AM4.presets.addressing), '103 Z04')
+  assert.equal(slotLabel(0, units.VP4.presets.addressing), '000', 'a VP4 is being given bank letters')
+
+  // The guard that stops a save being aimed at a slot the unit has not got.
+  for (const [name, caps] of Object.entries(units)) {
+    const count = slotCount(caps)
+    if (count === null) {
+      assert.equal(slotOutside(500, caps), false, `${name} refuses a slot on a count it never stated`)
+      continue
+    }
+    assert.equal(slotOutside(count - 1, caps), false, `${name} refuses its own last slot`)
+    assert.equal(slotOutside(count, caps), true, `${name} accepts one past its last slot`)
+  }
+
+  // And the jumps, per unit, from the same one rule.
+  assert.deepEqual(jumpsFor(slotCount(units.FM9)), [100, 200, 300, 400, 500])
+  assert.deepEqual(jumpsFor(slotCount(units.AM4)), [20, 40, 60, 80, 100])
+  assert.deepEqual(jumpsFor(slotCount(units.VP4) ?? 0), [], 'a VP4 gets jump buttons over a list of four')
+})
+
 test('the chat is told what the unit holds, and what nobody has looked at', async () => {
   /*
    * "What presets do we have named Metallica?" — "I don't have a way to browse
@@ -3726,56 +3809,6 @@ test('the slot list reaches the chat, and the chat is told how to read it', () =
   assert.match(route, /^SLOTS$/m)
   assert.match(route, /Never say a preset does not exist/)
   assert.match(route, /never an offer to remove the blocks/)
-})
-
-  const { slotCount, slotLabel, slotOutside } = await import('../src/lib/slots.js')
-  const { jumpsFor } = await import('../src/lib/presetJumps.js')
-
-  const grid = (rows, cols, count) => ({
-    slotModel: 'grid',
-    grid: { rows, cols },
-    sceneCount: 8,
-    presets: { count, addressing: 'numeric' }
-  })
-
-  const units = {
-    'Axe-Fx III': grid(6, 14, 512),
-    FM3: grid(4, 12, 512),
-    FM9: grid(6, 14, 512),
-    'Axe-Fx II': grid(4, 12, 384),
-    AM4: { slotModel: 'linear', slotCount: 4, sceneCount: 4, presets: { count: 104, addressing: 'bankLetter' } },
-    VP4: { slotModel: 'linear', slotCount: 4, sceneCount: 4, presets: { count: null, addressing: 'numeric' } }
-  }
-
-  // The count each unit actually holds, taken from what it says rather than
-  // from the gen-3 number the app used to assume.
-  assert.equal(slotCount(units['Axe-Fx III']), 512)
-  assert.equal(slotCount(units.FM9), 512)
-  assert.equal(slotCount(units['Axe-Fx II']), 384)
-  assert.equal(slotCount(units.AM4), 104)
-  assert.equal(slotCount(units.VP4), null, 'a VP4 is being told how many presets it has')
-
-  // Banks only where there are banks. A gen-3 unit numbers its slots and has
-  // none; the AM4 shows A01..Z04 on its own display.
-  assert.equal(slotLabel(0, units.FM9.presets.addressing), '000')
-  assert.equal(slotLabel(103, units.AM4.presets.addressing), '103 Z04')
-  assert.equal(slotLabel(0, units.VP4.presets.addressing), '000', 'a VP4 is being given bank letters')
-
-  // The guard that stops a save being aimed at a slot the unit has not got.
-  for (const [name, caps] of Object.entries(units)) {
-    const count = slotCount(caps)
-    if (count === null) {
-      assert.equal(slotOutside(500, caps), false, `${name} refuses a slot on a count it never stated`)
-      continue
-    }
-    assert.equal(slotOutside(count - 1, caps), false, `${name} refuses its own last slot`)
-    assert.equal(slotOutside(count, caps), true, `${name} accepts one past its last slot`)
-  }
-
-  // And the jumps, per unit, from the same one rule.
-  assert.deepEqual(jumpsFor(slotCount(units.FM9)), [100, 200, 300, 400, 500])
-  assert.deepEqual(jumpsFor(slotCount(units.AM4)), [20, 40, 60, 80, 100])
-  assert.deepEqual(jumpsFor(slotCount(units.VP4) ?? 0), [], 'a VP4 gets jump buttons over a list of four')
 })
 
 test('recent presets and favourites, per unit', () => {

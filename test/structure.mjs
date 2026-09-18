@@ -20,6 +20,13 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { cableColumns, doubtfulWrite, toWireCell as wireCell } from '../shared/grid-plan.mjs'
 import { linkTone, linkWord, toneOfRemote } from '../shared/link-word.mjs'
 import { describeLink } from '../src/lib/link.js'
+/* Used by the one check below that reads the TEST files rather than the app. */
+import { parse } from '@babel/parser'
+import babelTraverse from '@babel/traverse'
+
+/* CommonJS interop: @babel/traverse's default export is on `.default` under
+   some resolutions and is the module itself under others. */
+const traverse = babelTraverse.default || babelTraverse
 
 const src = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
 /* The Ask button's rule lives in a module so it can be asserted as behaviour
@@ -5785,5 +5792,61 @@ export function run(test) {
     const migration = readFileSync(new URL('../supabase/migrations/20260914_user_memory.sql', import.meta.url), 'utf8')
     assert.match(migration, /create table if not exists public\.user_memory/, 'the account has nowhere to keep the memory')
     assert.match(migration, /enable row level security/, 'one person could read another\'s memory')
+  })
+
+  test('no test is registered from inside another test', () => {
+    /*
+     * A `})` went missing once and two `test(...)` calls ended up INSIDE
+     * another test's body. They still ran and still passed, so nothing looked
+     * wrong — but they registered while the queue was draining rather than
+     * while this file was being read, which put one of them past the point
+     * where run.mjs counts the score.
+     *
+     * Two things came of that. The tally printed "808 passed" on a run whose
+     * 809th test had FAILED, with the failure below the line a person reads —
+     * exactly what the summary was rewritten to prevent. And the count moved
+     * with the Node version, because whether the straggler beat the summary
+     * depended on how the runtime drains its microtasks: 809 on Node 22, 808
+     * on Node 20 and 24. An upgrade looked like it had eaten a test.
+     *
+     * settle() re-awaits until the chain stops growing, so a stray brace can
+     * no longer hide a result. This says it should not happen in the first
+     * place, and says WHERE, which a count never did.
+     *
+     * A `test(` inside a plain block or a loop is fine and is not what this
+     * looks for — those still register while the file is being read. Only a
+     * registration inside another test's own callback is the fault.
+     */
+    const files = readdirSync(new URL('.', import.meta.url)).filter((f) => f.endsWith('.mjs'))
+    assert.ok(files.length >= 6, 'the test directory reads as empty; this check would pass on nothing')
+
+    const strays = []
+    for (const file of files) {
+      const code = readFileSync(new URL(file, import.meta.url), 'utf8')
+      const ast = parse(code, { sourceType: 'module', plugins: ['jsx'], allowAwaitOutsideFunction: true })
+
+      traverse(ast, {
+        CallExpression(path) {
+          if (path.node.callee?.name !== 'test') return
+          /* Is any enclosing function the callback of another `test(...)`? */
+          const outer = path.findParent(
+            (p) =>
+              p.isFunction() &&
+              p.parentPath?.isCallExpression() &&
+              p.parentPath.node.callee?.name === 'test'
+          )
+          if (outer) {
+            const name = path.node.arguments?.[0]?.value ?? '(unnamed)'
+            strays.push(`${file}:${path.node.loc?.start.line} — ${name}`)
+          }
+        }
+      })
+    }
+
+    assert.deepEqual(
+      strays,
+      [],
+      `these tests register from inside another test, so the runner counts them late:\n  ${strays.join('\n  ')}`
+    )
   })
 }
