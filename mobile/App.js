@@ -12,6 +12,7 @@ import Settings from './src/screens/Settings'
 import SignIn from './src/screens/SignIn'
 import Edit from './src/screens/Edit'
 import Connect from './src/screens/Connect'
+import Fixes from './src/screens/Fixes'
 import Gear from './src/screens/Gear'
 import Log from './src/screens/Log'
 import Presets from './src/screens/Presets'
@@ -41,6 +42,9 @@ export default function App() {
   /** 'checking' | 'out' | 'in' */
   const [auth, setAuth] = useState('checking')
   const [screen, setScreen] = useState('stage')
+  /* Which fix the guide opens on, and which screen Done goes back to. */
+  const [fixOpen, setFixOpen] = useState(null)
+  const [fixFrom, setFixFrom] = useState('settings')
   const [link, setLink] = useState(linkState())
   /** The last "picked up 2 setlists from your Mac", until it has been read. */
   const [picked, setPicked] = useState(null)
@@ -228,6 +232,20 @@ export default function App() {
               <Gear onBack={() => setScreen('settings')} />
             ) : screen === 'log' ? (
               <Log onBack={() => setScreen('settings')} />
+            ) : screen === 'fixes' ? (
+              /* Works with the computer off, which is exactly when it is
+                 wanted. The version it can check is the one the computer last
+                 told us; with nothing there it says so.
+
+                 `back` is where Done returns to, because this screen is
+                 reached two ways: from Setup, and from an error on the stage
+                 screen. Coming back to Setup from an error you hit while
+                 playing would be the wrong room. */
+              <Fixes
+                onBack={() => setScreen(fixFrom)}
+                open={fixOpen}
+                hostVersion={link.hostVersion}
+              />
             ) : screen === 'settings' ? (
               <Settings
                 link={link.link}
@@ -242,6 +260,13 @@ export default function App() {
                 onOpenConnect={() => setScreen('connect')}
                 /* Works with the Mac off, and is most wanted when it is off. */
                 onOpenLog={() => setScreen('log')}
+                /* Same, and more so: a guide to what to try is the one screen
+                   that has to work when nothing else does. */
+                onOpenFixes={() => {
+                  setFixOpen(null)
+                  setFixFrom('settings')
+                  setScreen('fixes')
+                }}
                 onReconnect={probeNow}
                 onSignOut={async () => {
                   /*
@@ -259,6 +284,13 @@ export default function App() {
               />
             ) : (
               <Stage
+                /* An error on the stage screen can name the fix for it, and
+                   Done comes back here rather than to Setup. */
+                onOpenFix={(id) => {
+                  setFixOpen(id)
+                  setFixFrom('stage')
+                  setScreen('fixes')
+                }}
                 /* Only once the Mac is answering: a list of slot numbers with
                    no names behind them is a screen that cannot do its one job. */
                 onOpenPresets={

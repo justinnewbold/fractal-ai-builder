@@ -67,6 +67,24 @@ export const FILES = [
    * the comparison has to mean the same thing at both ends of it.
    */
   { source: '../shared/versions.mjs', target: '../mobile/src/lib/versions.js' },
+  /*
+   * The troubleshooting guide, so a fix reads the same wherever somebody
+   * standing in front of a dead rig happens to look it up.
+   *
+   * Rendered rather than copied, for one character. Node needs an explicit
+   * extension on a relative import, so the shared file says `./versions.mjs`;
+   * the phone's copy of that module is `versions.js`, because that is what the
+   * sync has always called it and what Settings.js imports. So the extension
+   * is rewritten on the way across and the banner is put back by hand — a
+   * plain copy would ship an import that resolves to nothing and take demo
+   * mode's Metro bundle down with it.
+   */
+  {
+    source: '../shared/troubleshooting.mjs',
+    target: '../mobile/src/lib/troubleshooting.js',
+    render: (text) =>
+      banner('../shared/troubleshooting.mjs') + text.replace("from './versions.mjs'", "from './versions.js'")
+  },
 
 
   { source: '../src/lib/guardrails.js', target: '../mobile/src/lib/guardrails.js' },

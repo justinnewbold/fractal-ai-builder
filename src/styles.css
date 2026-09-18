@@ -9758,3 +9758,57 @@ button.setup-back {
   border-radius: 0;
   background: transparent;
 }
+
+/* ---------- fixes: the troubleshooting guide ---------- */
+
+/* One list of things to try, each folded shut until it is the one you want.
+   Opened by name when an error notice sends you here — see `fix` in App. */
+.fixes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.fix {
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  padding: var(--s-2);
+  background: var(--panel);
+}
+
+.fix > summary {
+  cursor: pointer;
+  /* The title and the "when" on separate lines: the when is what tells you
+     whether this is your problem, and it is longer than the title. */
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-height: 44px;
+  justify-content: center;
+}
+
+.fix-steps {
+  margin: var(--s-2) 0 0;
+  padding-left: var(--s-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  line-height: 1.5;
+}
+
+.fix-versions {
+  margin-top: var(--s-2);
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--rule);
+}
+
+/* Green when the two agree, amber when they do not, plain when nobody knows.
+   Never red: a version that has drifted is a thing to fix, not a failure. */
+.fix-versions [data-sync='ok'] {
+  color: var(--live, var(--silk));
+}
+
+.fix-versions [data-sync='behind'],
+.fix-versions [data-sync='ahead'] {
+  color: var(--warn, var(--silk));
+}

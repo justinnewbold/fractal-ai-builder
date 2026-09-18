@@ -1046,7 +1046,9 @@ export function run(test) {
       /* 'playing' was the play-mode switch, whose only job was hiding the
                  ✦ Ask button. Both went with the AI. */
       ['play', ['size', 'appearance']],
-      ['help', ['preset-check', 'debug-log', 'feedback', 'what-s-changed-this-session', 'how-this-works']],
+      /* Fixes first: it is the one somebody is looking for when they open
+         this page at all, and the log is what they send if it did not help. */
+      ['help', ['fixes', 'preset-check', 'debug-log', 'feedback', 'what-s-changed-this-session', 'how-this-works']],
       ['about', ['updates']]
     ]) {
       assert.deepEqual(behind(page), panels, `the ${page} page holds ${behind(page).join(', ')}`)
