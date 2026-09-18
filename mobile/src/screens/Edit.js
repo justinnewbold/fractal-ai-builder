@@ -881,7 +881,7 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
             .join(', ')}. ${
             refused
               ? `The unit answered “refused” to ${refused} of the ${answers.length} steps.`
-              : `The unit answered every step without refusing it. Copy the log from Setup — it has each answer.`
+              : `The unit answered every step without refusing it. Copy Logs from Setup — it has each answer.`
           }`
         )
       }

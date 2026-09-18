@@ -91,7 +91,7 @@ export default function SignIn({ email: initial = '', submitLabel = 'Sign in', o
           {working
             ? 'One moment…'
             : mode === 'create'
-              ? 'Create account'
+              ? 'Create Account'
               : mode === 'forgot'
                 ? 'Email me a reset link'
                 : submitLabel}
@@ -99,7 +99,7 @@ export default function SignIn({ email: initial = '', submitLabel = 'Sign in', o
         {mode === 'in' ? (
           <>
             <button type="button" className="signin-link" onClick={() => setMode('create')} disabled={off}>
-              Create an account
+              Create Account
             </button>
             <button type="button" className="signin-link" onClick={() => setMode('forgot')} disabled={off}>
               Forgot password?

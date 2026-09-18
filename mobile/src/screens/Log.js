@@ -159,7 +159,7 @@ export default function Log({ onBack }) {
 
       <View style={{ paddingHorizontal: space.lg, gap: space.sm, paddingBottom: space.sm }}>
         <Press
-          label="Copy the log"
+          label="Copy Logs"
           /*
             Named on the button, because it is the reason to press it after a
             crash: the copy carries the end of the previous run as well as this
@@ -222,7 +222,7 @@ export default function Log({ onBack }) {
             you want the thing that just happened; reading a paste you want the
             story in order.
           */}
-          <Press label="Clear the log" onPress={() => { clearDebugLog(); setLines([]) }} />
+          <Press label="Clear Logs" onPress={() => { clearDebugLog(); setLines([]) }} />
         </View>
       ) : null}
     </View>

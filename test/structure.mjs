@@ -507,7 +507,7 @@ export function run(test) {
     assert.match(read('components/Boundary.jsx'), /logDebug\('crash'/, 'a panel that fails to draw is not logged')
 
     const panel = read('components/DebugLog.jsx')
-    assert.match(panel, /Copy log/, 'the debug log has no Copy button')
+    assert.match(panel, /Copy Logs/, 'the debug log has no Copy button')
     assert.match(panel, /navigator\.clipboard\.writeText/, 'Copy does not use the clipboard')
     assert.match(panel, /navigator\.share/, 'no fallback for a phone that refuses the clipboard')
     assert.match(panel, /wireReport\(\)/, 'the wire tables are not in the copied text')
@@ -519,7 +519,7 @@ export function run(test) {
      */
     assert.match(panel, /Share as file/, 'the debug log cannot go out as a file')
     const buttons = panel.slice(panel.indexOf('className="diag-actions"'))
-    assert.ok(buttons.indexOf('Share as file') < buttons.indexOf('Copy log'), 'the file is not the first offer')
+    assert.ok(buttons.indexOf('Share as file') < buttons.indexOf('Copy Logs'), 'the file is not the first offer')
     assert.match(panel, /new File\(\[t\], fileName\(\), \{ type: 'text\/plain' \}\)/, 'the report is not a plain-text file')
     assert.match(panel, /navigator\.canShare\?\.\(\{ files: \[file\] \}\)/, 'the share sheet is not asked whether it takes a file')
     assert.match(panel, /a\.download = file\.name/, 'a browser with no share sheet gets no file')

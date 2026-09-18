@@ -2119,7 +2119,7 @@ test('the debug report carries the computer’s own account of its port', async 
    * "port not open" on the phone, live tuner readings at the same time, a
    * preset change that reached the unit — and nothing to read on the Mac,
    * whose server's stdout goes nowhere when the app is opened from the
-   * Finder. The Copy log button now asks the Mac's server how it is (its
+   * Finder. The Copy Logs button now asks the Mac's server how it is (its
    * /diag: port open or not, the last ten times it lost the port and why,
    * its last lines) and puts that under the log.
    */
@@ -2153,7 +2153,7 @@ test('the debug report carries the computer’s own account of its port', async 
   assert.match(formatMacDiag({ reopens: [], recent: [] }), /port lost and reopened: 0 times\nserver log: nothing said yet/)
 
   const panel = readSrc(new URL('../src/components/DebugLog.jsx', import.meta.url), 'utf8')
-  assert.match(panel, /const t = text\(await macReport\(\)\)/, 'Copy log does not ask the computer')
+  assert.match(panel, /const t = text\(await macReport\(\)\)/, 'Copy Logs does not ask the computer')
   assert.match(panel, /formatMacDiag\(await serverDiag\(\)\)/)
   assert.match(panel, /could not be asked/, 'a computer that does not answer is not said so')
   const fx = readSrc(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')

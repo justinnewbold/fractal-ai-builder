@@ -12,9 +12,12 @@ import { platform } from '../lib/platform'
  * "Make a unified debug log with a copy log button to send back to you for
  * debugging in the settings menu." Everything the app records — what the AI
  * did and when, what went to the unit and what came back, what the app
- * changed, every error and crash — is one list here, in order, and Copy log
+ * changed, every error and crash — is one list here, in order, and Copy Logs
  * puts the whole of it on the clipboard with the version and the unit at the
  * top, so a bug report is one paste.
+ *
+ * The words on these three buttons are the phone's words too — see the log
+ * area in test/both-ends.mjs, which holds the two ends to them.
  *
  * On a phone the clipboard can refuse — it needs a fresh tap and a secure
  * page — so the fallbacks are the share sheet, and failing that the text in a
@@ -172,7 +175,7 @@ export default function DebugLog({ device, link }) {
           {copied || 'Share as file'}
         </button>
         <button className="chip" onClick={copy}>
-          Copy log
+          Copy Logs
         </button>
         <button
           className="chip"
@@ -182,7 +185,7 @@ export default function DebugLog({ device, link }) {
           }}
           disabled={!all.length}
         >
-          Clear
+          Clear Logs
         </button>
         <span className="hint mono">
           {all.length} line{all.length === 1 ? '' : 's'}

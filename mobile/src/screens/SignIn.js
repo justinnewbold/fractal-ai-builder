@@ -186,7 +186,7 @@ export default function SignIn({ onSignedIn, onDemo }) {
         {note ? <Note>{note}</Note> : null}
 
         <Press
-          label={busy ? 'Working…' : mode === 'up' ? 'Create account' : mode === 'in' ? 'Sign in' : 'Connect'}
+          label={busy ? 'Working…' : mode === 'up' ? 'Create Account' : mode === 'in' ? 'Sign in' : 'Connect'}
           tone="signal"
           on={ready && !busy}
           disabled={!ready || busy}
@@ -200,7 +200,7 @@ export default function SignIn({ onSignedIn, onDemo }) {
             <View style={{ flexDirection: 'row', gap: space.md }}>
               <Press
                 grow
-                label={mode === 'up' ? 'I already have one' : 'Make an account'}
+                label={mode === 'up' ? 'I already have one' : 'Create Account'}
                 disabled={busy}
                 onPress={() => switchTo(mode === 'up' ? 'in' : 'up')}
               />
