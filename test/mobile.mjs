@@ -49,11 +49,23 @@ const PHONE_GLOBALS = new Set([
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
 
 /** Every .js under a directory, so a new screen cannot quietly opt out. */
+/*
+ * Forward slashes, on every platform.
+ *
+ * `fileURLToPath` gives back the platform's own separators, and on Windows
+ * that is a backslash — so `file.endsWith('/screens/Connect.js')` silently
+ * stopped matching and `f.split('/mobile/')[1]` became undefined. Both are
+ * real uses below, and both failed as something else: a screen that was meant
+ * to be skipped got scanned, and a path came out as `mobile/undefined`.
+ *
+ * Node reads a forward-slash path perfectly well on Windows, so normalising
+ * here costs nothing and means no caller has to think about it.
+ */
 function* walk(dir) {
   for (const entry of readdirSync(fileURLToPath(dir))) {
     const path = fileURLToPath(new URL(entry, dir))
     if (statSync(path).isDirectory()) yield* walk(new URL(`${entry}/`, dir))
-    else if (/\.js$/.test(entry)) yield path
+    else if (/\.js$/.test(entry)) yield path.replaceAll('\\', '/')
   }
 }
 

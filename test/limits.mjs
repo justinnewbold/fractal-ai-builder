@@ -18,17 +18,30 @@
  * went with the AI, and so did the tests that held them together.
  */
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
 
 /** Every .js/.jsx under a directory, so a new file cannot quietly opt out. */
+/*
+ * Forward slashes, on every platform.
+ *
+ * `fileURLToPath` gives back the platform's own separators, and on Windows
+ * that is a backslash — so `file.endsWith('/screens/Connect.js')` silently
+ * stopped matching and `f.split('/mobile/')[1]` became undefined. Both are
+ * real uses below, and both failed as something else: a screen that was meant
+ * to be skipped got scanned, and a path came out as `mobile/undefined`.
+ *
+ * Node reads a forward-slash path perfectly well on Windows, so normalising
+ * here costs nothing and means no caller has to think about it.
+ */
 function* walk(dir) {
   for (const entry of readdirSync(fileURLToPath(dir))) {
     const path = fileURLToPath(new URL(entry, dir))
     if (statSync(path).isDirectory()) yield* walk(new URL(`${entry}/`, dir))
-    else if (/\.(js|jsx)$/.test(entry)) yield path
+    else if (/\.(js|jsx)$/.test(entry)) yield path.replaceAll('\\', '/')
   }
 }
 
@@ -540,10 +553,21 @@ export function run(test) {
       assert.match(script, /Ctrl-C/, `${path} never says how to stop it`)
     }
 
-    /* The shell one has to be executable, or `bash script.sh` is the only way
-       to run it and the printed one-liner is the only way anybody will. */
-    const mode = statSync(fileURLToPath(new URL('../helpers/fractal-remote.sh', import.meta.url))).mode
-    assert.ok(mode & 0o111, 'the shell helper is not executable')
+    /*
+     * The shell one has to be executable, and the question is asked of GIT
+     * rather than of the disk.
+     *
+     * Windows has no executable bit to record, so `statSync().mode` there says
+     * nothing — this failed on the first Windows run for that reason alone.
+     * It is also the more honest question: what matters is the mode that was
+     * COMMITTED, and a file can be executable on the machine it was written on
+     * and check out as 100644 for everybody else.
+     */
+    const entry = execFileSync('git', ['ls-files', '-s', 'helpers/fractal-remote.sh'], {
+      cwd: fileURLToPath(new URL('..', import.meta.url)),
+      encoding: 'utf8'
+    })
+    assert.match(entry, /^100755 /, 'the shell helper is not committed as executable')
 
     /* And Windows gets its firewall warning, which is the failure that looks
        like nothing: the server starts, the unit is found, and the phone across
