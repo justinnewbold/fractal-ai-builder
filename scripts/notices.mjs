@@ -37,6 +37,10 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+/* The same sentence the two About screens show. It appeared here first, typed
+   by hand, which is exactly the drift shared/affiliation.mjs exists to stop. */
+import { NOT_AFFILIATED, TRADEMARKS } from '../shared/affiliation.mjs'
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 /** The two we carry whole, in the order they matter. */
@@ -148,10 +152,9 @@ const lines = [
   '',
   '## Fractal Audio Systems',
   '',
-  'Fractal Remote is **not affiliated with, endorsed by, or sponsored by**',
-  'Fractal Audio Systems, Inc. "Fractal Audio", "Axe-Fx", "FM3", "FM9", "AM4"',
-  'and "VP4" are their trademarks and are used here only to say which hardware',
-  'this app talks to.',
+  NOT_AFFILIATED,
+  '',
+  TRADEMARKS,
   '',
   '---',
   '',

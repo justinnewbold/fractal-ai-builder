@@ -13,10 +13,9 @@ Last generated: 2026-09-18
 
 ## Fractal Audio Systems
 
-Fractal Remote is **not affiliated with, endorsed by, or sponsored by**
-Fractal Audio Systems, Inc. "Fractal Audio", "Axe-Fx", "FM3", "FM9", "AM4"
-and "VP4" are their trademarks and are used here only to say which hardware
-this app talks to.
+Fractal Remote is an independent app. It is in no way affiliated with, endorsed by, or sponsored by Fractal Audio Systems, Inc.
+
+“Fractal Audio”, “Axe-Fx”, “FM3”, “FM9”, “AM4” and “VP4” are trademarks of Fractal Audio Systems, Inc., used here only to say which hardware this app works with.
 
 ---
 

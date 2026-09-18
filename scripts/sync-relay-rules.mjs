@@ -91,6 +91,12 @@ export const FILES = [
    * something a reader cannot compare with anything else.
    */
   { source: '../shared/report-rules.mjs', target: '../mobile/src/lib/report-rules.js' },
+  /*
+   * Whose app this is and whose it is not. One sentence, four places it has to
+   * appear, and the version that matters is whichever one somebody's lawyer
+   * reads — so it is generated rather than typed twice.
+   */
+  { source: '../shared/affiliation.mjs', target: '../mobile/src/lib/affiliation.js' },
   {
     source: '../shared/troubleshooting.mjs',
     target: '../mobile/src/lib/troubleshooting.js',

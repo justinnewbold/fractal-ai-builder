@@ -60,6 +60,7 @@ import { SIZES, loadSize, saveSize, clampSize, loadFit, saveFit } from './lib/gi
 import { editButtonShows } from './lib/playMode'
 import { FIXES, FIRMWARE_NOTE, fixById, fixFor, versionsInSync } from '../shared/troubleshooting.mjs'
 import { osGuess, waysFor } from '../shared/ways-in.mjs'
+import { AFFILIATION } from '../shared/affiliation.mjs'
 import { remember as rememberPreset, CHANGED as MARKS_CHANGED } from './lib/presetMarks'
 import { CHANGED as SETLISTS_CHANGED } from './lib/setlists'
 import { syncSetlists, setlistCloudReady } from './lib/cloudSetlists'
@@ -3960,6 +3961,10 @@ export default function App() {
             {/* Reachable from inside the app, which is the point of writing
                 them. Same two links as the phone's About page. */}
             <Section key="small-print" title="The small print" note="Worth knowing, once">
+              {/* Said in the app rather than only in a file somebody would have
+                  to go looking for. One string, shared with the phone — see
+                  shared/affiliation.mjs for why it is not typed twice. */}
+              <p className="hint">{AFFILIATION}</p>
               <div className="history-actions">
                 <a className="chip" href="/privacy.html" target="_blank" rel="noreferrer">
                   Privacy

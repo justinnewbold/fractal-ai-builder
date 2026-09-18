@@ -3,6 +3,7 @@ import { Linking, Platform, Pressable, ScrollView, Text, TextInput, View } from 
 
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
 import { APP_VERSION } from '../lib/version'
+import { AFFILIATION } from '../lib/affiliation'
 import { isOlder } from '../lib/versions'
 import { setDemo, useDemo } from '../lib/demo'
 import { getDebugLog } from '../lib/debugLog'
@@ -472,6 +473,9 @@ export default function Settings({
           */}
           <View style={{ gap: space.md }}>
             <Section>The small print</Section>
+            {/* Said in the app, not only in a file somebody would have to go
+                looking for. Same string as the browser — shared/affiliation.mjs. */}
+            <Note>{AFFILIATION}</Note>
             <Press
               label="Privacy"
               sub="What this sends, and what it never does"
