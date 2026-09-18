@@ -2840,6 +2840,50 @@ export function run(test) {
     assert.match(read('shared/link-word.mjs'), /'no computer' : 'no phone'/, 'the bar still says NO MAC')
   })
 
+  test('a new version number does not cost a build', async () => {
+    /*
+     * EAS Update only ever reaches a build whose runtime version matches, and
+     * the runtime version here is a fingerprint of everything that ends up in
+     * the binary. The fingerprint policy was chosen over appVersion for
+     * exactly this reason — and it does not, on its own, do the job.
+     *
+     * `expo.version` is part of the app config, the app config is hashed
+     * whole, so changing the version and nothing else moves the fingerprint.
+     * Measured rather than reasoned about:
+     *
+     *   7.325.0 → 54612e0a85ee9a08a80322c34dbb96e460377165
+     *   7.326.0 → 375fcaa1bc4c11c1911a6fe8106a99434b0e250c
+     *
+     * Every change in this repository carries a new version number — the
+     * `version` job insists on it — so left alone, every change would have
+     * been a new runtime no phone could take an update for, and the whole
+     * thing would have been set up and never once used.
+     */
+    const config = read('mobile/fingerprint.config.js').replace(/\s+/g, ' ')
+    assert.match(config, /sourceSkips: SourceSkips\.ExpoConfigVersions/, 'a version bump still makes a runtime nothing can update')
+    assert.match(config, /require\('@expo\/fingerprint'\)/, 'the skip is a spelled-out string rather than the library’s own name for it')
+
+    /*
+     * The library's own SourceSkips is NOT imported to check the name is still
+     * real, and this merged red once for trying. `npm ci` at the root installs
+     * what the root declares; mobile/node_modules is a different install CI has
+     * no reason to have made, so the import turned green only here, on a
+     * machine where somebody had run it. The same trap is written up forty
+     * lines further down in this file, about the decoder, and the remedy there
+     * was to carry the packages at the root — worth it for a suite that cannot
+     * run at all without them, not for one assertion.
+     *
+     * Nothing is lost by leaving it out: if Expo ever renames the constant,
+     * fingerprint.config.js throws where the fingerprint is computed, which is
+     * every build, every update and `expo-doctor`. That is louder than a test.
+     */
+
+    /* And the policy it is skipping FOR is still the fingerprint one. */
+    const app = JSON.parse(read('mobile/app.json')).expo
+    assert.deepEqual(app.runtimeVersion, { policy: 'fingerprint' }, 'the runtime version is not a fingerprint any more')
+    assert.ok(app.updates?.url?.includes(app.extra.eas.projectId), 'the update url and the project id disagree')
+  })
+
   test('the phone can say what the computer is running', async () => {
     /*
      * "The app keeps crashing, but it might be the Mac app which is very laggy
