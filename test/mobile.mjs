@@ -2863,10 +2863,20 @@ export function run(test) {
     assert.match(config, /sourceSkips: SourceSkips\.ExpoConfigVersions/, 'a version bump still makes a runtime nothing can update')
     assert.match(config, /require\('@expo\/fingerprint'\)/, 'the skip is a spelled-out string rather than the library’s own name for it')
 
-    /* The three it leaves out are the three that are only ever stamped on a
-       build. Anything else moving the binary must still ask for one. */
-    const { SourceSkips } = await import('../mobile/node_modules/@expo/fingerprint/build/index.js')
-    assert.equal(typeof SourceSkips.ExpoConfigVersions, 'number', 'the library no longer has this skip under this name')
+    /*
+     * The library's own SourceSkips is NOT imported to check the name is still
+     * real, and this merged red once for trying. `npm ci` at the root installs
+     * what the root declares; mobile/node_modules is a different install CI has
+     * no reason to have made, so the import turned green only here, on a
+     * machine where somebody had run it. The same trap is written up forty
+     * lines further down in this file, about the decoder, and the remedy there
+     * was to carry the packages at the root — worth it for a suite that cannot
+     * run at all without them, not for one assertion.
+     *
+     * Nothing is lost by leaving it out: if Expo ever renames the constant,
+     * fingerprint.config.js throws where the fingerprint is computed, which is
+     * every build, every update and `expo-doctor`. That is louder than a test.
+     */
 
     /* And the policy it is skipping FOR is still the fingerprint one. */
     const app = JSON.parse(read('mobile/app.json')).expo
