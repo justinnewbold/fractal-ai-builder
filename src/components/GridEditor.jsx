@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
-import { placeBlock, clearCell, readGrid, blockCatalog, wireRow } from '../lib/forgefx'
+import { useEffect, useRef, useState } from 'react'
+import { placeBlock, clearCell, readGrid, blockCatalog, wireRow, presetBlocks, clearDeviceCache } from '../lib/forgefx'
+import { logDebug } from '../lib/debugLog'
+import { blockPositions, landingIndex, reorderPlan } from '../../shared/lane-order.mjs'
 import { chainPlan } from '../lib/actions'
 import {
   colLabel,
@@ -59,7 +61,22 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
   const [palette, setPalette] = useState([])
   const [paletteFailed, setPaletteFailed] = useState(false)
 
-  const { linear } = gridShape(capabilities)
+  /* rows and cols were read here and never defined, so on a grid unit the
+     panel threw "Can't find variable: rows" before it drew a thing. */
+  const { linear, rows, cols } = gridShape(capabilities)
+
+  /*
+   * DRAG TO REORDER, AS ON THE PHONE. "How does moving the blocks in the chain
+   * work on the web version? Can we set it up like the phone." Hold the ≡ grip
+   * on a block and drag it up or down its lane; the other blocks shift out of
+   * the way, and letting go deals the lane's blocks back into the same
+   * columns in the new order. The maths is shared/lane-order, the same copy
+   * the phone runs, so the two apps write the same block to the same column.
+   */
+  const [drag, setDrag] = useState(null)
+  const slots = useRef({})
+  const dragFrom = useRef({ y: 0, heights: [] })
+  const GAP = 4
 
   /*
    * Columns are 0-indexed here, as /preset/blocks reports them and as
@@ -203,6 +220,101 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
     }
   }
 
+  /*
+   * A drag, landed: every moving block is cleared first, then every one is
+   * placed, so no target is occupied when it is written to. Every answer is
+   * logged, and the chain is re-read off the unit afterwards and each moved
+   * block looked for where it was put -- a unit that quietly ignores a write
+   * answers exactly like one that took it.
+   */
+  const reorder = async (lane, fromIndex, toIndex) => {
+    const items = laneItems(lane)
+    const pos = blockPositions(items, fromIndex, toIndex)
+    if (!pos) return
+    const moves = reorderPlan(
+      items.filter((it) => it.kind === 'block').map((it) => ({ col: it.col, block: it.block })),
+      pos.from,
+      pos.to
+    )
+    if (!moves.length) return
+    setWorking('moving')
+    setIssue(null)
+    const said = (r) => (r?.ok === false ? 'refused' : r?.ok === true ? 'ok' : 'no answer')
+    const answers = []
+    try {
+      for (const m of moves) {
+        const r = await clearCell(lane.row, m.from)
+        answers.push(r)
+        logDebug('chain', `clear ${m.block.name} from column ${m.from + 1}`, said(r))
+      }
+      try {
+        for (const m of moves) {
+          const r = await placeBlock(lane.row, m.to, m.block.effectId)
+          answers.push(r)
+          logDebug('chain', `place ${m.block.name} at column ${m.to + 1}`, said(r))
+        }
+      } catch (err) {
+        for (const m of moves) await placeBlock(lane.row, m.from, m.block.effectId).catch(() => {})
+        throw err
+      }
+      await clearDeviceCache().catch(() => {})
+      const now = await presetBlocks().catch(() => null)
+      if (now) {
+        const at = (m) => now.find((b) => b.effectId === m.block.effectId)
+        const astray = moves.filter((m) => at(m)?.row !== lane.row || at(m)?.col !== m.to)
+        for (const m of moves) {
+          const b = at(m)
+          logDebug('chain', `${m.block.name}: column ${m.from} → ${m.to}`, astray.includes(m) ? (b ? `unit has it at row ${rowLabel(b.row)}, column ${label(b.col)}` : 'unit has it nowhere') : 'landed')
+        }
+        const refused = answers.filter((r) => r?.ok === false).length
+        if (astray.length) {
+          setIssue(
+            `The unit did not keep the move: ${astray
+              .map((m) => {
+                const b = at(m)
+                return `${m.block.name} is ${b ? `at row ${rowLabel(b.row)}, column ${label(b.col)}` : 'nowhere'}`
+              })
+              .join(', ')}. ${refused ? `The unit answered “refused” to ${refused} of the ${answers.length} steps.` : 'The unit answered every step without refusing it.'}`
+          )
+        } else {
+          onChanged(`Moved ${moves.map((m) => m.block.name).join(', ')}`)
+        }
+      } else {
+        onChanged(`Moved ${moves.map((m) => m.block.name).join(', ')} — could not re-read the chain to check`)
+      }
+    } catch (err) {
+      setIssue(err.message)
+      onError(err.message)
+    } finally {
+      setWorking(null)
+    }
+  }
+
+  /* The grip reports; this decides. Pointer events, so a mouse and a finger
+     are the same drag, and capture so the drag survives leaving the grip. */
+  const gripDown = (e, lane, index) => {
+    if (busy || working) return
+    e.preventDefault()
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+    const n = laneItems(lane).length
+    const heights = []
+    for (let i = 0; i < n; i++) heights.push(slots.current[`${lane.row}:${i}`]?.getBoundingClientRect().height || 0)
+    dragFrom.current = { y: e.clientY, heights }
+    setDrag({ row: lane.row, index, dy: 0, to: index })
+  }
+  const gripMove = (e, lane, index) => {
+    if (!drag || drag.row !== lane.row || drag.index !== index) return
+    const dy = e.clientY - dragFrom.current.y
+    const to = landingIndex(dragFrom.current.heights, index, dy, GAP)
+    setDrag({ row: lane.row, index, dy, to })
+  }
+  const gripUp = (lane, index) => {
+    if (!drag || drag.row !== lane.row || drag.index !== index) return
+    const to = drag.to
+    setDrag(null)
+    if (to !== index) reorder(lane, index, to)
+  }
+
   const remove = async (row, col, name) => {
     setWorking('clearing')
     setIssue(null)
@@ -315,14 +427,32 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
             </p>
           ) : null}
 
-          {laneItems(lane).map((item) => {
+          {laneItems(lane).map((item, index) => {
             const at = `${lane.row}:${item.col}`
             const isOpen = open === at
+            /* While a block is held, the others slide out of its way. */
+            const dragging = drag && drag.row === lane.row ? drag : null
+            const lift = dragging ? dragFrom.current.heights[dragging.index] || 0 : 0
+            let shift = 0
+            if (dragging) {
+              if (index === dragging.index) shift = dragging.dy
+              else if (dragging.to > dragging.index && index > dragging.index && index <= dragging.to) shift = -(lift + GAP)
+              else if (dragging.to < dragging.index && index >= dragging.to && index < dragging.index) shift = lift + GAP
+            }
+            const slotStyle = {
+              transform: shift ? `translateY(${shift}px)` : undefined,
+              transition: dragging && index === dragging.index ? 'none' : 'transform 120ms ease',
+              zIndex: dragging && index === dragging.index ? 2 : undefined,
+              position: 'relative'
+            }
+            const slotRef = (el) => {
+              slots.current[`${lane.row}:${index}`] = el
+            }
 
             if (item.kind === 'gap') {
               const target = moving && moving.at !== at
               return (
-                <div className={`chain-slot ${isOpen ? 'open' : ''}`} key={at}>
+                <div className={`chain-slot ${isOpen ? 'open' : ''}`} key={at} ref={slotRef} style={slotStyle}>
                   <button
                     className={`chain-gap ${isOpen ? 'open' : ''} ${target ? 'target' : ''}`}
                     onClick={() => {
@@ -353,23 +483,41 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
             }
 
             const b = item.block
+            const lifted = !!dragging && index === dragging.index
             return (
-              <div className={`chain-slot ${isOpen ? 'open' : ''}`} key={at}>
-                <button
-                  className={`chain-block ${isOpen ? 'open' : ''} ${
-                    moving?.at === at ? 'lifting' : ''
-                  }`}
-                  onClick={() => {
-                    if (!editable) return
-                    setIssue(null)
-                    setOpen(isOpen ? null : at)
-                    setMoving(null)
-                  }}
-                  disabled={!editable || busy || !!working}
-                >
-                  <span className="chain-col mono">{label(item.col)}</span>
-                  <span className="chain-block-name">{b.name}</span>
-                </button>
+              <div className={`chain-slot ${isOpen ? 'open' : ''} ${lifted ? 'lifted' : ''}`} key={at} ref={slotRef} style={slotStyle}>
+                <div className="chain-row">
+                  <button
+                    className={`chain-block ${isOpen ? 'open' : ''} ${
+                      moving?.at === at || lifted ? 'lifting' : ''
+                    }`}
+                    onClick={() => {
+                      if (!editable) return
+                      setIssue(null)
+                      setOpen(isOpen ? null : at)
+                      setMoving(null)
+                    }}
+                    disabled={!editable || busy || !!working}
+                  >
+                    <span className="chain-col mono">{label(item.col)}</span>
+                    <span className="chain-block-name">{b.name}</span>
+                  </button>
+                  {editable && !linear ? (
+                    <button
+                      type="button"
+                      className="chain-grip"
+                      aria-label={`Move ${b.name} — hold and drag up or down`}
+                      title="Hold and drag up or down to move it"
+                      disabled={busy || !!working}
+                      onPointerDown={(e) => gripDown(e, lane, index)}
+                      onPointerMove={(e) => gripMove(e, lane, index)}
+                      onPointerUp={() => gripUp(lane, index)}
+                      onPointerCancel={() => gripUp(lane, index)}
+                    >
+                      ≡
+                    </button>
+                  ) : null}
+                </div>
 
                 {isOpen && editable ? (
                   <div className="chain-actions">
@@ -403,7 +551,7 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
                           <button
                             className="chip"
                             onClick={() => setMoving({ at, row: lane.row, col: item.col, block: b })}
-                            disabled={busy || !!working || !lanes.some((l) => l.gaps.length)}
+                            disabled={busy || !!working || !shown.some((l) => l.gaps.length)}
                           >
                             Move
                           </button>
@@ -483,7 +631,8 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
       </div>
 
       <p className="hint">
-        Tap a block for what you can do to it, or an empty slot to put something in it.
+        Hold ≡ and drag a block up or down to move it. Tap a block for Add and Remove, or an empty
+        slot to put something in it.
       </p>
 
       {laneList(true)}

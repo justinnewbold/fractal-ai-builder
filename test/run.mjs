@@ -11382,6 +11382,35 @@ test('the Edit button on the stage screen does not come and go with Ask', async 
   assert.equal(editButtonShows({ status: 'live', view: 'ask' }), false)
 })
 
+test('the web chain editor draws, and moves a block the way the phone does', async () => {
+  /*
+   * "Add, remove and move blocks couldn't draw — Can't find variable: rows."
+   * Three names were read and never defined, so on a grid unit the panel
+   * threw before it drew a thing. And "how does moving the blocks in the
+   * chain work on the web version? Can we set it up like the phone." A grip
+   * to hold and drag, the same lane maths as the phone, one shared copy.
+   */
+  const { readFileSync } = await import('node:fs')
+  const src = readFileSync(new URL('../src/components/GridEditor.jsx', import.meta.url), 'utf8')
+  assert.match(src, /const \{ linear, rows, cols \} = gridShape\(capabilities\)/, 'rows and cols are read without being defined')
+  assert.ok(!/\blanes\.some\(/.test(src), 'the Move chip reads a lanes that does not exist')
+  assert.match(src, /from '\.\.\/\.\.\/shared\/lane-order\.mjs'/, 'the web editor has its own copy of the lane maths')
+  assert.match(src, /className="chain-grip"/, 'there is no grip to drag a block by')
+  assert.match(src, /onPointerDown=\{\(e\) => gripDown\(e, lane, index\)\}/)
+  assert.match(src, /const reorder = async \(lane, fromIndex, toIndex\) => \{/)
+  assert.match(src, /const now = await presetBlocks\(\)\.catch\(\(\) => null\)/, 'a move is not checked against the unit')
+  assert.match(src, /The unit did not keep the move: /, 'a move the unit dropped is silent')
+  const shared = await import('../shared/lane-order.mjs')
+  const phone = await import('../mobile/src/lib/laneOrder.js')
+  assert.deepEqual(
+    shared.reorderPlan([{ col: 1, block: 'a' }, { col: 2, block: 'b' }, { col: 4, block: 'c' }], 0, 2),
+    phone.reorderPlan([{ col: 1, block: 'a' }, { col: 2, block: 'b' }, { col: 4, block: 'c' }], 0, 2),
+    'the two apps would move the same drag to different columns'
+  )
+  const sync = readFileSync(new URL('../scripts/sync-relay-rules.mjs', import.meta.url), 'utf8')
+  assert.match(sync, /source: '\.\.\/shared\/lane-order\.mjs', target: '\.\.\/mobile\/src\/lib\/laneOrder\.js'/, 'the phone copy of the lane maths is not generated')
+})
+
 test('the app builds a known band from the book and files every design under its band', () => {
   const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
   assert.match(app, /const noted = pickDesign\(await knownDesigns\(\)\.catch\(\(\) => \[\]\), description/)

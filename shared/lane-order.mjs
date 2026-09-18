@@ -1,7 +1,3 @@
-/* Generated from shared/lane-order.mjs by scripts/sync-relay-rules.mjs.
- * Do not edit. Change the source and run `npm run sync:rules`; the test suite
- * fails on any difference between the two. */
-
 /**
  * Dragging a block up or down a lane: what that means in grid cells.
  *

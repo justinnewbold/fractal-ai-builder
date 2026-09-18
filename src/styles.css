@@ -3177,6 +3177,41 @@ table.matrix th:first-child,
   flex-direction: column;
 }
 
+/* A block and its grip, side by side; the grip is the handle a drag starts on. */
+.chain-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--s-1);
+}
+
+.chain-row > button.chain-block {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+button.chain-grip {
+  flex: 0 0 44px;
+  min-height: 44px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2, 8px);
+  background: var(--panel-hi);
+  color: var(--silk);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+button.chain-grip:active:not(:disabled) {
+  cursor: grabbing;
+}
+
+.chain-slot.lifted {
+  opacity: 0.92;
+}
+
 /*
  * A four-slot chain reads the way the unit is laid out: left to right.
  *
