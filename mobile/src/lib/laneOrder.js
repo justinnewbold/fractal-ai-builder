@@ -44,6 +44,38 @@ export function reorderPlan(blocks, from, to) {
 }
 
 /**
+ * The lane as it will look once the unit has the move, for the seconds in
+ * between.
+ *
+ * A move is six writes to the unit and a re-read after them, which is about
+ * three seconds on an FM3. The card used to be released, snap back to where it
+ * came from, sit there for those three seconds, and then appear in its new
+ * place when the read landed: "it jumps back to where the block was for a few
+ * seconds before actually moving to its final spot".
+ *
+ * Nothing was wrong with the move. The lane is drawn from the last thing the
+ * unit said, the finger lifting ends the drag, and until the re-read the last
+ * thing the unit said is still the old order. So the new order is drawn from
+ * here in the meantime, and it is not a guess: this deals the blocks back into
+ * the same columns in their new order, which is exactly what reorderPlan
+ * writes. If the unit does not keep it, the re-read puts the truth back on
+ * screen and the panel says what happened.
+ */
+export function settledItems(items, fromPos, toPos) {
+  const list = items || []
+  const blocks = list.filter((it) => it.kind === 'block')
+  const n = blocks.length
+  if (!Number.isInteger(fromPos) || !Number.isInteger(toPos)) return list
+  if (fromPos < 0 || fromPos >= n || toPos < 0 || toPos >= n || fromPos === toPos) return list
+  const cols = blocks.map((it) => it.col)
+  const order = blocks.slice()
+  const [moved] = order.splice(fromPos, 1)
+  order.splice(toPos, 0, moved)
+  const dealt = order.map((it, i) => ({ ...it, col: cols[i], block: { ...it.block, col: cols[i] } }))
+  return [...dealt, ...list.filter((it) => it.kind !== 'block')].sort((a, b) => a.col - b.col)
+}
+
+/**
  * Which item a finger is over, given the items' measured heights (top to
  * bottom, gaps between them included in `gap`) and how far the finger has
  * travelled from the top of the item it picked up.
