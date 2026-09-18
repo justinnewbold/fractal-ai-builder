@@ -1435,6 +1435,149 @@ export function run(test) {
     )
   })
 
+  test('the demo is twelve presets a player would recognise, and the seed cannot lie', async () => {
+    /*
+     * "The demo currently shows empty presets, empty scenes, and empty chains."
+     *
+     * Demo mode is the only way to see this app without an FM3 on the desk, and
+     * it was showing one preset, one chain and 511 empty slots — so the preset
+     * list, the setlists and the scene tiles were all being demonstrated empty.
+     *
+     * The seed is data, so the things that can go wrong with it are data
+     * problems, and every one of them is silent on screen:
+     *
+     *  - an amp, cab or drive number nobody makes. The demo would name a model
+     *    that is not on any unit, which teaches the wrong thing to the one
+     *    person who cannot check it against hardware.
+     *  - a block slug the mock has no effect id for. The catalogue is built
+     *    from LAYOUT, so anything else simply would not appear in the chain.
+     *  - four scenes that do not differ. An identical scene list is the same
+     *    failure as an empty one, one step later.
+     *  - TWO SCENES ON ONE CHANNEL WITH DIFFERENT LEVELS, which is the one that
+     *    actually happened while this was being written. A level belongs to a
+     *    channel, not to a scene: the hardware lets the second scene's value
+     *    overwrite the first and reports success. The seed asked for a sound
+     *    the unit cannot hold, and nothing said so.
+     */
+    const seed = JSON.parse(read('src/data/demo-presets.json'))
+    const roster = Object.fromEntries(
+      ['amp', 'drive', 'cab'].map((k) => [
+        k,
+        new Set(JSON.parse(read(`src/data/${k}-types.json`)).map((m) => m.value))
+      ])
+    )
+    const mock = read('src/lib/mockDevice.js')
+    const known = new Set([...mock.matchAll(/\{ slug: '([a-z]+)', name: '[^']+', effectId: \d+/g)].map((m) => m[1]))
+    assert.ok(known.size >= 8, `only ${known.size} block slugs were read off LAYOUT; this check read nothing`)
+
+    assert.ok(seed.presets.length >= 8 && seed.presets.length <= 12, 'the demo is not eight to twelve presets')
+    const numbers = seed.presets.map((p) => p.number)
+    assert.equal(new Set(numbers).size, numbers.length, 'two demo presets claim the same slot')
+
+    for (const preset of seed.presets) {
+      const where = `${preset.number} ${preset.name}`
+      assert.ok(preset.name.trim(), `${preset.number} has no name`)
+
+      for (const kind of ['amp', 'cab', 'drive']) {
+        if (!preset.chain.includes(kind)) continue
+        assert.ok(
+          roster[kind].has(preset.models[kind]),
+          `${where} is on a ${kind} model no unit has: ${preset.models[kind]}`
+        )
+      }
+      for (const slug of preset.chain) assert.ok(known.has(slug), `${where} has a block the mock cannot place: ${slug}`)
+      for (const slug of ['amp', 'cab']) assert.ok(preset.chain.includes(slug), `${where} has no ${slug}`)
+
+      assert.equal(preset.scenes.length, 4, `${where} does not have four scenes`)
+      const names = preset.scenes.map((s) => s.name)
+      assert.equal(new Set(names).size, 4, `${where} has two scenes with one name`)
+
+      /* Every scene really is a different sound. */
+      const shapes = preset.scenes.map((s) =>
+        JSON.stringify([[...s.off].sort(), s.channels || {}, s.levels || {}])
+      )
+      assert.equal(new Set(shapes).size, 4, `${where} has two scenes that are the same sound`)
+
+      /* And the one that bit: a level is a property of a channel. */
+      const byChannel = new Map()
+      for (const scene of preset.scenes) {
+        for (const [slug, level] of Object.entries(scene.levels || {})) {
+          const key = `${slug}:${scene.channels?.[slug] || 'A'}`
+          if (byChannel.has(key))
+            assert.equal(
+              byChannel.get(key),
+              level,
+              `${where}: two scenes put ${slug} on the same channel and ask for different levels; ` +
+                'the unit would keep the last one and say nothing'
+            )
+          byChannel.set(key, level)
+        }
+        for (const slug of scene.off) assert.ok(preset.chain.includes(slug), `${where} switches off a block it has not got: ${slug}`)
+        for (const slug of Object.keys(scene.levels || {}))
+          assert.ok(preset.chain.includes(slug), `${where} sets a level on a block it has not got: ${slug}`)
+      }
+    }
+
+    /* And the mock actually serves it: a named preset, its own chain, its own
+       scene names, and a level that follows the scene. */
+    const had = Object.prototype.hasOwnProperty.call(globalThis, 'localStorage')
+    const saved = globalThis.localStorage
+    const store = new Map()
+    globalThis.localStorage = {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => store.set(k, String(v)),
+      removeItem: (k) => store.delete(k)
+    }
+    try {
+      const { createMockDevice } = await import('../src/lib/mockDevice.js')
+      const unit = createMockDevice()
+      const first = seed.presets[0]
+
+      unit.selectPreset(first.number)
+      assert.equal(unit.preset().name, first.name, 'the demo does not load the seeded preset')
+      const chain = (await unit.presetBlocks()).map((b) => b.slug)
+      assert.deepEqual(chain, first.chain, 'the demo draws a chain the seed did not ask for')
+      assert.deepEqual(
+        unit.getScene().names.slice(0, 4),
+        first.scenes.map((s) => s.name),
+        'the seeded scene names are not the ones the demo shows'
+      )
+
+      const levels = first.scenes.map((_, i) => {
+        unit.setScene(i)
+        const amp = unit.presetBlocks().find((b) => b.slug === 'amp')
+        return unit.blockParams(amp.effectId).named.find((x) => x.name === 'Amp1 Level')?.value
+      })
+      assert.deepEqual(
+        levels,
+        first.scenes.map((s) => s.levels.amp),
+        'the amp level does not follow the scene'
+      )
+
+      /* A slot nobody has visited still says what it holds, without going
+         there — otherwise the list is the thing that looks empty. */
+      const summary = unit.presetSummary(seed.presets[1].number)
+      assert.equal(summary.name, seed.presets[1].name)
+      assert.ok(summary.blocks.length, 'a seeded slot summarises as empty')
+      assert.deepEqual(unit.presetSummary(400), { number: 400, name: '', blocks: [] }, 'an unseeded slot is not empty')
+
+      /* An edit stays put when you walk away and come back. */
+      unit.selectPreset(first.number)
+      const drive = unit.presetBlocks().find((b) => b.slug === 'drive' || b.slug === 'amp')
+      unit.setBypass(drive.effectId, true)
+      unit.selectPreset(seed.presets[2].number)
+      unit.selectPreset(first.number)
+      assert.equal(
+        unit.presetBlocks().find((b) => b.effectId === drive.effectId).bypassed,
+        true,
+        'the demo forgot an edit as soon as another preset was visited'
+      )
+    } finally {
+      if (had) globalThis.localStorage = saved
+      else delete globalThis.localStorage
+    }
+  })
+
   test('a write the unit calls refused is never undone by the phone', () => {
     /*
      * THE BUG THIS PANEL WAS REPORTED FOR, in the browser: "delete works, the
@@ -4259,7 +4402,16 @@ export function run(test) {
       assert.ok(got !== undefined && got !== null, `the demo has no answer for ${method || 'GET'} ${path}`)
     }
 
-    /* The real thing behind it: a chain, and a preset that changes when asked. */
+    /*
+     * The real thing behind it: a chain, and a preset that changes when asked.
+     *
+     * The preset is named, because the demo holds twelve seeded ones now
+     * (src/data/demo-presets.json) and the chain differs between them — the
+     * route list above leaves the unit on 7, whose chain is deliberately a
+     * short one. Asking without saying which preset used to pass on whichever
+     * chain happened to be loaded.
+     */
+    await send('/preset/select', 'POST', { number: 0 })
     const blocks = await send('/preset/blocks')
     assert.ok(blocks.length > 5, 'the demo has no chain to draw')
     assert.ok(blocks.some((b) => b.slug === 'amp'), 'the demo preset has no amp in it')

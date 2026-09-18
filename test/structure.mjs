@@ -2276,8 +2276,9 @@ export function run(test) {
     assert.match(events, /mock\.tunerStream\(\)/, 'the mock event stream rolls its own tuner again')
     assert.ok(!/Math\.random/.test(events), 'the tuner reading is random per tick')
     const mock = readFileSync(new URL('../src/lib/mockDevice.js', import.meta.url), 'utf8')
-    assert.match(mock, /keepSceneNames\(state\.sceneNames\)/, 'a demo rename is not kept')
-    assert.match(mock, /sceneNames: storedSceneNames\(\) \|\|/, 'the demo does not read its kept names on load')
+    /* Both keyed by the preset the names belong to — see demoMemory.js. */
+    assert.match(mock, /keepSceneNames\(state\.presetNumber, state\.sceneNames\)/, 'a demo rename is not kept against its preset')
+    assert.match(mock, /storedSceneNames\(number\) \|\|/, 'the demo does not read its kept names on load')
     assert.match(mock, /tunerStream: \(\) => createTunerStream\(\)/, 'the mock has no tuner of its own')
     const tuner = readFileSync(new URL('../src/components/Console.jsx', import.meta.url), 'utf8')
     assert.match(tuner, /left: reading\?\.note \? `calc\(50% \+ \$\{offset\}%\)` : '50%'/, 'the needle keeps its last position when nothing is playing')

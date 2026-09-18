@@ -7817,17 +7817,37 @@ test('a scan already running is not started twice', async () => {
     }
     try {
     // "Solo" was "4" again after a reload: the array came from a literal every time.
-    assert.equal(storedSceneNames(), null, 'a fresh demo has kept names from nowhere')
+    assert.equal(storedSceneNames(500), null, 'a fresh demo has kept names from nowhere')
     const names = DEFAULT_SCENE_NAMES.slice()
     names[3] = 'Solo'
-    keepSceneNames(names)
-    assert.deepEqual(storedSceneNames(), names)
+    keepSceneNames(500, names)
+    assert.deepEqual(storedSceneNames(500), names)
     assert.ok(store.has(DEMO_SCENE_NAMES), 'the demo did not keep its own key')
     assert.ok(!store.has('fractal.sceneNames'), 'the demo wrote into the real-device cache')
-    store.set(DEMO_SCENE_NAMES, '"not an array"')
-    assert.equal(storedSceneNames(), null, 'a bad key is survived')
-    store.set(DEMO_SCENE_NAMES, JSON.stringify(['a', 'b']))
-    assert.equal(storedSceneNames(), null, 'the wrong number of names is survived')
+
+    /*
+     * PER PRESET, because the demo holds twelve of them and each carries its
+     * own four names. One global list meant renaming a scene on one preset
+     * renamed it on all of them, and the seeded names — Verse, Chorus, Bridge,
+     * Lead on one, Jangle, Room, Bite, Hall on another — would have been
+     * flattened into whichever was saved last.
+     */
+    assert.equal(storedSceneNames(0), null, 'a rename on one preset reached another')
+    const other = DEFAULT_SCENE_NAMES.slice()
+    other[0] = 'Verse'
+    keepSceneNames(0, other)
+    assert.deepEqual(storedSceneNames(0), other)
+    assert.deepEqual(storedSceneNames(500), names, 'keeping one preset\u2019s names lost another\u2019s')
+
+    store.set(DEMO_SCENE_NAMES, '"not an object"')
+    assert.equal(storedSceneNames(500), null, 'a bad key is survived')
+    store.set(DEMO_SCENE_NAMES, JSON.stringify({ 500: ['a', 'b'] }))
+    assert.equal(storedSceneNames(500), null, 'the wrong number of names is survived')
+    /* The shape this key held before it was keyed by preset. Not recognised,
+       so the seeded names stand — which costs a rename made before the change
+       and nothing else. */
+    store.set(DEMO_SCENE_NAMES, JSON.stringify(DEFAULT_SCENE_NAMES))
+    assert.equal(storedSceneNames(500), null, 'the old single-list shape is read as one preset\u2019s')
     store.clear()
     // And the mock reads them: pinned by the structure guard on mockDevice.js.
     } finally {

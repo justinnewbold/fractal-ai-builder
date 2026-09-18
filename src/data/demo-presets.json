@@ -1,0 +1,940 @@
+{
+  "_why": [
+    "The presets demo mode pretends the unit is holding.",
+    "",
+    "Demo mode existed so somebody with no FM3 could see the app work, and for",
+    "a long time it showed one preset with one chain and 511 empty slots. Every",
+    "screen that reads a LIST — the preset list, the setlists, the scene tiles —",
+    "was therefore being demonstrated empty, which is the one thing a demo must",
+    "not do.",
+    "",
+    "So this is twelve presets that look like a working rig. Every amp, cab and",
+    "drive number here is a real model on a real FM3, taken from the same",
+    "rosters the app already ships (src/data/amp-types.json and its neighbours),",
+    "not invented — a demo that names an amp nobody makes teaches the wrong",
+    "thing.",
+    "",
+    "Each preset carries FOUR named scenes that actually differ: which blocks",
+    "are off, which channel the amp is on, and where the levels sit. A scene",
+    "list whose entries are identical is the same failure as an empty list, one",
+    "step later.",
+    "",
+    "`chain` is the blocks in signal order. Only the slugs the mock's LAYOUT",
+    "knows may appear, because those effect ids were captured off hardware and",
+    "the block catalogue is built from them. `levels` is in dB for the amp and",
+    "for anything whose Level is in dB; `off` is by slug, not effect id, so this",
+    "file stays readable.",
+    "",
+    "A LEVEL BELONGS TO A CHANNEL, NOT TO A SCENE, and that is why every scene",
+    "here selects a different amp channel. The first draft of this file gave two",
+    "scenes the same channel and different levels; the second one silently won,",
+    "because that is what the hardware does — a scene chooses a channel and the",
+    "channel holds the value. Blocks a scene does not switch keep one setting",
+    "for the whole preset, under `levels` on the preset rather than on a scene."
+  ],
+  "presets": [
+    {
+      "number": 0,
+      "name": "Drop D Chug",
+      "note": "The everyday rhythm sound: tube screamer into a Recto, 4x12 behind it.",
+      "chain": [
+        "input",
+        "comp",
+        "wah",
+        "drive",
+        "amp",
+        "cab",
+        "delay",
+        "reverb",
+        "output"
+      ],
+      "models": {
+        "amp": 25,
+        "cab": 31,
+        "drive": 45
+      },
+      "levels": {
+        "drive": -2.0,
+        "delay": -6.0,
+        "reverb": -8.0
+      },
+      "scenes": [
+        {
+          "name": "Rhythm",
+          "off": [
+            "comp",
+            "wah",
+            "delay",
+            "reverb"
+          ],
+          "channels": {
+            "amp": "A"
+          },
+          "levels": {
+            "amp": -8.0
+          }
+        },
+        {
+          "name": "Lead",
+          "off": [
+            "wah"
+          ],
+          "channels": {
+            "amp": "B"
+          },
+          "levels": {
+            "amp": -4.0
+          }
+        },
+        {
+          "name": "Clean",
+          "off": [
+            "wah",
+            "drive"
+          ],
+          "channels": {
+            "amp": "C"
+          },
+          "levels": {
+            "amp": -10.0
+          }
+        },
+        {
+          "name": "Ambient",
+          "off": [
+            "wah",
+            "drive",
+            "comp"
+          ],
+          "channels": {
+            "amp": "D"
+          },
+          "levels": {
+            "amp": -12.0
+          }
+        }
+      ]
+    },
+    {
+      "number": 1,
+      "name": "Master of None",
+      "note": "Gallop rhythm into a 5153 green channel, tight and dry.",
+      "chain": [
+        "input",
+        "comp",
+        "wah",
+        "drive",
+        "amp",
+        "cab",
+        "delay",
+        "reverb",
+        "output"
+      ],
+      "models": {
+        "amp": 81,
+        "cab": 32,
+        "drive": 16
+      },
+      "levels": {
+        "delay": -8.0,
+        "drive": 4.0
+      },
+      "scenes": [
+        {
+          "name": "Rhythm",
+          "off": [
+            "comp",
+            "wah",
+            "delay",
+            "reverb"
+          ],
+          "channels": {
+            "amp": "A"
+          },
+          "levels": {
+            "amp": -7.0
+          }
+        },
+        {
+          "name": "Lead",
+          "off": [
+            "wah",
+            "comp"
+          ],
+          "channels": {
+            "amp": "B"
+          },
+          "levels": {
+            "amp": -3.0
+          }
+        },
+        {
+          "name": "Clean",
+          "off": [
+            "wah",
+            "drive"
+          ],
+          "channels": {
+            "amp": "C"
+          },
+          "levels": {
+            "amp": -9.0
+          }
+        },
+        {
+          "name": "Solo",
+          "off": [
+            "wah"
+          ],
+          "channels": {
+            "amp": "D"
+          },
+          "levels": {
+            "amp": -1.0
+          }
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "name": "Papa's Roach",
+      "note": "Friedman BE with a clean boost, four sections of one song.",
+      "chain": [
+        "input",
+        "comp",
+        "drive",
+        "amp",
+        "cab",
+        "delay",
+        "reverb",
+        "output"
+      ],
+      "models": {
+        "amp": 37,
+        "cab": 36,
+        "drive": 12
+      },
+      "levels": {
+        "reverb": -10.0,
+        "delay": -7.0
+      },
+      "scenes": [
+        {
+          "name": "Verse",
+          "off": [
+            "comp",
+            "delay",
+            "reverb"
+          ],
+          "channels": {
+            "amp": "A"
+          },
+          "levels": {
+            "amp": -9.0
+          }
+        },
+        {
+          "name": "Chorus",
+          "off": [
+            "comp"
+          ],
+          "channels": {
+            "amp": "B"
+          },
+          "levels": {
+            "amp": -5.0
+          }
+        },
+        {
+          "name": "Bridge",
+          "off": [
+            "drive",
+            "delay"
+          ],
+          "channels": {
+            "amp": "C"
+          },
+          "levels": {
+            "amp": -11.0
+          }
+        },
+        {
+          "name": "Lead",
+          "off": [],
+          "channels": {
+            "amp": "D"
+          },
+          "levels": {
+            "amp": -3.0
+          }
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "name": "Ouija Clean",
+      "note": "Blackface clean with a Klone in front, for the quiet parts.",
+      "chain": [
+        "input",
+        "comp",
+        "drive",
+        "amp",
+        "cab",
+        "delay",
+        "reverb",
+        "output"
+      ],
+      "models": {
+        "amp": 3,
+        "cab": 24,
+        "drive": 59
+      },
+      "levels": {
+        "reverb": -9.0,
+        "delay": -12.0,
+        "drive": 1.0
+      },
+      "scenes": [
+        {
+          "name": "Clean",
+          "off": [
+            "drive",
+            "delay"
+          ],
+          "channels": {
+            "amp": "A"
+          },
+          "levels": {
+            "amp": -12.0
+          }
+        },
+        {
+          "name": "Sparkle",
+          "off": [
+            "drive"
+          ],
+          "channels": {
+            "amp": "B"
+          },
+          "levels": {
+            "amp": -11.0
+          }
+        },
+        {
+          "name": "Push",
+          "off": [
+            "delay"
+          ],
+          "channels": {
+            "amp": "C"
+          },
+          "levels": {
+            "amp": -8.0
+          }
+        },
+        {
+          "name": "Swell",
+          "off": [],
+          "channels": {
+            "amp": "D"
+          },
+          "levels": {
+            "amp": -9.0
+          }
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "name": "Plexi Bark",
+      "note": "Treble boost into a 50W Plexi. Four steps of the same gain staircase.",
+      "chain": [
+        "input",
+        "drive",
+        "amp",
+        "cab",
+        "delay",
+        "reverb",
+        "output"
+      ],
+      "models": {
+        "amp": 10,
+        "cab": 31,
+        "drive": 4
+      },
+      "levels": {
+        "drive": 3.0,
+        "delay": -9.0
+      },
+      "scenes": [
+        {
+          "name": "Edge",
+          "off": [
+            "delay",
+            "reverb"
+          ],
+          "channels": {
+            "amp": "A"
+          },
+          "levels": {
+            "amp": -9.0
+          }
+        },
+        {
+          "name": "Push",
+          "off": [
+            "delay"
+          ],
+          "channels": {
+            "amp": "B"
+          },
+          "levels": {
+            "amp": -6.0
+          }
+        },
+        {
+          "name": "Lead",
+          "off": [],
+          "channels": {
+            "amp": "C"
+          },
+          "levels": {
+            "amp": -3.0
+          }
+        },
+        {
+          "name": "Roar",
+          "off": [
+            "reverb"
+          ],
+          "channels": {
+            "amp": "D"
+          },
+          "levels": {
+            "amp": -1.0
+          }
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "name": "Mk IV Rhythm",
+      "note": "The Mark IV rhythm voice — mids up, gain moderate.",
+      "chain": [
+        "input",
+        "comp",
+        "drive",
+        "amp",
+        "cab",
+        "delay",
+        "reverb",
+        "output"
+      ],
+      "models": {
+        "amp": 18,
+        "cab": 31,
+        "drive": 45
+      },
+      "levels": {
+        "delay": -8.0,
+        "drive": 2.0
+      },
+      "scenes": [
+        {
+          "name": "Rhythm",
+          "off": [
+            "comp",
+            "delay",
+            "reverb"
+          ],
+          "channels": {
+            "amp": "A"
+          },
+          "levels": {
+            "amp": -8.0
+          }
+        },
+        {
+          "name": "Lead",
+          "off": [
+            "comp"
+          ],
+          "channels": {
+            "amp": "B"
+          },
+          "levels": {
+            "amp": -4.0
+          }
+        },
+        {
+          "name": "Clean",
+          "off": [
+            "drive",
+            "delay"
+          ],
+          "channels": {
+            "amp": "C"
+          },
+          "levels": {
+            "amp": -10.0
+          }
+        },
+        {
+          "name": "Crunch",
+          "off": [
+            "delay"
+          ],
+          "channels": {
+            "amp": "D"
+          },
+          "levels": {
+            "amp": -6.0
+          }
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "name": "6160 Block",
+      "note": "Block-letter 6160, with the wah live in its own scene.",
+      "chain": [
+        "input",
+        "comp",
+        "wah",
+        "drive",
+        "amp",
+        "cab",
+        "delay",
+        "reverb",
+        "output"
+      ],
+      "models": {
+        "amp": 39,
+        "cab": 32,
+        "drive": 16
+      },
+      "levels": {
+        "delay": -7.0
+      },
+      "scenes": [
+        {
+          "name": "Rhythm",
+          "off": [
+            "comp",
+            "wah",
+            "delay",
+            "reverb"
+          ],
+          "channels": {
+            "amp": "A"
+          },
+          "levels": {
+            "amp": -7.0
+          }
+        },
+        {
+          "name": "Lead",
+          "off": [
+            "wah"
+          ],
+          "channels": {
+            "amp": "B"
+          },
+          "levels": {
+            "amp": -3.0
+          }
+        },
+        {
+          "name": "Wah",
+          "off": [
+            "delay",
+            "reverb"
+          ],
+          "channels": {
+            "amp": "C"
+          },
+          "levels": {
+            "amp": -6.0
+          }
+        },
+        {
+          "name": "Clean",
+          "off": [
+            "wah",
+            "drive"
+          ],
+          "channels": {
+            "amp": "D"
+          },
+          "levels": {
+            "amp": -11.0
+          }
+        }
+      ]
+    },
+    {
+      "number": 7,
+      "name": "AC Jangle",
+      "note": "A30 clean into a 1x12. The short chain, on purpose.",
+      "chain": [
+        "input",
+        "amp",
+        "cab",
+        "reverb",
+        "output"
+      ],
+      "models": {
+        "amp": 162,
+        "cab": 5,
+        "drive": 34
+      },
+      "levels": {
+        "reverb": -9.0
+      },
+      "scenes": [
+        {
+          "name": "Jangle",
+          "off": [
+            "reverb"
+          ],
+          "channels": {
+            "amp": "A"
+          },
+          "levels": {
+            "amp": -10.0
+          }
+        },
+        {
+          "name": "Room",
+          "off": [],
+          "channels": {
+            "amp": "B"
+          },
+          "levels": {
+            "amp": -10.0
+          }
+        },
+        {
+          "name": "Bite",
+          "off": [
+            "reverb"
+          ],
+          "channels": {
+            "amp": "C"
+          },
+          "levels": {
+            "amp": -7.0
+          }
+        },
+        {
+          "name": "Hall",
+          "off": [],
+          "channels": {
+            "amp": "D"
+          },
+          "levels": {
+            "amp": -8.0
+          }
+        }
+      ]
+    },
+    {
+      "number": 8,
+      "name": "Euro Blue Lead",
+      "note": "Euro Blue with a Riot in front for the solo.",
+      "chain": [
+        "input",
+        "drive",
+        "amp",
+        "cab",
+        "delay",
+        "reverb",
+        "output"
+      ],
+      "models": {
+        "amp": 29,
+        "cab": 36,
+        "drive": 37
+      },
+      "levels": {
+        "delay": -6.0,
+        "reverb": -10.0,
+        "drive": 5.0
+      },
+      "scenes": [
+        {
+          "name": "Rhythm",
+          "off": [
+            "delay",
+            "reverb"
+          ],
+          "channels": {
+            "amp": "A"
+          },
+          "levels": {
+            "amp": -8.0
+          }
+        },
+        {
+          "name": "Lead",
+          "off": [],
+          "channels": {
+            "amp": "B"
+          },
+          "levels": {
+            "amp": -3.0
+          }
+        },
+        {
+          "name": "Clean",
+          "off": [
+            "drive",
+            "delay"
+          ],
+          "channels": {
+            "amp": "C"
+          },
+          "levels": {
+            "amp": -11.0
+          }
+        },
+        {
+          "name": "Boost",
+          "off": [
+            "reverb"
+          ],
+          "channels": {
+            "amp": "D"
+          },
+          "levels": {
+            "amp": -1.0
+          }
+        }
+      ]
+    },
+    {
+      "number": 9,
+      "name": "Bludo Smooth",
+      "note": "The smooth overdrive voice, four degrees of it.",
+      "chain": [
+        "input",
+        "comp",
+        "drive",
+        "amp",
+        "cab",
+        "delay",
+        "reverb",
+        "output"
+      ],
+      "models": {
+        "amp": 124,
+        "cab": 24,
+        "drive": 59
+      },
+      "levels": {
+        "reverb": -8.0,
+        "drive": 2.0,
+        "delay": -8.0
+      },
+      "scenes": [
+        {
+          "name": "Clean",
+          "off": [
+            "drive",
+            "delay",
+            "reverb"
+          ],
+          "channels": {
+            "amp": "A"
+          },
+          "levels": {
+            "amp": -10.0
+          }
+        },
+        {
+          "name": "Warm",
+          "off": [
+            "drive",
+            "delay"
+          ],
+          "channels": {
+            "amp": "B"
+          },
+          "levels": {
+            "amp": -9.0
+          }
+        },
+        {
+          "name": "Drive",
+          "off": [
+            "delay"
+          ],
+          "channels": {
+            "amp": "C"
+          },
+          "levels": {
+            "amp": -6.0
+          }
+        },
+        {
+          "name": "Sing",
+          "off": [],
+          "channels": {
+            "amp": "D"
+          },
+          "levels": {
+            "amp": -4.0
+          }
+        }
+      ]
+    },
+    {
+      "number": 10,
+      "name": "Brit 800",
+      "note": "2204 on the high input. The sound most pedals were designed against.",
+      "chain": [
+        "input",
+        "drive",
+        "amp",
+        "cab",
+        "delay",
+        "reverb",
+        "output"
+      ],
+      "models": {
+        "amp": 14,
+        "cab": 31,
+        "drive": 45
+      },
+      "levels": {
+        "delay": -8.0,
+        "drive": 4.0,
+        "reverb": -12.0
+      },
+      "scenes": [
+        {
+          "name": "Crunch",
+          "off": [
+            "delay",
+            "reverb"
+          ],
+          "channels": {
+            "amp": "A"
+          },
+          "levels": {
+            "amp": -8.0
+          }
+        },
+        {
+          "name": "Lead",
+          "off": [
+            "reverb"
+          ],
+          "channels": {
+            "amp": "B"
+          },
+          "levels": {
+            "amp": -4.0
+          }
+        },
+        {
+          "name": "Clean",
+          "off": [
+            "drive",
+            "delay"
+          ],
+          "channels": {
+            "amp": "C"
+          },
+          "levels": {
+            "amp": -11.0
+          }
+        },
+        {
+          "name": "Stack",
+          "off": [],
+          "channels": {
+            "amp": "D"
+          },
+          "levels": {
+            "amp": -2.0
+          }
+        }
+      ]
+    },
+    {
+      "number": 11,
+      "name": "Fuzz Garage",
+      "note": "Face Fuzz into a Shiver clean — the fuzz IS the amp here.",
+      "chain": [
+        "input",
+        "drive",
+        "amp",
+        "cab",
+        "delay",
+        "reverb",
+        "output"
+      ],
+      "models": {
+        "amp": 31,
+        "cab": 24,
+        "drive": 21
+      },
+      "levels": {
+        "drive": 7.0,
+        "reverb": -6.0,
+        "delay": -9.0
+      },
+      "scenes": [
+        {
+          "name": "Fuzz",
+          "off": [
+            "delay",
+            "reverb"
+          ],
+          "channels": {
+            "amp": "A"
+          },
+          "levels": {
+            "amp": -9.0
+          }
+        },
+        {
+          "name": "Clean",
+          "off": [
+            "drive",
+            "delay"
+          ],
+          "channels": {
+            "amp": "B"
+          },
+          "levels": {
+            "amp": -11.0
+          }
+        },
+        {
+          "name": "Wall",
+          "off": [
+            "delay"
+          ],
+          "channels": {
+            "amp": "C"
+          },
+          "levels": {
+            "amp": -6.0
+          }
+        },
+        {
+          "name": "Lead",
+          "off": [],
+          "channels": {
+            "amp": "D"
+          },
+          "levels": {
+            "amp": -4.0
+          }
+        }
+      ]
+    }
+  ]
+}
