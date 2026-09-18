@@ -42,25 +42,26 @@ export function linkWord(tone, role) {
 }
 
 /**
- * The unit, on top of the link.
+ * The unit's own word, for the unit's own spot.
  *
- * CONNECTED was true and useless. It meant the phone could reach the Mac,
- * and it stayed green for the whole of an evening in which the FM3 had
- * frozen: no preset number, no chain, every read timing out, and the bar
- * still saying the one word that means everything is fine. "What's the point
- * of having things that sound connected if it's not connected? Otherwise
- * it's just lying."
+ * The bar has two: the unit's name on the left, the computer's link on the
+ * right. "They both need to tell the truth." CONNECTED on the right is about
+ * the computer and stays about the computer. The left used to show the
+ * unit's name and nothing else, so a frozen FM3 -- no preset number, no
+ * chain, every read timing out -- sat there as "FM3" under a green lamp for
+ * a whole evening. "What's the point of having things that sound connected
+ * if it's not connected? Otherwise it's just lying."
  *
- * So the unit gets a say. `unit` is what the Mac knows about it: 'missing'
- * when the Mac has no unit at all, 'silent' when it has one that stopped
- * answering, 'present' when it answers, 'unknown' before anything has been
- * asked. Only a good link gets a unit word -- with the link down, the link
- * is the news.
+ * `unit` is what the Mac knows: 'missing' when it has no unit at all,
+ * 'silent' when it has one that stopped answering, 'present' when it
+ * answers, 'unknown' before anything has been asked. Null means the name
+ * alone is the truth. Only a good link gets a unit word -- with the link
+ * down the unit cannot be asked, and the right-hand spot says why.
  */
 export function unitWord(tone, unit) {
   if (tone !== 'good') return null
   if (unit === 'missing') return 'no unit'
-  if (unit === 'silent') return 'unit not answering'
+  if (unit === 'silent') return 'not answering'
   return null
 }
 
