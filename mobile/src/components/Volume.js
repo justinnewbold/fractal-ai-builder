@@ -15,6 +15,7 @@ import {
   volumePercent
 } from '../lib/volume'
 import { tick } from '../lib/feedback'
+import { logDebug } from '../lib/debugLog'
 import Press from './Press'
 
 const face = Platform.select(mono)
@@ -164,6 +165,7 @@ export default function Volume({ blocks, open, onClose, onError }) {
        has none — and a write to block "undefined" was going out and being
        refused with a sentence about doing it at the computer. */
     if (!Number.isInteger(eid)) {
+      logDebug('set', 'volume: no Output block known yet', 'the chain has not been read')
       onError?.('No output level to move yet — the chain is still loading.')
       return
     }
@@ -218,6 +220,7 @@ export default function Volume({ blocks, open, onClose, onError }) {
     const p = live.current.param
     if (!p) return
     if (!Number.isInteger(eid)) {
+      logDebug('set', 'volume: no Output block known yet', 'the chain has not been read')
       onError?.('No output level to move yet — the chain is still loading.')
       return
     }

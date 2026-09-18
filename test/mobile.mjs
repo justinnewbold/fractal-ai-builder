@@ -1204,6 +1204,10 @@ export function run(test) {
     assert.match(editor, /after the add`, holds\(row, col\) \? 'holds the block' : 'still empty'/, 'an add does not say whether the cell filled')
     assert.match(editor, /`block \$\{eid\} model after the change`/, 'a model change does not say what the unit shows')
     assert.match(read('mobile/src/components/SaveToSlot.js'), /logDebug\('write', `save to slot \$\{preset\?\.number\}`, res\.ok \? 'saved' : `failed — \$\{res\.error\}`\)/, 'a save leaves no line')
+    /* And the two notes that were only ever on screen — "Chain — out of
+       date" and "No output level to move yet" — are lines as well. */
+    assert.match(read('mobile/src/lib/rig.js'), /logDebug\('chain', 'the chain could not be read — buttons kept from the last read', err\.message\)/, 'a failed chain read leaves no line')
+    assert.equal((read('mobile/src/components/Volume.js').match(/logDebug\('set', 'volume: no Output block known yet'/g) || []).length, 2, 'the volume refusing to move leaves no line')
   })
 
   test('a chain drawn on a phone shows what is there, and the gaps between', async () => {
