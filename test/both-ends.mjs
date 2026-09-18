@@ -1,0 +1,316 @@
+/**
+ * The same app at both ends, or a written reason why not.
+ *
+ * There are four things you can install and two sets of screens. The Mac app
+ * loads the browser's own build, so it cannot drift from the web by
+ * construction, and one Expo project builds both phones, so those two cannot
+ * drift from each other. What is left is the real seam: `src/` and `mobile/`,
+ * two screens written by hand for the same rig.
+ *
+ * Nothing used to watch that seam. The chain editor was fixed on the phone in
+ * 7.311.0 and did not reach the browser until 7.320.0 — nine versions of a
+ * screen that existed on one end and not the other, with nothing failing, and
+ * the only way anyone found out was by opening the app and not seeing it.
+ *
+ * So: every button either exists at both ends, or is written down here with the
+ * reason it does not. A new button on one side fails this test until somebody
+ * says which it is. That is the whole mechanism — it does not decide anything,
+ * it refuses to let the decision go unmade.
+ *
+ * WHAT IT CANNOT SEE, deliberately. A label built out of a variable is skipped
+ * rather than guessed at, and so is a busy caption ("Removing…"). An extractor
+ * that cries wolf gets an allowlist that becomes a junk drawer, and then it is
+ * worse than nothing. This one is quiet where it cannot read and loud where it
+ * can, which covers the plain `Move` / `Add` / `Remove` that drift is made of.
+ */
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+
+const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
+
+/**
+ * What counts as something a person taps: a short capitalised phrase.
+ *
+ * Three words at the outside. Anything longer is a sentence on a screen rather
+ * than a button, and the app has plenty of those.
+ */
+const LOOKS_LIKE_A_BUTTON = /^[A-Z][A-Za-z’']*(?: [A-Za-z’'&]+){0,2}$/
+
+const tidy = (s) => s.replace(/&rsquo;/g, '’').replace(/\s+/g, ' ').trim()
+
+/** "Removing…" is the same button mid-press, not a second button. */
+const isBusy = (s) => /…$/.test(s)
+
+function wordsIn(text) {
+  const out = new Set()
+  const keep = (raw) => {
+    const t = tidy(raw)
+    if (!isBusy(t) && LOOKS_LIKE_A_BUTTON.test(t)) out.add(t)
+  }
+  for (const m of text.matchAll(/>([^<>{}]+)</g)) keep(m[1])
+  for (const m of text.matchAll(/'([^']{1,24})'|"([^"]{1,24})"/g)) keep(m[1] ?? m[2])
+  return out
+}
+
+/**
+ * Where a `<button>`'s opening tag ends.
+ *
+ * Counted rather than searched for, because an attribute is full of the
+ * character being looked for: `onClick={() => move(a, b)}` has three `>` in it
+ * before the one that matters.
+ */
+function endOfOpeningTag(src, from) {
+  let depth = 0
+  let quote = null
+  for (let i = from; i < src.length; i++) {
+    const c = src[i]
+    if (quote) {
+      if (c === quote) quote = null
+      continue
+    }
+    if (c === '"' || c === "'" || c === '`') quote = c
+    else if (c === '{') depth++
+    else if (c === '}') depth--
+    else if (c === '>' && depth === 0) return i
+  }
+  return -1
+}
+
+/**
+ * What the browser's buttons say.
+ *
+ * Only what is between the tags. A `title` is a tooltip somebody has to hover
+ * to read, which a phone has no way to show and no reason to match.
+ */
+export function webButtons(src) {
+  const found = new Set()
+  let i = 0
+  while ((i = src.indexOf('<button', i)) !== -1) {
+    const opened = endOfOpeningTag(src, i + 7)
+    const closed = src.indexOf('</button>', i)
+    if (opened === -1 || closed === -1) break
+    for (const w of wordsIn(src.slice(opened, closed + 1))) found.add(w)
+    i = closed + 9
+  }
+  return found
+}
+
+/**
+ * What the phone's buttons say.
+ *
+ * `<Press label="Add" />` — the phone puts the word in an attribute because
+ * the same string is read out by VoiceOver, so this reads the attribute.
+ */
+export function phoneButtons(src) {
+  const found = new Set()
+  for (const m of src.matchAll(/\blabel=(?:"([^"]{1,40})"|\{([^}]{1,160})\})/g)) {
+    if (m[1] !== undefined) {
+      for (const w of wordsIn(`>${m[1]}<`)) found.add(w)
+      continue
+    }
+    for (const w of wordsIn(m[2])) found.add(w)
+  }
+  return found
+}
+
+export const buttonsIn = (side, files) => {
+  const out = new Set()
+  const pick = side === 'web' ? webButtons : phoneButtons
+  for (const f of files) for (const w of pick(read(f))) out.add(w)
+  return out
+}
+
+/**
+ * Every button, what it does, and what each end calls it.
+ *
+ * A one-sided button is not a bug — the phone is a stage remote and the
+ * browser is where you sit down and build a tone, and plenty of things
+ * belong at one end only. What was missing is anybody writing that down. So
+ * an entry with `phone: null` or `web: null` has to carry a `why`, and the
+ * `why` is allowed to be "only in the browser" where that is the honest state
+ * of it. The list is then a list of the open questions, which is worth having
+ * on its own.
+ *
+ * `unreadable` marks an end where the word is built out of a variable, so it
+ * is here for a reader and not checked against the file. `also` is the other
+ * words the same control shows — a toggle's second face, a tab pair.
+ */
+export const AREAS = [
+  {
+    area: 'the chain and block editor',
+    web: ['src/components/GridEditor.jsx', 'src/components/Modifiers.jsx'],
+    phone: ['mobile/src/screens/Edit.js'],
+    buttons: [
+      { does: 'put a new block in an empty slot', web: 'Add', phone: 'Add', unreadable: ['web'] },
+      {
+        does: 'swap the block in a full slot for a different one',
+        web: 'Replace',
+        phone: null,
+        unreadable: ['web'],
+        why: 'the phone has Add and Remove and no single Replace — two taps for what the browser does in one'
+      },
+      { does: 'take a block out of the chain', web: 'Remove', phone: 'Remove' },
+      {
+        does: 'move a block to another slot from a button',
+        web: 'Move',
+        phone: null,
+        why: 'both ends drag a block by holding its ≡ grip; only the browser also keeps a Move button, for a mouse'
+      },
+      {
+        does: 'abandon a move already started',
+        web: 'Cancel move',
+        phone: null,
+        why: 'the browser’s Move starts a move that then waits for a target slot; a drag on the phone ends when the finger lifts, so there is nothing to abandon'
+      },
+      { does: 'close the block sheet without changing anything', web: 'Cancel', phone: 'Close' },
+      {
+        does: 'ask the unit for its block list again after that read failed',
+        web: 'Try again',
+        phone: null,
+        why: 'only in the browser — nobody has decided whether the phone should offer it'
+      },
+      {
+        does: 'build a starting chain on an empty preset',
+        web: 'Starter chain',
+        phone: null,
+        why: 'only in the browser — nobody has decided whether the phone should offer it'
+      },
+      { does: 'attach a modifier to a control', web: 'Attach', phone: 'Attach' },
+      {
+        does: 'read what each scene holds for a modifier',
+        web: 'Read scenes',
+        phone: null,
+        why: 'only in the browser — nobody has decided whether the phone should offer it'
+      },
+      {
+        does: 'open the chain editor',
+        web: null,
+        phone: 'Edit chain',
+        why: 'in the browser the chain is a section of the page under its own heading, so there is nothing to open'
+      },
+      {
+        does: 'open the modifiers panel',
+        web: null,
+        phone: 'Modifiers',
+        why: 'as above — a section of the page in the browser, a sheet on the phone'
+      },
+      {
+        does: 'show whether a block is bypassed, and switch it',
+        web: null,
+        phone: 'Bypassed',
+        also: ['Engaged'],
+        why: 'the browser says a block’s on or off on the play screen instead, beside the block'
+      },
+      {
+        does: 'put a control back where it was',
+        web: null,
+        phone: 'Undo',
+        why: 'only on the phone — nobody has decided whether the browser should have it'
+      },
+      {
+        does: 'leave the block editor',
+        web: null,
+        phone: 'Done',
+        why: 'the browser’s editor is part of the page, so there is nothing to leave'
+      },
+      {
+        does: 'switch between a block’s main controls and the rest of them',
+        web: null,
+        phone: 'Main',
+        also: ['More'],
+        why: 'a handset cannot show every control at once, so the phone splits them over two tabs; the browser shows them together'
+      }
+    ]
+  },
+  {
+    area: 'the play screen',
+    web: ['src/components/Gig.jsx'],
+    phone: ['mobile/src/screens/Stage.js'],
+    buttons: [
+      { does: 'open the block editor', web: 'Edit', phone: 'Edit' },
+      { does: 'tap a tempo in', web: 'Tap', phone: 'Tap' },
+      {
+        does: 'turn the tuner on and off',
+        web: 'Tuner',
+        phone: 'Tuner',
+        also: ['Stop tuner']
+      },
+      { does: 'ask the app for a tone', web: 'Ask', phone: '✦ Tone', unreadable: ['phone'] },
+      {
+        does: 'choose what Previous and Next step through',
+        web: 'Source',
+        also: ['All'],
+        phone: 'the name of the list it is stepping through',
+        unreadable: ['phone']
+      },
+      {
+        does: 'show whether a block is bypassed',
+        web: 'On',
+        also: ['Off'],
+        phone: null,
+        why: 'the phone’s block tile carries the block’s short name and its channel, with no on/off word'
+      },
+      {
+        does: 'ask the unit for its block list again after that read failed',
+        web: 'Try again',
+        phone: null,
+        why: 'only in the browser — nobody has decided whether the phone should offer it'
+      }
+    ]
+  }
+]
+
+/** Every word an entry accounts for, whichever end it is at. */
+const covered = (b) => [b.web, b.phone, ...(b.also || [])].filter((w) => typeof w === 'string')
+
+export function run(test) {
+  for (const area of AREAS) {
+    const ends = { web: buttonsIn('web', area.web), phone: buttonsIn('phone', area.phone) }
+
+    test(`every button on ${area.area} is at both ends or written down`, () => {
+      const named = new Set()
+      for (const b of area.buttons) for (const w of covered(b)) named.add(w)
+      for (const side of ['web', 'phone']) {
+        for (const word of ends[side]) {
+          assert.ok(
+            named.has(word),
+            `"${word}" is a button on ${area.area} in the ${side === 'web' ? 'browser' : 'phone'} app ` +
+              'and is not in AREAS in test/both-ends.mjs. Add it there with what the other end calls it, ' +
+              'or with the reason it is only at this one.'
+          )
+        }
+      }
+    })
+
+    test(`a button ${area.area} lists at an end is still there`, () => {
+      for (const b of area.buttons) {
+        for (const side of ['web', 'phone']) {
+          const word = b[side]
+          if (typeof word !== 'string') continue
+          if ((b.unreadable || []).includes(side)) continue
+          if (!LOOKS_LIKE_A_BUTTON.test(word)) continue
+          assert.ok(
+            ends[side].has(word),
+            `"${word}" — ${b.does} — is listed on ${area.area} in the ` +
+              `${side === 'web' ? 'browser' : 'phone'} app and is not there any more. ` +
+              'If it went on purpose, update AREAS in test/both-ends.mjs.'
+          )
+        }
+      }
+    })
+  }
+
+  test('a button at one end only says why', () => {
+    for (const area of AREAS) {
+      for (const b of area.buttons) {
+        if (b.web !== null && b.phone !== null) continue
+        assert.ok(
+          b.why,
+          `"${b.web || b.phone}" on ${area.area} is at one end only and no reason is written down. ` +
+            'Put one in AREAS in test/both-ends.mjs — "only in the browser" is a fine answer, ' +
+            'a blank is not.'
+        )
+      }
+    }
+  })
+}
