@@ -338,10 +338,13 @@ export function run(test) {
 
   test('each screen holds what it is for, and nothing it is not', () => {
     /*
-     * Three screens now, and the things you open are sheets. The original of
+     * Two screens now, and the things you open are sheets. The original of
      * this test existed because five panels named in the UI as Library spent
      * three releases rendering in Edit; the same mistake is now possible in a
      * new direction — setup leaking onto a screen you look at on a stage.
+     *
+     * There were three. Create held the conversation and went with the AI,
+     * taking BandBook out of the Setup sheet with it.
      */
     const play = components(view('play'))
     assert.deepEqual(play, ['Gig'], `Play should be the gig screen alone, not ${play.join(', ')}`)
@@ -360,7 +363,7 @@ export function run(test) {
     for (const [title, names] of [
       ['Presets', ['PresetList', 'LocalLibrary', 'Backup', 'Versions', 'DeviceBackup']],
       ['Scenes', ['Scenes', 'SceneMatrix']],
-      ['Setup', ['DeviceDetail', 'PhoneRemote', 'Ports', 'ChangeLog', 'DebugLog', 'Diagnostics', 'LinkDetails', 'BandBook']]
+      ['Setup', ['DeviceDetail', 'PhoneRemote', 'Ports', 'ChangeLog', 'DebugLog', 'Diagnostics', 'LinkDetails']]
     ]) {
       for (const name of names) {
         assert.ok(components(sheet(title)).includes(name), `${name} should be in the ${title} sheet`)
@@ -394,191 +397,13 @@ export function run(test) {
     assert.match(css, /@media \(display-mode: standalone\) \{\s*\n\s*\.topbar \{\s*\n\s*padding-top: calc\(env\(safe-area-inset-top, 0px\) \+ 10px\)/, 'the bar starts under the glass on the home screen')
   })
 
-  test('a plain design and a plain volume request never reach the model', () => {
-    /*
-     * "Make a Breaking Benjamin rig" spent a thirteen-cent chat turn deciding
-     * it was a design; "turn up the volume by 4 dB" spent one moving the
-     * amp's Level on one channel. Both are answered in the app now: the
-     * design goes straight to the designer with the player's own words, the
-     * volume moves the Output block's Level — the speaker slider's control —
-     * and reads it back like any write. Both only after the watch line, so
-     * the tally still counts them.
-     */
-    const ask = src.slice(src.indexOf("logDebug('local', 'the local matcher threw and was ignored'"), src.indexOf('body = await askPlan('))
-    assert.match(ask, /const plain = plainDesignRequest\(instruction, \{ blocks: withPositions \}\)/, 'a plain design is not looked for')
-    assert.match(ask, /if \(plain && blocks\.some\(\(b\) => !EXCLUDED_BLOCKS\.includes\(b\.slug\)\)\)/, 'a design on an empty slot skips the chain build')
-    assert.match(ask, /await generate\(plain\.text, null, scenesWanted\)/, 'the designer does not get the player\u2019s own words')
-    assert.match(ask, /const volume = matchVolume\(instruction\)/, 'a plain volume request is not looked for')
-    /* A volume request the app cannot carry out is said — not handed to the
-       model, and not answered "the AI model is off". */
-    assert.match(ask, /if \(volume\) \{/, 'a volume match no longer has its own branch')
-    assert.match(ask, /if \(outputEid === null\) \{\s*\n\s*const text = 'I can\\u2019t find the Output block/, 'a volume request with no Output block falls through to the model')
-    assert.match(ask, /if \(!level \|\| !Number\.isFinite\(now\)\) \{\s*\n\s*const text = 'The Output block has no level control/, 'a volume request with no level to move falls through to the model')
-    assert.match(ask, /setParamConfirmed\(outputEid, level\.id, to, \{ \.\.\.level, name: level\.name \|\| 'Level' \}\)/, 'the Output level is written without a read-back')
-    assert.match(ask, /Math\.max\(level\.min \?\? -Infinity, Math\.min\(level\.max \?\? Infinity, target\)\)/, 'the level can leave its range')
-  })
-
-  test('two switches over the AI: the chat, and the model behind it', () => {
-    /*
-     * "When I said a button to turn the AI on off I meant have the chat still
-     * available but keep everything local. Maybe we can add a button for
-     * both." Chat off: the Ask button and the Ask tab go. Model off: the chat
-     * stays, the matcher's plan runs through the model's own path, a sentence
-     * it does not know is answered with what it could have been, and the two
-     * doors to the model — requestSpec and the chat turn — never open.
-     */
-    assert.match(src, /const askShows = askButtonShows\(\{ status, view, playing, aiOn: chatOn \}\)/, 'the Ask button ignores the chat switch')
-    assert.match(src, /viewsFor\(narrow\)\.filter\(\(v\) => chatOn \|\| v !== 'ask'\)/, 'the Ask tab ignores the chat switch')
-    /* And the switches exist before the list that reads them. One did not,
-       once, and the live site opened on "Cannot access 'xa' before
-       initialization": a const read before its own line is a crash, and
-       nothing here renders App to catch it. Every state a memo reads has to
-       come first. */
-    for (const state of ['const [chatOn, setChatOn] = useState(loadChatOn)', 'const [modelOn, setModelOn] = useState(loadModelOn)']) {
-      assert.ok(src.indexOf(state) < src.indexOf('const views = useMemo('), `${state.split(' ')[1]} is read by the screen list before it exists`)
-    }
-    const spec = src.slice(src.indexOf('const requestSpec = async'), src.indexOf('const requestSpec = async') + 500)
-    assert.match(spec, /if \(!modelOn\) throw new Error\(MODEL_OFF\)/, 'the designer can still be asked with the model off')
-    const ask = src.slice(src.indexOf('const askFor = async'), src.indexOf('body = await askPlan('))
-    /* With the model off, a sentence the matcher does not know gets the one
-       line — and only when the matcher had nothing, because a match is the
-       answer whichever way the switch sits (see the acting test below). */
-    assert.match(ask, /\} else if \(!modelOn\) \{\s*\n\s*setTurns\(\(prev\) => \[\.\.\.prev, \{ role: 'assistant', text: MODEL_OFF \}\]\)\s*\n\s*return/, 'an unknown sentence with the model off is not answered with what it could have been')
-    assert.ok(ask.indexOf('if (would) {') < ask.indexOf('} else if (!modelOn) {'), 'the model switch is checked before the matcher is asked')
-    assert.ok(ask.indexOf('const volume = matchVolume(') < ask.indexOf('} else if (!modelOn) {'), 'the free local answers are refused along with the model')
-    for (const which of ["noteSpend('design', err?.usage || null, { failed: err.message })", "noteSpend('refine', err?.usage || null, { failed: err.message })"]) {
-      const at = src.indexOf(which)
-      const caught = src.slice(src.lastIndexOf('} catch (err) {', at), at)
-      assert.match(caught, /if \(err\?\.message === MODEL_OFF\) \{[\s\S]*?return/, `a model-off refusal in ${which.slice(11, 17)} is a banner and a ledger row`)
-    }
-    const setup = sheet('Setup')
-    assert.match(setup, /<Section key="ai-switch" title="AI" note=\{`Chat \$\{chatOn \? 'on' : 'off'\} · model \$\{modelOn \? 'on' : 'off'\}`\} defaultOpen>/, 'Setup has no AI switches')
-    assert.match(setup, /saveChatOn\(on\)/, 'the chat switch is not remembered')
-    assert.match(setup, /saveModelOn\(on\)/, 'the model switch is not remembered')
-    assert.match(setup, /status=\{!chatOn \? 'Chat off' : !modelOn \? 'AI model off · local only' :/, 'the AI row does not say which switch is off')
-  })
-
-  test('emptiness is judged on editable blocks, not raw count', () => {
-    // An empty AM4 slot still reports input and output rows. Both hardware
-    // failures of the chain builder were this gap wearing different errors:
-    // "two blocks" skipped the build, then the schema filtered both out and
-    // sent the generator nothing.
-    const at = src.indexOf('const editableBlocks = blocks.filter')
-    assert.notEqual(at, -1, 'the editable filter is gone')
-    const guard = src.indexOf('if (editableBlocks.length === 0)')
-    assert.notEqual(guard, -1, 'the build trigger no longer counts editable blocks')
-    assert.ok(src.includes('const landed = (builtBlocks || []).filter'), 'the read-back guard lost its filter')
-  })
-
-  test('a fresh chain is designed against, never refined against', () => {
-    // The lingering-spec path: a failed attempt stores its spec, the next ask
-    // builds a chain, then refine runs against state that predates the build
-    // and reports "No blocks were read from the device" while the chain sits
-    // there, built and invisible.
-    const at = src.indexOf('if (builtBlocks) {')
-    assert.notEqual(at, -1, 'the build handoff no longer branches on builtBlocks')
-    const window = src.slice(at, at + 400)
-    assert.ok(window.includes('setResult(null)'), 'a stale spec survives the chain build')
-    assert.ok(window.includes('await generate('), 'a built chain must go to generate')
-    assert.ok(
-      src.indexOf('await refine(') > at,
-      'refine must only be reachable when nothing was built'
-    )
-  })
-
-  test('there is one debug log, everything writes to it, and Setup copies it', () => {
-    /*
-     * "Make a unified debug log with a copy log button to send back to you
-     * for debugging in the settings menu. Any debugging info already in menus
-     * move to debug log." Four separate records became one list; every
-     * source has to keep writing to it, or the one paste stops telling the
-     * whole story.
-     */
-    const read = (f) => readFileSync(new URL('../src/' + f, import.meta.url), 'utf8')
-    const stream = read('lib/stream.js')
-    assert.match(stream, /logDebug\('ai', event, detail\)/, 'a generation event no longer reaches the debug log')
-    const forge = read('lib/forgefx.js')
-    assert.match(forge, /function recordWire\(entry\) \{[\s\S]{0,200}logDebug\(\s*'wire'/, 'a write no longer reaches the debug log')
-    assert.match(forge, /function recordCheck\(entry\) \{[\s\S]{0,200}logDebug\(\s*'check'/, 'a verification no longer reaches the debug log')
-    assert.match(forge, /logDebug\('unit', `\$\{options\.method \|\| 'GET'\} \$\{path\} failed/, 'a failed request no longer reaches the debug log')
-    /* But not a refusal the phone was always going to get, nor a host
-       document that was never written: both opened every phone's log twice
-       over as alarms about nothing. */
-    assert.match(forge, /if \(!routine\(path, options, err\)\) \{\s*\n\s*logDebug\('unit'/, 'the expected refusals and absences are logged as failures again')
-    const routine = forge.slice(forge.indexOf('const routine = '), forge.indexOf('async function request('))
-    assert.match(routine, /err\?\.remoteBlocked/, 'a phone-side refusal is logged as a unit failure')
-    assert.match(routine, /\/\^\\\/store\\\/config\\\/\/\.test\(path\) && err\?\.status === 404/, 'a host document that was never written is logged as a unit failure')
-    assert.match(src, /logDebug\('app', `\$\{kind\}: \$\{summary\}`/, 'the app\u2019s own change record no longer reaches the debug log')
-    assert.match(src, /if \(error\) logDebug\('error'/, 'an error shown on screen no longer reaches the debug log')
-    assert.match(src, /useEffect\(\(\) => installCrashCapture\(\), \[\]\)/, 'crashes are not captured')
-    assert.match(read('components/Boundary.jsx'), /logDebug\('crash'/, 'a panel that fails to draw is not logged')
-
-    const panel = read('components/DebugLog.jsx')
-    assert.match(panel, /Copy Logs/, 'the debug log has no Copy button')
-    assert.match(panel, /navigator\.clipboard\.writeText/, 'Copy does not use the clipboard')
-    assert.match(panel, /navigator\.share/, 'no fallback for a phone that refuses the clipboard')
-    assert.match(panel, /wireReport\(\)/, 'the wire tables are not in the copied text')
-    /*
-     * "Can we make it so when we copy the bug log it's just a text file that
-     * I can paste instead of paste in the entire chat?" So the first button
-     * shares the report as one .txt through the phone's share sheet, downloads
-     * it where there is no sheet, and only then falls back to the paste.
-     */
-    assert.match(panel, /Share as file/, 'the debug log cannot go out as a file')
-    const buttons = panel.slice(panel.indexOf('className="diag-actions"'))
-    assert.ok(buttons.indexOf('Share as file') < buttons.indexOf('Copy Logs'), 'the file is not the first offer')
-    assert.match(panel, /new File\(\[t\], fileName\(\), \{ type: 'text\/plain' \}\)/, 'the report is not a plain-text file')
-    assert.match(panel, /navigator\.canShare\?\.\(\{ files: \[file\] \}\)/, 'the share sheet is not asked whether it takes a file')
-    assert.match(panel, /a\.download = file\.name/, 'a browser with no share sheet gets no file')
-    assert.match(panel, /err\?\.name === 'AbortError'/, 'closing the share sheet is treated as a failure')
-    assert.match(panel, /\.txt`/, 'the file is not named as text')
-    // The chat route reports its cache write the way the designer does, so
-    // the first chat turn of a session is priced at the write premium.
-    const command = readFileSync(new URL('../api/command.js', import.meta.url), 'utf8')
-    assert.match(command, /cacheWriteTokens:\s*\n\s*usage\?\.inputTokenDetails\?\.cacheWriteTokens \?\?\s*\n\s*anthropicMeta\.cacheCreationInputTokens/, 'a chat turn hides its cache write')
-    // The old copy button is gone: one place to copy from.
-    const diag = read('components/Diagnostics.jsx')
-    assert.ok(!/Copy all as text/.test(diag), 'Diagnostics still has a copy button of its own')
-    assert.match(diag, /export function wireReport/, 'the wire text is not shared with the debug log')
-    assert.match(src, /key="debug-log" title="Debug log"/, 'Setup has no Debug log section')
-  })
-
-  test('the bar drops the preset on Play, and a sent tone offers to save', () => {
-    /*
-     * "Remove the preset name from the header (it's already a button on the
-     * screen)" — on Play, where the tile is. "Where it says changes sent, add
-     * a button that says Save to FM3."
-     */
-    const bar = readFileSync(new URL('../src/components/TopBar.jsx', import.meta.url), 'utf8')
-    assert.match(bar, /status === 'live' && showPreset \?/, 'the bar always draws the preset')
-    assert.match(src, /showPreset=\{view !== 'play'\}/, 'the bar still carries the preset on Play')
-    const gen = readFileSync(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
-    assert.match(gen, /Save to \{saveTo\}/, 'a sent tone has no Save button')
-    assert.match(gen, /sent && onSave \? \(/, 'the Save button is not tied to the tone having been sent')
-    assert.match(src, /onSave=\{\(\) => setSheet\('save'\)\}/, 'Save on a tone does not open the Save sheet')
-    assert.match(src, /saveTo=\{device\?\.short \|\| device\?\.name \|\| 'unit'\}/, 'the button does not name the unit')
-  })
-
-  test('a different tone asked for over a waiting design starts over', () => {
-    /*
-     * "It said it was creating Metallica tones but then called it Killswitch
-     * Militia, which was the previous write." With a design on screen and not
-     * yet written, every tone description went to refine — right for "warmer",
-     * wrong for another band. The chat route now says which it is, and only
-     * an adjustment may reach refine.
-     */
-    const at = src.indexOf('const startOver = design.flag === true')
-    assert.notEqual(at, -1, 'the app no longer asks whether a design is an adjustment or a new tone')
-    const refineAt = src.indexOf('await refine(', at)
-    assert.notEqual(refineAt, -1)
-    const guard = src.slice(at, refineAt)
-    assert.match(guard, /result\?\.changes\?\.length && !startOver/, 'a new tone still goes to refine when one is waiting')
-
-    const api = readFileSync(new URL('../api/command.js', import.meta.url), 'utf8')
-    assert.match(api, /For designTone: true when the/, 'the chat model is never told to say new tone or adjustment')
-    assert.match(api, /flag true, and the app\nstarts over/, 'the instructions no longer explain what flag true does')
-  })
-
+  
+  
+  
+  
+  
+  
+  
   test('the build says which build it is, not just which version', () => {
     /*
      * Seven merges shipped under v6.9.5, because the number is hand-written and
@@ -640,58 +465,7 @@ export function run(test) {
     }
   })
 
-  test('what a request in words did travels to the screen it moves you to', () => {
-    /*
-     * "After requesting in the chat that it changed settings, it pulled up the
-     * screen automatically, but didn't tell me that anything got changed, so
-     * I'm confused."
-     *
-     * Both halves were already built and they cancelled each other out. The
-     * chat writes "Done — 3 changes." into the conversation, and then
-     * showWhatChanged switches to Edit so the thing that changed is visible —
-     * which leaves the answer on the one screen the person is no longer on.
-     *
-     * So the report goes with them: outside the screens, not inside one, and
-     * not on Ask where the conversation is already saying it.
-     */
-    assert.match(
-      src,
-      /setJustDid\(\{ labels: done, where: whereOf\(actions\) \}\)/,
-      'a finished request no longer reports outside the chat, or the report has stopped saying where the values landed'
-    )
-    // Where: one scene, or the whole preset. "Done — 2 changes" on Play could
-    // not be told from a preset-wide edit, and the values looked the same from
-    // scene 1.
-    assert.match(src, /\{justDid\.where \? <p className="did-where">\{justDid\.where\}<\/p> : null\}/, 'the report no longer says where the values landed')
-    // A tab is the person going somewhere themselves, so the report clears —
-    // through setView it stayed pinned on Play until Got it.
-    const tabs = src.slice(src.indexOf("['shape', 'Edit']"), src.indexOf('</nav>', src.indexOf("['shape', 'Edit']")))
-    assert.match(tabs, /onClick=\{\(\) => changeView\(id\)\}/, 'a tab press leaves the report of the last request on screen')
-    // And it goes by itself, after long enough to be read.
-    assert.match(src, /const DID_STAYS_MS = 20000/, 'the report stays until dismissed by hand')
-    assert.match(src, /setTimeout\(\(\) => setJustDid\(null\), DID_STAYS_MS\)/, 'the report is never taken off on its own')
-    assert.match(
-      src,
-      /\{justDid && view !== 'ask' \?/,
-      'the report is tied to a screen again, or doubles the conversation on Ask'
-    )
-    assert.ok(
-      src.indexOf("{justDid && view !== 'ask' ?") < src.indexOf('<Screens '),
-      'the report is inside a screen, so it only shows where it was already said'
-    )
-    // Named, not counted: "3 changes" over a screen full of blocks still
-    // leaves you looking for which three.
-    assert.match(src, /justDid\.labels\.map\(/, 'the report counts the changes without naming them')
-    // And it stops being the thing on screen once it has been read.
-    // The guard that drops an unreachable screen sits above this; what matters
-    // is that a change that does happen still clears the report.
-    assert.match(
-      src,
-      /const changeView = \(next\) => \{[\s\S]{0,240}?setJustDid\(null\)/,
-      'the report survives a tab pressed by hand'
-    )
-  })
-
+  
   test('the bar that carries the whole app renders in every state', () => {
     /*
      * It replaced six stacked elements, all of which were gated on being
@@ -932,49 +706,7 @@ export function run(test) {
     )
   })
 
-  test('every class this app scrolls to exists somewhere that renders it', () => {
-    /*
-     * `.local-library` didn't. The stylesheet had a rule for it, the assistant
-     * scrolled to it after keeping something in the library, and no component
-     * ever rendered the class — so "show me what you changed" quietly did
-     * nothing, and a silent scroll is indistinguishable from a dead button.
-     *
-     * Anchors are strings matched at runtime against a DOM built somewhere
-     * else, which is exactly the seam a text test can hold shut.
-     */
-    const dir = new URL('../src/', import.meta.url)
-    const files = []
-    const walk = (at) => {
-      for (const entry of readdirSync(at, { withFileTypes: true })) {
-        const next = new URL(entry.name + (entry.isDirectory() ? '/' : ''), at)
-        if (entry.isDirectory()) walk(next)
-        else if (/\.(jsx?|css)$/.test(entry.name)) files.push(readFileSync(next, 'utf8'))
-      }
-    }
-    walk(dir)
-    /*
-     * Three shapes, because a class written the fourth way is invisible here
-     * and reports a live anchor as dead. `className={cond ? 'a' : 'b'}` used to
-     * be that fourth way: a real rule, really rendered, and this scan could not
-     * see either name in it.
-     */
-    const rendered = files
-      .flatMap((body) => [
-        ...body.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\}|\{([^}]*)\})/g)
-      ])
-      .flatMap((m) => (m[1] || m[2] || m[3] || '').split(/[\s${}?:'"`]+/))
-      .filter(Boolean)
-
-    const anchors = [
-      ...[...src.matchAll(/querySelector\('\.([\w-]+)'\)/g)].map((m) => m[1]),
-      ...[...src.matchAll(/anchor: '\.([\w-]+)'/g)].map((m) => m[1])
-    ]
-    assert.ok(anchors.length >= 5, 'the anchor scan found nothing to check')
-    for (const name of new Set(anchors)) {
-      assert.ok(rendered.includes(name), `nothing renders .${name}, so scrolling to it does nothing`)
-    }
-  })
-
+  
   test('the error banner is outside every view', () => {
     // It lived inside Design, so a failure in Library or Edit set the message
     // and rendered nothing. Silence reads as a dead button.
@@ -1059,70 +791,7 @@ export function run(test) {
     assert.match(setup, /onClick=\{\(\) => setSheet\('gear'\)\}/, 'the way in does not open the sheet')
   })
 
-  test('the local matcher acts, and only through the model\u2019s own check', () => {
-    /*
-     * It watched for months and never acted, to be measured before it was
-     * trusted. Then the brief changed: "The app should be able to handle
-     * local commands like adjusting settings on controls and knobs and things
-     * like that without using the AI model ... if I wanted to make this app
-     * completely without an AI model, let's set it up that way."
-     *
-     * So a match is the answer now, model on or off. What this holds is HOW it
-     * acts: never on its own. A change the matcher proposes becomes the same
-     * `body` a model turn produces and goes through the same validatePlan,
-     * the same confirm-before-anything-destructive and the same runner. The
-     * matcher itself still reaches nothing.
-     */
-    const at = src.indexOf('would =\n          matchQuestion(instruction, known) ||')
-    assert.notEqual(at, -1, 'the local matcher is not run at all, or a question is not tried first')
-    assert.match(src.slice(at, at + 200), /matchRename\(instruction, known\) \|\|\s*\n\s*matchLocal\(instruction, known\)/, 'the three matchers are not tried in order')
-
-    /* The matcher is given only what is in hand: no device call to build it. */
-    const known = src.slice(src.indexOf('const known = {', src.lastIndexOf('try {', at)), at)
-    assert.ok(!known.includes('await '), 'building the matcher\u2019s context waits on the device')
-    for (const field of ['sceneNames', 'activeScene: scene', 'presetNumber: preset?.number', 'slots: slots.length ? slots : cachedPresetNames()', 'bpm', 'occupied: blocks.map(']) {
-      assert.ok(known.includes(field), `the matcher is not told ${field.split(':')[0]}`)
-    }
-
-    /* Still logged both ways, so a session can be read back. */
-    const watch = src.slice(at, src.indexOf('the local matcher threw and was ignored', at))
-    assert.match(watch, /logDebug\(\s*'local'/, 'a match is not recorded anywhere')
-    assert.ok(watch.includes("'left to the model'"), 'a miss is no longer written down')
-
-    /* A question is answered in words and nothing is written. */
-    const threw = src.indexOf('the local matcher threw and was ignored', at)
-    const local = src.slice(threw, src.indexOf('body = await askPlan(', threw))
-    const answer = local.slice(local.indexOf("if (would?.kind === 'answer') {"), local.indexOf('let body = null'))
-    assert.ok(answer.length > 0, 'a question has no answer path')
-    for (const escape of ['perform(', 'runPlan(', 'setParam', 'setBypass', 'setScene']) {
-      assert.ok(!answer.includes(escape), `answering a question does "${escape}"`)
-    }
-    assert.ok(answer.includes('blockParams(would.eid)'), 'which model a block is on is not read')
-
-    /* A change becomes the model\u2019s own body and goes no further here. */
-    assert.match(local, /if \(would\) \{\s*\n\s*counted = true[^\n]*\n\s*logDebug\('local', 'handled here: no model needed'[^\n]*\n\s*body = \{ understood: would\.why, actions: \[would\] \}\s*\n\s*\} else if \(!modelOn\) \{/, 'a local match does not take the model\u2019s own path, or a failed local write goes in the ledger as a chat turn')
-    for (const escape of ['perform(', 'runPlan(', 'validatePlan(']) {
-      assert.ok(!local.includes(escape), `the local path does "${escape}" before the shared check`)
-    }
-    /* And the shared check is shared: one validatePlan after the model half
-       closes, reached by both. */
-    const shared = src.slice(src.indexOf('} // end of the model half'), src.indexOf('const askFor = async') + 30000)
-    const checked = shared.indexOf('const checked = validatePlan(body, withPositions, {')
-    assert.notEqual(checked, -1, 'the shared plan check is gone')
-    assert.ok(checked < shared.indexOf('await perform(checked.actions)'), 'the plan runs before it is checked')
-    assert.ok(shared.slice(0, checked).indexOf('perform(') === -1, 'something runs between the two halves and the check')
-
-    /*
-     * The matcher itself reaches nothing. Pure text in, a plan or null out —
-     * that is what lets it run before the request rather than after, and what
-     * makes every rule in it testable against no hardware.
-     */
-    const lib = readFileSync(new URL('../src/lib/localCommands.js', import.meta.url), 'utf8')
-    const imports = [...lib.matchAll(/^import .*$/gm)].map((m) => m[0])
-    assert.deepEqual(imports, [], 'the matcher imports something — it can no longer be pure')
-    assert.ok(!/fetch\(|localStorage|document\.|window\./.test(lib), 'the matcher reaches outside itself')
-  })
-
+  
   test('the chain shows its two ends, and the stage screen still does not', () => {
     /*
      * "Does it just ignore the input and output so they're actually there but
@@ -1169,47 +838,7 @@ export function run(test) {
     )
   })
 
-  test('a saved tone reloaded onto an empty slot builds its own chain', () => {
-    /*
-     * "After loading a scene from history and saving I tapped chain and it
-     * doesn't show me the chain."
-     *
-     * It was showing it. The debug log says exactly what happened: slot 478
-     * was empty, the saved design proposed 9 changes, all 9 were dropped for
-     * naming blocks that were not there, 0 were written, and the empty preset
-     * was saved back to 478.
-     *
-     * Asking for a tone on an empty preset has built a chain first since
-     * 7.140. Reloading a tone you already made is the same sentence and never
-     * learned it — it checked the spec against nothing and told the player to
-     * go and type "add an amp and a cab" themselves.
-     */
-    const reload = src.slice(src.indexOf('const reload = async'), src.indexOf('const forget = ') > src.indexOf('const reload = async') ? src.indexOf('const forget = ') : undefined)
-    const body = reload.slice(0, reload.indexOf('\n  }\n'))
-    assert.match(body, /EXCLUDED_BLOCKS\.includes\(b\.slug\)/, 'a reload cannot tell an empty preset from a full one')
-    assert.match(body, /kind: 'buildChain'/, 'a saved tone reloaded onto an empty slot still has nothing to land on')
-    /* The design's own blocks, not a generic starter chain: what gets placed
-       is what this tone actually needs. */
-    assert.match(body, /entry\.blockNames \|\| \[\]/, 'the chain is built from something other than the design itself')
-    /* Built BEFORE the spec is checked, or the check is against nothing again. */
-    assert.ok(
-      body.indexOf("kind: 'buildChain'") < body.indexOf('validateSpec('),
-      'the chain is built after the spec has already been checked against an empty preset'
-    )
-    /* And a copy of the slot before the first structural write, the same
-       precaution the design path takes. */
-    assert.match(body, /backupPreset\(preset\.number\)/, 'a structural write goes in with no copy of what was there')
-
-    /* And an empty chain says so rather than drawing two arrows and a gap. */
-    const console_ = readFileSync(new URL('../src/components/Console.jsx', import.meta.url), 'utf8')
-    const strip = console_.slice(console_.indexOf('export function Chain('))
-    assert.match(
-      strip.slice(0, strip.indexOf('chain-strip')),
-      /chain\.length === 0/,
-      'a preset with nothing in it draws an empty strip and explains nothing'
-    )
-  })
-
+  
   test('the preset list opens on the one you are standing on, and keeps trying', () => {
     /*
      * "When opening the preset menu, have it scrolled to where the current
@@ -1337,139 +966,9 @@ export function run(test) {
     assert.match(notice, /cache: 'no-store'/, 'the staleness check is served from the cache')
   })
 
-  test('a chat can be put down, and the one you put down is still there', () => {
-    /*
-     * "The current chat is getting along in the app. Can we create a way to
-     * create a fresh chat?"
-     *
-     * New chat is only safe to press because the conversation it clears goes
-     * on the shelf first — so what is held here is that App shelves before it
-     * empties, and that the tone and the last design go with it. A fresh chat
-     * that still remembered the last tone is the same conversation with its
-     * transcript hidden.
-     */
-    const fresh = src.slice(src.indexOf('const newChat = useCallback'))
-    const body = fresh.slice(0, fresh.indexOf('\n  }, ['))
-    assert.match(body, /archiveChat\(turns, chatId\)/, 'New chat throws the conversation away')
-    assert.ok(
-      body.indexOf('archiveChat') < body.indexOf('setTurns([])'),
-      'the conversation is emptied before it is shelved'
-    )
-    for (const gone of ['setResult(null)', 'setLastDesign(null)', "setLastPrompt('')"]) {
-      assert.ok(body.includes(gone), `a fresh chat still carries ${gone.split('(')[0]}`)
-    }
-    /* And nothing is shelved from an empty box: pressing it twice must not
-       leave a row behind. */
-    assert.match(body, /if \(worthKeeping\(turns\)\)/, 'an empty chat is shelved as a conversation')
-
-    /*
-     * "Let's add the new chat to the chat bubble as a plus sign. For now have
-     * it click a + and then select new chat just in case we wanna add other
-     * things that a user can add with the + later."
-     *
-     * So the way out is behind a + on the composer row, and the + opens a
-     * MENU that offers New chat — not a + that is New chat. The row it used
-     * to have to itself above the transcript is gone.
-     */
-    const assistant = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
-    assert.doesNotMatch(assistant, /assistant-top/, 'New chat still has a row of its own over the transcript')
-    assert.match(assistant, /className="add-btn"/, 'there is no + on the chat box')
-    assert.ok(
-      assistant.indexOf('className="add-btn"') > assistant.indexOf('className="refine-row assistant-row"'),
-      'the + is not on the composer row'
-    )
-    assert.ok(
-      assistant.indexOf('className="add-btn"') < assistant.indexOf('className="refine-input"'),
-      'the + is not at the start of the box'
-    )
-    assert.match(assistant, /className="add-btn"[\s\S]{0,300}?aria-haspopup="menu"/, 'the + is a button, not a door to a menu')
-    const menu = assistant.slice(assistant.indexOf('className="add-menu"'), assistant.indexOf('className="refine-input"'))
-    assert.match(menu, /role="menu"/, 'the + opens something that is not a menu')
-    assert.match(menu, /New chat/, 'the menu does not offer a new chat')
-    assert.match(menu, /onNew\(\)/, 'New chat in the menu does not put the conversation down')
-    // Quiet over an empty conversation, not gone: a fresh chat of a fresh chat is nothing.
-    assert.match(menu, /disabled=\{busy \|\| !turns\.length\}/, 'New chat is live over an empty conversation')
-    // The + itself is always there while a conversation can be put down at all.
-    assert.doesNotMatch(assistant, /onNew && turns\.length/, 'the + vanishes over an empty conversation')
-    // A tap outside or Escape closes it, the way every popover here closes.
-    assert.match(assistant, /useDismiss\(addWrap, \(\) => setAdding\(false\), \{ open: adding, ignore: '\.add-btn' \}\)/, 'the menu has no way to close but its own items')
-    assert.match(src, /onNew=\{newChat\}/, 'the conversation is not given a way to be put down')
-    // And the menu opens up, over the box, not down into the keyboard.
-    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
-    const menuCss = css.slice(css.indexOf('.add-menu {'), css.indexOf('}', css.indexOf('.add-menu {')))
-    assert.match(menuCss, /bottom: calc\(100% \+ 8px\)/, 'the menu opens downward')
-    assert.doesNotMatch(css, /\.assistant-top/, 'the styles still dress a row that is gone')
-  })
-
-  test('the band book can be read and pruned from Setup', () => {
-    /*
-     * "How do I view the band book of saved artist and songs?" — there was no
-     * way. A thing that decides whether a request costs money needs a page
-     * where it can be read and pruned, so Setup lists it: one row per note
-     * with the band, its scenes (which is where the songs live), the unit and
-     * the date, Forget on each row, Forget all under the list.
-     */
-    const panel = readFileSync(new URL('../src/components/BandBook.jsx', import.meta.url), 'utf8')
-    assert.match(panel, /knownDesigns\(\)/, 'the panel does not read the book')
-    assert.match(panel, /forgetDesign\(row\.artist, row\.songs\)/, 'a band cannot be forgotten on its own')
-    assert.match(panel, /forgetDesigns\(\)/, 'the book cannot be emptied')
-    assert.match(panel, /\.map\(\(s\) => s\.name\)/, 'the scene names — the songs — are not shown')
-    assert.match(panel, /row\.device/, 'the unit a note was built on is not shown')
-    assert.match(panel, /toLocaleDateString\(\)/, 'the date is not shown')
-    assert.match(src, /<Section key="band-book" title="Band book"/, 'Setup has no Band book section')
-    // Forgetting one band is keyed the way filing is: band plus scene count.
-    const book = readFileSync(new URL('../src/lib/bandBook.js', import.meta.url), 'utf8')
-    const one = book.slice(book.indexOf('export async function forgetDesign('), book.indexOf('export async function forgetDesigns('))
-    assert.match(one, /const key = keyOf\(artist, songs\)/, 'forgetting one band is not keyed like filing one')
-    assert.match(one, /filter\(\(r\) => keyOf\(r\.artist, r\.songs\) !== key\)/, 'forgetting one band does not leave the others')
-    assert.match(one, /\.eq\('id', `\$\{userId\}:\$\{key\}`\)/, 'the account copy of that one band is not removed')
-  })
-
-  test('history is one list of what you made, not one list per store', () => {
-    /*
-     * "Combine the previously generated presets into one menu, don't separate
-     * them from what's saved in the browser compared to what's saved in the
-     * cloud."
-     *
-     * The Presets sheet keeps its panel per store, because moving a library
-     * between them is a real job. History is the other question — what have I
-     * made — and it is handed the already-merged list that Earlier generations
-     * draws from, so it cannot grow a heading per store.
-     */
-    const past = sheet('History')
-    assert.match(past, /<Past/, 'the history sheet shows nothing')
-    assert.match(past, /presets=\{library\}/, 'history is drawn from a store rather than from the merged list')
-    assert.match(past, /chats=\{chatLog\}/, 'history does not list past conversations')
-    assert.match(past, /signedIn=\{!!link\.account\}/, 'history cannot say where any of it is kept')
-
-    const panel = readFileSync(new URL('../src/components/Past.jsx', import.meta.url), 'utf8')
-    /* Where things live is said once, as a fact rather than a choice — signed
-       in it is the account, signed out it is this browser. */
-    assert.match(panel, /Sign in and everything here is kept with your account/)
-    assert.ok(
-      !/Browser|Cloud|Folder/.test(panel.replace(/\/\*[\s\S]*?\*\//g, '')),
-      'the merged list grew a heading per store again'
-    )
-
-    /*
-     * And the way in is a plain button in the first row the gear opens onto,
-     * beside Demo mode and Read the unit again.
-     *
-     * "I want a button, not a drop-down menu. And I want it at the top of the
-     * screen just like demo and read unit again so it's easily accessible
-     * quickly without scrolling down." It was a fold near the bottom of Setup,
-     * which is both of the things that sentence rules out.
-     */
-    const setup = sheet('Setup')
-    /* History is a button on Setup's AI page now, not a fold and not a
-       button on the unit's header: it is the AI's work, so it lives with it. */
-    assert.match(setup, /onClick=\{\(\) => setSheet\('history'\)\}/, 'Setup has no way to reach history')
-    assert.ok(
-      !/<Section\s+key="history"/.test(setup),
-      'history is a fold again, which is the drop-down this replaced'
-    )
-  })
-
+  
+  
+  
   test('a phone can reach the chain, from the bar rather than by a swipe', () => {
     /*
      * "On the PWA we need to be able to see what chain was written or what
@@ -1516,18 +1015,21 @@ export function run(test) {
     /*
      * "I wanna overhaul this whole settings set-up screen." Four doors under
      * a pile of unrelated buttons became: the version line at the top (kept
-     * on purpose — "I like that there"), seven rows each carrying one live
-     * fact, each opening its own page. Rename stays on the Unit page beside
-     * Read the unit again (he asked for it there), History moved in with the
-     * AI's work, the theme switch in with the Play screen, and the real amp
-     * names — "I do like that as well" — got a row of their own.
+     * on purpose — "I like that there"), rows each carrying one live fact,
+     * each opening its own page. Rename stays on the Unit page beside Read the
+     * unit again (he asked for it there), the theme switch in with the Play
+     * screen, and the real amp names — "I do like that as well" — got a row of
+     * their own.
+     *
+     * There were seven. "AI & cost" held the two switches, the token ledger
+     * and the history of every tone designed, and went with the AI.
      */
     const setup = sheet('Setup')
     assert.match(setup, /<div className="device-meta mono setup-version">\{FULL\}<\/div>/, 'the version line is not at the top')
     const rows = [...setup.matchAll(/<SetupRow key="([^"]+)" title="([^"]+)" status=/g)].map((m) => m[2])
     assert.deepEqual(
       rows,
-      ['Unit', 'Phone & computer', 'Play screen', 'AI & cost', 'Amp & pedal names', 'Help & fixes', 'About'],
+      ['Unit', 'Phone & computer', 'Play screen', 'Amp & pedal names', 'Help & fixes', 'About'],
       `Setup opens on ${rows.length} rows: ${rows.join(', ')}`
     )
     assert.ok(!setup.includes('<Group'), 'the doors are back')
@@ -1541,15 +1043,15 @@ export function run(test) {
     for (const [page, panels] of [
       ['unit', ['connection']],
       ['link', ['phone-remote', 'link-details']],
-      ['play', ['size', 'playing', 'appearance']],
-      ['ai', ['ai-switch', 'token-usage', 'what-it-has-learned', 'about-you', 'band-book']],
+      /* 'playing' was the play-mode switch, whose only job was hiding the
+                 ✦ Ask button. Both went with the AI. */
+      ['play', ['size', 'appearance']],
       ['help', ['preset-check', 'debug-log', 'feedback', 'what-s-changed-this-session', 'how-this-works']],
-      ['about', ['updates', 'developer']]
+      ['about', ['updates']]
     ]) {
       assert.deepEqual(behind(page), panels, `the ${page} page holds ${behind(page).join(', ')}`)
     }
     assert.ok(setup.slice(setup.indexOf("setupPage === 'unit'")).includes('<DeviceDetail'), 'the unit header is not on the Unit page')
-    assert.match(setup, /setSheet\('history'\)/, 'Setup has no way to reach history')
     const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
     assert.match(css, /button\.setup-row \{[^}]*min-height: 60px/, 'a Setup row is under thumb height')
     const row = readFileSync(new URL('../src/components/SetupRow.jsx', import.meta.url), 'utf8')
@@ -1566,37 +1068,73 @@ export function run(test) {
     assert.match(setup, /if \(setupPage\) \{\s*\n\s*setSetupPage\(null\)\s*\n\s*return 'stay'/, 'closing a page leaves Setup')
     const sheetSrc = readFileSync(new URL('../src/components/Sheet.jsx', import.meta.url), 'utf8')
     assert.match(sheetSrc, /if \(close\(\) === 'stay'\) mark\(\)/, 'a sheet that stayed open on Back has no entry for the next Back')
-    assert.match(sheet('History'), /onClose=\{\(\) => setSheet\('settings'\)\}/, 'closing History leaves Setup')
     assert.match(sheet('Amp and pedal names'), /onClose=\{\(\) => setSheet\('settings'\)\}/, 'closing the gear sheet leaves Setup')
   })
 
-  test('no price note outlives the date it promises', () => {
+  
+  test('a chain that is placed is also wired, or the preset makes no sound', () => {
     /*
-     * "Recheck current pricing for sonnet 5 as August 31st is gone."
+     * "None of the tones created make any sound."
      *
-     * The rates table carried `note: 'promotional through 31 Aug 2026, then
-     * $3/$15'`, printed under every cost figure in the app. The date passed —
-     * and the rise it warned about was then cancelled, so the sentence was
-     * wrong twice over while still being shown to a player.
+     * They were all built into empty slots, and an empty slot has no cabling
+     * in it. Placing a block fills a cell; it does not join that cell to
+     * anything. So five blocks went in, sixty-three values landed, the unit
+     * read every one of them back, the preset saved — and none of it was in
+     * the signal path. Nothing in the app looked, so nothing said so.
      *
-     * A note that names a date is a note with an expiry on it. This is the
-     * alarm clock: it starts failing the day the date does, whether the price
-     * changed or not, which is the day somebody has to go and look.
+     * It used to start one column BEFORE the first block, on the belief that
+     * the input needed joining to the chain like anything else. The unit never
+     * once accepted it — "srcCol out of range (1..13): 0" on every build, and
+     * every log line reading "6 of 7 cables — refused at columns -1". There is
+     * no such cable: the FM3 stores one set of links between each pair of its
+     * fourteen columns, the input feeds the first column by itself, and the
+     * thirteenth is the last that has a next one to reach.
+     *
+     * THIS USED TO WATCH TWO CHAIN BUILDERS. The other was the AI's, in
+     * actions.js, and went with it. The Starter chain button is the one that
+     * is left, and every rule above is still its rule — the planner they
+     * shared is still shared/grid-plan and lib/actions' chainPlan.
      */
-    const cost = readFileSync(new URL('../src/lib/cost.js', import.meta.url), 'utf8')
-    const table = cost.slice(cost.indexOf('const RATES = {'), cost.indexOf('}', cost.indexOf('const RATES = {')))
-    assert.ok(table.includes("'claude-sonnet-5'"), 'the rates table has moved')
+    const fx = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
+    const wire = fx.slice(fx.indexOf('export async function wireRow'))
+    assert.ok(wire, 'nothing wires a row of the grid')
+    assert.match(wire, /for \(const col of cableColumns\(lastCol\)\)/, 'the wire picks its own columns again')
+    assert.deepEqual(cableColumns(3), [0, 1, 2, 3], 'the wire skips the first block')
+    assert.equal(
+      cableColumns(20).at(-1),
+      12,
+      'the wire runs past the last column that can start a cable, which the unit throws out'
+    )
+    assert.ok(
+      !cableColumns(5).includes(-1),
+      'the wire still asks the unit for a cable out of the input, which it has always refused'
+    )
 
-    const months =
-      'jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec'
-    const stale = []
-    for (const [, note] of table.matchAll(/note: '([^']*)'/g)) {
-      const dated = note.match(new RegExp(`(\\d{1,2})\\s+(${months})[a-z]*\\s+(\\d{4})`, 'i'))
-      if (!dated) continue
-      const when = new Date(`${dated[1]} ${dated[2]} ${dated[3]} 23:59:59 UTC`)
-      if (when < new Date()) stale.push(`${note} — that date has passed`)
-    }
-    assert.deepEqual(stale, [], `price notes past their date:\n  ${stale.join('\n  ')}`)
+    const grid = readFileSync(new URL('../src/components/GridEditor.jsx', import.meta.url), 'utf8')
+    const build = grid.slice(grid.indexOf('const buildStarter'), grid.indexOf('const picker ='))
+    assert.ok(build.length > 200, 'the starter chain moved; retarget this test')
+    assert.ok(build.includes('placeBlock'), 'the starter chain no longer places anything')
+    assert.match(build, /wireRow\(1,/, 'the starter chain places blocks and never joins them up — the preset will be silent')
+    assert.ok(
+      build.indexOf('placeBlock') < build.indexOf('wireRow'),
+      'the row is wired before the blocks are in it'
+    )
+    assert.ok(/linear \? null : await wireRow/.test(build), 'a unit with no grid is sent cable writes it has no cells for')
+
+    /*
+     * And the chain is built into the free cells rather than from column 0.
+     *
+     * "The volume slider disappeared and no presets have sound." The slider
+     * moves the output block's level, and the output block had been built
+     * over: a slot this app calls empty is a slot with nothing EDITABLE in it,
+     * and the input and output are not editable.
+     */
+    assert.match(build, /chainPlan\(\{/, 'the starter chain no longer asks the planner where the free cells are')
+    assert.match(build, /plan\.cols\[i\]/, 'the chain is placed from column 0 again, over whatever is there')
+    assert.ok(
+      !/placeBlock\(1, (?:i|col) \+ 1/.test(build),
+      'the builder is 1-basing columns again'
+    )
   })
 
   test('every panel and every sheet is closed', () => {
@@ -2011,33 +1549,7 @@ export function run(test) {
     assert.equal(removals.length, 1, 'something other than setDemo drops the demo flag')
   })
 
-  test('the chat carries the scene names and the live scene into the plan', () => {
-    /*
-     * CREATE could not use PLAY's scene names — "make the lead scene brighter"
-     * came back with "I only have indexes" — and a plan aimed at scene 2 was
-     * checked without knowing scene 3 was live, so it wrote to scene 3.
-     */
-    const at = src.indexOf('await askPlan(')
-    assert.notEqual(at, -1)
-    const body = src.slice(at, at + 900)
-    assert.match(body, /\n\s*scene,\s*\n\s*sceneNames,\s*\n\s*sceneCount/, 'the chat request no longer carries the scene names')
-    assert.match(
-      src,
-      /validatePlan\(body, withPositions, \{[\s\S]{0,200}?activeScene: scene,[\s\S]{0,80}?sceneNames,/,
-      'the plan is checked without knowing which scene is live'
-    )
-    /*
-     * And without knowing whether it is being checked over the relay, it would
-     * go on proposing a slot write the host refuses from a distance — which
-     * applies a whole tone and then fails on the one step that keeps it.
-     */
-    assert.match(
-      src,
-      /validatePlan\(body, withPositions, \{[\s\S]{0,600}?remote: remoteActive\(\)/,
-      'the plan is checked without knowing it is being driven over the relay'
-    )
-  })
-
+  
   test('the preset list shows names it has, not 512 dashes', () => {
     /*
      * The demo's Presets sheet was 512 rows of "000: —", the loaded "500 DEMO"
@@ -2098,129 +1610,30 @@ export function run(test) {
     assert.ok(!/note=\{sceneNames\[scene\]/.test(sheet), 'the Scenes sheet still repeats the live scene name in its subtitle')
   })
 
-  test('the tabs run Play, Create, Edit — and a swipe agrees', () => {
+  test('the tabs run Play, Edit — and a swipe agrees', () => {
     /*
-     * "Move the edit button to the right of create." You make a tone and then
-     * adjust it, so that is the order. The swipe order is a separate list and
-     * has to move with it, or a swipe left goes somewhere the eye did not.
+     * "Move the edit button to the right of create." The swipe order is a
+     * separate list and has to move with the tabs, or a swipe left goes
+     * somewhere the eye did not.
+     *
+     * There were three. Create — the conversation — sat between these two and
+     * went with the AI, so the rule is now about two screens rather than
+     * three. The rule itself did not change.
      */
     const tabs = src.slice(src.indexOf("['play', 'Play']"), src.indexOf("].map(([id, label])"))
     const at = (id) => tabs.indexOf(`'${id}'`)
-    assert.ok(at('play') < at('ask') && at('ask') < at('shape'), `the tabs are not Play, Create, Edit — ${tabs}`)
+    assert.ok(at('play') < at('shape'), `the tabs are not Play, Edit — ${tabs}`)
+    assert.equal(at('ask'), -1, 'the Ask tab is back')
     const screens = readFileSync(new URL('../src/components/Screens.jsx', import.meta.url), 'utf8')
     assert.match(
       screens,
-      /export const ORDER = \['play', 'ask', 'shape'\]/,
+      /export const ORDER = \['play', 'shape'\]/,
       'a swipe still moves between the screens in the old order'
     )
   })
 
-  test('there is one conversation and one name for it', () => {
-    /*
-     * "It says Create, and then Ask on the same page, which kind of defeats the
-     * purpose of having multiple chat bots."
-     *
-     * There is one bot. It was listed twice: the Create tab rendered `chat` and
-     * `tones`, and a fourth ✦ Ask tab opened those same two elements in a
-     * sheet — greying itself out on Create, because there was nothing left to
-     * open. The screen carries the name and the ✦ now, and the duplicate is
-     * gone.
-     *
-     * On a phone the tab row is the way in (the floating button is hidden there
-     * because it sat over the controls). On a wide screen the floating button
-     * still opens the sheet from Play and Edit, where nothing is under it.
-     */
-    const nav = src.slice(src.indexOf('<nav className="views"'), src.indexOf('</nav>'))
-    assert.ok(
-      !/ask-tab/.test(nav),
-      'the duplicate Ask tab is back — it opens the conversation the Ask screen already is'
-    )
-    assert.match(nav, /\['ask', '✦ Ask'\]/, 'the conversation screen is not called Ask in the tab row')
-    assert.equal(
-      (nav.match(/\['(play|ask|shape)',/g) || []).length,
-      3,
-      'the tab row is no longer three screens'
-    )
-    // And the sheet route survives for the phone, from the stage bar. The
-    // floating button that opened it on a wide screen is gone: the tab above
-    // does the same thing, and the corner it floated over is where the last
-    // control in every grid lands.
-    assert.ok(!src.includes('className="ask-anywhere"'), 'the floating Ask is back over the bottom-right corner')
-    assert.match(src, /onAsk=\{askShows \? \(\) => setSheet\('chat'\) : null\}/, 'the stage bar has lost its way into the conversation')
-    assert.match(
-      src,
-      /const askShows = askButtonShows\(\{ status, view, playing, aiOn: chatOn \}\)/,
-      'the ask button decides for itself again, where a comment can impersonate the rule'
-    )
-    const styles = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
-    assert.ok(
-      !/button\.ask-tab \{/.test(styles),
-      'the removed tab still has styling, which will dress up the next thing given that class by accident'
-    )
-  })
-
-  test('polish: sheets close with the screen, hand edits are the only "You:", and the rest', () => {
-    const read = (f) => readFileSync(new URL('../src/components/' + f, import.meta.url), 'utf8')
-    // A block sheet stayed open across a tab press and its scrim ate the first tap on the new screen.
-    assert.match(src, /useEffect\(\(\) => setSheet\(null\), \[view\]\)/, 'a sheet no longer closes when the screen changes under it')
-    // "You: Done — 3 changes." — the app's own narration wore the player's label.
-    assert.equal((src.match(/role: 'hand'/g) || []).length, 1, 'hand edits are not the one producer of the hand role')
-    // The labelling moved to the route, which also labels the app's own notes.
-    const command = readFileSync(new URL('../api/command.js', import.meta.url), 'utf8')
-    assert.match(command, /if \(m\.role === 'hand'\) return \{ role: 'user', content: `\(Hand edit, by me/, 'the model is no longer told which turns were hand edits')
-    assert.match(command, /return \{ role: 'user', content: `\(App note: /, 'the app’s own notes reach the model as the player’s words')
-    const assistant = read('Assistant.jsx')
-    // "You: Named scene 4 Solo" — a hand edit is an event, not speech. Nothing in the transcript wears "You:".
-    assert.ok(!/You:/.test(assistant), 'a "You:" prefix is back in the transcript')
-    assert.match(assistant, /<p key=\{j\} className="turn-text">\s*\{para\}\s*<\/p>/, 'the turn text is decorated')
-    // Two narration sites were filed as hand edits: the app's own words about itself must pass fromAssistant.
-    assert.match(src, /record\('grid', 'Built a chain into the empty slot', \[\], true\)/, 'the design’s own chain build is recorded as a hand edit')
-    // The wording moved when keeping became a thing that happens at generation
-    // rather than after a write. What the guard is actually for is the trailing
-    // `true` — this is the app talking about itself, not a hand on the unit.
-    assert.match(src, /record\('library', `[^`]*\$\{err\.message\}`, \[\], true\)/, 'a cloud-save failure is recorded as a hand edit')
-    // The typed placeholder follows the reduced-motion setting live, through the one shared hook.
-    assert.match(assistant, /import \{ useAsks \} from '\.\.\/lib\/asks'/, 'Assistant reads reduced motion once at mount again')
-    assert.match(assistant, /useAsks\('\(prefers-reduced-motion: reduce\)'\)/)
-    assert.match(read('Sheet.jsx'), /import \{ useAsks \} from '\.\.\/lib\/asks'/, 'Sheet keeps a private copy of the media hook')
-    // Tour dots are controls or nothing; search hits announce as buttons.
-    const tour = read('Tour.jsx')
-    assert.match(tour, /<button[^>]*className=\{i === card \? 'tour-dot on' : 'tour-dot'\}/, 'the tour dots look like a control and are not one')
-    assert.match(tour, /aria-label=\{'Step ' \+ \(i \+ 1\) \+ ' of ' \+ CARDS\.length\}/)
-    const search = read('ParamSearch.jsx')
-    assert.ok(!/role="list"|role="listitem"/.test(search), 'a search hit announces as a list item, not a button')
-    /*
-     * The search was mouse-only: no keys on the field, thirty tab stops to
-     * the row you wanted. The field is a combobox driving a listbox now —
-     * arrows move, Enter opens, Escape clears — and the rows sit outside the
-     * Tab order. "Reading the blocks…" flickered because every keystroke
-     * started another read of every block; one read per chain, debounced,
-     * and the line only when a first read is taking its time.
-     */
-    assert.match(search, /role="combobox"/, 'the search field is not a combobox')
-    assert.match(search, /aria-activedescendant=/, 'the active row is not announced')
-    assert.match(search, /role="listbox"/, 'the hits are not a listbox')
-    assert.match(search, /role="option"/, 'a hit is not an option')
-    assert.match(search, /tabIndex=\{-1\}/, 'the hits are back in the Tab order')
-    for (const key of ['ArrowDown', 'ArrowUp', 'Enter', 'Escape']) {
-      assert.match(search, new RegExp(`e\\.key === '${key}'`), `${key} does nothing in the search`)
-    }
-    assert.match(search, /pending\.current\?\.key === chainKey/, 'a read already in flight is started again on the next keystroke')
-    assert.match(search, /setTimeout\(\(\) => \{\s*ensureIndex\(\)/, 'the read is not debounced')
-    assert.match(search, /slow && index === null \? <p className="hint mono">Reading the blocks/, 'the reading line still shows on every read, at once')
-    assert.ok(!/index && !reading \?/.test(search), 'the hits are hidden again while a re-read runs')
-    // The chain strip says when it scrolls — through the observer it now shares with the grid.
-    const overflow = readFileSync(new URL('../src/lib/overflow.js', import.meta.url), 'utf8')
-    assert.match(overflow, /el\.dataset\.overflow = /, 'the chain strip no longer says whether there is more to the right')
-    assert.match(overflow, /new ResizeObserver\(look\)/)
-    assert.match(read('Console.jsx'), /useOverflow\(strip/, 'the chain strip does not use the shared observer')
-    // The account project is not something to type into Setup.
-    const details = read('LinkDetails.jsx')
-    assert.ok(!/<input/.test(details), 'the Supabase project fields are back in Setup')
-    assert.ok(!/saveRemoteConfig/.test(details))
-    assert.match(details, /Test the link/, 'the link test went with the fields')
-  })
-
+  
+  
   test('Back moves between screens, through the one history ledger the sheets use', () => {
     /*
      * With no history for the screens, Back on a phone left the app from any
@@ -2556,197 +1969,10 @@ export function run(test) {
     assert.match(swallow.slice(0, swallow.indexOf('return')), /mark\(\)/, 'a swallowed pop is not paid back with a fresh entry — the sheet survives with no history and the next back press leaves the app')
   })
 
-  test('what the player has kept reaches the generator, and reaches them', () => {
-    /*
-     * Three links, and the feature is invisible if any one of them is missing
-     * — which is the problem with it. A profile that is computed and never
-     * sent, or sent and never shown, fails silently: generations carry on
-     * looking plausible, and nobody can tell a personalised one from a
-     * generic one by looking at it. Only the wiring can be checked cheaply,
-     * so it is.
-     */
-    assert.match(
-      src,
-      /taste: describeProfile\(taste\)/,
-      'the generation request no longer carries the taste profile — the whole feature is inert without this line, and nothing about a generation would look wrong'
-    )
-    assert.match(
-      src,
-      /suggestions=\{suggestionsFrom\(taste\)\}/,
-      'the conversation no longer offers starting points from past work'
-    )
-    assert.match(
-      src,
-      /summariseProfile\(taste\)/,
-      'the player can no longer see what has been inferred from their history'
-    )
-    assert.match(
-      src,
-      /setTasteEnabled\(!tasteOn\)/,
-      'the switch that turns the profile off is gone — an inference drawn from someone’s history has to be refusable'
-    )
-
-    /*
-     * Derived, not stored, and derived from the same list the player is shown.
-     *
-     * The moment this reads from a table it can disagree with the library it
-     * claims to describe, and deleting a preset stops un-learning it. And the
-     * moment it reads from a different set of presets than Create lists, the
-     * profile becomes something the player cannot check against anything.
-     */
-    /*
-     * Every store, merged at the point of use. Three now: this browser, the
-     * account, and a chosen folder — which was the one that could swallow a
-     * design whole, since picking a folder skips browser storage and nothing
-     * ever listed what went in there.
-     */
-    assert.match(
-      src,
-      /const library = useMemo\(\s*\n\s*\(\) => newestFirst\(listPresets\(\), cloudSaves, folderSaves\)/,
-      'the library is no longer every store merged at the point of use'
-    )
-    assert.match(
-      src,
-      /files\s*\n?\s*\.filter\(\(f\) => f\.kind === 'design'\)/,
-      'the folder is never read, so designs kept there stay invisible'
-    )
-    /*
-     * And the copy-to-account button is offered every store on this device.
-     *
-     * It read browser storage and nothing else, which is the wrong half on the
-     * machine it exists for: choosing a folder means a design is written to
-     * disk INSTEAD of browser storage, so a Mac with a folder set had, by that
-     * button's reckoning, nothing to copy — while holding the entire library
-     * the button was written to rescue.
-     */
-    assert.match(
-      src,
-      /const onThisDevice = useMemo\(\s*\n\s*\(\) => \[\s*\n\s*\.\.\.listPresets\(\),\s*\n\s*\.\.\.folderSaves/,
-      'the copy-to-account list is back to browser storage only'
-    )
-    assert.match(
-      src,
-      /<CloudPresets[\s\S]{0,200}local=\{onThisDevice\}[\s\S]{0,80}missing=\{stranded\}/,
-      'the account panel is not handed what is on this device, so it reads storage itself'
-    )
-    assert.match(
-      src,
-      /note=\{\s*\n\s*cloudReady\(\) && stranded/,
-      'a stranded library is invisible until the folded panel is opened'
-    )
-
-    assert.match(
-      src,
-      /profileFrom\(library\)/,
-      'the profile is no longer read from the same list the player is shown'
-    )
-    assert.match(
-      src,
-      /entries=\{library\}/,
-      'the Create screen no longer lists the library it learns from'
-    )
-  })
-
-  test('earlier generations are one tap from where they were made', () => {
-    /*
-     * The most common recovery there is — "the one before this was better" —
-     * used to be two taps away behind the bar, on a screen you had to leave to
-     * reach. It belongs under the box that made it.
-     *
-     * Restoring goes through the same `reload` the presets sheet uses, which
-     * validates the saved spec against whatever the unit has loaded now and
-     * stops at the preview. A second path that wrote directly would be a way
-     * to replay a design onto a chain it was never checked against.
-     */
-    assert.match(src, /<Recent\b/, 'the Create screen no longer lists what was generated')
-    const call = src.slice(src.indexOf('<Recent'), src.indexOf('/>', src.indexOf('<Recent')))
-    assert.match(call, /onRestore=\{reload\}/, 'restoring no longer goes through the validated reload path')
-
-    /*
-     * Create only. `chat` is one element rendered in two places, so anything
-     * inside it appears in the Ask sheet too — and a library is the longest
-     * thing that could be put in a surface whose whole point is being short.
-     */
-    assert.match(
-      src,
-      /\{status === 'live' && view === 'ask' \? \(\s*\n\s*<Recent/,
-      'the list is no longer confined to the Create screen'
-    )
-  })
-
-  test('the empty box offers the player their own past requests', () => {
-    const assistant = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
-    /*
-     * The personal suggestions have to join the rotation the empty box already
-     * runs, not sit beside it. This app shipped a row of suggestion buttons
-     * once and removed it — two copies of one list, and a wall of grey pills
-     * between the box and the page. A guard here is cheaper than rediscovering
-     * that.
-     */
-    assert.match(
-      assistant,
-      /\[\.\.\.own, \.\.\.SUGGESTIONS\]/,
-      'the player’s own suggestions are no longer merged into the rotating placeholder'
-    )
-    assert.ok(
-      !/suggestion-chip|suggestion-row|suggestions\.map/.test(assistant),
-      'the row of suggestion buttons is back — it was removed on purpose'
-    )
-  })
-
-  test('the conversation is written once and shown in two places', () => {
-    /*
-     * The Assistant now appears on Create as the screen and everywhere else in
-     * a sheet. The tempting way to do that is to write the tag twice, and it
-     * carries eleven props plus six children — so the second copy drifts, and
-     * what drifts is a conversation that behaves differently depending on how
-     * it was opened. Nobody tests both routes; they test the one they used.
-     *
-     * So: exactly one `<Assistant` in the file, hoisted into a variable, and
-     * both render sites reach for that variable.
-     */
-    const tags = src.match(/<Assistant[\s>]/g) || []
-    assert.equal(
-      tags.length,
-      1,
-      `${tags.length} <Assistant> tags in App.jsx — the conversation must be built once and rendered by reference`
-    )
-    assert.match(src, /const chat = /, 'the hoisted conversation is gone')
-    /*
-     * Rendered by reference on Create, wrapper or no wrapper. What this is
-     * really holding is that there is one conversation and both places show
-     * the same element — a second copy behaves subtly differently depending on
-     * how it was opened, which nobody would think to check.
-     */
-    assert.match(
-      src,
-      /view === 'ask' \? (<div className="chat-screen">\{chat\}<\/div>|chat) : null/,
-      'Create no longer renders the hoisted conversation'
-    )
-    /*
-     * Still by reference, still only while open. The sheet now shows the
-     * conversation and the tones under it — the same pair, in the same order,
-     * as Create — so a tone asked for from the sheet is not invisible until you
-     * walk to another screen.
-     */
-    assert.match(
-      src,
-      /\{sheet === 'chat' \? \(\s*<>\s*\{chat\}\s*\{tones\}\s*<\/>\s*\) : null\}/,
-      'the chat sheet no longer renders the hoisted conversation — and mounting it unconditionally would leave a second live turn list behind Create'
-    )
-
-    // The way in from the stage screen, on a phone.
-    assert.match(src, /onAsk=\{askShows \? \(\) => setSheet\('chat'\) : null\}/, 'the button that opens the chat from the stage bar is gone')
-    /* Hiding on Create is now playMode's rule rather than a line written here;
-       it is asserted against that module, which is testable without a DOM. */
-    assert.equal(
-      play.askButtonShows({ status: 'live', view: 'ask', playing: false }),
-      false,
-      'the ask button no longer hides on Create, where it would offer to open what is open'
-    )
-    assert.equal(play.askButtonShows({ status: 'live', view: 'play', playing: false }), true)
-  })
-
+  
+  
+  
+  
   test('the demo is not a one-way door on a phone', () => {
     /*
      * Reported from a real phone: a sheet headed "Set up phone remote — once,
@@ -2798,341 +2024,12 @@ export function run(test) {
     )
   })
 
-  test('the working line is drawn once, and carries the clock', () => {
-    /*
-     * There were three of them on screen at the same time, and a photograph of
-     * it is what made this a bug rather than a quibble:
-     *
-     *     Sent to the model - waiting for the first line...
-     *   ||| Sent to the model - waiting for the first line...
-     *   ..| Waiting on the model - 27s
-     *
-     * Assistant printed `progress` plainly, App printed the identical string
-     * again inside <Thinking>, and App then hand-built a second copy of
-     * Thinking's own meter bars around <Stages>, which counted. Nothing was
-     * wrong with any one of them; there were simply three.
-     *
-     * These three assertions are those three lines. The bars belong to one
-     * component, so no caller may draw its own; the message belongs to that
-     * component, so the transcript may not print it; and the clock has to reach
-     * it, or the merge would have thrown away the only thing the third line
-     * knew that the other two did not.
-     */
-    const assistant = readFileSync(
-      new URL('../src/components/Assistant.jsx', import.meta.url),
-      'utf8'
-    )
-    assert.ok(
-      !/>\s*\{progress\}\s*</.test(assistant),
-      'the transcript prints the progress message itself again - <Thinking> already says it, one line lower'
-    )
-    assert.ok(
-      !/className="thinking-bars"/.test(src),
-      'App draws its own copy of the working line - the bars belong to <Thinking>, and a second set of them is a second line saying the same thing'
-    )
-    /* The element, not the word. The comments around here name <Thinking> as
-       well, and the first hit was one of them. */
-    const drawn = src.indexOf('<Thinking\n')
-    assert.notEqual(drawn, -1, 'the working line is no longer drawn')
-    const line = src.slice(drawn, src.indexOf('/>', drawn))
-    for (const prop of ['message={progress}', 'active={thinking}', 'startedAt={genStarted}', 'typicalMs={typicalMs(past)}']) {
-      assert.ok(
-        line.includes(prop),
-        `the one working line has lost ${prop} — the clock was the only thing the third line knew that the other two did not`
-      )
-    }
-
-    /*
-     * And it is the way into the live feed, once there is one.
-     *
-     * "Would be nice if tapping on thinking shows actually more of the output
-     * while it's happening, like a live feed of everything." The feed was
-     * behind a separate chip under this line, which is one more thing to spot
-     * while waiting on a wait.
-     */
-    assert.ok(line.includes('live={!!partial}'), 'the working line cannot be tapped to watch the output')
-    assert.ok(line.includes('onToggle='), 'the working line is tappable and does nothing')
-    const shown = src.indexOf('<LiveGeneration\n')
-    assert.notEqual(shown, -1, 'the live feed is no longer drawn')
-    const feed = src.slice(shown, src.indexOf('/>', shown))
-    assert.ok(feed.includes('chip={!thinking}'), 'two controls open the same panel while a tone is building')
-
-    /*
-     * And it says which of the two waits is running. The server sends a hello
-     * before it asks the model anything, so this line changing at all is proof
-     * to the person watching that the round trip works — which is most of what
-     * anyone staring at a long wait actually wants to know. Dropped, the line
-     * would sit on "Reaching the server…" for the whole generation and say
-     * something false for most of it.
-     */
-    assert.match(
-      src,
-      /e\.kind === 'open'\)\s*\n?\s*setProgress\(/,
-      "the working line ignores the server's hello, so it claims to be reaching the server long after it has"
-    )
-    /*
-     * And it says which attempt is running. A quiet start is retried once, and
-     * the retry used to announce itself only for the second before this hello
-     * overwrote it — so two ninety-second waits read as one that never ended:
-     * "said working on tone for over 3 minutes then just disappeared".
-     */
-    // Not the literal sentence — the wording moved to "Thinking… (second try)"
-    // when the vague lines were cut. What has to hold is that `e.attempt` still
-    // picks a different message, and that the difference names the retry.
-    assert.match(
-      src,
-      /e\.attempt \? [^\n]*second try/i,
-      'the second attempt looks exactly like the first, so a three-minute wait looks like a hang'
-    )
-  })
-
-  test('the chat box is tall enough for the suggestion in it', () => {
-    /*
-     * "Chat box cuts off second line text."
-     *
-     * The box sizes itself from `scrollHeight`, which answers for a textarea's
-     * VALUE — and a placeholder is not a value. So a suggestion long enough to
-     * wrap ("Warm clean with a bit of shimmer" does, on a phone) was drawn into
-     * a box one line tall and lost its second line: the invitation to type was
-     * the one thing you could not read.
-     *
-     * Two halves, and both are needed. The measurement has to borrow the
-     * suggestion as a value to have anything to measure, and it has to depend
-     * on it so it runs again when the suggestion changes — the old effect
-     * watched `text` alone, which never changes while the placeholder rotates.
-     */
-    const a = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
-    assert.match(
-      a,
-      /const borrow = text \? null : `\$\{typedFull\}/,
-      'the empty box is measured against nothing again, so a wrapping suggestion is clipped'
-    )
-    assert.match(
-      a,
-      /\}, \[text, typedFull\]\)/,
-      'the height is not recomputed when the suggestion changes, so it fits only the first one'
-    )
-    // And the full line is what it measures, not the part typed so far —
-    // otherwise the box gains a line mid-animation and the page jumps.
-    assert.match(
-      a,
-      /return \{ shown: text, full \}/,
-      'the hook no longer reports the whole suggestion, so the box can only chase the animation'
-    )
-    // The borrowed value must go back, or React's controlled field is left
-    // holding a suggestion the player never typed.
-    assert.match(
-      a,
-      /if \(borrow !== null\) el\.value = ''/,
-      'the borrowed value is never given back, so the box fills with its own placeholder'
-    )
-  })
-
-  test('a line that cannot say what it is doing says only that', () => {
-    /*
-     * "Instead of saying working out what that means just say Thinking whenever
-     * it's not saying exactly what it's doing."
-     *
-     * Two kinds of woolliness went. `setProgress('Working out what that
-     * means...')` is the one that was reported. The other was quieter and
-     * worse: LiveGeneration carried eight STAGES on a three-second timer —
-     * "Choosing an amp", "Shaping the EQ" — that nothing consulted the model
-     * about. They read as progress and were a script, so the line claiming to
-     * choose a cabinet appeared whether or not one was ever touched.
-     *
-     * The specific lines are not covered by this and must not be: "Reading X of
-     * Y", "Building your chain — 3 blocks so far" and "Verifying …" are counts
-     * of things that really happened.
-     */
-    const live = readFileSync(
-      new URL('../src/components/LiveGeneration.jsx', import.meta.url),
-      'utf8'
-    )
-    assert.match(live, /export const THINKING = 'Thinking'/, 'the one honest holding line is gone')
-    assert.ok(
-      !/const STAGES = \[/.test(live),
-      'the scripted stage list is back — it advances on a timer and reports work nobody checked'
-    )
-    assert.ok(
-      !/Working out what that means/.test(src),
-      'the reported line is still there'
-    )
-    assert.ok(
-      !/working on your tone/i.test(src),
-      'a second woolly line is still there, saying nothing the lines around it do not'
-    )
-    // The specific ones survive, or this went too far.
-    assert.match(src, /Building your chain/, 'the real block count stopped being reported')
-    assert.match(src, /Verifying \$\{name\}/, 'the real verify count stopped being reported')
-  })
-
-  /*
-   * What the app tells the AI about the hardware.
-   *
-   * For a long time it told it something false: that a scene changes only what
-   * is switched on, and that every scene shares one set of values. Both routes
-   * said it, the tour taught it, and the chat refused legitimate asks because
-   * of it — while this app's own device layer had the truth written down the
-   * whole time ("bypass and channel are per-scene on this hardware — that IS
-   * what a scene is"). A scene remembers a channel per block, and a channel
-   * holds its own model and its own values, which is the mechanism scenes
-   * exist for. This is the guard that keeps the instructions honest.
-   */
-  test('the AI is not told that scenes share one set of values', () => {
-    const generate = readFileSync(new URL('../api/generate.js', import.meta.url), 'utf8')
-    const command = readFileSync(new URL('../api/command.js', import.meta.url), 'utf8')
-
-    for (const [name, text] of [['generate', generate], ['command', command]]) {
-      assert.ok(
-        !/shared by every scene|Every scene shares|values are shared/i.test(text),
-        `${name} still tells the model every scene shares one set of values`
-      )
-      assert.ok(
-        !/cannot give a scene its own|not a hotter amp/i.test(text),
-        `${name} still tells the model a scene cannot have its own amp`
-      )
-      assert.match(text, /channel/i, `${name} says nothing about channels at all`)
-    }
-
-    // And the designer can actually say it: a channel per block, and a channel
-    // per block per scene.
-    assert.match(
-      generate,
-      /channel: z\s*\n?\s*\.string\(\)/,
-      'the block spec has no channel, so values can only ever be written to the one the block is on'
-    )
-    assert.match(
-      generate,
-      /channels: onlyWhenPlaced\(\s*\n?\s*eids,\s*\n?\s*z\.array\(/,
-      'a scene cannot name the channels it plays'
-    )
-
-    /*
-     * And an empty preset cannot be asked to change anything at all.
-     *
-     * The id narrowing has a hole exactly where it matters most: `z.literal([])`
-     * cannot be built — an enum with no members can never be satisfied — so an
-     * empty preset fell back to a plain integer, and the one case where EVERY
-     * id is invalid was the one case with no constraint on it. Reported from a
-     * real run into an empty slot: six changes proposed against effects 94,
-     * 118, 58, 58, 58 and 66, all six thrown away, six identical rejections
-     * printed under REJECTED DURING CHECKING.
-     *
-     * `maxItems: 0` is the constraint that CAN be expressed for an empty set,
-     * and it has to cover all three places an id can appear or the intent
-     * simply moves to whichever one was left open.
-     */
-    assert.match(generate, /const onlyWhenPlaced = \(eids, array, whenEmpty\) =>/, 'the empty-preset hole is open again')
-    assert.match(generate, /eids\.length \? array : array\.max\(0\)/, 'an empty preset can be sent block changes again')
-    assert.match(generate, /blocks: onlyWhenPlaced\(/, 'blocks are not capped on an empty preset')
-    assert.match(generate, /engaged: onlyWhenPlaced\(/, 'a scene can still switch on a block that does not exist')
-
-    /*
-     * Every frame is pushed, not just the first.
-     *
-     * The hello was flushed and nothing after it was, which is a difference
-     * that only appears in production: whatever sits between the function and a
-     * phone can hold a few hundred bytes of ndjson waiting for more, and a
-     * partial is a few hundred bytes. So the hello arrived instantly — proving
-     * the route open — and the model then streamed into a buffer while the
-     * browser sat on a ninety-second clock. "The AI accepted the request and
-     * then sent nothing back for 90 seconds, twice."
-     *
-     * One helper, so a frame added later cannot be the unflushed one.
-     */
-    assert.match(generate, /const send = \(frame\) => \{/, 'frames are written one at a time again')
-    assert.match(
-      generate,
-      /res\.write\(JSON\.stringify\(frame\)[\s\S]{0,80}res\.flush\(\)/,
-      'a written frame is no longer flushed, so it can sit in a buffer'
-    )
-    assert.ok(
-      !/res\.write\(JSON\.stringify\(\{ type:/.test(generate),
-      'a frame is written straight to the response again, bypassing the flush'
-    )
-
-    /*
-     * And nothing in the roster that says nothing. Both lineage fields are null
-     * on every entry of most families, which was a fifth of the largest part of
-     * the request spent on `"manufacturer":null,"basedOn":null`.
-     */
-    assert.match(generate, /const trim = \(models\) =>/, 'the rosters carry their empty fields again')
-    assert.match(generate, /rosters\[block\.slug\] = trim\(block\.models\)/, 'the rosters are sent untrimmed')
-  })
-
-  /*
-   * What the app tells the AI about levels.
-   *
-   * Levels were withheld outright, and the model was never told — so asked for
-   * a lead sound louder than the rhythm one it argued rather than declining:
-   * "I told the AI the amp should be louder when it's on than when it's off and
-   * it told me I was wrong." A rule it cannot see is a rule it will talk its
-   * way around. Both routes must now name the window, so a refusal it does hit
-   * is one it can explain.
-   */
-  test('the AI is told what it may do with a level, not left to guess', () => {
-    const generate = readFileSync(new URL('../api/generate.js', import.meta.url), 'utf8')
-    const command = readFileSync(new URL('../api/command.js', import.meta.url), 'utf8')
-
-    for (const [name, text] of [['generate', generate], ['command', command]]) {
-      assert.ok(
-        !/Do not set anything named Level|never set .*\bLevel\b/i.test(text),
-        `${name} still tells the model levels are off limits, which is no longer true`
-      )
-      assert.match(
-        text,
-        /Level you may move, but only a little/,
-        `${name} does not tell the model a level may be nudged`
-      )
-      assert.match(
-        text,
-        /bottom fifth/,
-        `${name} names no floor, so the model cannot say why a request was refused`
-      )
-    }
-  })
-
-  /*
-   * The learning loop is wired end to end, or it is theatre.
-   *
-   * Every piece of this can be present and the feature still do nothing: a
-   * knob editor that reports a sentence and not the numbers, a recorder nobody
-   * calls, a summary the request body never carries. Each of those failures
-   * looks exactly like success from the outside — the panel fills up, the
-   * generations do not change — which is why this checks the whole chain
-   * rather than the ends of it.
-   */
-  test('what the player fixes by hand reaches the next generation', () => {
-    const console_ = readFileSync(new URL('../src/components/Console.jsx', import.meta.url), 'utf8')
-    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
-    const api = readFileSync(new URL('../api/generate.js', import.meta.url), 'utf8')
-
-    // The knob editor hands over the numbers, not just the sentence.
-    assert.match(
-      console_,
-      /onChanged\(\s*`\$\{block\.name\} · \$\{p\.name\} → \$\{next\}`,\s*\{\s*block: block\.name/,
-      'a hand change reports a sentence and drops the before-and-after that makes it useful'
-    )
-
-    // The app records one, and only against a generation it just wrote.
-    assert.match(app, /rememberCorrection\(change\)/, 'nothing records a correction')
-    assert.match(
-      app,
-      /if \(applied && change && tasteOn\)/,
-      'a knob turned on the player own preset is counted as correcting the model'
-    )
-    assert.match(app, /rememberNote\(instruction\)/, 'the words used to correct a tone are thrown away')
-
-    // And it travels.
-    assert.match(app, /corrections: tasteOn \? describeCorrections\(corrections\) : ''/, 'the summary never leaves the app')
-    assert.match(api, /corrections,/, 'the endpoint does not read it')
-    assert.match(api, /\(fixes \? `\\n\\n\$\{fixes\}` : ''\)/, 'the endpoint reads it and never puts it in the prompt')
-
-    // Switched off with the rest of it, and visible where the rest of it is.
-    assert.match(app, /summariseCorrections\(corrections\)/, 'the player cannot see what is being sent about them')
-    assert.match(app, /Forget what I keep fixing/, 'there is no way to erase it')
-  })
-
+  
+  
+  
+  
+  
+  
   /*
    * A stated count outranks a refusal.
    *
@@ -3277,217 +2174,9 @@ export function run(test) {
     assert.equal(hidden.length, 0, 'the version is hidden somewhere again — a phone is where it was asked for')
   })
 
-  /*
-   * A generated tone is a card, not pages.
-   *
-   * "The generated tones take up pages of the chat box, maybe we can just list
-   * those under it after they generate?" They did: a six-block preset is a
-   * couple of thousand pixels of parameter rows, scene plan, cost and trace,
-   * rendered inside a chat log 340 pixels tall. Measured after this change it
-   * is 200px on a desktop and 296px on a phone — 12-15% of what it hid.
-   */
-  test('a tone answers as a card with its detail folded', () => {
-    const gen = readFileSync(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
-    // The tag, not the whole line: the element carries a ref now so the fold can
-    // be shut from the button at the bottom of it.
-    assert.match(gen, /<details className="preview-detail"/, 'the whole tone is on the page again')
-    assert.match(gen, /className="preview-count mono"/, 'the card does not say how much it changes')
-    // A rejection is never folded away without a word on the card.
-    assert.match(gen, /className="preview-refused"/, 'settings can be rejected and never mentioned')
-
-    /*
-     * What may never be folded: a decision, or a consequence.
-     *
-     * The bulk is the diff — thirty-odd rows nobody reads unless a tone
-     * surprised them. Everything with a consequence stays on the card: what it
-     * will rename, which scene the bypasses land in, which scenes get written
-     * over. Those were put in front of people deliberately by earlier work,
-     * and a decision behind a fold is a decision made for you.
-     */
-    const card = gen.slice(
-      gen.indexOf('<div className="preview-head">'),
-      gen.indexOf('<details className="preview-detail"')
-    )
-    assert.match(card, /preset-name/, 'the name is behind the fold')
-    assert.match(card, /preview-actions/, 'the buttons are behind the fold')
-    assert.match(card, /rename-choice/, 'the rename decision is behind the fold')
-    assert.match(card, /write-target/, 'which scene the bypasses land in is behind the fold')
-    assert.match(card, /scene-plan/, 'what gets written over is behind the fold')
-
-    /*
-     * "After writing a scene make it scroll to where it says save to FM3 …
-     * otherwise you can't tell that everything was written to the unit
-     * because it just sits on the chat screen." The action row carries a ref
-     * and the card scrolls it into view on the crossing to sent — only then,
-     * only when there is a Save to show, and never for a card with an
-     * outcome, which is a record with nothing to press.
-     */
-    assert.match(gen, /<div className="preview-actions" ref=\{actions\}>/, 'the action row cannot be scrolled to')
-    const landing = gen.slice(gen.indexOf('const wasSent = useRef(sent)'), gen.indexOf('}, [sent, onSave, outcome])'))
-    assert.match(landing, /const crossed = sent && !wasSent\.current/, 'the card scrolls on every render, not on the crossing')
-    assert.match(landing, /if \(!crossed \|\| !onSave \|\| outcome\) return/, 'a record card, or one with no Save, still scrolls')
-    assert.match(landing, /scrollIntoView\(\{ block: 'center'/, 'the Save row is not brought to the middle of the screen')
-    assert.match(landing, /prefers-reduced-motion: reduce/, 'the scroll animates for someone who asked it not to')
-
-    /*
-     * "Make an animation for 'writing' so user knows it working." While busy
-     * the Send button wears `writing`, carries how far along it is as --done,
-     * and says the count; the styles fill it and sweep a light across it,
-     * with the sweep off under reduced motion.
-     */
-    assert.match(gen, /className=\{busy \? 'primary writing' : 'primary'\}/, 'the button does not change while writing')
-    assert.match(gen, /'--done': writingStep\(progress\)\.done \?\? 0/, 'the button does not know how far along the write is')
-    assert.match(gen, /<span>\{writingStep\(progress\)\.label\}<\/span>/, 'the button does not count the writes')
-    assert.match(src, /progress=\{progress\}\s*\n\s*sent=\{sent\}/, 'the live card is not told the progress line')
-    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
-    assert.match(css, /\.preview-actions button\.primary\.writing::before \{[^}]*width: calc\(var\(--done, 0\) \* 100%\)/, 'nothing fills as the writes land')
-    assert.match(css, /animation: writing-sweep/, 'nothing moves between writes')
-    assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*\n\s*\.preview-actions button\.primary\.writing::after \{\s*\n\s*animation: none/, 'the sweep runs for someone who asked for less motion')
-
-    /*
-     * And a value that bounces off a block just moved to a channel says which
-     * channel the unit reports the block on — asked once per change and only
-     * on a failure, so a clean write costs nothing extra.
-     */
-    const forge = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
-    const apply = forge.slice(forge.indexOf('export async function applyChanges'), forge.indexOf('export async function verifyChanges'))
-    assert.match(apply, /const whereIsIt = async \(\) => \{\s*\n\s*if \(sitting !== undefined\) return sitting/, 'the block list is read more than once per change')
-    assert.match(apply, /if \(!res\.unverified && change\.channel !== undefined\) \{/, 'the channel is asked about on writes that were never checked, or blocks that never moved')
-    assert.match(apply, /is on channel \$\{found\}, not \$\{asked\}/, 'a channel move that did not take is not named on the failure line')
-    assert.match(apply, /device ignored both write encodings\$\{where\}/, 'the channel answer does not reach the failure line')
-
-    // And what is folded is the bulk, not the decisions.
-    const folded = gen.slice(gen.indexOf('<details className="preview-detail"'))
-    assert.match(folded, /className="diff"/, 'the diff is not what is folded')
-
-    /*
-     * The trace rides inside the fold. The price does not, any more.
-     *
-     * Both arrived together and were folded away together, and only one of them
-     * belonged there. The trace is for when a tone surprises you — occasional,
-     * and worth a scroll. The price is checked on every single run: "right now
-     * I have to click Show, and then scroll all the way to the bottom to see
-     * it." So it sits on the face of the card, under the change count, and the
-     * trace stays where the rest of the detail is.
-     *
-     * Neither may become a panel of its own beside the tone, which is what all
-     * of this replaced. Every card, not the first one found: there is more than
-     * one <Preview> in App — the live tone and each one kept in the
-     * conversation — and stacking is the same regression whichever does it.
-     */
-    assert.match(card, /\{cost\}/, 'the price is not on the face of the card')
-    assert.ok(
-      !/<Cost\b/.test(folded),
-      'the price is behind the fold again — two taps and a scroll past the whole diff'
-    )
-    assert.match(folded, /\{children\}/, 'the trace is no longer inside the fold')
-
-    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
-    const cards = app.split('<Preview').slice(1).map((part) => part.slice(0, part.indexOf('</Preview>')))
-    assert.ok(cards.length >= 2, 'the tones kept in the conversation are not drawn as cards')
-    for (const card of cards) {
-      assert.match(card, /cost=\{<Cost\b/, 'the cost is a panel of its own beside the tone again')
-      assert.match(card, /<DevTrace\b/, 'the trace is a panel of its own beside the tone again')
-    }
-  })
-
-  test('every tone is kept, listed under the conversation, and cannot write', () => {
-    /*
-     * "Don't show the preset generation inside of the chat box — show it below
-     * it separately, just like the LP Meteora. Have it in a collapsible
-     * drop-down, but expanded by default after the tone is generated, and have
-     * buttons to send it in there. The chat box should pretty much be just the
-     * chats going back and forth."
-     *
-     * Two properties, and they are separable. Where the tones live is this
-     * report. That none of them is destroyed by asking for another was the
-     * one before it, and moving them must not quietly undo it.
-     */
-    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
-    const gen = readFileSync(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
-
-    /* Nothing is destroyed: four paths used to drop the live tone and all four
-       keep it — a new generation, a refinement, loading a saved design over it,
-       and Discard. */
-    const kept = (app.match(/\bkeep\((?:shelved\(\)|replacing)\)/g) || []).length
-    assert.ok(kept >= 4, `only ${kept} of the four paths keep the tone they replace`)
-
-    /* And they are under the conversation rather than between its turns. */
-    const tones = app.slice(app.indexOf('const tones ='), app.indexOf('const chat = status'))
-    assert.ok(tones.length > 200, 'the tones are no longer built as a panel of their own')
-    assert.match(tones, /<Section/, 'a tone is not something you can fold away')
-    assert.match(tones, /defaultOpen/, 'a tone arrives folded shut, so it looks like nothing happened')
-    /* Re-keyed per run: <details open> is a starting state, so a second tone
-       would arrive inside a panel somebody had folded and be invisible. */
-    assert.match(tones, /key=\{`tone-\$\{genAt\}-\$\{past\.length\}`\}/,
-      'the panel is not re-keyed, so only the first tone opens itself')
-
-    /* The conversation carries speech and the working line, and no tone. */
-    const a = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
-    assert.ok(!/designs/.test(a), 'the conversation is drawing tones between its turns again')
-    assert.ok(!a.includes('turn-result'), 'a tone is still dressed as a reply inside the log')
-
-    /*
-     * The one that matters most, unchanged by the move: a card from three
-     * requests ago describes a preset the app has since moved past, so a Send
-     * button on it is an offer to overwrite whatever came after.
-     */
-    const past = tones.slice(tones.indexOf('past].reverse()'))
-    assert.ok(past.length > 100, 'the kept tones are no longer listed')
-    for (const handler of ['onApply', 'onDiscard', 'onScene', 'onWithScenes', 'onRenamePreset']) {
-      assert.ok(!past.includes(handler), `a tone from earlier can still ${handler} — it would write the wrong preset`)
-    }
-
-    /* And the card itself offers nothing to press once it has an outcome. */
-    const bare = gen.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
-    const head = bare.slice(bare.indexOf('{outcome ? ('), bare.indexOf(') : ('))
-    assert.match(head, /preview-outcome/, 'a tone that has been answered does not say what happened to it')
-    assert.ok(!head.includes('<button'), 'a tone that has been answered still offers a button')
-
-    /* The scene names are the ones it was asked against, not whatever they
-       have since been renamed to — the card is a record of a moment. */
-    assert.match(app, /sceneNames=\{entry\.sceneNames\}/, 'a kept tone reads the live scene names')
-  })
-
-  test('the box you type in holds more than one line, and Enter still sends', () => {
-    /*
-     * It was a single-line field, so a request longer than about forty
-     * characters scrolled away to the left as it was typed — and describing a
-     * tone is exactly the kind of thing people write two sentences of.
-     */
-    const a = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
-    const bare = a.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
-    assert.match(bare, /<textarea\b/, 'the conversation is typed into one line again')
-    assert.ok(!/type='text'|type="text"/.test(bare), 'the single-line field is back')
-
-    /* Enter sends, Shift+Enter starts a line — what every chat does, and what
-       someone who has used one will try first. */
-    const keys = bare.slice(bare.indexOf('onKeyDown={(e) => {'), bare.indexOf('enterKeyHint'))
-    assert.match(keys, /e\.key !== 'Enter' \|\| e\.shiftKey/, 'shift+enter no longer starts a line')
-    assert.match(keys, /e\.preventDefault\(\)/, 'Enter sends and inserts a newline as well')
-    assert.match(keys, /submit\(\)/, 'Enter does not send')
-    /* Enter also commits an IME's character; sending there swallows the word
-       somebody is in the middle of. */
-    assert.match(keys, /isComposing/, 'a request typed with an IME sends half a word')
-
-    /* A textarea has one fixed height and scrolls inside it, which for two
-       lines means the first disappears upwards — no better than the field this
-       replaced. Measured from the content rather than counted from the text, so
-       it stays right at any width. */
-    /*
-     * The arrow says what it does to eyes; the label says it to everything
-     * else. A button whose whole face is a glyph is unnamed without one, and
-     * both of its states need naming — Send and Stop share the button.
-     */
-    assert.match(bare, /aria-label="Stop"/, 'the stop arrow has no name')
-    assert.match(bare, /aria-label=\{busy \? 'Send when the current tone finishes' : 'Send'\}/,
-      'the send arrow has no name')
-    assert.ok(!/>\s*Send\s*</.test(bare), 'the word Send is back on the button beside the arrow')
-
-    assert.match(bare, /el\.style\.height = 'auto'/, 'the box never shrinks back down')
-    assert.match(bare, /el\.style\.height = `\$\{el\.scrollHeight\}px`/, 'the box does not grow with what is in it')
-  })
-
+  
+  
+  
   test('scene names are checked against the preset they were asked for', () => {
     /*
      * "On the Cowboys From Hell rig it's still showing the Distortion Rigs
@@ -3705,81 +2394,8 @@ export function run(test) {
     )
   })
 
-  /*
-   * Opening the change list must not move the rest of the page out of reach.
-   *
-   * "After writing to the unit, if I put show everything that was changed, it
-   * displays it all in the chat window, but there's no way to collapse it
-   * again so it's flooding the chat. It also makes the next generation I do
-   * show up above that so I have to do a lot of scrolling to get back to see
-   * what's happening with the new generation."
-   *
-   * Eighty-two rows in one column on a phone is several screens, and this fold
-   * sits under a conversation. Two things hold: the list is bounded and
-   * scrolls inside itself, so nothing below it ever moves by more than that
-   * box; and the far end of it carries a way out, because by then the line
-   * that opened it is a long way back up.
-   */
-  test('a long change list is a window, and can be shut from the bottom of it', () => {
-    const gen = readFileSync(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
-    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
-
-    assert.match(gen, /className="diff-scroll"/, 'the change list can still grow the page without limit')
-
-    const box = css.slice(css.indexOf('.diff-scroll {'), css.indexOf('}', css.indexOf('.diff-scroll {')))
-    assert.ok(box.includes('max-height'), 'the change list has no height to be bounded by')
-    assert.match(box, /overflow-y:\s*auto/, 'the change list is bounded but cannot be scrolled')
-
-    // And the way out is inside the fold, past the diff, not beside it.
-    const folded = gen.slice(gen.indexOf('<details className="preview-detail"'))
-    assert.match(folded, /className="fold-shut"/, 'nothing at the bottom of the list shuts it')
-    assert.ok(
-      folded.indexOf('fold-shut') > folded.indexOf('diff-scroll'),
-      'the way out is above the list it is meant to end'
-    )
-    assert.ok(
-      /fold\.current\.open = false/.test(gen),
-      'the button does not actually close the fold'
-    )
-    // Shutting it several screens down would otherwise leave you in blank
-    // space where the rows used to be.
-    assert.match(gen, /foldHead\.current\?\.scrollIntoView/, 'shutting the fold leaves you nowhere')
-  })
-
-  test('a switch says where the thing it switches on will appear', () => {
-    /*
-     * "Where do I view the generation from the AI from the Developer tab?"
-     *
-     * The trace stood on its own under the tone, and the switch said so: "adds
-     * a panel under each new tone". Then the tone became a card and everything
-     * explanatory moved behind its fold — the trace with it — and the switch
-     * went on saying the old thing. So it was turned on, looked for under the
-     * tone, and not found: a setting that worked, reported as broken, by its
-     * own description.
-     *
-     * The fix is a sentence, and this is what keeps the sentence true: the
-     * words on the fold and the words that send you to it are the same words.
-     */
-    const gen = readFileSync(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
-    const trace = readFileSync(new URL('../src/components/DevTrace.jsx', import.meta.url), 'utf8')
-
-    const summary = gen.slice(gen.indexOf('<details className="preview-detail"'))
-    const label = summary.slice(summary.indexOf('>', summary.indexOf('<summary')) + 1, summary.indexOf('<span')).trim()
-    assert.ok(label.length > 6, `the fold has no words on it to point at: ${JSON.stringify(label)}`)
-
-    const hint = trace.slice(trace.indexOf('<p className="hint">'), trace.indexOf('</p>', trace.indexOf('<p className="hint">')))
-    assert.ok(
-      hint.includes(label),
-      `the switch sends people to "${label.length ? '…' : ''}" but the fold now says "${label}"`
-    )
-    /* And it is genuinely inside that fold rather than beside it — the other
-       half of the same claim, held by the tone-card test above. */
-    assert.ok(
-      gen.indexOf('{children}') > gen.indexOf('<details className="preview-detail"'),
-      'the trace is outside the fold the switch points at'
-    )
-  })
-
+  
+  
   /*
    * An update you can see, and ask for.
    *
@@ -3872,152 +2488,11 @@ export function run(test) {
     )
   })
 
-  /*
-   * "Is the generation just generating one scene? … And what happens to the
-   * other three scenes if it's a new empty preset?"
-   *
-   * The answer was: one scene, into whichever was live, and the others were
-   * left — but nothing on the screen said any of that, and nothing asked. A
-   * preset where no scene is named has nothing to lose, so that is the moment
-   * to ask; a preset that is laid out needs to be told which of its scenes is
-   * about to be written over, by name.
-   */
-  test('a build says which scenes it writes and which it writes over', () => {
-    const gen = readFileSync(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
-    assert.match(gen, /const overwritten =/, 'nothing works out which scenes already have names')
-    assert.match(gen, /Overwrites \$\{list\(overwritten/, 'the preview never says what is being written over')
-    assert.match(
-      gen,
-      /left exactly as/,
-      'the preview never says what happens to the scenes the plan does not touch'
-    )
-    assert.match(gen, /replaces \$\{nameOf\(scene\.index\)\}/, 'a scene row does not say what it replaces')
-  })
-
-  test('a preset with nothing laid out is asked before it is built', () => {
-    assert.match(
-      src,
-      /const nothingLaidOut = \(\) => !sceneNames\.some/,
-      'nothing decides whether this preset has anything to lose'
-    )
-    /* Asked whenever the words did not say — not only on an empty preset.
-       "If it doesn't understand how many scenes to create, it can pull up a
-       question box and ask." */
-    assert.match(
-      src,
-      /if \(opts\.wantScenes === undefined && sceneCount > 1\) \{\s*\n\s*setSceneAsk/,
-      'the build no longer stops to ask when the request names no count'
-    )
-    assert.match(src, /activeScene: scene,/, 'the designer is not told which scene the player is in')
-    assert.match(src, /setRenamePreset\(!opts\.keepName\)/, '"do not create a preset name" leaves the rename box ticked')
-    assert.match(src, /sceneNumbers\(sceneCount\)\.map\(\(n\) =>/, 'the question offers no exact count')
-    // Asked before the model runs, so the answer costs one generation, not two.
-    assert.match(
-      src,
-      /requestSpec\(schema, description, null, \{\s*\n\s*wantScenes: opts\.wantScenes,\s*\n\s*sceneBudget: opts\.sceneBudget\s*\n\s*\}\)/,
-      'the answer never reaches the model, so asking changed nothing'
-    )
-    const api = readFileSync(new URL('../api/generate.js', import.meta.url), 'utf8')
-    assert.match(api, /sceneInstruction\(\{ wantScenes, sceneBudget, sceneCount: state\.sceneCount, activeScene \}\)/, 'the designer route ignores the answer')
-    const scenes = readFileSync(new URL('../api/_scenes.js', import.meta.url), 'utf8')
-    assert.match(scenes, /SET OF SCENES/, 'a request for a set is not made plain to the model')
-    assert.match(scenes, /ONE SOUND/, 'a request for one sound is not made plain to the model')
-    assert.match(scenes, /EXACTLY \$\{n\} SCENES/, 'a request for a number is not made plain to the model')
-    assert.match(api, /Name every scene you return/, 'the model is not told to name the scenes it makes')
-  })
-
-  test('a count typed into the request reaches the designer on every path', () => {
-    /*
-     * The question above is only put on a preset with nothing laid out. On
-     * every other preset "Full Tool preset" reached the model with no count
-     * and came back with four scenes, and "it should be eight scenes not
-     * four" was refined with no count at all. The words are read first, on
-     * the build and on the refinement, and the chat hands both what was typed.
-     */
-    assert.match(src, /import \{ keepsName, sceneChoices, sceneNumbers, scenesAskedFor, songsWanted \} from '\.\.\/api\/_scenes\.js'/)
-    assert.match(
-      src,
-      /const named = scenesAskedFor\(description, sceneCount\)\s*\n\s*if \(named\) opts = \{ \.\.\.opts, \.\.\.named \}/,
-      'a build ignores a scene count in the request'
-    )
-    assert.match(
-      src,
-      /const refine = async \(instruction, against = null, opts = \{\}\) => \{[\s\S]{0,1500}?scenesAskedFor\(instruction, sceneCount\)[\s\S]{0,4000}?requestSpec\(schema, instruction, previous, scenesWanted\)/,
-      'a refinement ignores a scene count in the request'
-    )
-    assert.match(
-      src,
-      /const scenesWanted = \{\s*\n\s*\.\.\.\(scenesAskedFor\(instruction, sceneCount\) \|\| \{\}\),\s*\n\s*\.\.\.\(keepsName\(instruction\) \? \{ keepName: true \} : \{\}\)\s*\n\s*\}\s*\n\s*if \(builtBlocks\)/,
-      'the chat reads the count from what was typed, not from its retelling'
-    )
-    const api = readFileSync(new URL('../api/generate.js', import.meta.url), 'utf8')
-    assert.match(api, /wantScenes === true && sceneBudget\s*\n?\s*\?/, 'a refinement that names a count is still told to change as little as possible')
-  })
-
-  test('the model cannot name a block this preset does not have', () => {
-    /*
-     * Rule 1 has always forbidden it and a run still asked for effects 70, 82
-     * and 94 on a four-slot AM4 holding 46, 118, 58 and 66 — every change on
-     * them dropped at the validator, the tone half-applied. A rule is a
-     * request; an enum built from the preset's own ids is not one.
-     */
-    const api = readFileSync(new URL('../api/generate.js', import.meta.url), 'utf8')
-    assert.match(
-      api,
-      /const buildPresetSpec = \(eids/,
-      'the spec schema is fixed, so it cannot be narrowed to a preset'
-    )
-    assert.match(
-      api,
-      /eids\.length \? z\.literal\(eids\)/,
-      'the id field is not constrained to the ids the preset holds'
-    )
-    assert.match(
-      api,
-      /schema: buildPresetSpec\(blocks\.map\(\(b\) => b\.eid\)/,
-      'the request builds its schema from something other than the blocks it sent'
-    )
-    // And somewhere for the intent to go, so a constrained model does not hang
-    // a delay's settings on the reverb it is allowed to name.
-    assert.match(api, /wanted: z\n?\s*\.array\(z\.string\(\)\)/, 'there is no way to say a block is missing')
-    assert.match(
-      api,
-      /name its family in "wanted"/,
-      'the model is never told what to do with a block it cannot name'
-    )
-
-    const val = readFileSync(new URL('../src/lib/validate.js', import.meta.url), 'utf8')
-    assert.match(val, /wanted: wantedBlocks\(spec\.wanted\)/, 'the gap never leaves the validator')
-
-    const gen = readFileSync(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
-    assert.match(gen, /wanted\.length > 0/, 'nothing on the card says what the chain was missing')
-    assert.doesNotMatch(
-      gen,
-      /className="problems">[\s\S]{0,80}wanted/,
-      'a missing block is reported among the rejections, which it is not'
-    )
-  })
-
-  test('naming the preset is its own decision', () => {
-    /*
-     * Applying a generation renamed the slot as a side effect, so laying a set
-     * of scenes into a preset you had already named renamed it underneath you.
-     * The scene names still go on — they are what the footswitch shows.
-     */
-    assert.match(
-      src,
-      /if \(renamePreset && generatedName/,
-      'the preset is renamed whatever the player chose'
-    )
-    const gen = readFileSync(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
-    assert.match(gen, /className="rename-choice"/, 'there is no way to decline the rename')
-    assert.match(
-      gen,
-      /scene names are written either way/i,
-      'declining the rename does not say what still happens'
-    )
-  })
-
+  
+  
+  
+  
+  
   /*
    * "The edit chain doesn't seem to be functioning correctly at all, delete
    * block works, but the rest you can't really add anything or change
@@ -4295,52 +2770,7 @@ export function run(test) {
     )
   })
 
-  test('the conversation is speech and what is happening, in that order', () => {
-    /*
-     * "The chat box should pretty much be just the chats going back and forth,
-     * saying creating tone, what the AI is doing and things like that."
-     *
-     * It used to hold the tone as well, spliced in at the turn it was asked
-     * for — which is where the older report about ordering came from: the
-     * design was rendered after every turn, pinning it to the bottom for good,
-     * so anything said afterwards appeared above it. That is answered by the
-     * tone not being in the log at all. What is left has one order: everything
-     * said, then whatever is happening right now.
-     */
-    const a = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
-    const bare = a.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
-    const log = bare.slice(bare.indexOf('className="assistant-log"'), bare.indexOf('ref={tail}'))
-    assert.ok(
-      log.indexOf('turns.map(renderTurn)') < log.indexOf('{children}'),
-      'what is happening now is drawn above what was said'
-    )
-    /* The queue sits between them: what is about to be asked has been said,
-       and has not happened yet. */
-    assert.ok(
-      log.indexOf('queue.map') > log.indexOf('turns.map(renderTurn)') &&
-        log.indexOf('queue.map') < log.indexOf('{children}'),
-      'what is waiting its turn is out of order'
-    )
-
-    // One renderer, so every turn keeps its confirm buttons.
-    assert.match(a, /const renderTurn = /, 'the turn markup is duplicated and will drift')
-    assert.equal(
-      (a.match(/className="turn-confirm"/g) || []).length,
-      1,
-      'a pending turn is drawn twice'
-    )
-
-    /*
-     * And the position a run was asked at is still recorded, read from a ref
-     * rather than a closure — it is what re-keys the tone panel, so a second
-     * tone opens itself instead of arriving folded away.
-     */
-    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
-    assert.match(app, /turnsNow\.current = turns\.length/, 'nothing tracks how long the conversation is now')
-    assert.match(app, /setGenAt\(turnsNow\.current\)/, 'the run reads its position from a stale closure')
-    assert.ok(!app.includes('setGenAt(turns.length)'), 'the run reads its position from a stale closure')
-  })
-
+  
   test('the two-take comparison is gone, not half removed', () => {
     /*
      * "Comparing 2 tones still doesn't work well, just hangs on this screen.
@@ -4358,35 +2788,7 @@ export function run(test) {
     assert.ok(!/^\.compare\b/m.test(css), 'the compare styles are still shipped')
   })
 
-  test('an empty preset reaches the model instead of being refused', () => {
-    /*
-     * "Still need to fix the issue when generating on an empty preset."
-     *
-     * One guard clause defeated a feature that was already finished. buildChain
-     * exists precisely to lay a chain into an empty preset; the instructions
-     * already explain it, and already say that a tone description on an empty
-     * preset is still designTone because the chain is put there first. None of
-     * it could run: the request was refused before the model was ever asked.
-     *
-     * So the route checks the shape of `blocks` and not its length. The length
-     * check is the defect, which is why it is named here rather than described.
-     */
-    const command = readFileSync(new URL('../api/command.js', import.meta.url), 'utf8')
-    assert.ok(
-      !/blocks\.length === 0/.test(command),
-      'an empty preset is refused before the model can offer to build a chain'
-    )
-    assert.match(command, /if \(!Array\.isArray\(blocks\)\)/, 'the shape of blocks is no longer checked at all')
-
-    // And the instructions that make it work have to still be there.
-    assert.match(command, /buildChain places blocks into it/, 'the model is not told how to fill an empty preset')
-    assert.match(
-      command,
-      /still just designTone/,
-      'the model is not told that a tone on an empty preset builds the chain first'
-    )
-  })
-
+  
   test('a window you can see is a window you can force quit', () => {
     /*
      * "The Fractal AI Builder isn't showing up in the active programs running,
@@ -4418,60 +2820,7 @@ export function run(test) {
     )
   })
 
-  test('the composer goes blank while a tone is being built', () => {
-    /*
-     * This has been both ways, and which way it is now depends on something
-     * that changed underneath it.
-     *
-     * It first stopped on `busy`, and that was wrong for the reason the player
-     * gave: "when generating a new tone the suggestion typewriter stops and
-     * freezes. Can we keep the live suggestions going?" The one moment nothing
-     * else moved on screen was the moment the screen went still, and a
-     * thirty-second wait read as a hang. So the typing was kept running.
-     *
-     * The working line counts the wait out loud now — "Designing… 40s", ticking
-     * off the server's own heartbeat — so a generation is visibly alive without
-     * borrowing the composer to prove it. That leaves the motion with nothing to
-     * buy: a box typing an example under a tone being built invites an answer it
-     * will not take, since sending is disabled until the run finishes.
-     *
-     * "While the AI is thinking and building stop the typewriter text from
-     * displaying. And just have the type box blank."
-     */
-    const a = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
-    assert.match(
-      a,
-      /useTypedSuggestion\(\s*\n[\s\S]{0,200}!busy && !text && !focused,\s*\n\s*suggestions,\s*\n[\s\S]{0,120}busy\s*\n\s*\)/,
-      'the suggestions still type themselves through a generation'
-    )
-    // Blank, not frozen mid-word, and not the whole suggestion standing still —
-    // `silent` is a different state from `!active`, which still shows the full
-    // line for someone typing or with reduced motion on.
-    assert.match(a, /if \(silent\) return \{ shown: '', full \}/, 'the box is not actually blanked')
-    assert.match(a, /if \(reduced \|\| !active\) return \{ shown: full, full \}/, 'reduced motion lost its static suggestion')
-    /*
-     * `full` is still returned while silent, because it is what the box is
-     * measured against. Returning '' with it would shrink the box to one line
-     * the moment a generation started and grow it back at the end — a jump
-     * under the thumb, to save space nothing else was using.
-     */
-    assert.ok(
-      !/if \(silent\) return \{ shown: '', full: '' \}/.test(a),
-      'the composer collapses a line when a generation starts'
-    )
-    assert.match(a, /const borrow = text \? null : `\$\{typedFull\}/, 'the box is no longer measured against the whole suggestion')
-
-    // What is typed mid-run is kept, and goes one at a time afterwards.
-    assert.match(a, /if \(busy\) \{\s*\n\s*setQueue/, 'anything sent mid-generation is still dropped')
-    assert.match(a, /const \[next, \.\.\.rest\] = queue/, 'the queue is not drained one at a time')
-    assert.match(a, /ask\.current\(next\)/, 'the queue is drained through a changing function identity')
-    assert.match(a, /turn-queued/, 'what is waiting is never shown, so it looks ignored')
-
-    // And the box stays usable, or there is nothing to queue with.
-    const box = a.slice(a.indexOf('className="refine-input"') - 400, a.indexOf('className="refine-input"') + 400)
-    assert.ok(!/disabled=\{busy\}/.test(box), 'the box is still disabled while the model works')
-  })
-
+  
   test('the XY pad is gone, not half removed', () => {
     /*
      * "Let's just remove the XY pad. It's kind of weird."
@@ -4518,25 +2867,26 @@ export function run(test) {
 
   test('a phone reaches the stage screen and nothing else', () => {
     /*
-     * Ask and Edit are bench work: a conversation to read and reply to, and a
-     * 4x12 grid to drag blocks around on. Both were one sideways swipe from
-     * the stage screen, which is how a generate button and a grid editor came
-     * to be within reach of a thumb mid-song. The phone apps in `mobile/` have
-     * never carried either and say why in Stage.js; this is the same rule
-     * applied to the web app, which was missing it.
+     * Edit is bench work: a 4x12 grid to drag blocks around on. It was one
+     * sideways swipe from the stage screen, which is how a grid editor came to
+     * be within reach of a thumb mid-song. The phone apps in `mobile/` have
+     * never carried it and say why in Stage.js; this is the same rule applied
+     * to the web app, which was missing it.
      *
-     * Hidden by viewport, not deleted: a desktop browser is where both belong.
+     * Hidden by viewport, not deleted: a desktop browser is where it belongs.
      *
-     * Every route in is checked, because closing three of four is the same as
-     * closing none — the tab row, the swipe order, the floating Ask button on
-     * the stage screen, and Back restoring an entry pushed while the window
-     * was wide.
+     * Ask was the other bench screen, and went with the AI. The rule did not
+     * change with it.
+     *
+     * Every route in is checked, because closing two of three is the same as
+     * closing none — the tab row, the swipe order, and Back restoring an entry
+     * pushed while the window was wide.
      */
     const screens = readFileSync(new URL('../src/components/Screens.jsx', import.meta.url), 'utf8')
     assert.match(screens, /export const viewsFor/, 'Screens no longer decides which views a viewport reaches')
     assert.match(
       screens,
-      /export const BENCH = \['ask', 'shape'\]/,
+      /export const BENCH = \['shape'\]/,
       'the bench screens are no longer named, so nothing can be held back from a phone'
     )
     assert.match(
@@ -4559,25 +2909,9 @@ export function run(test) {
       /<Screens[^>]*order=\{views\}/,
       'the swipe surface is not told which screens this viewport reaches'
     )
-    /*
-     * The Ask BUTTON is deliberately back — the rest of this test is what
-     * makes that safe.
-     *
-     * Ask is a sheet, not one of the screens the tab row and the swipe move
-     * between, so a phone opening it is not a phone that can land on it by
-     * dragging sideways mid-song. Everything above still holds; what changed
-     * is one button, and it now answers to a switch instead of to the width of
-     * the screen. See lib/playMode.js.
-     */
-    assert.ok(
-      !/views\.includes\('ask'\) \? [^\n]*onAsk/.test(src) && /onAsk=\{askShows \?/.test(src),
-      'the ask button is gated on the viewport again, which is what took tone generation off the phone'
-    )
-    assert.equal(
-      play.askButtonShows({ status: 'live', view: 'play', playing: true }),
-      false,
-      'play mode no longer hides the ask button, so there is no way to clear the stage screen'
-    )
+    /* The Ask button and the sheet behind it went with the AI. Nothing on the
+       stage screen starts a conversation, so there is nothing left to gate. */
+    assert.ok(!/onAsk=/.test(src), 'the Ask button is back on the stage screen')
     assert.match(
       src,
       /if \(!viewsRef\.current\.includes\(st\.view\)\) return/,
@@ -4723,71 +3057,8 @@ export function run(test) {
     assert.match(play, /slots=\{allSlots\}/, 'the setlist sheet has no preset names to show')
   })
 
-  test('an answer on Ask has paragraphs, every change shows its reason, and a save lands once', () => {
-    /*
-     * The model was asked for two sentences and drawn in one <p>; now it is
-     * asked for a real answer and each blank-line paragraph is its own <p>.
-     * Every action has always carried a "why" the player was meant to read,
-     * and the row only ever showed the label.
-     */
-    const assistant = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
-    const a = assistant.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ' ').replace(/\{\s*\}/g, '')
-    assert.match(a, /paragraphs\(turn\.text\)\.map\(\(para, j\) => \(/, 'a reply is drawn as one paragraph again')
-    assert.match(a, /\.split\(\/\\n\\s\*\\n\/\)/, 'paragraphs are not split on blank lines')
-    assert.match(a, /a\.why \? <span className="turn-why">\{a\.why\}<\/span> : null/, 'the reason for a change is not shown')
-    assert.match(a, /Ask me anything about the unit,\s*the amps, the players or the music/, 'the empty screen still says it only answers about the preset')
-
-    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
-    assert.match(css, /\.turn-text \+ \.turn-text \{/, 'a second paragraph has no space above it')
-    assert.match(css, /\.turn-why \{/, 'the reason has no style')
-
-    /*
-     * "The Mac saved it to slot 499" twice in the same conversation: two
-     * ticks of the poll were in flight over the relay and both took the same
-     * answer before the state change tore the interval down.
-     */
-    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
-    const poll = app.slice(app.indexOf('const res = await readSaveResult()'), app.indexOf('const res = await readSaveResult()') + 700)
-    assert.match(poll, /stop = true\s*\n\s*setQueuedSave\(null\)/, 'a second poll tick can report the same save again')
-  })
-
-  test('a reply lands with its first line in view, and the two sides of the chat look different', () => {
-    /*
-     * "After typing a question and the AI gives an output it leaves it at
-     * the bottom of the chat, so I have to scroll back to the top to see
-     * what it started saying." And: "make the chat more obvious of whether
-     * I'm talking or the AI is talking."
-     */
-    const a = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
-    const bare = a.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ' ')
-    const effect = bare.slice(bare.indexOf('const seenTurns = useRef(0)'), bare.indexOf('}, [turns, progress, busy])'))
-    assert.ok(effect.length > 100, 'the scroll effect no longer watches turns, progress and busy')
-    assert.match(effect, /last\?\.role === 'assistant' && lastTurn\.current/, 'a reply is not told apart from a question')
-    assert.match(effect, /box\.scrollTop = Math\.max\(0, offsetWithin\(lastTurn\.current, box\) - 4\)/, 'a reply is not brought to the top of the box')
-    assert.match(effect, /if \(landed\) \{/, 'a progress tick under a reply yanks it away')
-    /*
-     * "Make it scroll down to show the live jam automatically." The working
-     * line under a reply is brought into view by the least that does it —
-     * only when it is out of sight, only while the app is busy — so a short
-     * reply stays in view above it and nothing is yanked mid-read.
-     */
-    assert.match(effect, /if \(busy\) \{\s*const tailAt = offsetWithin\(el, box\)/, 'the working line under a reply is never brought into view')
-    assert.match(effect, /if \(tailAt > seenTo\) box\.scrollTop = tailAt - box\.clientHeight \+ 8/, 'the box moves more than it needs to, or not at all')
-    assert.match(effect, /box\.scrollTop = box\.scrollHeight/, 'a question no longer goes to the bottom')
-    assert.match(bare, /const box = scrollerOf\(el\)/, 'the scroller is guessed rather than asked for')
-    assert.ok(!/scrollIntoView/.test(bare), 'scrollIntoView is back, and it drags the page')
-    assert.match(bare, /ref=\{i === turns\.length - 1 \? lastTurn : null\}/, 'the last turn cannot be found')
-    assert.match(bare, /aria-label=\{turn\.role === 'user' \? 'You' : turn\.role === 'assistant' \? 'Agent' : undefined\}/, 'a screen reader cannot tell the sides apart')
-
-    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
-    const rule = (sel) => css.slice(css.indexOf(sel + ' {'), css.indexOf('}', css.indexOf(sel + ' {')))
-    assert.match(rule('.turn-user'), /justify-content: flex-end/, 'the player’s words are not on the right')
-    assert.match(rule('.turn-user .turn-text'), /background: color-mix\(in srgb, var\(--signal\)/, 'the player’s bubble has no colour of its own')
-    assert.match(rule('.turn-assistant'), /background: var\(--chassis\)/, 'the agent’s bubble has no ground of its own')
-    assert.match(rule('.turn-assistant'), /border-radius: var\(--r-2\) var\(--r-2\) var\(--r-2\) var\(--r-1\)/, 'the two bubbles are the same shape')
-    assert.match(rule('.turn-system .turn-text,\n.turn-hand .turn-text'), /text-align: center/, 'a note is not set apart from both sides')
-  })
-
+  
+  
   test('the stage screen is the layout he picked, not the one it grew into', () => {
     /*
      * From a screenshot, with "like this": scenes two across in colour, the
@@ -4995,35 +3266,7 @@ export function run(test) {
     assert.match(fn, /remote: remoteActive\(\)/, 'the phone reads the chain on the computer\u2019s shorter allowance')
   })
 
-  test('the switch that clears the stage screen is reachable and sticks', () => {
-    /*
-     * The Ask button is back on a phone, so there has to be a way to take it
-     * away again — that was the condition: "an option to have it disappear
-     * when in play mode".
-     *
-     * In the Setup sheet, which is the one place a phone can already reach
-     * settings from the top bar, and ABOVE the connection panels: the rest of
-     * that sheet is read once when something is wrong, this is reached in a
-     * hurry with the lights down.
-     */
-    const setup = src.slice(src.indexOf("open={sheet === 'settings'}"))
-    assert.ok(setup.length > 0, 'the Setup sheet is gone')
-    /* On the Play screen page of Setup — the page about the stage screen. */
-    const panel = setup.slice(setup.indexOf("setupPage === 'play'"), setup.indexOf("setupPage === 'ai'"))
-    assert.match(panel, /key="playing"/, 'the play mode switch is not on the Play screen page')
-    assert.match(panel, /Play mode/, 'the switch no longer says what it is')
-    assert.match(panel, /checked=\{playing\}/, 'the switch does not show the state it controls')
-    assert.match(panel, /savePlayMode\(on\)/, 'the switch is forgotten as soon as the page reloads')
-
-    /* And it is read back for the FIRST paint. An Ask button that appears a
-       frame late is one a thumb reaching for something else can catch. */
-    assert.match(
-      src,
-      /useState\(loadPlayMode\)/,
-      'play mode is restored in an effect, so the stage screen paints wrong and then corrects itself'
-    )
-  })
-
+  
   test('the tour teaches what a scene actually is', () => {
     const tour = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
     const card = tour.slice(tour.indexOf('Scenes are one rig'), tour.indexOf('Scenes are one rig') + 1200)
@@ -5103,23 +3346,7 @@ export function run(test) {
     assert.match(src, /<SaveFooter[\s\S]*?slots=\{allSlots\}/, 'the footer cannot name what the slot holds')
   })
 
-  test('the wait is counted once, to the second', () => {
-    /*
-     * "It says 30 seconds and then the actual amount of seconds — only show
-     * it counting the actual amount of seconds." <Thinking> has a live clock;
-     * the server's heartbeat was writing a second, coarser count into the same
-     * line, so it read "Thinking… 30s · 37s".
-     */
-    assert.ok(!/THINKING\}… \$\{Math\.round\(\(e\.thinkingMs/.test(src), 'the heartbeat writes its own count of seconds beside the live clock')
-    assert.match(src, /e\.kind === 'waiting'\)\s*\n\s*setProgress\(\(was\) =>\s*\n?\s*was && was\.startsWith\(THINKING\) \? was : `\$\{THINKING\}\$\{secondTry\.current \? ' — second try' : ''\}…`/, 'a heartbeat no longer keeps the Thinking line alive, or forgets it is the second try')
-    /* A retry starts its own clock and says which try it is: two ninety-second
-       waits under one running count read as one that never ended. */
-    const retry = src.slice(src.indexOf("e.kind === 'retrying') {"), src.indexOf("e.kind === 'retrying') {") + 500)
-    assert.match(retry, /secondTry\.current = true\s*\n\s*setGenStarted\(Date\.now\(\)\)/, 'the retry keeps the first attempt\'s minutes on the clock')
-    const live = readFileSync(new URL('../src/components/LiveGeneration.jsx', import.meta.url), 'utf8')
-    assert.match(live, /clock = seconds >= 60 \? `\$\{Math\.floor\(seconds \/ 60\)\}m \$\{seconds % 60\}s` : `\$\{seconds\}s`/, 'the live clock is gone, so nothing counts at all')
-  })
-
+  
   test('the version check compares against the commit the pull request was based on', () => {
     /*
      * "I keep getting a failed notification from GitHub every time you push."
@@ -5261,109 +3488,7 @@ export function run(test) {
     assert.ok(yields.split(',').map((s) => s.trim()).includes('input'), 'a drag along the slider turns the page')
   })
 
-  test('a chain that is placed is also wired, or the preset makes no sound', () => {
-    /*
-     * "None of the tones created make any sound."
-     *
-     * They were all built into empty slots, and an empty slot has no cabling
-     * in it. Placing a block fills a cell; it does not join that cell to
-     * anything. So five blocks went in, sixty-three values landed, the unit
-     * read every one of them back, the preset saved — and none of it was in
-     * the signal path. Nothing in the app looked, so nothing said so.
-     *
-     * Both places that build a chain wire the row afterwards now.
-     *
-     * It used to start one column BEFORE the first block, on the belief that
-     * the input needed joining to the chain like anything else. The unit never
-     * once accepted it — "srcCol out of range (1..13): 0" on every build, and
-     * every log line reading "6 of 7 cables — refused at columns -1". There is
-     * no such cable: the FM3 stores one set of links between each pair of its
-     * fourteen columns, the input feeds the first column by itself, and the
-     * thirteenth is the last that has a next one to reach.
-     */
-    const fx = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
-    const wire = fx.slice(fx.indexOf('export async function wireRow'))
-    assert.ok(wire, 'nothing wires a row of the grid')
-    /*
-     * Which columns get a cable is shared/grid-plan's answer now, so this runs
-     * it: the first column is included, the input's is not asked for at all,
-     * and it stops at the last column that has a next one to reach.
-     */
-    assert.match(wire, /for \(const col of cableColumns\(lastCol\)\)/, 'the wire picks its own columns again')
-    assert.deepEqual(cableColumns(3), [0, 1, 2, 3], 'the wire skips the first block')
-    assert.equal(
-      cableColumns(20).at(-1),
-      12,
-      'the wire runs past the last column that can start a cable, which the unit throws out'
-    )
-    assert.ok(
-      !cableColumns(5).includes(-1),
-      'the wire still asks the unit for a cable out of the input, which it has always refused'
-    )
-
-    const actions = readFileSync(new URL('../src/lib/actions.js', import.meta.url), 'utf8')
-    const build = actions.slice(actions.indexOf("case 'buildChain'"), actions.indexOf("default:\n"))
-    assert.ok(build.includes('placeBlock'), 'buildChain no longer places anything')
-    assert.match(build, /wireRow\(1,/, 'buildChain places blocks and never joins them up — the preset will be silent')
-    assert.ok(
-      build.indexOf('placeBlock') < build.indexOf('wireRow'),
-      'the row is wired before the blocks are in it'
-    )
-    assert.match(build, /const linear = capabilities\?\.slotModel === 'linear'/, 'the grid work no longer asks whether the unit has a grid')
-    assert.match(build, /if \(!linear\) \{\s*\n\s*wiring = await d\.wireRow/, 'a unit with no grid is sent cable writes it has no cells for')
-
-    /*
-     * And the chain is built into the free cells rather than from column 0.
-     *
-     * "The volume slider disappeared and no presets have sound." The slider
-     * moves the output block's level, and the output block had been built
-     * over: a slot this app calls empty is a slot with nothing EDITABLE in it,
-     * and the input and the output are filtered out of that count. A preset
-     * with no output block makes no sound and has no level to move.
-     */
-    /*
-     * Where they go is worked out by chainPlan, apart from the action that
-     * runs it, because both halves of this have been wrong in production and
-     * both were silent. The case block asks it; the planner does the arithmetic
-     * and is tested against real rows in run.mjs.
-     */
-    const planner = actions.slice(actions.indexOf('export function chainPlan'))
-    const plan = planner.slice(0, planner.indexOf('\n}\n'))
-    assert.match(plan, /columnOf\('input'\)/, 'the builder no longer looks for the input before writing over it')
-    assert.match(plan, /columnOf\('output'\)/, 'the builder no longer looks for the output before writing over it')
-    assert.match(build, /chainPlan\(\{/, 'the builder chooses its own columns again, away from the tested planner')
-    assert.match(build, /list\.find\(\(b\) => b\.slug === 'output'\)/, 'a preset left with no output block is not given one')
-
-    /*
-     * And the same from the other end.
-     *
-     * "Does it know that it needs to put an input and an output in the block
-     * chain?" It knew about the output and not the input — so a chain built
-     * into a genuinely empty preset had a drive in the first column with
-     * nothing feeding it, which is the same silence from the other side of the
-     * row. The input goes in before the chain, because the chain starts to the
-     * right of it.
-     */
-    assert.match(build, /list\.find\(\(b\) => b\.slug === 'input'\)/, 'a preset left with no input block is not given one')
-    assert.ok(
-      build.indexOf("b.slug === 'input'") < build.indexOf('for (const [col, block] of cells)'),
-      'the input goes in after the chain that is supposed to start to the right of it'
-    )
-
-    const grid = readFileSync(new URL('../src/components/GridEditor.jsx', import.meta.url), 'utf8')
-    const starter = grid.slice(grid.indexOf('const buildStarter'))
-    assert.match(
-      starter.slice(0, starter.indexOf('\n  }')),
-      /wireRow\(/,
-      'the starter chain is placed and never joined up'
-    )
-
-    /* And the app says so when the unit reports blocks with nothing feeding
-       them, rather than reporting a finished preset that cannot make a sound. */
-    assert.match(src, /b\.col > 0 && !b\.fromRows\.length/, 'nothing checks whether the built chain is connected')
-    assert.match(src, /won't make a sound until the row is joined up/, 'a disconnected chain is reported in jargon, or not at all')
-  })
-
+  
   test('Setup can ask the unit why a preset makes no sound', () => {
     /*
      * "Can we set up a way to read the parameters of the current scene to
@@ -5376,8 +3501,12 @@ export function run(test) {
      */
     const setup = sheet('Setup')
     assert.match(setup, /<PresetReport device=\{device\} link=\{link\} \/>/, 'Setup cannot read the preset')
+    /* Above the debug log, which is the thing it must not be buried under.
+       This used to measure against a "Developer" section holding the AI's
+       trace; that went with the AI, and the log is the honest anchor — it is
+       what this panel has always had to come before. */
     assert.ok(
-      setup.indexOf('<PresetReport') < setup.indexOf('title="Developer"'),
+      setup.indexOf('<PresetReport') < setup.indexOf('title="Debug log"'),
       'the preset read is buried at the bottom of the sheet again'
     )
 
@@ -5452,102 +3581,9 @@ export function run(test) {
     assert.equal((sql.match(/auth\.uid\(\)/g) || []).length >= 4, true, 'a policy is not keyed to the account')
   })
 
-  test('a rename that renames nothing is not offered', () => {
-    /*
-     * "There's a button that says rename, but it always just shows the exact
-     * preset name overwriting the exact preset name. There's no other options.
-     * I'm not sure what the point of that is."
-     *
-     * There wasn't one. The write path has always skipped a rename when the
-     * two names match — the common case after reloading a saved tone, whose
-     * name IS the preset's name — so the tick box was a decision with one
-     * outcome and a sentence that read like a mistake.
-     */
-    const gen = readFileSync(new URL('../src/components/Generate.jsx', import.meta.url), 'utf8')
-    assert.match(
-      gen,
-      /const sameName = !!presetName && presetName\.trim\(\) === \(presetNow \|\| ''\)\.trim\(\)/,
-      'nothing compares the new name against the one already there'
-    )
-    assert.equal(
-      (gen.match(/&& !sameName \?/g) || []).length,
-      2,
-      'one of the two rename rows still offers to rename a preset to its own name'
-    )
-    /* And the question it was mistaken for — what this save replaces — is
-       still answered where it is actually asked. */
-    const sheet = readFileSync(new URL('../src/components/SaveSheet.jsx', import.meta.url), 'utf8')
-    assert.match(sheet, /currently holds/, 'the save sheet no longer says what is in the slot being written')
-  })
-
-  test('a saved preset that is reloaded lands somewhere you can see it', () => {
-    /*
-     * "Tapping a preset saved to my account doesn't do anything... the one
-     * saved in the browser, you click reload, it looks like it's gonna reload
-     * and then says nothing and does nothing."
-     *
-     * It was doing all of it. The tone card — the thing that shows what came
-     * back and carries the Send button — is rendered inside the Ask sheet, and
-     * the press happened in the Presets sheet, which stayed over the top of
-     * it. So the progress, the result, the button and even the error banner
-     * were all behind the sheet you were looking at.
-     *
-     * So the load moves you to the sheet it lands in, and says so on the way:
-     * one line when it starts, one naming what came back and what to press,
-     * one when it fails.
-     */
-    const reload = src.slice(src.indexOf('const reload = async (entry'), src.indexOf('const refine = async'))
-    assert.ok(reload, 'the reload handler is gone')
-    assert.match(reload, /setSheet\('chat'\)/, 'a reloaded preset still lands behind whatever sheet asked for it')
-    assert.ok(
-      reload.indexOf("setSheet('chat')") < reload.indexOf('const schema'),
-      'the sheet changes only after the read, so the wait happens behind the old one'
-    )
-    assert.match(reload, /Loading "\$\{entry\.name\}"/, 'nothing says the load has started')
-    assert.match(reload, /is loaded — \$\{ready\}/, 'nothing confirms what came back')
-    assert.match(reload, /with the button under it/, 'the confirmation does not say how to send it')
-    assert.match(reload, /none of it fits the preset on the unit/, 'a load that survives nothing still promises a Send button')
-    assert.match(reload, /Couldn't load "\$\{entry\.name\}"/, 'a failed load is only in the banner behind the sheet')
-
-    /* And the row you tap says what it is, rather than hiding it in a tooltip
-       no phone can show. */
-    const cloud = readFileSync(new URL('../src/components/CloudPresets.jsx', import.meta.url), 'utf8')
-    assert.ok(!/title=\{entry\.summary/.test(cloud), 'the description is back in a tooltip')
-    assert.match(cloud, /preset-row-desc/, 'the account rows no longer say what the preset is')
-    assert.match(cloud, /Tap one to load it/, 'nothing says what tapping a row does')
-  })
-
-  test('a tone with more scenes than the unit holds asks before it loads', () => {
-    /*
-     * "I am currently on the AM4, which only allows four scenes per preset. But
-     * most of these presets were created on the FM3."
-     *
-     * The validator dropped the ones that did not fit and listed them under
-     * "Rejected during checking" — so which four survived was decided by
-     * numbering, and the only notice was the most technical panel on the
-     * screen. The question is the player's, and it is asked before the load
-     * rather than reported after it: both halves are known from the spec and
-     * the device, so nothing has to be read off the hardware to ask it.
-     */
-    const reload = src.slice(src.indexOf('const reload = async (entry'), src.indexOf('const refine = async'))
-    assert.match(reload, /scenesOverflowing\(entry\?\.spec, sceneCount\)/, 'nothing checks whether the tone fits')
-    assert.ok(
-      reload.indexOf('setSceneFit(entry)') < reload.indexOf('setBusy(true)'),
-      'the question is asked after the load has already started'
-    )
-    assert.match(reload, /fitScenes\(entry\.spec, picked, sceneCount\)/, 'the chosen scenes are never renumbered to fit')
-    assert.match(
-      reload,
-      /validateSpec\(spec, schema, sceneCount, channelNames\)/,
-      'the original spec is still what gets checked, so the picking was for nothing'
-    )
-
-    /* And the sheet that asks is outside the swipe surface, like every other
-       one — a sheet inside it travels with the page. */
-    const app = src.slice(src.indexOf('open={!!sceneFit}'))
-    assert.match(app.slice(0, 600), /<SceneFit/, 'the scene picker sheet holds nothing')
-  })
-
+  
+  
+  
   test('the backup panel declares the prop it reads', () => {
     /*
      * `deviceSlots` was read in DeviceBackup's markup and never declared or
@@ -5608,101 +3644,10 @@ export function run(test) {
     )
   })
 
-  test('a value the player aimed at one scene asks first when it reaches others', () => {
-    /*
-     * "ASK 'brighten scene 2' — Treble and Presence move in the right
-     * direction, but the same values also show on scene 1, and the DONE card
-     * does not say 'in scene 2' or 'shared amp params'."
-     *
-     * Three things, held here. The plan check is handed the channel map
-     * (the demo's; a real unit says null) so it can say which scenes a value
-     * reaches. A plan with a shared write waits, with its own reason, so the
-     * chat shows the sentence about which scenes. And the result card names
-     * where the values landed.
-     */
-    const ask = src.slice(src.indexOf('const askFor = async'), src.indexOf('const changeView ='))
-    assert.match(ask, /const channelMap = await sceneChannels\(\)\.catch\(\(\) => null\)/, 'the plan check is never told which scenes share a channel')
-    assert.match(ask, /sceneChannels: channelMap,/, 'the channel map is read and not handed to the plan check')
-    assert.match(ask, /const shared = checked\.actions\.some\(\(a\) => a\.shared\)/, 'a write that reaches other scenes is not looked for')
-    assert.match(ask, /shared \? 'shared' : 'broad'/, 'a shared write does not wait with its own reason, so the chat cannot say why')
-    assert.match(ask, /if \(checked\.actions\.some\(\(a\) => a\.destructive\) \|\| shared \|\| broad\)/, 'a shared write goes straight through')
-
-    const chat = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
-    assert.match(chat, /turn\.reason === 'shared'\s*\?\s*sharedHint\(turn\)/, 'the question about shared scenes shows no sentence saying which scenes')
-    assert.match(chat, /turn\.actions\.find\(\(a\) => a\.sharedNote\)\?\.sharedNote/, 'the sentence is not the one the plan check wrote')
-    // Beside a button that gives the scene its own channel, the sentence must not still tell the player to ask for that.
-    assert.match(chat, /turn\.scopeOffer \? note\.replace\(\/\\s\*To change one scene by itself/, 'the question still hands out homework beside the button that does it')
-
-    /* The chat model is told to mark every value with the scene the player named. */
-    const command = readFileSync(new URL('../api/command.js', import.meta.url), 'utf8')
-    assert.match(command, /put that scene's index in "scene" on every setParam/, 'the model is not told to say which scene a value is for')
-    assert.match(command, /setChannel and setParam when the player named a scene/, 'the scene field is not described as applying to setParam')
-
-    /* And the demo knows its map; a real unit does not pretend to. */
-    const fx = readFileSync(new URL('../src/lib/forgefx.js', import.meta.url), 'utf8')
-    assert.match(fx, /export const sceneChannels = \(\) =>\s*mock \? tick\(\)\.then\(\(\) => mock\.sceneChannelsNow\?\.\(\) \?\? null\) : Promise\.resolve\(null\)/, 'a real unit is asked for a scene map it cannot give silently')
-    const mock = readFileSync(new URL('../src/lib/mockDevice.js', import.meta.url), 'utf8')
-    assert.match(mock, /sceneChannelsNow: \(\) =>/, 'the demo does not hand over its scene map')
-
-    /* A block that changed channel changed its values, so the chat's cache of them goes. */
-    const state = readFileSync(new URL('../src/lib/deviceState.js', import.meta.url), 'utf8')
-    const refresh = state.slice(state.indexOf('export async function refreshBlocks'), state.indexOf('export async function refreshBlocks') + 1600)
-    assert.match(refresh, /before\.get\(b\.effectId\) !== b\.channel\) invalidateSchema\(b\.effectId\)/, 'a scene change that moves a channel leaves the old channel\'s values in the cache')
-  })
-
-  test('there is no floating Ask; the tab and the stage bar are the ways in', () => {
-    /*
-     * "ASK FAB covers the right edge of EDIT search results and MODIFIERS
-     * source." It was pinned bottom-right, and that is the corner where the
-     * last control in every grid lands. On a wide window the ✦ Ask tab does
-     * the same thing, so the button is gone, along with the 80px the page
-     * kept clear under it. The shared rule still decides the stage bar's
-     * buttons.
-     */
-    assert.match(src, /const askShows = askButtonShows\(\{ status, view, playing, aiOn: chatOn \}\)\n/, 'the stage bar rule has grown a clause of its own')
-    assert.ok(!src.includes('ask-anywhere'), 'the floating Ask is back')
-    assert.equal(play.askButtonShows({ status: 'live', view: 'play', playing: false }), true, 'the stage bar lost its Ask')
-    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
-    assert.ok(!css.includes('.ask-anywhere'), 'the floating Ask still has styling, which will dress up whatever gets that class next')
-  })
-
-  test('the shared-channel question offers to give the scene its own channel', () => {
-    /*
-     * "Ask to give it its own channel first" handed the player homework. The
-     * button does it: a setChannel to a free channel in that scene ahead of
-     * each shared value, the plan checked again against the same chain, then
-     * run. Offered only when a free channel can be chosen, which needs the
-     * channel map — so the demo has it and a real unit does not pretend to.
-     */
-    const ask = src.slice(src.indexOf('const askFor = async'), src.indexOf('const changeView ='))
-    assert.match(ask, /lastPlanBlocks\.current = withPositions/, 'the chain the plan was checked against is not kept for the re-check')
-    assert.match(ask, /scopeOffer: scoped \? scoped\.label : null/, 'the turn carries no offer for the chat to show')
-    const scope = src.slice(src.indexOf('const scopeTurn = async'), src.indexOf('const cancelTurn ='))
-    assert.match(scope, /scopedActions\(turn\.actions, \{/, 'the plan is not re-made from the turn')
-    assert.match(scope, /sceneChannels: scoped\.after,/, 'the re-check reads the old map, so it asks the same question again')
-    assert.match(scope, /validatePlan\(\{ actions: scoped\.actions \}, lastPlanBlocks\.current/, 'the re-made plan is not checked before it runs')
-    assert.match(scope, /if \(checked\.actions\.length\) await perform\(checked\.actions\)/, 'the re-made plan is checked and then not run')
-    const chat = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
-    assert.match(chat, /turn\.reason === 'shared' && turn\.scopeOffer && onScope \? \(\s*<button className="save-now" onClick=\{\(\) => onScope\(i\)\}/, 'the question has no button that does the work')
-    assert.match(chat, /'Change them all' : 'Do it'/, 'the plain Do it no longer says it changes every scene when it does')
-  })
-
-  test('a request in words that wrote to the unit says Save is what keeps it', () => {
-    /*
-     * "Dirty state is only the gold Save; ASK/edits vanish on reload if Save
-     * wasn't clicked." The word goes under the button, on a wide screen —
-     * the phone bar is four controls wide and has no room for a fifth thing.
-     */
-    assert.match(src, /const \[askedUnsaved, setAskedUnsaved\] = useState\(false\)/, 'nothing remembers that a request in words wrote to the unit')
-    assert.match(src, /setAskedUnsaved\(!saved\)/, 'the word is not raised when a plan writes without saving')
-    assert.match(src, /if \(!dirty\) setAskedUnsaved\(false\)/, 'the word outlives the save')
-    assert.match(src, /hint=\{askedUnsaved \? \(narrow \? 'dot' : 'words'\) : false\}/, 'the Save bar is not told, or the phone is told in words it has no room for')
-    const bar = readFileSync(new URL('../src/components/SaveBar.jsx', import.meta.url), 'utf8')
-    assert.match(bar, /\{hint === 'words' && dirty && !working \? \(\s*<span className="save-hint" role="status">\s*Unsaved — Save to keep/, 'the Save bar has no word for unsaved')
-    // On a phone the same message is a dot on the button, with the sentence for a screen reader.
-    assert.match(bar, /\{hint === 'dot' && dirty && !working \? \(\s*<span className="save-hint-dot" role="status" aria-label="Unsaved — Save to keep" \/>/, 'a phone has no sign that a request in words went unsaved')
-  })
-
+  
+  
+  
+  
   test('the way to Edit on a phone is called Edit', () => {
     /*
      * "PLAY/ASK/EDIT tabs drop on phone; EDIT is easy to miss." The bar button
@@ -5716,21 +3661,7 @@ export function run(test) {
     assert.match(chain, /aria-label="Edit — see the chain and its controls"/, 'read aloud, the button no longer says Edit')
   })
 
-  test('the rotating suggestion carries a cursor only while it is moving', () => {
-    /*
-     * "Rotating placeholders can look like typed text." The cursor block on
-     * the end was drawn even while the suggestion stood still — which is
-     * exactly when the box has just been focused. Standing still it is a
-     * plain hint, italic, with no cursor.
-     */
-    const chat = readFileSync(new URL('../src/components/Assistant.jsx', import.meta.url), 'utf8')
-    assert.match(chat, /const typing = !busy && !text && !focused && !stillMotion/, 'nothing says whether the suggestion is moving')
-    assert.match(chat, /placeholder=\{typed \? \(typing \? `\$\{typed\}\\u258f` : typed\) : ''\}/, 'the cursor is drawn on a suggestion standing still')
-    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
-    const rule = css.slice(css.indexOf('.assistant-row .refine-input::placeholder {'), css.indexOf('.assistant-row .refine-input::placeholder {') + 200)
-    assert.match(rule, /font-style: italic/, 'the placeholder is set in the same face as typed text')
-  })
-
+  
   test('the Setup line about the unit is two lines that break between facts', () => {
     /*
      * "8 scenes · 512 slots wraps awkwardly" — one line broke wherever the
@@ -5747,54 +3678,7 @@ export function run(test) {
     assert.match(css, /\.device-meta-fact \+ \.device-meta-fact::before \{\s*content: ' · ';/, 'the facts on a line are not joined by dots')
   })
 
-  test('the agent knows who it is talking to, on every request and in Setup', () => {
-    /*
-     * Two fields per person — profile and preferences — kept by lib/memory.js,
-     * sent with every chat and tone request, and put in front of the model's
-     * instructions by api/_memory.js. Editable in Setup so it works on day
-     * one; the profile also learns from conversations, every ten things said
-     * and when a chat is put down.
-     */
-    assert.match(src, /const \[memory, setMemory\] = useState\(\(\) => loadMemory\(\)\)/, 'nothing holds who the agent is talking to')
-    assert.match(src, /syncMemory\(\)\.then\(\(m\) => \{\s*if \(!stop\) setMemory\(m\)/, 'the account\'s copy is never brought in')
-    assert.match(src, /\}, \[link\.account\?\.id\]\)/, 'the memory is not re-read when who is signed in changes')
-    assert.equal((src.match(/memory: memoryForRequest\(memory\),/g) || []).length, 2, 'the chat and the designer do not both carry the memory')
-    assert.match(src, /if \(dueForUpdate\(saidCount\(turns\)\)\) learn\(turns\)/, 'the profile does not learn every ten messages')
-    const fresh = src.slice(src.indexOf('const newChat = useCallback'), src.indexOf('\n  }, [', src.indexOf('const newChat = useCallback')))
-    assert.match(fresh, /if \(worthKeeping\(turns\)\) \{\s*learn\(turns\)/, 'a chat put down does not teach the profile')
-    assert.match(src, /<MemorySettings\s*\n\s*memory=\{memory\}/, 'Setup has no screen for the two fields')
-    assert.match(src, /setMemory\(await saveMemory\(next\)\)/, 'the Setup screen saves nowhere')
-
-    /*
-     * The chat puts the person in front of its instructions. The designer
-     * puts them in the request instead — its system prompt has to be the
-     * same bytes for every player or the rosters cached behind it are
-     * written for each one rather than read; see api/generate.js.
-     */
-    const command = readFileSync(new URL('../api/command.js', import.meta.url), 'utf8')
-    assert.match(command, /import \{ withMemory \} from '\.\/_memory\.js'/, 'command does not import the memory block')
-    assert.ok(!/system: SYSTEM,/.test(command), 'command still sends its instructions without the person in front')
-    assert.match(command, /system: withMemory\(SYSTEM, memory\)/, 'command does not put the person in front of its instructions')
-    const generate = readFileSync(new URL('../api/generate.js', import.meta.url), 'utf8')
-    assert.match(generate, /import \{ memoryBlock \} from '\.\/_memory\.js'/, 'generate does not import the memory block')
-    assert.match(generate, /const person = memoryBlock\(memory\)/, 'generate never builds the person')
-    assert.match(generate, /\$\{rigInstruction\(rig\)\}\\n\\n\$\{person\}/, 'the person does not reach the designer\'s request')
-    const shared = readFileSync(new URL('../api/_memory.js', import.meta.url), 'utf8')
-    for (const rule of [
-      'Greet the user by name when they say hello',
-      'Never say "based on your profile"',
-      'Never bring up sensitive or emotional details unless the user raises them first',
-      'flattering the user, hiding disagreement, or skipping honest feedback',
-      'the current message wins'
-    ]) {
-      assert.ok(shared.includes(rule), `the rules no longer say: ${rule}`)
-    }
-    assert.match(shared, /Never record inferences — only what the user actually said\. Return the full updated profile as markdown bullet points, each prefixed with \[stated\]\./, 'the update prompt drifted')
-    const migration = readFileSync(new URL('../supabase/migrations/20260914_user_memory.sql', import.meta.url), 'utf8')
-    assert.match(migration, /create table if not exists public\.user_memory/, 'the account has nowhere to keep the memory')
-    assert.match(migration, /enable row level security/, 'one person could read another\'s memory')
-  })
-
+  
   test('no test is registered from inside another test', () => {
     /*
      * A `})` went missing once and two `test(...)` calls ended up INSIDE

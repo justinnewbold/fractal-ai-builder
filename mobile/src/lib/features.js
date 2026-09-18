@@ -1,41 +1,25 @@
 /**
  * What this build of the phone app ships with.
  *
- * ONE SWITCH, and for the first release on the App Store and Play it is off.
+ * ONE SWITCH, and it is the bench.
  *
- * "For the initial releases I only want to release the stuff related to the
- * live gig pedal board, nothing with the AI or chat changes or things like
- * that." So the first version people can install is the stand and nothing
- * else: the preset, the scenes, what's engaged, the tempo, the tuner.
+ * There were two. The other was the AI, which shipped `false` from the first
+ * release — "For the initial releases I only want to release the stuff related
+ * to the live gig pedal board, nothing with the AI or chat changes or things
+ * like that" — and it was kept as a switch rather than a deletion because the
+ * tone screen worked and was expected back.
  *
- * WHY A SWITCH RATHER THAN DELETING IT. The tone screen works, it is covered
- * by tests that drive a fake unit through the whole write order, and it is
- * going back on in a later update. Deleting it would mean writing it again
- * against a rig that is not in the room. A switch means the second release
- * turns one word from `false` to `true`.
+ * It is not coming back. The tone designer and the chat are out of all four
+ * apps now, so the switch, the screen, lib/tone.js and the play-mode setting
+ * that existed only to hide the ✦ Tone button have gone with it. What was
+ * built is not lost: the branch feature/ai-builder-preserved holds the whole
+ * of it.
  *
- * WHAT IT TAKES AWAY, all of it in three places:
- *
- *   App.js         the route to the tone screen, and reading play mode back
- *   Stage.js       the ✦ Tone button (App passes no handler, so the row closes
- *                  up rather than keeping a dead button)
- *   Settings.js    the Play mode switch, which exists only to hide that button
- *
- * Play mode goes with it deliberately. Its whole job is taking the ✦ Tone
- * button off the stage screen, and a switch that hides something already
- * absent is a switch that does nothing and says it did something.
- *
- * WHAT IT DOES NOT CHANGE. Nothing about the relay, the allowlist, or what the
- * Mac will carry out. A phone was already refused a save to a slot, a backup,
- * a restore and firmware by the host rather than by this app, and that is
- * untouched — see shared/relay-rules.mjs.
- *
- * The tone modules stay in the bundle, unreachable. That is the point of the
- * switch, and it is worth being plain that "unreachable" is the guarantee
- * being made: with this off, nothing in the app calls the model, because the
- * only thing that ever did was the screen this takes the door away from.
+ * Nothing about the relay or the allowlist changed with it. A phone was
+ * already refused a save to a slot, a backup, a restore and firmware by the
+ * host rather than by this app — see shared/relay-rules.mjs — and that is
+ * untouched.
  */
-export const AI = false
 
 /**
  * The bench — the Edit screen — and it is ON.
@@ -56,8 +40,6 @@ export const AI = false
  * before the scroll view has been asked anything.
  *
  * The switch stays because it is the honest way to take something out if it
- * ever needs taking out again, and because the AI one above proves the pattern
- * works. Turning it off puts the route and the button back behind it, in
- * App.js and Stage.js, with no other change anywhere.
+ * ever needs taking out again.
  */
 export const BENCH = true

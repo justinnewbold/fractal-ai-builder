@@ -1,23 +1,21 @@
 /**
- * The two clocks, kept in agreement.
+ * What the Mac app is made of, and what it is allowed to claim.
  *
- * A generation is bounded twice: the serverless function has a ceiling set in
- * `vercel.json`, and the browser has its own stall timeout and hard cap in
- * `src/lib/stream.js`. Nothing connects the two files, and for a while they
- * disagreed badly — the function was cut off at 60 seconds while the client
- * sat waiting for 240.
+ * Packaging is the part of this project with no way to check itself at
+ * runtime. A missing entitlement, a certificate that is present but empty, a
+ * file the bundle references and does not ship, a device server pinned to a
+ * commit that moved — every one of them builds cleanly and fails on somebody
+ * else's machine, usually as "it won't open" with nothing to read.
  *
- * What made that expensive is how it presented. The server writes an `error`
- * frame for anything it catches, so a function killed by the platform sends no
- * frame at all: the stream just ends. The client saw partial blocks and then
- * silence, and reported that *the model* had stopped — so every instinct was
- * to go and look at the model, the prompt, the schema. The cause was a number
- * in a config file.
+ * So these read the build config rather than the app: electron-builder.yml,
+ * the entitlements, the workflow that signs it, and the lock file that says
+ * which ForgeFX is inside.
  *
- * The invariant that prevents it: the server must be able to run for at least
- * as long as the client is prepared to wait. Then the client's own cap is
- * always the binding one, it fails with a message it can actually explain, and
- * a truncated stream goes back to meaning something genuinely unusual.
+ * THIS FILE USED TO OPEN ON A DIFFERENT SUBJECT — the two clocks around a
+ * generation, the serverless function's ceiling in vercel.json against the
+ * browser's own cap in lib/stream.js, which disagreed badly enough that a
+ * function killed at 60 seconds looked like the model going quiet. Both files
+ * went with the AI, and so did the tests that held them together.
  */
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
@@ -35,162 +33,10 @@ function* walk(dir) {
 }
 
 export function run(test) {
-  test('the server can run for as long as the browser will wait', () => {
-    const { functions } = JSON.parse(read('vercel.json'))
-    const seconds = functions?.['api/*.js']?.maxDuration
-    assert.ok(Number.isFinite(seconds), 'no maxDuration is set for the API functions')
-
-    const stream = read('src/lib/stream.js')
-    const capMs = Number(stream.match(/const HARD_CAP_MS = (\d+)/)?.[1])
-    const stallMs = Number(stream.match(/const STALL_MS = (\d+)/)?.[1])
-    const firstMs = Number(stream.match(/const FIRST_MS = (\d+)/)?.[1])
-    const thinkMs = Number(stream.match(/const THINK_MS = (\d+)/)?.[1])
-    assert.ok(
-      Number.isFinite(capMs) &&
-        Number.isFinite(stallMs) &&
-        Number.isFinite(firstMs) &&
-        Number.isFinite(thinkMs),
-      'the client caps moved'
-    )
-
-    assert.ok(
-      seconds * 1000 >= capMs,
-      `the function is cut off at ${seconds}s but the browser waits ${capMs / 1000}s — ` +
-        'a generation between the two dies with no error frame and blames the model'
-    )
-    // A stall is meant to catch a silent connection, so it has to be the
-    // shorter of the two or it never fires before the cap does.
-    assert.ok(stallMs < capMs, 'the stall timeout is not shorter than the hard cap')
-    // Same for the model's first word: a budget the cap beats to the punch is
-    // not a budget, and the message the person reads would be the wrong one.
-    assert.ok(
-      firstMs < capMs,
-      'the first-answer budget is not shorter than the hard cap, so the cap fires first and blames the wrong thing'
-    )
-    /*
-     * And the budget for a model that is alive but has not begun. The
-     * heartbeat restarts the first-answer clock on every beat, so with beats
-     * arriving this is the only clock that can end the wait before the cap —
-     * and it has to, or "Thinking" runs to the cap, twice.
-     */
-    assert.ok(
-      thinkMs < capMs,
-      'the thinking budget is not shorter than the hard cap, so a live model that never starts runs to the cap'
-    )
-    /*
-     * And it leaves room for the tone to actually be written after it.
-     *
-     * The budget is the wait BEFORE the first word; the writing follows inside
-     * the same cap. Set too close to the cap and a model that starts at the
-     * last moment is cut off mid-chain — a failure with partials, which is the
-     * one kind this app cannot simply ask again for.
-     */
-    assert.ok(
-      capMs - thinkMs >= 45000,
-      `only ${(capMs - thinkMs) / 1000}s is left for writing the tone once the model starts`
-    )
-
-    /*
-     * And the chat route's clocks, which are the same invariant on the other
-     * half of the app. It answered without streaming at all, so the only clock
-     * on it was the phone's: a two-and-a-half-minute think came back as
-     * "That didn't work: Load failed" and there was nothing in the app that
-     * could have said anything better.
-     */
-    const chat = read('src/lib/command.js')
-    const chatCap = Number(chat.match(/COMMAND_CAP_MS = (\d+)/)?.[1])
-    const chatQuiet = Number(chat.match(/COMMAND_QUIET_MS = (\d+)/)?.[1])
-    assert.ok(Number.isFinite(chatCap) && Number.isFinite(chatQuiet), 'the chat caps moved')
-    assert.ok(
-      seconds * 1000 >= chatCap,
-      `the function is cut off at ${seconds}s but the chat waits ${chatCap / 1000}s`
-    )
-    assert.ok(chatQuiet < chatCap, 'the quiet clock never fires before the chat cap does')
-  })
-
-  test('the chat route is held open while it thinks', () => {
-    /*
-     * "It created the rig, but when I said write it, it said it failed."
-     *
-     * `[error] Load failed`, two minutes and forty-six seconds after the ask.
-     * That is iOS Safari hanging up on a connection that had sent nothing since
-     * it opened — not the model failing, and not anything the app could see.
-     * /api/generate had already learnt this: say hello at once, beat every ten
-     * seconds, and the connection stays a connection.
-     *
-     * The hello has to come before the model is asked, or it says exactly as
-     * little as sending nothing did.
-     */
-    const api = read('api/command.js')
-    const hello = api.indexOf("send({ type: 'open' })")
-    assert.notEqual(hello, -1, 'the chat route never opens a stream')
-    assert.ok(
-      hello < api.indexOf('for (const attempt of attempts)'),
-      'the hello is written after the model is asked, which reaches the browser no sooner than the answer'
-    )
-    assert.match(api, /setInterval\(\(\) => send\(\{ type: 'waiting'/, 'nothing proves the model is still there')
-
-    /* And the plain body still works, because the phone app and anything older
-       ask for it. */
-    assert.match(api, /if \(!streaming\) \{[\s\S]{0,40}?res\.status\(status\)\.json\(payload\)/, 'the unstreamed answer is gone')
-
-    /* The app reads it, and says something a player can act on when the line
-       really does die — never the browser's own words for it. */
-    const client = read('src/lib/command.js')
-    assert.match(client, /load failed\|failed to fetch/i, 'a dropped connection still reaches the screen as "Load failed"')
-    assert.match(client, /askPlan/, 'nothing asks again when the line drops')
-  })
-
-  test('the server says hello before it asks the model anything', () => {
-    /*
-     * Node holds the response until the first write, so with nothing written up
-     * front a browser waiting on `fetch` learns nothing until the first partial
-     * — and waiting for the first partial is the entire wait. Every timeout
-     * then looks identical from the browser, whether the server was never
-     * reached, the model never started, or the answer stopped halfway.
-     *
-     * The frame has to come before the model call, not merely exist: written
-     * after it, it says exactly as little as writing nothing did.
-     */
-    const api = read('api/generate.js')
-    const hello = api.indexOf("{ type: 'open' }")
-    const ask = api.indexOf('streamObject(args)')
-    assert.notEqual(hello, -1, 'the server no longer opens the stream before it asks the model')
-    assert.notEqual(ask, -1, 'the streaming call moved')
-    assert.ok(
-      hello < ask,
-      'the hello is written after the model call, which is the same as not writing it: nothing reaches the browser until the model does'
-    )
-  })
-
-  test('a verification report is rendered field by field, never as the object', () => {
-    /*
-     * `verifyChanges` returns objects — {block, param, wanted, got} — and App
-     * rendered one bare as a React child. That is error #31, which unmounts
-     * the whole tree: the page went blank the first time a written value
-     * actually failed to read back.
-     *
-     * It survived because of what it takes to reach: a real unit, a real
-     * write, and a real drift between them. No test and no demo session ever
-     * produces all three, so the only thing that can catch it is the shape of
-     * the code. Same failure as the cab picker rendering {value,label} pairs.
-     */
-    const app = read('src/App.jsx')
-    const at = app.indexOf('applied.mismatches.map(')
-    assert.ok(at !== -1, 'the mismatch list moved — retarget this test')
-    const body = app.slice(at, app.indexOf('))}', at))
-    const param = body.match(/\.map\(\((\w+)/)?.[1]
-
-    assert.ok(
-      new RegExp(`\\b${param}\\.\\w+`).test(body),
-      `the mismatch list renders ${param} without reading a field off it`
-    )
-    assert.ok(
-      !new RegExp(`\\{\\s*${param}\\s*\\}`).test(body),
-      `the mismatch list renders {${param}} bare — that object is not a valid React child`
-    )
-  })
-
+  
+  
+  
+  
   test('picking a save destination cannot load it', () => {
     /*
      * The one way this feature can destroy work.
@@ -214,51 +60,8 @@ export function run(test) {
     )
   })
 
-  test('every AI call goes through the one place that knows where the model lives', () => {
-    /*
-     * The failure this prevents is invisible where it is written.
-     *
-     * `fetch('/api/generate')` is correct on the hosted origin and always will
-     * be — which is why a new one would be added without a thought. Served by
-     * ForgeFX on the local network it is a 404 from a device server that has
-     * never heard of the model, and local mode is the whole point of Phase 4.
-     *
-     * So the rule is that nothing outside src/lib/ai.js names an /api/ path
-     * directly. There is exactly one place that decides absolute or relative.
-     */
-    const offenders = []
-    for (const file of walk(new URL('../src/', import.meta.url))) {
-      if (file.endsWith('/lib/ai.js')) continue
-      const code = readFileSync(file, 'utf8').replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ' ')
-      for (const m of code.matchAll(/fetch\(\s*['"`]\/api\/[^'"`]*/g)) {
-        offenders.push(`${file.split('/src/')[1]}: ${m[0].slice(0, 48)}`)
-      }
-    }
-    assert.deepEqual(
-      offenders,
-      [],
-      `AI routes fetched directly — these 404 when the app is served locally:\n  ${offenders.join('\n  ')}`
-    )
-  })
-
-  test('the generator asks for an output ceiling rather than taking the default', () => {
-    /*
-     * The provider must send max_tokens on every request, so leaving it unset
-     * is not "no limit" — it is the provider's 4096, which a full chain runs
-     * past. Truncation there fails schema validation at the very end, after
-     * the whole preset has been watched being built.
-     */
-    const gen = read('api/generate.js').replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ' ')
-    // Two ceilings: a refine returns a spec it was handed with a few values
-    // moved, a design can fill the unit. The design one is the one that
-    // has to clear a full chain.
-    const m = gen.match(/maxOutputTokens:\s*mode === 'refine' \? (\d+) : (\d+)/)
-    assert.ok(m, 'no maxOutputTokens — the request runs on the provider default')
-    const [refine, design] = [Number(m[1]), Number(m[2])]
-    assert.ok(design >= 8000, `maxOutputTokens for a design is ${design}, low enough to truncate a full chain`)
-    assert.ok(refine >= 4096 && refine < design, `a refine's ceiling is ${refine}`)
-  })
-  test('the Mac app spawns Node and keeps one menu-bar icon', () => {
+  
+    test('the Mac app spawns Node and keeps one menu-bar icon', () => {
     /*
      * Both of these are Electron-only, so nothing here can run them — but both
      * are visible in the shape of the code, which is the same trade the rest of

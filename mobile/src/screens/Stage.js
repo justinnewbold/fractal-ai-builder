@@ -64,7 +64,7 @@ const ofSlug = (s) => s.deviceSlug
  * button within reach of a stage tap is a hazard, and saving to a slot is
  * refused by the Mac anyway.
  */
-export default function Stage({ onOpenTone, onOpenPresets, onOpenSetlists, onOpenEdit }) {
+export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit }) {
   // The screen is the instrument panel for as long as this is open. A phone
   // that locks itself between songs is a phone you have to wake and unlock
   // while the count-in is happening.
@@ -242,35 +242,21 @@ export default function Stage({ onOpenTone, onOpenPresets, onOpenSetlists, onOpe
           </Text>
           <View style={{ flexDirection: 'row', gap: space.sm }}>
             {/*
-              The way to the tone screen, up in the corner rather than down
-              among the scenes.
+              What is up here rather than down among the scenes.
 
-              Both of the things up here take you OFF this screen, which is the
-              honest grouping: everything below the preset name acts on the rig
-              you are playing, and neither of these does. It is also the corner
-              furthest from where a thumb rests during a song.
+              This corner takes you OFF the screen, which is the honest
+              grouping: everything below the preset name acts on the rig you
+              are playing, and this does not. It is also the corner furthest
+              from where a thumb rests during a song.
 
               The speaker and Setup used to be in this row too. They are on the
               bar at the top of the app now, where the browser keeps them — see
               components/TopBar.
 
-              Absent, not disabled, when play mode is on — and absent until the
-              setting has been read back, because a button that appears late is
-              safer than one that vanishes under a press. See lib/playMode.js.
-
-              Absent throughout the first release, which ships with the AI
-              switched off: App hands down no handler at all. Nothing changes
-              here for that — a row that closes up around a button it was not
-              given is the same row either way. See lib/features.js.
+              A ✦ Tone button stood here until the tone designer was taken out
+              of the app. A row that closes up around a button it was not given
+              is the same row either way.
             */}
-            {onOpenTone ? (
-              <Press
-                label="✦ Tone"
-                height={36}
-                style={{ paddingHorizontal: space.md }}
-                onPress={onOpenTone}
-              />
-            ) : null}
             {/*
               The way to the bench, beside the other thing that takes you off
               this screen. Everything below the preset name acts on the rig you

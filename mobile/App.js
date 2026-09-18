@@ -17,28 +17,21 @@ import Log from './src/screens/Log'
 import Presets from './src/screens/Presets'
 import Setlists from './src/screens/Setlists'
 import Stage from './src/screens/Stage'
-import Tone from './src/screens/Tone'
-import { loadPlayMode, toneWayIn } from './src/lib/playMode'
 import { hydrate } from './src/lib/store'
 import { keepSetlistsInStep } from './src/lib/cloudSetlists'
 import { useRig } from './src/lib/rig'
 import { keepLog } from './src/lib/logKeep'
 import { installCrashCapture } from './src/lib/debugLog'
 import { restoreDemo, useDemo } from './src/lib/demo'
-import { AI, BENCH } from './src/lib/features'
+import { BENCH } from './src/lib/features'
 
 /**
  * Fractal Remote.
  *
  * A handful of states and no navigator. Signed out, playing, looking at the
- * preset list, fixing the running order, looking at setup, or asking for a
- * tone — that is the whole of the app, and a routing library for it would be
- * more moving parts than the thing being routed.
- *
- * All but the last of those in a shipping build: the tone screen is behind the
- * AI switch in lib/features.js, which is off for the first release. The route
- * is still written here rather than removed, because it goes back on in a later
- * update and the difference is one word.
+ * preset list, fixing the running order, fixing a chain, or looking at setup —
+ * that is the whole of the app, and a routing library for it would be more
+ * moving parts than the thing being routed.
  *
  * The status bar at the top is the one thing on every screen: what the link is
  * doing, said in words rather than an icon, because "connected" and "connected
@@ -49,13 +42,6 @@ export default function App() {
   const [auth, setAuth] = useState('checking')
   const [screen, setScreen] = useState('stage')
   const [link, setLink] = useState(linkState())
-  /*
-   * null until the setting has been read back — which is not the same as "not
-   * playing", and is why the tone button stays away rather than appearing and
-   * then being taken back. AsyncStorage cannot be read synchronously the way
-   * the browser reads localStorage.
-   */
-  const [playing, setPlaying] = useState(null)
   /** The last "picked up 2 setlists from your Mac", until it has been read. */
   const [picked, setPicked] = useState(null)
 
@@ -136,17 +122,6 @@ export default function App() {
    * goes. See installCrashCapture in lib/debugLog.
    */
   useEffect(() => installCrashCapture(), [])
-
-  useEffect(() => {
-    /* Nothing to hide with the AI off, and asking costs a read of storage on
-       every launch to answer a question nobody can act on. See lib/features.js. */
-    if (!AI) return undefined
-    let alive = true
-    loadPlayMode().then((on) => alive && setPlaying(on))
-    return () => {
-      alive = false
-    }
-  }, [])
 
   // A session left over from last time is the ordinary case: a phone that
   // signed in once is a remote, and it should say "Connecting…" from its first
@@ -253,15 +228,11 @@ export default function App() {
               <Gear onBack={() => setScreen('settings')} />
             ) : screen === 'log' ? (
               <Log onBack={() => setScreen('settings')} />
-            ) : AI && screen === 'tone' ? (
-              <Tone onBack={() => setScreen('stage')} />
             ) : screen === 'settings' ? (
               <Settings
                 link={link.link}
                 macName={link.macName}
                 hostVersion={link.hostVersion}
-                playing={playing}
-                onPlayMode={setPlaying}
                 onBack={() => setScreen('stage')}
                 /* Works with the Mac off: it is a reference sheet, not a
                    question for the unit. */
@@ -288,13 +259,6 @@ export default function App() {
               />
             ) : (
               <Stage
-                /* Absent rather than disabled when play mode is on, so the row
-                   closes up instead of keeping a dead button. */
-                onOpenTone={
-                  AI && toneWayIn({ connected: link.link === 'connected', playing })
-                    ? () => setScreen('tone')
-                    : null
-                }
                 /* Only once the Mac is answering: a list of slot numbers with
                    no names behind them is a screen that cannot do its one job. */
                 onOpenPresets={

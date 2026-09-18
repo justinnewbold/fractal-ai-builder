@@ -300,7 +300,11 @@ export function run(test) {
      * always carried and which is why the bar itself never had that bug.
      */
     const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
-    const shell = app.indexOf('className={`shell ')
+    /* The shell's class was a template literal while a chat screen could add
+       to it. That went with the AI; what this test is about — the bar being
+       inside the shell with nothing above it — did not, so it finds the shell
+       either way. */
+    const shell = app.search(/className=(\{`shell |"shell")/)
     const bar = app.indexOf('<TopBar', shell)
     assert.ok(shell !== -1 && bar > shell, 'the bar is not in the shell any more')
     for (const above of ['<UpdateNotice', '<UpdateReadyNotice']) {

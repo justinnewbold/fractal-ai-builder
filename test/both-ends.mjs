@@ -327,10 +327,11 @@ export const AREAS = [
      * number — which is also why the file lists here are lists.
      */
     area: 'the setlists and the preset list',
-    web: ['src/components/Setlists.jsx', 'src/components/CloudPresets.jsx', 'src/components/Recent.jsx'],
+    /* CloudPresets.jsx and Recent.jsx were here too. Both held the library of
+       tones the AI had made, and went with it. */
+    web: ['src/components/Setlists.jsx'],
     phone: ['mobile/src/screens/Setlists.js', 'mobile/src/screens/Presets.js'],
     notButtons: {
-      Untitled: 'what a preset with no name of its own is called in the row you press',
       Empty: 'what an empty slot is called in the list — the chain editor’s Empty IS a button, which is why this is per area'
     },
     buttons: [
@@ -346,9 +347,14 @@ export const AREAS = [
       },
       {
         does: 'take a preset out of the list it is in',
-        web: 'Remove',
+        /* The browser's used to be a bare "Remove", on the library of tones the
+           AI had made. That list went with the AI; what is left is the setlist
+           row, which names what it is about to remove exactly as the phone
+           does — on a list of forty rows a button that only says "Remove" says
+           nothing about which. */
+        web: 'Remove <name> from <setlist>',
         phone: 'Remove <name>',
-        unreadable: ['phone']
+        unreadable: ['web', 'phone']
       },
       {
         does: 'read the preset list off the unit again',
