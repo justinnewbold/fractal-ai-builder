@@ -11,10 +11,12 @@ import { color } from '../lib/theme'
  * stage believing they have a remote.
  */
 export default function Lamp({ state = 'idle', size = 10 }) {
+  /* 'good' is green: the unit is answering. 'live' is the cyan the link
+     lamps use for the Mac; 'fault' is red; anything else is unlit. */
   const fill =
-    state === 'live' ? color.live : state === 'fault' ? color.fault : color.silkFaint
+    state === 'good' ? color.ok : state === 'live' ? color.live : state === 'fault' ? color.fault : color.silkFaint
   const halo =
-    state === 'live' ? color.liveHalo : state === 'fault' ? color.faultHalo : 'transparent'
+    state === 'good' ? color.okHalo : state === 'live' ? color.liveHalo : state === 'fault' ? color.faultHalo : 'transparent'
   return (
     <View
       accessibilityElementsHidden

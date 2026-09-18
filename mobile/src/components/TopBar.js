@@ -66,7 +66,10 @@ export default function TopBar({ link, onOpenSettings }) {
    * looked exactly like a working one.
    */
   const unitSaid = demo ? null : unitWord(tone, unitState)
-  const unitLamp = !connected || demo ? (link?.link === 'no-answer' ? 'fault' : 'idle') : unitSaid ? 'fault' : unitState === 'present' ? 'live' : 'idle'
+  /* Green when connected to the unit, red when not — including when the
+     computer itself is out of reach, since the unit is then out of reach
+     too. Unlit only while nobody has been asked yet, and in the demo. */
+  const unitLamp = demo ? 'idle' : connected && unitState === 'present' ? 'good' : !connected || unitSaid ? 'fault' : 'idle'
 
   /*
    * The unit's short name, and a dash rather than a guess.
