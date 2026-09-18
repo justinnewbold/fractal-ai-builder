@@ -1146,9 +1146,26 @@ export function run(test) {
     const grid = await import('../mobile/src/lib/grid-plan.js')
     const web = await import('../shared/grid-plan.mjs')
 
-    assert.deepEqual(grid.toWireCell(1, 0), { row: 1, col: 1 }, 'the first column is not column one on the wire')
-    assert.deepEqual(grid.toWireCell(2, 5), { row: 2, col: 6 }, 'rows are being shifted as well as columns')
+    /* Rows too. The FM3 reports its rows from zero like its columns, and the
+       wire takes them from one like FM3-Edit; a chain read on row 1 written
+       to row 1 went to the top row, where every clear found an empty cell
+       and every placement was quietly declined -- "unit has it at 5" after
+       every move on an FM3, with not one step refused. */
+    assert.deepEqual(grid.toWireCell(0, 0), { row: 1, col: 1 }, 'the first cell is not row one, column one on the wire')
+    assert.deepEqual(grid.toWireCell(1, 5), { row: 2, col: 6 }, 'rows are not shifted with columns')
     assert.deepEqual(grid.toWireCell(1, 0), web.toWireCell(1, 0), 'the two apps disagree about the wire boundary')
+    assert.deepEqual(grid.toWireCable(1, 2, 1), { srcRow: 2, srcCol: 3, destRow: 2 }, 'a cable is not shifted like a cell')
+    assert.deepEqual(grid.toWireCable(1, 2, 1), web.toWireCable(1, 2, 1), 'the two apps disagree about the cable boundary')
+    assert.equal(grid.rowLabel(0), 1, 'the top row is not called row 1')
+    const lanes = grid.lanesFor([{ row: 0, col: 3, effectId: 58 }], { grid: { rows: 4, cols: 12 } })
+    assert.equal(lanes.length, 4)
+    assert.equal(lanes[0].row, 0, 'the top row has no lane')
+    assert.equal(lanes[0].blocks.length, 1, 'a block on the top row is drawn nowhere')
+    assert.match(read('mobile/src/lib/device.js'), /\.\.\.toWireCable\(srcRow, srcCol, destRow\)/, 'the phone cables with unshifted rows')
+    assert.match(read('src/lib/forgefx.js'), /\.\.\.toWireCable\(srcRow, srcCol, destRow\)/, 'the browser cables with unshifted rows')
+    assert.match(read('mobile/src/screens/Edit.js'), /Row \$\{rowLabel\(lane\.row\)\}/, 'the phone shows the row as it counts it')
+    assert.match(read('src/components/GridEditor.jsx'), /Row \$\{rowLabel\(lane\.row\)\}/, 'the browser shows the row as it counts it')
+    assert.match(read('mobile/src/lib/demoWire.js'), /path === '\/preset\/grid\/cell'\) return mock\.placeBlock\(body\?\.row - 1, body\?\.col - 1/, 'the demo does not answer the grid route the phone calls')
 
     /* And the phone adds it exactly once, at the boundary and nowhere else. */
     const device = read('mobile/src/lib/device.js')
@@ -1190,12 +1207,16 @@ export function run(test) {
 
     const lanes = lanesShown(blocks, caps)
     /* The row that holds something, plus the first empty one — so a bare preset
-       can be started and a parallel row can be begun. Not all four. */
+       can be started and a parallel row can be begun. Not all four. Rows count
+       from zero, so the empty top row is the first lane and the chain is the
+       second. */
     assert.equal(lanes.length, 2, 'every row of the grid is drawn, empty or not')
-    assert.deepEqual(lanes[0].blocks.map((b) => b.name), ['Drive 1', 'Amp 1'], 'a lane is not in signal order')
-    assert.deepEqual(lanes[0].gaps, [1, 3], 'the free cells in a lane are wrong')
+    assert.deepEqual(lanes.map((l) => l.row), [0, 1], 'the lanes shown are not the top row and the one with the chain')
+    const chain = lanes[1]
+    assert.deepEqual(chain.blocks.map((b) => b.name), ['Drive 1', 'Amp 1'], 'a lane is not in signal order')
+    assert.deepEqual(chain.gaps, [1, 3], 'the free cells in a lane are wrong')
 
-    const items = laneItems(lanes[0])
+    const items = laneItems(chain)
     assert.deepEqual(
       items.map((i) => `${i.kind}${i.col}`),
       ['block0', 'gap1', 'block2', 'gap3'],

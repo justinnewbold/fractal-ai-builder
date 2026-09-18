@@ -37,7 +37,7 @@ const remoteRequest = (path, options) => {
   return demo ? demoRequest(demo, path, options) : overTheWire(path, options)
 }
 import { withLineage } from './lineage'
-import { cableColumns, toWireCell } from './grid-plan'
+import { cableColumns, toWireCable, toWireCell } from './grid-plan'
 import { cleanPresetName, isEmptySlotName } from './unit.mjs'
 import { preferredEncoding, rememberEncoding } from './encoding'
 import { toNormalized } from './scale'
@@ -373,10 +373,7 @@ export const clearCell = (row, col) => placeBlock(row, col, 0)
 /** Connect or cut a cable from one cell to a row in the next column. */
 export const setCable = (srcRow, srcCol, destRow, connect = true) =>
   post('/preset/grid/cable', {
-    ...toWireCell(srcRow, srcCol),
-    srcRow,
-    srcCol: srcCol + 1,
-    destRow,
+    ...toWireCable(srcRow, srcCol, destRow),
     connect
   })
 

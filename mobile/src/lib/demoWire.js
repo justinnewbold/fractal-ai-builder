@@ -99,11 +99,13 @@ export async function demoRequest(mock, path, options = {}) {
     if (part[0] === 'preset' && part[1] === 'blocks' && part[3] === 'type') {
       return mock.setType(num(2), body?.value)
     }
-    if (path === '/preset/grid/block') return mock.placeBlock(body?.row, body?.col, body?.blockId)
     if (path === '/preset/grid/cable') return { ok: true }
   }
 
   if (method === 'PUT') {
+    /* Wire coordinates come in, counted from one; the mock keeps the ones a
+       read reports, counted from zero -- the same boundary the unit has. */
+    if (path === '/preset/grid/cell') return mock.placeBlock(body?.row - 1, body?.col - 1, body?.blockId)
     /* /preset/blocks/{eid}/params/{id} — normalised in, exactly as the unit. */
     if (part[0] === 'preset' && part[1] === 'blocks' && part[3] === 'params') {
       const eid = num(2)

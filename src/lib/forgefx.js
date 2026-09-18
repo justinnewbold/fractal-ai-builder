@@ -15,7 +15,7 @@ import { paletteFor } from './palette.js'
 import { withRetry } from './retry.js'
 import { cleanPresetName, isEmptySlotName } from './presetName.js'
 import { zeroBasedChain, wrongSlot } from './slots.js'
-import { cableColumns, toWireCell } from '../../shared/grid-plan.mjs'
+import { cableColumns, toWireCable, toWireCell } from '../../shared/grid-plan.mjs'
 import { DEFAULT_SLUG, deviceSlug } from '../../shared/device-slug.mjs'
 import { toNormalized } from './scale.js'
 import { withLineage } from './lineage.js'
@@ -1690,7 +1690,7 @@ export const setCable = (srcRow, srcCol, destRow, connect = true) =>
     ? tick().then(() => ({ ok: true }))
     : request('/preset/grid/cable', {
         method: 'POST',
-        body: JSON.stringify({ ...toWireCell(srcRow, srcCol), srcRow, srcCol: srcCol + 1, destRow, connect })
+        body: JSON.stringify({ ...toWireCable(srcRow, srcCol, destRow), connect })
       })
 
 /**
