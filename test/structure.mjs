@@ -1052,7 +1052,10 @@ export function run(test) {
       /* Fixes first: it is the one somebody is looking for when they open
          this page at all, and the log is what they send if it did not help. */
       ['help', ['fixes', 'preset-check', 'debug-log', 'feedback', 'what-s-changed-this-session', 'how-this-works']],
-      ['about', ['updates']]
+      /* The small print joins About because that is where somebody looks for
+         it, and because a store requires the privacy policy to be reachable
+         from the app rather than only from a form. */
+      ['about', ['updates', 'small-print']]
     ]) {
       assert.deepEqual(behind(page), panels, `the ${page} page holds ${behind(page).join(', ')}`)
     }

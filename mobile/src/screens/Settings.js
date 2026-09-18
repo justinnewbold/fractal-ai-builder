@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { Linking, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
 import { APP_VERSION } from '../lib/version'
+import { AFFILIATION } from '../lib/affiliation'
 import { isOlder } from '../lib/versions'
 import { setDemo, useDemo } from '../lib/demo'
 import { getDebugLog } from '../lib/debugLog'
@@ -463,6 +464,28 @@ export default function Settings({
               distance — by your computer, not by this app. A phone on a dark stage should not be able to
               overwrite a preset you spent a week on.
             </Note>
+          </View>
+          {/*
+            Reachable from inside the app, which is the point of writing them.
+            A store requires a privacy policy at a URL and the licences we ship
+            under require their notices travel with the software; neither is
+            satisfied by a file nobody can open from the thing it describes.
+          */}
+          <View style={{ gap: space.md }}>
+            <Section>The small print</Section>
+            {/* Said in the app, not only in a file somebody would have to go
+                looking for. Same string as the browser — shared/affiliation.mjs. */}
+            <Note>{AFFILIATION}</Note>
+            <Press
+              label="Privacy"
+              sub="What this sends, and what it never does"
+              onPress={() => Linking.openURL('https://fractal.newbold.cloud/privacy.html')}
+            />
+            <Press
+              label="Licences"
+              sub="The open-source work this is built on"
+              onPress={() => Linking.openURL('https://fractal.newbold.cloud/notices.txt')}
+            />
           </View>
         </>
       ) : null}

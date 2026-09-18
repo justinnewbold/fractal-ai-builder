@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy — Fractal Remote</title>
+    <meta
+      name="description"
+      content="What Fractal Remote collects, what it does not, and how to have it deleted."
+    />
+    <style>
+      :root {
+        --chassis: #0d0f12;
+        --panel: #15181d;
+        --rule: #262b33;
+        --silk: #e6e3dc;
+        --silk-dim: #878d97;
+        --signal: #f0a73c;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 48px 20px 96px;
+        background: var(--chassis);
+        color: var(--silk);
+        font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      main { max-width: 720px; margin: 0 auto; }
+      h1 { font-size: 30px; line-height: 1.2; margin: 0 0 4px; }
+      h2 { font-size: 20px; margin: 40px 0 8px; }
+      h3 { font-size: 16px; margin: 24px 0 4px; color: var(--signal); }
+      .when { color: var(--silk-dim); margin: 0 0 32px; font-size: 14px; }
+      .lead {
+        padding: 16px 20px;
+        border-left: 3px solid var(--signal);
+        background: var(--panel);
+        border-radius: 0 8px 8px 0;
+      }
+      table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 15px; }
+      th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+      th { color: var(--silk-dim); font-weight: 600; }
+      a { color: var(--signal); }
+      ul { padding-left: 22px; }
+      li { margin: 6px 0; }
+      footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--rule); color: var(--silk-dim); font-size: 14px; }
+      code { background: var(--panel); padding: 1px 5px; border-radius: 4px; font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Privacy</h1>
+      <p class="when">Fractal Remote · last updated 18 September 2026</p>
+
+      <p class="lead">
+        <strong>Used on your own wifi, this app sends nothing anywhere.</strong> Your phone talks
+        to your computer, your computer talks to your unit, and nothing leaves the room — no
+        account, no sign-in, nothing stored on anybody's server. That is how most people use it and
+        it is worth saying first.
+      </p>
+
+      <p>
+        Everything below is about the parts that <em>do</em> use the internet, and each one is
+        something you choose to turn on.
+      </p>
+
+      <h2>What is collected, and only if you ask for it</h2>
+
+      <h3>An account — only if you want to reach your rig from away</h3>
+      <p>
+        Playing at home over your own wifi needs no account. If you want your phone to reach your
+        computer from somewhere else, the two ends have to find each other, and that needs a
+        sign-in.
+      </p>
+      <table>
+        <tr><th>What</th><th>Why</th></tr>
+        <tr><td>Your email address</td><td>To sign you in, and to reset a password</td></tr>
+        <tr><td>Your password</td><td>Stored as a hash. It is never readable, by us or anyone.</td></tr>
+      </table>
+      <p>
+        The commands between your phone and your computer pass through a relay while you are
+        connected this way — a preset change, a scene, a knob. They are passed along, not written
+        down.
+      </p>
+
+      <h3>Your setlists — only if you are signed in</h3>
+      <p>
+        So the setlist you built on the couch is on your phone at the gig. It holds the names and
+        order of the songs you saved and which presets you starred. Nothing else about your
+        presets, and no audio of any kind.
+      </p>
+
+      <h3>Bug reports and suggestions — only when you press Send</h3>
+      <p>
+        There are two kinds and they carry different things, deliberately.
+      </p>
+      <table>
+        <tr><th></th><th>Something is broken</th><th>I want something</th></tr>
+        <tr><td>What you wrote</td><td>yes</td><td>yes</td></tr>
+        <tr><td>Your email, if you typed one</td><td>optional</td><td>optional</td></tr>
+        <tr><td>App version, your unit, your OS, screen size</td><td>yes</td><td>yes</td></tr>
+        <tr><td><strong>The debug log</strong></td><td>yes, and you can turn it off</td><td><strong>never</strong></td></tr>
+      </table>
+      <p>
+        The log is a record of what the app did — buttons pressed, requests made, errors. It is
+        gathered the moment you press Send and at no other time, you can read the whole thing
+        first, and you can send the report without it. A suggestion never carries one, and the
+        database itself refuses to store one against a suggestion.
+      </p>
+      <p>
+        The log holds no preset contents, no audio, no account details, and nothing else you have
+        typed into the app.
+      </p>
+
+      <h2>What is never collected</h2>
+      <ul>
+        <li><strong>No analytics and no tracking of any kind.</strong> There is no analytics
+          service in this app, no advertising identifier, and no third-party tracking code. Nobody
+          is counting your screens or your sessions.</li>
+        <li><strong>No location.</strong> Never asked for, never read.</li>
+        <li><strong>No contacts, photos, or microphone.</strong> The camera is used only if you
+          point it at a pairing code on your own screen, and nothing is saved or sent.</li>
+        <li><strong>No audio.</strong> This app sends control messages to your unit. It does not
+          record, stream or process sound.</li>
+        <li><strong>Nothing is sold or shared with anyone</strong> for advertising or any other
+          purpose.</li>
+      </ul>
+
+      <h2>Where it is kept, and who can see it</h2>
+      <p>
+        Accounts, setlists and reports are stored with
+        <a href="https://supabase.com/privacy" rel="noreferrer">Supabase</a>, on servers in the
+        United States. Every row is behind rules that tie it to the account that made it. Bug
+        reports can be written by anybody and read back by nobody through the app — only by the
+        person who builds it.
+      </p>
+      <p>
+        The desktop apps check for their own updates from GitHub, and the phone app checks for
+        updates from Expo. Both are ordinary download requests.
+      </p>
+
+      <h2>How long it is kept</h2>
+      <ul>
+        <li><strong>Your account and setlists</strong> — until you ask for them to be deleted.</li>
+        <li><strong>Bug reports</strong> — until the problem is fixed and long enough afterwards to
+          be sure, then deleted.</li>
+      </ul>
+
+      <h2>Deleting your data</h2>
+      <p>
+        Email <a href="mailto:justinnewbold@gmail.com">justinnewbold@gmail.com</a> and say what you
+        want removed — your account, your setlists, a report you sent, or all of it. No form and no
+        account needed to ask. It will be done and you will get a reply confirming it.
+      </p>
+      <p>
+        You can also delete your setlists from inside the app at any time without asking anyone.
+      </p>
+
+      <h2>Children</h2>
+      <p>
+        This app is for people with guitar hardware and is not directed at children under 13. No
+        account is knowingly created for one. If you believe a child has signed up, email the
+        address above and it will be removed.
+      </p>
+
+      <h2>Changes</h2>
+      <p>
+        If what this app collects ever changes, this page changes with it and the date at the top
+        moves. Anything that would collect materially more than the above would be announced in the
+        app before it happened, not buried here.
+      </p>
+
+      <h2>Who to ask</h2>
+      <p>
+        Fractal Remote is built by Justin Newbold.
+        <a href="mailto:justinnewbold@gmail.com">justinnewbold@gmail.com</a>
+      </p>
+
+      <footer>
+        <!-- These words are shared/affiliation.mjs, copied because a static
+             page cannot import. A test holds the two to each other. -->
+        <p>
+          Fractal Remote is an independent app. It is in no way affiliated with, endorsed by, or
+          sponsored by Fractal Audio Systems, Inc.
+        </p>
+        <p>
+          &ldquo;Fractal Audio&rdquo;, &ldquo;Axe-Fx&rdquo;, &ldquo;FM3&rdquo;, &ldquo;FM9&rdquo;,
+          &ldquo;AM4&rdquo; and &ldquo;VP4&rdquo; are trademarks of Fractal Audio Systems, Inc.,
+          used here only to say which hardware this app works with.
+        </p>
+        <p><a href="/notices.txt">Third-party licences and notices</a></p>
+      </footer>
+    </main>
+  </body>
+</html>
