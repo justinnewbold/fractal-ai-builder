@@ -96,6 +96,29 @@ export function webButtons(src) {
 }
 
 /**
+ * The text of a `{...}` beginning at `open`, or null if it never closes.
+ *
+ * Quotes are tracked as well as depth, because a brace inside a string is not
+ * a brace — and a label is one of the few places a `}` shows up in prose.
+ */
+function braced(src, open) {
+  let depth = 0
+  let quote = null
+  for (let i = open; i < src.length; i++) {
+    const c = src[i]
+    if (quote) {
+      if (c === '\\') i++
+      else if (c === quote) quote = null
+      continue
+    }
+    if (c === '"' || c === "'" || c === '`') quote = c
+    else if (c === '{') depth++
+    else if (c === '}' && --depth === 0) return src.slice(open + 1, i)
+  }
+  return null
+}
+
+/**
  * What the phone's buttons say.
  *
  * `<Press label="Add" />` — the phone puts the word in an attribute because
@@ -103,12 +126,22 @@ export function webButtons(src) {
  */
 export function phoneButtons(src) {
   const found = new Set()
-  for (const m of src.matchAll(/\blabel=(?:"([^"]{1,40})"|\{([^}]{1,160})\})/g)) {
+  for (const m of src.matchAll(/\blabel=(?:"([^"]{1,40})"|\{)/g)) {
     if (m[1] !== undefined) {
       for (const w of wordsIn(`>${m[1]}<`)) found.add(w)
       continue
     }
-    for (const w of wordsIn(m[2])) found.add(w)
+    /*
+     * The braces are counted rather than read up to the first `}`.
+     *
+     * A label built from a template — `` label={`${songs(l)} · tap to rename`} ``
+     * — closes one brace early, and a scan that stops there carries on eating
+     * the file. That is how "Empty", a word for a setlist with no songs in it
+     * forty lines further down, arrived in the survey as a button the browser
+     * was missing. Unbalanced is worse than unread: it invents findings.
+     */
+    const body = braced(src, m.index + m[0].length - 1)
+    if (body !== null) for (const w of wordsIn(body)) found.add(w)
   }
   return found
 }
@@ -134,6 +167,19 @@ export const buttonsIn = (side, files) => {
  * `unreadable` marks an end where the word is built out of a variable, so it
  * is here for a reader and not checked against the file. `also` is the other
  * words the same control shows — a toggle's second face, a tab pair.
+ *
+ * `notButtons` names words that sit inside a button and are not its label —
+ * `{entry.name || 'Untitled'}` is what an unnamed preset is CALLED in the row
+ * you press. The obvious rule for those, a literal after `||`, was written
+ * first and immediately ate `{copied || 'Share as file'}`, an ordinary
+ * button's ordinary label. The two shapes are identical and nothing around
+ * them tells them apart, so they are named instead: a list cannot quietly
+ * swallow a button the way a clever rule can. For a check whose whole job is
+ * noticing what went missing, a silent miss is the failure that matters.
+ *
+ * Per area rather than global, because the same word is a name in one place
+ * and a button in another: "Empty" is what an empty preset slot is called in
+ * the list, and it is the empty chain slot you press in the editor.
  */
 export const AREAS = [
   {
@@ -150,6 +196,11 @@ export const AREAS = [
         why: 'the phone has Add and Remove and no single Replace — two taps for what the browser does in one'
       },
       { does: 'take a block out of the chain', web: 'Remove', phone: 'Remove' },
+      {
+        does: 'the empty slot you press to put something in it',
+        web: 'Empty — tap to add',
+        phone: 'Empty'
+      },
       {
         does: 'move a block to another slot from a button',
         web: 'Move',
@@ -238,10 +289,16 @@ export const AREAS = [
       { does: 'ask the app for a tone', web: 'Ask', phone: '✦ Tone', unreadable: ['phone'] },
       {
         does: 'choose what Previous and Next step through',
+        /* Both ends name the button after the list it is stepping through, and
+           both say "All" when that is every preset on the unit. */
+        web: 'All',
+        phone: 'All'
+      },
+      {
+        does: 'the word "Source" above that button',
         web: 'Source',
-        also: ['All'],
-        phone: 'the name of the list it is stepping through',
-        unreadable: ['phone']
+        phone: null,
+        why: 'a lone list name between Previous and Next reads as a caption rather than the button that picks what those two walk; the phone’s is wide enough not to need telling'
       },
       {
         does: 'show whether a block is bypassed',
@@ -257,6 +314,119 @@ export const AREAS = [
         why: 'only in the browser — nobody has decided whether the phone should offer it'
       }
     ]
+  },
+  {
+    /*
+     * The one place a survey of this went wrong, and worth saying why.
+     *
+     * The browser has a button that says "Star this preset"; the phone stars
+     * from an icon whose label is built out of the preset's name, and an
+     * earlier pass read that as a phone with no way to star anything. It has
+     * had one all along. So every entry below was checked against the other
+     * end's whole app rather than the one file that looked like its opposite
+     * number — which is also why the file lists here are lists.
+     */
+    area: 'the setlists and the preset list',
+    web: ['src/components/Setlists.jsx', 'src/components/CloudPresets.jsx', 'src/components/Recent.jsx'],
+    phone: ['mobile/src/screens/Setlists.js', 'mobile/src/screens/Presets.js'],
+    notButtons: {
+      Untitled: 'what a preset with no name of its own is called in the row you press',
+      Empty: 'what an empty slot is called in the list — the chain editor’s Empty IS a button, which is why this is per area'
+    },
+    buttons: [
+      {
+        does: 'make a preset one of the starred ones',
+        web: 'Star this preset',
+        also: ['Starred', 'Star', 'Unstar'],
+        phone: 'Star',
+        /* The phone's says "Star <name>" / "Unstar <name>" — the same button,
+           named after what it is about to star, because on a list of forty
+           rows a button that only says "Star" says nothing about which. */
+        unreadable: ['web']
+      },
+      {
+        does: 'take a preset out of the list it is in',
+        web: 'Remove',
+        phone: 'Remove <name>',
+        unreadable: ['phone']
+      },
+      {
+        does: 'read the preset list off the unit again',
+        web: null,
+        phone: 'Refresh',
+        why: 'the browser re-reads the list by itself, on opening it and after every change; the phone offers it by hand as well, for a list that went stale in a pocket'
+      },
+      {
+        does: 'close the setlist sheet',
+        web: null,
+        phone: 'Done',
+        also: ['Done adding'],
+        why: 'setlists are a page in the browser, with nothing to close'
+      }
+    ]
+  },
+  {
+    /*
+     * These three words were two different sets of words until 7.325.0 — the
+     * browser said Copy log and Clear, the phone said Copy the log and Clear
+     * the log, and the account button said Create account in one place, Create
+     * an account in another and Make an account on the phone. Nothing was
+     * broken by it and nobody was confused, but the log is the thing you are
+     * told to press when something has gone wrong, and being told to press a
+     * button by a name it does not have is a bad moment to have on a stage.
+     * They are one set of words now, and this is what keeps them one.
+     */
+    area: 'the log',
+    web: ['src/components/DebugLog.jsx'],
+    phone: ['mobile/src/screens/Log.js'],
+    buttons: [
+      { does: 'put the whole log on the clipboard', web: 'Copy Logs', phone: 'Copy Logs' },
+      { does: 'throw the log away', web: 'Clear Logs', phone: 'Clear Logs' },
+      {
+        does: 'hand the log over as a file instead of a paste',
+        web: 'Share as file',
+        phone: null,
+        why: 'only in the browser — the log is capped at 400 lines, which pastes into a chat whole, so the phone has never needed it'
+      },
+      {
+        does: 'close the log',
+        web: null,
+        phone: 'Done',
+        why: 'the browser’s log is a panel in the settings page, with nothing to close'
+      }
+    ]
+  },
+  {
+    area: 'getting connected and signed in',
+    web: ['src/components/ConnectScreen.jsx', 'src/components/SignIn.jsx', 'src/components/SignInSheet.jsx'],
+    phone: ['mobile/src/screens/Connect.js', 'mobile/src/screens/SignIn.js'],
+    buttons: [
+      { does: 'make a new account', web: 'Create Account', phone: 'Create Account' },
+      { does: 'sign in to an account you have', web: 'Sign in', phone: 'Sign in' },
+      { does: 'join the computer with a pairing code', web: 'Connect', phone: 'Connect' },
+      {
+        does: 'send yourself a password reset',
+        web: 'Forgot password?',
+        phone: 'Forgot password',
+        /* The browser's carries a question mark because it sits in a row of
+           links; the phone's is a button and does not ask. */
+        unreadable: ['web']
+      },
+      {
+        does: 'look around without a rig',
+        web: 'Try the demo',
+        also: ['Try now', 'Go'],
+        phone: 'Just looking? Try the demo',
+        unreadable: ['phone'],
+        why: 'the same offer at both ends; the browser also says Try now on the not-connected screen and Go beside the code box, neither of which the phone has a place for'
+      },
+      {
+        does: 'close the sign-in sheet',
+        web: null,
+        phone: 'Done',
+        why: 'signing in is a page in the browser, with nothing to close'
+      }
+    ]
   }
 ]
 
@@ -265,7 +435,26 @@ const covered = (b) => [b.web, b.phone, ...(b.also || [])].filter((w) => typeof 
 
 export function run(test) {
   for (const area of AREAS) {
-    const ends = { web: buttonsIn('web', area.web), phone: buttonsIn('phone', area.phone) }
+    const notButtons = area.notButtons || {}
+    const drop = (words) => new Set([...words].filter((w) => !(w in notButtons)))
+    const ends = {
+      web: drop(buttonsIn('web', area.web)),
+      phone: drop(buttonsIn('phone', area.phone))
+    }
+
+    /* A name that stopped appearing is an excuse nobody needs any more, and
+       left alone it would go on excusing a button that arrived later under the
+       same word. */
+    test(`nothing on ${area.area} is excused that is not there`, () => {
+      const raw = new Set([...buttonsIn('web', area.web), ...buttonsIn('phone', area.phone)])
+      for (const word of Object.keys(notButtons)) {
+        assert.ok(
+          raw.has(word),
+          `"${word}" is listed under notButtons for ${area.area} and no longer appears there. ` +
+            'Take it out of AREAS in test/both-ends.mjs.'
+        )
+      }
+    })
 
     test(`every button on ${area.area} is at both ends or written down`, () => {
       const named = new Set()

@@ -3,7 +3,7 @@
     "name": "Fractal Remote",
     "slug": "fractal-remote",
     "owner": "justinnewbold",
-    "version": "7.324.0",
+    "version": "7.325.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "fractalremote",
@@ -14,6 +14,13 @@
       "ios",
       "android"
     ],
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/f590cdd2-a0b7-4a94-9027-0a00ab60bdc6",
+      "fallbackToCacheTimeout": 0
+    },
     "ios": {
       "bundleIdentifier": "cloud.newbold.fractalremote",
       "supportsTablet": true,
@@ -43,7 +50,9 @@
       ]
     ],
     "extra": {
-      "eas": {}
+      "eas": {
+        "projectId": "f590cdd2-a0b7-4a94-9027-0a00ab60bdc6"
+      }
     }
   }
 }

@@ -1761,7 +1761,7 @@ export function run(test) {
     /* The screen that hands it over. */
     const log = read('mobile/src/screens/Log.js')
     assert.match(log, /Clipboard\.setStringAsync\(text\)/, 'there is no way to get the log off the phone')
-    assert.match(log, /label="Copy the log"/)
+    assert.match(log, /label="Copy Logs"/)
     assert.match(read('mobile/src/screens/Settings.js'), /title="Help & fixes"/, 'Setup has no way into the log')
   })
 
