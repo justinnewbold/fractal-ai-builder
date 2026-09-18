@@ -16,7 +16,7 @@ import {
   setParamConfirmed,
   setType
 } from '../lib/device'
-import { colLabel, doubtfulWrite, gridShape, laneItems, lanesShown, rowLabel } from '../lib/grid-plan'
+import { colLabel, doubtfulWrite, gridShape, isSplitChain, laneItems, lanesShown, rowLabel } from '../lib/grid-plan'
 import { blockPositions, landingIndex, reorderPlan, settledItems } from '../lib/laneOrder'
 import { isSilencingParam } from '../lib/guardrails'
 import { buildParamIndex, findControls, indexFor } from '../lib/paramIndex'
@@ -731,6 +731,7 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
 
   const { linear } = gridShape(caps)
   const lanes = lanesShown(blocks, caps)
+  const splitChain = isSplitChain(blocks, caps)
 
   useEffect(() => {
     if (!open || palette !== null) return undefined
@@ -1042,6 +1043,28 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
       </View>
 
       {issue ? <Note tone="warn">{issue}</Note> : null}
+
+      {/*
+        A SPLIT CHAIN, SAID OUT LOUD.
+
+        The app knows where every block sits. It does not know how the rows are
+        JOINED — there is no read for the cables anywhere, only a write — so on
+        a preset that runs down two rows it can describe half of what is there
+        and has no way to tell a deliberate split from two unrelated rows.
+
+        Drawing that silently is the problem. Two lanes with no comment reads
+        either as one chain that happens to wrap, or as an editor that
+        understands the routing and is showing it to you. Neither is true, and
+        the second is the one that gets a preset rebuilt. Moving blocks WITHIN a
+        row is safe and stays available — cells and cables are different writes,
+        and shuffling a row cannot disturb what joins it to another.
+      */}
+      {splitChain ? (
+        <Note>
+          This preset uses more than one row. Moving blocks within a row is fine, but this app
+          can’t see or change how the rows are joined — do that on the computer.
+        </Note>
+      ) : null}
 
       <Text style={{ color: color.silkFaint, fontSize: font.micro }}>
         Hold ≡ and drag a block up or down to move it. Tap a block for Add and Remove.

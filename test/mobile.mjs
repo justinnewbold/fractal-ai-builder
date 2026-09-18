@@ -1378,6 +1378,63 @@ export function run(test) {
     assert.equal(lanesShown([], caps).length, 1)
   })
 
+  test('a block past the grid the phone assumed still gets drawn, and a split says so', async () => {
+    /*
+     * TWO THINGS THE SPLIT-CHAIN LOOK FOUND.
+     *
+     * (a) Lanes were built from the row count capabilities reported, so a
+     * block sitting on a row beyond it was not drawn ANYWHERE — it did not
+     * appear in a lane, and the editor showed a chain with a piece of it
+     * silently missing. A chain the app cannot place is the one it must not
+     * quietly drop: the grid it was told about loses to the blocks actually
+     * there.
+     *
+     * (b) The app reads where blocks sit, and nothing reads the CABLES that
+     * join the rows — there is no such read anywhere, only writes. So on a
+     * preset running down two rows it can describe half of what is there, and
+     * drawing that with no comment reads as an editor that understands the
+     * routing. It doesn't, and it says so.
+     */
+    const { lanesFor, isSplitChain } = await import('../mobile/src/lib/grid-plan.js')
+    const caps = { grid: { rows: 4, cols: 12 } }
+
+    /* (a) A block on row 5 of a grid the unit called four rows tall. */
+    const far = [
+      { row: 0, col: 0, name: 'Drive 1' },
+      { row: 5, col: 1, name: 'Delay 1' }
+    ]
+    const held = lanesFor(far, caps).flatMap((l) => l.blocks.map((b) => b.name))
+    assert.deepEqual(held.sort(), ['Delay 1', 'Drive 1'], 'a block past the assumed grid was dropped')
+
+    /* (b) One occupied row is a plain chain; two is a split, and the editor
+       has a line for it. */
+    assert.equal(isSplitChain([{ row: 0, col: 0 }, { row: 0, col: 2 }], caps), false)
+    assert.equal(isSplitChain(far, caps), true)
+
+    const editor = read('mobile/src/screens/Edit.js')
+    assert.ok(
+      /const splitChain = isSplitChain\(blocks, caps\)/.test(editor),
+      'the chain editor never works out whether the preset is split'
+    )
+    assert.ok(
+      /splitChain \? \(/.test(editor) && /can’t see or change how the rows are joined/.test(editor),
+      'a split preset is drawn with nothing said about the routing'
+    )
+
+    /* Both ends draw the same lanes from the same file, so both ends owe the
+       same sentence. The browser is where a split preset is most likely to be
+       opened, not least. */
+    const web = read('src/components/GridEditor.jsx')
+    assert.ok(
+      /const splitChain = isSplitChain\(blocks, capabilities\)/.test(web),
+      'the browser chain editor never works out whether the preset is split'
+    )
+    assert.ok(
+      /see or change how the rows are joined/.test(web),
+      'the browser draws a split preset with nothing said about the routing'
+    )
+  })
+
   test('a write the unit calls refused is never undone by the phone', () => {
     /*
      * THE BUG THIS PANEL WAS REPORTED FOR, in the browser: "delete works, the
