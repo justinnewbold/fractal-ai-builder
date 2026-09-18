@@ -1166,7 +1166,6 @@ export function run(test) {
     assert.match(read('mobile/src/screens/Edit.js'), /Row \$\{rowLabel\(lane\.row\)\}/, 'the phone shows the row as it counts it')
     assert.match(read('src/components/GridEditor.jsx'), /Row \$\{rowLabel\(lane\.row\)\}/, 'the browser shows the row as it counts it')
     assert.match(read('mobile/src/lib/demoWire.js'), /path === '\/preset\/grid\/cell'\) return mock\.placeBlock\(body\?\.row - 1, body\?\.col - 1/, 'the demo does not answer the grid route the phone calls')
-
     /* And the phone adds it exactly once, at the boundary and nowhere else. */
     const device = read('mobile/src/lib/device.js')
     assert.match(device, /put\('\/preset\/grid\/cell', \{ \.\.\.toWireCell\(row, col\), blockId \}\)/)
@@ -1185,6 +1184,26 @@ export function run(test) {
     assert.deepEqual(grid.cableColumns(3), [0, 1, 2, 3])
     assert.equal(grid.cableColumns(99).at(-1), 12)
     assert.ok(!grid.cableColumns(5).includes(-1))
+  })
+
+  test('every write is in the log with the unit\'s answer', () => {
+    /*
+     * "Is the log showing all the edit failures?" It was not: a scene, a
+     * bypass, a channel, a model change, a rename, a modifier and a tap of
+     * the tempo left no line, so a preset that came out wrong had nothing to
+     * point at. Each one is a line now, and a remove, an add, a model change
+     * and a save say what the unit shows afterwards, not what it said.
+     */
+    const writes = read('mobile/src/lib/device.js').replace(/\s+/g, ' ')
+    for (const name of ['selectPreset', 'setScene', 'setBypass', 'setChannel', 'setTempo', 'tapTempo', 'setType', 'bindModifier', 'setPresetName', 'setSceneName', 'setCable']) {
+      assert.match(writes, new RegExp(`export const ${name} = \\([^)]*\\) => told\\(`), `${name} writes without a line in the log`)
+    }
+    assert.match(writes, /logDebug\('write', what, r\?\.ok === false \? 'refused' : r\?\.ok === true \? 'ok' : 'no answer'\)/)
+    const editor = read('mobile/src/screens/Edit.js')
+    assert.match(editor, /after the remove`, holds\(row, col\) \? 'still holds a block' : 'empty now'/, 'a remove does not say whether the cell emptied')
+    assert.match(editor, /after the add`, holds\(row, col\) \? 'holds the block' : 'still empty'/, 'an add does not say whether the cell filled')
+    assert.match(editor, /`block \$\{eid\} model after the change`/, 'a model change does not say what the unit shows')
+    assert.match(read('mobile/src/components/SaveToSlot.js'), /logDebug\('write', `save to slot \$\{preset\?\.number\}`, res\.ok \? 'saved' : `failed — \$\{res\.error\}`\)/, 'a save leaves no line')
   })
 
   test('a chain drawn on a phone shows what is there, and the gaps between', async () => {

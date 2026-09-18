@@ -1,5 +1,6 @@
 import { useState } from 'react'
 
+import { logDebug } from '../lib/debugLog'
 import { colLabel } from '../lib/grid-plan'
 import { parkSave, readSaveResult } from '../lib/device'
 import { askComputerToSave } from '../lib/saveViaComputer'
@@ -51,6 +52,7 @@ export function useSaveToSlot() {
       name: preset?.name || ''
     })
     setSaving(false)
+    logDebug('write', `save to slot ${preset?.number}`, res.ok ? 'saved' : `failed — ${res.error}`)
     if (res.ok) savedToSlot(res.slot)
     setSaid(res.ok ? { tone: 'hint', text: `Saved to slot ${res.slot}.` } : { tone: 'warn', text: res.error })
   }

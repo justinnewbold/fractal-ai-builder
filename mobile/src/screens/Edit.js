@@ -406,6 +406,12 @@ function BlockPanel({ block, channels, focus, onError, onScrollLock }) {
     const was = type
     await setType(eid, Number(value))
     const fresh = await blockParams(eid)
+    /* The answer is what the unit shows afterwards, not what it said. */
+    logDebug(
+      'write',
+      `block ${eid} model after the change`,
+      fresh?.type?.value === Number(value) ? 'unit shows it' : `unit shows ${fresh?.type?.value ?? 'nothing'}, asked ${Number(value)}`
+    )
     setParams(fresh?.named || [])
     setType_(fresh?.type ?? null)
     setLocal({})
@@ -754,6 +760,7 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
       logDebug('chain', `add block ${page} at ${where(row, col)}`, refusedAnswer(r) ? 'refused' : r?.ok === true ? 'ok' : 'no answer')
       await after(r)
       setAddAfter(null)
+      logDebug('chain', `${where(row, col)} after the add`, holds(row, col) ? 'holds the block' : 'still empty')
       if (!holds(row, col)) {
         const put = placeOf(Number(page))
         logDebug('chain', `block ${page} after the add`, put ? `unit has it at ${where(put.row, put.col)}` : 'unit has it nowhere')
@@ -895,6 +902,7 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
       const r = await clearCell(row, col)
       logDebug('chain', `remove block at ${where(row, col)}`, refusedAnswer(r) ? 'refused' : r?.ok === true ? 'ok' : 'no answer')
       await after(r)
+      logDebug('chain', `${where(row, col)} after the remove`, holds(row, col) ? 'still holds a block' : 'empty now')
       if (holds(row, col)) {
         setIssue(`The unit did not remove it: ${where(row, col)} still holds a block${refusedAnswer(r) ? ', and the unit answered “refused”' : ''}.`)
       }
