@@ -52,7 +52,7 @@ import {
   signOut,
   remoteSignUp
 } from './remote.js'
-import { isPairAccount, makePairCode, normalizePairCode, pairCredentials, pairCodeFromUrl } from '../../shared/pairing.mjs'
+import { isPairAccount, makePairCode, normalizePairCode, NOT_A_PAIR_CODE, pairCredentials, pairCodeFromUrl } from '../../shared/pairing.mjs'
 export { isPairAccount, formatPairCode, pairLink, normalizePairCode, isPairCode } from '../../shared/pairing.mjs'
 
 /**
@@ -947,7 +947,7 @@ export const savedPairCode = () => {
  */
 export async function pairPhone(code) {
   const clean = normalizePairCode(code)
-  if (!clean) throw new Error('That isn’t a pairing code. It’s 16 letters and numbers, shown on your computer.')
+  if (!clean) throw new Error(NOT_A_PAIR_CODE)
   set({ pairError: null })
   try {
     await connectPhone(pairCredentials(clean))

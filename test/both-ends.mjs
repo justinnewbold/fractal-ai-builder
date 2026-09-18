@@ -421,6 +421,12 @@ export const AREAS = [
         why: 'the same offer at both ends; the browser also says Try now on the not-connected screen and Go beside the code box, neither of which the phone has a place for'
       },
       {
+        does: 'read the pairing code off the computer’s screen with the camera',
+        web: null,
+        phone: 'Scan a code',
+        why: 'the browser is the thing the QR POINTS AT — it carries the hosted app’s address with the code in the fragment, so opening the square’s link IS the browser pairing, and a camera there would be a laptop photographing its own screen'
+      },
+      {
         does: 'close the sign-in sheet',
         web: null,
         phone: 'Done',

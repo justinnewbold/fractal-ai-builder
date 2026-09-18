@@ -9689,14 +9689,31 @@ console.log('\npairing')
  */
 import * as pairing from '../shared/pairing.mjs'
 
-test('a code is 16 symbols nobody misreads, shown in fours', () => {
+test('a code is 8 symbols nobody misreads, shown in fours, and 16 still opens the door', () => {
   const bytes = (arr) => arr.map((_, i) => i * 7)
   const code = pairing.makePairCode(bytes)
-  assert.equal(code.length, 16)
-  assert.match(code, /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{16}$/, 'the alphabet has a 0, 1, I or O in it')
-  assert.equal(pairing.formatPairCode(code), `${code.slice(0, 4)}-${code.slice(4, 8)}-${code.slice(8, 12)}-${code.slice(12)}`)
+  assert.equal(code.length, 8, 'a new code is not the length the app tells people to expect')
+  assert.match(code, /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/, 'the alphabet has a 0, 1, I or O in it')
+  assert.equal(pairing.formatPairCode(code), `${code.slice(0, 4)}-${code.slice(4)}`)
   // Two calls with real randomness never agree.
   assert.notEqual(pairing.makePairCode(), pairing.makePairCode())
+
+  /*
+   * IT IS STILL A PASSWORD, which is the reason this is 8 and not the 4 that
+   * was asked for. 32 symbols to the 8th is about 1.1 trillion; a thousand
+   * guesses a second is eleven hundred years. Four digits is ten thousand —
+   * minutes, by a script, against a sign-in service that answers to anyone.
+   */
+  assert.ok(Math.pow(32, pairing.PAIR_LENGTH) > 1e12, 'a code is now short enough to be worth guessing')
+
+  /* And a Mac paired before this is not unpaired by it. A longer code is a
+     stronger one, so the old length keeps working rather than being retired. */
+  assert.deepEqual(pairing.PAIR_LENGTHS, [8, 16])
+  assert.equal(pairing.normalizePairCode('ABCD-EFGH-JKLM-NPQR'), 'ABCDEFGHJKLMNPQR', 'a phone paired at 16 is locked out by the change')
+  assert.equal(pairing.normalizePairCode('ABCD-2345'), 'ABCD2345')
+  for (const wrong of ['ABCD', 'ABCD-EFGH-JKLM', 'ABCD-EFGH-JKLM-NPQR-STUV']) {
+    assert.equal(pairing.normalizePairCode(wrong), null, `${wrong} passed as a code`)
+  }
 })
 
 test('a code typed carelessly is still the code', () => {
@@ -9706,6 +9723,7 @@ test('a code typed carelessly is still the code', () => {
     assert.ok(pairing.isPairCode(typed), typed)
   }
   assert.equal(pairing.normalizePairCode('ABCD-EFGH-JKLM-NPQ'), null, 'fifteen symbols passed as a code')
+  assert.equal(pairing.normalizePairCode('ABCD-EFG'), null, 'seven symbols passed as a code')
   assert.equal(pairing.normalizePairCode('ABCD-EFGH-JKLM-NPQ0'), null, 'a zero passed, and no code has one')
   assert.equal(pairing.normalizePairCode(''), null)
   assert.equal(pairing.normalizePairCode(null), null)
@@ -9720,6 +9738,19 @@ test('the same code is the same account at both ends, and the address gives half
   assert.ok(a.password.length >= 6, 'the account service refuses passwords under six')
   assert.ok(!a.email.toUpperCase().includes('JKLMNPQR'), 'the address, which screens show, carries the whole code')
   assert.throws(() => pairing.pairCredentials('nope'), /isn’t a pairing code/)
+
+  /*
+   * HALF OF WHATEVER LENGTH IT IS. Hard-coded at eight, an 8-symbol code would
+   * have put the whole thing in the address — and the address is what a screen
+   * shows when it says who is signed in. Shortening the code would have handed
+   * the code to anybody reading over a shoulder.
+   */
+  const short = pairing.pairCredentials('ABCD-2345')
+  assert.equal(short.email, 'pair-abcd@pair.fractal.newbold.cloud')
+  assert.equal(short.password, 'pair-ABCD2345')
+  assert.ok(!short.email.toUpperCase().includes('2345'), 'the short code is given away whole by its own address')
+  assert.ok(short.password.length >= 6, 'the account service refuses passwords under six')
+  assert.ok(pairing.isPairAccount(short.email), 'a short code’s account is not recognised as a paired one')
 })
 
 test('a paired account is told apart from a person’s, so no screen shows it as an email', () => {
