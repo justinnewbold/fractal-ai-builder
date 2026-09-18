@@ -2860,8 +2860,44 @@ export function run(test) {
     assert.match(link, /hostVersion: null/, 'the link state has nowhere to keep it')
     assert.match(
       link.replace(/\s+/g, ' '),
-      /const version = doc\?\.data\?\.version \|\| doc\?\.version if \(version\) set\(\{ hostVersion: String\(version\) \}\)/,
+      /set\(\{ macName: String\(name\), hostVersion: version \? String\(version\) : null \}\)/,
       'the version the computer sends is still thrown away'
+    )
+
+    /*
+     * AND ASKED AGAIN. "The Mac's version line still says did not say" — on a
+     * Mac that was on the right version. This end read `host.name` once, at
+     * join, and never again, so a computer updated while the phone sat
+     * connected kept answering with whatever an older launcher had written,
+     * which for a launcher older than 7.205.0 is a name and no version at all.
+     * The computer rewrites it every five minutes; this end now asks again.
+     */
+    assert.match(link, /export const NAME_AGAIN = 2 \* 60 \* 1000/, 'the phone has no interval for asking again')
+    assert.match(
+      link.replace(/\s+/g, ' '),
+      /if \(state\.link === 'connected' && Date\.now\(\) - namedAt > NAME_AGAIN\) await readMacName\(\)/,
+      'the computer is asked what it is only at join, so an update while connected is never noticed'
+    )
+
+    /*
+     * AND SAID IN THE LOG, all three ways. "Did not say" has three causes and
+     * the pasted log could not tell them apart: the read got no answer, the
+     * computer has written nothing, or it wrote a name with no version. Only
+     * the last one is the old launcher the Setup screen blames.
+     */
+    const flat = link.replace(/\s+/g, ' ')
+    assert.match(flat, /say\(`could not read what the computer is — \$\{err\?\.message/, 'a failed read is silent')
+    assert.match(flat, /say\('the computer has not written its name yet'\)/, 'a computer that wrote nothing is silent')
+    assert.match(flat, /`the computer is \$\{name\}, v\$\{version\}`/, 'the log never says which computer app answered')
+    assert.match(flat, /`the computer is \$\{name\} and did not say its version`/, 'a name with no version beside it is silent')
+
+    /* And said once. Asked again every couple of minutes, the same answer
+       written every time is thirty lines an hour burying the one that matters
+       in a log whose whole purpose is being pasted into a chat. */
+    assert.match(
+      flat,
+      /function say\(line\) \{ if \(line === namedSaid\) return namedSaid = line logDebug\('link', line\) \}/,
+      'the same answer is written into the log every couple of minutes'
     )
 
     /* In the log, because that is the copy that reaches a chat. */

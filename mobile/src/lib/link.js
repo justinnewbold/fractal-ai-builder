@@ -159,6 +159,10 @@ async function tick() {
     refresh()
   }
 
+  // A computer that was updated while this phone watched says so within a
+  // couple of minutes, rather than at the next join.
+  if (state.link === 'connected' && Date.now() - namedAt > NAME_AGAIN) await readMacName()
+
   delay = state.link === 'connected' ? KEEPALIVE : nextDelay(delay)
   schedule(delay)
 }
@@ -206,21 +210,74 @@ async function countHosts() {
 }
 
 /**
+ * How long the phone goes before asking the computer again what it is.
+ *
+ * The computer rewrites its name and version every five minutes (see
+ * TELL_PHONES_MS in desktop/lib/host.mjs), and this end used to read it once,
+ * at join, and never again. So a computer whose app was updated while the
+ * phone sat connected kept answering with whatever it had said hours earlier —
+ * including nothing at all, from a launcher too old to write a version.
+ *
+ * Asking again costs one small document read a couple of minutes, next to a
+ * keepalive that already runs every eight seconds. That buys a phone that
+ * notices a computer being updated while it watches.
+ */
+export const NAME_AGAIN = 2 * 60 * 1000
+
+/** When the computer was last asked what it is. */
+let namedAt = 0
+/*
+ * The last answer, so asking again every couple of minutes does not write the
+ * same line into the log thirty times an hour. The log is read by being pasted
+ * into a chat, and a line repeated that often buries the one that matters.
+ * What is worth saying is the first answer and every time it changes.
+ */
+let namedSaid = null
+
+/**
  * What the Mac calls itself, so a screen can say "Connected to Studio Mac".
  *
  * Written into the host's own document store by the launcher on that Mac, which
- * is also the read the roll call counts answers to.
+ * is also the read the roll call counts answers to. Since 7.205.0 the launcher
+ * writes its own version beside the name, which is what the Setup screen and a
+ * pasted log report as the computer app's version.
+ *
+ * Every outcome goes in the log, because "did not say" on the Setup screen has
+ * three different causes and the pasted log could not tell them apart: a read
+ * that never got an answer, a computer that has written nothing, and a computer
+ * that wrote a name with no version beside it. Only the last of those is the
+ * old launcher the screen blames.
  */
 async function readMacName() {
   try {
     const doc = await remoteRequest('/store/config/host.name')
-    const name = doc?.data?.name || doc?.name
-    if (name) set({ macName: String(name) })
-    const version = doc?.data?.version || doc?.version
-    if (version) set({ hostVersion: String(version) })
-  } catch {
-    // "your Mac" is a fine name.
+    const data = doc?.data && typeof doc.data === 'object' ? doc.data : doc
+    namedAt = Date.now()
+    const name = data?.name
+    const version = data?.version
+    if (!name) {
+      say('the computer has not written its name yet')
+      return
+    }
+    /*
+     * Both together, and the version cleared when it is absent, the way the
+     * browser has always read it. A version that is kept after the computer
+     * stopped saying one is a screen reporting an app that may not be running
+     * any more.
+     */
+    set({ macName: String(name), hostVersion: version ? String(version) : null })
+    say(version ? `the computer is ${name}, v${version}` : `the computer is ${name} and did not say its version`)
+  } catch (err) {
+    // "your Mac" is a fine name. The log still says the asking failed.
+    say(`could not read what the computer is — ${err?.message || String(err)}`)
   }
+}
+
+/** Said once, and again only when the answer is a different one. */
+function say(line) {
+  if (line === namedSaid) return
+  namedSaid = line
+  logDebug('link', line)
 }
 
 /** Start the loop. Idempotent — a second call is a probe, not a second loop. */
@@ -281,6 +338,8 @@ export async function stopLink() {
     }
   }
   unbind = []
+  namedAt = 0
+  namedSaid = null
   await remoteDisconnect()
   resetRig()
   set({ ...initial })
