@@ -87,6 +87,23 @@ came from is a job nobody finishes.
 shows the name and the blurb and leaves the space alone. Load every row first,
 add photos as they arrive.
 
+## What is already loaded
+
+`docs/gear-amps.csv` is in the table already — **103 amplifiers, 116 Fractal
+model names, 41 makers, and not one photograph.** The mapping came from the
+table of contents of Yek's Guide to the Fractal Audio Amp Models, which lists
+every model beside the amplifier it was taken from.
+
+**What was taken from it, and what was not.** Which Fractal model corresponds
+to which real amplifier is a fact, and facts are free to use. Yek's written
+descriptions are his own work and were not copied — that is why every `blurb`
+is empty, and they should be written fresh rather than pasted. The photographs
+in that guide are mostly manufacturer and forum images he collected; they were
+not his to license and they are not ours to ship.
+
+So what is missing is exactly the photos, and `photo_path` is empty on all 103
+rows waiting for them.
+
 ## Uploading
 
 Through the Supabase dashboard: Storage → `gear` → Upload files, and a whole
