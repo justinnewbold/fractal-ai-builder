@@ -71,6 +71,31 @@ const face = Platform.select(mono)
  * button that looks like a speaker in the header, and when it's tapped you can
  * slide the volume left or right… but it's not there on the main screen."
  */
+/**
+ * Why there is nothing to write to, told apart rather than guessed at.
+ *
+ * This said "the chain is still loading" for both, and it was the wrong half
+ * of the time: the chain HAD been read, and the Output block in it came back
+ * with no id to address. Blaming a read that already happened sends somebody
+ * to wait for something that has finished, which is the worst kind of wrong
+ * message — it looks like patience is the answer.
+ *
+ * With the bar's speaker now asking the same question this does, neither
+ * should be reachable at all. They are kept because they are what says so if
+ * the two ever disagree again.
+ */
+const noOutput = (present, onError) => {
+  const why = present
+    ? 'the unit reported an Output block with no id to write to'
+    : 'the chain has not been read'
+  logDebug('set', 'volume: no Output block known yet', why)
+  onError?.(
+    present
+      ? 'This preset’s Output block came back without a level this app can move.'
+      : 'No output level to move yet — the chain is still loading.'
+  )
+}
+
 export default function Volume({ blocks, open, onClose, onError }) {
   const output = (blocks || []).find((b) => b.slug === 'output')
   const eid = idOf(output)
@@ -174,12 +199,8 @@ export default function Volume({ blocks, open, onClose, onError }) {
   const land = async () => {
     const { param: p, value: v } = live.current
     if (!p || typeof v !== 'number') return
-    /* No Output block known yet — the chain is still coming, or this preset
-       has none — and a write to block "undefined" was going out and being
-       refused with a sentence about doing it at the computer. */
     if (!Number.isInteger(eid)) {
-      logDebug('set', 'volume: no Output block known yet', 'the chain has not been read')
-      onError?.('No output level to move yet — the chain is still loading.')
+      noOutput(!!output, onError)
       return
     }
     try {
@@ -233,8 +254,7 @@ export default function Volume({ blocks, open, onClose, onError }) {
     const p = live.current.param
     if (!p) return
     if (!Number.isInteger(eid)) {
-      logDebug('set', 'volume: no Output block known yet', 'the chain has not been read')
-      onError?.('No output level to move yet — the chain is still loading.')
+      noOutput(!!output, onError)
       return
     }
     const next = nudged(live.current.value, p, volumeNudge(p) * direction)

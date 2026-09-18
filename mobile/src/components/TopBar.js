@@ -6,6 +6,7 @@ import { linkTone, linkWord, toneOfRemote, unitWord } from '../lib/link-word'
 import { APP_VERSION } from '../lib/version'
 import { useRig } from '../lib/rig'
 import { useDemo } from '../lib/demo'
+import { idOf } from '../lib/device'
 import Lamp from './Lamp'
 import Volume from './Volume'
 
@@ -81,9 +82,25 @@ export default function TopBar({ link, onOpenSettings }) {
    */
   const named = unitSaid ? `${unit ? `${unit} · ` : ''}${unitSaid}`.toUpperCase() : unit || (connected ? 'Looking…' : '—')
 
-  /* Only where there is an output block to move, the same rule the browser
-     uses: a speaker that opens an empty sheet is worse than no speaker. */
-  const hasOutput = connected && (blocks || []).some((b) => b?.slug === 'output')
+  /*
+   * Only where there is an output block to move, the same rule the browser
+   * uses: a speaker that opens an empty sheet is worse than no speaker.
+   *
+   * AND ONLY WHERE IT CAN BE WRITTEN TO, which is not the same thing and cost
+   * an evening to tell apart. This asked whether a block called "output" was
+   * in the chain; the slider asks whether that block has an id to address. A
+   * unit that reports the block without one satisfies the first and fails the
+   * second, so the speaker appeared and every press of it answered "the chain
+   * has not been read" about a chain that had:
+   *
+   *   01:24:41 [set] volume: no Output block known yet — the chain has not been read
+   *   01:25:04 [set] volume: no Output block known yet — the chain has not been read
+   *
+   * — twenty seconds apart, on a preset whose chain had just been edited block
+   * by block. One question now, asked in one place, so the button and the
+   * write can no longer disagree about whether there is a volume to move.
+   */
+  const hasOutput = connected && Number.isInteger(idOf((blocks || []).find((b) => b?.slug === 'output')))
 
   return (
     <View
