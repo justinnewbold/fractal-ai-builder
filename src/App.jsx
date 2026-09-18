@@ -141,6 +141,7 @@ import {
   verifyChanges,
   storePreset,
   selectPreset,
+  clearDeviceCache,
   getScene,
   setScene,
   sceneChannels,
@@ -3511,6 +3512,10 @@ export default function App() {
     resetSchemaCache()
     try {
       await selectPreset(number)
+      /* Before anything is read back: the computer answers "what is loaded"
+         from a fifteen-second copy, and inside that window it names the preset
+         you just left. */
+      await clearDeviceCache().catch(() => {})
       record('select', `Loaded slot ${number}`)
       /*
        * Recorded after the unit took it, not when it was asked for: a slot the

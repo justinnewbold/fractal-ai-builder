@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { selectPreset, liveMeters, setChannel, setMetersWanted, setTempo } from '../lib/forgefx'
+import { selectPreset, clearDeviceCache, liveMeters, setChannel, setMetersWanted, setTempo } from '../lib/forgefx'
 import {
   useDevice,
   refreshBlocks as reReadChain,
@@ -511,6 +511,11 @@ export default function Gig({
     setWorking(true)
     try {
       await selectPreset(next)
+      /* The computer holds its copy of "what preset is loaded" for fifteen
+         seconds, so a read straight after this one describes the preset just
+         left. See the note in mobile/src/lib/rig.js — the phone showed the old
+         preset's name, scenes and chain for the length of that window. */
+      await clearDeviceCache().catch(() => {})
       onChanged()
     } catch (err) {
       onError(err.message)
