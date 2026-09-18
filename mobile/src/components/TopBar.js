@@ -53,11 +53,20 @@ export default function TopBar({ link, onOpenSettings }) {
   const demo = useDemo()
   const connected = link?.link === 'connected'
   const tone = toneOfRemote(link?.link)
-  /* The unit outranks the link: a green CONNECTED over a frozen FM3 is the
-     bar lying in the one spot that exists to stop it. See unitWord. */
+  const mark = demo ? 'wait' : linkTone(tone)
+  const word = demo ? 'demo' : linkWord(tone, 'remote')
+
+  /*
+   * TWO SPOTS, EACH TELLING ITS OWN TRUTH. The word on the right is the
+   * computer: CONNECTED means the phone can reach the Mac, and nothing more.
+   * The lamp and name on the left are the unit: green with its name while it
+   * answers, red with NOT ANSWERING when the Mac has a unit that has gone
+   * quiet, red with NO UNIT when the Mac has none. See unitWord. Before this
+   * the left showed the name and the right showed the link, and a frozen FM3
+   * looked exactly like a working one.
+   */
   const unitSaid = demo ? null : unitWord(tone, unitState)
-  const mark = demo ? 'wait' : unitSaid ? 'no' : linkTone(tone)
-  const word = demo ? 'demo' : unitSaid || linkWord(tone, 'remote')
+  const unitLamp = !connected || demo ? (link?.link === 'no-answer' ? 'fault' : 'idle') : unitSaid ? 'fault' : unitState === 'present' ? 'live' : 'idle'
 
   /*
    * The unit's short name, and a dash rather than a guess.
@@ -67,7 +76,7 @@ export default function TopBar({ link, onOpenSettings }) {
    * on a bar this narrow that is most of the width, and the lamp beside it is
    * already saying the same thing in a shape you can read at a glance.
    */
-  const named = unit || (connected ? 'Looking…' : '—')
+  const named = unitSaid ? `${unit ? `${unit} · ` : ''}${unitSaid}`.toUpperCase() : unit || (connected ? 'Looking…' : '—')
 
   /* Only where there is an output block to move, the same rule the browser
      uses: a speaker that opens an empty sheet is worse than no speaker. */
@@ -87,11 +96,11 @@ export default function TopBar({ link, onOpenSettings }) {
         backgroundColor: color.panel
       }}
     >
-      <Lamp state={unitSaid ? 'fault' : connected ? 'live' : link?.link === 'no-answer' ? 'fault' : 'idle'} />
+      <Lamp state={unitLamp} />
 
       <Text
         numberOfLines={1}
-        style={{ color: color.silk, fontSize: font.small, fontWeight: '700', letterSpacing: 1.5 }}
+        style={{ color: unitSaid ? color.fault : color.silk, fontSize: font.small, fontWeight: '700', letterSpacing: 1.5 }}
       >
         {named}
       </Text>

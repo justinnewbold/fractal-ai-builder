@@ -4044,27 +4044,33 @@ export function run(test) {
      */
     const bar = read('mobile/src/components/TopBar.js').replace(/\s+/g, ' ')
     assert.match(bar, /const demo = useDemo\(\)/, 'the bar cannot tell whether it is in the demo')
-    assert.match(bar, /const word = demo \? 'demo' : unitSaid \|\| linkWord\(tone, 'remote'\)/, 'the bar still says CONNECTED in the demo')
-    assert.match(bar, /const mark = demo \? 'wait' : unitSaid \? 'no' : linkTone\(tone\)/, 'the demo word is drawn in the colour a real connection gets')
+    assert.match(bar, /const word = demo \? 'demo' : linkWord\(tone, 'remote'\)/, 'the bar still says CONNECTED in the demo')
+    assert.match(bar, /const mark = demo \? 'wait' : linkTone\(tone\)/, 'the demo word is drawn in the colour a real connection gets')
   })
 
-  test('the bar says when the unit is gone or silent, over a link that is fine', async () => {
-    /*
+  test('the bar has two spots, and each tells its own truth', async () => {
+     /*
      * "The whole time I was playing around with the app, it said I was still
      * connected to the FM3." It was connected -- to the Mac. The FM3 had
      * frozen: no preset number, no chain, every read timing out, and the bar
-     * green for the whole of it. The unit outranks the link.
+     * green for the whole of it. "It has two spots for connections already.
+     * One is to the computer, the other is the unit link. They both need to
+     * tell the truth." The right-hand word stays the computer's; the lamp and
+     * name on the left are the unit's.
      */
     const words = await import('../shared/link-word.mjs')
     assert.equal(words.unitWord('good', 'missing'), 'no unit')
-    assert.equal(words.unitWord('good', 'silent'), 'unit not answering')
+    assert.equal(words.unitWord('good', 'silent'), 'not answering')
     assert.equal(words.unitWord('good', 'present'), null)
     assert.equal(words.unitWord('bad', 'silent'), null, 'with the link down, the link is the news')
     const phone = await import('../mobile/src/lib/link-word.js')
     assert.equal(phone.unitWord('good', 'silent'), words.unitWord('good', 'silent'), 'the two apps disagree about the unit word')
     const bar = read('mobile/src/components/TopBar.js').replace(/\s+/g, ' ')
     assert.match(bar, /const unitSaid = demo \? null : unitWord\(tone, unitState\)/, 'the bar does not ask about the unit')
-    assert.match(bar, /<Lamp state=\{unitSaid \? 'fault' : connected \? 'live'/, 'the lamp stays green over a silent unit')
+    assert.match(bar, /<Lamp state=\{unitLamp\} \/>/, 'the lamp is about the link, not the unit')
+    assert.match(bar, /unitSaid \? 'fault' : unitState === 'present' \? 'live' : 'idle'/, 'the lamp stays green over a silent unit')
+    assert.match(bar, /const named = unitSaid \? `\$\{unit \? `\$\{unit\} · ` : ''\}\$\{unitSaid\}`\.toUpperCase\(\) : unit \|\| \(connected \? 'Looking…' : '—'\)/, 'the unit spot does not say the unit is silent')
+    assert.match(bar, /color: unitSaid \? color\.fault : color\.silk/, 'a silent unit is not drawn in red')
     const rig = read('mobile/src/lib/rig.js').replace(/\s+/g, ' ')
     assert.match(rig, /const unit = caps\?\.connected === false \? 'missing' : 'present'/, 'a Mac with no unit is not noticed')
     assert.match(rig, /fresh\?\.number === -1 \? \{ unit: 'silent' \}/, 'a unit that stops answering its name is not noticed')
