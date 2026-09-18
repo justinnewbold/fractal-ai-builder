@@ -106,8 +106,10 @@ export function forbiddenRemotely(method, path) {
   if (hostAllows(m, clean)) return null
   // The host will refuse it; say why in words if we have them.
   return (
-    REMOTE_FORBIDDEN.find((r) => r.match(m, clean))?.why ||
-    'do that from a distance — it only works at the computer'
+    /* Read as "You can't do that from your phone — do that at the computer."
+       It used to say "from a distance — it only works at the computer" here
+       as well, which came out as one sentence with two endings. */
+    REMOTE_FORBIDDEN.find((r) => r.match(m, clean))?.why || 'do that'
   )
 }
 
