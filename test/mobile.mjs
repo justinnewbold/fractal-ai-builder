@@ -1250,13 +1250,12 @@ export function run(test) {
     ]
 
     const lanes = lanesShown(blocks, caps)
-    /* The row that holds something, plus the first empty one — so a bare preset
-       can be started and a parallel row can be begun. Not all four. Rows count
-       from zero, so the empty top row is the first lane and the chain is the
-       second. */
+    /* The row that holds something, then the first empty one — so a bare preset
+       can be started and a parallel row can be begun. Not all four. The chain
+       is drawn first and the spare row after it, whatever their numbers. */
     assert.equal(lanes.length, 2, 'every row of the grid is drawn, empty or not')
-    assert.deepEqual(lanes.map((l) => l.row), [0, 1], 'the lanes shown are not the top row and the one with the chain')
-    const chain = lanes[1]
+    assert.deepEqual(lanes.map((l) => l.row), [1, 0], 'the spare row is drawn above the chain')
+    const chain = lanes[0]
     assert.deepEqual(chain.blocks.map((b) => b.name), ['Drive 1', 'Amp 1'], 'a lane is not in signal order')
     assert.deepEqual(chain.gaps, [1, 3], 'the free cells in a lane are wrong')
 
