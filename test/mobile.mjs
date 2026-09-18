@@ -3002,9 +3002,9 @@ export function run(test) {
       !/no one-file installer for this yet/.test(src),
       'the page still says there is no installer, and there are two'
     )
-    assert.match(src, /raw\.githubusercontent\.com/, 'neither terminal route fetches anything')
-    assert.match(src, /fractal-remote\.sh/, 'the Mac terminal route prints no command')
-    assert.match(src, /fractal-remote\.ps1/, 'the Windows terminal route prints no command')
+    assert.match(src, /fractal\.newbold\.cloud/, 'neither terminal route fetches anything')
+    assert.match(src, /mac\.sh/, 'the Mac terminal route prints no command')
+    assert.match(src, /windows\.ps1/, 'the Windows terminal route prints no command')
 
     /* The thing nobody knows and everything else depends on. */
     assert.match(screen, /Your unit plugs into a computer with a USB cable/, 'the page never says why a computer is involved')

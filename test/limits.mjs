@@ -485,35 +485,46 @@ export function run(test) {
     assert.match(unsigned, /github\.ref == 'refs\/heads\/main'/, "a build from any branch could publish under main's name")
   })
 
-  test('the two one-line helpers are real files', async () => {
+  test('the two one-paste installers are real files, and say the same things', async () => {
     /*
      * "Create terminal helper scripts — a shell script for Mac and a
      * PowerShell one for Windows — that print connection status and the local
      * URL."
      *
-     * THE RULE THIS HOLDS is that the app never prints a command that does not
-     * work. The connect screen used to say "there is no one-file installer for
-     * this yet", which was true and was better than a command that fails at
-     * the far end of somebody's evening with nothing to go on. Now there are
-     * two, and what keeps that promise is this: the URL the app prints is
-     * taken apart and the file it points at has to exist in this repository.
+     * ONE OF THE TWO ALREADY EXISTED, which is worth writing down because it
+     * was nearly missed. `public/windows.ps1` had been written, is referenced
+     * by MISSING_FORGEFX in host.mjs, and does more than the brief asked: it
+     * fetches the app as well as the server and finishes by running
+     * `npm run serve`, so the page and the device API are the same origin and
+     * a phone scans a QR instead of signing in. A second Windows script was
+     * written beside it and thrown away; what shipped was the Mac counterpart
+     * that had been the actual gap.
+     *
+     * So what this holds is the pair. Two files, two platforms, the same
+     * decisions — because the way they FAIL is where they would drift, and a
+     * person meeting a missing token on one platform should read what the
+     * other would have said.
      */
     const ways = await import('../shared/ways-in.mjs')
     const commands = ways.WAYS.filter((w) => w.command)
-    assert.equal(commands.length, 2, 'there are not two one-line helpers')
+    assert.equal(commands.length, 2, 'there are not two one-paste installers')
 
+    const scripts = []
     for (const way of commands) {
       /* The command is in the steps too, in reading order, and the screens
          tell it apart from the prose by matching this exact string. */
       assert.ok(way.steps.includes(way.command), `${way.id} names a command it never shows`)
 
+      /*
+       * THE RULE THIS HOLDS is that the app never prints a command that does
+       * not work. The URL is taken apart and the file it points at has to
+       * exist in this repository — `public/` is copied to the root of the
+       * deployed site, so a file there is reachable at that address.
+       */
       const url = way.command.match(/https:\/\/\S+/)
       assert.ok(url, `${way.id}'s command fetches nothing`)
-      const path = url[0].replace(
-        'https://raw.githubusercontent.com/justinnewbold/fractal-ai-builder/main/',
-        ''
-      )
-      assert.notEqual(path, url[0], `${way.id} fetches from somewhere that is not this repository`)
+      const path = url[0].replace('https://fractal.newbold.cloud/', 'public/')
+      assert.notEqual(path, url[0], `${way.id} fetches from somewhere that is not this site`)
       /* Throws, loudly and by filename, if the app prints a URL for a file
          nobody wrote. */
       const script = read(path)
@@ -524,60 +535,75 @@ export function run(test) {
         script.includes(way.command),
         `${path} does not begin with the command the app tells people to paste`
       )
+      scripts.push([path, script])
+    }
 
+    for (const [path, script] of scripts) {
       /*
-       * What both of them must say out loud. The desktop apps vendor a PINNED
-       * PRIVATE FORK of ForgeFX with fixes that are not upstream; these clone
-       * the public upstream, because that is the one anybody can clone without
-       * a token. It is the same project and it works, but a bug that appears
-       * only on this route may simply be a fix the fork already carries — and
-       * somebody debugging that deserves to know before they start.
+       * A TOKEN, AND SAYING SO BEFORE ANYTHING IS DOWNLOADED. The three
+       * repositories are private; there is no tokenless version of this route.
+       * Both scripts stop on a missing token with the same sentence rather
+       * than letting git fail with "could not read Username for
+       * 'https://github.com'", which sends people to look at everything except
+       * the token.
        */
-      assert.match(script, /FORGEFX_REPO/, `${path} offers no way to point at a different ForgeFX`)
-      assert.match(script, /PUBLIC upstream/, `${path} does not say it runs a different ForgeFX from the app`)
+      assert.match(script, /FORGEFX_TOKEN/, `${path} never mentions the token it cannot work without`)
+      assert.match(script, /A GitHub token is needed/, `${path} does not stop on a missing token with the shared wording`)
+      assert.match(
+        script,
+        /credential\.helper/,
+        `${path} no longer passes the token through a credential helper, so it can end up in .git/config and in git's error messages`
+      )
+      assert.ok(
+        !/https:\/\/[^\s'"]*\$\{?(FORGEFX_)?[Tt]oken/.test(script),
+        `${path} puts the token in a URL, where git writes it into .git/config`
+      )
 
-      /* Nothing system-wide, and no administrator. Everything in one folder,
-         and deleting that folder is the uninstall. */
-      assert.ok(!/\bsudo\b/.test(script), `${path} asks for an administrator`)
-      assert.match(script, /fractal-remote/, `${path} does not keep its files in one named place`)
+      /* Node 20 exactly, because the device server carries compiled USB and
+         MIDI code built against it. Both scripts check before cloning
+         anything — an evening spent on a clone that cannot build is the
+         failure this prevents. */
+      assert.match(script, /Node 20/, `${path} never says which Node it needs`)
 
-      /* Node 20 is the floor, checked before anything is downloaded — a script
-         that clones two repositories and then finds no usable Node has wasted
-         an evening and left a directory behind to explain. */
-      assert.match(script, /20/, `${path} never says which Node it needs`)
+      /* Siblings, not nested: the server depends on the codec by relative
+         path, and flattening the layout makes that link dangle. */
+      assert.match(script, /forgefx-midi/, `${path} never fetches the codec the server needs`)
+      /* Pinned by commit, read from the lock file the Mac build also reads. */
+      assert.match(script, /forgefx\.lock\.json/, `${path} picks its own versions instead of the pinned ones`)
+      assert.match(script, /FETCH_HEAD/, `${path} no longer checks out the commit it asked for`)
 
-      /* The two things a person needs on screen, which is what these were
-         asked for: is it connected, and what do I open. */
-      assert.match(script, /localhost:/, `${path} never prints an address for this computer`)
-      assert.match(script, /USB cable/, `${path} never says to plug the unit in`)
-      assert.match(script, /Ctrl-C/, `${path} never says how to stop it`)
+      /* And it ends by serving, which is what makes this local mode rather
+         than a bare server somebody still has to sign in to reach. */
+      assert.match(script, /run.{0,3} serve/, `${path} sets everything up and never starts it`)
+
+      /* The two things that are silent when wrong: the firewall prompt, and
+         something else already holding the USB port. */
+      assert.match(script, /firewall|incoming connections/i, `${path} never warns about the firewall prompt`)
+      assert.match(script, /Axe-Edit/, `${path} never says to quit the editor that holds the port`)
+    }
+
+    /* And the connect screen says the token part before somebody pastes a
+       line and watches it stop. */
+    for (const way of commands) {
+      assert.match(
+        way.steps.join(' '),
+        /token/i,
+        `${way.id} sends somebody at a command that will stop on a token it never mentioned`
+      )
     }
 
     /*
-     * The shell one has to be executable, and the question is asked of GIT
-     * rather than of the disk.
-     *
-     * Windows has no executable bit to record, so `statSync().mode` there says
-     * nothing — this failed on the first Windows run for that reason alone.
-     * It is also the more honest question: what matters is the mode that was
-     * COMMITTED, and a file can be executable on the machine it was written on
-     * and check out as 100644 for everybody else.
+     * The shell one is served, not run from a checkout, so it carries no
+     * shebang and needs no executable bit — `curl … | bash` names the shell.
+     * What it does need is to be safe when the download is cut off: piping
+     * into bash feeds the shell as it arrives, so a dropped connection would
+     * otherwise run the first half of a setup script. Everything lives in a
+     * function and the call is the last line, so a truncated file does
+     * nothing at all.
      */
-    const entry = execFileSync('git', ['ls-files', '-s', 'helpers/fractal-remote.sh'], {
-      cwd: fileURLToPath(new URL('..', import.meta.url)),
-      encoding: 'utf8'
-    })
-    assert.match(entry, /^100755 /, 'the shell helper is not committed as executable')
-
-    /* And Windows gets its firewall warning, which is the failure that looks
-       like nothing: the server starts, the unit is found, and the phone across
-       the room silently cannot reach any of it. */
-    assert.match(read('helpers/fractal-remote.ps1'), /firewall/i, 'nothing warns a PC about the firewall prompt')
-    assert.match(
-      ways.wayById('windows-terminal').steps.join(' '),
-      /firewall/i,
-      'the connect screen never mentions the firewall prompt a PC will show'
-    )
+    const mac = read('public/mac.sh')
+    assert.match(mac, /^fractal_remote_setup\(\) \{/m, 'mac.sh is not wrapped in a function')
+    assert.match(mac.trimEnd(), /fractal_remote_setup$/, 'mac.sh does not call itself on its last line, so a truncated download would run half of it')
   })
 
   test('the Mac app has a face, and claims only entitlements it uses', () => {

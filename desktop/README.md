@@ -88,3 +88,10 @@ in CI rather than on a desk. What CI still cannot answer:
 - **Windows USB in particular.** A Fractal unit is class-compliant, so it
   should need no driver, but `serialport` naming differs (`COM3` rather than
   `/dev/tty.usbmodem…`) and that path has never had a unit on the end of it.
+
+## Without installing anything
+
+Neither app is required. `public/windows.ps1` and `public/mac.sh` are one-paste
+setup scripts that fetch the same three repositories, build them, and run
+`npm run serve` — the same server these apps wrap, with a QR code instead of a
+window. Both need a GitHub token, because the repositories are private.

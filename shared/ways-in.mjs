@@ -20,10 +20,16 @@
  * Windows says so in a blue box, and the terminal route builds the server from
  * source and asks real effort of you.
  *
- * NO COMMANDS ARE INVENTED HERE. The one-liners below are the two files in
- * `helpers/`, fetched from this repository's main branch, and they are the
+ * NO COMMANDS ARE INVENTED HERE. The one-liners below are the two setup
+ * scripts in `public/`, served from the app's own domain, and they are the
  * same two commands written at the top of those files. If one of them moves,
  * a test fails.
+ *
+ * AND BOTH TERMINAL ROUTES NEED A TOKEN, which is the part that has to be said
+ * before somebody pastes a line and watches it stop. They fetch three private
+ * repositories — the app and the two projects the device server is made of —
+ * so there is no tokenless version of this route, and a page that did not say
+ * so up front would be sending people at a wall.
  */
 
 /*
@@ -38,9 +44,16 @@ export const RELEASES = 'https://github.com/justinnewbold/fractal-ai-builder/rel
 export const FORGEFX = 'https://github.com/sKuhLight/ForgeFX'
 export const CODEC = 'https://github.com/sKuhLight/forgefx-midi'
 
-const RAW = 'https://raw.githubusercontent.com/justinnewbold/fractal-ai-builder/main/helpers'
-export const HELPER_SH = `curl -fsSL ${RAW}/fractal-remote.sh | bash`
-export const HELPER_PS1 = `irm ${RAW}/fractal-remote.ps1 | iex`
+/*
+ * Served from the app's own domain rather than from raw.githubusercontent.
+ *
+ * Both files live in `public/`, which Vite copies to the root of the deployed
+ * site, so these are short enough to read down a phone to somebody and they do
+ * not go stale when a branch is renamed.
+ */
+const SITE = 'https://fractal.newbold.cloud'
+export const HELPER_SH = `curl -fsSL ${SITE}/mac.sh | bash`
+export const HELPER_PS1 = `irm ${SITE}/windows.ps1 | iex`
 
 /**
  * `ready` is a thing you can download and run today.
@@ -99,13 +112,14 @@ export const WAYS = [
      */
     command: HELPER_SH,
     steps: [
-      'Only worth doing if you do not want the Mac app. The app carries this same server inside it and sets it up for you.',
-      'It needs Node 20 or newer, and git. Open Terminal and paste the line below.',
+      'Only worth doing if you do not want the Mac app. The app carries this same server inside it and sets it up for you. This is also the only route a Linux machine has.',
+      'It needs git, Node 20, and a GitHub token that can read the project — the repositories are private, so ask Justin for one. Then open Terminal and paste both lines:',
+      'export FORGEFX_TOKEN="the-token"',
       HELPER_SH,
-      'It downloads ForgeFX and the codec it needs, builds both, and starts the server. The first run takes a minute; after that it is quick.',
-      'Everything it downloads lives in one folder — ~/.fractal-remote — and deleting that folder is the uninstall. Nothing else on the Mac is touched.',
-      'Leave that window open. With the unit plugged in, sign in on your phone with the same account and it will find this Mac.',
-      'One difference worth knowing: this builds the public ForgeFX, and the Mac app carries a pinned copy with fixes that are not public yet. It works, but the two are not byte for byte the same.'
+      'It fetches the app and the two projects the device server is made of, builds them, and starts everything. The first run takes a few minutes; after that it is quick.',
+      'It finishes by printing a QR code. Scan it with your phone on the same wifi — no account, nothing to sign into, same as the Mac app.',
+      'macOS asks whether to let node accept incoming connections the first time. Say yes, or the phone cannot reach this machine.',
+      'Everything lands in ~/src, and running the same line again updates it rather than starting over.'
     ],
     links: [
       { label: 'ForgeFX', url: FORGEFX },
@@ -120,14 +134,14 @@ export const WAYS = [
     note: 'Works today, and skips the installer entirely',
     command: HELPER_PS1,
     steps: [
-      'Only worth doing if you would rather not install the Windows app. The app carries this same server inside it.',
-      'It needs Node 20 or newer, and git. Open PowerShell and paste the line below.',
+      'Only worth doing if you would rather not install the Windows app. The app carries this same server inside it and sets it up for you.',
+      'It needs git, Node 20, and a GitHub token that can read the project — the repositories are private, so ask Justin for one. Then open PowerShell and paste both lines:',
+      '$env:FORGEFX_TOKEN = "the-token"',
       HELPER_PS1,
-      'It downloads ForgeFX and the codec it needs, builds both, and starts the server. The first run takes a minute; after that it is quick.',
-      'Windows will ask whether to let it through the firewall. Say yes, or the phone cannot reach it over wifi.',
-      'Everything it downloads lives in one folder in your user folder, and deleting that folder is the uninstall. It needs no administrator.',
-      'Leave that window open. With the unit plugged in, sign in on your phone with the same account and it will find this PC.',
-      'One difference worth knowing: this builds the public ForgeFX, and the apps carry a pinned copy with fixes that are not public yet. It works, but the two are not byte for byte the same.'
+      'It fetches the app and the two projects the device server is made of, builds them, and starts everything. The first run takes a few minutes; after that it is quick.',
+      'It finishes by printing a QR code. Scan it with your phone on the same wifi — no account, nothing to sign into, same as the apps.',
+      'Windows will ask whether to let node through the firewall. Say yes, or the phone cannot reach this PC over wifi.',
+      'Everything lands in your user folder under src, and running the same lines again updates it rather than starting over.'
     ],
     links: [
       { label: 'ForgeFX', url: FORGEFX },
