@@ -45,6 +45,29 @@ export function linkWord(tone, role) {
   return role === 'remote' ? 'no computer' : 'no phone'
 }
 
+/**
+ * The unit, on top of the link.
+ *
+ * CONNECTED was true and useless. It meant the phone could reach the Mac,
+ * and it stayed green for the whole of an evening in which the FM3 had
+ * frozen: no preset number, no chain, every read timing out, and the bar
+ * still saying the one word that means everything is fine. "What's the point
+ * of having things that sound connected if it's not connected? Otherwise
+ * it's just lying."
+ *
+ * So the unit gets a say. `unit` is what the Mac knows about it: 'missing'
+ * when the Mac has no unit at all, 'silent' when it has one that stopped
+ * answering, 'present' when it answers, 'unknown' before anything has been
+ * asked. Only a good link gets a unit word -- with the link down, the link
+ * is the news.
+ */
+export function unitWord(tone, unit) {
+  if (tone !== 'good') return null
+  if (unit === 'missing') return 'no unit'
+  if (unit === 'silent') return 'unit not answering'
+  return null
+}
+
 /** The colour that word is drawn in, named rather than hexed. */
 export function linkTone(tone) {
   if (tone === 'good') return 'ok'

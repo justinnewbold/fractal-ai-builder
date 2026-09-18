@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Platform, Pressable, Text, View } from 'react-native'
 
 import { color, font, mono, space } from '../lib/theme'
-import { linkTone, linkWord, toneOfRemote } from '../lib/link-word'
+import { linkTone, linkWord, toneOfRemote, unitWord } from '../lib/link-word'
 import { APP_VERSION } from '../lib/version'
 import { useRig } from '../lib/rig'
 import { useDemo } from '../lib/demo'
@@ -36,6 +36,7 @@ const face = Platform.select(mono)
  */
 export default function TopBar({ link, onOpenSettings }) {
   const unit = useRig(ofDeviceName)
+  const unitState = useRig(ofUnitState)
   const blocks = useRig(ofAllBlocks)
   const [volume, setVolume] = useState(false)
   const [failed, setFailed] = useState(null)
@@ -52,8 +53,11 @@ export default function TopBar({ link, onOpenSettings }) {
   const demo = useDemo()
   const connected = link?.link === 'connected'
   const tone = toneOfRemote(link?.link)
-  const mark = demo ? 'wait' : linkTone(tone)
-  const word = demo ? 'demo' : linkWord(tone, 'remote')
+  /* The unit outranks the link: a green CONNECTED over a frozen FM3 is the
+     bar lying in the one spot that exists to stop it. See unitWord. */
+  const unitSaid = demo ? null : unitWord(tone, unitState)
+  const mark = demo ? 'wait' : unitSaid ? 'no' : linkTone(tone)
+  const word = demo ? 'demo' : unitSaid || linkWord(tone, 'remote')
 
   /*
    * The unit's short name, and a dash rather than a guess.
@@ -83,7 +87,7 @@ export default function TopBar({ link, onOpenSettings }) {
         backgroundColor: color.panel
       }}
     >
-      <Lamp state={connected ? 'live' : link?.link === 'no-answer' ? 'fault' : 'idle'} />
+      <Lamp state={unitSaid ? 'fault' : connected ? 'live' : link?.link === 'no-answer' ? 'fault' : 'idle'} />
 
       <Text
         numberOfLines={1}
@@ -179,6 +183,7 @@ export default function TopBar({ link, onOpenSettings }) {
 }
 
 const ofDeviceName = (s) => s.deviceName
+const ofUnitState = (s) => s.unit
 const ofAllBlocks = (s) => s.allBlocks
 
 /**

@@ -31,6 +31,15 @@ const initial = {
   capabilities: null,
   deviceName: '',
   /*
+   * Whether the unit is there and answering, as distinct from whether the
+   * computer is. 'unknown' until asked; 'missing' when the computer has no
+   * unit; 'silent' when it has one that stopped answering (a frozen FM3
+   * answers nothing: no preset number, no chain, every read times out);
+   * 'present' when it answers. The bar and Setup say this before they say
+   * "connected" -- see shared/link-word unitWord.
+   */
+  unit: 'unknown',
+  /*
    * The same unit, as the key its setlists and stars are filed under.
    *
    * Kept beside the name rather than derived at each call site, because the
@@ -248,10 +257,13 @@ export async function refreshAll() {
    * somebody to the wrong song by its right name.
    */
   if (slug !== state.deviceSlug) forgetNames()
+  const unit = caps?.connected === false ? 'missing' : 'present'
+  if (unit !== state.unit) logDebug('unit', unit === 'missing' ? 'the computer has no unit' : 'the computer has a unit', caps?.short || caps?.name || undefined)
   set({
     capabilities: caps?.capabilities ?? null,
     deviceName: caps?.short || caps?.name || '',
-    deviceSlug: slug
+    deviceSlug: slug,
+    unit
   })
   /*
    * The preset names, from disk now and from the computer's list when it
@@ -355,7 +367,15 @@ export async function refreshPreset() {
     if (fresh && pending && pending.number === fresh.number && typeof pending.presetName === 'string') {
       fresh.name = state.preset?.name ?? fresh.name
     }
-    set({ preset: fresh })
+    /*
+     * A preset number of -1 is the computer saying the unit did not answer
+     * its own name -- the first thing a frozen unit stops doing. Said on the
+     * bar as "unit not answering" rather than a slot -1 under a green word.
+     */
+    const answered = Number.isInteger(fresh?.number) && fresh.number >= 0
+    if (fresh?.number === -1 && state.unit !== 'silent') logDebug('unit', 'the unit did not answer the computer', 'no preset number')
+    if (answered && state.unit === 'silent') logDebug('unit', 'the unit is answering again')
+    set({ preset: fresh, ...(fresh?.number === -1 ? { unit: 'silent' } : answered && state.unit !== 'missing' ? { unit: 'present' } : {}) })
   } catch (err) {
     set({ error: err.message })
   }
