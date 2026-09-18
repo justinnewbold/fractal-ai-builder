@@ -9812,3 +9812,62 @@ button.setup-back {
 .fix-versions [data-sync='ahead'] {
   color: var(--warn, var(--silk));
 }
+
+/* ---------- ways in: how to get a computer on the other end ---------- */
+
+/* The same four routes the phone shows, sorted so this computer's come
+   first — see shared/ways-in.mjs. Folded, because four sets of steps at once
+   is a wall; the first is open because it is the one for you. */
+.ways {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+}
+
+.way {
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  padding: var(--s-2);
+  background: var(--panel);
+}
+
+.way > summary {
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 var(--s-2);
+  align-items: baseline;
+  min-height: 44px;
+}
+
+.way-n {
+  color: var(--signal);
+  font-weight: 700;
+}
+
+.way-title {
+  font-weight: 700;
+}
+
+/* The note sits under the title rather than beside it: it is the thing that
+   tells you whether this route is for you, and it is longer than the title. */
+.way > summary > .hint {
+  grid-column: 2;
+}
+
+/* A route that does not exist yet is dimmed rather than hidden. "When will
+   there be a Windows app" is a real question, and silence is a worse answer
+   than "not yet". */
+.way[data-status='planned'] .way-title {
+  color: var(--silk-dim, inherit);
+}
+
+.way-steps {
+  margin: var(--s-2) 0 0;
+  padding-left: var(--s-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  line-height: 1.5;
+}

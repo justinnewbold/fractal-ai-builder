@@ -59,6 +59,7 @@ import { useAsks } from './lib/asks'
 import { SIZES, loadSize, saveSize, clampSize, loadFit, saveFit } from './lib/gigSize'
 import { editButtonShows } from './lib/playMode'
 import { FIXES, FIRMWARE_NOTE, fixById, fixFor, versionsInSync } from '../shared/troubleshooting.mjs'
+import { osGuess, waysFor } from '../shared/ways-in.mjs'
 import { remember as rememberPreset, CHANGED as MARKS_CHANGED } from './lib/presetMarks'
 import { CHANGED as SETLISTS_CHANGED } from './lib/setlists'
 import { syncSetlists, setlistCloudReady } from './lib/cloudSetlists'
@@ -317,7 +318,6 @@ const SETUP_PAGES = {
   unit: 'Unit',
   link: 'Phone & computer',
   play: 'Play screen',
-  ai: 'AI & cost',
   help: 'Help & fixes',
   about: 'About'
 }
@@ -1011,6 +1011,12 @@ export default function App() {
   /* Whether Play sizes its tiles from the screen instead of the step. */
   const [fit, setFit] = useState(loadFit)
   /* Which page of Setup is open; null is the list of rows. */
+  /* Which computer this browser is on, read once. The guide's routes are
+     sorted by it; see shared/ways-in.mjs for why only this end sorts them. */
+  const thisComputer = useMemo(
+    () => osGuess(typeof navigator === 'undefined' ? '' : navigator.userAgent),
+    []
+  )
   const [setupPage, setSetupPage] = useState(null)
   /* Which fix the guide opens on, when an error notice sent you there. Null is
      the guide with everything folded shut, which is what Setup opens on. */
@@ -3691,6 +3697,64 @@ export default function App() {
             */}
             <PhoneRemote link={link} onAction={linkAction} onError={setError} busy={busy} />
           </Section>
+          {/*
+            How to get a computer on the other end at all, which is the
+            question somebody has when there is nothing on the other end.
+
+            The routes are shared with the phone — see shared/ways-in.mjs —
+            and THIS end is the one where sorting them means something. A
+            browser is running on the computer in question, so waysFor can put
+            the routes for it first; a handset cannot know whether there is a
+            Mac or a PC on the desk and leaves the order alone.
+          */}
+          <Section
+            key="ways-in"
+            title="Connect a computer"
+            note={
+              thisComputer === 'mac'
+                ? 'Four ways, with the Mac ones first'
+                : thisComputer === 'windows'
+                  ? 'Four ways, with the Windows ones first'
+                  : 'Four ways, and what each one costs you'
+            }
+          >
+            <p className="hint">
+              Your unit plugs into a computer with a USB cable. That computer talks to the unit, and
+              your phone tells the computer what to do — over wifi at the venue, or over the
+              internet from anywhere. The phone never talks to the unit directly.
+            </p>
+            <div className="ways">
+              {waysFor(thisComputer).map((way, i) => (
+                <details key={way.id} className="way" data-status={way.status} open={i === 0}>
+                  <summary>
+                    <span className="way-n">{i + 1}</span>
+                    <span className="way-title">{way.title}</span>
+                    <span className="hint">{way.note}</span>
+                  </summary>
+                  <ol className="way-steps">
+                    {way.steps.map((step, n) => (
+                      <li key={n}>{step}</li>
+                    ))}
+                  </ol>
+                  {way.links.length ? (
+                    <div className="history-actions">
+                      {way.links.map((to) => (
+                        <a key={to.url} className="chip" href={to.url} target="_blank" rel="noreferrer">
+                          {to.label}
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
+                </details>
+              ))}
+            </div>
+            <p className="footnote">
+              Whichever way you go: only one program at a time can hold the unit&rsquo;s USB port. If
+              the computer says it cannot find your unit, something else has it — the Fractal editor,
+              or a second copy of this app.
+            </p>
+          </Section>
+
           <Section key="link-details" title="Link details" note="What the phone and the computer say about the line between them">
             <LinkDetails />
           </Section>

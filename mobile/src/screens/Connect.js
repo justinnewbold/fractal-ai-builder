@@ -3,11 +3,7 @@ import { Linking, ScrollView, Text, View } from 'react-native'
 import { color, font, radius, space } from '../lib/theme'
 import Note from '../components/Note'
 import Press from '../components/Press'
-import { PAIR_LENGTH } from '../lib/pairing'
-
-const RELEASES = 'https://github.com/justinnewbold/fractal-ai-builder/releases/latest'
-const FORGEFX = 'https://github.com/sKuhLight/ForgeFX'
-const CODEC = 'https://github.com/sKuhLight/forgefx-midi'
+import { WAYS } from '../lib/ways-in'
 
 /**
  * How to get a computer on the other end of this, in the order people will
@@ -23,18 +19,10 @@ const CODEC = 'https://github.com/sKuhLight/forgefx-midi'
  * and there was no way from there to find out which computer, or how to make
  * one show anything.
  *
- * THREE ROUTES, AND ONLY ONE OF THEM EXISTS TODAY — which is the whole reason
- * this is written the way it is. The Mac app is real and downloadable now.
- * Running ForgeFX by hand is real and genuinely technical, and is the only
- * thing a Windows or Linux machine can do until the apps are built. The Windows
- * app is not written. A page that dressed all three up as equals would send
- * somebody looking for a download that does not exist, so each one says plainly
- * where it stands.
- *
- * NO COMMANDS ARE INVENTED HERE. The terminal route names the two repositories
- * and the version of Node they need, because those are true; there is no
- * one-line installer yet, and saying so is better than printing a command that
- * does not work on the other end of somebody's evening.
+ * THE ROUTES THEMSELVES LIVE IN shared/ways-in.mjs, so the browser offers the
+ * same four with the same honest status. What is here is the phone's way of
+ * drawing them and nothing else — see that file for why one of them says "not
+ * built yet" rather than being quietly left out.
  */
 export default function Connect({ onBack }) {
   return (
@@ -58,14 +46,14 @@ export default function Connect({ onBack }) {
             Connecting a computer
           </Text>
           <Text style={{ color: color.silkDim, fontSize: font.small }}>
-            Three ways, and what each one costs you
+            Four ways, and what each one costs you
           </Text>
         </View>
         <Press label="Done" height={40} onPress={onBack} />
       </View>
 
       {/*
-        The one thing somebody has to understand before any of the three makes
+        The one thing somebody has to understand before any of the four makes
         sense. It is not obvious and nothing else in the app says it.
       */}
       <Note>
@@ -74,49 +62,20 @@ export default function Connect({ onBack }) {
         anywhere. The phone never talks to the unit directly.
       </Note>
 
-      {/* ------------------------------------------------------------ mac */}
-      <Way
-        number="1"
-        title="The Mac app"
-        note="Ready now — this is the easy one"
-        steps={[
-          'On the Mac, open the download page below and get the latest Fractal Remote.',
-          'Drag it to Applications and open it.',
-          'Plug your unit into the Mac with its USB cable.',
-          'Quit FM3-Edit or Axe-Edit if either is open. Only one program can hold the USB port, and whichever got there first keeps it.',
-          `In the app, choose Set up phone remote. It shows a code of ${PAIR_LENGTH} letters and numbers, and a QR you can scan.`,
-          'On this phone, scan that QR with Scan a code — or type the code in. That is the whole of it — no account needed.'
-        ]}
-        link={{ label: 'Download Fractal Remote for Mac', url: RELEASES }}
-      />
+      {/*
+        The routes themselves, from the list both ends share — see
+        shared/ways-in.mjs, which also holds what each one costs you.
 
-      {/* -------------------------------------------------------- windows */}
-      <Way
-        number="2"
-        title="The Windows app"
-        note="Not built yet"
-        steps={[
-          'There is no Windows app to download at the moment.',
-          'When there is, it will be the same handful of steps as the Mac one: install it, plug the unit in, and type the code it shows on this phone.',
-          'Until then, a Windows machine can run ForgeFX itself — the next one down.'
-        ]}
-      />
-
-      {/* -------------------------------------------------------- forgefx */}
-      <Way
-        number="3"
-        title="ForgeFX in a terminal"
-        note="Any computer, but this one is properly technical"
-        steps={[
-          'ForgeFX is the part that actually talks to the unit. The Mac app carries a copy of it inside; on Windows or Linux you can run it yourself.',
-          'It needs Node 20 installed, and two repositories checked out next to each other: ForgeFX, and the codec it depends on.',
-          'Build the codec first, then start the server inside ForgeFX. It listens on port 5056 on that machine.',
-          'With it running and the unit plugged in, sign in on this phone with the same account and it will find it.',
-          'There is no one-file installer for this yet. When there is, it will be here.'
-        ]}
-        link={{ label: 'ForgeFX', url: FORGEFX }}
-        second={{ label: 'forgefx-midi (the codec)', url: CODEC }}
-      />
+        NOT REORDERED HERE, and that is deliberate. waysFor puts the routes for
+        YOUR computer first, and a phone cannot know which computer that is:
+        knowing this app is running on an iPhone says nothing about whether
+        there is a Mac or a PC on the desk. So the phone takes the list as it
+        comes, which opens on the one route that exists today, and the browser
+        — which IS running on the computer in question — does the sorting.
+      */}
+      {WAYS.map((way, i) => (
+        <Way key={way.id} number={String(i + 1)} way={way} />
+      ))}
 
       <Note tone="warn">
         Whichever way you go: only one program at a time can hold the unit’s USB port. If the
@@ -131,7 +90,7 @@ export default function Connect({ onBack }) {
  * One route, numbered, with what it costs said before the steps rather than
  * discovered half way down them.
  */
-function Way({ number, title, note, steps, link, second }) {
+function Way({ number, way }) {
   return (
     <View
       style={{
@@ -146,13 +105,13 @@ function Way({ number, title, note, steps, link, second }) {
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space.sm }}>
         <Text style={{ color: color.signal, fontSize: font.lead, fontWeight: '700' }}>{number}</Text>
         <Text style={{ color: color.silk, fontSize: font.lead, fontWeight: '700', flex: 1 }}>
-          {title}
+          {way.title}
         </Text>
       </View>
-      <Text style={{ color: color.silkDim, fontSize: font.small }}>{note}</Text>
+      <Text style={{ color: color.silkDim, fontSize: font.small }}>{way.note}</Text>
 
       <View style={{ gap: space.sm, marginTop: space.xs }}>
-        {steps.map((step, i) => (
+        {way.steps.map((step, i) => (
           <View key={i} style={{ flexDirection: 'row', gap: space.sm }}>
             <Text style={{ color: color.silkFaint, fontSize: font.small, minWidth: 18 }}>
               {`${i + 1}.`}
@@ -164,8 +123,9 @@ function Way({ number, title, note, steps, link, second }) {
         ))}
       </View>
 
-      {link ? <Press label={link.label} onPress={() => Linking.openURL(link.url)} /> : null}
-      {second ? <Press label={second.label} onPress={() => Linking.openURL(second.url)} /> : null}
+      {way.links.map((link) => (
+        <Press key={link.url} label={link.label} onPress={() => Linking.openURL(link.url)} />
+      ))}
     </View>
   )
 }

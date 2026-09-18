@@ -79,6 +79,9 @@ export const FILES = [
    * plain copy would ship an import that resolves to nothing and take demo
    * mode's Metro bundle down with it.
    */
+  /* How to get a computer on the other end, so the browser and the phone
+     offer the same four routes with the same honest status on each. */
+  { source: '../shared/ways-in.mjs', target: '../mobile/src/lib/ways-in.js' },
   {
     source: '../shared/troubleshooting.mjs',
     target: '../mobile/src/lib/troubleshooting.js',
