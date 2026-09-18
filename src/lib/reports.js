@@ -13,39 +13,78 @@
  * people who hit the bugs worth hearing about. A signed-in report is stamped
  * with who sent it so a reply is possible; an anonymous one carries no user.
  *
+ * WHAT IS IN A REPORT is decided in shared/report-rules.mjs rather than here,
+ * because the phone sends these too and a phone that trimmed the log
+ * differently would produce reports nobody could compare. This file is only
+ * the part that is genuinely the browser's: which client, which user, and
+ * what the browser knows about itself.
+ *
  * Named reports rather than feedback because lib/feedback.js is already taken,
  * by the flash and the buzz under a thumb on a tap-tempo button.
  */
+import {
+  KINDS,
+  MAX_MESSAGE,
+  buildReport,
+  carriesLog,
+  contextFrom,
+  lastErrorFrom,
+  pickForReport,
+  trimToBytes
+} from '../../shared/report-rules.mjs'
+import { formatLine, getDebugLog } from './debugLog.js'
 import { DEFAULT_PROJECT, supabaseClient } from './remote.js'
 import { VERSION } from './version.js'
 
-/** What a report can be. Two kinds, because a third would only ever be "other". */
-export const KINDS = ['bug', 'idea']
-
-/** The longest message the table will take, mirrored here so the box can say so. */
-export const MAX_MESSAGE = 4000
+export { KINDS, MAX_MESSAGE, carriesLog }
 
 /**
  * What was going on when they wrote it.
  *
  * The difference between a report that can be acted on and one that cannot is
  * almost always this, and it is exactly what a person cannot be expected to
- * type: which version, which unit, how they were connected.
+ * type: which version, which unit, how they were connected, what last went
+ * wrong.
  *
  * Nothing identifying is collected. No preset contents, no account details,
  * nothing else typed into the app — the report carries what someone chose to
  * write and what shape of setup they were on, and that is all.
  */
-export function context({ device, link, platform } = {}) {
-  const out = { version: VERSION }
-  if (device?.model) out.unit = device.model
-  if (link?.role) out.role = link.role
-  if (platform) out.platform = platform
-  if (typeof navigator !== 'undefined' && navigator.language) out.language = navigator.language
-  if (typeof window !== 'undefined' && window.innerWidth) {
-    out.screen = `${window.innerWidth}x${window.innerHeight}`
-  }
-  return out
+export function context({ device, link, platform, macVersion } = {}) {
+  return contextFrom({
+    version: VERSION,
+    macVersion,
+    unit: device?.model,
+    role: link?.role,
+    platform,
+    /* The browser's own account of itself. Not a fingerprint — the user agent
+       is what tells a reader "this is Safari on an iPad", which is the whole
+       of what a layout bug report needs and is not worth making somebody
+       describe. */
+    os: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+    language: typeof navigator !== 'undefined' ? navigator.language : undefined,
+    screen:
+      typeof window !== 'undefined' && window.innerWidth
+        ? `${window.innerWidth}x${window.innerHeight}`
+        : undefined,
+    lastError: lastErrorFrom(getDebugLog())
+  })
+}
+
+/**
+ * Exactly the log that would be sent, as text — for showing somebody first.
+ *
+ * "Let them see it before it goes." This is not an approximation of what goes:
+ * it is the same two functions the send path calls, in the same order, so a
+ * preview cannot drift from the thing it is previewing. Anything that changed
+ * the trimming would change both at once or neither.
+ *
+ * Empty string for a kind that carries no log, so a caller can show nothing
+ * without asking a second question.
+ */
+export function logPreview(kind) {
+  if (!carriesLog(kind)) return ''
+  return trimToBytes(pickForReport(getDebugLog()).map(formatLine).join('\n'))
 }
 
 /**
@@ -55,11 +94,23 @@ export function context({ device, link, platform } = {}) {
  * no network at all, which is common enough on a stage and must not lose what
  * they typed — the caller keeps the text on screen when this rejects.
  */
-export async function sendReport({ kind, message, contact, context: ctx = {} }) {
-  const body = (message || '').trim()
-  if (!KINDS.includes(kind)) throw new Error('Say whether this is a bug or an idea.')
-  if (!body) throw new Error('Write something first.')
-  if (body.length > MAX_MESSAGE) throw new Error('That is longer than this box can send.')
+export async function sendReport({ kind, message, contact, context: ctx = {}, withLog = true }) {
+  const row = buildReport({
+    kind,
+    message,
+    contact,
+    context: ctx,
+    /*
+     * Read at send, never before. "Only when they press send" is the rule, and
+     * this is where it is kept: nothing is gathered while somebody types, and
+     * a report abandoned half-written leaves no copy of anything anywhere.
+     *
+     * An empty list when they turned the log off, which buildReport then turns
+     * into a null column rather than an empty one.
+     */
+    lines: withLog ? getDebugLog() : [],
+    format: withLog ? formatLine : null
+  })
 
   /*
    * The signed-in client when there is one, a bare anon client otherwise.
@@ -80,13 +131,7 @@ export async function sendReport({ kind, message, contact, context: ctx = {} }) 
     c = createClient(DEFAULT_PROJECT.url, DEFAULT_PROJECT.anonKey)
   }
 
-  const { error } = await c.from('feedback').insert({
-    kind,
-    message: body,
-    contact: (contact || '').trim() || null,
-    context: ctx,
-    user_id: userId
-  })
+  const { error } = await c.from('feedback').insert({ ...row, user_id: userId })
 
   if (error) {
     throw new Error(

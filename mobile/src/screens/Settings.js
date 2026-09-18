@@ -53,7 +53,8 @@ export default function Settings({
   onSignOut,
   onOpenGear,
   onOpenLog,
-  onOpenFixes
+  onOpenFixes,
+  onOpenReport
 }) {
   const deviceName = useRig(ofDeviceName)
   const unitState = useRig(ofUnitState)
@@ -203,11 +204,24 @@ export default function Settings({
                 onPress={onOpenFixes}
               />
             ) : null}
+            {/* Called Log, because that is what it opens. It said "Help &
+                fixes" — the name of the row directly above it, which opens
+                something else entirely. */}
             {onOpenLog ? (
               <SetupRow
-                title="Help & fixes"
+                title="Log"
                 status={`${getDebugLog().length} line${getDebugLog().length === 1 ? '' : 's'} in the log`}
                 onPress={onOpenLog}
+              />
+            ) : null}
+            {/* Last of the three, and the one that goes the other way: Fixes
+                and the log are things to read, this is the thing to send when
+                neither helped. */}
+            {onOpenReport ? (
+              <SetupRow
+                title="Tell us"
+                status="Something broken, or something you want"
+                onPress={onOpenReport}
               />
             ) : null}
             <SetupRow title="About" status={`v${APP_VERSION}`} onPress={() => setPage('about')} />

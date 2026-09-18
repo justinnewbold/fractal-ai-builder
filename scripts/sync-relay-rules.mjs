@@ -82,6 +82,15 @@ export const FILES = [
   /* How to get a computer on the other end, so the browser and the phone
      offer the same four routes with the same honest status on each. */
   { source: '../shared/ways-in.mjs', target: '../mobile/src/lib/ways-in.js' },
+  /*
+   * What a report carries, and what it must never carry.
+   *
+   * Belongs here more than most: the phone is where the bad evenings happen
+   * and the browser is where they get read, and a phone that trimmed the log
+   * differently — or attached one to a feature suggestion — would be sending
+   * something a reader cannot compare with anything else.
+   */
+  { source: '../shared/report-rules.mjs', target: '../mobile/src/lib/report-rules.js' },
   {
     source: '../shared/troubleshooting.mjs',
     target: '../mobile/src/lib/troubleshooting.js',
