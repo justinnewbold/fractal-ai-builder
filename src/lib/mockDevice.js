@@ -27,6 +27,7 @@ import ampTypes from '../data/amp-types.json' with { type: 'json' }
 import driveTypes from '../data/drive-types.json' with { type: 'json' }
 import cabTypes from '../data/cab-types.json' with { type: 'json' }
 import ampParams from '../data/amp-params.json' with { type: 'json' }
+import demoPresets from '../data/demo-presets.json' with { type: 'json' }
 import { fromNormalized } from './scale.js'
 import { createSceneState } from './sceneState.js'
 import { storedSceneNames, keepSceneNames, DEFAULT_SCENE_NAMES } from './demoMemory.js'
@@ -74,6 +75,55 @@ const SCENE_SEEDS = {
 const SCENE_CHANNELS = {
   1: { [eid('amp')]: 'D' },
   2: { [eid('amp')]: 'A' }
+}
+
+/*
+ * THE TWELVE PRESETS THE DEMO PRETENDS THE UNIT IS HOLDING.
+ *
+ * Demo mode used to be one preset, one chain, and five hundred and eleven
+ * empty slots — so every screen that reads a LIST was demonstrated empty,
+ * which is the one thing a demo must not do. src/data/demo-presets.json is
+ * twelve rigs with real models on them and four named scenes each.
+ *
+ * A preset is built the first time it is selected and then kept, so editing
+ * one and coming back to it shows the edit — a demo that forgets is a demo
+ * that looks broken.
+ */
+const SEEDS = new Map(demoPresets.presets.map((p) => [p.number, p]))
+
+/** Where a seeded preset's blocks sit: signal order, one per column. */
+const chainOf = (seed) =>
+  seed.chain.map((slug, col) => {
+    const known = LAYOUT.find((l) => l.slug === slug)
+    return {
+      slug,
+      name: known.name,
+      effectId: known.effectId,
+      col,
+      row: 1,
+      fromRows: col === 0 ? [] : [1],
+      channel: seed.scenes[0]?.channels?.[slug] || known.channel || 'A'
+    }
+  })
+
+/** A seed's scenes as the engine wants them: off-lists and channels by effect id. */
+function sceneStateOf(seed, blocks) {
+  const idOfSlug = (slug) => blocks.find((b) => b.slug === slug)?.effectId
+  const seeds = {}
+  const channels = {}
+  seed.scenes.forEach((scene, i) => {
+    seeds[i] = scene.off.map(idOfSlug).filter((n) => Number.isInteger(n))
+    const per = {}
+    for (const [slug, ch] of Object.entries(scene.channels || {})) {
+      const id = idOfSlug(slug)
+      if (Number.isInteger(id)) per[id] = ch
+    }
+    if (Object.keys(per).length) channels[i] = per
+  })
+  /* Scenes past the seeded four sit as the first one does, which is what an
+     untouched scene on the hardware looks like. */
+  seeds.default = seeds[0] || []
+  return { seeds, channels }
 }
 
 /*
@@ -157,31 +207,110 @@ export function createMockDevice() {
     presetNumber: 500,
     presetName: 'DEMO',
     scene: 0,
-    sceneNames: storedSceneNames() || DEFAULT_SCENE_NAMES.slice(),
+    sceneNames: [],
     // Bypass and channel both live per scene, not on the block — see sceneState.js.
-    scenes: createSceneState({ count: 8, seeds: SCENE_SEEDS, channels: SCENE_CHANNELS }),
-    blocks: LAYOUT.map((b, i) => ({
-      slug: b.slug,
-      name: b.name,
-      effectId: b.effectId,
-      col: b.col,
-      row: 1,
-      fromRows: i === 0 ? [] : [1],
-      channel: b.channel || 'A'
-    })),
+    scenes: null,
+    blocks: [],
     // Both keyed "effectId:channel", because that is where a value lives.
-    params: new Map(),
-    models: new Map(),
-    stored: new Map([
-      [0, 'Justin'],
-      [1, 'Mia'],
-      [500, 'DEMO']
-    ])
+    params: null,
+    models: null,
+    /* The names the unit would report for its slots. Seeded slots carry their
+       name; everything else is genuinely empty, because a unit with 512 full
+       slots is its own kind of lie. */
+    stored: new Map([...SEEDS.values()].map((seed) => [seed.number, seed.name]).concat([[500, 'DEMO']]))
   }
 
-  for (const block of state.blocks) {
-    state.params.set(`${block.effectId}:${block.channel}`, paramsFor(block.slug))
+  /*
+   * One working rig per preset, built on first visit and kept after.
+   *
+   * state.blocks and its neighbours POINT AT the rig rather than copying it,
+   * so every existing write in this file — a bypass, a model swap, a knob —
+   * lands on the preset it was made on and is still there on the way back.
+   */
+  const rigs = new Map()
+
+  function buildRig(number) {
+    const seed = SEEDS.get(number)
+    const blocks = seed
+      ? chainOf(seed)
+      : LAYOUT.map((b, i) => ({
+          slug: b.slug,
+          name: b.name,
+          effectId: b.effectId,
+          col: b.col,
+          row: 1,
+          fromRows: i === 0 ? [] : [1],
+          channel: b.channel || 'A'
+        }))
+
+    const { seeds, channels } = seed
+      ? sceneStateOf(seed, blocks)
+      : { seeds: SCENE_SEEDS, channels: SCENE_CHANNELS }
+
+    const rig = {
+      blocks,
+      params: new Map(),
+      models: new Map(),
+      scenes: createSceneState({ count: 8, seeds, channels }),
+      sceneNames:
+        storedSceneNames(number) ||
+        (seed
+          ? seed.scenes.map((sc) => sc.name).concat(['', '', '', '']).slice(0, 8)
+          : DEFAULT_SCENE_NAMES.slice())
+    }
+
+    for (const block of blocks) {
+      rig.params.set(`${block.effectId}:${block.channel}`, paramsFor(block.slug))
+    }
+
+    /* The models and the levels the seed asked for, applied through the same
+       maps a real edit writes to — so a seeded sound and an edited one are
+       indistinguishable from here down. */
+    if (seed) {
+      for (const [kind, value] of Object.entries(seed.models)) {
+        const block = blocks.find((b) => b.slug === kind)
+        if (block) rig.models.set(`${block.effectId}:${block.channel}`, value)
+      }
+      const setLevel = (slug, ch, level) => {
+        const block = blocks.find((b) => b.slug === slug)
+        if (!block) return
+        const key = `${block.effectId}:${ch || block.channel}`
+        if (!rig.params.has(key)) rig.params.set(key, paramsFor(block.slug))
+        const named = rig.params.get(key).find((x) => x.name === 'Amp1 Level' || x.name === 'Level')
+        if (named) named.value = Math.max(named.min, Math.min(named.max, level))
+      }
+
+      /* What the scenes cannot switch: one setting for the whole preset. */
+      for (const [slug, level] of Object.entries(seed.levels || {})) setLevel(slug, null, level)
+
+      /*
+       * And what they can. A level belongs to a CHANNEL, so a scene only has a
+       * level of its own because it selects a channel of its own — see the
+       * note in demo-presets.json about the draft where two scenes shared a
+       * channel and the second one's level quietly won.
+       */
+      for (const scene of seed.scenes) {
+        for (const [slug, level] of Object.entries(scene.levels || {})) {
+          setLevel(slug, scene.channels?.[slug], level)
+        }
+      }
+    }
+    return rig
   }
+
+  /** Point the live state at a preset's rig, building it if this is the first visit. */
+  function loadRig(number) {
+    if (!rigs.has(number)) rigs.set(number, buildRig(number))
+    const rig = rigs.get(number)
+    state.blocks = rig.blocks
+    state.params = rig.params
+    state.models = rig.models
+    state.scenes = rig.scenes
+    state.sceneNames = rig.sceneNames
+  }
+
+  loadRig(state.presetNumber)
+  state.presetName = state.stored.get(state.presetNumber) || ''
 
   /** Whether a block is off in the scene the unit is in. */
   const off = (effectId) => state.scenes.isOff(state.scene, effectId)
@@ -346,6 +475,7 @@ export function createMockDevice() {
     selectPreset: (number) => {
       state.presetNumber = number
       state.presetName = state.stored.get(number) || ''
+      loadRig(number)
       return { ok: true }
     },
 
@@ -523,11 +653,30 @@ export function createMockDevice() {
       ]
     }),
 
-    presetSummary: (n) => ({
-      number: n,
-      name: state.stored.get(n) || '',
-      blocks: state.blocks.filter((b) => !off(b.effectId)).map((b) => b.name)
-    }),
+    /*
+     * What slot n holds, WITHOUT going there.
+     *
+     * This used to answer with the chain of whatever preset was loaded, for
+     * every n, which was invisible while the demo had one preset and wrong the
+     * moment it had twelve: the list would have shown every slot holding the
+     * same blocks. It reads the asked-for preset's own rig, building it if
+     * nobody has visited it — which is what a summary is for.
+     */
+    presetSummary: (n) => {
+      const name = state.stored.get(n) || ''
+      if (n === state.presetNumber)
+        return { number: n, name, blocks: state.blocks.filter((b) => !off(b.effectId)).map((b) => b.name) }
+      if (!SEEDS.has(n)) return { number: n, name, blocks: [] }
+      /* Another slot, so there is no scene to be in: scene one, the one it
+         would load on. */
+      if (!rigs.has(n)) rigs.set(n, buildRig(n))
+      const rig = rigs.get(n)
+      return {
+        number: n,
+        name,
+        blocks: rig.blocks.filter((b) => !rig.scenes.isOff(0, b.effectId)).map((b) => b.name)
+      }
+    },
 
     /*
      * GET /mod/model, in the device's shape: `slotCount` not `slots`,
@@ -616,7 +765,7 @@ export function createMockDevice() {
 
     setSceneName: (index, name) => {
       state.sceneNames[index] = name
-      keepSceneNames(state.sceneNames)
+      keepSceneNames(state.presetNumber, state.sceneNames)
       return { ok: true }
     },
 
