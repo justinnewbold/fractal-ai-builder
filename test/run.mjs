@@ -11367,6 +11367,21 @@ test('the account row tidies its own delete-marks, whatever writes it', () => {
   assert.match(sql, /exception when others then/, 'a row the trigger cannot tidy is refused, which turns the sync off')
 })
 
+test('the Edit button on the stage screen does not come and go with Ask', async () => {
+  /*
+   * "add edit to the web version so I can test the chain editor there first
+   * before spending ANOTHER expo build slot." It was there, behind the same
+   * rule as Ask: play mode on, or the AI switched off, and the chain editor
+   * was gone from the web version. Editing the chain is not asking the AI.
+   */
+  const { askButtonShows, editButtonShows } = await import('../shared/play-mode.mjs')
+  assert.equal(askButtonShows({ status: 'live', view: 'gig', playing: true }), false)
+  assert.equal(editButtonShows({ status: 'live', view: 'gig', playing: true }), true, 'play mode takes the chain editor away')
+  assert.equal(editButtonShows({ status: 'live', view: 'gig', aiOn: false }), true, 'the AI switch takes the chain editor away')
+  assert.equal(editButtonShows({ status: 'off', view: 'gig' }), false, 'there is an Edit button with no unit')
+  assert.equal(editButtonShows({ status: 'live', view: 'ask' }), false)
+})
+
 test('the app builds a known band from the book and files every design under its band', () => {
   const app = readSrc(new URL('../src/App.jsx', import.meta.url), 'utf8')
   assert.match(app, /const noted = pickDesign\(await knownDesigns\(\)\.catch\(\(\) => \[\]\), description/)

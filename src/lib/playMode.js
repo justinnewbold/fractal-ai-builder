@@ -30,7 +30,7 @@
  * about its own stage screen. Only the storage differs, and it differs enough
  * to matter — see toneWayIn's third state over there.
  */
-export { clampMode, askButtonShows } from '../../shared/play-mode.mjs'
+export { clampMode, askButtonShows, editButtonShows } from '../../shared/play-mode.mjs'
 import { clampMode } from '../../shared/play-mode.mjs'
 
 const KEY = 'fractal.playMode'
