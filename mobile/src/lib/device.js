@@ -60,6 +60,28 @@ const post = (path, body) =>
 
 const put = (path, body) => remoteRequest(path, { method: 'PUT', body: JSON.stringify(body) })
 
+/*
+ * EVERY WRITE IS IN THE LOG WITH THE UNIT'S ANSWER.
+ *
+ * "Is the log showing all the edit failures?" It was not. It had every step
+ * of a chain move and a knob that did not take, and nothing about a scene, a
+ * bypass, a channel, a model change, a rename, a modifier or a tap of the
+ * tempo -- so a preset that came out wrong had no line to point at. Now each
+ * of those is one line: what was asked, and ok, refused, no answer, or the
+ * error. The wire's own line still says the path and how long it took.
+ */
+const told = (what, req) =>
+  req.then(
+    (r) => {
+      logDebug('write', what, r?.ok === false ? 'refused' : r?.ok === true ? 'ok' : 'no answer')
+      return r
+    },
+    (err) => {
+      logDebug('write', what, `failed — ${err?.message || err}`)
+      throw err
+    }
+  )
+
 /* ---------------------------------------------------------------- */
 /* Reading                                                           */
 /* ---------------------------------------------------------------- */
@@ -173,7 +195,7 @@ async function readParamValue(eid, paramId) {
 /* ---------------------------------------------------------------- */
 
 /** Load a stored slot into the edit buffer. Nothing is committed by doing this. */
-export const selectPreset = (number) => post('/preset/select', { number })
+export const selectPreset = (number) => told(`select preset ${number}`, post('/preset/select', { number }))
 
 /**
  * What a stored slot is called, without loading it.
@@ -278,16 +300,18 @@ export async function readSaveResult(slug) {
 export const nameOwner = (slug) => (slug ? (demoDevice() ? `${slug}:demo` : slug) : null)
 
 /** Switch scenes. */
-export const setScene = (index) => post('/scene', { index })
+export const setScene = (index) => told(`scene ${index + 1}`, post('/scene', { index }))
 
 /** Engage or bypass a block. The live scene is what remembers it. */
-export const setBypass = (eid, bypassed) => post(`/preset/blocks/${eid}/bypass`, { bypassed })
+export const setBypass = (eid, bypassed) =>
+  told(`block ${eid} ${bypassed ? 'off' : 'on'}`, post(`/preset/blocks/${eid}/bypass`, { bypassed }))
 
 /** Switch a block's channel. Channels are A–D and hold independent settings. */
-export const setChannel = (eid, channel) => post(`/preset/blocks/${eid}/channel`, { channel })
+export const setChannel = (eid, channel) =>
+  told(`block ${eid} channel ${channel}`, post(`/preset/blocks/${eid}/channel`, { channel }))
 
 /** Set the tempo outright. */
-export const setTempo = (bpm) => post('/tempo', { bpm })
+export const setTempo = (bpm) => told(`tempo ${bpm}`, post('/tempo', { bpm }))
 
 /**
  * One tap of the tempo.
@@ -296,7 +320,7 @@ export const setTempo = (bpm) => post('/tempo', { bpm })
  * a resend is a beat that never happened. The relay knows; see `repeatable` in
  * the rules.
  */
-export const tapTempo = () => post('/tempo/tap')
+export const tapTempo = () => told('tap tempo', post('/tempo/tap'))
 
 /**
  * Start or stop the unit's tuner.
@@ -321,7 +345,7 @@ export const setTuner = (on) => post('/tuner', { on })
  * normalising one would be meaningless. Option 2 of 5 is not "40% of the way
  * along".
  */
-export const setType = (eid, value) => post(`/preset/blocks/${eid}/type`, { value })
+export const setType = (eid, value) => told(`block ${eid} model ${value}`, post(`/preset/blocks/${eid}/type`, { value }))
 
 /**
  * Every model a block family offers, with what each one is modelled on.
@@ -372,10 +396,13 @@ export const clearCell = (row, col) => placeBlock(row, col, 0)
 
 /** Connect or cut a cable from one cell to a row in the next column. */
 export const setCable = (srcRow, srcCol, destRow, connect = true) =>
-  post('/preset/grid/cable', {
-    ...toWireCable(srcRow, srcCol, destRow),
-    connect
-  })
+  told(
+    `cable row ${srcRow + 1} column ${srcCol + 1} → row ${destRow + 1}${connect ? '' : ' cut'}`,
+    post('/preset/grid/cable', {
+      ...toWireCable(srcRow, srcCol, destRow),
+      connect
+    })
+  )
 
 /**
  * Run a wire the length of a row: every cell through to the one feeding the
@@ -420,11 +447,14 @@ export const modifierModel = () => remoteRequest('/mod/model')
 
 /** Attach a source to a control, in one of the unit's modifier slots. */
 export const bindModifier = (slot, targetEffectId, targetParam, source) =>
-  post('/mod/bind', { slot, targetEffectId, targetParam, source })
+  told(
+    `modifier ${slot}: ${source} → block ${targetEffectId} param ${targetParam}`,
+    post('/mod/bind', { slot, targetEffectId, targetParam, source })
+  )
 
 /** Name the preset, and name a scene. Both land in the edit buffer only. */
-export const setPresetName = (name) => post('/preset/name', { name })
-export const setSceneName = (index, name) => post('/scene/name', { index, name })
+export const setPresetName = (name) => told(`preset name “${name}”`, post('/preset/name', { name }))
+export const setSceneName = (index, name) => told(`scene ${index + 1} name “${name}”`, post('/scene/name', { index, name }))
 
 /**
  * Write one knob and do not wait to be told it landed.
