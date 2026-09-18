@@ -1218,6 +1218,35 @@ export function run(test) {
     )
   })
 
+  test('the bench draws the chain in a line you can swipe, not a grid that wraps', () => {
+    /*
+     * "The chain shows up differently from the web version compared to on the
+     * phone. I'd like the web version better, where it shows the chain and you
+     * can swipe left to right to view it."
+     *
+     * It was four across and then a new line. That fits more on a screen and
+     * throws away the one thing the row is for: a chain is an ORDER — what the
+     * guitar hits first and what it hits last. Wrapped, the fifth block sits
+     * under the first and nothing says the rows join up. The unit draws it in a
+     * line and so does the browser.
+     */
+    const edit = read('mobile/src/screens/Edit.js').replace(/\s+/g, ' ')
+    assert.ok(!/flexDirection: 'row', flexWrap: 'wrap', gap: space\.sm \} > \{blocks\.map/.test(edit), 'the chain still wraps into a grid')
+    assert.match(
+      edit,
+      /<ScrollView horizontal showsHorizontalScrollIndicator=\{false\}[^>]*> \{blocks\.map/,
+      'the chain is not a row you can swipe'
+    )
+    /* A fixed width, because a row that scrolls has no width to share out and
+       tiles sized to their own labels make a ragged strip. */
+    assert.match(edit, /style=\{\{ width: 84, opacity: engaged \? 1 : 0\.55 \}\}/, 'the tiles size themselves in a row that cannot size them')
+
+    /* Tapping still OPENS the block rather than toggling it — the difference
+       between this screen and the stage, and the half of the request that was
+       already right. */
+    assert.match(edit, /onPress=\{\(\) => setOpenEid\(open \? null : idOf\(b\)\)\}/, 'a tap on the bench no longer opens the block')
+  })
+
   test('changing preset drops the computer’s copy before reading the new one back', () => {
     /*
      * "I clicked a preset name, in this case it was Drop D Chug, then it went
