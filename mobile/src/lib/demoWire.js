@@ -57,6 +57,8 @@ export async function demoRequest(mock, path, options = {}) {
     if (path === '/device/detect') return mock.detect()
     if (path === '/preset') return mock.preset()
     if (path === '/preset/blocks') return mock.presetBlocks()
+    if (path === '/preset/scene-state')
+      return mock.presetBlocks().map((b) => ({ effectId: b.effectId, bypassed: b.bypassed ?? null, channel: b.channel ?? null }))
     if (path === '/preset/grid') return mock.grid()
     if (path === '/scene') return mock.getScene()
     if (path === '/tempo') return mock.tempo()

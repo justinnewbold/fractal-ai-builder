@@ -123,6 +123,23 @@ export async function presetBlocks() {
   return list.filter((b) => b?.slug)
 }
 
+/**
+ * Just what a scene changes: each block's bypass and channel.
+ *
+ * A scene switch never moves a block; it only changes which are on and which
+ * channel each is set to. The full chain read makes the unit dump its whole
+ * preset, which takes seconds and, asked for right after a scene switch,
+ * lands while the unit is still rebuilding and comes back without its header:
+ * "PRESET_DUMP_HEADER: expected func 0x77 at offset 0, got 0x78", four times
+ * in a row in one log, each one leaving the chain "out of date" on screen.
+ * This is one small status read instead. Empty when the computer is too old
+ * to answer it, and the caller falls back to the full read.
+ */
+export async function sceneState() {
+  const list = await remoteRequest('/preset/scene-state')
+  return Array.isArray(list) ? list : []
+}
+
 /** The ones that belong on a stage: everything but the four you never kick. */
 export const stageBlocks = (blocks) =>
   (blocks || []).filter((b) => !EXCLUDED_BLOCKS.includes(b.slug))
