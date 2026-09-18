@@ -447,14 +447,37 @@ export function run(test) {
     const job = wf.slice(wf.indexOf('\n  windows:'))
     assert.ok(wf.includes('\n  windows:'), 'nothing builds it')
     assert.match(job, /runs-on: windows-latest/, 'the Windows app is being built somewhere that is not Windows')
+    /* bash for every step in that job: the heredoc, the loops over release/,
+       and the publish flag below. */
+    assert.match(job, /defaults:\n\s+run:\n\s+shell: bash/, 'the Windows job is not pinned to bash')
+
     /*
-     * bash for every step in that job, which is not decoration. The dist
-     * script ends in `${PUBLISH:-never}` — shell syntax that PowerShell passes
-     * through as a literal, so electron-builder reads "${PUBLISH:-never}" as
-     * the name of a publish provider and dies on a line that looks nothing
-     * like the cause.
+     * AND NO SHELL SYNTAX INSIDE THE DIST SCRIPT, which is a different rule
+     * from that one and the reason this test exists.
+     *
+     * `--publish ${PUBLISH:-never}` lived in dist:win, and `shell: bash` did
+     * not save it: that governs the STEP's command and nothing further, and
+     * npm runs a script's body through its own shell — cmd.exe on Windows,
+     * whatever the workflow asked for. electron-builder was handed the six
+     * characters `${PUBL…` and failed with
+     *   Argument: publish, Given: "${PUBLISH:-never}"
+     * which names the right argument and never mentions a shell.
+     *
+     * The expansion belongs in the step, where bash is real. The Mac script
+     * keeps its own copy and is fine — npm runs that one through sh.
      */
-    assert.match(job, /defaults:\n\s+run:\n\s+shell: bash/, 'the Windows job is not pinned to bash, and the dist script is shell syntax')
+    const scripts = JSON.parse(read('desktop/package.json')).scripts
+    assert.ok(
+      !/[$][{]/.test(scripts['dist:win']),
+      'dist:win carries shell syntax again, and npm will run it through cmd.exe on Windows'
+    )
+    for (const step of job.split('- name: ').filter((s) => s.startsWith('Package'))) {
+      assert.match(
+        step,
+        /npm run dist:win -- --publish "\$\{PUBLISH:-never\}"/,
+        'a Windows Package step no longer passes the publish flag, so it falls back to electron-builder\'s own default'
+      )
+    }
 
     /* The same question the Mac job asks: modules built against the runner's
        Node, loaded under Electron's. The symptom of getting it wrong is an app

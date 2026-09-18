@@ -282,11 +282,22 @@ jobs:
       contents: write
     env:
       SIGNABLE: ${{ secrets.WIN_CERT_P12 != '' }}
-    # bash on the Windows runner, for every step that runs a command.
-    # `${PUBLISH:-never}` in the dist script is shell syntax, and PowerShell
-    # passes it through as a literal — electron-builder then reads
-    # "${PUBLISH:-never}" as the name of a publish provider and fails on a line
-    # that looks nothing like the cause.
+    # bash on the Windows runner, for every step that runs a command: the
+    # heredoc below, the loops over release/, and `${PUBLISH:-never}` in the
+    # Package steps.
+    #
+    # THAT LAST ONE USED TO LIVE IN THE DIST SCRIPT, and this is the shape of
+    # the bug it caused, because it is not the one it looks like. `shell: bash`
+    # governs the step's own command and nothing further: npm runs a script's
+    # BODY through its own shell, which on Windows is cmd.exe whatever the
+    # workflow asked for. So `--publish ${PUBLISH:-never}` inside the script
+    # reached electron-builder verbatim and it failed with
+    #   Argument: publish, Given: "${PUBLISH:-never}"
+    # — a message that names the right argument and gives no hint that a shell
+    # is involved at all.
+    #
+    # dist:win carries no shell syntax now. The expansion happens here, where
+    # bash is real, and npm is handed a word.
     defaults:
       run:
         shell: bash
@@ -354,7 +365,7 @@ jobs:
                      || (inputs.publish && github.ref == 'refs/heads/main')))
                 && 'always' || 'never' }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run dist:win
+        run: npm run dist:win -- --publish "${PUBLISH:-never}"
 
       - name: Package, signed
         if: ${{ github.event_name != 'pull_request' && env.SIGNABLE == 'true' }}
@@ -367,7 +378,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.WIN_CERT_P12 }}
           CSC_KEY_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
-        run: npm run dist:win
+        run: npm run dist:win -- --publish "${PUBLISH:-never}"
 
       # An installer and the zip beside it. The zip is not for people: it is
       # what electron-updater downloads, exactly as on macOS, and without it
