@@ -95,7 +95,7 @@ import { Chain, PresetList, BlockPanel, Tuner } from './components/Console'
 import Screens, { viewsFor } from './components/Screens'
 import { SIZES, loadSize, saveSize, clampSize, loadFit, saveFit } from './lib/gigSize'
 import { loadChatOn, saveChatOn, loadModelOn, saveModelOn } from './lib/aiSwitch'
-import { loadPlayMode, savePlayMode, askButtonShows } from './lib/playMode'
+import { loadPlayMode, savePlayMode, askButtonShows, editButtonShows } from './lib/playMode'
 import { remember as rememberPreset, CHANGED as MARKS_CHANGED } from './lib/presetMarks'
 import { CHANGED as SETLISTS_CHANGED } from './lib/setlists'
 import { syncSetlists, setlistCloudReady } from './lib/cloudSetlists'
@@ -1225,6 +1225,9 @@ export default function App() {
    * floated over is where the last control in every grid lands.
    */
   const askShows = askButtonShows({ status, view, playing, aiOn: chatOn })
+  /* Edit is not Ask: the chain editor is there whenever there is a unit,
+     play mode or not, AI or not. See editButtonShows. */
+  const chainShows = editButtonShows({ status, view })
 
   const [size, setSize] = useState(loadSize)
   /* Whether Play sizes its tiles from the screen instead of the step. */
@@ -5874,7 +5877,7 @@ export default function App() {
            * second copy of the same editor in the rail beside it.
            */
           onChain={
-            askShows
+            chainShows
               ? () => (views.includes('shape') ? changeView('shape') : setSheet('chain'))
               : null
           }

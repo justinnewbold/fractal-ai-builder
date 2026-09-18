@@ -54,6 +54,17 @@ export const askButtonShows = ({ status, view, playing, aiOn = true }) =>
   status === 'live' && view !== 'ask' && !playing && aiOn !== false
 
 /**
+ * Whether the Edit button is drawn on the stage screen: the way to the chain
+ * and its knobs. It used to come and go with Ask, so play mode or the AI
+ * switch being off took the chain editor off the web version entirely --
+ * the one place it could be tried without spending a phone build: "add edit
+ * to the web version so I can test the chain editor there first before
+ * spending ANOTHER expo build slot." Editing the chain is not asking the AI
+ * for anything, so it is on whenever there is a unit to edit.
+ */
+export const editButtonShows = ({ status, view }) => status === 'live' && view !== 'ask'
+
+/**
  * The phone app's rule, for the ✦ Tone button on the stage screen.
  *
  * `playing` is a TRI-STATE here, unlike the browser's: `null` means the setting

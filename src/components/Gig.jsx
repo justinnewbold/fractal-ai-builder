@@ -83,7 +83,9 @@ export default function Gig({
   /*
    * The way to the chain and its knobs.
    *
-   * Given on the same terms as onAsk — absent, not disabled, when play mode is
+   * Absent, not disabled, when there is no unit to edit. Unlike onAsk it does
+   * not go with play mode or the AI switch: editing the chain is not asking
+   * the AI for anything. It used to, and play mode is
    * on — because it is the same kind of thing: work you do between songs, not
    * during one. On a phone this is the ONLY way in, since the Edit screen is
    * deliberately unreachable there (see BENCH in Screens.jsx); on a wide screen

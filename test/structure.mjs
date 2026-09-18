@@ -1489,7 +1489,8 @@ export function run(test) {
        open at a time, so without this a block tapped in the chain sheet drops
        you on the stage screen when you close it. */
     assert.match(src, /setSheet\(sheetBack\)/, 'the block editor forgets where it was opened from')
-    assert.match(src, /onChain=\{\s*\n?\s*askShows/, 'the chain is reachable with play mode on')
+    assert.match(src, /onChain=\{\s*\n?\s*chainShows/, 'the chain is reachable with play mode on')
+    assert.match(src, /const chainShows = editButtonShows\(\{ status, view \}\)/, 'the chain button still comes and goes with Ask')
     assert.match(
       src,
       /views\.includes\('shape'\) \? changeView\('shape'\) : setSheet\('chain'\)/,
