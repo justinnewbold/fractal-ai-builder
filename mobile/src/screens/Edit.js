@@ -16,7 +16,7 @@ import {
   setParamConfirmed,
   setType
 } from '../lib/device'
-import { colLabel, doubtfulWrite, gridShape, laneItems, lanesShown } from '../lib/grid-plan'
+import { colLabel, doubtfulWrite, gridShape, laneItems, lanesShown, rowLabel } from '../lib/grid-plan'
 import { blockPositions, landingIndex, reorderPlan } from '../lib/laneOrder'
 import { isSilencingParam } from '../lib/guardrails'
 import { buildParamIndex, findControls, indexFor } from '../lib/paramIndex'
@@ -711,7 +711,7 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
   }
 
   const where = (row, col) =>
-    linear ? `slot ${colLabel(col)}` : `row ${row}, column ${colLabel(col)}`
+    linear ? `slot ${colLabel(col)}` : `row ${rowLabel(row)}, column ${colLabel(col)}`
 
   /* A write is done when the unit has been asked AND the chain re-read. */
   const after = async (res) => {
@@ -997,7 +997,7 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
         const lift = dragging ? (heights.current[lane.row] || [])[dragging.index] || 0 : 0
         return (
           <View key={lane.row} style={{ gap: space.sm }}>
-            {linear ? null : <Label>{`Row ${lane.row}`}</Label>}
+            {linear ? null : <Label>{`Row ${rowLabel(lane.row)}`}</Label>}
             {items.map((item, index) => {
               /* Where this item is drawn while a drag is on: the dragged one
                  follows the finger; the ones it has passed step out of its

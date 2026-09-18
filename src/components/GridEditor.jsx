@@ -6,7 +6,8 @@ import {
   doubtfulWrite,
   gridShape,
   laneItems,
-  lanesShown
+  lanesShown,
+  rowLabel
 } from '../../shared/grid-plan.mjs'
 
 /**
@@ -145,7 +146,7 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
       onChanged(
         linear
           ? `Placed ${block?.name} in slot ${label(col)}`
-          : `Placed ${block?.name} at row ${row}, column ${label(col)}`
+          : `Placed ${block?.name} at row ${rowLabel(row)}, column ${label(col)}`
       )
       const note = doubtful(res)
       if (note) setIssue(note)
@@ -187,7 +188,7 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
       onChanged(
         linear
           ? `Moved ${block.name} to slot ${label(to.col)}`
-          : `Moved ${block.name} to row ${to.row}, column ${label(to.col)}`
+          : `Moved ${block.name} to row ${rowLabel(to.row)}, column ${label(to.col)}`
       )
       const note = doubtful(res)
       if (note) setIssue(note)
@@ -207,7 +208,7 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
     setIssue(null)
     try {
       await clearCell(row, col)
-      onChanged(linear ? `Cleared slot ${label(col)}` : `Cleared row ${row}, column ${label(col)}`)
+      onChanged(linear ? `Cleared slot ${label(col)}` : `Cleared row ${rowLabel(row)}, column ${label(col)}`)
       close()
     } catch (err) {
       setIssue(err.message)
@@ -310,7 +311,7 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
         <div className="chain-lane" data-linear={linear ? 'yes' : undefined} key={lane.row}>
           {rows > 1 ? (
             <p className="silk-label chain-lane-head">
-              {lane.blocks.length ? `Row ${lane.row}` : `Row ${lane.row} — empty`}
+              {lane.blocks.length ? `Row ${rowLabel(lane.row)}` : `Row ${rowLabel(lane.row)} — empty`}
             </p>
           ) : null}
 

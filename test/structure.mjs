@@ -3542,9 +3542,11 @@ export function run(test) {
       /from '\.\.\/\.\.\/shared\/grid-plan\.mjs'/,
       'the browser has its own wire boundary again, so the two apps can drift'
     )
+    /* Rows shift with columns: the dump counts both from zero and the wire
+       counts both from one. A row written unshifted went to the top row. */
     assert.deepEqual(
       wireCell(1, 0),
-      { row: 1, col: 1 },
+      { row: 2, col: 1 },
       'the wire boundary changed; the chain may now be corrected twice or not at all'
     )
 

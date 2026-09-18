@@ -25,10 +25,32 @@
 /**
  * The cell as the write routes want it.
  *
- * Rows already count from one on both sides. Columns do not, and that is the
- * whole of it.
+ * BOTH COUNT FROM ZERO IN A READ AND FROM ONE ON THE WIRE. This used to shift
+ * only the column, on the belief that rows already counted from one on both
+ * sides. They do not: the FM3's preset dump numbers its rows 0-3, exactly as
+ * it numbers its columns 0-11, and the write routes take rows 1-4 the way
+ * FM3-Edit shows them. So a chain read on row 1 -- the second row, where the
+ * factory presets keep theirs -- was written back to row 1 on the wire, which
+ * is the TOP row. Every clear landed on an empty cell and did nothing; every
+ * placement tried to put a block on the top row while the same block still
+ * sat one row down, and the unit quietly declined. The unit answered "ok" to
+ * all of it, and a log from an FM3 read "unit has it at 5" after every move,
+ * with not one step refused.
+ *
+ * Rows are shifted here for the same reason columns are: once, at the
+ * boundary, so a wrong row cannot happen one screen at a time.
  */
-export const toWireCell = (row, col) => ({ row, col: col + 1 })
+export const toWireCell = (row, col) => ({ row: row + 1, col: col + 1 })
+
+/**
+ * A cable as the write route wants it: out of (srcRow, srcCol) into destRow
+ * of the next column. The same shift, for the same reason.
+ */
+export const toWireCable = (srcRow, srcCol, destRow) => ({
+  srcRow: srcRow + 1,
+  srcCol: srcCol + 1,
+  destRow: destRow + 1
+})
 
 /**
  * The last column a cable can start from.
@@ -66,8 +88,9 @@ export function gridShape(capabilities) {
   }
 }
 
-/** What a person calls a column. The only place anything counts from one. */
+/** What a person calls a column, and a row: the numbers FM3-Edit shows. */
 export const colLabel = (col) => col + 1
+export const rowLabel = (row) => row + 1
 
 /**
  * The grid as lanes: what is in each row, and where the gaps are.
@@ -84,7 +107,9 @@ export const colLabel = (col) => col + 1
 export function lanesFor(blocks, capabilities) {
   const { rows, cols } = gridShape(capabilities)
   const lanes = []
-  for (let row = 1; row <= rows; row++) {
+  /* Rows count from zero, like columns: a chain on the top row is row 0,
+     and it used to be drawn nowhere at all. */
+  for (let row = 0; row < rows; row++) {
     const inRow = (blocks || [])
       .filter((b) => b.row === row && typeof b.col === 'number')
       .sort((a, b) => a.col - b.col)
