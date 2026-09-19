@@ -130,11 +130,13 @@ jobs:
       # number and cut off every installed copy of the app to fix the thing
       # that stops installed copies being cut off.
       - name: Make it able to take updates
+        id: fp
         working-directory: mobile
         run: |
           set -euo pipefail
           hash="$(node -p "require('./fingerprint.json').android")"
           [ -n "$hash" ] || { echo "::error::No android fingerprint recorded."; exit 1; }
+          echo "hash=$hash" >> "$GITHUB_OUTPUT"
           mkdir -p android/app/src/main/assets
           printf '%s' "$hash" > android/app/src/main/assets/fingerprint
           python3 - "$hash" <<'PY'
@@ -152,6 +154,48 @@ jobs:
           print('runtime version', sys.argv[1], 'and channel preview written in')
           PY
           grep -c 'expo-channel-name' android/app/src/main/AndroidManifest.xml
+
+      # HALF THIS APK WAS NATIVE CODE NO PHONE CAN RUN.
+      #
+      # "It keeps hanging when it says it's all the way downloaded." The file
+      # was 99.6 MB, and a download that large over a handset's connection is
+      # the kind of thing a phone browser gives up on at the last step.
+      #
+      # Opened up, it carried FOUR copies of every native library — one per
+      # processor the Android toolchain knows about:
+      #
+      #   lib/x86           22.7 MB   emulators on a desktop, never a phone
+      #   lib/x86_64        21.9 MB   the same
+      #   lib/armeabi-v7a   14.0 MB   32-bit ARM, gone from phones years ago
+      #   lib/arm64-v8a     20.5 MB   every Android phone made this decade
+      #
+      # Nearly 59 MB of a 99.6 MB download that the handset it was aimed at
+      # would never load. Not this app's own code either: the biggest single
+      # file in the x86 pile is Google's barcode scanner, shipped prebuilt for
+      # all four and packaged for all four.
+      #
+      # `reactNativeArchitectures` is the lever. The React Native gradle plugin
+      # turns it into AGP's `ndk.abiFilters`, which filters every native
+      # library packaged into the APK — the ones from third-party AARs
+      # included, which is what makes it worth more than it looks.
+      #
+      # WHICH LEAVES arm64-v8a, and what that costs: an APK that will not
+      # install on a 32-bit-only Android device. Google Play has required
+      # 64-bit since 2019 and every phone worth driving a rig from is arm64,
+      # so this is a line to change back rather than a bridge to burn — and
+      # the page that hands out the link says what it is for.
+      #
+      # 99.6 MB -> about 41 MB.
+      #
+      # HERE RATHER THAN IN app.json, for the same reason as the memory
+      # settings below. app.json is hashed into the runtime fingerprint, and
+      # moving that number cuts off every installed copy of the app from
+      # updates.
+      - name: Only the processor a phone actually has
+        working-directory: mobile/android
+        run: |
+          sed -i 's/^reactNativeArchitectures=.*/reactNativeArchitectures=arm64-v8a/' gradle.properties
+          grep reactNativeArchitectures gradle.properties
 
       # THE TEMPLATE'S MEMORY CEILING IS NO LONGER ENOUGH FOR THIS APP.
       #
@@ -181,11 +225,62 @@ jobs:
           printf '\n# Raised by .github/workflows/apk.yml — see the note there.\nkotlin.daemon.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=768m\n' >> gradle.properties
           grep jvmargs gradle.properties
 
+      # AND THE RUNTIME VERSION HAS TO SURVIVE THE BUILD, which it did not.
+      #
+      # "The Android app is still on 7.391.0." It was, and it always would
+      # have been: not one APK this workflow has ever produced could take an
+      # update, including the ones built after the step above was added to
+      # make exactly that work.
+      #
+      # `expo-updates` WRITES THAT ASSET ITSELF, during the gradle build, in
+      # createFingerprintForBuildAsync — and it recomputes the fingerprint
+      # rather than reading the one already sitting there. So the step above
+      # writes the right hash and gradle then overwrites it.
+      #
+      # What it computes is different, and it is different for a reason that
+      # is its own fault. The fingerprint hashes, among other things, the
+      # directory `node_modules/expo-updates/expo-updates-gradle-plugin` — and
+      # by the time gradle asks the question, gradle has compiled that plugin
+      # and left its build output inside that very directory. Building the app
+      # changes the number that identifies the app. Every APK therefore got a
+      # runtime version of its own:
+      #
+      #   published updates ask for   826b1b536206f9405d315fdfa1761986b60ade12
+      #   the 7.391.0 APK answered    35dd3dda164fc94d542d3d170cca62078137936b
+      #   the next APK answered       b39d9d5a517bb773d5350ba31508878a1fd68059
+      #
+      # A phone whose runtime version matches nothing is handed nothing, for
+      # ever, and is told nothing about it. That is the whole of why a handset
+      # sat on the version it was installed at while thirty changes went past.
+      #
+      # EXPO_UPDATES_FINGERPRINT_OVERRIDE is the supported way to say it: the
+      # same function checks it first and skips the recompute entirely. The
+      # value is the one `eas update` publishes under, straight out of
+      # fingerprint.json, so the two cannot drift.
       - name: Build it
         working-directory: mobile/android
+        env:
+          EXPO_UPDATES_FINGERPRINT_OVERRIDE: ${{ steps.fp.outputs.hash }}
         run: |
           chmod +x ./gradlew
           ./gradlew assembleRelease --no-daemon
+
+      # Proof rather than hope: read the runtime version back out of the APK
+      # that was actually built and hold it to the one updates go to. A silent
+      # mismatch here is invisible until a phone is sitting in front of you on
+      # last week's version.
+      - name: The APK asks for the updates that exist
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          want="$(node -p "require('./fingerprint.json').android")"
+          got="$(unzip -p android/app/build/outputs/apk/release/app-release.apk assets/fingerprint)"
+          echo "published under: $want"
+          echo "the APK asks for: $got"
+          [ "$want" = "$got" ] || {
+            echo "::error::This APK would never receive an update. Built $got, updates go to $want."
+            exit 1
+          }
 
       - name: Name it after the version
         id: apk

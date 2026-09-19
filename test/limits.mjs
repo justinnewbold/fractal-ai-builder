@@ -986,6 +986,129 @@ export function run(test) {
     assert.equal(checked, 4, `expected four publishing steps, checked ${checked}`)
   })
 
+  test('the APK carries only the processor a phone actually has', () => {
+    /*
+     * "It keeps hanging when it says it's all the way downloaded."
+     *
+     * 99.6 MB, and a phone browser giving up at the last step of it. Opened
+     * up, the APK carried FOUR copies of every native library, one per
+     * processor the Android toolchain knows about:
+     *
+     *   lib/x86           22.7 MB   emulators on a desktop, never a phone
+     *   lib/x86_64        21.9 MB   the same
+     *   lib/armeabi-v7a   14.0 MB   32-bit ARM, gone from phones years ago
+     *   lib/arm64-v8a     20.5 MB   every Android phone made this decade
+     *
+     * Nearly 59 MB of the download was code the handset it was aimed at could
+     * never load — and not this app's own code either: the largest single file
+     * in the x86 pile is Google's barcode scanner, shipped prebuilt for all
+     * four and packaged for all four.
+     *
+     * `reactNativeArchitectures` is the lever rather than anything hand-rolled:
+     * React Native's gradle plugin turns it into AGP's `ndk.abiFilters`, which
+     * filters every native library packaged into the APK, the ones arriving
+     * inside third-party AARs included. That last part is what makes it worth
+     * more than it looks.
+     */
+    const apk = read('.github/workflows/apk.yml')
+    const at = apk.indexOf('reactNativeArchitectures=arm64-v8a')
+    assert.notEqual(
+      at,
+      -1,
+      'the APK is built for all four processors again — half of it is then native code no phone can run'
+    )
+
+    /*
+     * After prebuild writes the file, and before the build reads it.
+     *
+     * Anchored on the COMMAND rather than the words: three comments in this
+     * workflow mention `expo prebuild` and the first of them is at the top of
+     * the file, so an order checked against the phrase is an order that can
+     * never be wrong. See CLAUDE.md — the same trap, in a different file.
+     */
+    const prebuild = apk.indexOf('run: npx expo prebuild')
+    const build = apk.indexOf('./gradlew assembleRelease')
+    assert.notEqual(prebuild, -1, 'nothing generates the native project any more')
+    assert.ok(prebuild < at, 'the architectures are pinned before prebuild, which then writes all four back')
+    assert.ok(at < build, 'the architectures are pinned after the build has already read them')
+
+    /*
+     * And not in app.json, for the same reason as the memory settings and the
+     * updates config: that file is hashed into the runtime fingerprint, and
+     * moving that number cuts off every installed copy of the app from the
+     * updates this exists to deliver.
+     */
+    const config = JSON.parse(read('mobile/app.json'))
+    assert.ok(
+      !JSON.stringify(config).includes('abiFilters'),
+      'the architectures moved into app.json, which moves the fingerprint and cuts off every installed copy'
+    )
+
+    /* Somebody with an older handset gets told why rather than left with
+       Android's own "App not installed" and nothing else. */
+    assert.match(
+      read('public/android.html'),
+      /64-bit Android/,
+      'the download page does not say which phones this build is for'
+    )
+  })
+
+  test('the APK asks for the updates that are actually published', () => {
+    /*
+     * "The Android app is still on 7.391.0."
+     *
+     * NOT ONE APK THIS WORKFLOW HAS EVER PRODUCED COULD TAKE AN UPDATE —
+     * including the ones built after the step beside this one was added to
+     * make exactly that work. That step writes the runtime version into
+     * `assets/fingerprint`, correctly. Then gradle overwrites it.
+     *
+     * `expo-updates` writes that asset itself during the build, in
+     * createFingerprintForBuildAsync, and it RECOMPUTES the fingerprint
+     * rather than reading the one already sitting there. What it computes is
+     * different, for a reason that is its own doing: the fingerprint hashes
+     * `node_modules/expo-updates/expo-updates-gradle-plugin`, and by the time
+     * gradle asks, gradle has compiled that plugin and left its build output
+     * inside that directory. Building the app changes the number that
+     * identifies the app.
+     *
+     *   published updates ask for   826b1b536206f9405d315fdfa1761986b60ade12
+     *   the 7.391.0 APK answered    35dd3dda164fc94d542d3d170cca62078137936b
+     *   the next APK answered       b39d9d5a517bb773d5350ba31508878a1fd68059
+     *
+     * A phone whose runtime version matches nothing is handed nothing, for
+     * ever, and is told nothing about it — which is the entire reason a
+     * handset sat on the version it was installed at while thirty changes
+     * went past it.
+     *
+     * The same function checks EXPO_UPDATES_FINGERPRINT_OVERRIDE first and
+     * skips the recompute, so that is what it is given, out of the same file
+     * `eas update` publishes under.
+     */
+    const apk = read('.github/workflows/apk.yml')
+
+    assert.match(
+      apk,
+      /EXPO_UPDATES_FINGERPRINT_OVERRIDE: \$\{\{ steps\.fp\.outputs\.hash \}\}/,
+      'the build recomputes the runtime version again, and gets one no published update is addressed to'
+    )
+
+    /* And that value is the published one rather than a second opinion. */
+    const fp = apk.slice(apk.indexOf('id: fp'), apk.indexOf('\n      - name:', apk.indexOf('id: fp')))
+    assert.match(fp, /fingerprint\.json/, 'the override is not the hash updates are published under')
+    assert.match(fp, /echo "hash=\$hash" >> "\$GITHUB_OUTPUT"/, 'nothing hands the hash to the build step')
+
+    /*
+     * AND IT IS READ BACK OUT OF THE FINISHED APK. This failed silently for
+     * every build there has ever been; the only honest guard is opening the
+     * artefact and asking it, which is what a phone does.
+     */
+    const at = apk.indexOf('The APK asks for the updates that exist')
+    assert.notEqual(at, -1, 'nothing checks the APK can take an update, which is how this went unnoticed for thirty versions')
+    const step = apk.slice(at, apk.indexOf('\n      - name:', at))
+    assert.match(step, /unzip -p .*assets\/fingerprint/, 'the check does not read the runtime version out of the APK itself')
+    assert.match(step, /exit 1/, 'a mismatch is reported and the build goes green anyway')
+  })
+
   test('an APK is built able to take the updates that are published', () => {
     /*
      * "The android app is still on 3.171. It's supposed to be doing updates,
@@ -1029,9 +1152,16 @@ export function run(test) {
     assert.match(step, /expo-channel-name/, 'the APK asks for an update without saying which branch')
     assert.match(step, /preview/, 'the channel is not the one a directly-installed build is on')
 
-    /* Written after prebuild, or prebuild overwrites both of them. */
+    /*
+     * Written after prebuild, or prebuild overwrites both of them.
+     *
+     * Against the COMMAND. This read `indexOf('expo prebuild')`, and the
+     * first of the three mentions of that phrase is a comment at the top of
+     * the file — so the assertion was true whatever the order, and had never
+     * been able to fail.
+     */
     assert.ok(
-      apk.indexOf('expo prebuild') < at,
+      apk.indexOf('run: npx expo prebuild') < at,
       'the updates config is written before prebuild, which then overwrites it'
     )
   })
