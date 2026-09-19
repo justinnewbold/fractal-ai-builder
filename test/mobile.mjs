@@ -2710,7 +2710,10 @@ export function run(test) {
     assert.match(flat, /linkWord\(tone, 'remote'\)/, 'the phone is not using the shared word')
 
     /* The old bar is gone rather than stacked above the new one. */
-    const app = read('mobile/App.js')
+    const app = read('mobile/App.js').replace(/\s+/g, ' ')
+    /* Flattened, because the props wrapped onto their own lines the day the
+       unit name learned to go two places. The rule is that the bar is drawn
+       with the link and a way into Setup, not that it fits on one line. */
     assert.match(app, /<TopBar link=\{link\} onOpenSettings=/, 'the app does not draw the header')
     assert.ok(!/function LinkBar/.test(app), 'the old sentence bar is still there, under the new one')
     assert.ok(!/Connected to \$\{/.test(app), 'the app still writes out which computer it found')
@@ -5085,7 +5088,12 @@ export function run(test) {
     /* It names whichever unit it is being, which is the whole point of
        offering five of them. */
     assert.match(settings, /This is the demo — a simulated \$\{/, 'the demo does not say it is one')
-    assert.match(settings, /DEMO_UNITS\.find\(\(u\) => u\.key === demoUnit\(\)\)/, 'the demo says a unit it may not be')
+    /* Named off the SUBSCRIPTION rather than a plain read. It was
+       `demoUnit()`, which cannot be told it has gone stale, so this sentence
+       went on naming the unit the app started as after somebody had picked
+       another one. */
+    assert.match(settings, /const unit = useDemoUnit\(\)/, 'the demo screen does not follow which unit it is')
+    assert.match(settings, /DEMO_UNITS\.find\(\(u\) => u\.key === unit\)/, 'the demo says a unit it may not be')
     assert.match(settings, /status=\{ demo \? 'Demo — simulated FM3' :/, 'Setup does not show that the demo is on')
 
     /* The link reads as connected, because from every screen's point of view it
@@ -5529,6 +5537,88 @@ export function run(test) {
     /* Null on a real rig, where the relay carries the readings and a second
        source would fight them. */
     assert.match(device, /demoDevice\(\)\?\./, 'the phone would drive a tuner over a real unit too')
+  })
+
+  test('the phone can change which unit the demo is, and see that it did', () => {
+    /*
+     * "On the demo, it's not letting you switch to a different demo. It's
+     * stuck on the FM3. And when you click the top left unit button, it brings
+     * up the setup screen where it used to bring up the demo page."
+     *
+     * Three faults, and every one of them had to go for a tap on a unit to
+     * mean anything.
+     *
+     * ONE: NOTHING REDREW. `setDemoUnit` recorded the choice, rebuilt the
+     * simulated unit and told every watcher, exactly as it reads — and the
+     * only subscription on offer was `useDemo`, whose SNAPSHOT is `isDemo`, a
+     * boolean. Going from a simulated FM3 to a simulated Axe-Fx III leaves
+     * that boolean true; `useSyncExternalStore` compares snapshots with
+     * Object.is and skips the render when nothing moved. So the announcement
+     * arrived and was correctly ignored, and the five buttons kept the old
+     * unit lit however many times they were pressed.
+     *
+     * TWO: NOTHING RE-READ. The stage screen's read runs on mount, with no
+     * dependencies. The rig underneath really had become another unit and
+     * nothing had asked it anything since, so the screen went on showing the
+     * old one's presets, scenes and chain.
+     *
+     * THREE: NOTHING TOOK YOU THERE. The name in the corner opened Setup —
+     * the whole screen, from the top — with the five units two doors further
+     * in, inside a page named after pairing a phone.
+     */
+    const demo = read('mobile/src/lib/demo.js')
+
+    /* The snapshot is the unit, and that is the entire first fault. A hook
+       here whose snapshot is `isDemo` cannot report a change of unit, however
+       loudly the store announces one. */
+    assert.match(
+      demo,
+      /export const useDemoUnit = \(\) => useSyncExternalStore\(subscribe, demoUnit, demoUnit\)/,
+      'nothing can subscribe to WHICH unit the demo is, so changing it redraws nothing'
+    )
+    assert.match(
+      demo,
+      /export const useDemo = \(\) => useSyncExternalStore\(subscribe, isDemo, isDemo\)/,
+      'the on/off subscription changed shape — the two must stay separate questions'
+    )
+    assert.match(demo, /announce\(\)/, 'a change of unit tells nobody')
+
+    /* The screens ask the store, not a plain function: `demoUnit()` in a
+       render is a read that can never be told it is stale. */
+    for (const where of ['mobile/src/screens/Settings.js', 'mobile/src/components/DemoUnit.js']) {
+      const src = read(where)
+      assert.match(src, /useDemoUnit\(\)/, `${where} reads the unit without subscribing to it`)
+      assert.ok(
+        !/[^e]demoUnit\(\)/.test(src.replace(/\/\*[\s\S]*?\*\//g, '')),
+        `${where} still reads demoUnit() directly, which cannot redraw when it changes`
+      )
+    }
+
+    /* Two: the rig is read again when the unit changes. */
+    const stage = read('mobile/src/screens/Stage.js')
+    assert.match(stage, /import \{ useDemoUnit \} from '\.\.\/lib\/demo'/, 'the stage screen uses a hook it never imported')
+    assert.match(stage, /const demoIs = useDemoUnit\(\)/, 'the stage screen does not watch which unit the demo is')
+    assert.match(
+      stage,
+      /useEffect\(\(\) => \{\s*reload\(\)\s*\}, \[reload, demoIs\]\)/,
+      'the stage screen reads once on mount again, so a new demo unit keeps the old one’s presets'
+    )
+
+    /* Three: the name in the corner goes to the units in the demo, and to the
+       facts outside it. */
+    const app = read('mobile/App.js')
+    assert.match(
+      app,
+      /onOpenUnit=\{\(\) => \(demo \? setPickUnit\(true\) : setScreen\('settings'\)\)\}/,
+      'the unit name opens Setup in the demo again, with the five units two doors further in'
+    )
+    assert.match(app, /<DemoUnit open=\{pickUnit\} onClose=\{\(\) => setPickUnit\(false\)\}/, 'the picker is never drawn')
+    assert.match(app, /import DemoUnit from '\.\/src\/components\/DemoUnit'/, 'the picker is used and never imported')
+
+    /* And the browser end still does the same thing, because this was asked
+       for once about one app that exists twice. */
+    const web = read('src/components/TopBar.jsx')
+    assert.match(web, /aria-label=\{demo \? 'Which unit the demo is' : 'About this unit'\}/, 'the browser’s unit name stopped being two destinations')
   })
 
 }

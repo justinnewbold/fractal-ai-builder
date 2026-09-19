@@ -5,7 +5,7 @@ import { color, font, mono, radius, space, TAP, MODES, getMode, setMode } from '
 import { APP_VERSION } from '../lib/version'
 import { AFFILIATION } from '../lib/affiliation'
 import { isOlder } from '../lib/versions'
-import { setDemo, useDemo, demoUnit, setDemoUnit } from '../lib/demo'
+import { setDemo, useDemo, useDemoUnit, setDemoUnit } from '../lib/demo'
 import { UNITS as DEMO_UNITS } from '../lib/demoUnits'
 import { getDebugLog } from '../lib/debugLog'
 import { tick } from '../lib/feedback'
@@ -119,6 +119,10 @@ export default function Settings({
    * bar line says what the phones hear.
    */
   const demo = useDemo()
+  /* Which one, and told when it changes. Read as `demoUnit()` this never
+     redrew, so the five buttons stayed lit on whichever unit the app started
+     as however many times they were pressed. */
+  const unit = useDemoUnit()
   const behind = !!hostVersion && isOlder(hostVersion, APP_VERSION) === true
 
   const [page, setPage] = useState(null)
@@ -364,7 +368,7 @@ export default function Settings({
               <>
                 <Note tone="warn">
                   {`This is the demo — a simulated ${
-                    DEMO_UNITS.find((u) => u.key === demoUnit())?.name || 'FM3'
+                    DEMO_UNITS.find((u) => u.key === unit)?.name || 'FM3'
                   }. Every screen works and nothing reaches hardware. It also answers instantly, so anything still slow in here is this app rather than the line to a computer.`}
                 </Note>
                 {/*
@@ -380,7 +384,7 @@ export default function Settings({
                       key={u.key}
                       label={u.name}
                       tone="signal"
-                      on={u.key === demoUnit()}
+                      on={u.key === unit}
                       height={44}
                       style={{ paddingHorizontal: space.md }}
                       onPress={() => setDemoUnit(u.key)}
