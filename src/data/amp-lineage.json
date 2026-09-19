@@ -132,7 +132,8 @@
     "family": "Brit JVM",
     "manufacturer": "Marshall",
     "basedOn": "Marshall JVM410H",
-    "description": "A modern four-channel Marshall that covers the whole history of the brand, from clean to more gain than a Plexi ever had."
+    "specs": "100 watt · ECC83 / EL34",
+    "description": "A modern four-channel Marshall that covers the whole history of the brand, from clean to more gain than a Plexi ever had.\n\nFour channels, three voices each, which is the whole point of it: twelve settings that walk from a JTM 45 up to something with more gain than any Marshall sold before it. The models here are the two overdrive channels.\n\nThey have a lot of gain on tap. Start with Input Drive lower than feels right and come up — this is an amp that will happily give you more than the song wants."
   },
   {
     "family": "Brit Pre",

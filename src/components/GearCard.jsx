@@ -1,5 +1,5 @@
 import { photoFor } from '../lib/gearPhotos'
-import { descriptionFor } from '../lib/lineage'
+import { descriptionFor, paragraphsOf, specsFor } from '../lib/lineage'
 
 /**
  * One model, on a page of its own.
@@ -27,7 +27,8 @@ import { descriptionFor } from '../lib/lineage'
 export default function GearCard({ entry, onBack }) {
   if (!entry) return null
   const photo = photoFor(entry.name)
-  const about = descriptionFor(entry.slug, entry.name)
+  const about = paragraphsOf(descriptionFor(entry.slug, entry.name))
+  const specs = specsFor(entry.slug, entry.name)
 
   /*
    * Two verbs, because one sentence will not carry both. "Based on Mesa" is
@@ -50,8 +51,14 @@ export default function GearCard({ entry, onBack }) {
       <p className="gear-card-name">{entry.name}</p>
       {lineage ? <p className="gear-card-gear">{lineage}</p> : null}
 
-      {about ? <p className="hint gear-about">{about}</p> : null}
+      {/*
+        THE PICTURE FIRST, then the numbers, then the writing.
 
+        The order is the order the questions arrive in, and it changed once it
+        had a photograph to put in it: what it looks like is answered by a
+        glance, and a paragraph above the photograph is a paragraph read
+        before you know what you are reading about.
+      */}
       {photo ? (
         <figure className="gear-photo">
           <img src={photo.src} alt={photo.alt} loading="lazy" />
@@ -63,6 +70,16 @@ export default function GearCard({ entry, onBack }) {
         </figure>
       ) : null}
 
+      {specs ? <p className="gear-specs">{specs}</p> : null}
+
+      {/* As many paragraphs as were written. One sentence is an array of one,
+          so everything already in the catalog draws exactly as it did. */}
+      {about.map((para, i) => (
+        <p className="hint gear-about" key={i}>
+          {para}
+        </p>
+      ))}
+
       {/*
         Said rather than left as a blank space. About a quarter of the roster
         has a photograph and rather less has a description, and somebody who
@@ -72,7 +89,7 @@ export default function GearCard({ entry, onBack }) {
         invented, because a wrong attribution in a guitar app is worse than a
         blank one.
       */}
-      {!about && !photo ? (
+      {!about.length && !photo ? (
         <p className="hint">
           Nothing written down about this one yet. The catalog only
           holds what can be said for certain — a plausible guess would be read as fact by somebody

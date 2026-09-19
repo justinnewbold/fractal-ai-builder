@@ -2,7 +2,7 @@ import { Image, Linking, ScrollView, Text, View } from 'react-native'
 
 import { color, font, radius, space } from '../lib/theme'
 import { photoFor } from '../lib/gearPhotos'
-import { descriptionFor } from '../lib/lineage'
+import { descriptionFor, paragraphsOf, specsFor } from '../lib/lineage'
 import { HOSTED_ORIGIN } from '../lib/pairing'
 import Press from './Press'
 
@@ -34,7 +34,8 @@ import Press from './Press'
 export default function GearCard({ entry, onBack }) {
   if (!entry) return null
   const photo = photoFor(entry.name, `${HOSTED_ORIGIN}/gear`)
-  const about = descriptionFor(entry.slug, entry.name)
+  const about = paragraphsOf(descriptionFor(entry.slug, entry.name))
+  const specs = specsFor(entry.slug, entry.name)
 
   /* Two verbs, because one sentence will not carry both. "Based on Mesa" is
      not English — "based on" wants a thing. "Modelled on Mesa" reads correctly
@@ -76,10 +77,14 @@ export default function GearCard({ entry, onBack }) {
           ) : null}
         </View>
 
-        {about ? (
-          <Text style={{ color: color.silkDim, fontSize: font.body, lineHeight: 22 }}>{about}</Text>
-        ) : null}
+        {/*
+          THE PICTURE FIRST, then the numbers, then the writing.
 
+          The order is the order the questions arrive in, and it changed once
+          there was a photograph to put in it: what it looks like is answered
+          by a glance, and a paragraph above the photograph is a paragraph
+          read before you know what you are reading about.
+        */}
         {photo ? (
           <View style={{ gap: space.xs }}>
             <Image
@@ -102,6 +107,18 @@ export default function GearCard({ entry, onBack }) {
           </View>
         ) : null}
 
+        {specs ? (
+          <Text style={{ color: color.silk, fontSize: font.body, fontWeight: '600' }}>{specs}</Text>
+        ) : null}
+
+        {/* As many paragraphs as were written. One sentence is an array of
+            one, so everything already in the catalog draws as it did. */}
+        {about.map((para, i) => (
+          <Text key={i} style={{ color: color.silkDim, fontSize: font.body, lineHeight: 22 }}>
+            {para}
+          </Text>
+        ))}
+
         {/*
           Said rather than left as a blank screen. Somebody who opens three
           models and gets three different amounts of page needs to know that
@@ -109,7 +126,7 @@ export default function GearCard({ entry, onBack }) {
           it obeys is the one lineage.js is built on: nothing invented,
           because a wrong attribution in a guitar app is worse than a blank.
         */}
-        {!about && !photo ? (
+        {!about.length && !photo ? (
           <Text style={{ color: color.silkFaint, fontSize: font.small, lineHeight: 20 }}>
             Nothing written down about this one yet. The catalog only
             holds what can be said for certain — a plausible guess would be read as fact by somebody

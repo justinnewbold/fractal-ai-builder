@@ -739,4 +739,63 @@ export function run(test) {
     }
   })
 
+  test('a model page holds a spec line and as many paragraphs as were written', async () => {
+    /*
+     * "Your descriptions are not very captivating. I thought I described it
+     * clearly how I wanted them previously when I uploaded the photo... I
+     * didn't say I wanted a scrape of anything. I said I wanted it 'like'
+     * this."
+     *
+     * The reference is a SHAPE: the model's name, what it really is, the
+     * photograph, a line of numbers, then several paragraphs. This page could
+     * hold one sentence. Anything longer written into the catalog came out as
+     * a single block with the paragraph breaks eaten, which makes the writing
+     * look worse the more of it there is — the opposite of what a person
+     * filling these in deserves.
+     *
+     * So the plumbing goes in first and the words come after. Whoever writes
+     * them types a blank line between paragraphs and gets paragraphs.
+     */
+    const lines = {
+      browser: await import('../src/lib/lineage.js'),
+      phone: await import('../mobile/src/lib/lineage.js')
+    }
+
+    for (const [where, lib] of Object.entries(lines)) {
+      const { descriptionFor, specsFor, paragraphsOf } = lib
+
+      /* Blank lines are paragraph breaks; a single newline inside one is just
+         how the file was wrapped and is not a break. */
+      assert.deepEqual(paragraphsOf('one\n\ntwo\n\nthree'), ['one', 'two', 'three'], `${where} loses paragraph breaks`)
+      assert.deepEqual(paragraphsOf('wrapped\nover two lines'), ['wrapped over two lines'], `${where} breaks on a soft wrap`)
+
+      /* Nothing written is an empty list, not a list holding an empty string —
+         the "nothing written down yet" message hangs off exactly this. */
+      for (const nothing of [null, undefined, '', '   ', '\n\n']) {
+        assert.deepEqual(paragraphsOf(nothing), [], `${where} turns nothing into a paragraph`)
+      }
+
+      /* The one filled in as the worked example, in the shape the reference
+         has: a spec line, and more than one paragraph. */
+      const jvm = 'Brit JVM OD1 Orange'
+      assert.match(specsFor('amp', jvm), /watt/, `${where} has no spec line for the JVM`)
+      assert.ok(paragraphsOf(descriptionFor('amp', jvm)).length > 1, `${where} draws the JVM as one block`)
+
+      /* And every one-sentence entry still draws, untouched: an array of one,
+         and no spec line rather than an empty one. */
+      assert.equal(paragraphsOf(descriptionFor('amp', '1987X Treble')).length, 1, `${where} changed an existing description`)
+      assert.equal(specsFor('amp', '1987X Treble'), null, `${where} invents a spec line`)
+    }
+
+    /* Both pages read all three, or the fields exist and nothing draws them. */
+    for (const [where, file] of [['browser', 'src/components/GearCard.jsx'], ['phone', 'mobile/src/components/GearCard.js']]) {
+      const card = read(file)
+      assert.match(card, /paragraphsOf\(descriptionFor\(/, `${where}'s model page still draws one block`)
+      assert.match(card, /specsFor\(entry\.slug, entry\.name\)/, `${where}'s model page never asks for the spec line`)
+      /* And the picture comes before the writing, which is the order asked
+         for and the order the questions arrive in. */
+      assert.ok(card.indexOf('photo.credit') < card.indexOf('about.map'), `${where} puts the writing above the photograph`)
+    }
+  })
+
 }
