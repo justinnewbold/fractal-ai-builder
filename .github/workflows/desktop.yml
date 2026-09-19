@@ -467,6 +467,49 @@ jobs:
             console.log('serial and MIDI both load under Electron-as-Node');
           "
 
+      # ON ARM ONLY, AND THE REASON IS A BINARY THAT DOES NOT EXIST.
+      #
+      # electron-builder does not build a .deb itself — it downloads fpm and
+      # shells out to it. The copy it downloads is `fpm-1.9.3-2.3.1-linux-x86`,
+      # and that is the only one published: there is no arm64 build of it. So
+      # on this runner the AppImage finishes perfectly, the .deb starts, and
+      # the Ruby inside that bundle dies with
+      #
+      #   cannot execute binary file: Exec format error
+      #
+      # which reads like a corrupt download and is in fact a 32-bit x86
+      # interpreter being handed to an arm64 kernel.
+      #
+      # fpm is a Ruby gem, and a gem is architecture-neutral. Installing it
+      # and setting USE_SYSTEM_FPM makes app-builder run `fpm` off PATH and
+      # download nothing — verified by running app-builder that way against an
+      # empty cache and watching a valid .deb come out with no fetch.
+      #
+      # The x64 job deliberately does NOT do this. Its bundled fpm works, and
+      # a gem install it does not need is one more thing between that build
+      # and a release.
+      #
+      # WHICH IS WHY THE FLAG IS EXPORTED HERE RATHER THAN SET ON `Package`
+      # WITH A CONDITIONAL VALUE. app-builder tests whether USE_SYSTEM_FPM is
+      # PRESENT, not what it says, so `USE_SYSTEM_FPM: ${{ ... || '' }}` —
+      # which is the obvious way to write "arm only" — hands x64 an empty
+      # string that still means yes, and that job then looks for an fpm nobody
+      # installed. Tested: with the variable set to empty and fpm off PATH,
+      # app-builder skips its own copy and fails with "executable file not
+      # found in $PATH". Exporting it from this step means the variable simply
+      # does not exist on x64, and the install and the switch stay in one
+      # place where they cannot disagree.
+      - name: A packager that runs on this machine
+        if: matrix.arch == 'arm64'
+        run: |
+          if ! command -v ruby >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ruby ruby-dev build-essential
+          fi
+          sudo gem install --no-document fpm
+          fpm --version
+          echo "USE_SYSTEM_FPM=true" >> "$GITHUB_ENV"
+
       - name: Package
         working-directory: desktop
         env:

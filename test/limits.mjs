@@ -634,6 +634,54 @@ export function run(test) {
     /* No shell syntax in the script, for the same reason dist:win has none. */
     const scripts = JSON.parse(read('desktop/package.json')).scripts
     assert.ok(!/[$][{]/.test(scripts['dist:linux']), 'dist:linux carries shell syntax, which npm runs through its own shell')
+
+    /*
+     * AND THE ARM BUILD HAS A PACKAGER IT CAN ACTUALLY RUN.
+     *
+     * electron-builder shells out to fpm to make a .deb, and the copy it
+     * downloads is published for linux-x86 only — there is no arm64 build of
+     * it. On the arm runner the AppImage finishes, the .deb starts, and a
+     * 32-bit x86 Ruby meets an arm64 kernel: "cannot execute binary file".
+     * fpm is a gem, so installing it and pointing app-builder at PATH fixes
+     * it; that is what the arm-only step does.
+     *
+     * THE FLAG HAS TO BE EXPORTED FROM THAT STEP, not set on Package with a
+     * conditional value, and this is the part worth holding. app-builder
+     * checks whether USE_SYSTEM_FPM is PRESENT and never reads its value, so
+     * the natural `${{ ... || '' }}` spelling gives x64 an empty string that
+     * still means yes — and x64 then hunts for an fpm nobody installed. The
+     * variable must not exist there at all.
+     */
+    const wfL = read('.github/workflows/desktop.yml')
+    const linuxJob = (() => {
+      const at = wfL.indexOf('\n  linux:\n')
+      assert.notEqual(at, -1, 'the linux job is gone')
+      const next = wfL.slice(at + 1).search(/\n {2}[a-z][a-z0-9-]*:\n/)
+      return next === -1 ? wfL.slice(at) : wfL.slice(at, at + 1 + next)
+    })()
+    assert.match(linuxJob, /gem install --no-document fpm/, 'nothing installs fpm, so the arm .deb cannot be built at all')
+    assert.match(
+      linuxJob,
+      /echo "USE_SYSTEM_FPM=true" >> "\$GITHUB_ENV"/,
+      'the system-fpm switch is not exported from the step that installs it, so the two can disagree'
+    )
+    /* Real YAML lines only — the paragraph above spells the bad form out in
+       prose, and a naive search finds its own explanation. */
+    const setsAsEnv = linuxJob
+      .split('\n')
+      .map((line) => line.trim())
+      .some((line) => !line.startsWith('#') && line.startsWith('USE_SYSTEM_FPM:'))
+    assert.ok(
+      !setsAsEnv,
+      'USE_SYSTEM_FPM is set as a step env — an empty value there still reads as ON, and x64 would look for an fpm it never installed'
+    )
+    /* And the install is arm-only: x64's bundled fpm works and needs no gem. */
+    const fpmStep = linuxJob.slice(linuxJob.indexOf('- name: A packager that runs on this machine'))
+    assert.match(
+      fpmStep.slice(0, fpmStep.indexOf('- name: Package')),
+      /if: matrix\.arch == 'arm64'/,
+      'the fpm install is not limited to arm64, so the x64 build grew a dependency it does not need'
+    )
   })
 
   test('the two one-paste installers are real files, and say the same things', async () => {
