@@ -14,7 +14,7 @@
  * conditional are all things you can see without a browser.
  */
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 /* The grid rules both apps share, so the checks below can RUN them rather than
    read them out of whichever file happens to hold them this month. */
 import { cableColumns, doubtfulWrite, toWireCell as wireCell } from '../shared/grid-plan.mjs'
@@ -3741,5 +3741,96 @@ export function run(test) {
       [],
       `these tests register from inside another test, so the runner counts them late:\n  ${strays.join('\n  ')}`
     )
+  })
+
+  test('nothing in the app reaches for a name that does not exist', () => {
+    /*
+     * "The new mac app. Broke it" — a white window reading
+     *
+     *   The app couldn't draw — loadPlayMode is not defined.
+     *
+     * THE WEB APP HAD BEEN BROKEN SINCE 7.336.0 AND NOTHING SAID SO. That
+     * version removed the AI tone builder and play mode, and three call sites
+     * survived their definitions: `loadPlayMode` in a useState, and
+     * `worthKeeping` and `newChatId` inside an effect that shelved a
+     * conversation. Every one of them is a free variable — perfectly valid
+     * JavaScript that throws the first time it is evaluated.
+     *
+     * Nothing in this repository could see it. The bundler does not resolve free
+     * variables, because a browser global is also a free variable and it has no
+     * way to tell them apart. The test suite reads App.jsx as TEXT — this file
+     * says so in its own opening paragraph, "these read the source rather than
+     * mount it", and gives the honest reason: App.jsx cannot be imported by
+     * node. And it went unnoticed for three weeks because the testing happened
+     * on the phone, which is a different codebase, and on a Mac app built before
+     * the break.
+     *
+     * So: parse it and ask the scope. Babel resolves every reference against the
+     * bindings actually in scope and hands back the ones that resolve to
+     * nothing. That is the same question a browser asks at runtime, answered
+     * without a browser — which is the gap the paragraph at the top of this file
+     * admits to and could not previously close.
+     */
+    const KNOWN = new Set([
+      /* The language. */
+      'Array', 'ArrayBuffer', 'BigInt', 'Boolean', 'DataView', 'Date', 'Error', 'Float32Array',
+      'Float64Array', 'Infinity', 'Int8Array', 'Intl', 'JSON', 'Map', 'Math', 'NaN', 'Number',
+      'Object', 'Promise', 'Proxy', 'Reflect', 'RegExp', 'Set', 'String', 'Symbol', 'Uint16Array',
+      'Uint32Array', 'Uint8Array', 'WeakMap', 'WeakSet', 'globalThis', 'undefined',
+      'parseInt', 'parseFloat', 'isNaN', 'isFinite',
+      'encodeURI', 'encodeURIComponent', 'decodeURI', 'decodeURIComponent',
+      /* The browser. Only the ones this app actually uses — a permissive list
+         would let the next `loadPlayMode` through as easily as the bundler did. */
+      'AbortController', 'AbortSignal', 'Blob', 'DecompressionStream', 'DOMParser', 'Event',
+      'EventSource', 'EventTarget', 'File', 'FileReader', 'FormData', 'Headers', 'Image',
+      'IntersectionObserver', 'MutationObserver', 'Request', 'Response', 'ResizeObserver',
+      'TextDecoder', 'TextEncoder', 'URL', 'URLSearchParams', 'WebSocket', 'XMLHttpRequest',
+      'atob', 'btoa', 'cancelAnimationFrame', 'clearInterval', 'clearTimeout', 'console',
+      'crypto', 'document', 'fetch', 'getComputedStyle', 'history', 'indexedDB', 'localStorage',
+      'location', 'matchMedia', 'navigator', 'performance', 'queueMicrotask',
+      'requestAnimationFrame', 'screen', 'sessionStorage', 'setInterval', 'setTimeout',
+      'structuredClone', 'window',
+      /* Replaced by Vite at build time — see `define` in vite.config.js. Free
+         variables on purpose, and the only ones that are. */
+      '__APP_VERSION__', '__COMMIT__', '__BUILT_AT__',
+      /* React Native, for the phone's own files. */
+      'process', 'global', '__DEV__', 'requestIdleCallback', 'cancelIdleCallback', 'alert'
+    ])
+
+    const files = []
+    const walk = (dir) => {
+      for (const entry of readdirSync(dir)) {
+        const full = `${dir}/${entry}`
+        if (statSync(full).isDirectory()) walk(full)
+        else if (/\.(jsx?|mjs)$/.test(entry)) files.push(full)
+      }
+    }
+    for (const dir of ['src', 'shared', 'mobile/src']) walk(new URL(`../${dir}`, import.meta.url).pathname)
+    assert.ok(files.length > 50, `only found ${files.length} source files to check`)
+
+    const broken = []
+    for (const file of files) {
+      const code = readFileSync(file, 'utf8')
+      let ast
+      try {
+        ast = parse(code, { sourceType: 'module', plugins: ['jsx'] })
+      } catch (err) {
+        broken.push(`${file}: will not parse — ${err.message}`)
+        continue
+      }
+      let globals = []
+      traverse(ast, {
+        Program(path) {
+          globals = Object.keys(path.scope.globals)
+        }
+      })
+      const unknown = globals.filter((name) => !KNOWN.has(name)).sort()
+      if (unknown.length) {
+        const short = file.slice(file.indexOf('/fractal-ai-builder/') + 20)
+        broken.push(`${short} uses ${unknown.join(', ')} — defined nowhere, so it throws when that line runs`)
+      }
+    }
+
+    assert.deepEqual(broken, [], `\n${broken.join('\n')}\n`)
   })
 }
