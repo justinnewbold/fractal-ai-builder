@@ -2882,6 +2882,13 @@ export default function App() {
         showPreset={view !== 'play'}
         onOpenPresets={() => setPresetMenu((v) => !v)}
         onOpenSettings={() => setSheet('settings')}
+        onOpenUnit={() => {
+          /* Two destinations behind one press — see TopBar's onOpenUnit. The
+             demo's name is a choice and opens the five; a real unit's name is
+             a fact and opens the page that holds the facts about it. */
+          setSheet('settings')
+          setSetupPage(isDemo() ? 'demo' : 'link')
+        }}
         onOpenVolume={status === 'live' && outputEid !== null ? () => setSheet('volume') : null}
         menu={
           presetMenu && !narrow ? (

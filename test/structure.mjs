@@ -483,6 +483,53 @@ export function run(test) {
     assert.ok(gate < opened, 'the top bar is behind a status check')
   })
 
+  test('the unit name is pressed, and goes somewhere different in the demo', () => {
+    /*
+     * "Make it so that if you tap the top left button where it shows the
+     * current device in the demo mode, that it'll bring up that same list
+     * where you can change which one you're on. In other modes, if they tap
+     * that button, just have it show the about where it shows more info about
+     * the current device connected."
+     *
+     * It was a <span>, and it was the first thing anybody pressed — the name
+     * of the thing you are driving, top left, looking exactly like the preset
+     * beside it, which has been a button since the bar was built.
+     *
+     * WHAT MAKES IT TWO DESTINATIONS is that the name means two things. In the
+     * demo it is a choice, so it opens the five. On a real rig it is a fact,
+     * so it opens the page holding the facts — gen, grid, scenes, slots — and
+     * the connections behind them. One press, and which page is the app's
+     * decision rather than the bar's.
+     */
+    const bar = readFileSync(new URL('../src/components/TopBar.jsx', import.meta.url), 'utf8')
+    assert.match(bar, /<button\s+className="topbar-unit/, 'the unit name is a label again, not a button')
+    assert.match(bar, /onClick=\{onOpenUnit\}/, 'the unit name is a button that does nothing')
+
+    const wired = src.replace(/\s+/g, ' ')
+    assert.match(
+      wired,
+      /onOpenUnit=\{\(\) => \{.*setSetupPage\(isDemo\(\) \? 'demo' : 'link'\)/,
+      'the unit name no longer opens the picker in the demo and the unit page outside it'
+    )
+    assert.match(wired, /onOpenUnit=\{\(\) => \{ .*setSheet\('settings'\)/, 'it picks a page without opening the sheet it lives in')
+
+    /* And a button has to be styled as one, or it arrives with a browser's
+       default chrome in the middle of the bar. A class named in JSX and absent
+       from the stylesheet is not a small mistake in this app. */
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    assert.match(css, /button\.topbar-unit \{/, 'the unit button has no styling at all')
+
+    /*
+     * Both ends. The phone's bar is the browser's bar — "Make sure the iOS app
+     * shows this exact header" — and a name that presses in one and not the
+     * other is the seam this suite exists to hold. Setup is one screen there
+     * rather than a stack, so it cannot open already standing on a page; it
+     * lands at the top, where the demo block is the first thing drawn.
+     */
+    const phone = readFileSync(new URL('../mobile/src/components/TopBar.js', import.meta.url), 'utf8')
+    assert.match(phone, /onPress=\{onOpenUnit \|\| onOpenSettings\}/, 'the phone still reads its unit name without pressing it')
+  })
+
   test('the block editor arrives over the screen, not below it', () => {
     /*
      * It used to be the last row of the console grid. Tapping a block on a

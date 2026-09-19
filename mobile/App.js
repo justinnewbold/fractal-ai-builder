@@ -244,7 +244,7 @@ export default function App() {
           <SignIn onSignedIn={() => setAuth('in')} onDemo={() => setAuth('in')} />
         ) : (
           <>
-            <TopBar link={link} onOpenSettings={() => setScreen('settings')} />
+            <TopBar link={link} onOpenSettings={() => setScreen('settings')} onOpenUnit={() => setScreen('settings')} />
             {picked ? <Arrived picked={picked} /> : null}
             {/*
               The bar stays up while this waits, which is what makes the wait
