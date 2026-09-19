@@ -3833,7 +3833,21 @@ export default function App() {
             </p>
             <div className="ways">
               {waysFor(thisComputer).map((way, i) => (
-                <details key={way.id} className="way" data-status={way.status} open={i === 0}>
+                /*
+                  All four shut. "When opening the connect a computer menu the
+                  Mac app is expanded by default. Have it collapsed like the
+                  windows and Linux apps."
+
+                  The first one used to open itself, on the reasoning that
+                  waysFor puts the route for YOUR computer first so the open
+                  one is the one you want. What that actually produced was a
+                  page where one route is a wall of steps and the other three
+                  are one line each — which reads as one real answer with
+                  three footnotes, rather than four ways to choose between.
+                  Four summaries, each saying what it costs you, is the list
+                  somebody came here to read; the steps are for after choosing.
+                */
+                <details key={way.id} className="way" data-status={way.status}>
                   <summary>
                     <span className="way-n">{i + 1}</span>
                     <span className="way-title">{way.title}</span>

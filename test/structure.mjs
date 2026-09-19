@@ -3995,4 +3995,23 @@ export function run(test) {
     assert.match(app, /<LinkDetails role=\{link\.role\} \/>/, 'LinkDetails is never told which machine it is on')
   })
 
+  test('the four ways to connect a computer start level with each other', () => {
+    /*
+     * "When opening the connect a computer menu the Mac app is expanded by
+     * default. Have it collapsed like the windows and Linux apps."
+     *
+     * The first route used to open itself, on the reasoning that waysFor puts
+     * the one for YOUR computer first. What that produced was a page where
+     * one route is a wall of steps and the other three are a line each, which
+     * reads as one answer with three footnotes rather than a choice between
+     * four. The summaries say what each one costs; the steps are for after
+     * somebody has picked.
+     */
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    const ways = app.slice(app.indexOf('<div className="ways">'), app.indexOf('</div>', app.indexOf('<div className="ways">')))
+    assert.ok(ways.length > 100, 'the ways list moved; this check reads it')
+    assert.match(ways, /<details key=\{way\.id\} className="way" data-status=\{way\.status\}>/, 'the routes are no longer folds')
+    assert.ok(!/open=/.test(ways), 'one of the four routes opens itself again')
+  })
+
 }
