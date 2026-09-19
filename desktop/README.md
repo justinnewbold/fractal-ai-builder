@@ -91,7 +91,12 @@ in CI rather than on a desk. What CI still cannot answer:
 
 ## Without installing anything
 
-Neither app is required. `public/windows.ps1` and `public/mac.sh` are one-paste
-setup scripts that fetch the same three repositories, build them, and run
-`npm run serve` — the same server these apps wrap, with a QR code instead of a
-window. Both need a GitHub token, because the repositories are private.
+From a checkout of this repository, `npm run vendor:forgefx && npm run serve`
+runs the same server these apps wrap, with a QR code instead of a window.
+
+There used to be two one-paste setup scripts in `public/` offering this to
+people who were not developers. They were removed, and the reason is worth
+keeping: they cloned private repositories, so the first `git fetch` failed for
+everybody without a token, and the instructions had to say "ask Justin for
+one". The three apps carry the same server inside them and need nothing. A
+route that begins by asking a stranger to email the author is not a route.

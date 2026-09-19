@@ -19,7 +19,7 @@
  */
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
@@ -684,126 +684,55 @@ export function run(test) {
     )
   })
 
-  test('the two one-paste installers are real files, and say the same things', async () => {
+  test('the one-paste installers are gone, and stay gone', async () => {
     /*
-     * "Create terminal helper scripts — a shell script for Mac and a
-     * PowerShell one for Windows — that print connection status and the local
-     * URL."
+     * "I think that we should just drop the helpers completely. Nobody wants
+     * to deal with that kind of stuff in order for it to work."
      *
-     * ONE OF THE TWO ALREADY EXISTED, which is worth writing down because it
-     * was nearly missed. `public/windows.ps1` had been written, is referenced
-     * by MISSING_FORGEFX in host.mjs, and does more than the brief asked: it
-     * fetches the app as well as the server and finishes by running
-     * `npm run serve`, so the page and the device API are the same origin and
-     * a phone scans a QR instead of signing in. A second Windows script was
-     * written beside it and thrown away; what shipped was the Mac counterpart
-     * that had been the actual gap.
+     * WHAT THIS GUARDS IS A GOOD IDEA THAT WAS NEVER A ROUTE. Two scripts in
+     * `public/` let somebody paste one line into a shell and have the device
+     * server built from source — which reads like the expert's shortcut, and
+     * was in fact the opposite. They fetched three private repositories, so
+     * the first `git fetch` failed for everybody on earth without a token,
+     * and the printed steps had to say "ask Justin for one" out loud.
      *
-     * So what this holds is the pair. Two files, two platforms, the same
-     * decisions — because the way they FAIL is where they would drift, and a
-     * person meeting a missing token on one platform should read what the
-     * other would have said.
+     * A route whose opening instruction is to email the author costs a reader
+     * their time before it admits it cannot help them. The three apps carry
+     * the same server inside them, vendored at build time, and cover every
+     * computer this runs on — so the download IS the tokenless version, and
+     * there is nothing here to go back and finish.
+     *
+     * The files, the routes and the commands go together. Leaving any one of
+     * them is how a dead end gets rebuilt by somebody reading the leftovers
+     * as a plan.
      */
-    const ways = await import('../shared/ways-in.mjs')
-    const commands = ways.WAYS.filter((w) => w.command)
-    assert.equal(commands.length, 2, 'there are not two one-paste installers')
-
-    const scripts = []
-    for (const way of commands) {
-      /* The command is in the steps too, in reading order, and the screens
-         tell it apart from the prose by matching this exact string. */
-      assert.ok(way.steps.includes(way.command), `${way.id} names a command it never shows`)
-
-      /*
-       * THE RULE THIS HOLDS is that the app never prints a command that does
-       * not work. The URL is taken apart and the file it points at has to
-       * exist in this repository — `public/` is copied to the root of the
-       * deployed site, so a file there is reachable at that address.
-       */
-      const url = way.command.match(/https:\/\/\S+/)
-      assert.ok(url, `${way.id}'s command fetches nothing`)
-      const path = url[0].replace('https://fractal.newbold.cloud/', 'public/')
-      assert.notEqual(path, url[0], `${way.id} fetches from somewhere that is not this site`)
-      /* Throws, loudly and by filename, if the app prints a URL for a file
-         nobody wrote. */
-      const script = read(path)
-
-      /* And the file says the same line at the top of itself, so the two
-         cannot drift and leave a working script nobody can find. */
-      assert.ok(
-        script.includes(way.command),
-        `${path} does not begin with the command the app tells people to paste`
-      )
-      scripts.push([path, script])
+    for (const gone of ['public/mac.sh', 'public/windows.ps1']) {
+      assert.ok(!existsSync(new URL(`../${gone}`, import.meta.url)), `${gone} is back`)
     }
 
-    for (const [path, script] of scripts) {
-      /*
-       * A TOKEN, AND SAYING SO BEFORE ANYTHING IS DOWNLOADED. The three
-       * repositories are private; there is no tokenless version of this route.
-       * Both scripts stop on a missing token with the same sentence rather
-       * than letting git fail with "could not read Username for
-       * 'https://github.com'", which sends people to look at everything except
-       * the token.
-       */
-      assert.match(script, /FORGEFX_TOKEN/, `${path} never mentions the token it cannot work without`)
-      assert.match(script, /A GitHub token is needed/, `${path} does not stop on a missing token with the shared wording`)
-      assert.match(
-        script,
-        /credential\.helper/,
-        `${path} no longer passes the token through a credential helper, so it can end up in .git/config and in git's error messages`
-      )
-      assert.ok(
-        !/https:\/\/[^\s'"]*\$\{?(FORGEFX_)?[Tt]oken/.test(script),
-        `${path} puts the token in a URL, where git writes it into .git/config`
-      )
-
-      /* Node 20 exactly, because the device server carries compiled USB and
-         MIDI code built against it. Both scripts check before cloning
-         anything — an evening spent on a clone that cannot build is the
-         failure this prevents. */
-      assert.match(script, /Node 20/, `${path} never says which Node it needs`)
-
-      /* Siblings, not nested: the server depends on the codec by relative
-         path, and flattening the layout makes that link dangle. */
-      assert.match(script, /forgefx-midi/, `${path} never fetches the codec the server needs`)
-      /* Pinned by commit, read from the lock file the Mac build also reads. */
-      assert.match(script, /forgefx\.lock\.json/, `${path} picks its own versions instead of the pinned ones`)
-      assert.match(script, /FETCH_HEAD/, `${path} no longer checks out the commit it asked for`)
-
-      /* And it ends by serving, which is what makes this local mode rather
-         than a bare server somebody still has to sign in to reach. */
-      assert.match(script, /run.{0,3} serve/, `${path} sets everything up and never starts it`)
-
-      /* The two things that are silent when wrong: the firewall prompt, and
-         something else already holding the USB port. */
-      assert.match(script, /firewall|incoming connections/i, `${path} never warns about the firewall prompt`)
-      assert.match(script, /Axe-Edit/, `${path} never says to quit the editor that holds the port`)
-    }
-
-    /* And the connect screen says the token part before somebody pastes a
-       line and watches it stop. */
-    for (const way of commands) {
-      assert.match(
-        way.steps.join(' '),
-        /token/i,
-        `${way.id} sends somebody at a command that will stop on a token it never mentioned`
-      )
+    const src = read('shared/ways-in.mjs').replace(/\/\*[\s\S]*?\*\//g, ' ')
+    for (const word of ['HELPER_SH', 'HELPER_PS1', 'mac.sh', 'windows.ps1']) {
+      assert.ok(!src.includes(word), `ways-in.mjs still names ${word}`)
     }
 
     /*
-     * The shell one is served, not run from a checkout, so it carries no
-     * shebang and needs no executable bit — `curl … | bash` names the shell.
-     * What it does need is to be safe when the download is cut off: piping
-     * into bash feeds the shell as it arrives, so a dropped connection would
-     * otherwise run the first half of a setup script. Everything lives in a
-     * function and the call is the last line, so a truncated file does
-     * nothing at all.
+     * AND NOTHING ASKS A STRANGER FOR A TOKEN. This is the substance of it
+     * rather than the filenames: whatever routes exist, none may open by
+     * requiring a credential only the author can hand out.
+     *
+     * Read off the routes rather than out of the file, because the paragraph
+     * above explains the token in order to say why it is gone — and a search
+     * of the source finds that explanation and calls it the crime. The same
+     * trap comments have sprung here before; this reads the data instead.
      */
-    const mac = read('public/mac.sh')
-    assert.match(mac, /^fractal_remote_setup\(\) \{/m, 'mac.sh is not wrapped in a function')
-    assert.match(mac.trimEnd(), /fractal_remote_setup$/, 'mac.sh does not call itself on its last line, so a truncated download would run half of it')
+    const { WAYS } = await import('../shared/ways-in.mjs')
+    const words = WAYS.flatMap((w) => [w.title, w.note, ...(w.steps || [])]).join(' ')
+    assert.ok(
+      !/FORGEFX_TOKEN|ask Justin|GitHub token/i.test(words),
+      'a connect route asks for a token again, which is a wall rather than a route'
+    )
   })
+
 
   test('a JS change can reach a phone without spending a build', () => {
     /*
