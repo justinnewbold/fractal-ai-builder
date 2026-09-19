@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { listPorts, selectPort, servedLocally } from '../lib/forgefx'
 
 /**
@@ -8,9 +8,47 @@ import { listPorts, selectPort, servedLocally } from '../lib/forgefx'
  * other end of the connection.
  */
 export default function Ports({ onError, onChanged, busy }) {
+  const box = useRef(null)
   const [ports, setPorts] = useState(null)
   const [open, setOpen] = useState(false)
   const [switching, setSwitching] = useState(null)
+
+  /*
+   * ONE FOLD, NOT TWO.
+   *
+   * "On the Phone and computer drop-down where it says Connection, there's a
+   * redundant Connection button that then takes you to the connection — let's
+   * get rid of that extra step."
+   *
+   * This panel had a fold of its own: a chip reading "Connection", then "Hide
+   * connection", sitting inside a section already titled CONNECTION, with its
+   * own chevron and the note "Which unit this app is talking to". Two presses
+   * to reach one list, the second one labelled the same as the first.
+   *
+   * The chip was never really a fold, which is why it is not simply deleted.
+   * It was where the READ happened: nothing asks the computer what is plugged
+   * into it until somebody wants to know, because the answer is a scan of
+   * every port on the machine and, from a phone, a question relayed across the
+   * internet. So the panel now takes that cue from the fold it already lives
+   * in rather than from a second one of its own.
+   *
+   * It has to be asked for rather than assumed: `<details>` keeps its contents
+   * mounted while it is shut, so a panel that read on mount would scan the
+   * ports of every computer that opened Setup, folded or not.
+   */
+  useEffect(() => {
+    const fold = box.current?.closest('details')
+    /* Nothing folded above it means it is simply on screen, and what is on
+       screen should say something. */
+    if (!fold) {
+      setOpen(true)
+      return undefined
+    }
+    const sync = () => setOpen(fold.open)
+    sync()
+    fold.addEventListener('toggle', sync)
+    return () => fold.removeEventListener('toggle', sync)
+  }, [])
 
   const load = async () => {
     try {
@@ -101,85 +139,73 @@ export default function Ports({ onError, onChanged, busy }) {
   const overMidiNow = chosen?.transport === 'midi'
 
   return (
-    <section className="ports">
-      <div className="log-head">
-        <button className="chip" onClick={() => setOpen(!open)}>
-          {open ? 'Hide connection' : 'Connection'}
+    <section className="ports" ref={box}>
+      <p className="silk-label">Units plugged into your computer</p>
+
+      {!ports ? (
+        <p className="hint">Reading…</p>
+      ) : (
+        <div className="port-list">
+          {chosen && chosenName ? (
+            <p className="port-live">
+              Talking to <strong>{chosenName}</strong> over{' '}
+              {overMidiNow ? 'MIDI' : 'a serial port'}.
+            </p>
+          ) : null}
+
+          {fractal.length === 0 ? (
+            <p className="hint pad">
+              {overMidiNow
+                ? 'Nothing on a serial port — MIDI is carrying it.'
+                : 'No Fractal units found on a serial port.'}
+            </p>
+          ) : (
+            fractal.map((port) => (
+              <button
+                key={port.id}
+                className={`port-row ${port.id === chosenId ? 'current' : ''}`}
+                onClick={() => choose(port)}
+                disabled={busy || !!switching}
+              >
+                <span className="port-model">{port.model || 'Fractal device'}</span>
+                <span className="port-id mono">{port.id}</span>
+                {switching === port.id ? <span className="hint">switching…</span> : null}
+              </button>
+            ))
+          )}
+
+          {/* Only when MIDI is not already the answer: when it is, the line
+              above has said so, and saying it twice invites the reading
+              that these are two different things. */}
+          {overMidi.length && !overMidiNow ? (
+            <p className="hint pad">
+              Also reachable over MIDI: {overMidi.map((p) => p.model || p.label || p.id).join(', ')} —
+              used automatically when nothing is on a serial port.
+            </p>
+          ) : null}
+
+          {others.length ? (
+            <p className="hint pad">
+              {others.length} other connection{others.length === 1 ? '' : 's'} ignored — no
+              Fractal unit on them.
+            </p>
+          ) : null}
+        </div>
+      )}
+
+      <div className="history-actions">
+        <button className="chip" onClick={load} disabled={busy || !!switching}>
+          Re-scan
+        </button>
+        <button className="chip" onClick={auto} disabled={busy || !!switching}>
+          Auto-detect
         </button>
       </div>
 
-      {open ? (
-        <>
-          <p className="silk-label" style={{ marginTop: 10 }}>
-            Units plugged into your computer
-          </p>
-
-          {!ports ? (
-            <p className="hint">Reading…</p>
-          ) : (
-            <div className="port-list">
-              {chosen && chosenName ? (
-                <p className="port-live">
-                  Talking to <strong>{chosenName}</strong> over{' '}
-                  {overMidiNow ? 'MIDI' : 'a serial port'}.
-                </p>
-              ) : null}
-
-              {fractal.length === 0 ? (
-                <p className="hint pad">
-                  {overMidiNow
-                    ? 'Nothing on a serial port — MIDI is carrying it.'
-                    : 'No Fractal units found on a serial port.'}
-                </p>
-              ) : (
-                fractal.map((port) => (
-                  <button
-                    key={port.id}
-                    className={`port-row ${port.id === chosenId ? 'current' : ''}`}
-                    onClick={() => choose(port)}
-                    disabled={busy || !!switching}
-                  >
-                    <span className="port-model">{port.model || 'Fractal device'}</span>
-                    <span className="port-id mono">{port.id}</span>
-                    {switching === port.id ? <span className="hint">switching…</span> : null}
-                  </button>
-                ))
-              )}
-
-              {/* Only when MIDI is not already the answer: when it is, the line
-                  above has said so, and saying it twice invites the reading
-                  that these are two different things. */}
-              {overMidi.length && !overMidiNow ? (
-                <p className="hint pad">
-                  Also reachable over MIDI: {overMidi.map((p) => p.model || p.label || p.id).join(', ')} —
-                  used automatically when nothing is on a serial port.
-                </p>
-              ) : null}
-
-              {others.length ? (
-                <p className="hint pad">
-                  {others.length} other connection{others.length === 1 ? '' : 's'} ignored — no
-                  Fractal unit on them.
-                </p>
-              ) : null}
-            </div>
-          )}
-
-          <div className="history-actions">
-            <button className="chip" onClick={load} disabled={busy || !!switching}>
-              Re-scan
-            </button>
-            <button className="chip" onClick={auto} disabled={busy || !!switching}>
-              Auto-detect
-            </button>
-          </div>
-
-          <p className="silk-label" style={{ marginTop: 20 }}>
-            Reaching this from your phone
-          </p>
-          <RemoteHelp />
-        </>
-      ) : null}
+      <p className="silk-label" style={{ marginTop: 20 }}>
+        Reaching this from your phone
+      </p>
+      <RemoteHelp />
     </section>
   )
 }
