@@ -3,6 +3,7 @@ import QRCode from 'qrcode'
 import { servedLocally } from '../lib/forgefx'
 import { changePassword } from '../lib/remote'
 import { describeLink, formatPairCode, isPairAccount, pairLink, savedPairCode, HOSTED_ORIGIN } from '../lib/link'
+import PhoneQr from './PhoneQr'
 
 /**
  * Phone remote, in Setup: what this end is, whether the other end is there,
@@ -95,15 +96,22 @@ function MacSide({ link, email, onAction, busy }) {
     )
   }
 
-  const paired = isPairAccount(email)
   return (
     <>
-      <WifiCard />
-      {paired ? (
-        <PairCard on={link.link === 'connected'} onAction={onAction} busy={busy} />
-      ) : (
-        <AccountCard on={link.link === 'connected'} email={email} />
-      )}
+      {/*
+        ONE SQUARE, and the wifi one folded under it.
+
+        "Are both QR codes needed on the Mac app? It's confusing and they are
+        literally right by each other so a phone will pick up both codes."
+        Both are needed and they are for different things — the app, and a web
+        browser — which PhoneQr says in words. Two squares an inch apart is a
+        camera choosing for you.
+
+        Shared with the first-launch tour rather than drawn twice: two
+        renderings of a pairing code drift, and that drift is a phone scanning
+        a square that pairs it with nothing.
+      */}
+      <PhoneQr connected={link.link === 'connected'} email={email} onAction={onAction} busy={busy} />
       <div className="history-actions">
         {link.link === 'connected' ? (
           <button className="chip" onClick={() => onAction('mac-off')} disabled={busy}>

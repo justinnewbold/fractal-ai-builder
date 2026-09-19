@@ -4270,4 +4270,63 @@ export function run(test) {
     assert.match(app, /<Tour[\s\S]{0,200}role=\{link\.role\}/, 'the tour is never told which machine it is on')
   })
 
+  test('one square is on screen at a time, and it says which it is', () => {
+    /*
+     * "Are both QR codes needed on the Mac app? It's confusing and they are
+     * literally right by each other so a phone will pick up both codes."
+     *
+     * Both are needed. Neither should have been beside the other, and the
+     * proof it was already costing people is in the phone app's scanner: it
+     * carries a message written for somebody who scanned the wrong one —
+     * "that is the same wifi square, which is for a web browser". A warning
+     * that apologises for a layout is a layout that wants fixing.
+     *
+     * They are for two different things, which had never been said:
+     *   the app's square works from anywhere and is what the scanner reads;
+     *   the wifi square opens a BROWSER on this computer's own address, with
+     *   nothing to sign into, and only while both are on the same wifi.
+     */
+    const qr = readFileSync(new URL('../src/components/PhoneQr.jsx', import.meta.url), 'utf8')
+    const bare = qr.replace(/\{?\/\*[\s\S]*?\*\/\}?/g, '')
+
+    /* The app's square is the one on screen; the wifi one is behind a fold. */
+    assert.match(bare, /<details className="wifi-fold">/, 'the wifi square is not folded away')
+    assert.ok(
+      bare.indexOf('PairCard') < bare.indexOf('wifi-fold'),
+      'the wifi square is drawn before the one the app actually needs'
+    )
+    /* And the fold says what it is FOR, not what it is called. */
+    assert.match(qr, /web browser/, 'the fold never says the other square is for a browser')
+
+    /*
+     * Asked rather than discovered: calling a component as a plain function
+     * to see whether it drew anything runs its hooks in the caller's place,
+     * which works right up until either changes shape.
+     */
+    assert.match(bare, /if \(!servedLocally\(\)\) return null/, 'the fold decides by rendering the card and looking')
+    assert.ok(!/const wifi = WifiCard\(\)/.test(bare), 'WifiCard is being called as a function again')
+
+    /*
+     * ONE RENDERING, shared by Setup and the first-launch tour. Two copies of
+     * a pairing code drift, and that drift is a phone scanning a square that
+     * pairs it with nothing.
+     */
+    const remote = readFileSync(new URL('../src/components/PhoneRemote.jsx', import.meta.url), 'utf8')
+    const macSide = remote.slice(remote.indexOf('function MacSide'), remote.indexOf('function WifiCard'))
+    assert.match(macSide, /<PhoneQr connected=\{link\.link === 'connected'\} email=\{email\}/, 'Setup draws its own squares again')
+    /*
+     * The branch where BOTH squares exist is the only one that was confusing.
+     * Before the computer is set up there is no pairing code yet, so the wifi
+     * square is the only one on the page and stands alone quite happily — it
+     * is the route that asks for nothing, which is worth offering first.
+     */
+    const setUp = macSide.slice(macSide.indexOf('<PhoneQr'))
+    assert.ok(!/<WifiCard \/>/.test(setUp), 'Setup still puts the wifi square beside the other one')
+
+    /* The scanner's message stays: it is still right, and somebody who opens
+       the fold and scans that square deserves to be told which one it was. */
+    const scan = readFileSync(new URL('../mobile/src/components/ScanCode.js', import.meta.url), 'utf8')
+    assert.match(scan, /looksLikeTheWifiSquare/, 'the scanner no longer recognises the wrong square')
+  })
+
 }

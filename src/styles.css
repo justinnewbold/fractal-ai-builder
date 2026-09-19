@@ -7316,6 +7316,16 @@ button.gig-bar-btn:disabled {
   background: var(--panel-deep, rgba(255, 255, 255, 0.04));
 }
 
+/* The other way in, folded: it is for a web browser rather than the app, and
+   only while both are on this wifi. Two squares an inch apart is a camera
+   choosing for you — see PhoneQr. */
+.wifi-fold > summary {
+  cursor: pointer;
+  color: var(--silk-dim);
+  font-size: var(--f-1);
+  padding: var(--s-2) 0;
+}
+
 /* The five units the demo can be. A row of chips rather than a select: five
    short names fit, and a picker you can see the options of is one you use. */
 .demo-units {
