@@ -4,590 +4,687 @@
     "name": "Rat Distortion",
     "manufacturer": null,
     "basedOn": "Pro Co RAT",
-    "description": "The RAT. A hard, gritty distortion with a filter knob that works backwards — the sound of a lot of alternative and noise rock."
+    "specs": "Op-amp · LM308 · 1978",
+    "description": "The Pro Co RAT. Hard clipping, a filter knob that works backwards, and one of the three or four genuinely distinct distortion sounds that exist.\n\nThe LM308 op-amp at its heart is deliberately slow, which rounds off the harshest edges and gives the RAT its thick, slightly compressed grind. The Filter control removes treble as you turn it up — clockwise is darker, which catches everyone out once.\n\nJeff Beck, Thom Yorke, Kurt Cobain, Dave Grohl. It sits somewhere between an overdrive and a fuzz and sounds like neither."
   },
   {
     "value": 1,
     "name": "PI Fuzz",
     "manufacturer": null,
     "basedOn": "Electro-Harmonix Big Muff Pi, current",
-    "description": "The Big Muff. Enormous sustain and a scooped midrange, which is why it disappears in a band unless the amp puts the mids back."
+    "specs": "Four transistors · 1969 circuit",
+    "description": "The Electro-Harmonix Big Muff Pi, in its current production form.\n\nFour transistor stages, enormous sustain and a tone control that scoops the midrange out in the middle of its travel — which is why a Muff can sound huge alone and vanish completely in a band. Keep the tone knob off centre.\n\nGilmour's lead sound, Smashing Pumpkins' wall, and every stoner rock record ever made."
   },
   {
     "value": 2,
     "name": "Tube Drive 3-Knob",
     "manufacturer": null,
     "basedOn": "Butler Tube Driver",
-    "description": "The Tube Driver — a real valve inside a pedal. Warm and amp-like rather than fizzy, and famously David Gilmour's."
+    "specs": "12AX7 valve · 1979",
+    "description": "The Butler Tube Driver, which has a real 12AX7 valve running at high voltage inside a stompbox.\n\nThat makes it behave like an amp stage rather than a clipping circuit: it compresses under your hands, it gets warmer as you push it, and it never gets harsh. This is the three-knob version.\n\nEric Johnson's violin lead sound is a Tube Driver into a Marshall, and David Gilmour has used one since the eighties."
   },
   {
     "value": 3,
     "name": "Super OD",
     "manufacturer": null,
     "basedOn": "BOSS SD-1 Super OverDrive",
-    "description": "The BOSS SD-1. A Tube Screamer with asymmetrical clipping — a bit brighter and less mid-humped than a TS."
+    "specs": "Op-amp · asymmetrical clipping · 1981",
+    "description": "The BOSS SD-1, which is a Tube Screamer with one diode changed.\n\nThat change makes the clipping asymmetrical, which sounds subtly rougher and more open than the symmetrical version. It has been the cheapest good overdrive on Earth for forty years.\n\nZakk Wylde has used one in front of a JCM800 for his entire career."
   },
   {
     "value": 4,
     "name": "Treble Boost",
     "manufacturer": null,
     "basedOn": "silicon treble booster circuit",
-    "description": "A sixties treble booster. Cuts the bass before the amp so a cranked valve amp stays tight instead of turning to mud."
+    "specs": "Single transistor · silicon",
+    "description": "A treble booster — a single transistor, a capacitor that throws away the low end, and a volume knob.\n\nIt was the standard trick for making a small British amp break up in the sixties, and it is the entire reason Brian May's AC30 sounds the way it does. Almost useless on its own and transformative in front of a valve amp."
   },
   {
     "value": 5,
     "name": "Mid Boost",
     "manufacturer": null,
-    "basedOn": "custom model"
+    "basedOn": "custom model",
+    "specs": "Fractal original · no pedal behind it",
+    "description": "Fractal's own midrange boost, not a model of anything. A lift in the mids and nothing else.\n\nUseful for the job a Tube Screamer is usually doing — pushing an amp's front end where it responds most — without the Screamer's character coming along with it."
   },
   {
     "value": 6,
     "name": "T808 OD",
     "manufacturer": null,
     "basedOn": "Ibanez TS-808 Tube Screamer",
-    "description": "The TS-808 Tube Screamer. The mid-hump is the whole point: it pushes an amp where a band leaves room, which is why it never went away."
+    "specs": "Op-amp · symmetrical clipping · 1979",
+    "description": "The Ibanez TS-808 Tube Screamer, and the most argued-about nine volts in music.\n\nWhat it actually does is cut low end, push the midrange forward and add a soft, symmetrical clip — which on its own sounds nasal and thin. In front of a cranked amp it is transformative: the bass that would have turned to mud is gone before it arrives, and what is left is tight and vocal.\n\nSet the drive low and the level high. It is a tightening device far more often than it is a distortion."
   },
   {
     "value": 7,
     "name": "Fat Rat",
     "manufacturer": null,
     "basedOn": "modded Pro Co RAT with LED clipping",
-    "description": "A RAT with LED clipping — louder, more open, and less compressed than the stock pedal."
+    "specs": "Op-amp · LED clipping · 1978",
+    "description": "A RAT with LEDs in place of the clipping diodes, which is the most common modification done to one.\n\nLEDs clip at a higher voltage, so the pedal gets louder, cleaner and considerably more open before it distorts. More amp-like and less compressed than a stock RAT."
   },
   {
     "value": 8,
     "name": "T808 Mod",
     "manufacturer": null,
     "basedOn": "modded Ibanez TS-808 Tube Screamer",
-    "description": "A modded TS-808 with the mid-hump reduced and more low end let through."
+    "specs": "Op-amp · modified clipping · 1979",
+    "description": "A modified TS-808 — the mods people have been doing to these since the eighties, which almost always mean more low end and more output.\n\nThe stock pedal's mid hump is the thing everyone loves and the thing everyone tries to remove. This is the version that keeps more of the guitar underneath it."
   },
   {
     "value": 9,
     "name": "Octave Distortion",
     "manufacturer": null,
     "basedOn": "Tycobrahe Octavia",
-    "description": "The Octavia. Fuzz with an octave above it, which only tracks cleanly high on the neck — that is the sound, not a fault."
+    "specs": "Transformer · octave up · 1970s",
+    "description": "The Tycobrahe Octavia, which adds an octave above the note as well as distorting it.\n\nThe octave only tracks cleanly on the neck pickup above the twelfth fret, which is exactly where Hendrix played the solo it is famous for. Elsewhere it is a strange, ring-modulated mess, which is also useful."
   },
   {
     "value": 10,
     "name": "Plus Distortion",
     "manufacturer": null,
     "basedOn": "Distortion +",
-    "description": "The MXR Distortion+. Soft, slightly compressed, and much politer than the name suggests."
+    "specs": "Op-amp · germanium diodes · 1973",
+    "description": "The MXR Distortion+, and the sound of early Ozzy-era Randy Rhoads.\n\nTwo knobs and germanium diode clipping, which is softer and warmer than the silicon in most pedals. Not very much gain by modern standards — it works as a midrange-forward boost into an already-working amp."
   },
   {
     "value": 11,
     "name": "Hard Fuzz",
     "manufacturer": null,
-    "basedOn": "custom model"
+    "basedOn": "custom model",
+    "specs": "Fractal original · no pedal behind it",
+    "description": "A hard-clipping fuzz of Fractal's own design rather than a model of a particular box.\n\nSquare-wave clipping with very little rounding, which is aggressive and slightly broken-sounding by intent."
   },
   {
     "value": 12,
     "name": "FET Boost",
     "manufacturer": null,
-    "basedOn": "custom model"
+    "basedOn": "custom model",
+    "specs": "Fractal original · no pedal behind it",
+    "description": "A clean FET boost of Fractal's own design rather than a model of a particular pedal.\n\nFET gain stages clip softly and asymmetrically, which is why they are used as front ends. This adds level and a little of that softness and nothing else."
   },
   {
     "value": 13,
     "name": "Tape Distortion",
     "manufacturer": null,
-    "basedOn": "tape distortion"
+    "basedOn": "tape distortion",
+    "specs": "Fractal original · tape saturation",
+    "description": "Not a pedal at all: the saturation of magnetic tape driven past what it can hold.\n\nTape compresses as it distorts and rolls the extreme top off as it goes, which is why loud records cut to tape sound bigger rather than harsher. A very different texture from any diode."
   },
   {
     "value": 14,
     "name": "Full OD",
     "manufacturer": null,
     "basedOn": "Fulltone Full-Drive 2",
-    "description": "The Fulltone Full-Drive 2 — a Tube Screamer with more range and a boost switch for when you want it louder rather than dirtier."
+    "specs": "Op-amp · switchable clipping · 1990s",
+    "description": "The Fulltone Full-Drive 2, and for a long stretch the default boutique overdrive on every pedalboard.\n\nIt is a Tube Screamer relative with a boost stage built in and a switch for flat mids — that switch removes the Screamer hump and is why people bought it."
   },
   {
     "value": 15,
     "name": "Blues OD",
     "manufacturer": null,
     "basedOn": "Marshall Bluesbreaker Mk1",
-    "description": "The Marshall Bluesbreaker. Low gain and very transparent, and the circuit half the modern boutique overdrives descend from."
+    "specs": "Op-amp · soft clipping · 1991",
+    "description": "The Marshall Bluesbreaker: barely any gain, an enormous amount of warmth, and a pedal Marshall discontinued before realising what they had.\n\nIt is the ancestor of a whole family of transparent overdrives, and originals now sell for many times what they cost new."
   },
   {
     "value": 16,
     "name": "Shred Distortion",
     "manufacturer": null,
     "basedOn": "Marshall Shredmaster",
-    "description": "The Marshall Shredmaster — nineties British distortion, and the sound of a lot of shoegaze."
+    "specs": "Op-amp · three-band EQ · 1991",
+    "description": "The Marshall Shredmaster: a proper three-band EQ, a lot of gain, and a voicing somewhere between a JCM800 and a RAT.\n\nRadiohead built most of The Bends and OK Computer on one, which is not what Marshall had in mind."
   },
   {
     "value": 17,
     "name": "M-Zone Distortion",
     "manufacturer": null,
     "basedOn": "BOSS MT-2 Metal Zone",
-    "description": "The Metal Zone. Massively scooped with a powerful mid sweep, and universally either loved or loathed."
+    "specs": "Dual op-amp · mid-sweep EQ · 1991",
+    "description": "The BOSS Metal Zone, the most famous and most mocked distortion pedal ever built.\n\nIt has a huge amount of gain and a proper parametric midrange control — and it is mocked because the factory setting scoops those mids out entirely, which sounds enormous alone and disappears in a band.\n\nPut the mids back and it is a genuinely capable high-gain pedal. That one knob is the difference."
   },
   {
     "value": 18,
     "name": "Bender Fuzz",
     "manufacturer": null,
     "basedOn": "Sola Sound / Vox Tone Bender",
-    "description": "The Tone Bender. The British fuzz of the sixties — thicker and more aggressive than a Fuzz Face."
+    "specs": "Three transistors · 1965",
+    "description": "The Tone Bender, which came before the Fuzz Face and is rougher, more aggressive and less polite about it.\n\nThree transistor stages rather than two, with a harder, more spitting texture. Jimmy Page used one on the first two Led Zeppelin records."
   },
   {
     "value": 19,
     "name": "BB Pre",
     "manufacturer": null,
     "basedOn": "Xotic BB preamp",
-    "description": "The Xotic BB Preamp. A clean-ish boost with real EQ, for pushing an amp without changing what it sounds like."
+    "specs": "Op-amp · two-band active EQ",
+    "description": "The Xotic BB Preamp — a clean boost and a Marshall-ish overdrive in one, with active bass and treble that can add as well as cut.\n\nThat active EQ is the difference. It will put low end back into a thin amp rather than only taking it away."
   },
   {
     "value": 20,
     "name": "Master Fuzz",
     "manufacturer": null,
     "basedOn": "Gibson Maestro Fuzz-Tone FZ-1A",
-    "description": "The Maestro Fuzz-Tone — the first fuzz pedal, and the one on Satisfaction. Raspy and splattery by modern standards."
+    "specs": "Three transistors · 1962",
+    "description": "The Maestro Fuzz-Tone, the first fuzz pedal ever sold, and for two years nobody bought one.\n\nThen Keith Richards put it on Satisfaction as a placeholder for a horn section that never got recorded, and Gibson sold out of them within months.\n\nIt is thin, splatty and genuinely primitive, and no modern fuzz sounds like it."
   },
   {
     "value": 21,
     "name": "Face Fuzz",
     "manufacturer": null,
     "basedOn": "Dallas-Arbiter Fuzz Face",
-    "description": "The Fuzz Face. Cleans up beautifully from the guitar's volume knob, which is most of why people still chase it."
+    "specs": "Two transistors · 1966",
+    "description": "The Dallas-Arbiter Fuzz Face. Two transistors, two knobs, a circuit simple enough to sketch from memory, and the sound of the late sixties.\n\nIts defining behaviour is how it responds to your guitar's volume knob: full up it is a thick, splatty fuzz, and rolled back to seven it cleans up into a warm overdrive. That interaction is the pedal. It only works properly straight into the guitar, with nothing buffered in front of it.\n\nHendrix, almost entirely. Everything anybody knows about fuzz came out of one man using one of these."
   },
   {
     "value": 22,
     "name": "Bit Crusher",
     "manufacturer": null,
-    "basedOn": "custom model"
+    "basedOn": "custom model",
+    "specs": "Fractal original · digital",
+    "description": "Not a pedal and not analogue: this throws away bits of resolution and sample rate on purpose.\n\nThe result is the harsh, gritty, slightly metallic sound of early samplers and broken digital gear. Nothing that happens in a valve or a diode sounds like this."
   },
   {
     "value": 23,
     "name": "Eternal Love",
     "manufacturer": null,
     "basedOn": "Lovepedal Eternity",
-    "description": "The Lovepedal Eternity — a Tube Screamer variant with more clarity and less midrange bump."
+    "specs": "Op-amp · germanium diodes",
+    "description": "The Lovepedal Eternity, a hand-built overdrive built on the Tube Screamer idea with germanium clipping and a lot more openness.\n\nWarmer and less mid-humped than the pedal it descends from."
   },
   {
     "value": 24,
     "name": "Esoteric ACB",
     "manufacturer": null,
     "basedOn": "Xotic AC Booster",
-    "description": "The Xotic AC Booster. A low-gain overdrive that adds body without obviously colouring the amp."
+    "specs": "Op-amp · two-band active EQ",
+    "description": "The Xotic AC Booster — the warmer, more overdriven half of the pair, voiced somewhere near a cranked class-A amp.\n\nMore gain and more midrange than the RC, with active bass and treble to shape it."
   },
   {
     "value": 25,
     "name": "Esoteric RCB",
     "manufacturer": null,
     "basedOn": "Xotic RC Booster v1",
-    "description": "The Xotic RC Booster — a clean boost with tone controls, for making a good amp louder without changing it."
+    "specs": "Op-amp · two-band active EQ",
+    "description": "The Xotic RC Booster: a clean boost that adds level and a little sparkle and almost nothing else.\n\nIts active EQ makes it a genuinely useful tone shaper rather than only a volume control. Very common as an always-on."
   },
   {
     "value": 26,
     "name": "Zen Master",
     "manufacturer": null,
     "basedOn": "Hermida Zendrive",
-    "description": "The Hermida Zendrive. Built to get a Dumble-style lead sound out of an ordinary amp, and it does it better than most."
+    "specs": "Op-amp · MOSFET clipping",
+    "description": "The Hermida Zendrive, built to get a Dumble-ish sound out of an amp that is not a Dumble.\n\nSmooth, vocal and extremely responsive to picking, with a voice control that shifts it from dark and thick to open and singing. Best set low and used as an always-on."
   },
   {
     "value": 27,
     "name": "Tube Drive 4-Knob",
     "manufacturer": null,
     "basedOn": "Butler Tube Driver",
-    "description": "The four-knob Tube Driver, with a bias control that lets it run from smooth to spluttering."
+    "specs": "12AX7 valve · 1979",
+    "description": "The four-knob Tube Driver, which adds a tone control to the original three.\n\nSame valve, same amp-like behaviour, with one more way to shape it."
   },
   {
     "value": 28,
     "name": "FAS LED-Drive",
     "manufacturer": null,
-    "basedOn": "custom model"
+    "basedOn": "custom model",
+    "specs": "Fractal original · LED clipping",
+    "description": "Fractal's own overdrive built around LED clipping rather than a copy of an existing pedal.\n\nLEDs clip at a higher voltage than diodes, so this stays open and loud rather than compressing — more headroom than most drives, and more of the guitar left underneath."
   },
   {
     "value": 29,
     "name": "SDD Preamp",
     "manufacturer": null,
     "basedOn": "Korg SDD-3000 preamp",
-    "description": "The preamp stage from a Korg SDD-3000 delay — an eighties colouration people chase for its own sake."
+    "specs": "Analogue preamp · 1982",
+    "description": "The preamp section of the Korg SDD-3000 delay, which nobody set out to use as an effect until The Edge did.\n\nHis entire U2 sound runs through this front end — it adds a compressed, slightly hi-fi sheen and a lift in the upper mids that makes a clean guitar sound enormous before any delay arrives."
   },
   {
     "value": 30,
     "name": "FET Preamp",
     "manufacturer": null,
     "basedOn": "possibly based on the BOSS FA-1 FET Amplifier",
-    "description": "A clean FET preamp, for adding level and a little hardness before an amp."
+    "specs": "FET preamp · 1980s",
+    "description": "A FET preamp of the kind used as a front end rather than an effect — most likely the BOSS FA-1, which Andy Summers and The Edge both used.\n\nIt adds level and a bright, glassy lift and very little distortion."
   },
   {
     "value": 31,
     "name": "Suhr Riot Ge (R)",
     "manufacturer": null,
     "basedOn": "R) (Suhr Riot",
-    "description": "The Suhr Riot with germanium clipping — the smoothest and most compressed of its three voices."
+    "specs": "Germanium clipping · red",
+    "description": "The Suhr Riot with germanium diodes selected — the softest and warmest of its three clipping options.\n\nThe Riot is a high-gain pedal built to sound like an amp rather than a box, and this setting is the most forgiving of the three."
   },
   {
     "value": 32,
     "name": "Micro Boost",
     "manufacturer": null,
     "basedOn": "MXR Micro Amp",
-    "description": "The MXR Micro Amp. One knob, no tone controls, nothing but more — the honest clean boost."
+    "specs": "Op-amp · one knob · 1970s",
+    "description": "The MXR Micro Amp: one knob, up to twenty-odd dB of gain, and no tone shaping at all.\n\nIt is the most honest boost in this list. Everything goes up and nothing changes, which is exactly what you want in front of an amp that is already right."
   },
   {
     "value": 33,
     "name": "FAS Boost",
     "manufacturer": null,
-    "basedOn": "custom model"
+    "basedOn": "custom model",
+    "specs": "Fractal original · no pedal behind it",
+    "description": "Fractal's own clean boost. There is no pedal behind it and no story to tell about it.\n\nIt adds level with as little colour as the block can manage, which is exactly what you want in front of an amp that is already doing the right thing."
   },
   {
     "value": 34,
     "name": "Timothy Mid",
     "manufacturer": null,
     "basedOn": "Paul Cochrane Timmy V4",
-    "description": "The Timmy. Almost perfectly transparent, with bass and treble cuts that let you shape what the amp gets."
+    "specs": "Op-amp · bass and treble cut",
+    "description": "The Paul Cochrane Timmy, which became a cult pedal entirely by word of mouth.\n\nIts trick is that the bass and treble controls CUT rather than boost, so you subtract what the amp does not need and leave everything else alone. This is the middle setting, with both roughly flat.\n\nOne of the most transparent overdrives ever made, and it was never expensive."
   },
   {
     "value": 35,
     "name": "Shimmer Drive",
     "manufacturer": null,
-    "basedOn": "custom model"
+    "basedOn": "custom model",
+    "specs": "Fractal original · no pedal behind it",
+    "description": "Fractal's own drive, voiced bright and harmonically busy rather than after any particular pedal.\n\nIt adds upper-harmonic content as it saturates, which is where the name comes from."
   },
   {
     "value": 36,
     "name": "Blackglass 7K",
     "manufacturer": null,
     "basedOn": "Darkglass Microtubes B7K",
-    "description": "The Darkglass B7K — a modern bass distortion with a clean blend, so the low end survives the dirt."
+    "specs": "Bass preamp · four-band EQ",
+    "description": "The Darkglass Microtubes B7K — a bass preamp and distortion with a blend and a proper four-band EQ, and the standard modern metal bass sound.\n\nThe blend is essential: distort the top and keep the clean low end underneath, or the bass disappears."
   },
   {
     "value": 37,
     "name": "Suhr Riot LED (L)",
     "manufacturer": null,
     "basedOn": "L) (Suhr Riot",
-    "description": "The Riot with LED clipping — the loudest and most open of the three."
+    "specs": "LED clipping · high headroom",
+    "description": "The Riot with LED clipping: more headroom, more volume and a more open, less compressed response.\n\nThe most amp-like of the three settings, and the loudest."
   },
   {
     "value": 38,
     "name": "Timothy Up",
     "manufacturer": null,
     "basedOn": "Paul Cochrane Timmy V4",
-    "description": "The Timmy set brighter, letting more top end through to the amp."
+    "specs": "Op-amp · bass and treble cut",
+    "description": "The Timmy with its cut controls opened up — more low end and more top than the middle setting, which makes it fuller and more amp-like.\n\nThe setting for a thin single-coil guitar."
   },
   {
     "value": 39,
     "name": "Tone of Kings",
     "manufacturer": null,
     "basedOn": "Analog Man King of Tone",
-    "description": "The Analog Man King of Tone. Two low-gain drives in one box, and a waiting list measured in years."
+    "specs": "Dual op-amp · two channels",
+    "description": "The Analog Man King of Tone: two independent overdrives in one box, and a waiting list that has run to years.\n\nEach side can be set as boost, overdrive or distortion, and stacking them is the point. Warm, open and unfussy — closer to turning an amp up than to adding a pedal.\n\nThe waiting list is real and it is the reason this model exists."
   },
   {
     "value": 40,
     "name": "Heartpedal 11",
     "manufacturer": null,
     "basedOn": "Lovepedal OD11 / Amp Eleven",
-    "description": "A Lovepedal amp-in-a-box — more gain and more midrange than a boost, without the fizz."
+    "specs": "Op-amp · high gain",
+    "description": "Lovepedal's OD11 — considerably more gain than the Eternity and voiced towards a cranked British amp.\n\nCloser to a distortion than an overdrive, with a thick midrange."
   },
   {
     "value": 41,
     "name": "Jam Ray",
     "manufacturer": null,
     "basedOn": "Venuram Jan Ray",
-    "description": "The Jan Ray. A low-gain drive built around the old blackface Fender voice."
+    "specs": "Op-amp · transparent overdrive",
+    "description": "The Vemuram Jan Ray, built around the idea of a blackface Fender at the edge of breakup.\n\nVery little gain and a great deal of low-end body, with a trim control for the amount of that Fender-ish push. Expensive, and much loved by players who mostly play clean."
   },
   {
     "value": 42,
     "name": "Suhr Riot LED/Si (M)",
     "manufacturer": null,
     "basedOn": "M) (Suhr Riot",
-    "description": "The Riot's middle voice, between the germanium smoothness and the LED openness."
+    "specs": "LED and silicon clipping",
+    "description": "The Riot's middle setting, mixing LED and silicon clipping — more bite than germanium, more control than LEDs alone.\n\nThe setting most people end up leaving it on, and the one that suits a downtuned guitar best."
   },
   {
     "value": 43,
     "name": "OD 250",
     "manufacturer": null,
     "basedOn": "DOD Overdrive Preamp 250: reissue",
-    "description": "The DOD 250 reissue — a simple, raw overdrive, close cousin to the MXR Distortion+."
+    "specs": "Op-amp · reissue · 1974 circuit",
+    "description": "The DOD Overdrive Preamp 250, reissued. Two knobs, a lot of level on tap, and a bright, hard-edged boost.\n\nCircuit-wise it is a close relative of the MXR Distortion+, with a different diode choice that makes it sharper."
   },
   {
     "value": 44,
     "name": "Timothy Down",
     "manufacturer": null,
     "basedOn": "Paul Cochrane Timmy V4",
-    "description": "The Timmy with the top rolled off, for taming a bright amp."
+    "specs": "Op-amp · bass and treble cut",
+    "description": "The Timmy with the bass and treble cut hard, leaving a focused midrange.\n\nThis is the setting that turns it into a tightening boost in front of a high-gain amp."
   },
   {
     "value": 45,
     "name": "TS9DX +",
     "manufacturer": null,
     "basedOn": "Ibanez TS9DX Turbo Tube Screamer",
-    "description": "The Turbo Tube Screamer in one of its hotter modes — more gain and more low end than a standard TS9."
+    "specs": "Op-amp · four modes · 1998",
+    "description": "The Turbo Tube Screamer's Plus mode: the classic circuit with more gain and more output on top.\n\nIt keeps the mid push and adds saturation the original never had."
   },
   {
     "value": 46,
     "name": "Box o' Crunch",
     "manufacturer": null,
     "basedOn": "MI Audio Crunch Box",
-    "description": "The MI Audio Crunch Box — a British-voiced distortion in a pedal, aimed at Marshall tones from a clean amp."
+    "specs": "Op-amp · high gain",
+    "description": "The MI Audio Crunch Box: a Marshall in a small box, with more gain than the amps it imitates.\n\nMid-forward, aggressive and very direct. One of the better amp-in-a-box distortions."
   },
   {
     "value": 47,
     "name": "OD 250 Gray",
     "manufacturer": null,
     "basedOn": "DOD Overdrive Preamp 250: original",
-    "description": "The original grey DOD 250. A little rougher and more characterful than the reissue."
+    "specs": "Op-amp · original grey · 1974",
+    "description": "The original grey DOD 250, which sounds slightly different from the reissue and costs a great deal more because of it.\n\nYngwie Malmsteen used one in front of a Marshall, which is most of why anybody still looks for them."
   },
   {
     "value": 48,
     "name": "Horizon Precision Drive",
     "manufacturer": null,
     "basedOn": "Horizon Devices Precision Drive",
-    "description": "Built for modern metal: a tight overdrive with a noise gate and an aggressive high-pass, for chugging in low tunings."
+    "specs": "Op-amp · noise gate · 2016",
+    "description": "The Horizon Devices Precision Drive, designed by Misha Mansoor specifically for modern metal.\n\nIt has a noise gate built in and an attack control that sharpens the pick transient, which is the whole reason it exists — it makes fast downpicking on a downtuned guitar readable. Nothing older does that job."
   },
   {
     "value": 49,
     "name": "Compulsion Distortion LP",
     "manufacturer": null,
     "basedOn": "Fulltone OCD",
-    "description": "The Fulltone OCD in its lower-gain mode — amp-like and responsive rather than obviously a pedal."
+    "specs": "MOSFET clipping · low peak · 2004",
+    "description": "The Fulltone OCD in its low-peak setting: less gain, more headroom, and a cleaner, more open response.\n\nThe OCD's trick is MOSFET clipping, which behaves more like a valve stage than diodes do, so it stays dynamic instead of compressing flat."
   },
   {
     "value": 50,
     "name": "Hoodoo Drive",
     "manufacturer": null,
     "basedOn": "Voodoo Lab Overdrive",
-    "description": "A straightforward valve-voiced overdrive, aimed at pushing an amp rather than replacing it."
+    "specs": "Op-amp · low gain",
+    "description": "The Voodoo Lab Overdrive, a warm low-gain pedal in the Tube Screamer family with a flatter midrange.\n\nMade by the company better known for power supplies."
   },
   {
     "value": 51,
     "name": "Compulsion Distortion HP",
     "manufacturer": null,
     "basedOn": "Fulltone OCD",
-    "description": "The OCD's high-gain mode, with considerably more saturation."
+    "specs": "MOSFET clipping · high peak · 2004",
+    "description": "The OCD in high-peak mode — considerably more gain and a bigger midrange, which is the setting the pedal is famous for.\n\nIt sounds like an amp rather than a pedal, which is the whole reason it sold in the numbers it did."
   },
   {
     "value": 52,
     "name": "TS9DX Hot",
     "manufacturer": null,
     "basedOn": "Ibanez TS9DX Turbo Tube Screamer",
-    "description": "The Turbo Tube Screamer at its most aggressive setting."
+    "specs": "Op-amp · four modes · 1998",
+    "description": "The Turbo Tube Screamer in Hot mode, which is the most extreme of its four settings.\n\nConsiderably more gain than a TS9, with the low end opened up so it stops behaving like a boost and starts behaving like a distortion."
   },
   {
     "value": 53,
     "name": "DS1 Distortion",
     "manufacturer": null,
     "basedOn": "BOSS DS-1 Distortion",
-    "description": "The BOSS DS-1. Cheap, harsh, and on a great many records — Kurt Cobain and Joe Satriani both used one."
+    "specs": "Op-amp · symmetrical clipping · 1978",
+    "description": "The BOSS DS-1. Orange, cheap, sold in absurd numbers, and widely dismissed by people who have never heard one set up properly.\n\nIt is brighter and harder-edged than a Tube Screamer with far more gain, and it has a midrange scoop that makes it sound thin on its own. Through a real amp with the tone rolled back it is the sound of an enormous number of records.\n\nKurt Cobain, Steve Vai and Joe Satriani have all used one."
   },
   {
     "value": 54,
     "name": "DS1 Distortion Mod",
     "manufacturer": null,
     "basedOn": "modded BOSS DS-1 Distortion",
-    "description": "A modded DS-1, with the harshest of the top end taken out and more low end let through."
+    "specs": "Op-amp · modified · 1978 circuit",
+    "description": "A modified DS-1, which is the second most modified pedal after the RAT.\n\nThe usual targets are the scooped midrange and the fizzy top end, and this version has more body and less of both."
   },
   {
     "value": 55,
     "name": "MCMLXXXI Drive",
     "manufacturer": null,
     "basedOn": "1981 Inventions DRV",
-    "description": "The 1981 DRV — a modern high-gain drive built around the RAT idea with far more control."
+    "specs": "Op-amp · modern overdrive",
+    "description": "The 1981 Inventions DRV — a modern take on the RAT idea with more clarity and a more usable tone control.\n\nIt keeps the hard-clipped grind and loses most of the fizz."
   },
   {
     "value": 56,
     "name": "Sonic Drive",
     "manufacturer": null,
     "basedOn": "Maxon/Ibanez SD-9 Sonic Distortion",
-    "description": "The SD-9 Sonic Distortion. More aggressive and less mid-humped than a Tube Screamer."
+    "specs": "Op-amp · asymmetrical clipping · 1983",
+    "description": "The Maxon SD-9 Sonic Distortion — a Tube Screamer relative with a much flatter midrange and a lot more gain.\n\nWhere the Screamer humps the mids, this one leaves them alone, which makes it a better standalone distortion and a worse boost."
   },
   {
     "value": 57,
     "name": "Valve Screamer VS9",
     "manufacturer": null,
     "basedOn": "Ibanez TS9 Tube Screamer",
-    "description": "The TS9. Brighter and a little harder than the 808, and the one most people actually owned."
+    "specs": "Op-amp · symmetrical clipping · 1982",
+    "description": "The TS9 — the Tube Screamer that replaced the 808, with a different output section that makes it slightly brighter and more aggressive.\n\nWhich of the two is better has occupied forums for thirty years. The honest answer is that they are very close and the 9 has a touch more edge."
   },
   {
     "value": 58,
     "name": "Maxoff 808",
     "manufacturer": null,
     "basedOn": "Maxon OD-808",
-    "description": "The Maxon OD-808 — the same circuit as the original Tube Screamer, from the company that built them."
+    "specs": "Op-amp · symmetrical clipping · 1979",
+    "description": "The Maxon OD-808. Maxon actually built the original Tube Screamers for Ibanez, so this is the same pedal from the company whose hands it came out of.\n\nMarginally smoother than the Ibanez-badged version, and the two are closer than the price difference suggests."
   },
   {
     "value": 59,
     "name": "Klone Chiron",
     "manufacturer": null,
     "basedOn": "Klon Centaur / KTR",
-    "description": "The Klon. Famously transparent, famously expensive, and it really does add body without swamping the amp."
+    "specs": "Op-amp · germanium diodes · 1994",
+    "description": "The Klon Centaur, and the strangest story in pedals: Bill Finnegan built them by hand, charged a few hundred dollars, and the used price is now in the thousands.\n\nWhat it does is add gain without changing what the guitar sounds like. The clean signal runs alongside the distorted one, so the note keeps its body and top end while the overdrive sits underneath — which is why it is called transparent and why people find it hard to describe.\n\nAs a clean boost with the gain right down it is close to perfect. That is how most people use it."
   },
   {
     "value": 60,
     "name": "Esoteric Bass RCB",
     "manufacturer": null,
     "basedOn": "Xotic Bass RC Booster",
-    "description": "The bass version of the RC Booster, with the low end left intact."
+    "specs": "Op-amp · bass voicing",
+    "description": "The bass version of the RC Booster, with the low end left intact rather than filtered away.\n\nA clean boost that does not thin out a bass guitar, which most guitar boosts do immediately."
   },
   {
     "value": 61,
     "name": "BB Pre AT",
     "manufacturer": null,
     "basedOn": "Xotic BB preamp AT",
-    "description": "A hotter-gain version of the BB Preamp."
+    "specs": "Op-amp · Andy Timmons voicing",
+    "description": "The Andy Timmons version of the BB Preamp: more gain, more midrange, and a smoother top end than the standard pedal.\n\nVoiced for sustained lead playing rather than rhythm."
   },
   {
     "value": 62,
     "name": "Griddle Cake",
     "manufacturer": null,
     "basedOn": "Crowther Hot Cake",
-    "description": "The Crowther Hot Cake — a thick, open overdrive that stays clear under a lot of gain."
+    "specs": "Op-amp · soft clipping · 1970s",
+    "description": "The Crowther Hot Cake, made in New Zealand since the seventies and one of the first boutique overdrives anywhere.\n\nIt keeps the low end where most overdrives cut it, so it thickens rather than tightens. A very different answer from the Tube Screamer's."
   },
   {
     "value": 63,
     "name": "Bosom Boost",
     "manufacturer": null,
     "basedOn": "Friedman Buxom Boost",
-    "description": "Friedman's boost, voiced to tighten and push a high-gain amp rather than to distort on its own."
+    "specs": "Op-amp · clean boost",
+    "description": "Friedman's Buxom Boost — a clean boost with a slight low-mid lift, built by an amp maker for pushing his own amps.\n\nIt adds weight rather than gain, which is the useful thing when an amp is already distorting enough."
   },
   {
     "value": 64,
     "name": "OD-One Overdrive",
     "manufacturer": null,
     "basedOn": "BOSS OD-1 Over Drive",
-    "description": "The BOSS OD-1, the first of the line. Simple, soft and warm — the pedal the SD-1 grew out of."
+    "specs": "Op-amp · asymmetrical clipping · 1977",
+    "description": "The BOSS OD-1, the first pedal BOSS ever made and the original asymmetrical overdrive.\n\nTwo knobs and almost no gain. It is a boost that adds warmth rather than a distortion, and it is the ancestor of the SD-1 and everything like it."
   },
   {
     "value": 65,
     "name": "Nobelium OVD-1",
     "manufacturer": null,
-    "basedOn": null
+    "basedOn": null,
+    "specs": "Op-amp · spectrum control",
+    "description": "A low-gain overdrive with a single spectrum control in place of a conventional tone stack, which sweeps the whole voicing rather than cutting one end.\n\nVery transparent and very flat, and much used by session players for exactly that reason."
   },
   {
     "value": 66,
     "name": "Sunrise Splendor Hi-Cut",
     "manufacturer": null,
     "basedOn": null,
-    "description": "The Morning Glory with the top end rolled back."
+    "specs": "Op-amp · high cut engaged",
+    "description": "The Morning Glory with its high-cut option engaged, which rounds off the top end.\n\nFor a bright amp or a bright guitar, where the standard voicing is too much."
   },
   {
     "value": 67,
     "name": "Gauss Drive",
     "manufacturer": null,
     "basedOn": "Mesa Flux-Drive",
-    "description": "Mesa's own overdrive, voiced to push a Mesa without fighting the amp's midrange."
+    "specs": "Op-amp · Mesa voicing",
+    "description": "Mesa's Flux-Drive: an overdrive built by an amp company to sit in front of its own amps.\n\nTight low end and a forward midrange, made for pushing a Rectifier rather than replacing it."
   },
   {
     "value": 68,
     "name": "Sunrise Splendor",
     "manufacturer": null,
     "basedOn": "JHS Pedals Morning Glory V4",
-    "description": "The JHS Morning Glory — a very transparent low-gain drive in the Bluesbreaker tradition."
+    "specs": "Op-amp · transparent overdrive",
+    "description": "The JHS Morning Glory: a Bluesbreaker descendant, low gain and very open, with a bright switch for cutting through.\n\nDesigned to sit under what the amp is already doing rather than replace it."
   },
   {
     "value": 69,
     "name": "Integral Pre",
     "manufacturer": null,
     "basedOn": "TC Electronics Integrated Preamp",
-    "description": "A clean preamp, for level and a little shaping ahead of the amp."
+    "specs": "Analogue preamp",
+    "description": "TC Electronic's Integrated Preamp: a clean, high-headroom front end with EQ, built to sit at the start of a rack rig.\n\nMore a tone-shaping stage than a drive: headroom and EQ, with distortion left to whatever comes after it."
   },
   {
     "value": 70,
     "name": "PI Fuzz - Triangle",
     "manufacturer": null,
     "basedOn": "Electro-Harmonix 1971 Big Muff Pi Triangle",
-    "description": "The earliest Big Muff. Brighter and less scooped than the ones that followed, so it sits in a mix more easily."
+    "specs": "Four transistors · 1971",
+    "description": "The Triangle Muff, named for the layout of its knobs and the first version Electro-Harmonix made.\n\nThe brightest and least scooped of the Muffs, with a more open low end than the ones that followed. The closest a Big Muff gets to sounding like an amp."
   },
   {
     "value": 71,
     "name": "PI Fuzz - Ram's Head",
     "manufacturer": null,
     "basedOn": "Electro-Harmonix '70s Big Muff Pi Ram's Head",
-    "description": "The seventies Big Muff — smoother and darker than the Triangle, and the one on a lot of famous records."
+    "specs": "Four transistors · 1973",
+    "description": "The Ram's Head, the second Big Muff, and the one Gilmour used.\n\nDarker and more scooped than the Triangle, with a thick midrange dip that lets a lead sit above a mix without fighting it. The most sought-after Muff by a distance."
   },
   {
     "value": 72,
     "name": "Colortone Booster",
     "manufacturer": null,
     "basedOn": "Colorsound Power Boost",
-    "description": "The Colorsound Power Boost — a loud, raw sixties boost, and part of the early Gilmour sound."
+    "specs": "Germanium transistors · 1960s",
+    "description": "The Colorsound Power Boost, which is a treble booster that kept the bass — the thing everyone wished a treble booster did.\n\nGilmour used one for years. It is really a preamp: it adds level and a broad, warm lift and lets the amp do the distorting."
   },
   {
     "value": 73,
     "name": "Colortone OD",
     "manufacturer": null,
     "basedOn": "Colorsound Overdriver",
-    "description": "The Colorsound Overdriver — the same family, with more gain and a fierce top end."
+    "specs": "Germanium transistors · 1970s",
+    "description": "The Colorsound Overdriver, the Power Boost's louder relative, with enough output to push almost any amp into distortion.\n\nRough, loud and completely unsubtle. Jeff Beck used one."
   },
   {
     "value": 74,
     "name": "MOSFET Distortion",
     "manufacturer": null,
     "basedOn": "Ibanez MT10 Mostortion",
-    "description": "The Ibanez Mostortion. A mid-gain distortion with proper three-band EQ, much loved by session players."
+    "specs": "MOSFET · three-band EQ",
+    "description": "The Ibanez Mostortion — MOSFET clipping and a real three-band EQ, and a quiet favourite of Nashville session players for decades.\n\nIt stays clean and natural at low gain in a way most distortion pedals cannot."
   },
   {
     "value": 75,
     "name": "PI Fuzz - Russian",
     "manufacturer": null,
     "basedOn": "Electro-Harmonix Russian Big Muff Pi",
-    "description": "The Russian-made Big Muff. Darker and woollier than the American ones, with a thick, heavy low end."
+    "specs": "Four transistors · 1990s",
+    "description": "The Russian Muff, built in Sovtek's factory when Electro-Harmonix had moved production east.\n\nDarker, woollier and less aggressive than the American versions, with a softer top end. The sound of a lot of nineties alternative records."
   },
   {
     "value": 76,
     "name": "Super Fuzz",
     "manufacturer": null,
     "basedOn": "Univox Super-Fuzz",
-    "description": "The Univox Super-Fuzz. Octave-flavoured, enormously thick, and completely uncompromising."
+    "specs": "Six transistors · octave up · 1968",
+    "description": "The Univox Super-Fuzz: an enormous, octave-tinged fuzz with a tone switch that scoops the midrange into oblivion.\n\nPete Townshend used one, and so did most of the bands who later decided guitars should be louder than everything else. It is more of an event than an effect."
   },
   {
     "value": 77,
     "name": "Tube Drive 5-Knob",
     "manufacturer": null,
     "basedOn": "Butler Tube Driver / Dean Markley Overlord",
-    "description": "The fullest Tube Driver, with the most control over how the valve is run."
+    "specs": "12AX7 valve · bias control",
+    "description": "The five-knob Tube Driver, with a bias control that starves the valve.\n\nTurn it down and the pedal starts to sag, splutter and fall apart in a musically useful way — the sound of a valve being asked for more than it has."
   },
   {
     "value": 78,
     "name": "77 Custom OD",
     "manufacturer": null,
     "basedOn": "MXR M77 Custom Badass Modified O.D.",
-    "description": "The MXR Custom Badass — a modern mid-gain overdrive that goes further than a Tube Screamer."
+    "specs": "Op-amp · modified Screamer",
+    "description": "The MXR Custom Badass Modified O.D. — a Tube Screamer with the modifications already done and a bass boost switch.\n\nMore low end, more gain and more output than the pedal it is based on, for a fraction of a boutique price."
   },
   {
     "value": 79,
     "name": "Angry Chuck",
     "manufacturer": null,
     "basedOn": "JHS Angry Charlie V3",
-    "description": "The JHS Angry Charlie — a JCM800 in a box, and a good one."
+    "specs": "Op-amp · JCM800 voicing",
+    "description": "The JHS Angry Charlie, voiced after a JCM800 with a three-band EQ to shape it.\n\nOne of the better Marshall-in-a-box pedals, and it takes a boost in front of it well."
   },
   {
     "value": 80,
     "name": "Guardian Photon Speed",
     "manufacturer": null,
     "basedOn": "Greer Lightspeed",
-    "description": "The Greer Lightspeed — a very clean, very transparent boost that mostly just makes things better."
+    "specs": "Op-amp · low gain",
+    "description": "The Greer Lightspeed: an extremely low-gain overdrive meant to be left on all the time.\n\nIt adds a little compression and a little sparkle and almost no distortion. A pedal you notice when you turn it off."
   },
   {
     "value": 81,
     "name": "Paradigm Shifter",
     "manufacturer": null,
     "basedOn": "Barber Electronics Gain Changer",
-    "description": "A drive with a variable clipping character, so the same pedal can be soft or hard-edged."
+    "specs": "Op-amp · variable gain structure",
+    "description": "Barber's Gain Changer, built around a control that alters the gain STRUCTURE rather than the amount — how hard the stages hit each other.\n\nAn unusual design, and it covers more ground than its size suggests."
   },
   {
     "value": 82,
     "name": "PI Fuzz - Bass",
     "manufacturer": null,
     "basedOn": "Electro-Harmonix Deluxe Bass Big Muff",
-    "description": "A Big Muff voiced for bass, with the low end kept underneath the fuzz instead of being eaten by it."
+    "specs": "Four transistors · bass voicing",
+    "description": "The Deluxe Bass Big Muff — the Muff circuit with the low end kept rather than filtered away, and a blend control so the clean signal stays underneath.\n\nThat blend is the whole point: fuzz on a bass without losing the note."
   },
   {
     "value": 83,
     "name": "NoAmp Bass DI",
     "manufacturer": null,
-    "basedOn": null
+    "basedOn": null,
+    "specs": "Fractal original · bass DI",
+    "description": "A direct box for bass rather than a model of a pedal: the sound of a bass going straight to the desk with no amp in the chain.\n\nThat is how an enormous number of bass parts are actually recorded, and it is a legitimate sound rather than a compromise."
   },
   {
     "value": 84,
     "name": "NoAmp Bass Pre",
     "manufacturer": null,
-    "basedOn": null
+    "basedOn": null,
+    "specs": "Fractal original · bass preamp",
+    "description": "A bass preamp with EQ and no amplifier modelling behind it — shaping and level, straight to the desk.\n\nFor the very common case where the bass never goes near a speaker."
   },
   {
     "value": 85,
     "name": "Royal Bass DI",
     "manufacturer": null,
     "basedOn": "Noble Bass Preamp DI",
-    "description": "A valve-voiced bass preamp and DI, for going straight to the desk with a real tone."
+    "specs": "Valve bass preamp · DI",
+    "description": "The Noble bass preamp and DI — a valve preamp built for recording bass straight to the desk.\n\nWarm, expensive and used on a great many records where the bass never went near an amp."
   }
 ]
