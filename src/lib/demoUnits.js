@@ -101,3 +101,17 @@ export const unitByKey = (key) => BY_KEY.get(key) || BY_KEY.get(DEFAULT_UNIT)
 
 /** Every key, for a picker that must not offer one the catalog has no bank for. */
 export const UNIT_KEYS = UNITS.map((u) => u.key)
+
+/**
+ * The demo's one sentence, naming the unit it is actually pretending to be.
+ *
+ * Written here rather than at each place that says it, because it was said in
+ * three — the banner, the word in the top bar, and the phone's Settings —
+ * and two of them had "Simulated FM3" typed into them as a literal. Those two
+ * went on saying FM3 to somebody looking at a simulated AM4, which is exactly
+ * the kind of confident wrong fact about gear this project refuses everywhere
+ * else. The third read the unit and was right, so the bug looked like a phone
+ * and a browser disagreeing about what was on screen.
+ */
+export const demoSentence = (key) =>
+  `Simulated ${unitByKey(key).name} — nothing here reaches hardware. Real models and parameter ranges, real write behaviour including the silent clamp.`

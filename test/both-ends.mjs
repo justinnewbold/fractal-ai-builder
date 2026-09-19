@@ -443,6 +443,13 @@ export const AREAS = [
         why: 'the same offer at both ends; the browser also says Try now on the not-connected screen and Go beside the code box, neither of which the phone has a place for'
       },
       {
+        does: 'choose which of the five Fractals the demo is',
+        web: 'Which unit the demo is',
+        phone: 'Which unit',
+        unreadable: ['phone'],
+        why: 'the phone says it as a section heading inside the demo block, where the sentence above it has already said this is the demo; the browser says it as a row in a list of unrelated rows and has to carry the whole errand in the title'
+      },
+      {
         does: 'read the pairing code off the computer’s screen with the camera',
         web: null,
         phone: 'Scan a code',

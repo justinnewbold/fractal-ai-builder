@@ -1067,6 +1067,15 @@ export function run(test) {
       rows,
       [
         'Phone & computer',
+        /*
+         * Only drawn while the demo is on, and this reads App.jsx as text
+         * rather than running it, so it is always in this list. It sits
+         * second because the demo is the whole app for somebody who has not
+         * plugged anything in yet, and because it was unfindable where it
+         * used to be: two doors inside Phone & computer, a row named after
+         * pairing a phone. "Only shows FM3 is the only model available."
+         */
+        'Which unit the demo is',
         'Rename presets and scenes',
         'Play screen',
         'Amp & pedal names',
