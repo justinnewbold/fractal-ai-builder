@@ -684,6 +684,109 @@ export function run(test) {
     )
   })
 
+  test('every gear photograph says why we may use it, and names who took it', async () => {
+    /*
+     * "All the amp/cabs/drive photos have been uploaded to GitHub so you can
+     * get those wired up."
+     *
+     * THE FIRST BATCH OF TWO HUNDRED WAS THROWN AWAY, and this is what it was
+     * thrown away over. 123 of those records were a photograph of some OTHER
+     * piece of gear standing in — a Bandmaster filed as a Bassman, a Vox AC15
+     * filed as an AC20 — and roughly 71 came from retailers under a claimed
+     * "fair use editorial", which does not survive a paid app.
+     *
+     * So two rules, both held here rather than remembered:
+     *
+     *   A photograph without a rights_url does not ship. Every one of these is
+     *   Creative Commons, and CC BY and CC BY-SA both require the photographer
+     *   be named wherever the picture appears — so a row that cannot say who
+     *   took it is a row we cannot legally show.
+     *
+     *   A slug must name gear this app actually has. That is the check that
+     *   catches the wrong-gear failure from the other end: a photograph filed
+     *   under a name no model carries is one nobody thought about, and six of
+     *   the second batch were exactly that.
+     */
+    const csv = read('public/gear/sources.csv').trim().split(/\r?\n/)
+    const cols = csv[0].split(',')
+    for (const want of ['slug', 'source_url', 'rights_url', 'copyright_holder', 'licence']) {
+      assert.ok(cols.includes(want), `sources.csv no longer records ${want}`)
+    }
+    const rows = csv.slice(1).filter(Boolean).map((line) => {
+      const v = line.split(',')
+      return Object.fromEntries(cols.map((c, i) => [c, (v[i] ?? '').trim()]))
+    })
+    assert.ok(rows.length > 0, 'there are no gear photographs at all')
+
+    for (const r of rows) {
+      assert.ok(r.rights_url, `${r.slug}: no rights_url, so nothing says why we may use it`)
+      assert.ok(r.copyright_holder, `${r.slug}: nobody is named as the photographer`)
+      /*
+       * Retailers, forums and image searches are never a source. This is the
+       * substance of the cull rather than a list of hostnames for its own
+       * sake: those photographs belong to somebody who has not licensed them
+       * to anybody, whatever the page they sit on implies.
+       */
+      const src = `${r.source_url} ${r.rights_url}`.toLowerCase()
+      for (const never of ['thomann', 'andertons', 'sweetwater', 'guitarcenter', 'reverb.com', 'ebay.', 'google.com/imgres', 'pinterest']) {
+        assert.ok(!src.includes(never), `${r.slug}: sourced from ${never}, which has not licensed it to us`)
+      }
+    }
+
+    /* Every slug reaches real gear, by the same family rule the app matches
+       with — a photograph filed under a name nothing carries is invisible, and
+       invisible is how a wrong one survives review. */
+    const slugify = (n) =>
+      String(n)
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+    const names = []
+    for (const f of ['src/data/amp-types.json', 'src/data/cab-types.json', 'src/data/drive-types.json']) {
+      for (const m of JSON.parse(read(f))) names.push(slugify(m.name))
+    }
+    for (const r of rows) {
+      assert.ok(
+        names.some((n) => n === r.slug || n.startsWith(`${r.slug}-`)),
+        `${r.slug}: names no model in the catalog, so this photograph can never appear`
+      )
+    }
+
+    /* And the generated copy the app imports agrees with the record. A photo
+       list that drifts from the licence list is one showing pictures whose
+       terms nobody checked. */
+    const photos = JSON.parse(read('src/data/gear-photos.json'))
+    assert.deepEqual(
+      Object.keys(photos).sort(),
+      rows.map((r) => r.slug).sort(),
+      'src/data/gear-photos.json is stale — run `npm run gear:photos`'
+    )
+    for (const [slug, p] of Object.entries(photos)) {
+      assert.ok(p.holder && p.rights, `${slug}: the generated entry lost its attribution`)
+      assert.ok(existsSync(new URL(`../public/gear/${p.file}`, import.meta.url)), `${slug}: names a file that is not there`)
+    }
+
+    /*
+     * AND THE CREDIT CANNOT BE RENDERED WITHOUT THE PICTURE OR THE OTHER WAY
+     * ROUND. photoFor hands back both in one object precisely so there is no
+     * shape of this that draws an image with no attribution; this holds the
+     * screen to using it that way.
+     */
+    const { photoFor } = await import('../src/lib/gearPhotos.js')
+    const one = photoFor('1959SLP Treble')
+    assert.ok(one?.src && one?.credit && one?.rights, 'photoFor no longer returns the credit with the picture')
+    assert.equal(photoFor('Recto2 Orange Vintage'), null, 'a model with no photograph is being given one')
+    assert.equal(photoFor(''), null)
+    assert.equal(photoFor(), null, 'photoFor throws rather than answering for a missing name')
+
+    const console_ = read('src/components/Console.jsx')
+    assert.match(console_, /chosenPhoto\.src/, 'the screen never shows a photograph')
+    assert.match(console_, /chosenPhoto\.credit/, 'the screen shows a photograph without naming the photographer')
+  })
+
   test('the one-paste installers are gone, and stay gone', async () => {
     /*
      * "I think that we should just drop the helpers completely. Nobody wants

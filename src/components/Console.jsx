@@ -5,6 +5,7 @@ import { useDismiss } from '../lib/dismiss'
 import { marksFor, toggleFavourite } from '../lib/presetMarks'
 import { jumpsFor } from '../lib/presetJumps'
 import { logDebug } from '../lib/debugLog'
+import { photoFor } from '../lib/gearPhotos'
 
 const SHORT = {
   wah: 'WAH',
@@ -866,6 +867,11 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
       ? `Modelled on ${chosen.manufacturer}`
       : null
 
+  /* Looked up by the model's own name, the same key lineage joins on — the
+     unit reports a name and nothing else, so it is the only thing both ends
+     agree about. */
+  const chosenPhoto = chosen ? photoFor(chosen.name) : null
+
   /*
    * What a model is, in the list where the choosing happens.
    *
@@ -1151,6 +1157,33 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
         </div>
       ) : null}
       {models.length && gear ? <p className="hint pad based-on">{gear}</p> : null}
+      {/*
+        A photograph of the amp the model is named after.
+        
+        Under the lineage line rather than beside it, because the line is the
+        fact and the picture is the illustration — somebody who already knows
+        what a Super Lead looks like reads one word and moves on, and the
+        picture costs them nothing by being below it.
+
+        THE CREDIT IS RENDERED IN THE SAME BREATH AS THE IMAGE. Every one of
+        these is Creative Commons and naming the photographer is a condition of
+        showing it at all, so the two are one element with no way to draw the
+        first without the second. photoFor hands back both together for that
+        reason.
+
+        Most models have no photograph — about a quarter of the roster does —
+        and those show nothing at all rather than a grey box apologising.
+      */}
+      {models.length && chosenPhoto ? (
+        <figure className="gear-photo">
+          <img src={chosenPhoto.src} alt={chosenPhoto.alt} loading="lazy" />
+          <figcaption className="hint">
+            <a href={chosenPhoto.rights} target="_blank" rel="noreferrer noopener">
+              {chosenPhoto.credit}
+            </a>
+          </figcaption>
+        </figure>
+      ) : null}
 
       {rest.length ? (
         <div className="block-tabs">
