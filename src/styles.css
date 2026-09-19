@@ -6496,13 +6496,72 @@ input.setlist-filter {
 
 .setlist-song {
   display: grid;
-  grid-template-columns: 2ch minmax(0, 1fr) 44px 44px 44px;
+  /* The two arrows became one grip — see setlist-grip below. A song alone in
+     a list has no grip at all, and `auto` lets that column collapse rather
+     than leaving a 44px hole where a control used to be. */
+  grid-template-columns: 2ch minmax(0, 1fr) auto 44px;
   align-items: center;
   gap: var(--s-1);
   min-height: 44px;
   padding-left: var(--s-1);
   border: 1px solid transparent;
   border-radius: var(--r-1);
+}
+
+/*
+ * THE GRIP, AND WHAT MOVES WHILE IT IS HELD.
+ *
+ * The same control as the chain editor's, because it is the same gesture on
+ * the same kind of list, and a second way of expressing "hold this and drag"
+ * in one app is a second thing to learn.
+ *
+ * `touch-action: none` is the part that matters on a phone: without it the
+ * browser claims the gesture as a page scroll and the row never moves.
+ */
+button.setlist-grip {
+  flex: 0 0 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2, 8px);
+  background: var(--panel-hi);
+  color: var(--silk);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+button.setlist-grip:active {
+  cursor: grabbing;
+}
+
+/*
+ * The lifted row rides above the ones it is passing, and nothing animates
+ * while it is under the finger: a transition on the row being dragged turns
+ * the pointer into something the row is chasing.
+ */
+.setlist-song.lifted {
+  position: relative;
+  z-index: 2;
+  /*
+   * Opaque, and it has to be. Translated out of the list the row passes over
+   * the search box below it, and with the panel showing through, the song's
+   * name and the words "Find a preset" printed on top of each other — which
+   * is not a row being carried, it is two rows in one place.
+   */
+  background: var(--panel-hi);
+  border-color: var(--rule);
+  /* The middle step, the same lift a sheet gets: a carried row is above the
+     page, and elevation here is three tokens rather than a number somebody
+     picked. */
+  box-shadow: var(--e-2);
+}
+
+.setlist-song:not(.lifted) {
+  transition: transform 120ms ease;
 }
 
 /* The one playing, lit the way the live scene is. */
@@ -6535,7 +6594,7 @@ input.setlist-filter {
   color: var(--silk-faint);
 }
 
-.setlist-song button.setlist-move,
+/* `setlist-move` is gone with the arrows — the grip replaced both. */
 .setlist-song button.setlist-remove {
   min-height: 44px;
   padding: 0;

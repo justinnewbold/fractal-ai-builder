@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Sheet from './Sheet'
+import { landingIndex } from '../../shared/lane-order.mjs'
 import { toggleFavourite } from '../lib/presetMarks'
 import {
   ALL,
@@ -47,6 +48,77 @@ export default function Setlists({
 }) {
   const current = preset?.number
   const chosen = lists.find((l) => l.id === source) || null
+
+  /*
+   * DRAGGING A SONG UP OR DOWN THE RUNNING ORDER.
+   *
+   * "It should be drag and drop for rearranging songs in created setlists.
+   * For starred items and when it shows all, you can leave those in order
+   * where they can't be rearranged."
+   *
+   * Which is already true by construction: this editor is drawn only for a
+   * list somebody made. All presets and Starred are slot order, they are not
+   * in `lists`, and there is nothing here to drag them with.
+   *
+   * The phone has had this since setlists arrived and the browser never got
+   * it — same seam, opposite way round from the demo picker. The maths is the
+   * chain editor's, out of shared/lane-order.mjs, so a song lands where a
+   * block would: pointer events, so a mouse and a finger are one drag, and
+   * capture so it survives the finger leaving the grip.
+   */
+  /* var(--s-1), the gap `.setlist-songs` lays the rows out with. */
+  const GAP = 4
+  const [drag, setDrag] = useState(null)
+  const rows = useRef({})
+  const from = useRef({ y: 0, heights: [] })
+
+  const songCount = chosen?.presets?.length || 0
+
+  const gripDown = (e, i) => {
+    e.preventDefault()
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+    /* Only the rows that exist: a removed song leaves its height behind. */
+    const heights = []
+    for (let n = 0; n < songCount; n++) heights.push(rows.current[n]?.getBoundingClientRect().height || 0)
+    from.current = { y: e.clientY, heights }
+    setDrag({ index: i, dy: 0, to: i })
+  }
+  const gripMove = (e, i) => {
+    if (!drag || drag.index !== i) return
+    const dy = e.clientY - from.current.y
+    setDrag({ index: i, dy, to: landingIndex(from.current.heights, i, dy, GAP) })
+  }
+  const gripUp = (i) => {
+    if (!drag || drag.index !== i) return
+    const to = drag.to
+    setDrag(null)
+    if (to !== i) setPresets(moveIn(chosen.presets, i, to))
+  }
+
+  /*
+   * And by keyboard, because a grip that only answers a pointer takes the
+   * running order away from anybody driving this with one. The arrows that
+   * were here did that job; the grip inherits it rather than dropping it.
+   */
+  const gripKey = (e, i) => {
+    const step = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0
+    if (!step) return
+    e.preventDefault()
+    const to = i + step
+    if (to < 0 || to >= songCount) return
+    setPresets(moveIn(chosen.presets, i, to))
+  }
+
+  /* Where each row is drawn mid-drag: the lifted one under the pointer, the
+     ones it has passed stepped out of its way. */
+  const shiftFor = (i) => {
+    if (!drag) return 0
+    if (i === drag.index) return drag.dy
+    const h = (from.current.heights[drag.index] || 0) + GAP
+    if (drag.to > drag.index && i > drag.index && i <= drag.to) return -h
+    if (drag.to < drag.index && i >= drag.to && i < drag.index) return h
+    return 0
+  }
   const starred = Number.isInteger(current) && favourites.includes(current)
   /*
    * Adding a song that is not the one playing needs a way to find it: a
@@ -260,30 +332,44 @@ export default function Setlists({
           {chosen.presets.length ? (
             <ol className="setlist-songs" aria-label={`Songs in ${chosen.name}`}>
               {chosen.presets.map((n, i) => (
-                <li key={n} className={`setlist-song ${n === current ? 'current' : ''}`}>
+                <li
+                  key={n}
+                  ref={(el) => {
+                    if (el) rows.current[i] = el
+                    else delete rows.current[i]
+                  }}
+                  className={`setlist-song ${n === current ? 'current' : ''} ${
+                    drag?.index === i ? 'lifted' : ''
+                  }`}
+                  style={shiftFor(i) ? { transform: `translateY(${shiftFor(i)}px)` } : undefined}
+                >
                   <span className="setlist-song-pos mono">{i + 1}</span>
                   <span className="setlist-song-name">
                     <span className="mono setlist-song-slot">{slotLabel(n, addressing)}</span>
                     <span>{nameOf(n) || 'Unnamed'}</span>
                   </span>
-                  <button
-                    type="button"
-                    className="setlist-move"
-                    onClick={() => setPresets(moveIn(chosen.presets, i, i - 1))}
-                    disabled={i === 0}
-                    aria-label={`Move ${nameOf(n) || `preset ${n}`} up`}
-                  >
-                    ▲
-                  </button>
-                  <button
-                    type="button"
-                    className="setlist-move"
-                    onClick={() => setPresets(moveIn(chosen.presets, i, i + 1))}
-                    disabled={i === chosen.presets.length - 1}
-                    aria-label={`Move ${nameOf(n) || `preset ${n}`} down`}
-                  >
-                    ▼
-                  </button>
+                  {/*
+                    One song has nowhere to move, so it gets no grip rather
+                    than one that does nothing — the lesson the phone learned
+                    out loud: "the little arrows to go up and down don't work."
+                    They did work; there was simply only one song, and a
+                    disabled arrow looks exactly like a broken one.
+                  */}
+                  {chosen.presets.length > 1 ? (
+                    <button
+                      type="button"
+                      className="setlist-grip"
+                      aria-label={`Move ${nameOf(n) || `preset ${n}`} — hold and drag, or use the arrow keys`}
+                      title="Hold and drag up or down to move it in the running order"
+                      onPointerDown={(e) => gripDown(e, i)}
+                      onPointerMove={(e) => gripMove(e, i)}
+                      onPointerUp={() => gripUp(i)}
+                      onPointerCancel={() => gripUp(i)}
+                      onKeyDown={(e) => gripKey(e, i)}
+                    >
+                      ≡
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="setlist-remove"
