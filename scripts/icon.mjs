@@ -35,13 +35,34 @@ const source = resolve(root, 'public/icon.svg')
  * They are the same 1024px render written to four places, which is the only
  * arrangement in which they cannot disagree about what the app looks like.
  */
+/*
+ * AND ONE OF THEM MUST BE OPAQUE, which is an App Store rule rather than a
+ * preference. Apple rejects an iOS app icon with an alpha channel: the icon
+ * is a full square and the system applies its own corner mask, so a PNG with
+ * transparent corners comes back as "the app icon can't contain alpha
+ * channels or transparencies" before a human ever opens the build.
+ *
+ * The artwork's own rounded square is #0d0f12 and only its four corners are
+ * clear, so making it opaque is a matter of painting that same colour behind
+ * it rather than changing the drawing.
+ *
+ * The other three keep their transparency and need it. Android's adaptive
+ * icon is a foreground layer the system masks itself — filling its corners
+ * would put a dark square inside Android's circle. The splash mark sits on
+ * the splash colour. And the Mac build wants the rounded shape, because macOS
+ * does not mask app icons at all.
+ */
 const outputs = [
-  'desktop/build/icon.png',
-  'mobile/assets/icon.png',
-  'mobile/assets/adaptive-icon.png',
-  'mobile/assets/splash-icon.png'
-].map((rel) => resolve(root, rel))
+  { rel: 'desktop/build/icon.png', opaque: false },
+  { rel: 'mobile/assets/icon.png', opaque: true },
+  { rel: 'mobile/assets/adaptive-icon.png', opaque: false },
+  { rel: 'mobile/assets/splash-icon.png', opaque: false }
+].map((o) => ({ ...o, path: resolve(root, o.rel) }))
 const SIZE = 1024
+
+/* The fill of the artwork's own square, so the corners it rounds off are
+   filled with the colour they were cut out of rather than a guess. */
+const OPAQUE_BG = '#0d0f12'
 
 /*
  * And the Windows tray icon, which is a different job at a different size.
@@ -82,9 +103,17 @@ await page.setContent(
   `<style>html,body{margin:0;padding:0;background:transparent}svg{display:block;width:${SIZE}px;height:${SIZE}px}</style>${svg}`
 )
 for (const out of outputs) {
-  mkdirSync(dirname(out), { recursive: true })
-  await page.locator('svg').screenshot({ path: out, omitBackground: true })
-  console.log(`${out.slice(root.length + 1)} — ${SIZE}x${SIZE} from ${source.slice(root.length + 1)}`)
+  mkdirSync(dirname(out.path), { recursive: true })
+  /* The page background is what fills the corners when the shot is not
+     omitting it — set per output rather than once, because three of the four
+     want it gone. */
+  await page.evaluate((bg) => {
+    document.body.style.background = bg
+  }, out.opaque ? OPAQUE_BG : 'transparent')
+  await page.locator('svg').screenshot({ path: out.path, omitBackground: !out.opaque })
+  console.log(
+    `${out.rel} — ${SIZE}x${SIZE}${out.opaque ? ', opaque (App Store requires it)' : ''}`
+  )
 }
 
 /* The same drawing, rendered at tray size rather than scaled down from 1024:
