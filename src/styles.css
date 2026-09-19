@@ -9963,3 +9963,11 @@ button.setup-back {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* What the real amp is like to play, between the lineage line and the photo.
+   Slightly roomier than the hint above it because it is a sentence rather than
+   a label, and a sentence set at label spacing is hard to read on a phone. */
+.gear-about {
+  line-height: 1.45;
+  max-width: 62ch;
+}

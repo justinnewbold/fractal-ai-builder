@@ -3488,6 +3488,62 @@ export function run(test) {
     assert.equal(scripts.fingerprint, 'node scripts/fingerprint.mjs', 'npm run fingerprint no longer runs the check')
   })
 
+  test('the gear descriptions say what a model is like, and never guess', async () => {
+    /*
+     * "Then work on the amp and cab descriptions and effects pedals."
+     *
+     * The lineage line says WHICH amp a model is. That is the fact and it is
+     * useless to somebody who has never played one — which is most people who
+     * have just bought one of these units. They can read that a model is a
+     * Rectifier and still not know whether it is the one for the song.
+     *
+     * TWO RULES, AND THE SECOND IS THE ONE WORTH A TEST.
+     *
+     * Nothing is quoted. Lineage facts came from Yek's Guide and Fractal's own
+     * Blocks Guide, and a fact — this model is that amp — is not something
+     * anybody owns. A paragraph about how an amp sounds is somebody's writing,
+     * so none of these are from either.
+     *
+     * And nothing is described that is not known. Ten amp families are
+     * boutique amps obscure enough that any character written for them would
+     * be invention, and eleven drives are Fractal's own designs with no real
+     * pedal behind them. Those say nothing, deliberately — this file's own
+     * rule is that the reader knows the gear better than the app does, and a
+     * confident wrong sentence about an amp somebody owns costs more than a
+     * blank.
+     */
+    const { descriptionFor } = await import('../src/lib/lineage.js')
+
+    /* A model gets its family's description: "1959SLP Treble" is one voicing
+       of a Super Lead and wants what is written about the Super Lead. */
+    const slp = descriptionFor('amp', '1959SLP Treble')
+    assert.ok(slp && slp.length > 30, 'an amp model no longer inherits its family description')
+    assert.ok(descriptionFor('drive', 'Rat Distortion'), 'the drives have no descriptions')
+    assert.ok(descriptionFor('cab', '4x12 RECTO SLANT'), 'the cabs have no descriptions')
+
+    /* Silence where nothing is known, which is the half that matters. */
+    assert.equal(descriptionFor('amp', 'Atomica Ch1'), null, 'an obscure amp is being described anyway')
+    assert.equal(descriptionFor('drive', 'FAS Boost'), null, "Fractal's own pedal is being given a history it does not have")
+    assert.equal(descriptionFor('amp', ''), null)
+    assert.equal(descriptionFor('amp'), null, 'descriptionFor throws rather than answering for a missing name')
+    assert.equal(descriptionFor('reverb', 'Ambient'), null, 'a family with no catalog is being answered for')
+
+    /* Every description is a sentence rather than a fragment, and none of them
+       is long enough to need scrolling on a phone. */
+    const ampFams = JSON.parse(read('src/data/amp-lineage.json'))
+    const described = ampFams.filter((f) => f.description)
+    assert.ok(described.length > 100, `only ${described.length} amp families are described`)
+    for (const f of [...described, ...JSON.parse(read('src/data/cab-types.json')).filter((c) => c.description)]) {
+      const d = f.description
+      assert.ok(d.length >= 40 && d.length <= 200, `${f.family || f.name}: a description of ${d.length} characters`)
+      assert.match(d, /[.!?]$/, `${f.family || f.name}: does not end as a sentence`)
+      assert.ok(!/^\s|\s$/.test(d), `${f.family || f.name}: has stray whitespace`)
+    }
+
+    const console_ = read('src/components/Console.jsx')
+    assert.match(console_, /descriptionFor\(block\.slug/, 'the screen never shows a description')
+  })
+
   test('the phone can say what the computer is running', async () => {
     /*
      * "The app keeps crashing, but it might be the Mac app which is very laggy

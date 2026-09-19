@@ -6,6 +6,7 @@ import { marksFor, toggleFavourite } from '../lib/presetMarks'
 import { jumpsFor } from '../lib/presetJumps'
 import { logDebug } from '../lib/debugLog'
 import { photoFor } from '../lib/gearPhotos'
+import { descriptionFor } from '../lib/lineage'
 
 const SHORT = {
   wah: 'WAH',
@@ -872,6 +873,11 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
      agree about. */
   const chosenPhoto = chosen ? photoFor(chosen.name) : null
 
+  /* And what the real thing is like to play. The line above says which amp it
+     is; this says what that means, for the many people who have never had one
+     in a room. Null for anything nobody could describe honestly. */
+  const chosenAbout = chosen && block?.slug ? descriptionFor(block.slug, chosen.name) : null
+
   /*
    * What a model is, in the list where the choosing happens.
    *
@@ -1174,6 +1180,11 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
         Most models have no photograph — about a quarter of the roster does —
         and those show nothing at all rather than a grey box apologising.
       */}
+      {/*
+        Under the lineage line and above the photograph: name it, say what it
+        is like, then show it. Reading order rather than decoration.
+      */}
+      {models.length && chosenAbout ? <p className="hint pad gear-about">{chosenAbout}</p> : null}
       {models.length && chosenPhoto ? (
         <figure className="gear-photo">
           <img src={chosenPhoto.src} alt={chosenPhoto.alt} loading="lazy" />
