@@ -3454,6 +3454,38 @@ export function run(test) {
     const app = JSON.parse(read('mobile/app.json')).expo
     assert.deepEqual(app.runtimeVersion, { policy: 'fingerprint' }, 'the runtime version is not a fingerprint any more')
     assert.ok(app.updates?.url?.includes(app.extra.eas.projectId), 'the update url and the project id disagree')
+
+    /*
+     * AND THE COST OF A BUILD IS WRITTEN DOWN WHERE A MACHINE CAN CHECK IT.
+     *
+     * The policy above is only half of it. It guarantees an update never
+     * reaches a build that cannot run it — which is the safety — and says
+     * nothing about the phone that stops getting updates as a result. That
+     * half used to be a habit: 7.332.0, 7.335.0 and 7.338.0 each recorded
+     * "the fingerprint is e44c3556… before and after" by hand. After 7.327.0
+     * the habit stopped and three native changes went through unseen.
+     *
+     * mobile/fingerprint.json is that habit made mechanical, and the check
+     * lives in mobile.yml where the app's own dependencies are installed —
+     * the fingerprint hashes those, not just the config, and this suite
+     * deliberately does not reach into mobile/node_modules (see the note
+     * above about the install CI does not have). So what is held here is that
+     * the record exists, is a real pair of hashes, and is still wired up.
+     */
+    const fp = JSON.parse(read('mobile/fingerprint.json'))
+    for (const platform of ['android', 'ios']) {
+      assert.match(
+        String(fp[platform]),
+        /^[0-9a-f]{40}$/,
+        `mobile/fingerprint.json has no recorded ${platform} fingerprint, so nothing can tell a build from an update`
+      )
+    }
+    assert.notEqual(fp.android, fp.ios, 'both platforms record the same hash, which means one was pasted over the other')
+
+    const wf = read('.github/workflows/mobile.yml')
+    assert.match(wf, /npm run fingerprint/, 'nothing checks the fingerprint on a pull request, so a build cost lands unannounced')
+    const scripts = JSON.parse(read('package.json')).scripts
+    assert.equal(scripts.fingerprint, 'node scripts/fingerprint.mjs', 'npm run fingerprint no longer runs the check')
   })
 
   test('the phone can say what the computer is running', async () => {

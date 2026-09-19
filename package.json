@@ -1,6 +1,6 @@
 {
   "name": "fractal-ai-builder",
-  "version": "7.353.0",
+  "version": "7.354.0",
   "private": true,
   "type": "module",
   "description": "Describe a tone, get a preset written to your Fractal device. Cloud UI over the ForgeFX device API.",
@@ -17,7 +17,8 @@
     "sync:rules": "node scripts/sync-relay-rules.mjs",
     "vendor:forgefx": "node scripts/vendor-forgefx.mjs",
     "notices": "node scripts/notices.mjs",
-    "gear:photos": "node scripts/gear-photos.mjs"
+    "gear:photos": "node scripts/gear-photos.mjs",
+    "fingerprint": "node scripts/fingerprint.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
