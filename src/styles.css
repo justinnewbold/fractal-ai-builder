@@ -2341,6 +2341,12 @@ button.scene.current .scene-num {
   box-shadow: 0 0 0 3px var(--dim-halo);
 }
 
+/*
+ * The one-time hint on Play, and the demo's one-line explanation. Same shape
+ * for the same reason: a sentence the app says once, with the button that puts
+ * it away, sitting above the screen it is about.
+ */
+.play-hint,
 .demo-banner {
   display: flex;
   align-items: center;
@@ -2355,6 +2361,7 @@ button.scene.current .scene-num {
   border-radius: var(--r-1);
 }
 
+.play-hint > span,
 .demo-banner > span {
   flex: 1 1 260px;
 }

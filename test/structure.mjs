@@ -682,6 +682,58 @@ export function run(test) {
     assert.match(lifted.slice(0, lifted.indexOf('}')), /background:/, 'the row being dragged is see-through')
   })
 
+  test('the introduction teaches the hold, and Play says it once as well', () => {
+    /*
+     * "We need to add to the tutorial about holding down the amp in effect
+     * buttons to switch channels by tapping and holding. After that,
+     * additionally on the play screen the first time it's opened, have another
+     * pop up that also tells them to hold down those buttons... I actually
+     * believe we had this previously set up, but I'm not seeing it working."
+     *
+     * It was not set up. Nothing on Play had ever said it, and that is exactly
+     * why it reads as something that used to work: the gesture is real and has
+     * been since the channel sheet was built, so a gesture with nothing on
+     * screen pointing at it is indistinguishable from a broken one.
+     *
+     * The card before it in the tour explains what a channel IS and never says
+     * how to reach one, which left the most useful thing on the Play screen
+     * behind a gesture nobody was told about.
+     */
+    const tour = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
+    assert.match(tour, /title: 'Hold a block to change its channel'/, 'the introduction never mentions the hold')
+    const card = tour.slice(tour.indexOf("title: 'Hold a block to change its channel'"))
+    assert.match(card.slice(0, 1200), /Hold\s*\n?\s*it down/, 'the card does not say to hold it down')
+
+    /*
+     * AND PLAY SAYS IT ONCE, on its own key rather than the tour's. Somebody
+     * who skipped the introduction, or met this app before that card existed,
+     * still gets told — and once put away it stays away.
+     */
+    assert.match(src, /const HOLD_NOTE_KEY = 'fab\.play\.hold'/, 'the Play hint has nowhere to remember it was seen')
+    assert.match(src, /className="play-hint"/, 'Play never mentions the hold')
+    assert.match(src, /onClick=\{dismissHoldNote\}/, 'the Play hint cannot be put away')
+    assert.ok(
+      src.indexOf("const HOLD_NOTE_KEY") < src.indexOf("const DEMO_NOTE_KEY"),
+      'the two one-time notes have drifted apart'
+    )
+
+    /*
+     * Inside the Play view, not above it. The strip between the bar and the
+     * first screen is held to the bar, the states that mean the app cannot
+     * work yet, and the assistant — the chrome check in this file is what
+     * keeps 290px from creeping back. A hint belongs with the thing it hints
+     * at anyway.
+     */
+    const playAt = src.indexOf("view === 'play' ? (")
+    const hintAt = src.indexOf('className="play-hint"')
+    assert.ok(playAt !== -1 && hintAt > playAt, 'the Play hint sits in the chrome above every screen')
+
+    /* And it is styled, sharing the demo note's shape because it is the same
+       thing: one sentence the app says once, with the button that clears it. */
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    assert.match(css, /\.play-hint,\n\.demo-banner \{/, 'the Play hint has no styling at all')
+  })
+
   test('the block editor arrives over the screen, not below it', () => {
     /*
      * It used to be the last row of the console grid. Tapping a block on a
@@ -1306,11 +1358,16 @@ export function run(test) {
       ['play', ['size', 'appearance']],
       /* Fixes first: it is the one somebody is looking for when they open
          this page at all, and the log is what they send if it did not help. */
-      ['help', ['fixes', 'preset-check', 'debug-log', 'feedback', 'what-s-changed-this-session', 'how-this-works']],
+      ['help', ['fixes', 'preset-check', 'debug-log', 'feedback', 'what-s-changed-this-session']],
       /* The small print joins About because that is where somebody looks for
          it, and because a store requires the privacy policy to be reachable
-         from the app rather than only from a form. */
-      ['about', ['updates', 'small-print']]
+         from the app rather than only from a form.
+         And so does the introduction — "move the tutorial to replay it later
+         into the about section instead of under troubleshooting". Nothing
+         about it is a fault being fixed: it is what the app is and how it
+         works, and somebody hunting for it under Troubleshooting has first
+         had to decide they have a problem. */
+      ['about', ['how-this-works', 'updates', 'small-print']]
     ]) {
       assert.deepEqual(behind(page), panels, `the ${page} page holds ${behind(page).join(', ')}`)
     }
@@ -4486,7 +4543,22 @@ export function run(test) {
     assert.match(qr, /from '\.\/PhoneRemote'/, 'the tour draws its own pairing code')
     assert.match(qr, /PairCard|AccountCard/, 'the shared block renders no square')
     const tour = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
-    assert.match(tour, /<PhoneQr connected=\{connected\} email=\{email\} \/>/, 'the card has no square in it')
+    assert.match(tour, /<PhoneQr connected=\{connected\} email=\{email\}/, 'the card has no square in it')
+
+    /*
+     * AND IT DOES NOT PRINT THE ADDRESS. "The first shot that pops up in the
+     * tutorial literally shows my personal email address on it."
+     *
+     * The Setup page prints it and should: it is answering "which account is
+     * this", on his own screen, asked for. The tour is the first thing the app
+     * ever shows — the screen that gets photographed, screen-shared and handed
+     * across a desk — and the sentence above the square already says what to do
+     * without naming anybody.
+     */
+    assert.match(tour, /showAccount=\{false\}/, 'the tour prints the signed-in address on its first card again')
+    const remote = readFileSync(new URL('../src/components/PhoneRemote.jsx', import.meta.url), 'utf8')
+    assert.match(remote, /showAccount = true/, 'the address can no longer be withheld, so the tour cannot hide it')
+    assert.match(remote, /\{showAccount \? \(/, 'the address is drawn whatever the caller asked for')
 
     /* And the app tells it which end this is, or the check above is decorative. */
     const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
