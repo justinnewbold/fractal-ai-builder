@@ -1336,6 +1336,52 @@ export function run(test) {
     )
   })
 
+  test('the Connection panel has one fold rather than two', () => {
+    /*
+     * "On the Phone and computer drop-down where it says Connection, there's a
+     * redundant Connection button that then takes you to the connection — let's
+     * get rid of that extra step."
+     *
+     * Two presses to reach one list, and the second button carried the same
+     * word as the section above it.
+     *
+     * WHAT THE CHIP ACTUALLY DID, and why it is replaced rather than deleted:
+     * nothing asks the computer what is plugged into it until somebody wants
+     * to know. That answer is a scan of every port on the machine, and from a
+     * phone it is a question relayed across the internet — so it waits to be
+     * asked for. The panel takes that cue from the fold it already lives in
+     * now.
+     *
+     * And it has to keep waiting. `<details>` keeps its contents mounted while
+     * it is shut, so a panel that read on mount would scan the ports of every
+     * computer that so much as opened Setup.
+     */
+    const ports = readFileSync(new URL('../src/components/Ports.jsx', import.meta.url), 'utf8')
+
+    assert.ok(
+      !/Hide connection/.test(ports),
+      'the Connection panel has a second fold of its own again, inside the one titled Connection'
+    )
+
+    assert.match(ports, /closest\('details'\)/, 'the panel no longer takes its cue from the fold it lives in')
+    assert.match(ports, /addEventListener\('toggle'/, 'the panel never hears the fold open, so it reads once and never again')
+    assert.match(
+      ports,
+      /if \(open && !ports\) load\(\)/,
+      'the ports are scanned whether or not anybody asked — on every computer that opens Setup'
+    )
+
+    /* All of which needs a fold above it to listen to. */
+    const setup = sheet('Setup')
+    const at = setup.indexOf('<Ports')
+    assert.notEqual(at, -1, 'the Connection panel is gone from Setup')
+    const opened = setup.lastIndexOf('<Section', at)
+    assert.ok(
+      opened !== -1 && setup.slice(opened, at).includes('title="Connection"'),
+      'the Connection panel is no longer inside the Connection section, so it has no fold to read'
+    )
+  })
+
   test('the phone leads Setup with the gear too, and says its facts in green', () => {
     /*
      * Both ends. "On the set-up screen, let's change the text underneath the
