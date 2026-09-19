@@ -108,3 +108,25 @@ const subscribe = (fn) => {
 
 /** Re-render this screen when the demo goes on or off. */
 export const useDemo = () => useSyncExternalStore(subscribe, isDemo, isDemo)
+
+/**
+ * Re-render this screen when the demo becomes a DIFFERENT unit.
+ *
+ * "On the demo, it's not letting you switch to a different demo. It's stuck on
+ * the FM3."
+ *
+ * It was not stuck: `setDemoUnit` recorded the choice, rebuilt the mock and
+ * told every watcher, exactly as it reads. Nothing redrew.
+ *
+ * `useDemo` is a subscription whose SNAPSHOT is `isDemo` — a boolean. Changing
+ * from a simulated FM3 to a simulated Axe-Fx III leaves that boolean `true`,
+ * and `useSyncExternalStore` compares snapshots with Object.is and bails out
+ * of the render when nothing moved. So the announcement arrived and was
+ * correctly ignored: the screens asking the question were only ever asking
+ * whether the demo was ON.
+ *
+ * Which is the whole bug. There was no way for a screen to ask WHICH unit and
+ * be told when the answer changed, so the five buttons kept the old one lit
+ * and the app kept the old one's presets.
+ */
+export const useDemoUnit = () => useSyncExternalStore(subscribe, demoUnit, demoUnit)

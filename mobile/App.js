@@ -8,6 +8,7 @@ import { haveSession, linkState, probeNow, startLink, stopLink, subscribeLink } 
 import { signOut } from './src/lib/relay'
 import Note from './src/components/Note'
 import TopBar from './src/components/TopBar'
+import DemoUnit from './src/components/DemoUnit'
 import Settings from './src/screens/Settings'
 import SignIn from './src/screens/SignIn'
 import Edit from './src/screens/Edit'
@@ -75,6 +76,8 @@ export default function App() {
   const [link, setLink] = useState(linkState())
   /** The last "picked up 2 setlists from your Mac", until it has been read. */
   const [picked, setPicked] = useState(null)
+  /** Whether the five units are up, from the name in the corner. */
+  const [pickUnit, setPickUnit] = useState(false)
 
   /*
    * Whether there is a rig to draw yet.
@@ -244,7 +247,20 @@ export default function App() {
           <SignIn onSignedIn={() => setAuth('in')} onDemo={() => setAuth('in')} />
         ) : (
           <>
-            <TopBar link={link} onOpenSettings={() => setScreen('settings')} onOpenUnit={() => setScreen('settings')} />
+            {/*
+              The name in the corner means two things, so it goes two places.
+              In the demo it is a CHOICE — five units, and the sheet is one tap
+              — and outside it it is a FACT, so it opens Setup where the facts
+              are. It used to do the second thing in both cases, which sent
+              somebody after the demo picker on a walk through Setup and into
+              a page named after pairing a phone.
+            */}
+            <TopBar
+              link={link}
+              onOpenSettings={() => setScreen('settings')}
+              onOpenUnit={() => (demo ? setPickUnit(true) : setScreen('settings'))}
+            />
+            <DemoUnit open={pickUnit} onClose={() => setPickUnit(false)} />
             {picked ? <Arrived picked={picked} /> : null}
             {/*
               The bar stays up while this waits, which is what makes the wait

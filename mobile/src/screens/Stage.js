@@ -28,6 +28,7 @@ import {
   writeTempo,
   writeTuner
 } from '../lib/rig'
+import { useDemoUnit } from '../lib/demo'
 import { nope, thud } from '../lib/feedback'
 import { blockColor } from '../lib/blockColors'
 import { sceneColor } from '../lib/sceneColors'
@@ -164,9 +165,23 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
     }
   }, [])
 
+  /*
+   * And again when the demo becomes a different unit.
+   *
+   * "It's not letting you switch to a different demo. It's stuck on the FM3."
+   * Picking one rebuilt the simulated unit immediately — but this read ran
+   * once, on mount, so the screen went on showing the old unit's presets, its
+   * scenes and its chain. The rig underneath had changed and nothing had asked
+   * it anything since.
+   *
+   * Harmless outside the demo: `demoUnit` never moves there, so this is the
+   * same single read on mount it has always been.
+   */
+  const demoIs = useDemoUnit()
+
   useEffect(() => {
     reload()
-  }, [reload])
+  }, [reload, demoIs])
 
   /*
    * Where a press of Previous or Next would land, or null when the button has
