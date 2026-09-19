@@ -3724,9 +3724,11 @@ export function run(test) {
     const ampFams = JSON.parse(read('src/data/amp-lineage.json'))
     const described = ampFams.filter((f) => f.description)
     assert.ok(described.length > 100, `only ${described.length} amp families are described`)
+    const everyCab = JSON.parse(read('src/data/cab-types.json'))
+    const everyDrive = JSON.parse(read('src/data/drive-types.json'))
     const alsoDescribed = [
-      ...JSON.parse(read('src/data/cab-types.json')).filter((c) => c.description),
-      ...JSON.parse(read('src/data/drive-types.json')).filter((c) => c.description)
+      ...everyCab.filter((c) => c.description),
+      ...everyDrive.filter((c) => c.description)
     ]
     for (const f of [...described, ...alsoDescribed]) {
       const who = f.family || f.name
@@ -3747,6 +3749,63 @@ export function run(test) {
       assert.ok(f.specs.length <= 60, `${who}: a spec line of ${f.specs.length} characters is a sentence`)
       assert.ok(!/[.!?]$/.test(f.specs), `${who}: the spec line ends as a sentence`)
       assert.ok(!/^\s|\s$/.test(f.specs), `${who}: the spec line has stray whitespace`)
+    }
+
+    /*
+     * AND NO PARAGRAPH SAYS WHAT THE ONE ABOVE IT ALREADY SAID.
+     *
+     * Every pedal and cabinet here was one sentence before it was a page, and
+     * the quick way to make a page out of a sentence is to write the sentence
+     * again at greater length. A draft of the pedal pass did exactly that on
+     * most of the catalog — "Punchy, mid-forward, and it stays defined when
+     * pushed" followed by "Punchy and mid-forward, and it stays defined when
+     * the amp is pushed" — which costs a reader a scroll to learn nothing, and
+     * which every other check in this file was happy to let through. Nothing
+     * on main does it today; this is here so nothing starts.
+     *
+     * Five words is the line. A run that long appearing twice in one entry is
+     * not two thoughts that happen to share a phrase, it is one thought typed
+     * out twice. Anything shorter catches honest contrasts, like an Orange
+     * high-gain amp being measured against an American high-gain amp.
+     */
+    const RUN = 5
+    const runs = (p) => p.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim().split(' ')
+    for (const m of [...ampFams, ...everyCab, ...everyDrive]) {
+      if (!m.description) continue
+      const saidIn = new Map()
+      paragraphsOf(m.description).forEach((p, i) => {
+        const w = runs(p)
+        for (let at = 0; at + RUN <= w.length; at++) {
+          const run = w.slice(at, at + RUN).join(' ')
+          const first = saidIn.get(run)
+          assert.ok(
+            first === undefined || first === i,
+            `${m.family || m.name}: paragraph ${i + 1} says what paragraph ${first + 1} already said — "${run}"`
+          )
+          if (first === undefined) saidIn.set(run, i)
+        }
+      })
+    }
+
+    /*
+     * AND A SPEC LINE NEVER APPEARS WITHOUT THE PARAGRAPHS UNDER IT.
+     *
+     * The page draws the line of facts above the writing, so an entry carrying
+     * only a spec line renders as a heading with nothing beneath it — which
+     * reads, to the person who just opened it, as a page that failed to load.
+     *
+     * This has to walk the whole catalog rather than `alsoDescribed`, which is
+     * filtered to entries that already have a description: the one shape this
+     * is looking for is precisely the one that list cannot contain, so asking
+     * it would be asking the wrong list and always getting a yes.
+     *
+     * The other way round is fine and deliberate. A model with nothing written
+     * about it says nothing at all, which is the honest answer rather than a
+     * gap.
+     */
+    for (const m of [...ampFams, ...everyCab, ...everyDrive]) {
+      if (!m.specs) continue
+      assert.ok(m.description, `${m.family || m.name}: a spec line with no description under it`)
     }
 
     const console_ = read('src/components/Console.jsx')
