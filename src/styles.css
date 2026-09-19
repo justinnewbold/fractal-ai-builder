@@ -1065,31 +1065,58 @@ input[type='text']:focus-visible {
     display: none;
   }
 
+  /*
+   * The name gets the room the bar is not using.
+   *
+   * "AXE-FX III cuts off. It looks like there's some room up there." Both
+   * halves right. It is ten characters and it was meeting a nine-character
+   * cap, and the room is real: the filler between the name and the version is
+   * 37px wide on that screen with 21 of them going spare.
+   *
+   * The cap was for the PRESET — a long name spending the eight characters
+   * the preset is guaranteed beside it. That is a real rule and it is kept
+   * below. What it was asking was the wrong question: it read the connection
+   * rather than the bar, so it went on defending room on every screen that
+   * does not carry a preset at all. Play is one, and on a phone Play is the
+   * only screen there is.
+   *
+   * Shrink rather than a fixed cap, so a long name on a narrow handset gives
+   * ground to the icons instead of pushing them off: full where it fits, an
+   * ellipsis where it does not, never over the edge.
+   *
+   * And the room the cap was not the whole of it. On a 360px Android — the
+   * commonest screen there is — the bar has exactly 80px to spend here and the
+   * name wanted 94. What came off is what came off the preset name the last
+   * time this bar ran out: the tracking, and one step of size onto `--f-1`,
+   * which is what the version and the chip beside it are already set in. Ten
+   * characters of a silkscreen face at 0.16em is nineteen pixels of air
+   * between letters; at 0.06em it is seven, and it still reads as the label it
+   * is. AXE-FX III then wants 76 of the 80, whole, with room to spare — and on
+   * a 320px handset, where nothing fits, even FM3 was being clipped.
+   */
   button.topbar-unit {
-    font-size: var(--f-2);
+    font-size: var(--f-1);
+    letter-spacing: 0.06em;
     padding: var(--s-1);
-    max-width: 9ch;
+    flex: 0 1 auto;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   /*
-   * A word that is not a name gets the room to be a word.
+   * And capped where the preset really is sharing the row, which is the case
+   * the cap was written for: a wide-enough window on which somebody has opened
+   * Edit, then narrowed it.
    *
-   * "It's cutting off the word, can you make it show the whole word no unit,
-   * and when it's loading it just says LOOKi…" Both true: nine characters of a
-   * tracked, capitalised display face is about five letters, so NO UNIT read
-   * "NO UN…" and Looking… read "LOOKI…" — and a cut-off word is worse than no
-   * word, because the half that survives says nothing.
-   *
-   * The cap is there for the unit's NAME while it is answering, where an
-   * "Axe-Fx III" would spend the preset's eight characters. When it is not
-   * answering there is no preset in this bar at all — it is drawn only at
-   * status live — so the middle of the bar is empty and the word can have it.
+   * Nine characters of a tracked, capitalised display face is about five
+   * letters, so this is also why the cap cannot be the everywhere rule — it
+   * cut NO UNIT to "NO UN…" and Looking… to "LOOKI…" when it was hung on the
+   * connection, and a half word says nothing at all.
    */
-  .topbar:not([data-status='live']):not([data-status='demo']) .topbar-unit {
-    max-width: none;
+  .topbar[data-preset='yes'] .topbar-unit {
+    max-width: 9ch;
   }
 
   button.save-options.compact {

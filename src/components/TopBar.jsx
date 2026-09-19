@@ -106,8 +106,20 @@ export default function TopBar({
           ? 'offline'
           : ''
 
+  /*
+   * Whether the preset is actually in this row, which is not the same question
+   * as whether there is a preset.
+   *
+   * It decides the cap on the unit's name on a phone, and the cap was reading
+   * the CONNECTION instead. "AXE-FX III cuts off" — ten characters against a
+   * nine-character cap, on the Play screen, where the preset is the tile below
+   * rather than anything in this bar. The cap was defending room nothing was
+   * using.
+   */
+  const presetInBar = status === 'live' && showPreset
+
   return (
-    <div className="topbar" data-status={lampState}>
+    <div className="topbar" data-status={lampState} data-preset={presetInBar ? 'yes' : 'no'}>
       <div className="topbar-row">
         <span className="lamp" data-state={lampState} />
         {/*
@@ -142,7 +154,7 @@ export default function TopBar({
 
         {/* The preset is a button because it's the thing you change most, and
             because a slot number nobody can act on is trivia. */}
-        {status === 'live' && showPreset ? (
+        {presetInBar ? (
           <button
             className={`topbar-preset ${presetsOpen ? 'open' : ''}`}
             onClick={onOpenPresets}

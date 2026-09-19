@@ -530,6 +530,49 @@ export function run(test) {
     assert.match(phone, /onPress=\{onOpenUnit \|\| onOpenSettings\}/, 'the phone still reads its unit name without pressing it')
   })
 
+  test('the bar says whether it is carrying a preset, and says it once', () => {
+    /*
+     * "In the top left corner where it shows the device name all of them look
+     * good except AXE FX III cuts off... most people will be using this from
+     * phones, and so it needs to be able to kind of show that all the way, so
+     * it looks clean."
+     *
+     * The cap on the name is a real rule — a long one must not spend the eight
+     * characters the preset name is promised beside it — and it was asking the
+     * wrong question. It read the CONNECTION, so it defended the preset's room
+     * on every screen that has no preset in this bar at all. Play is one of
+     * those, and on a phone Play is the only screen there is: the cap was
+     * guarding space nothing could ever use, and cutting a ten-character name
+     * to do it.
+     *
+     * So the bar says it outright, and the ONE condition that draws the preset
+     * is the same one that writes it down. Two conditions here would drift,
+     * and the way that drift shows up is a name cut short beside an empty half
+     * of the bar — which is exactly where this started.
+     */
+    const bar = readFileSync(new URL('../src/components/TopBar.jsx', import.meta.url), 'utf8')
+
+    assert.match(
+      bar,
+      /const presetInBar = status === 'live' && showPreset/,
+      'nothing decides, in one place, whether the preset is in this row'
+    )
+    assert.match(
+      bar,
+      /data-preset=\{presetInBar \? 'yes' : 'no'\}/,
+      'the bar no longer tells the stylesheet whether it is carrying a preset'
+    )
+    assert.match(bar, /\{presetInBar \? \(/, 'the preset is drawn off a second condition, which can disagree with the first')
+
+    /* And only the one. A second copy of the test is a second thing to keep in
+       step with the attribute. */
+    assert.equal(
+      (bar.match(/status === 'live' && showPreset/g) || []).length,
+      1,
+      'the condition that decides whether the preset is in the bar is written out more than once'
+    )
+  })
+
   test('the preset picker keeps its controls while the list runs past them', async () => {
     /*
      * "Can we lock the top portion of the part where it shows the numbers you
