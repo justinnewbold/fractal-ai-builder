@@ -130,11 +130,13 @@ jobs:
       # number and cut off every installed copy of the app to fix the thing
       # that stops installed copies being cut off.
       - name: Make it able to take updates
+        id: fp
         working-directory: mobile
         run: |
           set -euo pipefail
           hash="$(node -p "require('./fingerprint.json').android")"
           [ -n "$hash" ] || { echo "::error::No android fingerprint recorded."; exit 1; }
+          echo "hash=$hash" >> "$GITHUB_OUTPUT"
           mkdir -p android/app/src/main/assets
           printf '%s' "$hash" > android/app/src/main/assets/fingerprint
           python3 - "$hash" <<'PY'
@@ -223,11 +225,62 @@ jobs:
           printf '\n# Raised by .github/workflows/apk.yml — see the note there.\nkotlin.daemon.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=768m\n' >> gradle.properties
           grep jvmargs gradle.properties
 
+      # AND THE RUNTIME VERSION HAS TO SURVIVE THE BUILD, which it did not.
+      #
+      # "The Android app is still on 7.391.0." It was, and it always would
+      # have been: not one APK this workflow has ever produced could take an
+      # update, including the ones built after the step above was added to
+      # make exactly that work.
+      #
+      # `expo-updates` WRITES THAT ASSET ITSELF, during the gradle build, in
+      # createFingerprintForBuildAsync — and it recomputes the fingerprint
+      # rather than reading the one already sitting there. So the step above
+      # writes the right hash and gradle then overwrites it.
+      #
+      # What it computes is different, and it is different for a reason that
+      # is its own fault. The fingerprint hashes, among other things, the
+      # directory `node_modules/expo-updates/expo-updates-gradle-plugin` — and
+      # by the time gradle asks the question, gradle has compiled that plugin
+      # and left its build output inside that very directory. Building the app
+      # changes the number that identifies the app. Every APK therefore got a
+      # runtime version of its own:
+      #
+      #   published updates ask for   826b1b536206f9405d315fdfa1761986b60ade12
+      #   the 7.391.0 APK answered    35dd3dda164fc94d542d3d170cca62078137936b
+      #   the next APK answered       b39d9d5a517bb773d5350ba31508878a1fd68059
+      #
+      # A phone whose runtime version matches nothing is handed nothing, for
+      # ever, and is told nothing about it. That is the whole of why a handset
+      # sat on the version it was installed at while thirty changes went past.
+      #
+      # EXPO_UPDATES_FINGERPRINT_OVERRIDE is the supported way to say it: the
+      # same function checks it first and skips the recompute entirely. The
+      # value is the one `eas update` publishes under, straight out of
+      # fingerprint.json, so the two cannot drift.
       - name: Build it
         working-directory: mobile/android
+        env:
+          EXPO_UPDATES_FINGERPRINT_OVERRIDE: ${{ steps.fp.outputs.hash }}
         run: |
           chmod +x ./gradlew
           ./gradlew assembleRelease --no-daemon
+
+      # Proof rather than hope: read the runtime version back out of the APK
+      # that was actually built and hold it to the one updates go to. A silent
+      # mismatch here is invisible until a phone is sitting in front of you on
+      # last week's version.
+      - name: The APK asks for the updates that exist
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          want="$(node -p "require('./fingerprint.json').android")"
+          got="$(unzip -p android/app/build/outputs/apk/release/app-release.apk assets/fingerprint)"
+          echo "published under: $want"
+          echo "the APK asks for: $got"
+          [ "$want" = "$got" ] || {
+            echo "::error::This APK would never receive an update. Built $got, updates go to $want."
+            exit 1
+          }
 
       - name: Name it after the version
         id: apk

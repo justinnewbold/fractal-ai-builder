@@ -1053,6 +1053,62 @@ export function run(test) {
     )
   })
 
+  test('the APK asks for the updates that are actually published', () => {
+    /*
+     * "The Android app is still on 7.391.0."
+     *
+     * NOT ONE APK THIS WORKFLOW HAS EVER PRODUCED COULD TAKE AN UPDATE —
+     * including the ones built after the step beside this one was added to
+     * make exactly that work. That step writes the runtime version into
+     * `assets/fingerprint`, correctly. Then gradle overwrites it.
+     *
+     * `expo-updates` writes that asset itself during the build, in
+     * createFingerprintForBuildAsync, and it RECOMPUTES the fingerprint
+     * rather than reading the one already sitting there. What it computes is
+     * different, for a reason that is its own doing: the fingerprint hashes
+     * `node_modules/expo-updates/expo-updates-gradle-plugin`, and by the time
+     * gradle asks, gradle has compiled that plugin and left its build output
+     * inside that directory. Building the app changes the number that
+     * identifies the app.
+     *
+     *   published updates ask for   826b1b536206f9405d315fdfa1761986b60ade12
+     *   the 7.391.0 APK answered    35dd3dda164fc94d542d3d170cca62078137936b
+     *   the next APK answered       b39d9d5a517bb773d5350ba31508878a1fd68059
+     *
+     * A phone whose runtime version matches nothing is handed nothing, for
+     * ever, and is told nothing about it — which is the entire reason a
+     * handset sat on the version it was installed at while thirty changes
+     * went past it.
+     *
+     * The same function checks EXPO_UPDATES_FINGERPRINT_OVERRIDE first and
+     * skips the recompute, so that is what it is given, out of the same file
+     * `eas update` publishes under.
+     */
+    const apk = read('.github/workflows/apk.yml')
+
+    assert.match(
+      apk,
+      /EXPO_UPDATES_FINGERPRINT_OVERRIDE: \$\{\{ steps\.fp\.outputs\.hash \}\}/,
+      'the build recomputes the runtime version again, and gets one no published update is addressed to'
+    )
+
+    /* And that value is the published one rather than a second opinion. */
+    const fp = apk.slice(apk.indexOf('id: fp'), apk.indexOf('\n      - name:', apk.indexOf('id: fp')))
+    assert.match(fp, /fingerprint\.json/, 'the override is not the hash updates are published under')
+    assert.match(fp, /echo "hash=\$hash" >> "\$GITHUB_OUTPUT"/, 'nothing hands the hash to the build step')
+
+    /*
+     * AND IT IS READ BACK OUT OF THE FINISHED APK. This failed silently for
+     * every build there has ever been; the only honest guard is opening the
+     * artefact and asking it, which is what a phone does.
+     */
+    const at = apk.indexOf('The APK asks for the updates that exist')
+    assert.notEqual(at, -1, 'nothing checks the APK can take an update, which is how this went unnoticed for thirty versions')
+    const step = apk.slice(at, apk.indexOf('\n      - name:', at))
+    assert.match(step, /unzip -p .*assets\/fingerprint/, 'the check does not read the runtime version out of the APK itself')
+    assert.match(step, /exit 1/, 'a mismatch is reported and the build goes green anyway')
+  })
+
   test('an APK is built able to take the updates that are published', () => {
     /*
      * "The android app is still on 3.171. It's supposed to be doing updates,
