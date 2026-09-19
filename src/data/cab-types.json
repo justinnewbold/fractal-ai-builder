@@ -4,314 +4,359 @@
     "name": "1x8 5F1 TWEED",
     "manufacturer": null,
     "basedOn": null,
-    "description": "A single eight-inch speaker in a small tweed box. Almost no low end, all midrange — which is why tiny amps record so well."
+    "specs": "1x8 open back · tweed Champ",
+    "description": "A single eight-inch speaker in a small open-backed tweed box, and one of the most recorded sounds in this list.\n\nEight inches cannot move much air and cannot reproduce much low end, which sounds like a fault and is the whole point: what comes out is mid-range, focused, and it sits in a mix without being EQ'd first.\n\nSmall does not mean quiet on tape. A great many famous solos were cut through one of these."
   },
   {
     "value": 1,
     "name": "1x8 PRINCETONE",
     "manufacturer": null,
     "basedOn": null,
-    "description": "The smallest Fender cabinet. Boxy and mid-forward, and it sounds far bigger through a microphone than in the room."
+    "specs": "1x8 open back · Princeton",
+    "description": "The smallest Fender cabinet, boxy and mid-forward with very little bottom end.\n\nIt has a particular honk to it that a bigger cabinet will not give you. Useful when a guitar needs to cut rather than fill."
   },
   {
     "value": 2,
     "name": "1x10 BF PRINCETONE",
     "manufacturer": null,
     "basedOn": null,
-    "description": "A blackface ten-inch. Tight and clear with a little more bottom than an eight, and still very easy to record."
+    "specs": "1x10 open back · blackface",
+    "description": "A blackface ten-inch: tight and clear, with a little more low end and a good deal more clarity than the eight.\n\nTen inches is the size where a Fender starts sounding like the records — fast attack, glassy top, and enough body underneath to hold a chord."
   },
   {
     "value": 3,
     "name": "1x10 METRO BLUES",
     "manufacturer": null,
     "basedOn": null,
-    "description": "A small Mesa ten-inch — rounder and less aggressive than the Fender equivalents."
+    "specs": "1x10 open back · Mesa",
+    "description": "A small Mesa ten-inch — rounder and less aggressive than the Fender tens, with a softer top end.\n\nBoogie voiced their small cabinets away from the glassy Fender sound on purpose."
   },
   {
     "value": 4,
     "name": "1x10 SF PRINCETONE",
     "manufacturer": null,
     "basedOn": null,
-    "description": "The silverface ten-inch. A touch brighter and stiffer than the blackface cabinet."
+    "specs": "1x10 open back · silverface",
+    "description": "The silverface ten-inch, a touch brighter and stiffer than the blackface version.\n\nFender changed the circuits and the cabinets across that era. The difference is small and audible: this one has a little more edge and a little less give."
   },
   {
     "value": 5,
     "name": "1x12 AC20",
     "manufacturer": null,
     "basedOn": null,
-    "description": "A boutique twelve voiced for chime — open and airy, with the top end left alone."
+    "specs": "1x12 open back · Morgan",
+    "description": "A boutique twelve voiced for chime: open, airy and quick, with the British top end intact.\n\nThe single-speaker version of the AC30 idea, which is more useful in a small room than the pair."
   },
   {
     "value": 6,
     "name": "1x12 BLACK MAGICK",
     "manufacturer": null,
     "basedOn": null,
-    "description": "A Supro twelve. Dark, loose and characterful, nothing like a Fender or a Marshall."
+    "specs": "1x12 open back · Supro",
+    "description": "A Supro twelve: dark, loose and characterful, and nothing like a Fender of the same size.\n\nSupro cabinets roll off both ends and leave a thick midrange, which is why those small amps sound so much bigger on tape than they do in the room."
   },
   {
     "value": 7,
     "name": "1x12 CAR AMBLER",
     "manufacturer": null,
     "basedOn": null,
-    "description": "An American-voiced boutique twelve with a clear top end and plenty of low end for its size."
+    "specs": "1x12 open back · boutique American",
+    "description": "An American-voiced boutique twelve with a clear top end and more low-end control than a vintage Fender cabinet.\n\nModern build quality applied to an old idea: the same voice with less of the rattle."
   },
   {
     "value": 8,
     "name": "1x12 DELUXE TWEED",
     "manufacturer": null,
     "basedOn": null,
-    "description": "The tweed Deluxe cabinet. Warm and soft-edged, and it compresses when pushed."
+    "specs": "1x12 open back · tweed Deluxe",
+    "description": "The tweed Deluxe cabinet: warm, soft-edged, and quick to give way at the bottom when you push it.\n\nThat softness is not a limitation being modelled, it is the sound. The cabinet compresses along with the amp, and the two together are why a 5E3 feels alive under your hands."
   },
   {
     "value": 9,
     "name": "1x12 DELUXE VERB",
     "manufacturer": null,
     "basedOn": null,
-    "description": "The Deluxe Reverb cabinet — the reference twelve-inch clean sound, and on a huge number of records."
+    "specs": "1x12 open back · Deluxe Reverb",
+    "description": "The Deluxe Reverb cabinet, and the reference twelve-inch American sound.\n\nOpen backed, so it throws sound behind it as well as in front — which is why a Deluxe sounds bigger in a room than its size suggests and why it is harder to mic than a closed cabinet.\n\nIf you do not know which cab to choose, this or the Recto slant will cover most of what you need."
   },
   {
     "value": 10,
     "name": "1x12 DIV13 CJ11",
     "manufacturer": null,
     "basedOn": null,
-    "description": "A small boutique twelve, voiced for touch response rather than volume."
+    "specs": "1x12 open back · boutique",
+    "description": "A small boutique twelve voiced for touch response rather than volume.\n\nIt gives way early and evenly, which suits the low-powered amps it belongs to."
   },
   {
     "value": 11,
     "name": "1x12 G12T-100",
     "manufacturer": null,
     "basedOn": null,
-    "description": "A single Celestion G12T-100 — a high-power speaker with a scooped, modern voice made for heavy music."
+    "specs": "1x12 · Celestion G12T-100",
+    "description": "A single Celestion G12T-100 — a high-power speaker with a scooped midrange and a firm, deep bottom end.\n\nDesigned to survive modern amps rather than to colour them, and it is the reason a lot of eighties and nineties rigs sound the way they do."
   },
   {
     "value": 12,
     "name": "1x12 HOT KITTY",
     "manufacturer": null,
     "basedOn": null,
-    "description": "A boutique British-voiced twelve, brighter and more cutting than a Greenback."
+    "specs": "1x12 open back · Bad Cat",
+    "description": "A boutique British-voiced twelve, brighter and more forward than a Vox cabinet.\n\nBuilt to keep up with the amount of gain the amps it was made for produce."
   },
   {
     "value": 13,
     "name": "1x12 JR BLUES",
     "manufacturer": null,
     "basedOn": null,
-    "description": "The Blues Junior cabinet. Small, slightly boxy, and it starts to flap when you push it — which many people like."
+    "specs": "1x12 open back · Blues Junior",
+    "description": "The Blues Junior cabinet: small, slightly boxy, and a little honky in the mids.\n\nIt is the sound of a cheap amp in a good way — direct, unpolished, and on an enormous number of bar stages."
   },
   {
     "value": 14,
     "name": "1x12 NUCLEAR TONE",
     "manufacturer": null,
     "basedOn": null,
-    "description": "A small dark twelve, made for the atmospheric reverb sounds the amp is known for."
+    "specs": "1x12 open back · Swart",
+    "description": "A small dark twelve, made for the atmospheric reverb-and-tremolo amps it usually sits under.\n\nIt rolls the top off early, which is exactly what you want when the amp is already busy."
   },
   {
     "value": 15,
     "name": "1x12 SCHOLZ",
     "manufacturer": null,
     "basedOn": null,
-    "description": "The twelve behind Tom Scholz's Boston sound — smooth and thick, with the harshness gone."
+    "specs": "1x12 · Boston voicing",
+    "description": "The twelve behind Tom Scholz's Boston sound — smooth, thick, and unusually even across the midrange.\n\nThat record's guitar sound is famously hard to place, and the cabinet is a bigger part of it than most people assume."
   },
   {
     "value": 16,
     "name": "1x12 TWEED 20112",
     "manufacturer": null,
     "basedOn": null,
-    "description": "A tweed-era twelve with a soft top end and a gentle midrange push."
+    "specs": "1x12 open back · tweed era",
+    "description": "A tweed-era twelve with a soft top end and a gentle low-end roll-off.\n\nLess hi-fi than the blackface cabinets that replaced it, and more forgiving of a bright guitar."
   },
   {
     "value": 17,
     "name": "1x12 VIBRATO LUX",
     "manufacturer": null,
     "basedOn": null,
-    "description": "A brown-panel twelve — warmer and looser than a blackface cabinet."
+    "specs": "1x12 open back · brown panel",
+    "description": "A brown-panel twelve — warmer and looser than a blackface cabinet, with more midrange and a softer top.\n\nThe brown-era Fenders are collected for this voicing as much as for their circuits."
   },
   {
     "value": 18,
     "name": "1x15 HEART KEY",
     "manufacturer": null,
     "basedOn": null,
-    "description": "A fifteen-inch speaker: rounder and slower than a twelve, with a low end that moves more air."
+    "specs": "1x15 open back",
+    "description": "A fifteen-inch speaker: rounder and slower than a twelve, with a bigger bottom and a darker top.\n\nThe size that fell out of fashion for guitar and is worth revisiting when a twelve sounds too quick and too bright."
   },
   {
     "value": 19,
     "name": "1x15 PORTABASS",
     "manufacturer": null,
     "basedOn": null,
-    "description": "A compact bass fifteen, voiced for clarity rather than weight."
+    "specs": "1x15 · bass",
+    "description": "A compact bass fifteen voiced for clarity rather than weight — more midrange and less of the enormous bottom a big rig gives you.\n\nMade for hearing the note rather than feeling it, which on a small stage is the more useful trade."
   },
   {
     "value": 20,
     "name": "1x15 VIBROVERB",
     "manufacturer": null,
     "basedOn": null,
-    "description": "The Vibroverb's fifteen. Looser and fatter than any Fender twelve, and a blues favourite for exactly that."
+    "specs": "1x15 open back · Fender",
+    "description": "The Vibroverb's fifteen-inch speaker: looser and fatter than any twelve, with a slower attack.\n\nFifteen inches moves a lot of air and takes longer to do it, which rounds the pick attack off and thickens everything underneath. Stevie Ray Vaughan's sound leans on this."
   },
   {
     "value": 21,
     "name": "2x10 HEART KEY",
     "manufacturer": null,
     "basedOn": null,
-    "description": "Two tens — tighter and faster than a twelve, with a midrange that cuts."
+    "specs": "2x10 open back",
+    "description": "Two tens — tighter and faster than a twelve, with a firmer low end and more upper-mid attack.\n\nA good choice when a twelve is swallowing the pick."
   },
   {
     "value": 22,
     "name": "2x10 SUPER 6G4",
     "manufacturer": null,
     "basedOn": null,
-    "description": "The brown Super's pair of tens. Punchy, mid-forward, and it stays defined when pushed."
+    "specs": "2x10 open back · brown Super",
+    "description": "The brown Super's pair of tens: punchy, mid-forward and faster than any twelve.\n\nTwo tens cover roughly the same cone area as one twelve but respond quicker, which is why the four-ten and two-ten Fenders bite in a way the twelves do not."
   },
   {
     "value": 23,
     "name": "2x12 5153 STEALTH",
     "manufacturer": null,
     "basedOn": null,
-    "description": "A modern two-by-twelve voiced for the EVH amps — tight, scooped and aimed at heavy playing."
+    "specs": "2x12 closed back · EVH Stealth",
+    "description": "A modern two-by-twelve voiced for the EVH amps: tight, controlled, and considerably more manageable than the four.\n\nTwo closed-back twelves give up some low end and almost none of the focus."
   },
   {
     "value": 24,
     "name": "2x12 65 BASSGUY",
     "manufacturer": null,
     "basedOn": null,
-    "description": "A blackface two-by-twelve. Clean, firm and uncoloured, which makes it a good platform for pedals."
+    "specs": "2x12 open back · blackface",
+    "description": "A blackface two-by-twelve: clean, firm and about as uncoloured as a guitar cabinet gets.\n\nIt adds very little of its own, which makes it the right choice when the amp or the pedals in front of it are doing the talking."
   },
   {
     "value": 25,
     "name": "2x12 CHIEFMAN",
     "manufacturer": null,
     "basedOn": null,
-    "description": "A boutique British two-by-twelve with chime and considerable headroom."
+    "specs": "2x12 open back · Matchless",
+    "description": "A boutique British two-by-twelve with chime and control — the Vox idea built to a much higher standard.\n\nTighter and less rattly than the cabinet it descends from, with the same open top end."
   },
   {
     "value": 26,
     "name": "2x12 CLASS-A 30W",
     "manufacturer": null,
     "basedOn": null,
-    "description": "The AC30 cabinet, with its Celestion Blues. Chimey, compressed, and the reason a Vox sounds like a Vox."
+    "specs": "2x12 open back · Celestion Blue",
+    "description": "The AC30 cabinet, with its alnico Celestion Blues, and one of the few speakers famous enough to be bought on its own.\n\nAlnico magnets compress earlier and more musically than ceramic ones, so the speaker starts to give at the same time the amp does. That combined softening is the chime everyone means when they say AC30.\n\nBright, open and slightly ragged when pushed. Nothing else sounds like it."
   },
   {
     "value": 27,
     "name": "2x12 DOUBLE VERB",
     "manufacturer": null,
     "basedOn": null,
-    "description": "The Twin Reverb cabinet — big, clean and bright, the standard against which clean is measured."
+    "specs": "2x12 open back · Twin Reverb",
+    "description": "The Twin Reverb cabinet — big, clean and bright, with the most headroom of any Fender.\n\nTwo twelves in a wide open-backed box, which is why a Twin fills a room the way it does and why it is difficult to make one sound small."
   },
   {
     "value": 28,
     "name": "2x12 LEAD 80",
     "manufacturer": null,
     "basedOn": null,
-    "description": "A pair of Celestion Lead 80s — a harder, more modern voice than a vintage Celestion."
+    "specs": "2x12 · Celestion Lead 80",
+    "description": "A pair of Celestion Lead 80s: harder and more modern than a Greenback, with a sharper attack.\n\nWhere a vintage speaker softens the pick, this one does not."
   },
   {
     "value": 29,
     "name": "2x12 TEXAS STAR",
     "manufacturer": null,
     "basedOn": null,
-    "description": "Mesa's two-by-twelve. Tight and even, with more low-end control than most open-backed cabinets."
+    "specs": "2x12 · Mesa Lone Star",
+    "description": "Mesa's two-by-twelve: tight and even, with more low-end control than a Fender cabinet of the same size.\n\nBoogie build their cabinets stiffer, and it shows in how little the bottom end wanders."
   },
   {
     "value": 30,
     "name": "4x10 BASSGUY RI",
     "manufacturer": null,
     "basedOn": null,
-    "description": "The Bassman's four tens. The cabinet that made both blues guitar and early rock — punchy, mid-rich and loud."
+    "specs": "4x10 open back · tweed Bassman",
+    "description": "The Bassman's four tens, and the cabinet that made both American blues and British rock possible.\n\nFour ten-inch speakers in an open-backed box give you the punch of a small speaker with the air of a big one, and a midrange that cuts through anything. Jim Marshall copied the amp; everybody copied the cabinet.\n\nStill the best-sounding cabinet Fender ever built."
   },
   {
     "value": 31,
     "name": "4x12 1960TV",
     "manufacturer": null,
     "basedOn": null,
-    "description": "The tall Marshall cabinet. Greenbacks, a deeper box, and a rounder low end than the later slant cabs."
+    "specs": "4x12 closed back · Celestion Greenback",
+    "description": "The tall Marshall cabinet with Greenbacks — the original four-by-twelve and the thing that made a Marshall a Marshall.\n\nClosed back, so all of it comes forward, and the extra height gives a deeper bottom end than the squat cabinets that replaced it. Greenbacks are only rated twenty-five watts each, which means they distort along with the amp rather than staying clean under it.\n\nThat speaker distortion is half of every classic British rock guitar sound ever recorded."
   },
   {
     "value": 32,
     "name": "4x12 5153",
     "manufacturer": null,
     "basedOn": null,
-    "description": "The EVH four-by-twelve — modern, tight and built for high gain."
+    "specs": "4x12 closed back · EVH",
+    "description": "The EVH four-by-twelve: modern, tight and built for the amp that shares its name.\n\nControlled low end and a forward upper midrange, with less of the Recto cabinet's enormous bottom."
   },
   {
     "value": 33,
     "name": "4x12 5153 STEALTH",
     "manufacturer": null,
     "basedOn": null,
-    "description": "The Stealth version of the EVH cabinet, voiced a little darker."
+    "specs": "4x12 closed back · EVH Stealth",
+    "description": "The Stealth version of the EVH cabinet, voiced a little darker and smoother than the standard one.\n\nTakes the edge off a bright high-gain amp without losing the tightness."
   },
   {
     "value": 34,
     "name": "4x12 CITRUS",
     "manufacturer": null,
     "basedOn": null,
-    "description": "Orange's four-by-twelve. Thick, woody and mid-heavy, with none of the Marshall bite."
+    "specs": "4x12 closed back · Orange",
+    "description": "Orange's four-by-twelve: thick, woody and mid-heavy, with far less top end than a Marshall cabinet.\n\nIt pushes where others scoop, which is why an Orange rig stays audible under a loud band without needing to be brighter than everything else."
   },
   {
     "value": 35,
     "name": "4x12 FRIEDMAN GB",
     "manufacturer": null,
     "basedOn": null,
-    "description": "Friedman's cabinet with Greenbacks — vintage British voicing with modern build."
+    "specs": "4x12 closed back · Greenback",
+    "description": "Friedman's cabinet loaded with Greenbacks — vintage British voicing built to modern tolerances.\n\nThe old speaker's early break-up and midrange bark, in a cabinet that does not rattle itself apart."
   },
   {
     "value": 36,
     "name": "4x12 FRIEDMAN V30",
     "manufacturer": null,
     "basedOn": null,
-    "description": "The same cabinet with Vintage 30s: brighter, harder and with a pronounced upper midrange."
+    "specs": "4x12 closed back · Vintage 30",
+    "description": "The same Friedman cabinet with Vintage 30s: brighter, harder and considerably tighter.\n\nV30s have a pronounced upper-midrange peak that cuts through a dense mix, which is why they became the default for modern high gain. Swapping between this and the Greenback version changes more than most amp settings will."
   },
   {
     "value": 37,
     "name": "4x12 LERXST",
     "manufacturer": null,
     "basedOn": null,
-    "description": "The cabinet behind Alex Lifeson's sound — British-voiced with a clear, articulate top end."
+    "specs": "4x12 closed back · British",
+    "description": "The cabinet behind Alex Lifeson's sound: British-voiced, with a clear top end and an unusually open midrange for a four-by-twelve.\n\nRush records have a guitar sound that sits oddly high and wide, and this is a large part of why."
   },
   {
     "value": 38,
     "name": "4x12 RECTO SLANT",
     "manufacturer": null,
     "basedOn": null,
-    "description": "Mesa's slant Rectifier cab with Vintage 30s. The nineties and after: tight, aggressive and directional."
+    "specs": "4x12 slant · Vintage 30",
+    "description": "Mesa's slant Rectifier cabinet with Vintage 30s, and the single most recorded high-gain cabinet of the last thirty years.\n\nIt is oversized and heavily braced, which extends the low end well below where a Marshall cabinet stops — that enormous bottom is the Recto sound as much as the amp is.\n\nIf you are chasing a modern heavy guitar tone, start here."
   },
   {
     "value": 39,
     "name": "4x12 RECTO STRAIGHT",
     "manufacturer": null,
     "basedOn": null,
-    "description": "The straight Rectifier cabinet — the same speakers with a little more low end than the slant."
+    "specs": "4x12 straight · Vintage 30",
+    "description": "The straight Rectifier cabinet — same speakers, different box, and a noticeably different sound.\n\nThe straight front is a little tighter and more focused in the low end than the slant, which is why most rigs stack one of each and mic the one that suits the part."
   },
   {
     "value": 40,
     "name": "4x12 RUMBLE EV12L",
     "manufacturer": null,
     "basedOn": null,
-    "description": "A four-by-twelve with EV12Ls. Enormous headroom and a very flat response — the hi-fi end of guitar cabinets."
+    "specs": "4x12 closed back · EV12L",
+    "description": "A four-by-twelve with Electro-Voice EV12Ls — enormous headroom, a flat response and almost no speaker distortion at all.\n\nEVs are rated at two hundred watts each and simply do not give way, so everything you hear is the amp. That makes them brutally honest and the reason players who want clarity at volume choose them.\n\nVery different from a Greenback, which is most of the sound."
   },
   {
     "value": 41,
     "name": "4x12 RUMBLE EV12S",
     "manufacturer": null,
     "basedOn": null,
-    "description": "The other EV loading, with a slightly softer top end."
+    "specs": "4x12 closed back · EV12S",
+    "description": "The other EV loading, with a slightly softer top end than the EV12L and the same refusal to distort.\n\nThe friendlier of the two if the L sounds too clinical."
   },
   {
     "value": 42,
     "name": "4x12 SOLO 100",
     "manufacturer": null,
     "basedOn": null,
-    "description": "The Soldano cabinet — smooth, even, and voiced to flatter high gain rather than sharpen it."
+    "specs": "4x12 closed back · Soldano",
+    "description": "The Soldano cabinet: smooth, even, and voiced to flatter the enormous sustain of the amp it was built for.\n\nLess aggressive in the upper mids than a V30 cabinet, which keeps a saturated lead sound from getting shrill."
   },
   {
     "value": 43,
     "name": "4x12 USA MC90",
     "manufacturer": null,
     "basedOn": null,
-    "description": "Mesa's cabinet with MC90s. Warmer and less scooped than a Vintage 30 cab."
+    "specs": "4x12 closed back · Mesa MC90",
+    "description": "Mesa's cabinet with MC90s: warmer and less scooped than a Vintage 30 loading, with a fuller midrange.\n\nA better match for the Mark series than the Recto cabinet is."
   },
   {
     "value": 44,
     "name": "8x10 SV BASS",
     "manufacturer": null,
     "basedOn": null,
-    "description": "The Ampeg fridge. Eight tens moving as one — the loud bass cabinet, and the one on most rock records."
+    "specs": "8x10 sealed · Ampeg",
+    "description": "The Ampeg fridge: eight ten-inch speakers in a sealed cabinet, and the standard by which rock bass is measured.\n\nEight tens move as much air as a much larger speaker while keeping the fast attack of a small one, and the sealed box gives the low end a tightness that a ported cabinet cannot. The result is a bass you feel and still hear.\n\nIt weighs about as much as a person and nobody has found a reason to replace it."
   }
 ]
