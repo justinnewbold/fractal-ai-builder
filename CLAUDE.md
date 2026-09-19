@@ -35,6 +35,25 @@ jargon to make sense, the question is not finished yet.
 Give options as plain choices with the consequence attached, and say which
 one you would pick.
 
+**Give him the Android download link every time he needs one.**
+
+> "Give me the direct download link for the android build. And always give
+> me that link if I have to re-download."
+
+The APK lands on a GitHub Releases page, and the link to it is a link he
+taps on the handset — that is the whole of the install. So it is not enough
+to say a new APK is ready, or to name the version: paste the URL.
+
+The shape is fixed and the version is the only part that moves:
+
+```
+https://github.com/justinnewbold/fractal-ai-builder/releases/download/apk-v<VERSION>/fractal-remote-v<VERSION>.apk
+```
+
+Anything that ends with him needing to install an APK — a native change, a
+fresh phone, a build that had to be redone — ends with that link in the
+reply. He should never have to go and find it.
+
 **Never start an Expo build without asking him first.**
 
 > "I have a very limited amount of free expo builds for iOS so I need to make
