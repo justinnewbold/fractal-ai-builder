@@ -7316,6 +7316,61 @@ button.gig-bar-btn:disabled {
   background: var(--panel-deep, rgba(255, 255, 255, 0.04));
 }
 
+/* ---------- the hosted site: a way to get the app, not the app ---------- */
+
+/*
+ * One column, generous, and readable on a phone held in a shop. This is the
+ * only screen in the app somebody sees before they have decided anything, so
+ * it is the one place a line length matters more than a tap target.
+ */
+.get-app {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: var(--s-4) var(--s-3) var(--s-5);
+  display: grid;
+  gap: var(--s-4);
+}
+
+.get-app h1 {
+  font-family: var(--display);
+  font-size: var(--f-5);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.get-app h2 {
+  font-size: var(--f-3);
+  margin: 0 0 var(--s-2);
+}
+
+.get-app .lead {
+  font-size: var(--f-3);
+  color: var(--silk-dim);
+  margin: 0;
+}
+
+/* The code somebody arrived holding, which must not be the smallest thing on
+   the page — they are about to type it into another device. */
+.get-app-pair {
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2);
+  padding: var(--s-3);
+  background: var(--panel);
+}
+
+.get-app-ways {
+  margin: 0 0 var(--s-3);
+  padding-left: var(--s-4);
+  display: grid;
+  gap: var(--s-1);
+}
+
+.get-app a.primary {
+  display: inline-block;
+  text-decoration: none;
+}
+
 /* The other way in, folded: it is for a web browser rather than the app, and
    only while both are on this wifi. Two squares an inch apart is a camera
    choosing for you — see PhoneQr. */

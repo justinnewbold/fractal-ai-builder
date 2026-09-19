@@ -4329,4 +4329,60 @@ export function run(test) {
     assert.match(scan, /looksLikeTheWifiSquare/, 'the scanner no longer recognises the wrong square')
   })
 
+  test('the hosted site is a way to get the app, not the app', async () => {
+    /*
+     * "We are getting rid of the web app accessibility, I know that app is
+     * needed for the computer app to work, but it's going to require an
+     * actual app download. We don't want it accessible from their browser
+     * directly."
+     *
+     * THE BUNDLE IS UNCHANGED AND THAT IS THE POINT. The desktop apps serve
+     * this very build from the machine holding the cable — that is what they
+     * are — so the app cannot be deleted without deleting them. What can be
+     * decided is WHERE it agrees to run.
+     */
+    const main = readFileSync(new URL('../src/main.jsx', import.meta.url), 'utf8')
+    assert.match(main, /const shopFront = isHostedOrigin\(\) && !isStandalone\(\)/, 'nothing decides where the app may run')
+    assert.match(main, /\{shopFront \? <GetTheApp \/> : <App \/>\}/, 'the app still mounts on the hosted site')
+
+    /*
+     * The test is the HOSTNAME, which is what leaves every other way in
+     * untouched. Run through the cases that must still work, because each of
+     * them is somebody who has paid or downloaded something.
+     */
+    const { isHostedOrigin, isStandalone, HOSTED } = await import('../src/lib/platform.js')
+    const at = (hostname, extra = {}) => ({ location: { hostname }, navigator: {}, ...extra })
+
+    assert.equal(isHostedOrigin(at(HOSTED)), true, 'the hosted site is not recognised')
+    /* The desktop app serves this bundle from the machine with the cable. */
+    assert.equal(isHostedOrigin(at('localhost')), false, 'the desktop app would lose the app')
+    assert.equal(isHostedOrigin(at('127.0.0.1')), false, 'the desktop app would lose the app')
+    /* A phone on the same wifi opens the computer's own address. */
+    assert.equal(isHostedOrigin(at('192.168.1.40')), false, 'the same-wifi route would lose the app')
+    assert.equal(isHostedOrigin(at('studio.local')), false, 'the same-wifi route would lose the app')
+
+    /* And somebody who installed it to their home screen already keeps it:
+       taking that away is taking something from a person who has it. */
+    assert.equal(isStandalone(at(HOSTED, { navigator: { standalone: true } })), true, 'an installed copy is not recognised')
+
+    /*
+     * A PAIRING CODE IN THE ADDRESS IS STILL HONOURED. The squares a computer
+     * shows carry `#pair=CODE`, and a phone CAMERA pointed at one lands here
+     * — so the page reads it back out rather than silently dropping the one
+     * thing the person arrived with.
+     */
+    const page = readFileSync(new URL('../src/components/GetTheApp.jsx', import.meta.url), 'utf8')
+    assert.match(page, /pairCodeFromUrl\(/, 'a scanned pairing code is dropped on the floor')
+    assert.match(page, /formatPairCode\(code\)/, 'the code is never shown to be typed in')
+    const { pairLink, pairCodeFromUrl } = await import('../shared/pairing.mjs')
+    const link = pairLink('abcd2345')
+    assert.ok(link, 'there is no pairing link to land here')
+    assert.ok(pairCodeFromUrl({ hash: new URL(link).hash }), 'the page could not read back the code its own links carry')
+
+    /* It offers the downloads, and says which routes exist rather than
+       counting them by hand — see ways-in. */
+    assert.match(page, /RELEASES/, 'there is nowhere to download the computer app')
+    assert.match(page, /waysWord\(\)/, 'the page types the number of ways rather than counting them')
+  })
+
 }
