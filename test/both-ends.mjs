@@ -373,6 +373,13 @@ export const AREAS = [
         unreadable: ['web', 'phone']
       },
       {
+        does: 'move a song up or down the running order',
+        web: 'Move <name> — hold and drag, or use the arrow keys',
+        phone: 'Drag <name>',
+        unreadable: ['web', 'phone'],
+        why: 'the same grip and the same gesture at both ends; the browser also answers the arrow keys, because a grip that only takes a pointer takes the running order away from anybody driving it with a keyboard, which is not a thing a phone has'
+      },
+      {
         does: 'read the preset list off the unit again',
         web: null,
         phone: 'Refresh',

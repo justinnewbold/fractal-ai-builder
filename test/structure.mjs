@@ -618,6 +618,70 @@ export function run(test) {
     assert.ok(new Set(names).size > 1, 'all five demo units open on the same preset name')
   })
 
+  test('a song is dragged up the running order, in the browser too', () => {
+    /*
+     * "I thought we updated this to where presets or setlist could be
+     * rearranged by just dragging and dropping. I don't know if this is just
+     * only in the demo version or on the web app."
+     *
+     * Half right, and the half that was missing is the browser. The phone has
+     * dragged setlist songs since setlists arrived; the browser kept a pair of
+     * arrows. Same seam as the demo unit picker, the other way round.
+     *
+     * AND THE ARROWS LOOKED BROKEN, which is how this surfaced. With one song
+     * in a list they are both disabled, and a disabled arrow looks exactly
+     * like an arrow that does not work — "the little arrows to go up and down
+     * don't work" is the phone hearing the same complaint before it changed.
+     * A single song now gets no grip at all rather than a control that cannot
+     * do anything.
+     */
+    const web = readFileSync(new URL('../src/components/Setlists.jsx', import.meta.url), 'utf8')
+    assert.ok(!/setlist-move/.test(web), 'the browser still moves songs with arrows')
+    assert.match(web, /className="setlist-grip"/, 'the browser has no grip to drag a song with')
+    assert.match(web, /chosen\.presets\.length > 1 \? \(/, 'a list of one song still draws a control that can do nothing')
+
+    /*
+     * The chain editor's maths, out of shared/, so a song lands where a block
+     * would. A second landing rule in one app is a second feel to learn.
+     */
+    assert.match(web, /from '\.\.\/\.\.\/shared\/lane-order\.mjs'/, 'the browser rolled its own landing maths')
+    for (const on of ['onPointerDown', 'onPointerMove', 'onPointerUp', 'onPointerCancel']) {
+      assert.ok(web.includes(on), `the grip does not handle ${on}, so a drag starts or ends somewhere it should not`)
+    }
+    assert.match(web, /setPointerCapture/, 'the drag dies the moment the pointer leaves the grip')
+
+    /* And by keyboard, which the arrows did and a bare pointer grip would not. */
+    assert.match(web, /const gripKey = /, 'the running order is now pointer-only')
+    assert.match(web, /ArrowUp/, 'the grip does not answer the up arrow')
+
+    /*
+     * ONLY THE LISTS SOMEBODY MADE. "For starred items and when it shows all,
+     * you can leave those in order where they can't be rearranged." True by
+     * construction rather than by a flag: this editor is drawn for `chosen`,
+     * which is looked up in the setlists, and All presets and Starred are
+     * sources rather than setlists — there is nothing here to drag them with.
+     */
+    assert.match(
+      web,
+      /const chosen = lists\.find\(\(l\) => l\.id === source\) \|\| null/,
+      'the song editor is no longer tied to a list somebody made, so slot order may be draggable'
+    )
+
+    /* The grip has to be styled, and has to take the gesture off the page:
+       without touch-action the browser claims it as a scroll and the row
+       never moves at all on the one device this was asked for. */
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+    const rule = css.slice(css.indexOf('button.setlist-grip {'))
+    assert.notEqual(rule.indexOf('button.setlist-grip {'), -1, 'the grip has no styling at all')
+    assert.match(rule.slice(0, rule.indexOf('}')), /touch-action: none/, 'a drag on a phone scrolls the sheet instead of moving the song')
+
+    /* The carried row is opaque. Translated out of the list it passes over the
+       search box below, and a see-through row prints its name on top of
+       "Find a preset" — two rows in one place rather than one being moved. */
+    const lifted = css.slice(css.indexOf('.setlist-song.lifted {'))
+    assert.match(lifted.slice(0, lifted.indexOf('}')), /background:/, 'the row being dragged is see-through')
+  })
+
   test('the block editor arrives over the screen, not below it', () => {
     /*
      * It used to be the last row of the console grid. Tapping a block on a
