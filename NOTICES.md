@@ -7,7 +7,7 @@ it carries the notices those licences require rather than pointing at them.
 actually installed, and a test fails if it is stale. Edit the sources, not
 this.
 
-Last generated: 2026-09-18
+Last generated: 2026-09-19
 
 ---
 
