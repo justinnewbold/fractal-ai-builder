@@ -950,7 +950,7 @@ export function run(test) {
      */
     const support = read('public/support.html')
     assert.match(support, /justinnewbold@gmail\.com/, 'the support page offers no way to reach anybody')
-    assert.match(support, /Tell us/, 'the support page never points at the in-app report')
+    assert.match(support, /Feedback/, 'the support page never points at the in-app report')
     assert.match(support, /privacy\.html/, 'the support page does not link the privacy policy')
 
     /* Linked both ways, so somebody landing on either finds the other. */

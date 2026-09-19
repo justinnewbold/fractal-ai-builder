@@ -2855,7 +2855,7 @@ button.gig-name:disabled .gig-name-caret {
   color: var(--silk);
 }
 
-/* "Source", small, over the name: what the button is for. */
+/* "Setlists", small, over the name: what the button is for. */
 .gig-nav-source-kind {
   font-family: var(--display);
   font-weight: 700;

@@ -642,7 +642,7 @@ export function run(test) {
     assert.match(lists, /listsForIn\(device, sync\)/, 'lib/lists is not handing the storage down')
   })
 
-  test('Previous and Next on the phone follow the setlist, and the SOURCE button says which', () => {
+  test('Previous and Next on the phone follow the setlist, and the Setlists button says which', () => {
     /*
      * "Hitting next or previous cycles through songs on the favorites or
      * setlists." The phone's two buttons walked slot numbers, which is the
@@ -665,7 +665,7 @@ export function run(test) {
 
     /* The button between them, and the word above it: a lone "All" reads as a
        caption rather than as the thing that decides what the other two do. */
-    assert.match(stage, /caption="Source"/, 'nothing on the stage screen says what the buttons walk')
+    assert.match(stage, /caption="Setlists"/, 'nothing on the stage screen says what the buttons walk')
     assert.match(stage, /onPress=\{onOpenSetlists\}/, 'the source button does not open anything')
     assert.match(read('mobile/App.js'), /screen === 'setlists'/, 'there is no setlist screen to open')
   })
@@ -1898,8 +1898,39 @@ export function run(test) {
       'the read-back is awaited inside the tap, which makes the tap itself late and the rhythm wrong'
     )
 
+    /*
+     * AND THE NUMBER MOVES ON THE TAP ITSELF, at both ends.
+     *
+     * "It should change the tempo based on the tap and change the number
+     * immediately and then read the device." The figure used to come only
+     * from the unit, which cannot be asked until the burst ends — so it lagged
+     * the last press by nearly a second, and you could not see the tempo you
+     * were tapping. The arithmetic is shared (shared/tempo.mjs) so the two
+     * ends cannot answer differently for the same rhythm.
+     */
+    assert.match(tap, /tappedBpm\(/, 'the phone no longer works out what the taps mean')
+    assert.ok(
+      tap.indexOf('set({ bpm:') < tap.indexOf('await device.tapTempo()'),
+      'the phone shows the number only after the request, so it still lags the tap'
+    )
+
     /* Both apps do it the same way. */
-    assert.match(read('src/components/Gig.jsx'), /setTimeout\(\(\) => refreshTempo\(\), TAP_REREAD_MS\)/)
+    const webGig = read('src/components/Gig.jsx')
+    assert.match(webGig, /refreshTempo\(\)/, 'the browser never re-reads the tempo after a tap')
+    assert.match(webGig, /TAP_REREAD_MS/, 'the browser no longer shares the delay with the phone')
+    assert.match(webGig, /tappedBpm\(/, 'the browser no longer works out what the taps mean')
+
+    const { tappedBpm, keepTaps, TAP_GAP_MAX_MS } = await import('../shared/tempo.mjs')
+    assert.equal(tappedBpm([0, 500, 1000, 1500]), 120, 'half-second taps are not 120 BPM')
+    assert.equal(tappedBpm([0, 1000, 2000]), 60, 'one-second taps are not 60 BPM')
+    assert.equal(tappedBpm([0]), null, 'one tap is being called a tempo')
+    assert.equal(tappedBpm([]), null)
+    /* A pause is a new count, not a very slow beat. */
+    assert.equal(tappedBpm([0, 500, 500 + TAP_GAP_MAX_MS + 1000]), null, 'a pause is being averaged into the tempo')
+    assert.equal(keepTaps([0, 500, 1000], 1000 + TAP_GAP_MAX_MS + 1).length, 1, 'a pause does not start a new count')
+    /* Outside what the unit takes is a mis-tap, and says nothing rather than
+       putting an impossible figure on the button. */
+    assert.equal(tappedBpm([0, 10, 20, 30]), null, 'an impossible tempo is being shown')
   })
 
   test('the phone keeps a log of what went wrong, and can hand it over', async () => {

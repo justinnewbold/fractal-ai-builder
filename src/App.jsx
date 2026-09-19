@@ -3878,7 +3878,7 @@ export default function App() {
               , an independent project not affiliated with Fractal Audio Systems.
             </p>
           </Section>
-<Section key="feedback" title="Tell us" note="Something broken, or something you want">
+<Section key="feedback" title="Feedback" note="Something broken, or something you want">
             {/*
               Where a person looks when the app has annoyed them: behind the
               same door as the checks and the log, because "it's broken" and

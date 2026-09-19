@@ -2481,10 +2481,24 @@ test('the stage screen is sized by whoever is holding it', () => {
     assert.equal(loadFit(store), false, 'fit could not be turned off')
   }
 
+  /*
+   * The default is the SMALLEST step, so the whole rig is on the screen the
+   * first time somebody sees it.
+   *
+   * "Make the default play screen button sizes (smallest) so that everything
+   * fits on the screen. Currently, it's set to small, as the default. You have
+   * to scroll up and down a little to see everything."
+   *
+   * It used to be one step up, which pushed the effects under the bottom of a
+   * phone — and a stage screen you have to scroll is one you cannot use with a
+   * guitar on. Bigger targets are still a tap away and the choice is
+   * remembered; it is the untouched default that has to fit.
+   */
+  assert.equal(DEFAULT_SIZE, 0, 'the default is no longer the step that fits on a phone')
   assert.deepEqual(sizeVars(DEFAULT_SIZE), {
-    '--gig-tile': '62px',
-    '--gig-col': '110px',
-    '--gig-col-block': '130px',
+    '--gig-tile': '48px',
+    '--gig-col': '88px',
+    '--gig-col-block': '92px',
     '--gig-scene-cols': '2',
     '--gig-fx-cols': '4'
   }, 'the default step no longer reproduces the screen as it shipped')
@@ -6819,7 +6833,7 @@ test('the Tap button opens the tempo box on a hold or a right-click, at both end
   const press = readSrc(new URL('../mobile/src/components/Press.js', import.meta.url), 'utf8')
   assert.match(press, /onLongPress=\{\s*onLongPress/, 'the phone’s button cannot be held')
   const stage = readSrc(new URL('../mobile/src/screens/Stage.js', import.meta.url), 'utf8')
-  assert.match(stage, /label="Tap"[^>]*onLongPress=\{\(\) => setTyping\(true\)\}/, 'holding Tap on the phone does nothing')
+  assert.match(stage, /label="Tap Tempo"[^>]*onLongPress=\{\(\) => setTyping\(true\)\}/, 'holding Tap on the phone does nothing')
   /*
    * The box moved out of the stage screen and into an overlay of its own — the
    * keyboard was covering it where it was, at the foot, which is exactly where

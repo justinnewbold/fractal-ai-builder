@@ -126,6 +126,17 @@ function braced(src, open) {
  */
 export function phoneButtons(src) {
   const found = new Set()
+  /*
+   * A caption is the small word ABOVE a button's label, and it is a word on
+   * the button as surely as the label is — the Setlists button on the stage
+   * screen is "Setlists" over the name of the list, and reading only the
+   * label saw the name and missed what the button is for. Only literal
+   * captions are read; the rest are a scene number or a block's name, which
+   * are contents rather than words anybody wrote.
+   */
+  for (const m of src.matchAll(/\bcaption="([^"]{1,40})"/g)) {
+    for (const w of wordsIn(`>${m[1]}<`)) found.add(w)
+  }
   for (const m of src.matchAll(/\blabel=(?:"([^"]{1,40})"|\{)/g)) {
     if (m[1] !== undefined) {
       for (const w of wordsIn(`>${m[1]}<`)) found.add(w)
@@ -188,6 +199,12 @@ export const AREAS = [
     phone: ['mobile/src/screens/Edit.js'],
     buttons: [
       { does: 'put a new block in an empty slot', web: 'Add', phone: 'Add', unreadable: ['web'] },
+      {
+        does: 'change which amp, cab or drive a block is',
+        web: null,
+        phone: 'Model',
+        why: 'only on the phone — the browser edits a block\u2019s controls but has no model picker at all, so an amp on the browser is whatever the unit was already set to'
+      },
       {
         does: 'swap the block in a full slot for a different one',
         web: 'Replace',
@@ -279,7 +296,7 @@ export const AREAS = [
     phone: ['mobile/src/screens/Stage.js'],
     buttons: [
       { does: 'open the block editor', web: 'Edit', phone: 'Edit' },
-      { does: 'tap a tempo in', web: 'Tap', phone: 'Tap' },
+      { does: 'tap a tempo in', web: 'Tap Tempo', phone: 'Tap Tempo' },
       {
         does: 'turn the tuner on and off',
         web: 'Tuner',
@@ -295,10 +312,9 @@ export const AREAS = [
         phone: 'All'
       },
       {
-        does: 'the word "Source" above that button',
-        web: 'Source',
-        phone: null,
-        why: 'a lone list name between Previous and Next reads as a caption rather than the button that picks what those two walk; the phone’s is wide enough not to need telling'
+        does: 'the word "Setlists" above that button',
+        web: 'Setlists',
+        phone: 'Setlists'
       },
       {
         does: 'show whether a block is bypassed',

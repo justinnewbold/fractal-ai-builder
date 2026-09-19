@@ -12,7 +12,7 @@ import {
   tapBeat,
   refreshTempo
 } from '../lib/deviceState'
-import { TAP_REREAD_MS } from '../../shared/tempo.mjs'
+import { keepTaps, tappedBpm, TAP_REREAD_MS } from '../../shared/tempo.mjs'
 import { remoteActive } from '../lib/remote'
 import { EXCLUDED_BLOCKS } from '../lib/guardrails'
 import { blockColor } from '../lib/blockColors'
@@ -395,30 +395,53 @@ export default function Gig({
    * middle of the screen.
    */
   const reread = useRef(null)
+  const taps = useRef([])
+  /*
+   * What the taps mean, shown while they are still happening.
+   *
+   * "It should change the tempo based on the tap and change the number
+   * immediately and then read the device and then change it if it needs to
+   * after that … right now it takes a few seconds after doing the tap, so you
+   * can't even tell the tempo you're tapping at."
+   *
+   * The number used to come only from the unit, and the unit can only be asked
+   * once tapping stops — see TAP_REREAD_MS — so it lagged the last press by
+   * nearly a second. That defeats what tapping is FOR: you tap to find a
+   * tempo, and a tempo you cannot see while tapping is one you cannot aim.
+   *
+   * So this is shown the instant it can be worked out, and the unit's own
+   * answer replaces it when it arrives. Cleared there rather than on a timer,
+   * so the two never both hold a figure.
+   */
+  const [tapped, setTapped] = useState(null)
   const tap = async () => {
     /*
      * The tap goes NOW; the read-back waits for the burst to end.
      *
      * deviceState.tapBeat says why the two must not be folded together: the
      * unit works the tempo out from the spacing between taps, so a tap held
-     * back by a debounce is not a tap. The number on the button is the other
-     * half of that — it can only be read once tapping has stopped, because
-     * reading mid-burst returns the tempo of the taps before this one and
-     * puts a stale figure on the button you are still pressing.
+     * back by a debounce is not a tap. The unit also cannot be asked mid-burst,
+     * because it answers with the tempo of the taps BEFORE this one.
      *
-     * So: fire every press, and re-read once, 900ms after the last one. Four
-     * taps at 60bpm are three seconds apart at the slowest tempo anyone counts
-     * in, and 900ms is comfortably inside that.
+     * So: fire every press, show what the presses mean, and re-read once,
+     * 900ms after the last one.
      */
     clearTimeout(reread.current)
     haptic()
+    taps.current = keepTaps(taps.current, Date.now())
+    const guess = tappedBpm(taps.current)
+    if (guess != null) setTapped(guess)
     try {
       await tapBeat()
     } catch (err) {
       onError(err.message)
       return
     }
-    reread.current = setTimeout(() => refreshTempo(), TAP_REREAD_MS)
+    reread.current = setTimeout(async () => {
+      await refreshTempo()
+      /* The unit has now spoken, so stop showing our own arithmetic. */
+      setTapped(null)
+    }, TAP_REREAD_MS)
   }
 
   /* A pending read on a screen that has gone is a write into nothing. */
@@ -944,8 +967,10 @@ export default function Gig({
         >
           {/* The word above the name: a lone "All" between Previous and Next
               read as a caption, not as the button that picks what those two
-              step through. */}
-          <span className="gig-nav-source-kind">Source</span>
+              step through. It says Setlist rather than Source because that is
+              the name of the thing on every other screen; "source" named the
+              mechanism, which is the app's business and not the player's. */}
+          <span className="gig-nav-source-kind">Setlists</span>
           <span className="gig-nav-source-name">{order ? sourceName : 'All'}</span>
           {sourceWhere ? <span className="gig-nav-source-pos mono">{sourceWhere}</span> : null}
         </button>
@@ -977,8 +1002,10 @@ export default function Gig({
         */}
         <div className="gig-tap-cell" ref={tapCell}>
           <button className="gig-bar-btn gig-tap" onClick={tap} aria-label={tapLabel} {...holdTap}>
-            <span>Tap</span>
-            {Number.isFinite(bpm) ? <span className="gig-tap-bpm mono">{Math.round(bpm)}</span> : null}
+            <span>Tap Tempo</span>
+            {Number.isFinite(tapped ?? bpm) ? (
+              <span className="gig-tap-bpm mono">{Math.round(tapped ?? bpm)}</span>
+            ) : null}
           </button>
           {typing ? (
             <div className="gig-tempo" role="group" aria-label="Type a tempo">
