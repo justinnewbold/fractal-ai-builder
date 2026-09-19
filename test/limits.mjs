@@ -629,6 +629,66 @@ export function run(test) {
     assert.match(mac.trimEnd(), /fractal_remote_setup$/, 'mac.sh does not call itself on its last line, so a truncated download would run half of it')
   })
 
+  test('a JS change can reach a phone without spending a build', () => {
+    /*
+     * THERE WAS NO WAY TO DO THIS AT ALL, which is the gap this closes.
+     * mobile.yml could build and submit and nothing else, so every JavaScript
+     * change since the last build — the debug log, the feedback forms, the
+     * connect screen, the fixes guide — sat in main with no route onto a
+     * handset short of spending one of a handful of iOS build slots.
+     *
+     * `eas update` costs nothing and is safe in a way a build is not, because
+     * app.json pins runtimeVersion to the `fingerprint` policy: Expo hashes
+     * everything native and an update only reaches a build whose hash matches.
+     * A native change moves the hash and older builds never see the update
+     * rather than downloading something they cannot run.
+     */
+    const wf = read('.github/workflows/mobile.yml')
+    assert.match(wf, /\n {2}update:\n/, 'there is no way to publish an update')
+
+    /* The fingerprint policy is what makes the above true. If it ever became
+       appVersion or a literal, an update could land on a build whose native
+       side does not match it. */
+    const appJson = JSON.parse(read('mobile/app.json')).expo
+    assert.equal(
+      appJson.runtimeVersion?.policy,
+      'fingerprint',
+      'the runtime version is no longer a fingerprint, so an update could reach a build it does not fit'
+    )
+
+    /*
+     * AND TICKING "UPDATE" MUST NOT ALSO START A BUILD. The two jobs run off
+     * the same dispatch, and a workflow that quietly did both would spend the
+     * thing this exists to avoid spending — on a repository where iOS build
+     * slots are counted in single figures per month.
+     */
+    const jobIf = (name) => {
+      const at = wf.indexOf(`\n  ${name}:\n`)
+      assert.notEqual(at, -1, `the ${name} job is gone`)
+      const line = wf.slice(at).match(/\n {4}if: (.+)/)
+      return line ? line[1] : ''
+    }
+    assert.match(jobIf('build'), /!inputs\.update/, 'ticking update would also start a build')
+    assert.match(jobIf('update'), /inputs\.update/, 'the update job is not gated on the update input')
+
+    /*
+     * And it proves the generated copies are current before publishing.
+     * mobile/src/lib is generated from shared/ at the repository root, and an
+     * update carrying a stale copy is exactly the drift sync:rules exists to
+     * prevent — published straight onto a phone, where it is hardest to see.
+     */
+    const job = wf.slice(wf.indexOf('\n  update:\n'))
+    assert.match(job, /npm run sync:rules/, 'the update job does not regenerate the shared copies')
+    assert.match(job, /git diff --exit-code/, 'the update job would publish a stale generated copy')
+
+    /* Both channels by default: which one an installed app listens to depends
+       on the profile it was built with, and nobody should have to remember. */
+    assert.match(wf, /default: both/, 'the update no longer goes to both channels by default')
+    for (const channel of ['production', 'preview']) {
+      assert.ok(job.includes(channel), `the update job never mentions the ${channel} channel`)
+    }
+  })
+
   test('the phone icon is one Apple will accept, and the others keep their alpha', () => {
     /*
      * "The app icon can't contain alpha channels or transparencies" is an

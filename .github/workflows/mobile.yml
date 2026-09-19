@@ -54,6 +54,15 @@ on:
         description: 'Skip building; send the last build that succeeded'
         type: boolean
         default: false
+      update:
+        description: 'Publish a JS update instead of building (costs no build slot)'
+        type: boolean
+        default: false
+      update_channel:
+        description: 'Which channel the update goes to'
+        type: choice
+        default: both
+        options: [both, production, preview]
   pull_request:
     paths:
       - 'mobile/**'
@@ -97,7 +106,7 @@ jobs:
         run: npx expo export --platform android --output-dir /tmp/bundle-android
 
   build:
-    if: github.event_name == 'workflow_dispatch'
+    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.update }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -255,3 +264,93 @@ jobs:
             --non-interactive \
             --no-wait \
             ${{ inputs.submit && '--auto-submit' || '' }}
+
+  # ---------------------------------------------------------------- updating
+  #
+  # PUBLISHING A JS UPDATE, WHICH COSTS NOTHING.
+  #
+  # This existed nowhere until now, which was a real gap rather than an
+  # oversight worth shrugging at: every change since the last build has been
+  # JavaScript, and there was no way to get any of it onto a phone short of
+  # spending one of a handful of iOS build slots. `eas update` sends the
+  # bundle to Expo and the installed app picks it up on its next launch.
+  #
+  # WHY IT CANNOT SHIP THE WRONG THING TO THE WRONG BUILD. app.json sets
+  # `runtimeVersion.policy` to `fingerprint`: Expo hashes everything native —
+  # the config, the native dependency graph, the autolinked modules — and an
+  # update only reaches a build whose fingerprint matches. Change a native
+  # dependency and the hash moves, and older builds simply never see it rather
+  # than downloading something they cannot run. So this is safe to run on a
+  # whim in a way that a build is not.
+  #
+  # BOTH CHANNELS BY DEFAULT, because which one an installed app listens to is
+  # decided by the profile it was built with — `production` for anything that
+  # went to TestFlight, `preview` for anything installed directly — and the
+  # person asking for an update should not have to remember which. The same
+  # bundle going to both is harmless; a bundle going to the one channel the
+  # phone in your hand is not on is a confusing half hour.
+  update:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.update }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # The same one question the build job asks, for the same reason, and
+      # deliberately without reading the `secrets` context as a whole — see
+      # the long note on that step above.
+      - name: There is a token to publish with
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_SECRET }}
+        run: |
+          if [ -z "${EXPO_TOKEN}" ]; then
+            echo "::error::No EXPO_SECRET secret. Add an Expo access token at Settings › Secrets and variables › Actions, on the Secrets tab, named exactly EXPO_SECRET."
+            exit 1
+          fi
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_SECRET }}
+
+      # The generated copies the phone carries are built from shared/ at the
+      # repository root, so the root install happens too. An update that
+      # shipped a stale copy of the relay rules would be the exact drift
+      # sync:rules exists to stop, published straight to a handset.
+      - name: Install, and prove the generated copies are current
+        run: |
+          npm ci
+          npm run sync:rules
+          git diff --exit-code -- mobile/src/lib mobile/app.json \
+            || { echo "::error::A generated copy under mobile/ is stale. Run npm run sync:rules and commit it."; exit 1; }
+
+      - name: Install the app's own dependencies
+        working-directory: mobile
+        run: npm ci
+
+      # Branch rather than channel. A channel points at a branch, and every
+      # channel here was created by a build with the same name as its branch,
+      # so naming the branch reaches the same place and works on every version
+      # of the CLI rather than only the ones that accept `--channel`.
+      - name: Publish
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          want="${{ inputs.update_channel }}"
+          [ "$want" = "both" ] && targets="production preview" || targets="$want"
+          for branch in $targets; do
+            echo "── $branch ──"
+            eas update \
+              --branch "$branch" \
+              --message "${GITHUB_REF_NAME}@$(git rev-parse --short HEAD): $(git log -1 --pretty=%s | cut -c1-80)" \
+              --non-interactive
+          done
+
+      - name: What was published
+        run: |
+          echo "Published to: ${{ inputs.update_channel }}"
+          echo "An installed app picks this up on its next launch, if its fingerprint matches the build."
