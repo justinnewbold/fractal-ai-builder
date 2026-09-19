@@ -1,3 +1,7 @@
+/* Generated from src/lib/gearPhotos.js by scripts/sync-relay-rules.mjs.
+ * Do not edit. Change the source and run `npm run sync:rules`; the test suite
+ * fails on any difference between the two. */
+
 /**
  * A photograph of the real amp, and the credit that has to travel with it.
  *

@@ -3381,11 +3381,30 @@ test('every model on the unit can be looked up by what it really is', async () =
   assert.ok(byKey.amp && byKey.drive, 'the two lists anybody came here for are missing')
 
   /*
-   * Cabinets are the absence that has to stay an absence. All 45 carry a blank
-   * lineage, so a Cabs tab would be 45 rows of nothing — and the rule this
-   * inherits from lineage.js is silence over a plausible guess.
+   * Cabinets were the absence that had to stay an absence: all 45 carried a
+   * blank lineage, so a Cabs tab would have been 45 rows of nothing, and the
+   * rule this inherits from lineage.js is silence over a plausible guess.
+   *
+   * Then all 45 got a description — what the cabinet sounds like, which is the
+   * thing anybody choosing one actually wants — and a dozen got a photograph.
+   * A row with a paragraph behind it is not a blank row, so they are listed.
+   *
+   * What is still absent is the attribution, and that is a fact about how
+   * Fractal names cabinets rather than a hole in the research: "1x12 Deluxe
+   * Tweed" already says what it is. `lineage: false` is how the lists know not
+   * to print "nobody has recorded what this one is based on" 45 times about
+   * something that was never missing.
    */
-  assert.ok(!byKey.cab, 'a cab list is offered, and every row of it would be blank')
+  assert.ok(byKey.cab, 'the cabs are not listed, so nothing can reach their descriptions')
+  assert.equal(byKey.cab.lineage, false, 'the cab list will apologise under every row for an attribution that does not exist')
+  assert.equal(byKey.cab.entries.length, 45, `the cab list holds ${byKey.cab.entries.length} rows`)
+  const { descriptionFor } = await import('../src/lib/lineage.js')
+  const describedCabs = byKey.cab.entries.filter((e) => descriptionFor('cab', e.name)).length
+  assert.equal(
+    describedCabs,
+    byKey.cab.entries.length,
+    `${describedCabs} of ${byKey.cab.entries.length} cabs say what they sound like`
+  )
 
   // Every amp names a real amp. That is the state of the data and the thing
   // most worth noticing if it ever stops being true.

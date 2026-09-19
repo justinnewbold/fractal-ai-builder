@@ -7264,18 +7264,47 @@ button.gig-bar-btn:disabled {
 }
 
 /*
- * Not a .type-row: that one is a button with a 44px floor because it is a
- * choice you make with a thumb. These are lines to read, so they take the room
- * two lines of text need and no more — a 44px floor on 400 of them is four
- * thousand pixels of air between the reader and the model they are looking for.
+ * A button now — it opens the model's own page — but deliberately NOT a
+ * .type-row, which carries a 44px floor because it is a choice you make with
+ * a thumb mid-song. These are lines you read while standing still, and a 44px
+ * floor on 400 of them is four thousand pixels of air between the reader and
+ * the model they came here to find. Two lines of text and no more; the whole
+ * row is the target, which is wider than any thumb even when it is short.
  */
 .gear-row {
-  padding: var(--s-2) var(--s-3);
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
   border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  padding: var(--s-2) var(--s-3);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
 }
 
-.gear-row:last-child {
+.gear-list li:last-child .gear-row {
   border-bottom: 0;
+}
+
+.gear-row:hover,
+.gear-row:focus-visible {
+  background: var(--panel-deep, rgba(255, 255, 255, 0.04));
+}
+
+/* ---------- one model, on a page of its own ---------- */
+
+.gear-card-name {
+  font-size: var(--f-4);
+  font-weight: 700;
+  margin: var(--s-3) 0 2px;
+}
+
+.gear-card-gear {
+  color: var(--signal);
+  margin: 0 0 var(--s-3);
 }
 
 /* ---------- find a control ---------- */

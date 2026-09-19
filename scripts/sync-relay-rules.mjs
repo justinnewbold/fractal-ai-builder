@@ -220,6 +220,14 @@ export const FILES = [
   { source: '../src/data/drive-types.json', target: '../mobile/src/data/drive-types.json', raw: true },
   { source: '../src/data/amp-lineage.json', target: '../mobile/src/data/amp-lineage.json', raw: true },
   { source: '../src/data/gear-photos.json', target: '../mobile/src/data/gear-photos.json', raw: true },
+  /*
+   * And the rule that turns a model name into one of those files. The phone
+   * shows the same photographs on the same models, and a second copy of the
+   * family-prefix matching would drift — which shows up as a photograph of
+   * the wrong amp under the right name, the exact failure that threw away the
+   * first batch of two hundred.
+   */
+  { source: '../src/lib/gearPhotos.js', target: '../mobile/src/lib/gearPhotos.js' },
   { source: '../src/data/effect-lineage.json', target: '../mobile/src/data/effect-lineage.json', raw: true },
   /*
    * THE SIMULATED FM3, so the phone has something to be without a rig.

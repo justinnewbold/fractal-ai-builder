@@ -773,13 +773,43 @@ export function run(test) {
     const code = panel.slice(panel.indexOf('export default')).replace(/\{?\/\*[\s\S]*?\*\/\}?/g, '')
 
     /*
-     * The rows are not buttons. There is nothing to choose here, and a row
-     * that depresses under a thumb promises an action it does not have —
-     * picking a model is the editor's job, on a row that really is a button.
+     * THE ROWS ARE BUTTONS, and they were not. "There is nothing to choose
+     * here, and a row that depresses under a thumb promises an action it does
+     * not have" — half right. Nothing to choose, but something to READ: the
+     * photographs and the descriptions existed the whole time and were
+     * reachable only from the block editor's panel, for the model already
+     * chosen, which is the one model nobody is wondering about.
+     *
+     * "Still not seeing any amp cab and pedal photos or descriptions. Should
+     * be able to tap on the card and open a detailed page like this." So a row
+     * opens the model's own page; picking a model is still the editor's job.
      */
     const rows = code.slice(code.indexOf('gear-list'))
-    assert.ok(!/<button/.test(rows), 'the reference rows became buttons that do nothing')
-    assert.match(rows, /<li className="gear-row"/, 'the list is not a list')
+    assert.match(rows, /<button type="button" className="gear-row" onClick=\{\(\) => setOpen\(e\)\}>/, 'the rows cannot be opened')
+    assert.match(code, /if \(open\) return <GearCard entry=\{open\} onBack=\{\(\) => setOpen\(null\)\} \/>/, 'there is nothing behind a row')
+
+    /*
+     * And the page is the three things that were missing, in the order the
+     * questions come in: what it really is, what it is like, what it looks
+     * like. The credit cannot be separated from the photograph — every one of
+     * these is Creative Commons and naming the photographer is the condition
+     * of showing it at all.
+     */
+    const card = readFileSync(new URL('../src/components/GearCard.jsx', import.meta.url), 'utf8')
+    assert.match(card, /descriptionFor\(entry\.slug, entry\.name\)/, 'the page never asks what the model is like')
+    assert.match(card, /photoFor\(entry\.name\)/, 'the page never asks what the model looks like')
+    assert.ok(
+      card.indexOf('<img src={photo.src}') < card.indexOf('{photo.credit}'),
+      'the photograph is drawn somewhere the credit is not'
+    )
+    assert.ok(
+      card.indexOf('{about}') < card.indexOf('<img src={photo.src}'),
+      'the picture comes before the words that say what it is'
+    )
+    /* A row with the slug dropped cannot be looked up at all, which is the
+       whole reason the catalog carries it. */
+    const catalog = readFileSync(new URL('../src/lib/gearCatalog.js', import.meta.url), 'utf8')
+    assert.match(catalog, /out\.push\(\{\s*slug,/, 'a catalog row no longer knows which block it came from')
 
     // The search field clears the iOS zoom floor like every other one.
     const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')

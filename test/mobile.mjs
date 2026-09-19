@@ -5163,4 +5163,58 @@ export function run(test) {
     assert.equal(bad.idle, true, 'one refusal stops the button working for good')
   })
 
+  test('a model in the reference opens its own page, with the picture and the words', async () => {
+    /*
+     * "Still not seeing any amp cab and pedal photos or descriptions. Should
+     * be able to tap on the card and open a detailed page like this."
+     *
+     * Both were written months ago and wired into one place: the panel inside
+     * the block editor, for the model ALREADY CHOSEN — the one model nobody
+     * is wondering about. The reference list, whose entire purpose is "what
+     * have I got", had rows that could not be opened, on the reasoning that
+     * there was nothing to choose. Nothing to choose; something to read.
+     */
+    const gear = read('mobile/src/screens/Gear.js')
+    assert.match(gear, /onPress=\{\(\) => setOpen\(item\)\}/, 'the phone\u2019s rows still cannot be opened')
+    assert.match(gear, /if \(open\) return <GearCard entry=\{open\} onBack=\{\(\) => setOpen\(null\)\} \/>/, 'there is nothing behind a row')
+    assert.match(gear, /accessibilityRole="button"/, 'a row that opens a page does not say it is a button')
+
+    const card = read('mobile/src/components/GearCard.js')
+    assert.match(card, /descriptionFor\(entry\.slug, entry\.name\)/, 'the page never asks what the model is like')
+    assert.match(card, /photoFor\(entry\.name, `\$\{HOSTED_ORIGIN\}\/gear`\)/, 'the phone looks for the photographs somewhere it has no files')
+    /* The credit cannot be separated from the picture: every one is Creative
+       Commons and naming the photographer is the condition of showing it. */
+    assert.ok(
+      card.indexOf('source={{ uri: photo.src }}') < card.indexOf('{photo.credit}'),
+      'the photograph is drawn somewhere the credit is not'
+    )
+
+    /*
+     * Both ends match models to photographs by the same rule, from the same
+     * generated file. A second copy of the family-prefix matching would drift,
+     * and drift here shows up as a picture of the WRONG amp under the right
+     * name — the exact failure that threw away the first batch of two hundred.
+     */
+    const web = await import('../src/lib/gearPhotos.js')
+    const phone = await import('../mobile/src/lib/gearPhotos.js')
+    assert.equal(phone.photoCount, web.photoCount, 'the two apps carry different numbers of photographs')
+    for (const name of ['1959SLP Normal', 'Brit JVM', 'Nothing At All XYZ']) {
+      const a = web.photoFor(name)
+      const b = phone.photoFor(name, '/gear')
+      assert.deepEqual(b, a, `the two apps disagree about the photograph for ${name}`)
+    }
+
+    /* A relative path is right for a web page and wrong for a phone, which has
+       no site root to be relative to. */
+    const remote = phone.photoFor('1959SLP Normal', 'https://example.test/gear')
+    assert.ok(remote.src.startsWith('https://example.test/gear/'), 'the phone cannot be told where the files are')
+
+    /* And a catalog row carries the block it came from, or nothing above can
+       be looked up at all. */
+    const { groupsFor } = await import('../mobile/src/lib/gearCatalog.js')
+    const amps = groupsFor({}).find((g) => g.key === 'amp')
+    assert.ok(amps.entries.length > 0, 'the amp list is empty')
+    assert.ok(amps.entries.every((e) => e.slug === 'amp'), 'a catalog row does not know which block it came from')
+  })
+
 }
