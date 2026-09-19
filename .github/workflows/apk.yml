@@ -51,6 +51,17 @@ permissions:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    # A HANG HERE USED TO COST SIX HOURS AND SAY NOTHING.
+    #
+    # Every APK build from 7.325.0 to 7.352.0 ran out of Metaspace, printed
+    # `java.lang.OutOfMemoryError: Metaspace` a few dozen times, and then sat
+    # there. The last error in the log was at 20:51 and GitHub killed the job
+    # at 01:30 — four and a half hours of nothing, ending in `cancelled`
+    # rather than `failure`, which reads like somebody pressed a button.
+    #
+    # Nine releases went by with no Android build and nothing said so. A
+    # ceiling makes the next one a red X in forty minutes.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -83,6 +94,34 @@ jobs:
       - name: Make the native Android project
         working-directory: mobile
         run: npx expo prebuild --platform android --no-install
+
+      # THE TEMPLATE'S MEMORY CEILING IS NO LONGER ENOUGH FOR THIS APP.
+      #
+      # `expo prebuild` writes the React Native template's gradle.properties,
+      # which has said this since long before this project existed:
+      #
+      #   org.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m
+      #
+      # Metaspace holds class metadata, and it is the 512m that ran out —
+      # around twenty Expo modules plus React Native plus Kotlin is simply
+      # more classes than that. Not heap: the log says Metaspace by name.
+      #
+      # RAISED HERE RATHER THAN IN app.json, which is the part worth being
+      # deliberate about. The same numbers can be set with the
+      # expo-build-properties plugin, and that would put them in the app
+      # config — which is hashed into the runtime fingerprint, so every
+      # installed copy of the app would stop being able to take updates. A
+      # build-server memory setting is not something the binary cares about,
+      # so it does not belong anywhere the binary is identified by.
+      #
+      # android/ is generated and gitignored, so this edits a file that only
+      # exists for the next two minutes.
+      - name: Give the build enough memory to finish
+        working-directory: mobile/android
+        run: |
+          sed -i 's/^org\.gradle\.jvmargs=.*/org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=2g -Dfile.encoding=UTF-8/' gradle.properties
+          printf '\n# Raised by .github/workflows/apk.yml — see the note there.\nkotlin.daemon.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=768m\n' >> gradle.properties
+          grep jvmargs gradle.properties
 
       - name: Build it
         working-directory: mobile/android
