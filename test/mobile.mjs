@@ -3654,8 +3654,30 @@ export function run(test) {
     assert.ok(descriptionFor('drive', 'Rat Distortion'), 'the drives have no descriptions')
     assert.ok(descriptionFor('cab', '4x12 RECTO SLANT'), 'the cabs have no descriptions')
 
-    /* Silence where nothing is known, which is the half that matters. */
-    assert.equal(descriptionFor('amp', 'Atomica Ch1'), null, 'an obscure amp is being described anyway')
+    /*
+     * WHAT AN OBSCURE AMP IS ALLOWED TO SAY, which is the half that matters.
+     *
+     * The rule used to be silence: ten boutique families said nothing at all,
+     * because anything written about their character would be invention. The
+     * rule was right about the character and wrong about the silence — a page
+     * reading "nothing written down about this one yet" tells somebody
+     * nothing, where "hand built, made in very small numbers, barely
+     * documented" tells them exactly why they have never heard of it. That is
+     * a fact about the amp and it is the useful one.
+     *
+     * So they get a maker and a rarity and they stop. Held here by length:
+     * the well-known amps run two or three full paragraphs, and any of these
+     * growing to that size means somebody has started describing a sound
+     * nobody in this project has heard.
+     */
+    for (const obscure of ['Atomica Ch1', 'Capt Hook Ch1', 'Ruby Rocket Ch1', 'Cameron CCV Ch1']) {
+      const d = descriptionFor('amp', obscure)
+      assert.ok(d, `${obscure} says nothing at all, not even who made it`)
+      assert.ok(d.length < 280, `${obscure}: ${d.length} characters is a character description of an amp nobody here has played`)
+    }
+
+    /* A pedal that models nothing real still says nothing, and that has not
+       changed: there is no original to have a history. */
     assert.equal(descriptionFor('drive', 'FAS Boost'), null, "Fractal's own pedal is being given a history it does not have")
     assert.equal(descriptionFor('amp', ''), null)
     assert.equal(descriptionFor('amp'), null, 'descriptionFor throws rather than answering for a missing name')
