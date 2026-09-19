@@ -552,14 +552,70 @@ export function run(test) {
     assert.match(linux, /AppImage/, 'no AppImage, so there is no Linux download that updates itself')
     assert.match(linux, /deb/, 'no .deb, so the rack machine has no package it recognises')
 
-    /* The two fields the build died on. */
-    assert.match(yml, /\nhomepage: https:/, 'no homepage, and the .deb build fails outright rather than defaulting')
+    /*
+     * THE TWO FIELDS THE BUILD DIED ON, AND THEY LIVE IN DIFFERENT FILES.
+     *
+     * electron-builder reports them in one breath — "specify project homepage"
+     * and "specify author email" — which makes it read as one missing block.
+     * It is not. `maintainer` is a deb option and belongs in the yml;
+     * `homepage` is package.json METADATA and is not a configuration key at
+     * all. Putting it in the yml, which is the obvious response to the error,
+     * fails the whole config on `unknown property 'homepage'` before anything
+     * is packaged — a worse failure than the one being fixed, and the second
+     * red CI run this test exists to have prevented.
+     */
+    const pkg = JSON.parse(read('desktop/package.json'))
+    assert.match(
+      String(pkg.homepage),
+      /^https:\/\//,
+      'desktop/package.json has no homepage, and the .deb build stops rather than defaulting'
+    )
+    assert.ok(
+      !/^homepage:/m.test(yml),
+      "homepage is in electron-builder.yml, where it is not a real option — electron-builder rejects the whole config"
+    )
     const deb = yml.slice(yml.indexOf('\ndeb:'))
     assert.match(
       deb,
       /maintainer: .+ <[^@\s]+@[^>\s]+>/,
       'the .deb names no maintainer with a working address, and the build refuses to guess one'
     )
+
+    /*
+     * AND NO INVENTED KEYS ANYWHERE AT THE TOP LEVEL, which is the general
+     * form of the mistake above.
+     *
+     * electron-builder validates its whole config against a schema before it
+     * does any work, so one misremembered key name costs a full CI cycle and
+     * produces nothing. This is that schema's top-level property list, copied
+     * from electron-builder 25's own rejection message. It only needs revising
+     * when the pinned electron-builder major moves.
+     */
+    const VALID_TOP_LEVEL = new Set(
+      `afterAllArtifactBuild afterExtract afterPack afterSign apk appId appImage appx
+       appxManifestCreated artifactBuildCompleted artifactBuildStarted artifactName asar
+       asarUnpack beforeBuild beforePack buildDependenciesFromSource buildNumber buildVersion
+       compression copyright cscKeyPassword cscLink deb defaultArch detectUpdateChannel
+       directories disableDefaultIgnoredFiles disableSanityCheckAsar dmg downloadAlternateFFmpeg
+       electronBranding electronCompile electronDist electronDownload electronLanguages
+       electronUpdaterCompatibility electronVersion executableName extends extraFiles
+       extraMetadata extraResources fileAssociations files flatpak forceCodeSigning framework
+       freebsd generateUpdatesFilesForAllChannels icon includePdb includeSubNodeModules
+       launchUiVersion linux mac mas masDev msi msiProjectCreated msiWrapped nativeRebuilder
+       nodeGypRebuild nodeVersion npmArgs npmRebuild nsis nsisWeb onNodeModuleFile p5p pacman
+       pkg portable productName protocols publish releaseInfo removePackageKeywords
+       removePackageScripts rpm snap squirrelWindows target win $schema`.split(/\s+/)
+    )
+    const topLevel = yml.split('\n').flatMap((line) => {
+      const m = /^([A-Za-z$][A-Za-z0-9$]*):/.exec(line)
+      return m ? [m[1]] : []
+    })
+    for (const key of topLevel) {
+      assert.ok(
+        VALID_TOP_LEVEL.has(key),
+        `electron-builder has no top-level option "${key}" — it rejects the entire config and builds nothing`
+      )
+    }
 
     /*
      * AND NO ARCHITECTURE LIST, which is the one thing here that is a decision

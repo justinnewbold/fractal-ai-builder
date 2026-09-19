@@ -5,11 +5,6 @@
 # `process.resourcesPath/dist`, which is what makes ForgeFX able to serve it.
 appId: cloud.newbold.fractal
 productName: Fractal Remote
-# Where the app says it comes from. Only the .deb build actually demands this —
-# a Debian package with no Homepage field is rejected outright by the tool that
-# assembles it — but it is true of every target, so it sits at the top rather
-# than inside the linux block.
-homepage: https://fractal.newbold.cloud
 directories:
   output: release
 # An allowlist, not a filter. Anything main.js reaches for at runtime has to be
@@ -202,6 +197,12 @@ deb:
   # point — somebody who has a problem with the package should not have to find
   # a different door to knock on than somebody who has a problem with the app.
   maintainer: Justin Newbold <justinnewbold@gmail.com>
+  # ITS SIBLING, `homepage`, IS NOT SETTABLE HERE. The .deb wants both and the
+  # error names them together, so the obvious move is to put both here — and
+  # electron-builder then refuses the whole config with "unknown property
+  # 'homepage'" before it packages anything at all, which is a worse failure
+  # than the one being fixed. It is read from the app's package.json metadata
+  # instead, and desktop/package.json carries it.
   # The two the device layer actually needs. udev is what gives a non-root
   # user access to the USB serial device, and libasound is what the MIDI
   # backend links against — a package that installs and then cannot see the
