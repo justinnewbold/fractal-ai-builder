@@ -28,6 +28,7 @@ import driveTypes from '../data/drive-types.json' with { type: 'json' }
 import cabTypes from '../data/cab-types.json' with { type: 'json' }
 import ampParams from '../data/amp-params.json' with { type: 'json' }
 import demoPresets from '../data/demo-presets.json' with { type: 'json' }
+import { nameFor, scenesFor, presetsFor } from './factoryPresets.js'
 import { fromNormalized } from './scale.js'
 import { createSceneState } from './sceneState.js'
 import { storedSceneNames, keepSceneNames, DEFAULT_SCENE_NAMES } from './demoMemory.js'
@@ -90,6 +91,13 @@ const SCENE_CHANNELS = {
  * that looks broken.
  */
 const SEEDS = new Map(demoPresets.presets.map((p) => [p.number, p]))
+
+/*
+ * Which unit this is pretending to be, in the one word the factory catalog
+ * files its presets under. A constant rather than a literal in four places,
+ * because the demo for the other units is the same mock with this changed.
+ */
+const UNIT = 'fm3'
 
 /** Where a seeded preset's blocks sit: signal order, one per column. */
 const chainOf = (seed) =>
@@ -214,10 +222,32 @@ export function createMockDevice() {
     // Both keyed "effectId:channel", because that is where a value lives.
     params: null,
     models: null,
-    /* The names the unit would report for its slots. Seeded slots carry their
-       name; everything else is genuinely empty, because a unit with 512 full
-       slots is its own kind of lie. */
-    stored: new Map([...SEEDS.values()].map((seed) => [seed.number, seed.name]).concat([[500, 'DEMO']]))
+    /*
+     * The names the unit would report for its slots.
+     *
+     * THE REAL FACTORY BANK, not twelve presets and 500 blanks. "Here are all
+     * the preset names and scene names for all of the current fractal units
+     * for you to put in the demos" — so an FM3 in the demo holds the 384 it
+     * actually ships with, in the slots it ships them in. Somebody trying
+     * this before they buy is comparing it against the unit on their desk,
+     * and a list sharing no names with theirs is one they cannot check.
+     *
+     * The twelve hand-built presets keep their own names, ON TOP of the
+     * factory ones, because those are the slots with a real chain, real
+     * models and scenes that differ — they are what the Edit screen is
+     * demonstrating. A factory name over a chain that is not that preset's
+     * would be worse than either.
+     *
+     * Past 384 the slots are genuinely empty, which is what they are on the
+     * unit: a demo with 512 full slots is its own kind of lie.
+     */
+    stored: new Map(
+      presetsFor(UNIT)
+        .filter((p) => p.name)
+        .map((p) => [p.number, p.name])
+        .concat([...SEEDS.values()].map((seed) => [seed.number, seed.name]))
+        .concat([[500, 'DEMO']])
+    )
   }
 
   /*
@@ -252,11 +282,17 @@ export function createMockDevice() {
       params: new Map(),
       models: new Map(),
       scenes: createSceneState({ count: 8, seeds, channels }),
+      /*
+       * A renamed scene wins, then the hand-built preset's own four, then the
+       * real factory names for that slot — see factoryPresets.js. An unnamed
+       * factory scene comes back as "Scene 5", which is what the unit shows;
+       * only a slot with nothing in it falls through to the defaults.
+       */
       sceneNames:
         storedSceneNames(number) ||
         (seed
           ? seed.scenes.map((sc) => sc.name).concat(['', '', '', '']).slice(0, 8)
-          : DEFAULT_SCENE_NAMES.slice())
+          : scenesFor(UNIT, number) || DEFAULT_SCENE_NAMES.slice())
     }
 
     for (const block of blocks) {
@@ -666,6 +702,9 @@ export function createMockDevice() {
       const name = state.stored.get(n) || ''
       if (n === state.presetNumber)
         return { number: n, name, blocks: state.blocks.filter((b) => !off(b.effectId)).map((b) => b.name) }
+      /* A factory slot nobody has built a rig for: the name is real and the
+         block list is genuinely unknown until it is loaded, which is what an
+         empty array says. */
       if (!SEEDS.has(n)) return { number: n, name, blocks: [] }
       /* Another slot, so there is no scene to be in: scene one, the one it
          would load on. */

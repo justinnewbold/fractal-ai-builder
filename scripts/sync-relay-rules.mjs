@@ -259,6 +259,14 @@ export const FILES = [
   /* The demo's twelve presets. The mock imports it on both ends, so a phone
      without this file is a phone whose demo mode will not bundle. */
   { source: '../src/data/demo-presets.json', target: '../mobile/src/data/demo-presets.json', raw: true },
+  /*
+   * The real factory banks, so the demo on a phone holds the same presets as
+   * the demo in a browser. Generated from data/factory-presets.csv by
+   * scripts/factory-presets.mjs — see that file for why an unnamed scene is
+   * called "Scene 5" and an empty slot stays empty.
+   */
+  { source: '../src/data/factory-presets.json', target: '../mobile/src/data/factory-presets.json', raw: true },
+  { source: '../src/lib/factoryPresets.js', target: '../mobile/src/lib/factoryPresets.js' },
 
   /*
    * Where a block sits, and how that becomes something the unit will accept.

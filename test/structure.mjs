@@ -4060,4 +4060,87 @@ export function run(test) {
     assert.ok(!/open=/.test(ways), 'one of the routes opens itself again')
   })
 
+  test('the demo holds the factory bank the unit really ships with', async () => {
+    /*
+     * "Here are all the preset names and scene names for all of the current
+     * fractal units for you to put in the demos."
+     *
+     * The demo was twelve hand-built presets and 500 blank slots. Good
+     * presets — real amps, real cabs, scenes that differ — but not what
+     * anybody's unit says when they switch it on, and somebody trying the
+     * demo is holding it against the rig on their desk.
+     */
+    const { UNITS, presetsFor, nameFor, scenesFor, namedCount } = await import('../src/lib/factoryPresets.js')
+    const { SLOTS, SCENES, build, splitRow } = await import('../scripts/factory-presets.mjs')
+
+    assert.deepEqual([...UNITS].sort(), ['am4', 'axefx3', 'fm3', 'fm9', 'vp4'], `the catalog covers ${UNITS.join(', ')}`)
+
+    for (const unit of UNITS) {
+      const list = presetsFor(unit)
+      assert.equal(list.length, SLOTS[unit], `${unit} has ${list.length} slots, not ${SLOTS[unit]}`)
+      /* Slot numbers are the index, or a preset list would draw the right
+         names against the wrong numbers — which is how somebody ends up on
+         the wrong song. */
+      list.forEach((p, i) => assert.equal(p.number, i, `${unit} slot ${i} says it is ${p.number}`))
+    }
+
+    /* The counts the source itself states: 384 on the big three, and the AM4
+       and VP4 ship part-full on purpose. */
+    assert.equal(namedCount('axefx3'), 384)
+    assert.equal(namedCount('fm9'), 384)
+    assert.equal(namedCount('fm3'), 384)
+    assert.equal(namedCount('am4'), 88, 'the AM4 ships 88 presets in 104 slots; W1-Z4 are yours')
+    assert.equal(namedCount('vp4'), 80, 'the VP4 ships 80')
+
+    /*
+     * AN EMPTY SLOT IS EMPTY, and has no scenes. "Generic names likely scene
+     * 1, scene 2 or empty are accurate and should reflect that way." A demo
+     * that fills those teaches that they come full.
+     */
+    assert.equal(nameFor('am4', 103), '', 'the AM4\u2019s last user slot was given something')
+    assert.equal(scenesFor('am4', 103), null, 'an empty slot is offering scenes')
+
+    /*
+     * AN UNNAMED SCENE IS CALLED "Scene 5", because that is what the unit
+     * shows. Not a blank tile, and not something invented to fill it.
+     */
+    for (const unit of UNITS) {
+      for (const preset of presetsFor(unit)) {
+        if (!preset.name) continue
+        assert.equal(preset.scenes.length, SCENES[unit], `${unit} "${preset.name}" has ${preset.scenes.length} scenes`)
+        preset.scenes.forEach((name, i) => {
+          assert.ok(name, `${unit} "${preset.name}" scene ${i + 1} is blank`)
+        })
+      }
+    }
+    assert.equal(scenesFor('fm3', 2)[6], 'Scene 7', 'an unnamed scene is not called what the unit calls it')
+
+    /* The units really do differ where the documentation says they differ:
+       the FM3 rewrites the Rotary scene on 59 Bassguy because it has not the
+       CPU for it. That the two are not copies of each other is the point of
+       holding five lists rather than one. */
+    assert.equal(nameFor('fm3', 0), nameFor('axefx3', 0), 'slot 0 is a different preset on the two units')
+    assert.notEqual(
+      scenesFor('fm3', 0)[4],
+      scenesFor('axefx3', 0)[4],
+      'the FM3 and the Axe-Fx III are being given identical scenes, so one of them is wrong'
+    )
+
+    /* Generated, not hand-edited: regenerate from the CSV and it must match. */
+    const csv = readFileSync(new URL('../data/factory-presets.csv', import.meta.url), 'utf8')
+    const fresh = build(csv)
+    const onDisk = JSON.parse(readFileSync(new URL('../src/data/factory-presets.json', import.meta.url), 'utf8'))
+    assert.deepEqual(onDisk, fresh, 'src/data/factory-presets.json is stale — run scripts/factory-presets.mjs')
+
+    /* A preset name with a comma in it must not shift every scene along one. */
+    assert.deepEqual(splitRow('fm3,7,"Sunday, Morning",A,B'), ['fm3', '7', 'Sunday, Morning', 'A', 'B'])
+
+    /* And the demo actually serves them, at both ends. */
+    for (const file of ['../src/lib/mockDevice.js', '../mobile/src/lib/mockDevice.js']) {
+      const mock = readFileSync(new URL(file, import.meta.url), 'utf8')
+      assert.match(mock, /presetsFor\(UNIT\)/, `${file} still shows twelve presets and 500 blanks`)
+      assert.match(mock, /scenesFor\(UNIT, number\)/, `${file} does not use the factory scene names`)
+    }
+  })
+
 }
