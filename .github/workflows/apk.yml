@@ -95,6 +95,64 @@ jobs:
         working-directory: mobile
         run: npx expo prebuild --platform android --no-install
 
+      # AND THE TWO THINGS EAS WOULD HAVE PUT IN, WITHOUT WHICH THIS APK CAN
+      # NEVER TAKE AN UPDATE.
+      #
+      # "The android app is still on 3.171. It's supposed to be doing updates,
+      # right?" It was supposed to, and it could not, and nothing said so —
+      # the app asked Expo for an update on every launch and was never going
+      # to be given one.
+      #
+      # `expo prebuild` writes the updates URL into the manifest and stops
+      # there, because the rest is normally EAS Build's job. Two pieces were
+      # therefore missing from every APK this workflow has ever produced:
+      #
+      #   THE RUNTIME VERSION. app.json sets `runtimeVersion.policy` to
+      #   `fingerprint`, and prebuild renders that as the literal string
+      #   `file:fingerprint` — a sentinel telling expo-updates to read the
+      #   real hash out of an asset named `fingerprint`. Nothing in a bare
+      #   gradle build writes that asset, so the read threw and the whole
+      #   updates configuration was invalid. Written without a trailing
+      #   newline on purpose: it is compared to the published runtime version
+      #   as a whole string, and "…de12\n" is not "…de12".
+      #
+      #   THE CHANNEL. An update is published to a branch, and an app says
+      #   which branch it wants with an `expo-channel-name` request header.
+      #   EAS injects it from the profile in eas.json. A sideloaded APK had
+      #   none, so even a correct fingerprint would have asked the server a
+      #   question with no answer. `preview` is the one to ask for: it is the
+      #   eas.json profile for a directly-installed build, which is what this
+      #   is.
+      #
+      # BOTH ARE WRITTEN HERE RATHER THAN IN app.json, for the reason the
+      # memory settings are — see the note below. app.json is hashed into the
+      # runtime fingerprint, so putting either of these there would move the
+      # number and cut off every installed copy of the app to fix the thing
+      # that stops installed copies being cut off.
+      - name: Make it able to take updates
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          hash="$(node -p "require('./fingerprint.json').android")"
+          [ -n "$hash" ] || { echo "::error::No android fingerprint recorded."; exit 1; }
+          mkdir -p android/app/src/main/assets
+          printf '%s' "$hash" > android/app/src/main/assets/fingerprint
+          python3 - "$hash" <<'PY'
+          import sys
+          key = 'expo.modules.updates.UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY'
+          at = 'android/app/src/main/AndroidManifest.xml'
+          s = open(at).read()
+          if key in s:
+              raise SystemExit('the channel is already set — prebuild now does this, so this step can go')
+          anchor = '<meta-data android:name="expo.modules.updates.EXPO_UPDATE_URL"'
+          if anchor not in s:
+              raise SystemExit('no updates URL in the manifest — updates are off, so the channel would mean nothing')
+          row = '<meta-data android:name="%s" android:value="{&quot;expo-channel-name&quot;:&quot;preview&quot;}"/>\n    ' % key
+          open(at, 'w').write(s.replace(anchor, row + anchor, 1))
+          print('runtime version', sys.argv[1], 'and channel preview written in')
+          PY
+          grep -c 'expo-channel-name' android/app/src/main/AndroidManifest.xml
+
       # THE TEMPLATE'S MEMORY CEILING IS NO LONGER ENOUGH FOR THIS APP.
       #
       # `expo prebuild` writes the React Native template's gradle.properties,

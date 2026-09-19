@@ -895,6 +895,82 @@ export function run(test) {
     for (const channel of ['production', 'preview']) {
       assert.ok(job.includes(channel), `the update job never mentions the ${channel} channel`)
     }
+
+    /*
+     * AND IT HAPPENS BY ITSELF, which is the half that was missing. The job
+     * existed and was gated on somebody opening this workflow and ticking a
+     * box. Nobody ever did, so a handset sat on the version it was installed
+     * at while thirty changes went past it — "The android app is still on
+     * 3.171. It's supposed to be doing updates, right?"
+     */
+    assert.match(job, /github\.event_name == 'push'/, 'an update is published only when somebody remembers to ask')
+    assert.match(wf, /\n {2}push:\n {4}branches: \[main\]/, 'nothing lands on main to publish from')
+    assert.match(job, /needs: check/, 'a bundle that does not build could be published to a phone')
+
+    /*
+     * AND A PUSH CAN NEVER START A BUILD. This is the one that costs money if
+     * it is ever wrong: main is pushed several times a day, iOS build slots
+     * are counted in single figures a month, and the whole reason this
+     * workflow was dispatch-only was to keep those two facts apart. The
+     * update job now fires on a push, so the gate on the build job is no
+     * longer a formality — it is the only thing standing between a merge and
+     * a spent slot.
+     */
+    assert.match(
+      jobIf('build'),
+      /github\.event_name == 'workflow_dispatch'/,
+      'a push to main can now start an iOS build, which is a build slot per merge'
+    )
+  })
+
+  test('an APK is built able to take the updates that are published', () => {
+    /*
+     * "The android app is still on 3.171. It's supposed to be doing updates,
+     * right? For small changes without having to do any build?"
+     *
+     * It was, and it could not, and nothing anywhere said so. The app asked
+     * Expo for an update every launch and was never going to be handed one,
+     * because `expo prebuild` writes the updates URL and stops — the rest is
+     * normally EAS Build's job, and this APK is built by gradle on an
+     * ordinary runner precisely so it costs nothing.
+     *
+     * TWO PIECES WERE MISSING FROM EVERY APK THIS HAS EVER PRODUCED.
+     *
+     *   The runtime version. `runtimeVersion.policy` is `fingerprint`, which
+     *   prebuild renders as the literal `file:fingerprint` — a sentinel
+     *   telling expo-updates to read the real hash out of an asset called
+     *   `fingerprint`. Nothing in a bare gradle build writes that asset, the
+     *   read threw, and the whole updates configuration was invalid.
+     *
+     *   The channel. An update is published to a branch and an app says which
+     *   branch it wants with an `expo-channel-name` header. EAS injects it
+     *   from eas.json. A sideloaded APK had none, so even a correct
+     *   fingerprint would have asked a question with no answer.
+     *
+     * Neither belongs in app.json: that file is hashed into the fingerprint,
+     * so putting them there would move the number and cut off every installed
+     * copy in order to fix the thing that stops installed copies being cut
+     * off.
+     */
+    const apk = read('.github/workflows/apk.yml')
+    const at = apk.indexOf('Make it able to take updates')
+    assert.notEqual(at, -1, 'the APK is built unable to take an update again')
+    const step = apk.slice(at, apk.indexOf('\n      - name:', at + 1))
+
+    assert.match(step, /fingerprint\.json/, 'the runtime version is not the one updates are published under')
+    assert.match(
+      step,
+      /printf '%s' "\$hash" > android\/app\/src\/main\/assets\/fingerprint/,
+      'the fingerprint asset is written with a trailing newline, which is a different string from the one published'
+    )
+    assert.match(step, /expo-channel-name/, 'the APK asks for an update without saying which branch')
+    assert.match(step, /preview/, 'the channel is not the one a directly-installed build is on')
+
+    /* Written after prebuild, or prebuild overwrites both of them. */
+    assert.ok(
+      apk.indexOf('expo prebuild') < at,
+      'the updates config is written before prebuild, which then overwrites it'
+    )
   })
 
   test('the phone icon is one Apple will accept, and the others keep their alpha', () => {
