@@ -444,8 +444,22 @@ export function run(test) {
     assert.match(read('scripts/icon.mjs'), /TRAY_WIN/, 'nothing generates the Windows tray icon, so it cannot be regenerated from the artwork')
 
     const wf = read('.github/workflows/desktop.yml')
-    const job = wf.slice(wf.indexOf('\n  windows:'))
-    assert.ok(wf.includes('\n  windows:'), 'nothing builds it')
+    /*
+     * Bounded at the next job, not at the end of the file.
+     *
+     * This read from `windows:` to EOF, which was right while windows was
+     * last and silently wrong the moment a linux job was added after it: the
+     * slice swallowed linux's own `Package` step and the publish-flag check
+     * below failed against a step that was never meant to match. A slice that
+     * depends on being last is a slice that breaks when somebody appends.
+     */
+    const jobBody = (name) => {
+      const at = wf.indexOf(`\n  ${name}:\n`)
+      assert.notEqual(at, -1, `the ${name} job is gone`)
+      const next = wf.slice(at + 1).search(/\n {2}[a-z][a-z0-9-]*:\n/)
+      return next === -1 ? wf.slice(at) : wf.slice(at, at + 1 + next)
+    }
+    const job = jobBody('windows')
     assert.match(job, /runs-on: windows-latest/, 'the Windows app is being built somewhere that is not Windows')
     /* bash for every step in that job: the heredoc, the loops over release/,
        and the publish flag below. */

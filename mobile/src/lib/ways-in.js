@@ -98,6 +98,23 @@ export const WAYS = [
     links: [{ label: 'Download Fractal Remote for Windows', url: RELEASES }]
   },
   {
+    id: 'linux-app',
+    os: 'linux',
+    title: 'The Linux app',
+    status: 'ready',
+    note: 'Ready now — and the one to use on a box that lives in the rack',
+    steps: [
+      'On the download page below, take either the file ending in .AppImage (works on any Linux) or the one ending in .deb (Debian, Ubuntu, Raspberry Pi OS).',
+      'For the AppImage: make it executable and run it. In a file manager that is Properties then a tick marked "allow executing"; in a terminal it is chmod +x on the file.',
+      'For the .deb: sudo apt install ./the-file.deb',
+      'Plug your unit into the machine with its USB cable.',
+      'You may need permission to use the USB port. If the app says it cannot find your unit, run: sudo usermod -aG dialout $USER — then log out and back in. Most distributions keep serial ports behind that group, and it catches nearly everybody once.',
+      'In the app, choose Set up phone remote, and type the code it shows into your phone. No account needed.',
+      'There are builds for both ordinary PCs and ARM machines, so a Raspberry Pi works — which makes a cheap box that sits in the rack and stays on a genuinely good answer.'
+    ],
+    links: [{ label: 'Download Fractal Remote for Linux', url: RELEASES }]
+  },
+  {
     id: 'mac-terminal',
     os: 'mac',
     title: 'ForgeFX in a terminal, on a Mac',
@@ -116,7 +133,7 @@ export const WAYS = [
      */
     command: HELPER_SH,
     steps: [
-      'Only worth doing if you do not want the Mac app. The app carries this same server inside it and sets it up for you. This is also the only route a Linux machine has.',
+      'Only worth doing if you do not want the app. The Mac and Linux apps carry this same server inside them and set it up for you.',
       'It needs git, Node 20, and a GitHub token that can read the project — the repositories are private, so ask Justin for one. Then open Terminal and paste both lines:',
       'export FORGEFX_TOKEN="the-token"',
       HELPER_SH,
@@ -174,6 +191,20 @@ export function osGuess(ua = '') {
   /* iPhone and iPad first: an iPad's user agent says Macintosh. */
   if (/iPhone|iPad|iPod|Android/i.test(s)) return null
   if (/Macintosh|Mac OS X/i.test(s)) return 'mac'
+  /*
+   * Linux last, and only after the handsets have been ruled out above.
+   * Android's user agent says "Linux" — every one of them — so testing for it
+   * any earlier would tell a phone it was a desktop and offer it an AppImage.
+   *
+   * ChromeOS is deliberately not counted. It says CrOS and it is Linux
+   * underneath, but its Linux environment is a container and getting a USB
+   * device through to it varies by machine; offering a download that probably
+   * cannot reach the unit is worse than leaving the page unsorted. It needs
+   * its own line because a Chromebook's user agent reads "X11; CrOS" — the
+   * Linux test below matches it, so the exclusion has to come first.
+   */
+  if (/CrOS/i.test(s)) return null
+  if (/Linux|X11/i.test(s)) return 'linux'
   return null
 }
 

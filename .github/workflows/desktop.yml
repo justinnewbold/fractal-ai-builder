@@ -399,3 +399,103 @@ jobs:
           name: fractal-ai-builder-windows
           path: desktop/release/*.exe
           if-no-files-found: error
+
+  # ----------------------------------------------------------------- linux
+  #
+  # TWO ARCHITECTURES, EACH BUILT ON ITS OWN, which is the one decision in
+  # this job that is not cosmetic. serialport and @julusian/midi are compiled
+  # against the machine that installs them, so an x64 runner cross-building an
+  # arm64 package produces an installer whose device layer cannot load — it
+  # installs perfectly and never sees the unit. Each runner builds for itself
+  # and claims nothing about the other.
+  #
+  # The arm64 half is what makes a Raspberry Pi a real answer rather than a
+  # suggestion: a Pi in a rack with a USB cable in it, left on, is the closest
+  # thing to a purpose-built box this project has. `ubuntu-24.04-arm` runners
+  # are free on a public repository, which this one is.
+  #
+  # UNSIGNED, AND THAT IS NORMAL HERE. Linux has no Gatekeeper and no
+  # SmartScreen; an AppImage is made executable and run. There is nothing to
+  # buy and nothing to warn anybody about, so unlike the other two platforms
+  # this job has no signed variant at all.
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: x64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: The web app, and the logic the launchers share
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+      - name: Vendor the device server
+        env:
+          FORGEFX_TOKEN: ${{ secrets.FORGEFX_TOKEN }}
+        run: npm run vendor:forgefx
+
+      - name: Install the shell
+        working-directory: desktop
+        run: npm install
+
+      # The same question the other two jobs ask, and on this one it carries
+      # the extra weight of proving the arm64 half is real: a module built for
+      # the wrong architecture fails here rather than on somebody's Pi.
+      - name: The native modules load under Electron
+        working-directory: desktop/vendor/forgefx/server
+        run: |
+          ELECTRON="$(cd "$GITHUB_WORKSPACE/desktop" && node -p 'require("electron")')"
+          echo "electron: $ELECTRON  arch: $(uname -m)"
+          ELECTRON_RUN_AS_NODE=1 "$ELECTRON" -e "
+            require('serialport');
+            require('@julusian/midi');
+            console.log('serial and MIDI both load under Electron-as-Node');
+          "
+
+      - name: Package
+        working-directory: desktop
+        env:
+          PUBLISH: >-
+            ${{ (github.event_name != 'pull_request'
+                 && (startsWith(github.ref, 'refs/tags/desktop-v')
+                     || (inputs.publish && github.ref == 'refs/heads/main')))
+                && 'always' || 'never' }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run dist:linux -- --publish "${PUBLISH:-never}"
+
+      # The AppImage is the one that can update itself, so a release without
+      # one leaves every installed copy stranded. The .deb is the one people
+      # on a Pi or a Debian box will actually reach for. Both or neither.
+      - name: Both halves of a release are there
+        working-directory: desktop
+        run: |
+          ls -la release/
+          seen=0
+          for f in release/*.AppImage; do [ -e "$f" ] && seen=1; done
+          [ "$seen" = 1 ] || { echo "no AppImage was produced, so nothing can update itself"; exit 1; }
+          seen=0
+          for f in release/*.deb; do [ -e "$f" ] && seen=1; done
+          [ "$seen" = 1 ] || { echo "no .deb was produced"; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fractal-ai-builder-linux-${{ matrix.arch }}
+          path: |
+            desktop/release/*.AppImage
+            desktop/release/*.deb
+          if-no-files-found: error
