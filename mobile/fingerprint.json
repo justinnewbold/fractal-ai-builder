@@ -1,0 +1,25 @@
+{
+  "_": [
+    "WHAT A BUILD COSTS, WRITTEN DOWN SO CI CAN CHECK IT.",
+    "",
+    "These are the runtime fingerprints of the app as it stands. An EAS Update",
+    "only ever reaches a build whose fingerprint matches it, so while these two",
+    "numbers hold still, every change ships to an installed phone for free. The",
+    "moment one moves, every copy already on a handset is cut off until somebody",
+    "spends a build — and on iOS that is a handful a month.",
+    "",
+    "WHY IT IS A FILE AND NOT A HABIT. It used to be a habit. Commits through",
+    "7.332.0, 7.335.0 and 7.338.0 each recorded 'the fingerprint is e44c3556…",
+    "before and after' — somebody computing it by hand every time and writing it",
+    "down. After 7.327.0 that stopped, and three native changes went through",
+    "unnoticed: two Expo packages at 7.328.0, the camera at 7.329.0, and the",
+    "opaque iOS icon at 7.349.0. Nobody found out until a phone sat on an old",
+    "version taking no updates and the reason took an hour to work out.",
+    "",
+    "A pull request that moves either number now fails, and says what it costs.",
+    "If the change is wanted, `npm run fingerprint` rewrites this file and the",
+    "diff records which change spent the build."
+  ],
+  "android": "826b1b536206f9405d315fdfa1761986b60ade12",
+  "ios": "42e64bb56d66847e4b5c997cd507a9a0517eedfd"
+}
