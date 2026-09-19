@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Sheet from './Sheet'
 import { toggleFavourite } from '../lib/presetMarks'
 import {
@@ -59,20 +59,28 @@ export default function Setlists({
   /* Delete asks twice. One tap on a sheet you are scrolling is one tap. */
   const [armed, setArmed] = useState(false)
   /*
-   * The name as it is being typed. Stored names are never blank, so a box
-   * bound straight to storage snapped back to the old name the moment the
-   * last letter was deleted — you could not clear it to type a new one.
+   * The name as it is being typed, and NOTHING ELSE TOUCHED UNTIL IT IS TYPED.
+   *
+   * This is the phone's rule, brought over with the box. Saving on every
+   * keystroke writes storage, which announces, which re-renders this whole
+   * sheet between one letter and the next — and a React text box is told what
+   * it contains by its `value`, so a `value` arriving a frame late is a box
+   * that puts back the letter you just deleted. On the phone that showed up as
+   * a name you could not clear and a name that carried pieces of itself twice.
+   *
+   * So the box is the only thing that knows the name while you are typing it,
+   * and storage is told once: on blur, on Enter, on choosing another setlist,
+   * and on closing the sheet.
    */
   const [draft, setDraft] = useState(null)
+  /*
+   * The setlist just made, whose box opens with its name selected and ready to
+   * be typed over. Only ever the one just pressed into being: a row that
+   * grabbed the keyboard every time it was chosen would be a row you cannot
+   * choose without typing.
+   */
+  const [justMade, setJustMade] = useState(null)
 
-  useEffect(() => {
-    if (!open) {
-      setAdding(false)
-      setNeedle('')
-      setArmed(false)
-      setDraft(null)
-    }
-  }, [open])
   useEffect(() => {
     setArmed(false)
     setAdding(false)
@@ -86,8 +94,23 @@ export default function Setlists({
     return name || (n === current ? presetLabel(preset) : '')
   }
 
+  /** Save what was typed, if it is a name and it is a different one. */
+  const commitName = () => {
+    setJustMade(null)
+    const name = (draft ?? '').trim()
+    setDraft(null)
+    if (!chosen || !name || name === chosen.name) return
+    updateList(deviceKey, chosen.id, { name })
+  }
+
+  /*
+   * Choosing another setlist takes the box away with the row it was in, and a
+   * box that goes away is not blurred — so a name typed and then chosen away
+   * from is saved here, before the row changes.
+   */
   const choose = (src) => {
     haptic()
+    commitName()
     setSource(deviceKey, src)
   }
 
@@ -99,10 +122,12 @@ export default function Setlists({
 
   const fresh = () => {
     haptic()
-    const list = createList(deviceKey)
+    commitName()
     // A new setlist is the one you are about to build, so it is the one the
-    // buttons follow — and the one this sheet opens for editing, below.
+    // buttons follow — and the one whose row opens ready to be named.
+    const list = createList(deviceKey)
     setSource(deviceKey, list.id)
+    setJustMade(list.id)
   }
 
   const setPresets = (presets) => {
@@ -110,11 +135,26 @@ export default function Setlists({
     updateList(deviceKey, chosen.id, { presets })
   }
 
-  const rename = (name) => {
-    if (!chosen) return
-    setDraft(name)
-    if (name.trim()) updateList(deviceKey, chosen.id, { name: name.trim() })
-  }
+  /*
+   * And once more on the way out, because closing the sheet takes the box off
+   * the screen without ever blurring it — a rename typed and then closed on
+   * would simply not have happened.
+   */
+  const live = useRef({ draft: null, chosen: null, deviceKey: null })
+  useEffect(() => {
+    live.current = { draft, chosen, deviceKey }
+  })
+  useEffect(() => {
+    if (open) return
+    const { draft: d, chosen: c, deviceKey: unit } = live.current
+    const name = (d ?? '').trim()
+    if (c && name && name !== c.name) updateList(unit, c.id, { name })
+    setAdding(false)
+    setNeedle('')
+    setArmed(false)
+    setDraft(null)
+    setJustMade(null)
+  }, [open])
 
   const add = (n) => {
     if (!chosen) return
@@ -166,7 +206,18 @@ export default function Setlists({
             on={source === l.id}
             onPick={() => choose(l.id)}
             name={l.name}
-            note={l.presets.length ? `${l.presets.length} song${l.presets.length === 1 ? '' : 's'}` : 'Empty'}
+            note={
+              source === l.id
+                ? `${songs(l)} \u00b7 tap the name to rename`
+                : songs(l)
+            }
+            /* The chosen row IS the name box, exactly as it is on the phone.
+               See the note above it. */
+            editing={
+              source === l.id
+                ? { value: draft ?? l.name, setDraft, commitName, selectAll: justMade === l.id }
+                : null
+            }
           />
         ))}
         <button type="button" className="chip setlist-new" onClick={fresh}>
@@ -206,17 +257,6 @@ export default function Setlists({
 
       {chosen ? (
         <div className="setlist-edit">
-          <label className="setlist-name">
-            <span className="silk-label">Name</span>
-            <input
-              type="text"
-              value={draft ?? chosen.name}
-              onChange={(e) => rename(e.target.value)}
-              onBlur={() => setDraft(null)}
-              aria-label="Setlist name"
-            />
-          </label>
-
           {chosen.presets.length ? (
             <ol className="setlist-songs" aria-label={`Songs in ${chosen.name}`}>
               {chosen.presets.map((n, i) => (
@@ -333,7 +373,49 @@ export default function Setlists({
   )
 }
 
-function SourceRow({ on, onPick, name, note }) {
+/** "3 songs", "1 song", "Empty". */
+const songs = (l) => (l.presets.length ? `${l.presets.length} song${l.presets.length === 1 ? '' : 's'}` : 'Empty')
+
+/**
+ * One choice of what Previous and Next walk.
+ *
+ * With `editing`, the name is a text box in the row — the chosen setlist's
+ * row, which is where the name is read and so where it is changed.
+ *
+ * "Typing should happen in the blue cell and the duplicate deleted." There
+ * were two names for one setlist an inch apart: the row you had just tapped,
+ * and a NAME box under it that the phone app has not had for a while. Two
+ * boxes for one name is a question about which one is the real one.
+ *
+ * The chosen row is a div rather than a button because a text box inside a
+ * button is a text box a browser will not reliably let you into. Nothing is
+ * lost: it is the row that is already chosen, so there is no choosing left to
+ * do in it.
+ */
+function SourceRow({ on, onPick, name, note, editing = null }) {
+  if (editing) {
+    return (
+      <div className="setlist-source current setlist-source-named" aria-current="true">
+        <input
+          type="text"
+          className="setlist-source-name"
+          value={editing.value}
+          onChange={(e) => editing.setDraft(e.target.value)}
+          onBlur={editing.commitName}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+          }}
+          /* A new setlist opens with its name selected, so typing replaces
+             "Setlist 1" rather than landing after it. */
+          autoFocus={editing.selectAll}
+          onFocus={(e) => editing.selectAll && e.currentTarget.select()}
+          placeholder="Name this setlist"
+          aria-label="Setlist name"
+        />
+        <span className="setlist-source-note">{note}</span>
+      </div>
+    )
+  }
   return (
     <button type="button" className={`setlist-source ${on ? 'current' : ''}`} onClick={onPick} aria-pressed={on}>
       <span className="setlist-source-name">{name}</span>

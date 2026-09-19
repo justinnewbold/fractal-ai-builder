@@ -3,14 +3,21 @@ import Sheet from './Sheet'
 import PhoneQr from './PhoneQr'
 
 /**
- * The four things nobody works out on their own.
+ * The three things nobody works out on their own.
  *
  * A tour is a tax on everyone who did not need it, so this one is short and
  * says only what the screen cannot. Where the tabs are is not in here: they
- * are labelled Play, Edit and Create and sit across the top. What is in here
- * is the two facts that make people nervous — where a change actually goes,
- * and how to undo it — plus the one concept this app leans on that a Fractal
- * unit itself explains badly.
+ * are labelled Play and Edit and sit across the top. What is in here is the
+ * two facts that make people nervous — where a change actually goes, and how
+ * to undo it — plus the one concept this app leans on that a Fractal unit
+ * itself explains badly.
+ *
+ * "Delete the create tone from the tutorial." There used to be a third tab,
+ * Create, where you described a sound in words and it was built for you, and
+ * two of these cards were about it — the screens card named it, and a whole
+ * card taught you how to phrase a request. The tab went with the AI. A tour
+ * is the first thing a new person reads and it was sending them to look for
+ * a screen that is not there, which is a worse first minute than no tour.
  *
  * It is offered, not imposed. Skip keeps the same corner on every card that
  * has one, and it is a real button rather than a grey word: someone who has
@@ -46,7 +53,7 @@ export const markTourSeen = () => {
 
 const CARDS = [
   {
-    title: 'Three screens',
+    title: 'Two screens',
     body: (
       <>
         <p>
@@ -56,25 +63,6 @@ const CARDS = [
         <p>
           <strong>Edit</strong> is the signal chain &mdash; tap any block to open it, or search for
           a control by name if you know what you want.
-        </p>
-        <p>
-          <strong>Create</strong> is where you describe a sound and it gets built for you.
-        </p>
-      </>
-    )
-  },
-  {
-    title: 'Say what you want',
-    body: (
-      <>
-        <p>
-          On Create, write it the way you&rsquo;d say it to someone: <em>tight modern metal rhythm
-          in drop A</em>, or <em>warm clean with a bit of shimmer</em>. Name a band, a record or a
-          real amp and it will work out what made that sound.
-        </p>
-        <p>
-          You always see the whole thing &mdash; every block, every value &mdash; before anything
-          reaches the unit. Nothing is sent until you press the button that says so.
         </p>
       </>
     )

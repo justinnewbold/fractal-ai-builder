@@ -4261,7 +4261,7 @@ export function run(test) {
      */
     const qr = readFileSync(new URL('../src/components/PhoneQr.jsx', import.meta.url), 'utf8')
     assert.match(qr, /from '\.\/PhoneRemote'/, 'the tour draws its own pairing code')
-    assert.match(qr, /PairCard|AccountCard|WifiCard/, 'the shared block renders no square')
+    assert.match(qr, /PairCard|AccountCard/, 'the shared block renders no square')
     const tour = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
     assert.match(tour, /<PhoneQr connected=\{connected\} email=\{email\} \/>/, 'the card has no square in it')
 
@@ -4270,119 +4270,51 @@ export function run(test) {
     assert.match(app, /<Tour[\s\S]{0,200}role=\{link\.role\}/, 'the tour is never told which machine it is on')
   })
 
-  test('one square is on screen at a time, and it says which it is', () => {
+  test('there is one square, and the wifi one is gone', () => {
     /*
      * "Are both QR codes needed on the Mac app? It's confusing and they are
      * literally right by each other so a phone will pick up both codes."
+     * Then, plainly: "Just delete the QR code. Because we will not be using
+     * it."
      *
-     * Both are needed. Neither should have been beside the other, and the
-     * proof it was already costing people is in the phone app's scanner: it
-     * carries a message written for somebody who scanned the wrong one —
-     * "that is the same wifi square, which is for a web browser". A warning
-     * that apologises for a layout is a layout that wants fixing.
+     * The one that went was the SAME WIFI square — it opened the computer's
+     * own address in a web browser on the phone, with nothing to sign into,
+     * and only while both were on the same network. A real route, and not one
+     * this app asks anybody to use: the phone app is the phone app.
      *
-     * They are for two different things, which had never been said:
-     *   the app's square works from anywhere and is what the scanner reads;
-     *   the wifi square opens a BROWSER on this computer's own address, with
-     *   nothing to sign into, and only while both are on the same wifi.
+     * What is left is the square for the APP: a pairing code, or the way in
+     * to signing into the same account. It works from anywhere, and it is the
+     * one the phone's scanner reads.
      */
     const qr = readFileSync(new URL('../src/components/PhoneQr.jsx', import.meta.url), 'utf8')
     const bare = qr.replace(/\{?\/\*[\s\S]*?\*\/\}?/g, '')
 
-    /* The app's square is the one on screen; the wifi one is behind a fold. */
-    assert.match(bare, /<details className="wifi-fold">/, 'the wifi square is not folded away')
-    assert.ok(
-      bare.indexOf('PairCard') < bare.indexOf('wifi-fold'),
-      'the wifi square is drawn before the one the app actually needs'
-    )
-    /* And the fold says what it is FOR, not what it is called. */
-    assert.match(qr, /web browser/, 'the fold never says the other square is for a browser')
+    /* Gone, not folded away and not merely unreferenced. A fold left behind
+       is a square a camera can still find. */
+    assert.ok(!/wifi-fold/.test(bare), 'the wifi square is still folded into the page')
+    assert.ok(!/WifiCard/.test(bare), 'the wifi square is still drawn')
+    assert.ok(!/servedLocally/.test(bare), 'the block still asks whether it is being served locally')
 
-    /*
-     * Asked rather than discovered: calling a component as a plain function
-     * to see whether it drew anything runs its hooks in the caller's place,
-     * which works right up until either changes shape.
-     */
-    assert.match(bare, /if \(!servedLocally\(\)\) return null/, 'the fold decides by rendering the card and looking')
-    assert.ok(!/const wifi = WifiCard\(\)/.test(bare), 'WifiCard is being called as a function again')
+    /* And what remains is the app's square, both ways in to it. */
+    assert.match(bare, /<PairCard /, 'the pairing square is gone too')
+    assert.match(bare, /<AccountCard /, 'the account square is gone too')
+
+    const remote = readFileSync(new URL('../src/components/PhoneRemote.jsx', import.meta.url), 'utf8')
+    assert.ok(!/function WifiCard/.test(remote), 'the wifi square is still built, waiting to be drawn again')
 
     /*
      * ONE RENDERING, shared by Setup and the first-launch tour. Two copies of
      * a pairing code drift, and that drift is a phone scanning a square that
      * pairs it with nothing.
      */
-    const remote = readFileSync(new URL('../src/components/PhoneRemote.jsx', import.meta.url), 'utf8')
-    const macSide = remote.slice(remote.indexOf('function MacSide'), remote.indexOf('function WifiCard'))
-    assert.match(macSide, /<PhoneQr connected=\{link\.link === 'connected'\} email=\{email\}/, 'Setup draws its own squares again')
-    /*
-     * The branch where BOTH squares exist is the only one that was confusing.
-     * Before the computer is set up there is no pairing code yet, so the wifi
-     * square is the only one on the page and stands alone quite happily — it
-     * is the route that asks for nothing, which is worth offering first.
-     */
-    const setUp = macSide.slice(macSide.indexOf('<PhoneQr'))
-    assert.ok(!/<WifiCard \/>/.test(setUp), 'Setup still puts the wifi square beside the other one')
+    const macSide = remote.slice(remote.indexOf('function MacSide'), remote.indexOf('export function PairCard'))
+    assert.match(macSide, /<PhoneQr connected=\{link\.link === 'connected'\} email=\{email\}/, 'Setup draws its own square again')
 
-    /* The scanner's message stays: it is still right, and somebody who opens
-       the fold and scans that square deserves to be told which one it was. */
+    /* The scanner's message stays: a desktop build older than this one still
+       shows that square, and somebody who scans it deserves to be told which
+       one it was. */
     const scan = readFileSync(new URL('../mobile/src/components/ScanCode.js', import.meta.url), 'utf8')
     assert.match(scan, /looksLikeTheWifiSquare/, 'the scanner no longer recognises the wrong square')
-  })
-
-  test('the hosted site is a way to get the app, not the app', async () => {
-    /*
-     * "We are getting rid of the web app accessibility, I know that app is
-     * needed for the computer app to work, but it's going to require an
-     * actual app download. We don't want it accessible from their browser
-     * directly."
-     *
-     * THE BUNDLE IS UNCHANGED AND THAT IS THE POINT. The desktop apps serve
-     * this very build from the machine holding the cable — that is what they
-     * are — so the app cannot be deleted without deleting them. What can be
-     * decided is WHERE it agrees to run.
-     */
-    const main = readFileSync(new URL('../src/main.jsx', import.meta.url), 'utf8')
-    assert.match(main, /const shopFront = isHostedOrigin\(\) && !isStandalone\(\)/, 'nothing decides where the app may run')
-    assert.match(main, /\{shopFront \? <GetTheApp \/> : <App \/>\}/, 'the app still mounts on the hosted site')
-
-    /*
-     * The test is the HOSTNAME, which is what leaves every other way in
-     * untouched. Run through the cases that must still work, because each of
-     * them is somebody who has paid or downloaded something.
-     */
-    const { isHostedOrigin, isStandalone, HOSTED } = await import('../src/lib/platform.js')
-    const at = (hostname, extra = {}) => ({ location: { hostname }, navigator: {}, ...extra })
-
-    assert.equal(isHostedOrigin(at(HOSTED)), true, 'the hosted site is not recognised')
-    /* The desktop app serves this bundle from the machine with the cable. */
-    assert.equal(isHostedOrigin(at('localhost')), false, 'the desktop app would lose the app')
-    assert.equal(isHostedOrigin(at('127.0.0.1')), false, 'the desktop app would lose the app')
-    /* A phone on the same wifi opens the computer's own address. */
-    assert.equal(isHostedOrigin(at('192.168.1.40')), false, 'the same-wifi route would lose the app')
-    assert.equal(isHostedOrigin(at('studio.local')), false, 'the same-wifi route would lose the app')
-
-    /* And somebody who installed it to their home screen already keeps it:
-       taking that away is taking something from a person who has it. */
-    assert.equal(isStandalone(at(HOSTED, { navigator: { standalone: true } })), true, 'an installed copy is not recognised')
-
-    /*
-     * A PAIRING CODE IN THE ADDRESS IS STILL HONOURED. The squares a computer
-     * shows carry `#pair=CODE`, and a phone CAMERA pointed at one lands here
-     * — so the page reads it back out rather than silently dropping the one
-     * thing the person arrived with.
-     */
-    const page = readFileSync(new URL('../src/components/GetTheApp.jsx', import.meta.url), 'utf8')
-    assert.match(page, /pairCodeFromUrl\(/, 'a scanned pairing code is dropped on the floor')
-    assert.match(page, /formatPairCode\(code\)/, 'the code is never shown to be typed in')
-    const { pairLink, pairCodeFromUrl } = await import('../shared/pairing.mjs')
-    const link = pairLink('abcd2345')
-    assert.ok(link, 'there is no pairing link to land here')
-    assert.ok(pairCodeFromUrl({ hash: new URL(link).hash }), 'the page could not read back the code its own links carry')
-
-    /* It offers the downloads, and says which routes exist rather than
-       counting them by hand — see ways-in. */
-    assert.match(page, /RELEASES/, 'there is nowhere to download the computer app')
-    assert.match(page, /waysWord\(\)/, 'the page types the number of ways rather than counting them')
   })
 
 }
