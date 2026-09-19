@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { getHost, setHost, isDemo, setDemo } from '../lib/forgefx'
+import { getHost, setHost, isDemo, setDemo, demoUnit, setDemoUnit } from '../lib/forgefx'
 import { remoteActive } from '../lib/remote'
+import { UNITS as DEMO_UNITS } from '../lib/demoUnits'
 import { FULL } from '../lib/version'
 
 /**
@@ -44,8 +45,36 @@ export default function DeviceDetail({ status, device, onRetry, busy }) {
     window.location.reload()
   }
 
+  /*
+   * Which Fractal the demo is. Only while the demo is on, because on a real
+   * rig the unit is whatever is plugged in and a picker would be offering to
+   * change a fact.
+   *
+   * A reload rather than a re-render: every preset name, scene list and
+   * capability in the simulation belongs to the unit it was built for, and
+   * the screens are holding the old one. See setDemoUnit.
+   */
+  const pickUnit = (key) => {
+    setDemoUnit(key)
+    window.location.reload()
+  }
+
   return (
     <div className="device-detail">
+      {demo ? (
+        <div className="demo-units" role="group" aria-label="Which unit the demo is">
+          {DEMO_UNITS.map((u) => (
+            <button
+              key={u.key}
+              className={`chip${u.key === demoUnit() ? ' active' : ''}`}
+              aria-pressed={u.key === demoUnit()}
+              onClick={() => pickUnit(u.key)}
+            >
+              {u.name}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {status === 'live' && device ? (
         <div className="device-meta mono">
           {/* The commit rides with the number. A version is hand-written and can

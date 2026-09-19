@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
-import { servedLocally } from '../lib/forgefx'
 import { changePassword } from '../lib/remote'
 import { describeLink, formatPairCode, isPairAccount, pairLink, savedPairCode, HOSTED_ORIGIN } from '../lib/link'
+import PhoneQr from './PhoneQr'
 
 /**
  * Phone remote, in Setup: what this end is, whether the other end is there,
@@ -74,7 +74,6 @@ function MacSide({ link, email, onAction, busy }) {
      */
     return (
       <>
-        <WifiCard />
         <p className="hint">
           Set this up once and your phone can play through this computer from anywhere. No account
           needed &mdash; the computer shows a code, the phone scans it.
@@ -95,15 +94,22 @@ function MacSide({ link, email, onAction, busy }) {
     )
   }
 
-  const paired = isPairAccount(email)
   return (
     <>
-      <WifiCard />
-      {paired ? (
-        <PairCard on={link.link === 'connected'} onAction={onAction} busy={busy} />
-      ) : (
-        <AccountCard on={link.link === 'connected'} email={email} />
-      )}
+      {/*
+        ONE SQUARE, and the wifi one folded under it.
+
+        "Are both QR codes needed on the Mac app? It's confusing and they are
+        literally right by each other so a phone will pick up both codes."
+        Both are needed and they are for different things — the app, and a web
+        browser — which PhoneQr says in words. Two squares an inch apart is a
+        camera choosing for you.
+
+        Shared with the first-launch tour rather than drawn twice: two
+        renderings of a pairing code drift, and that drift is a phone scanning
+        a square that pairs it with nothing.
+      */}
+      <PhoneQr connected={link.link === 'connected'} email={email} onAction={onAction} busy={busy} />
       <div className="history-actions">
         {link.link === 'connected' ? (
           <button className="chip" onClick={() => onAction('mac-off')} disabled={busy}>
@@ -120,96 +126,6 @@ function MacSide({ link, email, onAction, busy }) {
 }
 
 /**
- * The way in for a computer signed into an account.
- *
- * "I looked all over the Mac app. There is no other QR code besides the one
- * that gives the web address. There is also nowhere that shows the connect
- * code to connect."
- *
- * Both true, and the second one has an answer that had never been written
- * down anywhere he could read it: WITH AN ACCOUNT THERE IS NO CODE. A code
- * exists so that two devices can share a hidden account without anybody
- * making one — see PairCard. Once there is a real account, the account is
- * the code, and the phone joins by signing into it.
- *
- * What was wrong is that the app knew that and never said it. This computer
- * showed one line, "Signed in as you@example.com", beside a wifi QR for a
- * completely different route, and left somebody hunting the menus for a
- * number that does not exist.
- *
- * So: the same square, pointing at the app on the hosted site, and the
- * account to sign into written under it. Scanning gets the phone to the
- * right place; the line under it says what to do when it arrives.
- */
-function AccountCard({ on, email }) {
-  const url = HOSTED_ORIGIN
-  const [qr, setQr] = useState(null)
-
-  useEffect(() => {
-    let alive = true
-    QRCode.toDataURL(url, { margin: 1, width: 320, color: { dark: '#0d0f12', light: '#ffffff' } })
-      .then((d) => alive && setQr(d))
-      .catch(() => alive && setQr(null))
-    return () => {
-      alive = false
-    }
-  }, [url])
-
-  return (
-    <div className="phone-setup">
-      <p className="hint">
-        {on
-          ? 'From anywhere. Point your phone’s camera at this to open the app, then sign in with the same account.'
-          : 'From anywhere, once this is turned on. Point your phone’s camera at this to open the app, then sign in with the same account.'}
-      </p>
-      {qr ? (
-        <img className="phone-qr" src={qr} alt={`Code for ${url}`} width={160} height={160} />
-      ) : null}
-      <p className="pair-code mono" aria-label="The account to sign in as">
-        {email}
-      </p>
-      {/* The sentence that was missing. Somebody who has read about pairing
-          codes will otherwise keep looking for one. */}
-      <p className="footnote">
-        There is no pairing code to type: that is for computers set up without an account. This one
-        has one, so signing in on the phone is what joins it.
-      </p>
-    </div>
-  )
-}
-
-/**
- * Same wifi, nothing to sign into. Shown at the Mac when the page is being
- * served from it, which is exactly when this route exists: point the phone's
- * camera at it and the phone is talking to the unit directly.
- */
-function WifiCard() {
-  const local = servedLocally()
-  const url = local ? window.location.origin : null
-  const [qr, setQr] = useState(null)
-
-  useEffect(() => {
-    if (!url) return undefined
-    let alive = true
-    QRCode.toDataURL(url, { margin: 1, width: 320, color: { dark: '#0d0f12', light: '#ffffff' } })
-      .then((d) => alive && setQr(d))
-      .catch(() => alive && setQr(null))
-    return () => {
-      alive = false
-    }
-  }, [url])
-
-  if (!local) return null
-  return (
-    <div className="phone-setup">
-      <p className="hint">Same wifi? Point your phone&rsquo;s camera at this &mdash; nothing to sign into.</p>
-      {qr ? <img className="phone-qr" src={qr} alt={`Code for ${url}`} width={160} height={160} /> : null}
-      <p className="phone-url mono">{url}</p>
-    </div>
-  )
-}
-
-/**
  * The code a paired Mac shows, as a QR and as text.
  *
  * The QR opens the hosted app with the code in the address, so a phone that
@@ -220,7 +136,7 @@ function WifiCard() {
  * at the same Mac knows the Mac is paired but not with what, and the only
  * honest offer is to pair again.
  */
-function PairCard({ on, onAction, busy }) {
+export function PairCard({ on, onAction, busy }) {
   const code = savedPairCode()
   const url = code ? pairLink(code) : null
   const [qr, setQr] = useState(null)
@@ -263,6 +179,65 @@ function PairCard({ on, onAction, busy }) {
       {qr ? <img className="phone-qr" src={qr} alt="Code to pair your phone with this computer" width={160} height={160} /> : null}
       <p className="pair-code mono" aria-label="Pairing code">
         {formatPairCode(code)}
+      </p>
+    </div>
+  )
+}
+
+/**
+ * The way in for a computer signed into an account.
+ *
+ * "I looked all over the Mac app. There is no other QR code besides the one
+ * that gives the web address. There is also nowhere that shows the connect
+ * code to connect."
+ *
+ * Both true, and the second one has an answer that had never been written
+ * down anywhere he could read it: WITH AN ACCOUNT THERE IS NO CODE. A code
+ * exists so that two devices can share a hidden account without anybody
+ * making one — see PairCard. Once there is a real account, the account is
+ * the code, and the phone joins by signing into it.
+ *
+ * What was wrong is that the app knew that and never said it. This computer
+ * showed one line, "Signed in as you@example.com", beside a wifi QR for a
+ * completely different route, and left somebody hunting the menus for a
+ * number that does not exist.
+ *
+ * So: the same square, pointing at the app on the hosted site, and the
+ * account to sign into written under it. Scanning gets the phone to the
+ * right place; the line under it says what to do when it arrives.
+ */
+export function AccountCard({ on, email }) {
+  const url = HOSTED_ORIGIN
+  const [qr, setQr] = useState(null)
+
+  useEffect(() => {
+    let alive = true
+    QRCode.toDataURL(url, { margin: 1, width: 320, color: { dark: '#0d0f12', light: '#ffffff' } })
+      .then((d) => alive && setQr(d))
+      .catch(() => alive && setQr(null))
+    return () => {
+      alive = false
+    }
+  }, [url])
+
+  return (
+    <div className="phone-setup">
+      <p className="hint">
+        {on
+          ? 'From anywhere. Point your phone’s camera at this to open the app, then sign in with the same account.'
+          : 'From anywhere, once this is turned on. Point your phone’s camera at this to open the app, then sign in with the same account.'}
+      </p>
+      {qr ? (
+        <img className="phone-qr" src={qr} alt={`Code for ${url}`} width={160} height={160} />
+      ) : null}
+      <p className="pair-code mono" aria-label="The account to sign in as">
+        {email}
+      </p>
+      {/* The sentence that was missing. Somebody who has read about pairing
+          codes will otherwise keep looking for one. */}
+      <p className="footnote">
+        There is no pairing code to type: that is for computers set up without an account. This one
+        has one, so signing in on the phone is what joins it.
       </p>
     </div>
   )

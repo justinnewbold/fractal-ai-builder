@@ -29,6 +29,7 @@ import cabTypes from '../data/cab-types.json' with { type: 'json' }
 import ampParams from '../data/amp-params.json' with { type: 'json' }
 import demoPresets from '../data/demo-presets.json' with { type: 'json' }
 import { nameFor, scenesFor, presetsFor } from './factoryPresets.js'
+import { unitByKey, DEFAULT_UNIT } from './demoUnits.js'
 import { fromNormalized } from './scale.js'
 import { createSceneState } from './sceneState.js'
 import { storedSceneNames, keepSceneNames, DEFAULT_SCENE_NAMES } from './demoMemory.js'
@@ -92,12 +93,7 @@ const SCENE_CHANNELS = {
  */
 const SEEDS = new Map(demoPresets.presets.map((p) => [p.number, p]))
 
-/*
- * Which unit this is pretending to be, in the one word the factory catalog
- * files its presets under. A constant rather than a literal in four places,
- * because the demo for the other units is the same mock with this changed.
- */
-const UNIT = 'fm3'
+
 
 /** Where a seeded preset's blocks sit: signal order, one per column. */
 const chainOf = (seed) =>
@@ -210,7 +206,29 @@ const midiCarried = () => {
   }
 }
 
-export function createMockDevice() {
+/**
+ * @param {string} [unitKey] which Fractal to pretend to be — see demoUnits.js.
+ *   Anything unrecognised is the FM3, because a mock that cannot say what it
+ *   is cannot draw a screen either.
+ */
+export function createMockDevice(unitKey = DEFAULT_UNIT) {
+  const unit = unitByKey(unitKey)
+  const UNIT = unit.key
+  /*
+   * THE TWELVE HAND-BUILT PRESETS ARE FM3 PRESETS, so they only appear on the
+   * FM3. They are an FM3 chain with FM3 amp and cab numbers in it, and
+   * "Drop D Chug" is not a name anybody's AM4 has ever shown. Putting them on
+   * every unit would undo the whole point of the other four banks: a demo you
+   * can check against the thing on your desk.
+   *
+   * On the other units every slot is the factory bank, and the rigs behind
+   * them are the generic chain — which is honest about what this knows. The
+   * names and the scenes are real; the blocks are the simulation's own.
+   */
+  /* `rigSeeds`, not `seeds`: buildRig destructures a local `seeds` out of
+     sceneStateOf, and the two names in one scope is a temporal-dead-zone
+     error at the first preset load rather than anything visible here. */
+  const rigSeeds = unit.key === DEFAULT_UNIT ? SEEDS : new Map()
   const state = {
     presetNumber: 500,
     presetName: 'DEMO',
@@ -245,7 +263,7 @@ export function createMockDevice() {
       presetsFor(UNIT)
         .filter((p) => p.name)
         .map((p) => [p.number, p.name])
-        .concat([...SEEDS.values()].map((seed) => [seed.number, seed.name]))
+        .concat([...rigSeeds.values()].map((seed) => [seed.number, seed.name]))
         .concat([[500, 'DEMO']])
     )
   }
@@ -260,7 +278,7 @@ export function createMockDevice() {
   const rigs = new Map()
 
   function buildRig(number) {
-    const seed = SEEDS.get(number)
+    const seed = rigSeeds.get(number)
     const blocks = seed
       ? chainOf(seed)
       : LAYOUT.map((b, i) => ({
@@ -281,7 +299,9 @@ export function createMockDevice() {
       blocks,
       params: new Map(),
       models: new Map(),
-      scenes: createSceneState({ count: 8, seeds, channels }),
+      /* The unit's own scene count. An AM4 has four, and eight tiles on a
+         four-scene unit is the demo teaching something untrue. */
+      scenes: createSceneState({ count: unit.scenes, seeds, channels }),
       /*
        * A renamed scene wins, then the hand-built preset's own four, then the
        * real factory names for that slot — see factoryPresets.js. An unnamed
@@ -291,8 +311,8 @@ export function createMockDevice() {
       sceneNames:
         storedSceneNames(number) ||
         (seed
-          ? seed.scenes.map((sc) => sc.name).concat(['', '', '', '']).slice(0, 8)
-          : scenesFor(UNIT, number) || DEFAULT_SCENE_NAMES.slice())
+          ? seed.scenes.map((sc) => sc.name).concat(['', '', '', '']).slice(0, unit.scenes)
+          : scenesFor(UNIT, number) || DEFAULT_SCENE_NAMES.slice(0, unit.scenes))
     }
 
     for (const block of blocks) {
@@ -418,21 +438,26 @@ export function createMockDevice() {
 
     detect: () => ({
       connected: true,
-      modelId: 17,
-      name: 'FM3 (simulated)',
-      short: 'FM3',
+      name: `${unit.name} (simulated)`,
+      short: unit.name,
       gen: 3,
       supported: true,
       simulated: true,
       capabilities: {
-        slotModel: 'grid',
-        grid: GRID,
+        /*
+         * An AM4 and a VP4 are a chain of four blocks and report no grid, so
+         * the app must not be told they have one — "grid ×" with nothing
+         * either side of it is not a fact about a unit. See demoUnits.js.
+         */
+        slotModel: unit.grid ? 'grid' : 'chain',
+        ...(unit.grid ? { grid: unit.grid } : {}),
         hasScenes: true,
-        sceneCount: 8,
+        sceneCount: unit.scenes,
         hasChannels: true,
-        channelNames: ['A', 'B', 'C', 'D'],
-        presets: { count: 512, canScanNames: false },
-        cabIrs: true,
+        channelNames: unit.channels,
+        presets: { count: unit.slots, canScanNames: false },
+        /* No cab block on a VP4, so no impulse responses to offer either. */
+        cabIrs: unit.amps,
         tuner: true,
         supportsSave: false
       },
@@ -705,7 +730,7 @@ export function createMockDevice() {
       /* A factory slot nobody has built a rig for: the name is real and the
          block list is genuinely unknown until it is loaded, which is what an
          empty array says. */
-      if (!SEEDS.has(n)) return { number: n, name, blocks: [] }
+      if (!rigSeeds.has(n)) return { number: n, name, blocks: [] }
       /* Another slot, so there is no scene to be in: scene one, the one it
          would load on. */
       if (!rigs.has(n)) rigs.set(n, buildRig(n))

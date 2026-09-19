@@ -5,7 +5,8 @@ import { color, font, mono, radius, space, TAP, MODES, getMode, setMode } from '
 import { APP_VERSION } from '../lib/version'
 import { AFFILIATION } from '../lib/affiliation'
 import { isOlder } from '../lib/versions'
-import { setDemo, useDemo } from '../lib/demo'
+import { setDemo, useDemo, demoUnit, setDemoUnit } from '../lib/demo'
+import { UNITS as DEMO_UNITS } from '../lib/demoUnits'
 import { getDebugLog } from '../lib/debugLog'
 import { tick } from '../lib/feedback'
 import {
@@ -336,10 +337,30 @@ export default function Settings({
             {demo ? (
               <>
                 <Note tone="warn">
-                  This is the demo — a simulated FM3. Every screen works and nothing reaches
-                  hardware. It also answers instantly, so anything still slow in here is this app
-                  rather than the line to a computer.
+                  {`This is the demo — a simulated ${
+                    DEMO_UNITS.find((u) => u.key === demoUnit())?.name || 'FM3'
+                  }. Every screen works and nothing reaches hardware. It also answers instantly, so anything still slow in here is this app rather than the line to a computer.`}
                 </Note>
+                {/*
+                  Which unit, because the demo was an FM3 and only an FM3 —
+                  and an AM4 owner opening it saw eight scene tiles their unit
+                  has not got. Each of these holds its own real factory bank:
+                  the preset names and the scene names the unit ships with.
+                */}
+                <Section>Which unit</Section>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+                  {DEMO_UNITS.map((u) => (
+                    <Press
+                      key={u.key}
+                      label={u.name}
+                      tone="signal"
+                      on={u.key === demoUnit()}
+                      height={44}
+                      style={{ paddingHorizontal: space.md }}
+                      onPress={() => setDemoUnit(u.key)}
+                    />
+                  ))}
+                </View>
                 <Press label="Leave the demo" tone="signal" onPress={() => setDemo(false)} />
               </>
             ) : null}

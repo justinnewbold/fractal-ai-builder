@@ -3463,7 +3463,16 @@ export default function App() {
         because it is not one of the app's places: it opens itself, once, and
         the only way back to it is the button in Settings.
       */}
-      <Tour open={tour} onClose={() => setTour(false)} />
+      {/* The tour gets told which end this is, because the machine with the
+          cable gets a card the others do not: the square a phone scans. See
+          Tour.cardsFor. */}
+      <Tour
+        open={tour}
+        onClose={() => setTour(false)}
+        role={link.role}
+        connected={link.link === 'connected'}
+        email={link.account?.email}
+      />
 
       {/* The one sign-in, as a sheet: it pops up, you do the thing, it goes. */}
       <SignInSheet

@@ -350,6 +350,15 @@ export const tapTempo = () => told('tap tempo', post('/tempo/tap'))
  */
 export const setTuner = (on) => post('/tuner', { on })
 
+/**
+ * The demo's tuner readings, for the phone to drive itself.
+ *
+ * Null on a real rig, where the readings arrive off the relay and a second
+ * source would fight them. See rig.writeTuner for why the phone needs this at
+ * all and the browser does not.
+ */
+export const demoTuner = () => demoDevice()?.tunerStream?.() || null
+
 
 /* ---------------------------------------------------------------- */
 /* Writing a tone                                                    */

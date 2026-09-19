@@ -830,6 +830,39 @@ export function writeTempo(bpm) {
   return optimistic({ bpm }, { bpm: was }, () => device.setTempo(bpm))
 }
 
+/*
+ * The demo's tuner, which on a phone was a needle that never moved.
+ *
+ * "Demo tuner animations." The simulation has had a proper tuner in it the
+ * whole time — lib/tunerStream, which holds a note for the life of a ring and
+ * only picks a new string coming out of a quiet gap, because a real detector
+ * cannot hop mid-note. The browser subscribes to it and animates.
+ *
+ * The phone never did. Its readings arrive as events off the relay, and in
+ * the demo there is no relay to carry them — so the tuner opened, the timer
+ * ran, and nothing ever reached the needle. Which is the one screen in the
+ * app where "nothing happens" and "it is broken" look identical.
+ *
+ * So in the demo the phone drives the same stream itself, at the same 400ms
+ * the browser polls it, straight into the same handleEvent every real reading
+ * goes through. Nothing downstream can tell the difference, which is the
+ * point: the tuner screen is being demonstrated, not a second copy of it.
+ */
+let tunerTimer = null
+
+function stopDemoTuner() {
+  if (!tunerTimer) return
+  clearInterval(tunerTimer)
+  tunerTimer = null
+}
+
+function startDemoTuner() {
+  stopDemoTuner()
+  const source = device.demoTuner?.()
+  if (!source) return
+  tunerTimer = setInterval(() => handleEvent(source.next()), 400)
+}
+
 /**
  * Turn the tuner on or off.
  *
@@ -838,10 +871,15 @@ export function writeTempo(bpm) {
  */
 export async function writeTuner(on) {
   set({ tunerOn: on, tuning: on ? state.tuning : null, error: null })
+  if (!on) stopDemoTuner()
   try {
     await device.setTuner(on)
+    /* Only once the unit has agreed, and only in the demo — on a real rig the
+       readings come off the relay and a second source would fight them. */
+    if (on) startDemoTuner()
     return true
   } catch (err) {
+    stopDemoTuner()
     set({ tunerOn: false, tuning: null, error: err.message })
     return false
   }

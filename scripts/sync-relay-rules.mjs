@@ -267,6 +267,8 @@ export const FILES = [
    */
   { source: '../src/data/factory-presets.json', target: '../mobile/src/data/factory-presets.json', raw: true },
   { source: '../src/lib/factoryPresets.js', target: '../mobile/src/lib/factoryPresets.js' },
+  /* The five units the demo can be, and what is real about each. */
+  { source: '../src/lib/demoUnits.js', target: '../mobile/src/lib/demoUnits.js' },
 
   /*
    * Where a block sits, and how that becomes something the unit will accept.

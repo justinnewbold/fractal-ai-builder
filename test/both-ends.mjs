@@ -637,4 +637,36 @@ export function run(test) {
     assert.match(bar, /<span className="lamp" data-state=\{lampState\} \/>/, 'the unit lamp is not in the top bar')
   })
 
+  test('a setlist is renamed in the row you chose, at both ends', () => {
+    /*
+     * "Typing should happen in the blue cell and the duplicate deleted."
+     *
+     * The phone got this right first: the chosen setlist's card IS the name
+     * box, so the name you are reading is the name you change. The browser
+     * kept the older shape — the row you tapped, and then a separate NAME
+     * field under it holding the same word an inch away. Two boxes for one
+     * name is a question about which one is real, and it is exactly the kind
+     * of drift this file exists to catch.
+     */
+    const web = read('src/components/Setlists.jsx')
+    const phone = read('mobile/src/screens/Setlists.js')
+
+    for (const [where, src] of [['the browser', web], ['the phone', phone]]) {
+      /* The box is inside the row, handed down the same way at both ends. */
+      assert.match(src, /editing=\{[\s\S]{0,240}?value: draft \?\? l\.name/, `${where} does not put the name box in the chosen row`)
+      assert.match(src, /tap the name to rename/, `${where} never says the row can be typed in`)
+      /*
+       * And storage hears about it ONCE, when the typing is done. Writing per
+       * keystroke re-renders the sheet between letters, which is what made a
+       * name impossible to clear and made new setlists arrive named twice.
+       */
+      assert.match(src, /const commitName = \(\) => \{/, `${where} has no single place a typed name is saved`)
+      assert.ok(!/onChange(Text)?=\{[^}]*updateList/.test(src), `${where} writes the name on every keystroke again`)
+    }
+
+    /* And the second name box is gone from the browser, not merely hidden. */
+    assert.ok(!/setlist-name/.test(web), 'the browser still carries a second box for the same name')
+    assert.ok(!/setlist-name/.test(read('src/styles.css')), 'the second name box is styled, so something still draws it')
+  })
+
 }

@@ -4143,4 +4143,178 @@ export function run(test) {
     }
   })
 
+  test('the demo can be any of the five units, and each is itself', async () => {
+    /*
+     * "Demo for all Fractal units with real default presets and scenes."
+     *
+     * It was an FM3 and only an FM3, which is the wrong shape of answer for
+     * somebody deciding whether to buy this. An AM4 owner opening it saw
+     * eight scene tiles their unit has not got, five hundred slots it has
+     * not got, and a preset list sharing no names with theirs.
+     */
+    const { UNITS, unitByKey, DEFAULT_UNIT } = await import('../src/lib/demoUnits.js')
+    const { createMockDevice } = await import('../src/lib/mockDevice.js')
+    const { namedCount } = await import('../src/lib/factoryPresets.js')
+
+    assert.deepEqual(UNITS.map((u) => u.key), ['fm3', 'fm9', 'axefx3', 'am4', 'vp4'])
+
+    for (const unit of UNITS) {
+      const mock = createMockDevice(unit.key)
+      const caps = mock.detect().capabilities
+
+      /* The counts are the unit's own. Eight scene tiles on a four-scene unit
+         is the demo teaching something untrue about hardware. */
+      assert.equal(caps.sceneCount, unit.scenes, `${unit.key} offers ${caps.sceneCount} scenes`)
+      assert.equal(caps.presets.count, unit.slots, `${unit.key} offers ${caps.presets.count} slots`)
+      assert.equal(mock.detect().short, unit.name)
+
+      /*
+       * An AM4 and a VP4 are a chain of four blocks and report NO GRID, which
+       * is what a real one does — the app draws "grid ×" otherwise, and that
+       * is not a fact about the unit.
+       */
+      if (unit.grid) assert.deepEqual(caps.grid, unit.grid, `${unit.key} lost its layout`)
+      else assert.ok(!('grid' in caps), `${unit.key} claims a grid it has not got`)
+      assert.equal(caps.slotModel, unit.grid ? 'grid' : 'chain')
+
+      /* No cab block on a VP4, so no impulse responses to offer. */
+      assert.equal(caps.cabIrs, unit.amps, `${unit.key} offers the wrong cab support`)
+
+      /* And it is holding ITS OWN factory bank. */
+      const first = mock.presetSummary(0).name
+      assert.ok(first, `${unit.key} slot 0 is empty`)
+      assert.ok(namedCount(unit.key) > 0, `${unit.key} has no factory bank behind it`)
+    }
+
+    /*
+     * THE TWELVE HAND-BUILT PRESETS ARE FM3 PRESETS and appear only there.
+     * They are an FM3 chain with FM3 amp numbers in it, and "Drop D Chug" is
+     * not a name any AM4 has ever shown.
+     */
+    assert.equal(createMockDevice('fm3').presetSummary(0).name, 'Drop D Chug')
+    for (const key of ['fm9', 'axefx3', 'am4', 'vp4']) {
+      assert.notEqual(
+        createMockDevice(key).presetSummary(0).name,
+        'Drop D Chug',
+        `the FM3's hand-built presets leaked onto the ${key}`
+      )
+    }
+    /* The AM4 and the VP4 really are different banks from each other. */
+    assert.notEqual(createMockDevice('am4').presetSummary(0).name, createMockDevice('vp4').presetSummary(0).name)
+
+    /* An unreadable saved choice is the FM3, not a crash: a demo that refuses
+       to start is worse than one that starts as the wrong unit. */
+    assert.equal(unitByKey('nonsense').key, DEFAULT_UNIT)
+    assert.equal(unitByKey(undefined).key, DEFAULT_UNIT)
+
+    /* And both ends offer the choice, only while the demo is on. */
+    const detail = readFileSync(new URL('../src/components/DeviceDetail.jsx', import.meta.url), 'utf8')
+    assert.match(detail, /\{demo \? \(\s*<div className="demo-units"/, 'the browser offers no unit picker')
+    assert.match(detail, /setDemoUnit\(key\)/, 'the browser picker changes nothing')
+    const settings = readFileSync(new URL('../mobile/src/screens/Settings.js', import.meta.url), 'utf8')
+    assert.match(settings, /onPress=\{\(\) => setDemoUnit\(u\.key\)\}/, 'the phone offers no unit picker')
+  })
+
+  test('the computer with the cable is shown the square on its first launch', () => {
+    /*
+     * "Mac app first-launch tutorial pulling up QR/pairing codes
+     * automatically."
+     *
+     * The Mac app's whole job is to hold the cable so a phone can drive the
+     * unit from the other side of a stage — and the tour never mentioned the
+     * phone. It taught the three screens to somebody sitting AT the computer,
+     * which is the one place they are least likely to be using this.
+     *
+     * The squares existed the whole time, three taps into Setup → Phone &
+     * computer, which is exactly where somebody in their first minute of
+     * owning the app has not been yet.
+     */
+    /* Read as text: node cannot import JSX, which is why every check in this
+       file reads a component's source rather than running it. */
+    const tourSrc = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
+
+    /* The extra card exists, and only the machine with the cable gets it. */
+    assert.match(tourSrc, /title: 'Get your phone on this'/, 'there is no card about the phone')
+    assert.match(
+      tourSrc,
+      /role === 'mac' \? \[phoneCard\(\{ connected, email \}\), \.\.\.CARDS\] : CARDS/,
+      'every device is shown the same cards, or the computer is shown them in the wrong order'
+    )
+
+    /* FIRST, because it is the thing to do while you are still at the desk;
+       everything after it is about using the app once the phone is on. */
+    assert.ok(
+      tourSrc.indexOf('phoneCard({ connected, email })') < tourSrc.indexOf('...CARDS'),
+      'the phone card is not the first thing the computer sees'
+    )
+
+    /* And the paging reads that list rather than the static one, or the extra
+       card is built and never drawn. */
+    for (const line of ['const last = card === cards.length - 1', '{cards[card].body}', 'title={cards[card].title}']) {
+      assert.ok(tourSrc.includes(line), `the tour still pages through the static list: ${line}`)
+    }
+
+    /*
+     * THE SAME COMPONENTS SETUP USES, not a second copy. Two renderings of a
+     * pairing code drift, and the way that drift shows up is a phone scanning
+     * a square that pairs it with nothing.
+     */
+    const qr = readFileSync(new URL('../src/components/PhoneQr.jsx', import.meta.url), 'utf8')
+    assert.match(qr, /from '\.\/PhoneRemote'/, 'the tour draws its own pairing code')
+    assert.match(qr, /PairCard|AccountCard/, 'the shared block renders no square')
+    const tour = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
+    assert.match(tour, /<PhoneQr connected=\{connected\} email=\{email\} \/>/, 'the card has no square in it')
+
+    /* And the app tells it which end this is, or the check above is decorative. */
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    assert.match(app, /<Tour[\s\S]{0,200}role=\{link\.role\}/, 'the tour is never told which machine it is on')
+  })
+
+  test('there is one square, and the wifi one is gone', () => {
+    /*
+     * "Are both QR codes needed on the Mac app? It's confusing and they are
+     * literally right by each other so a phone will pick up both codes."
+     * Then, plainly: "Just delete the QR code. Because we will not be using
+     * it."
+     *
+     * The one that went was the SAME WIFI square — it opened the computer's
+     * own address in a web browser on the phone, with nothing to sign into,
+     * and only while both were on the same network. A real route, and not one
+     * this app asks anybody to use: the phone app is the phone app.
+     *
+     * What is left is the square for the APP: a pairing code, or the way in
+     * to signing into the same account. It works from anywhere, and it is the
+     * one the phone's scanner reads.
+     */
+    const qr = readFileSync(new URL('../src/components/PhoneQr.jsx', import.meta.url), 'utf8')
+    const bare = qr.replace(/\{?\/\*[\s\S]*?\*\/\}?/g, '')
+
+    /* Gone, not folded away and not merely unreferenced. A fold left behind
+       is a square a camera can still find. */
+    assert.ok(!/wifi-fold/.test(bare), 'the wifi square is still folded into the page')
+    assert.ok(!/WifiCard/.test(bare), 'the wifi square is still drawn')
+    assert.ok(!/servedLocally/.test(bare), 'the block still asks whether it is being served locally')
+
+    /* And what remains is the app's square, both ways in to it. */
+    assert.match(bare, /<PairCard /, 'the pairing square is gone too')
+    assert.match(bare, /<AccountCard /, 'the account square is gone too')
+
+    const remote = readFileSync(new URL('../src/components/PhoneRemote.jsx', import.meta.url), 'utf8')
+    assert.ok(!/function WifiCard/.test(remote), 'the wifi square is still built, waiting to be drawn again')
+
+    /*
+     * ONE RENDERING, shared by Setup and the first-launch tour. Two copies of
+     * a pairing code drift, and that drift is a phone scanning a square that
+     * pairs it with nothing.
+     */
+    const macSide = remote.slice(remote.indexOf('function MacSide'), remote.indexOf('export function PairCard'))
+    assert.match(macSide, /<PhoneQr connected=\{link\.link === 'connected'\} email=\{email\}/, 'Setup draws its own square again')
+
+    /* The scanner's message stays: a desktop build older than this one still
+       shows that square, and somebody who scans it deserves to be told which
+       one it was. */
+    const scan = readFileSync(new URL('../mobile/src/components/ScanCode.js', import.meta.url), 'utf8')
+    assert.match(scan, /looksLikeTheWifiSquare/, 'the scanner no longer recognises the wrong square')
+  })
+
 }

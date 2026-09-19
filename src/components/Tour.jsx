@@ -1,15 +1,23 @@
 import { useEffect, useState } from 'react'
 import Sheet from './Sheet'
+import PhoneQr from './PhoneQr'
 
 /**
- * The four things nobody works out on their own.
+ * The three things nobody works out on their own.
  *
  * A tour is a tax on everyone who did not need it, so this one is short and
  * says only what the screen cannot. Where the tabs are is not in here: they
- * are labelled Play, Edit and Create and sit across the top. What is in here
- * is the two facts that make people nervous — where a change actually goes,
- * and how to undo it — plus the one concept this app leans on that a Fractal
- * unit itself explains badly.
+ * are labelled Play and Edit and sit across the top. What is in here is the
+ * two facts that make people nervous — where a change actually goes, and how
+ * to undo it — plus the one concept this app leans on that a Fractal unit
+ * itself explains badly.
+ *
+ * "Delete the create tone from the tutorial." There used to be a third tab,
+ * Create, where you described a sound in words and it was built for you, and
+ * two of these cards were about it — the screens card named it, and a whole
+ * card taught you how to phrase a request. The tab went with the AI. A tour
+ * is the first thing a new person reads and it was sending them to look for
+ * a screen that is not there, which is a worse first minute than no tour.
  *
  * It is offered, not imposed. Skip keeps the same corner on every card that
  * has one, and it is a real button rather than a grey word: someone who has
@@ -45,7 +53,7 @@ export const markTourSeen = () => {
 
 const CARDS = [
   {
-    title: 'Three screens',
+    title: 'Two screens',
     body: (
       <>
         <p>
@@ -55,25 +63,6 @@ const CARDS = [
         <p>
           <strong>Edit</strong> is the signal chain &mdash; tap any block to open it, or search for
           a control by name if you know what you want.
-        </p>
-        <p>
-          <strong>Create</strong> is where you describe a sound and it gets built for you.
-        </p>
-      </>
-    )
-  },
-  {
-    title: 'Say what you want',
-    body: (
-      <>
-        <p>
-          On Create, write it the way you&rsquo;d say it to someone: <em>tight modern metal rhythm
-          in drop A</em>, or <em>warm clean with a bit of shimmer</em>. Name a band, a record or a
-          real amp and it will work out what made that sound.
-        </p>
-        <p>
-          You always see the whole thing &mdash; every block, every value &mdash; before anything
-          reaches the unit. Nothing is sent until you press the button that says so.
         </p>
       </>
     )
@@ -121,8 +110,49 @@ const CARDS = [
   }
 ]
 
-export default function Tour({ open, onClose }) {
+/**
+ * The card only the machine with the cable gets, and it goes first.
+ *
+ * "Mac app first-launch tutorial pulling up QR/pairing codes automatically."
+ *
+ * The Mac app's whole job is to hold the cable so a phone can drive the unit
+ * from the other side of a stage — and the tour never mentioned the phone.
+ * It taught the three screens to somebody sitting at the computer, which is
+ * the one place they are least likely to be using this.
+ *
+ * So the square is HERE, in the first minute, rather than three taps into a
+ * Setup menu nobody has found yet. First of the cards because it is the thing
+ * to do while you are still at the desk; everything after it is about using
+ * the app once the phone is on.
+ *
+ * Only at the computer. On a phone, or on the hosted site, there is nothing
+ * to scan and the card would be teaching somebody to connect a device to
+ * itself.
+ */
+const phoneCard = ({ connected, email }) => ({
+  title: 'Get your phone on this',
+  body: (
+    <>
+      <p>
+        This computer holds the cable to your unit. Your phone becomes the remote &mdash; point its
+        camera at this, and you can work the rig from the other end of a stage.
+      </p>
+      <PhoneQr connected={connected} email={email} />
+      <p className="hint">
+        It is in Setup &rarr; Phone &amp; computer whenever you want it again.
+      </p>
+    </>
+  )
+})
+
+/** The cards this device should show, in order. */
+export function cardsFor({ role, connected, email } = {}) {
+  return role === 'mac' ? [phoneCard({ connected, email }), ...CARDS] : CARDS
+}
+
+export default function Tour({ open, onClose, role, connected, email }) {
   const [card, setCard] = useState(0)
+  const cards = cardsFor({ role, connected, email })
 
   // Back to the start when it is asked for again from Settings. Reopening on
   // the last card is a small thing that makes it feel broken.
@@ -130,7 +160,7 @@ export default function Tour({ open, onClose }) {
     if (open) setCard(0)
   }, [open])
 
-  const last = card === CARDS.length - 1
+  const last = card === cards.length - 1
   const finish = () => {
     markTourSeen()
     onClose()
@@ -144,8 +174,8 @@ export default function Tour({ open, onClose }) {
          to stop it coming back, or dismissing it is a thing you do repeatedly
          rather than once. */
       onClose={finish}
-      title={CARDS[card].title}
-      note={`${card + 1} of ${CARDS.length}`}
+      title={cards[card].title}
+      note={`${card + 1} of ${cards.length}`}
       footer={
         /*
           The right-hand button is always the way forward — Next, Next, Next,
@@ -166,13 +196,13 @@ export default function Tour({ open, onClose }) {
           {/* Dots that do what they look like they do. Inert ones read as a
               paging control that ignores the finger. */}
           <div className="tour-dots">
-            {CARDS.map((c, i) => (
+            {cards.map((c, i) => (
               <button
                 key={c.title}
                 type="button"
                 className={i === card ? 'tour-dot on' : 'tour-dot'}
                 onClick={() => setCard(i)}
-                aria-label={'Step ' + (i + 1) + ' of ' + CARDS.length}
+                aria-label={'Step ' + (i + 1) + ' of ' + cards.length}
                 aria-current={i === card}
               />
             ))}
@@ -188,7 +218,7 @@ export default function Tour({ open, onClose }) {
         </div>
       }
     >
-      <div className="tour-card">{CARDS[card].body}</div>
+      <div className="tour-card">{cards[card].body}</div>
     </Sheet>
   )
 }
