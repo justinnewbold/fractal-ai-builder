@@ -1,7 +1,7 @@
 {
   "name": "fractal-remote-desktop",
   "productName": "Fractal Remote",
-  "version": "7.391.0",
+  "version": "7.392.0",
   "private": true,
   "description": "Serves Fractal Remote from the machine with the cable, so a phone on the same wifi can reach the unit.",
   "author": "Justin Newbold",

@@ -447,11 +447,32 @@ export function run(test) {
     assert.ok(/\.topbar-how/.test(hidden), 'the connection word is back, saying what the chip beside it already says')
 
     /*
-     * And a long one is capped, so "Axe-Fx III" cannot spend the eight
-     * characters the preset name is guaranteed just below it.
+     * And a long one is capped only where the preset is actually sharing the
+     * row — which is the whole of the bug the cap caused.
+     *
+     * "In the top left corner where it shows the device name all of them look
+     * good except AXE FX III cuts off." Ten characters against a nine-character
+     * cap. The cap is a real rule: a long name must not spend the eight
+     * characters the preset name is promised beside it. What was wrong is the
+     * question it asked — it read the CONNECTION, so it went on defending room
+     * on every screen with no preset in the bar at all, and on a phone that is
+     * every screen there is.
      */
-    const unit = narrow.slice(narrow.indexOf('.topbar-unit {'))
-    assert.match(unit.slice(0, unit.indexOf('}')), /max-width/, 'a long unit name can eat the preset name')
+    const bare = narrow.slice(narrow.indexOf('button.topbar-unit {'))
+    assert.ok(
+      !/max-width/.test(bare.slice(0, bare.indexOf('}'))),
+      'the unit name is capped on every phone screen again, including the ones carrying no preset'
+    )
+    assert.match(
+      bare.slice(0, bare.indexOf('}')),
+      /text-overflow: ellipsis/,
+      'a name too long for the bar spills out of it rather than ending in an ellipsis'
+    )
+    assert.match(
+      narrow,
+      /\.topbar\[data-preset='yes'\] \.topbar-unit \{[^}]*max-width/,
+      'a long unit name can eat the preset name when the two share the row'
+    )
   })
 
   test('the Macs to choose between both fit on the screen', () => {
