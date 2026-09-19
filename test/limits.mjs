@@ -1157,6 +1157,54 @@ export function run(test) {
     assert.match(gen, /omitBackground: !out\.opaque/, 'the icon script ignores its own opaque flag')
   })
 
+  test('the Android link is a bookmark rather than a thing to ask for', () => {
+    /*
+     * "Is there a link that I can just save to my bookmarks that will take me
+     * and always show me what the latest link is, even if it doesn't download
+     * directly, that way I don't have to keep asking for it."
+     *
+     * The APK's own address carries the version in it twice, so every build
+     * makes a new address and any bookmark of one is stale the moment the next
+     * build lands. This page's address never moves; what moves is what it
+     * finds.
+     *
+     * THE FILTER IS THE WHOLE TRICK. The Mac app publishes into the same list
+     * of releases, tagged `v` rather than `apk-v`, and both are cut from the
+     * same commit — so GitHub's own /releases/latest can hand back the Mac one
+     * and would send a phone a .dmg. And for the same reason the newest cannot
+     * be "the one GitHub listed first": it sorts by when a release was
+     * created, which the two share. The number in the tag decides.
+     */
+    const page = read('public/android.html')
+
+    assert.match(page, /api\.github\.com\/repos\/' \+ REPO/, 'the page no longer asks GitHub what exists')
+    assert.match(page, /justinnewbold\/fractal-ai-builder/, 'the page names no repository')
+    assert.match(page, /indexOf\('apk-v'\) === 0/, 'the page would offer a Mac release to a phone')
+    assert.match(page, /\.sort\(\(a, b\) => rank\(b\.tag_name\) - rank\(a\.tag_name\)\)/, 'the page trusts the order GitHub happened to list, which is not the newest first')
+    assert.match(page, /\/\\\.apk\$\/i/, 'the button no longer points at the APK itself')
+    assert.match(page, /r\.draft/, 'a half-published build can be offered as the current one')
+
+    /* Never a dead end. GitHub rate-limits by address, so an unlucky minute
+       must still leave somewhere to go. */
+    assert.match(page, /\.catch\(/, 'the page has nothing to say when GitHub does not answer')
+    assert.match(page, /Open the releases page/, 'the failure case offers no way on')
+
+    /*
+     * And it is reachable without the extension, because a bookmark is typed
+     * as often as it is tapped. The catch-all below sends everything that is
+     * not a file on disk to the app, so this has to come first.
+     */
+    const vercel = JSON.parse(read('vercel.json'))
+    const at = vercel.rewrites.findIndex((r) => r.source === '/android')
+    const all = vercel.rewrites.findIndex((r) => r.source === '/(.*)')
+    assert.ok(at !== -1, '/android goes to the app instead of the download page')
+    assert.equal(vercel.rewrites[at].destination, '/android.html', '/android points somewhere else')
+    assert.ok(at < all, '/android is behind the catch-all, so it never matches')
+
+    /* Findable without the bookmark too, from the page a store sends people to. */
+    assert.match(read('public/support.html'), /href="\/android"/, 'the support page does not say where the Android app comes from')
+  })
+
   test('a store has somewhere to send people, and the app can be reviewed without hardware', () => {
     /*
      * Two things App Store Connect will not proceed without, and one that

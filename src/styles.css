@@ -10001,10 +10001,24 @@ button.setup-row:first-child {
   color: var(--silk);
 }
 
-/* The one fact you would have opened the row to learn. */
+/*
+ * The one fact you would have opened the row to learn — and in green.
+ *
+ * "On the set-up screen, let's change the text underneath the button labels to
+ * green." Faint grey said "small print"; these lines are the opposite of small
+ * print. Each one is the live answer to the question the row is named after —
+ * what the demo is pretending to be, which theme is on, whether the unit is
+ * connected — and the whole point of the list is that most of it needs no tap.
+ *
+ * `--ok` rather than a new green: it is already what this app says a thing in
+ * words it is sure of, it is already tuned per theme, and the amp's real name
+ * under its code name has been using it for the same reason. On the ground
+ * these rows have, #63c68c reads 8.46:1 dark and #1f7a45 5.04:1 cream — both
+ * clear of the 4.5:1 floor.
+ */
 .setup-row-status {
   font-size: var(--f-2);
-  color: var(--silk-faint);
+  color: var(--ok);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

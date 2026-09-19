@@ -3796,6 +3796,19 @@ export default function App() {
           <>
             <div className="device-meta mono setup-version">{FULL}</div>
             <div className="setup-rows">
+              {/*
+                First, because it is the only row here anybody opens for the
+                fun of it.
+
+                "Move the amp and pedals button to the top of the list." Every
+                other row in this list is plumbing — what is connected, what
+                the screen looks like, what went wrong — and they are all rows
+                you go to when something needs sorting out. This one answers
+                "what IS a Das Metall, really", which is the question a player
+                has while playing, and it was last but two, under
+                Troubleshooting's neighbours.
+              */}
+              <SetupRow key="gear-names" title="Amp & pedal names" status="What each model on your unit really is" onClick={() => setSheet('gear')} />
               {/* The whole chain on one line: the computer, and the unit on
                   the end of it. Two rows could each only say half of it, and
                   half of a chain is never the answer to "why is nothing
@@ -3822,7 +3835,6 @@ export default function App() {
                   stand LOOKS, so they stay together; the row now says which
                   theme is on, which is what makes it findable by scanning. */}
               <SetupRow key="play" title="Play screen" status={['Buttons ' + (fit ? 'fit to screen' : SIZES[size].name.toLowerCase()), (THEME_WORD[getMode()] || 'Auto') + ' theme'].join(' · ')} onClick={() => setSetupPage('play')} />
-              <SetupRow key="gear-names" title="Amp & pedal names" status="What each model on your unit really is" onClick={() => setSheet('gear')} />
               <SetupRow key="help" title="Troubleshooting" status={`${getDebugLog().length} line${getDebugLog().length === 1 ? '' : 's'} in the log`} onClick={() => setSetupPage('help')} />
               <SetupRow key="about" title="About" status={FULL} onClick={() => setSetupPage('about')} />
             </div>
