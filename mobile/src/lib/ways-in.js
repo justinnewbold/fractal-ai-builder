@@ -52,20 +52,21 @@
  * electron-builder's publish block — which is BOTH where a release uploads
  * and where an installed Mac app looks for the next version.
  *
- * It says fractal-ai-builder because that is the repository's name today.
- * "Rename the repo fractal-remote instead of fractal-AI-builder" is still the
- * plan and the prose all reads fractal-remote already; what cannot move until
- * the rename actually happens on GitHub is THIS, because a name that has
- * never existed does not redirect — it 404s. Changing it early published a
- * desktop build at a repository that was not there and shipped a Download
- * link that went nowhere.
+ * THE RENAME HAPPENED. "github and vercel rename are completed" — so this
+ * says fractal-remote, which is what the prose here has said all along.
  *
- * ON THE DAY OF THE RENAME: change this line, change `repo:` in
- * desktop/electron-builder.yml to match, run `npm run sync:rules`, and the
- * test in test/structure.mjs will hold the rest to it. GitHub redirects the
- * OLD name afterwards, so nothing breaks in the gap.
+ * It was pinned to the old name for a reason worth keeping written down: a
+ * name that has never existed does not redirect, it 404s. Changing it early
+ * published a desktop build at a repository that was not there and shipped a
+ * Download link that went nowhere. The check before this moved was the old
+ * name answering "Moved Permanently" from GitHub's API, which only happens
+ * once a rename is real.
+ *
+ * GitHub redirects the OLD name from here on, so every link already in the
+ * world — an installed Mac app looking for its next version, a Download
+ * button on a page somebody bookmarked — keeps working.
  */
-export const REPO = 'justinnewbold/fractal-ai-builder'
+export const REPO = 'justinnewbold/fractal-remote'
 
 export const RELEASES = `https://github.com/${REPO}/releases`
 

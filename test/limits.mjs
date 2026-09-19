@@ -1308,7 +1308,7 @@ export function run(test) {
     const page = read('public/android.html')
 
     assert.match(page, /api\.github\.com\/repos\/' \+ REPO/, 'the page no longer asks GitHub what exists')
-    assert.match(page, /justinnewbold\/fractal-ai-builder/, 'the page names no repository')
+    assert.match(page, /justinnewbold\/fractal-remote/, 'the page names no repository')
     assert.match(page, /indexOf\('apk-v'\) === 0/, 'the page would offer a Mac release to a phone')
     /*
      * AND THE NEWEST IS THE MOST RECENTLY PUBLISHED, not the highest number.

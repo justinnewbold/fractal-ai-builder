@@ -61,7 +61,7 @@ publish:
   # redirect — it 404s. Setting it early failed every desktop build at the
   # publish step and would have pointed installed apps at nothing.
   # See shared/ways-in.mjs REPO for what to change on the day.
-  repo: fractal-ai-builder
+  repo: fractal-remote
   # Published, not drafted.
   #
   # electron-builder's own default here is `draft`, and a draft release is

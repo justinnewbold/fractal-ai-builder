@@ -26,7 +26,7 @@ const net = require('node:net')
 /** Where the new version can always be fetched by hand. */
 /* Held to shared/ways-in.mjs REPO by a test — this cannot be the repository
    the code lives in and the download link be a different one. */
-const RELEASES_URL = 'https://github.com/justinnewbold/fractal-ai-builder/releases/latest'
+const RELEASES_URL = 'https://github.com/justinnewbold/fractal-remote/releases/latest'
 
 let tray = null
 let win = null
