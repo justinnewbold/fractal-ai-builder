@@ -3931,57 +3931,50 @@ export function run(test) {
 
     assert.deepEqual(broken, [], `\n${broken.join('\n')}\n`)
   })
-  test('one repository name, everywhere it decides where something goes', () => {
+  test('one repository name, everywhere it decides where something goes', async () => {
     /*
      * "Rename the repo fractal-remote instead of fractal-AI-builder and update
      * anything that requires knowing that repo name."
      *
-     * Most of what knew the old name was prose. Three places were not, and
-     * those are the ones worth a check, because each of them sends somebody
-     * or something to a URL:
+     * Most of what knew the old name was prose. THREE places are not, and each
+     * one sends somebody or something to a URL:
      *
      *   - electron-builder's publish block, which is BOTH where a release
-     *     build uploads to and where the installed Mac app looks for the next
+     *     build uploads and where an installed Mac app looks for the next
      *     version. Those two cannot be allowed to disagree.
      *   - the Releases link the phone and the browser offer for downloading
      *     the computer app.
      *   - the same link in the Mac app's own menu.
      *
-     * GitHub redirects the old name, so none of these broke on the day. That
-     * is exactly why they are checked rather than trusted: a redirect makes a
-     * wrong name work, which means nothing fails until the day somebody makes
-     * a NEW repository under the old name and the redirect stops.
+     * THE NAME THEY CARRY IS THE ONE THAT EXISTS TODAY, and this check learned
+     * that the expensive way. All three were pointed at `fractal-remote`
+     * before the rename had actually happened on GitHub, on the reasoning that
+     * GitHub redirects the old name. It does — the OLD one. A name that has
+     * never existed does not redirect, it 404s. So every desktop build failed
+     * at the publish step, on all four platforms, and the Download link the
+     * apps offered went nowhere.
+     *
+     * Hence one constant and a check that the other two match it, rather than
+     * three strings and a hope. On the day of the rename: change REPO, change
+     * `repo:` in electron-builder.yml, run the sync, and this passes again.
      */
-    const REPO = 'fractal-remote'
-    const OLD = ['fractal', 'ai', 'builder'].join('-')
+    const { REPO, RELEASES } = await import('../shared/ways-in.mjs')
+    assert.match(REPO, /^[\w.-]+\/[\w.-]+$/, `REPO is not owner/name: ${REPO}`)
+    const [owner, name] = REPO.split('/')
 
     const yml = readFileSync(new URL('../desktop/electron-builder.yml', import.meta.url), 'utf8')
-    assert.match(yml, new RegExp(`^\\s*repo: ${REPO}$`, 'm'), 'the Mac app publishes to, and updates from, another repository')
-    assert.match(yml, /^\s*owner: justinnewbold$/m, 'the publish block has no owner')
+    assert.match(yml, new RegExp(`^\\s*owner: ${owner}$`, 'm'), 'the publish block names another owner')
+    assert.match(yml, new RegExp(`^\\s*repo: ${name}$`, 'm'), `the Mac app publishes to, and updates from, a repository that is not ${REPO}`)
 
-    const ways = readFileSync(new URL('../shared/ways-in.mjs', import.meta.url), 'utf8')
-    assert.match(ways, new RegExp(`github\\.com/justinnewbold/${REPO}/releases`), 'the download link points at another repository')
+    assert.equal(RELEASES, `https://github.com/${REPO}/releases`, 'the download link is not this repository')
 
     const main = readFileSync(new URL('../desktop/main.js', import.meta.url), 'utf8')
-    assert.match(main, new RegExp(`github\\.com/justinnewbold/${REPO}/releases`), 'the Mac app menu points at another repository')
+    assert.match(main, new RegExp(`github\\.com/${REPO}/releases`), 'the Mac app menu points at another repository')
 
-    /*
-     * And nothing that decides a destination still carries the old name. The
-     * two Supabase files are exempt and say why in their own text: that is
-     * the name of the SUPABASE project, which a GitHub rename does not touch.
-     */
-    for (const file of [
-      '../package.json',
-      '../desktop/package.json',
-      '../shared/ways-in.mjs',
-      '../mobile/src/lib/ways-in.js',
-      '../desktop/main.js',
-      '../desktop/electron-builder.yml',
-      '../.github/workflows/desktop.yml'
-    ]) {
-      const text = readFileSync(new URL(file, import.meta.url), 'utf8')
-      assert.ok(!text.includes(OLD), `${file} still carries the old repository name`)
-    }
+    /* And the phone's generated copy carries the same link, or a phone sends
+       somebody somewhere the browser does not. */
+    const phone = readFileSync(new URL('../mobile/src/lib/ways-in.js', import.meta.url), 'utf8')
+    assert.ok(phone.includes(REPO), 'the phone offers a download from a different repository')
   })
 
   test('no screen shows anybody the account service\u2019s settings', () => {

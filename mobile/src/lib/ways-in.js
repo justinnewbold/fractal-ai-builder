@@ -44,7 +44,30 @@
  * aimed at the Mac app landed on an .apk. The list page shows all of them with
  * their names, and the step below says which file to take.
  */
-export const RELEASES = 'https://github.com/justinnewbold/fractal-remote/releases'
+/**
+ * WHERE THIS CODE ACTUALLY LIVES, in one place, because three things point at
+ * it and none of them can be wrong.
+ *
+ * The download link the apps offer, the Mac app's own menu, and
+ * electron-builder's publish block — which is BOTH where a release uploads
+ * and where an installed Mac app looks for the next version.
+ *
+ * It says fractal-ai-builder because that is the repository's name today.
+ * "Rename the repo fractal-remote instead of fractal-AI-builder" is still the
+ * plan and the prose all reads fractal-remote already; what cannot move until
+ * the rename actually happens on GitHub is THIS, because a name that has
+ * never existed does not redirect — it 404s. Changing it early published a
+ * desktop build at a repository that was not there and shipped a Download
+ * link that went nowhere.
+ *
+ * ON THE DAY OF THE RENAME: change this line, change `repo:` in
+ * desktop/electron-builder.yml to match, run `npm run sync:rules`, and the
+ * test in test/structure.mjs will hold the rest to it. GitHub redirects the
+ * OLD name afterwards, so nothing breaks in the gap.
+ */
+export const REPO = 'justinnewbold/fractal-ai-builder'
+
+export const RELEASES = `https://github.com/${REPO}/releases`
 
 /**
  * `ready` is a thing you can download and run today.
