@@ -34,7 +34,29 @@ on:
         description: 'Publish a release from this build'
         type: boolean
         default: false
+  # AND ON MAIN, SO THE MAC APP FOLLOWS THE OTHERS.
+  #
+  # "When you make an update on phone versions, they need to make it on the
+  # web version and Mac app as well, which I think that those are running the
+  # same web app versions anyways."
+  #
+  # Same code, and not the same copy. The browser gets the new bundle from
+  # Vercel the moment main moves, and the phone gets an over-the-air update
+  # now that the APK can take one. The Mac app serves `dist/` from INSIDE the
+  # packaged app — `process.resourcesPath/dist` in desktop/main.js — so it
+  # carries whatever web app it was built with and nothing reaches it until
+  # somebody publishes a new one.
+  #
+  # Nobody had. This built on pull requests and on a `desktop-v*` tag, and
+  # published only from a tag or a ticked box, so the last release went out at
+  # 7.372.0 and every change since has been invisible on that machine while
+  # being live everywhere else.
+  #
+  # It costs no quota — ordinary runners and Apple's notary service, the same
+  # as the APK's free build — and electron-updater does the rest: the app
+  # checks the release feed on launch and installs what it finds.
   push:
+    branches: [main]
     tags: ['desktop-v*']
   pull_request:
     paths:
@@ -160,7 +182,7 @@ jobs:
           # else's code.
           PUBLISH: >-
             ${{ (startsWith(github.ref, 'refs/tags/desktop-v')
-                 || (inputs.publish && github.ref == 'refs/heads/main'))
+                 || (((inputs.publish || github.event_name == 'push') && github.ref == 'refs/heads/main')))
                 && 'always' || 'never' }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
@@ -362,7 +384,7 @@ jobs:
           PUBLISH: >-
             ${{ (github.event_name != 'pull_request'
                  && (startsWith(github.ref, 'refs/tags/desktop-v')
-                     || (inputs.publish && github.ref == 'refs/heads/main')))
+                     || (((inputs.publish || github.event_name == 'push') && github.ref == 'refs/heads/main'))))
                 && 'always' || 'never' }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run dist:win -- --publish "${PUBLISH:-never}"
@@ -373,7 +395,7 @@ jobs:
         env:
           PUBLISH: >-
             ${{ (startsWith(github.ref, 'refs/tags/desktop-v')
-                 || (inputs.publish && github.ref == 'refs/heads/main'))
+                 || (((inputs.publish || github.event_name == 'push') && github.ref == 'refs/heads/main')))
                 && 'always' || 'never' }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.WIN_CERT_P12 }}
@@ -516,7 +538,7 @@ jobs:
           PUBLISH: >-
             ${{ (github.event_name != 'pull_request'
                  && (startsWith(github.ref, 'refs/tags/desktop-v')
-                     || (inputs.publish && github.ref == 'refs/heads/main')))
+                     || (((inputs.publish || github.event_name == 'push') && github.ref == 'refs/heads/main'))))
                 && 'always' || 'never' }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run dist:linux -- --publish "${PUBLISH:-never}"
