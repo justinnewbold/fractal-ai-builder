@@ -100,7 +100,7 @@ export default function Report({ onBack, start = 'bug' }) {
               accessibilityRole="header"
               style={{ color: color.silk, fontSize: font.title, fontWeight: '700' }}
             >
-              Tell us
+              Feedback
             </Text>
             <Text style={{ color: color.silkDim, fontSize: font.small }}>
               Something broken, or something you want
@@ -122,7 +122,7 @@ export default function Report({ onBack, start = 'bug' }) {
                   key={k}
                   grow
                   height={48}
-                  label={k === 'bug' ? 'Something is broken' : 'I want something'}
+                  label={k === 'bug' ? 'Something is broken' : 'Suggest feature'}
                   on={kind === k}
                   disabled={busy}
                   onPress={() => {

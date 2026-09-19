@@ -220,7 +220,7 @@ export default function Settings({
                 neither helped. */}
             {onOpenReport ? (
               <SetupRow
-                title="Tell us"
+                title="Feedback"
                 status="Something broken, or something you want"
                 onPress={onOpenReport}
               />

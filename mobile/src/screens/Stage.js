@@ -257,8 +257,8 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.5 }}>
             {Number.isInteger(preset?.number)
-              ? `SLOT ${slotLabel(preset.number, caps?.presets?.addressing)}`
-              : 'SLOT —'}
+              ? `PRESET ${slotLabel(preset.number, caps?.presets?.addressing)}`
+              : 'PRESET —'}
             {slots ? ` OF ${slots}` : ''}
           </Text>
           <View style={{ flexDirection: 'row', gap: space.sm }}>
