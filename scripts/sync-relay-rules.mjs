@@ -40,6 +40,17 @@ export const FILES = [
   { source: '../shared/pairing.mjs', target: '../mobile/src/lib/pairing.js' },
   /* What counts as a tempo somebody typed. The unit's range, once, for both boxes. */
   { source: '../shared/tempo.mjs', target: '../mobile/src/lib/tempo.js' },
+  /*
+   * How often to check the unit is still there, and how much silence counts.
+   *
+   * Belongs here for the reason the word at the top of the screen does: two
+   * apps looking at one unit and disagreeing about whether it is plugged in
+   * is not a difference, it is one of them lying. The numbers also have to be
+   * argued for once — how long a dead unit may read as live, against how
+   * often a working one gets asked — and an argument settled twice is an
+   * argument settled differently.
+   */
+  { source: '../shared/unit-watch.mjs', target: '../mobile/src/lib/unit-watch.js' },
   { source: '../shared/tone-steps.mjs', target: '../mobile/src/lib/tone-steps.js' },
   { source: '../shared/play-mode.mjs', target: '../mobile/src/lib/play-mode.js' },
   /*
@@ -209,6 +220,14 @@ export const FILES = [
   { source: '../src/data/drive-types.json', target: '../mobile/src/data/drive-types.json', raw: true },
   { source: '../src/data/amp-lineage.json', target: '../mobile/src/data/amp-lineage.json', raw: true },
   { source: '../src/data/gear-photos.json', target: '../mobile/src/data/gear-photos.json', raw: true },
+  /*
+   * And the rule that turns a model name into one of those files. The phone
+   * shows the same photographs on the same models, and a second copy of the
+   * family-prefix matching would drift — which shows up as a photograph of
+   * the wrong amp under the right name, the exact failure that threw away the
+   * first batch of two hundred.
+   */
+  { source: '../src/lib/gearPhotos.js', target: '../mobile/src/lib/gearPhotos.js' },
   { source: '../src/data/effect-lineage.json', target: '../mobile/src/data/effect-lineage.json', raw: true },
   /*
    * THE SIMULATED FM3, so the phone has something to be without a rig.

@@ -3,7 +3,7 @@ import { Linking, Platform, ScrollView, Text, View } from 'react-native'
 import { color, font, radius, space } from '../lib/theme'
 import Note from '../components/Note'
 import Press from '../components/Press'
-import { WAYS } from '../lib/ways-in'
+import { WAYS, waysWord } from '../lib/ways-in'
 
 /**
  * How to get a computer on the other end of this, in the order people will
@@ -46,7 +46,7 @@ export default function Connect({ onBack }) {
             Connecting a computer
           </Text>
           <Text style={{ color: color.silkDim, fontSize: font.small }}>
-            Four ways, and what each one costs you
+            {`${waysWord()} ways, and what each one costs you`}
           </Text>
         </View>
         <Press label="Done" height={40} onPress={onBack} />

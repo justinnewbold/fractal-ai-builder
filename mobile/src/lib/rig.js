@@ -18,7 +18,8 @@ import { useSyncExternalStore } from 'react'
 
 import * as device from './device'
 import { idOf, sameBlock } from './unit.mjs'
-import { TAP_REREAD_MS, keepTaps, tappedBpm } from './tempo'
+import { TAP_REREAD_MS, keepTaps, tappedBpm, tempoSender } from './tempo'
+import { watchEvery, probeSays, countQuiet, unitGone } from './unit-watch'
 import { DEFAULT_SLUG, deviceSlug } from './device-slug'
 import { adopt as adoptNames, forget as forgetNames, learn as learnName, nameOf } from './presetNames'
 import { forget as forgetControls } from './paramIndex'
@@ -233,6 +234,86 @@ export function stopListening() {
   const off = stopEvents
   stopEvents = null
   off()
+  stopWatching()
+}
+
+/* ---------------------------------------------------------------- */
+/* Is the unit still there?                                          */
+/* ---------------------------------------------------------------- */
+
+/*
+ * "I purposefully unplugged the FM3 from the computer and it still said
+ * connected. I waited a few minutes, went ahead and tried to click some
+ * buttons, go to different presets, still said connected, so it's lying."
+ *
+ * Nothing asked. `unit` was set by refreshAll at the moment of connecting
+ * and by whatever reads a screen happened to make after that — and the
+ * screens that matter most on stage make none, because everything they draw
+ * is already in this store.
+ *
+ * Pressing buttons could not settle it either. A preset change, a bypass, a
+ * scene: those are writes, and a write into a port whose far end has been
+ * pulled out does not have to come back as an error. Only an ANSWER proves
+ * anybody is home, so this asks for one on a timer — which preset is loaded,
+ * the first thing a unit that has gone stops being able to say.
+ *
+ * refreshPreset already knows that rule (-1 means the computer asked and the
+ * unit said nothing) and already sets `unit: 'silent'`, which the top bar
+ * already draws in red. Everything needed was here except somebody asking.
+ */
+let watchTimer = null
+/*
+ * Which run of the watch this is.
+ *
+ * A read is in the air for as long as the far end takes, and stopWatching can
+ * land in the middle of one. Clearing the timer does not reach that read, so
+ * without a generation the tick it belongs to would come back and arm the
+ * next one — a watch that carries on after it was stopped, invisibly, and a
+ * second watchUnit() would then leave two of them running.
+ */
+let watchRun = 0
+
+/** Ask about the unit from now on. Safe to call repeatedly. */
+export function watchUnit() {
+  if (watchTimer) return stopWatching
+  const run = ++watchRun
+  let quiet = 0
+  const tick = async () => {
+    watchTimer = null
+    let said = 'quiet'
+    try {
+      said = probeSays({ preset: await device.currentPreset() })
+    } catch {
+      said = probeSays({ failed: true })
+    }
+    if (run !== watchRun) return
+    quiet = countQuiet(quiet, said)
+    /*
+     * One quiet answer is not evidence — the computer asks this same port
+     * several times a second and a question that loses that race looks
+     * exactly like a unit that has gone. Two in a row is not a race.
+     */
+    if (unitGone(quiet)) {
+      quiet = 0
+      if (state.unit !== 'silent' && state.unit !== 'missing') {
+        logDebug('unit', 'the unit stopped answering the timed check')
+      }
+      /* refreshPreset is what decides the word, so it decides it here too
+         rather than this reaching into the store with its own opinion. */
+      await refreshPreset()
+      if (run !== watchRun) return
+    }
+    watchTimer = setTimeout(tick, watchEvery(true))
+  }
+  watchTimer = setTimeout(tick, watchEvery(true))
+  return stopWatching
+}
+
+export function stopWatching() {
+  watchRun += 1
+  if (!watchTimer) return
+  clearTimeout(watchTimer)
+  watchTimer = null
 }
 
 /* ---------------------------------------------------------------- */
@@ -683,39 +764,62 @@ async function readTappedTempo() {
    rhythm however many screens come and go during it. */
 let taps = []
 
+/*
+ * What crosses the network is the NUMBER, not the taps.
+ *
+ * "Right now after I tap it a few times slowly, it'll send a number and then
+ * I'm done tapping and it sends back a different one."
+ *
+ * Because every press was forwarded as a tap — POST /tempo/tap — and the unit
+ * worked the tempo out from the spacing between them AS THEY ARRIVED. That is
+ * the thumb's spacing plus whatever the wifi, the relay server and the
+ * computer's own queue added to each press, differently each time, and the
+ * further apart the taps the more of it accumulates. The unit then reported,
+ * correctly, the tempo of what it had actually heard.
+ *
+ * Nothing at the far end can undo that; the timing is gone by the time it
+ * arrives. The only clock that knows the rhythm is the one in the hand. So
+ * the gaps are measured here and the answer is SET, with the same call a
+ * typed tempo uses. See shared/tempo.mjs.
+ *
+ * One write in the air at a time, newest number wins — a burst of taps must
+ * not queue five writes and have the last one land after the read-back.
+ */
+const sendTempo = tempoSender(
+  (bpm) => device.setTempo(bpm),
+  (err) => set({ error: err.message })
+)
+
 export async function tapTempo() {
   clearTimeout(reread)
   /*
-   * WHAT THE TAPS MEAN, SHOWN NOW.
+   * WHAT THE TAPS MEAN, SHOWN NOW AND SENT NOW.
    *
    * "It should change the tempo based on the tap and change the number
-   * immediately and then read the device … right now it takes a few seconds
-   * after doing the tap, so you can't even tell the tempo you're tapping at."
-   *
-   * The figure used to come only from the unit, and the unit cannot be asked
-   * until tapping stops — see TAP_REREAD_MS — so it lagged the last press by
-   * nearly a second. Tapping is how you FIND a tempo; one you cannot see while
-   * tapping is one you cannot aim.
+   * immediately … you can't even tell the tempo you're tapping at."
    *
    * tempoSetAt is stamped so the ordinary stale-read guard protects this the
    * same way it protects a typed tempo. readTappedTempo clears it deliberately,
-   * which is how the unit's own answer gets to win a moment later.
+   * which is how the unit's own answer gets to win a moment later — and now
+   * that answer is the number this sent, so it agrees.
    */
   taps = keepTaps(taps, Date.now())
   const guess = tappedBpm(taps)
   if (guess != null) {
     set({ bpm: guess })
     tempoSetAt = Date.now()
+    expect('bpm', guess)
+    sendTempo.push(guess)
   }
-  try {
-    await device.tapTempo()
-  } catch (err) {
-    set({ error: err.message })
-    return false
-  }
-  /* The read after the burst is the tempo the unit settled on; from then it
-     is this phone's figure, held against a stale copy. See TEMPO_KEEP_MS. */
-  reread = setTimeout(() => readTappedTempo(), TAP_REREAD_MS)
+  /* The read after the burst confirms what the unit ended up on. It waits for
+     the last write to land, or it answers about the one before it. */
+  reread = setTimeout(function settle() {
+    if (!sendTempo.idle) {
+      reread = setTimeout(settle, TAP_REREAD_MS)
+      return
+    }
+    readTappedTempo()
+  }, TAP_REREAD_MS)
   return true
 }
 

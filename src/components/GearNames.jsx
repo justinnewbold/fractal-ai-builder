@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { GEAR_GROUPS, GEAR_TOTAL, searchAll } from '../lib/gearCatalog'
+import GearCard from './GearCard'
 
 /**
  * What every model on the unit really is.
@@ -18,14 +19,31 @@ import { GEAR_GROUPS, GEAR_TOTAL, searchAll } from '../lib/gearCatalog'
  * A search over the left-hand column alone would answer nothing for every query
  * a person really has.
  *
- * The rows are not buttons. There is nothing to choose here: it is a reference
- * sheet, and a row that highlights and depresses under a thumb promises an
- * action it does not have. Picking a model is the editor's job, where the same
- * two lines appear on a row that IS a button.
+ * THE ROWS ARE BUTTONS, and they did not used to be. "There is nothing to
+ * choose here, and a row that depresses under a thumb promises an action it
+ * does not have" was the reasoning, and it was half right: there is nothing to
+ * choose, but there is something to READ. The photographs and the descriptions
+ * existed the whole time and were reachable from exactly one place — the panel
+ * inside the block editor, for the model already chosen, which is the one
+ * model nobody is wondering about.
+ *
+ * "Still not seeing any amp cab and pedal photos or descriptions. Should be
+ * able to tap on the card and open a detailed page like this." So a row opens
+ * the model's own page. Picking a model is still the editor's job; this is the
+ * reference, and a reference you can open is worth more than one you can only
+ * scan.
  */
 export default function GearNames() {
   const [group, setGroup] = useState(GEAR_GROUPS[0]?.key || 'amp')
   const [query, setQuery] = useState('')
+  /*
+   * Which model is open, held as the whole entry rather than a name.
+   *
+   * A name alone cannot be looked up: the description and the photograph are
+   * per block kind, and "Brit JVM" means nothing without knowing it came from
+   * the amp list. The row already has both, so it hands over both.
+   */
+  const [open, setOpen] = useState(null)
 
   /*
    * Every group is searched, not just the open one. The counts on the tabs are
@@ -39,6 +57,15 @@ export default function GearNames() {
   const elsewhere = searching ? groups.filter((g) => g.key !== current?.key && g.hits.length) : []
 
   if (!current) return null
+
+  /*
+   * The page replaces the list rather than sitting under it. Setup's own rows
+   * work this way — "when you go deeper into the settings menu have swiping
+   * down or clicking the X take you back to the settings menu" — and the
+   * search, the tabs and the scroll position are all still here underneath,
+   * so coming back lands where you left.
+   */
+  if (open) return <GearCard entry={open} onBack={() => setOpen(null)} />
 
   return (
     <div className="gear-names">
@@ -79,14 +106,16 @@ export default function GearNames() {
       {current.hits.length ? (
         <ul className="gear-list">
           {current.hits.map((e) => (
-            <li className="gear-row" key={e.name}>
-              <span className="type-row-name">{e.name}</span>
-              {/*
-                A model with nothing recorded says nothing. Four drives are in
-                that position and a plausible guess about any of them would be
-                read by somebody who owns the pedal.
-              */}
-              {e.gear ? <span className="type-row-gear">{e.gear}</span> : null}
+            <li key={e.name}>
+              <button type="button" className="gear-row" onClick={() => setOpen(e)}>
+                <span className="type-row-name">{e.name}</span>
+                {/*
+                  A model with nothing recorded says nothing. Four drives are
+                  in that position and a plausible guess about any of them
+                  would be read by somebody who owns the pedal.
+                */}
+                {e.gear ? <span className="type-row-gear">{e.gear}</span> : null}
+              </button>
             </li>
           ))}
         </ul>

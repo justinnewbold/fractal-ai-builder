@@ -260,7 +260,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: fractal-ai-builder-mac
+          name: fractal-remote-mac
           path: desktop/release/*.dmg
           if-no-files-found: error
 
@@ -396,7 +396,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: fractal-ai-builder-windows
+          name: fractal-remote-windows
           path: desktop/release/*.exe
           if-no-files-found: error
 
@@ -537,7 +537,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: fractal-ai-builder-linux-${{ matrix.arch }}
+          name: fractal-remote-linux-${{ matrix.arch }}
           path: |
             desktop/release/*.AppImage
             desktop/release/*.deb

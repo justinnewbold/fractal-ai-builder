@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Linking, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 
-import { color, font, mono, radius, space, TAP } from '../lib/theme'
+import { color, font, mono, radius, space, TAP, MODES, getMode, setMode } from '../lib/theme'
 import { APP_VERSION } from '../lib/version'
 import { AFFILIATION } from '../lib/affiliation'
 import { isOlder } from '../lib/versions'
@@ -32,6 +32,9 @@ import Sheet from '../components/Sheet'
 const face = Platform.select(mono)
 
 const ofDeviceName = (s) => s.deviceName
+
+/** What each theme setting is called, for the row that has to say which. */
+const THEME_WORD = { auto: 'Auto', light: 'Light', dark: 'Dark' }
 const ofUnitState = (s) => s.unit
 
 /**
@@ -158,34 +161,54 @@ export default function Settings({
             {`v${APP_VERSION}`}
           </Text>
           <View style={{ gap: 0 }}>
+            {/*
+              One row for the whole chain: this phone, the computer, and the
+              unit plugged into it.
+
+              It was two rows — "Unit" on top and "Phone & computer" under it
+              — and neither could answer the only question anybody opens
+              either of them with. "Not connected" on the Unit row might mean
+              the unit is unplugged or might mean the computer is asleep, and
+              you had to open the second row to find out which. One chain, one
+              row, and the status says how far along it gets.
+            */}
             <SetupRow
-              title="Unit"
+              title="Phone & computer"
               status={
-                link !== 'connected'
-                  ? 'Not connected'
-                  : unitState === 'missing'
-                    ? 'No unit found on the computer'
-                    : unitState === 'silent'
-                      ? `${deviceName || 'Unit'} · not answering`
-                      : `${deviceName || 'Unit'} · connected`
+                demo
+                  ? 'Demo — simulated FM3'
+                  : link !== 'connected'
+                    ? linkWord
+                    : unitState === 'missing'
+                      ? 'Computer connected · no unit'
+                      : unitState === 'silent'
+                        ? `Computer connected · ${deviceName || 'unit'} not answering`
+                        : `${deviceName || 'Unit'} · connected`
+              }
+              onPress={() => setPage('link')}
+            />
+            {/*
+              Named after the errand rather than after the thing.
+
+              This row said "Unit", and behind it were the rename boxes and a
+              line about whether the unit was answering. The line has gone up
+              one row where the rest of the chain is; the boxes are the whole
+              page now, so the row can say what pressing it gets you.
+            */}
+            <SetupRow
+              title="Rename presets and scenes"
+              status={
+                link === 'connected'
+                  ? 'Names you will know on a dark stage'
+                  : 'Connect a computer first'
               }
               onPress={() => setPage('unit')}
             />
             <SetupRow
-              title="Phone & computer"
-              status={demo ? 'Demo — simulated FM3' : linkWord}
-              onPress={() => setPage('link')}
-            />
-            {onOpenConnect ? (
-              <SetupRow
-                title="Connecting a computer"
-                status="Mac app, Windows, or ForgeFX by hand"
-                onPress={onOpenConnect}
-              />
-            ) : null}
-            <SetupRow
               title="Play screen"
-              status={SIZES[loadSize(sync)]?.name || 'Small'}
+              /* Both of the things behind this row, so somebody looking for
+                 the theme can see from the list that it is in here. */
+              status={[SIZES[loadSize(sync)]?.name || 'Small', THEME_WORD[getMode()] || 'Auto'].join(' · ')}
               onPress={() => setPage('play')}
             />
             {onOpenGear ? (
@@ -195,9 +218,57 @@ export default function Settings({
                 onPress={onOpenGear}
               />
             ) : null}
-            {/* Above the log, because it is the one somebody is looking for
-                when something is wrong; the log is what they send afterwards
-                if it did not help. */}
+            {/*
+              Three rows became one door.
+
+              Fixes, Log and Feedback were three rows in a column, and they
+              are three stages of the same evening: read what to try, read
+              what actually happened, tell somebody when neither helped. As
+              separate rows each looked like a different errand, and the one
+              in the middle looked like a developer's.
+            */}
+            {onOpenFixes || onOpenLog || onOpenReport ? (
+              <SetupRow
+                title="Troubleshooting"
+                status="What to try, the log, and telling us"
+                onPress={() => setPage('trouble')}
+              />
+            ) : null}
+            <SetupRow title="About" status={`v${APP_VERSION}`} onPress={() => setPage('about')} />
+          </View>
+        </>
+      ) : null}
+
+      {/* -------------------------------------------------------- renaming */}
+      {page === 'unit' ? (
+        <>
+          {head('Rename presets and scenes', 'back')}
+          {/*
+            The boxes are the page now.
+
+            "Move the rename presets and scenes button to the settings menu"
+            put them behind a row called Unit, with a line above them about
+            whether the unit was answering. That line has gone to Phone &
+            computer, where the rest of the chain is — so what is left here is
+            one errand and nothing in front of it.
+          */}
+          <Text style={{ color: color.silkDim, fontSize: font.small, lineHeight: 20 }}>
+            The names your unit came with are numbers and abbreviations. These are the words you
+            read off a phone on a dark stage.
+          </Text>
+          {link === 'connected' ? <UnitBits /> : <Note>Connect to the computer to rename anything.</Note>}
+        </>
+      ) : null}
+
+      {/* -------------------------------------------------- troubleshooting */}
+      {page === 'trouble' ? (
+        <>
+          {head('Troubleshooting', 'back')}
+          <Text style={{ color: color.silkDim, fontSize: font.small, lineHeight: 20 }}>
+            In order: try the fixes, read the log if they did not help, then tell us and the log
+            goes with it.
+          </Text>
+          <View style={{ gap: 0 }}>
             {onOpenFixes ? (
               <SetupRow
                 title="Fixes"
@@ -225,35 +296,7 @@ export default function Settings({
                 onPress={onOpenReport}
               />
             ) : null}
-            <SetupRow title="About" status={`v${APP_VERSION}`} onPress={() => setPage('about')} />
           </View>
-        </>
-      ) : null}
-
-      {/* ------------------------------------------------------------ unit */}
-      {page === 'unit' ? (
-        <>
-          {head('Unit', 'back')}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-            <Lamp state={lamp} />
-            <Text style={{ color: color.silk, fontSize: font.body, flex: 1 }}>
-              {link !== 'connected'
-                ? 'No unit, because the computer isn’t answering.'
-                : unitState === 'missing'
-                  ? 'The computer has no unit. Check the FM3 is on and its cable is in.'
-                  : unitState === 'silent'
-                    ? `${deviceName || 'Your unit'} — not answering the computer. A frozen unit looks like this; turn it off and on.`
-                    : `${deviceName || 'Your unit'} — answering`}
-            </Text>
-          </View>
-          {/*
-            Renaming is here and not on the front page. "Move the rename presets
-            and scenes button to the settings menu" put it in the browser's Unit
-            page; the phone had the boxes themselves as the first thing in Setup,
-            which is eight empty fields in front of everything anybody actually
-            opened Setup for.
-          */}
-          {link === 'connected' ? <UnitBits /> : <Note>Connect to the computer to rename anything.</Note>}
         </>
       ) : null}
 
@@ -266,10 +309,23 @@ export default function Settings({
             <Section>The link</Section>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
               <Lamp state={lamp} />
+              {/*
+                The far end of the chain, in the same breath as the near end.
+
+                "Connected to your computer" was the whole line, and it was
+                true on an evening when the unit was switched off — which is
+                the evening you are reading it. The unit's own state used to
+                be one door away on a row called Unit; it is here, because
+                this page is the chain and the unit is the end of it.
+              */}
               <Text style={{ color: color.silk, fontSize: font.body, flex: 1 }}>
-                {link === 'connected'
-                  ? `Connected to ${macName || 'your computer'}${deviceName ? ` — ${deviceName}` : ''}`
-                  : `${linkWord}.`}
+                {link !== 'connected'
+                  ? `${linkWord}.`
+                  : unitState === 'missing'
+                    ? `Connected to ${macName || 'your computer'} — but it has no unit. Check your unit is on and its cable is in.`
+                    : unitState === 'silent'
+                      ? `Connected to ${macName || 'your computer'} — ${deviceName || 'your unit'} isn’t answering. A frozen unit looks like this; turn it off and on.`
+                      : `Connected to ${macName || 'your computer'}${deviceName ? ` — ${deviceName}` : ''}`}
               </Text>
             </View>
 
@@ -327,9 +383,17 @@ export default function Settings({
               </Note>
             ) : null}
 
-            {/* Nothing connected is the one state where the rest of this page
-                can do nothing at all, so the way in is offered right here. */}
-            {onOpenConnect && link !== 'connected' ? (
+            {/*
+              The way in to getting a computer on the other end at all.
+
+              It was a row of its own on the front of Setup, called
+              "Connecting a computer", sitting between two rows about a
+              computer that was already connected. It belongs here, on the
+              page about the line to that computer — and it stays offered even
+              once the line is up, because the second computer somebody wants
+              to add is one they add on an evening when the first one works.
+            */}
+            {onOpenConnect ? (
               <Press label="How do I connect a computer?" onPress={onOpenConnect} />
             ) : null}
 
@@ -447,6 +511,20 @@ export default function Settings({
             <TileSize />
           </View>
 
+          {/*
+            Light, dark, or whatever the phone is set to.
+
+            "I'm not seeing where the light/dark/auto theme buttons are
+            anymore. Please put that back on Setup." The browser has had these
+            three for a long time and keeps them here, under Play screen,
+            because both of these settings are about how the thing you look at
+            on a stand LOOKS. The phone had none of them and was dark whatever
+            the handset was set to, which is the wrong answer in a lit room.
+          */}
+          <View style={{ gap: space.md }}>
+            <Section>Appearance</Section>
+            <Appearance />
+          </View>
         </>
       ) : null}
 
@@ -724,5 +802,36 @@ function Section({ children }) {
     >
       {children}
     </Text>
+  )
+}
+
+/**
+ * Light, dark, or the handset's own setting.
+ *
+ * Auto first, and it is the default: a phone that already knows whether its
+ * owner wants light or dark is a better guess than anything this app could
+ * make, and somebody who has never thought about it gets the right answer
+ * without choosing.
+ */
+function Appearance() {
+  const [mode, setLocal] = useState(getMode())
+  const LABEL = { auto: 'Auto', light: 'Light', dark: 'Dark' }
+  return (
+    <View style={{ flexDirection: 'row', gap: space.sm }}>
+      {MODES.map((m) => (
+        <Press
+          key={m}
+          grow
+          label={LABEL[m]}
+          tone="signal"
+          on={m === mode}
+          height={TAP}
+          onPress={() => {
+            setMode(m, sync)
+            setLocal(m)
+          }}
+        />
+      ))}
+    </View>
   )
 }

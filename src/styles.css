@@ -46,6 +46,7 @@
   --knob-edge: #2c323b;
   --signal-wash: rgba(240, 167, 60, 0.12);
   --live-halo: rgba(95, 191, 209, 0.2);
+  --ok-halo: rgba(99, 198, 140, 0.2);
   --fault-halo: rgba(224, 104, 79, 0.2);
   --dim-halo: rgba(135, 141, 151, 0.16);
 
@@ -622,6 +623,26 @@ button.device-summary {
 .lamp[data-state='fault'] {
   background: var(--fault);
   box-shadow: 0 0 0 3px var(--fault-halo);
+}
+
+/*
+ * The unit's own lamp is GREEN when the unit answers. The link lamps stay
+ * cyan, and the difference is the whole point of having two colours.
+ *
+ * "The dot next to the unit name was changed to green a while back. Looks
+ * like it didn't hit the web app." It did not: the phone's top bar has had
+ * `unitLamp` on --ok since the day the two lamps were split apart, and the
+ * browser kept drawing the unit on --live — which is the colour that means
+ * "the computer is answering", one link further back down the chain. Two
+ * apps, one rig, two different colours for the same fact.
+ *
+ * Scoped to .topbar rather than changing `live` everywhere, because the OTHER
+ * two lamps in this app — LinkChip and PhoneRemote — really are about the
+ * computer, and cyan is right for them at both ends.
+ */
+.topbar .lamp[data-state='live'] {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px var(--ok-halo);
 }
 
 .device-name {
@@ -5177,6 +5198,7 @@ ol.action-list li.destructive::marker {
   --knob-edge: #c7c2b7;
   --signal-wash: rgba(181, 113, 26, 0.12);
   --live-halo: rgba(31, 127, 146, 0.18);
+  --ok-halo: rgba(31, 122, 69, 0.18);
   --fault-halo: rgba(178, 59, 35, 0.16);
   --dim-halo: rgba(95, 102, 112, 0.14);
 }
@@ -5797,6 +5819,17 @@ button.add-btn[aria-expanded='true'] {
 .remote input.name-field {
   min-width: 0;
   flex: 1 1 260px;
+}
+
+/* Folded away, because three of the four ways to connect a computer never
+   need any of this and the fourth needs it once. The summary is a question
+   somebody can answer about themselves rather than a heading they have to
+   already understand. */
+.env-fold > summary {
+  cursor: pointer;
+  color: var(--silk-dim);
+  font-size: var(--f-1);
+  padding: var(--s-2) 0;
 }
 
 /* The .env block is meant to be copied, so it wraps rather than scrolls and
@@ -7253,18 +7286,47 @@ button.gig-bar-btn:disabled {
 }
 
 /*
- * Not a .type-row: that one is a button with a 44px floor because it is a
- * choice you make with a thumb. These are lines to read, so they take the room
- * two lines of text need and no more — a 44px floor on 400 of them is four
- * thousand pixels of air between the reader and the model they are looking for.
+ * A button now — it opens the model's own page — but deliberately NOT a
+ * .type-row, which carries a 44px floor because it is a choice you make with
+ * a thumb mid-song. These are lines you read while standing still, and a 44px
+ * floor on 400 of them is four thousand pixels of air between the reader and
+ * the model they came here to find. Two lines of text and no more; the whole
+ * row is the target, which is wider than any thumb even when it is short.
  */
 .gear-row {
-  padding: var(--s-2) var(--s-3);
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
   border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  padding: var(--s-2) var(--s-3);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
 }
 
-.gear-row:last-child {
+.gear-list li:last-child .gear-row {
   border-bottom: 0;
+}
+
+.gear-row:hover,
+.gear-row:focus-visible {
+  background: var(--panel-deep, rgba(255, 255, 255, 0.04));
+}
+
+/* ---------- one model, on a page of its own ---------- */
+
+.gear-card-name {
+  font-size: var(--f-4);
+  font-weight: 700;
+  margin: var(--s-3) 0 2px;
+}
+
+.gear-card-gear {
+  color: var(--signal);
+  margin: 0 0 var(--s-3);
 }
 
 /* ---------- find a control ---------- */

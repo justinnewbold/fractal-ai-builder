@@ -18,12 +18,22 @@
  * lineage.js honest (nothing invented, silence over a plausible guess) is the
  * rule this inherits.
  *
- * Cabinets are the visible absence, and deliberately so. All 45 of them have a
- * blank lineage in the data, so a Cabs tab would be 45 rows of nothing; the
- * catalog says which families it covers rather than offering an empty one.
+ * CABINETS ARE HERE NOW, and they were deliberately left out. All 45 had a
+ * blank lineage, so a Cabs tab would have been 45 rows of nothing. Then all 45
+ * got a description — what the cabinet sounds like, which is the thing anybody
+ * picking one wants — and about a dozen got a photograph. A row with no "based
+ * on" and a paragraph behind it is not an empty row.
+ *
+ * What they still have is no attribution, and that is a fact about Fractal's
+ * naming rather than a gap in the research: "1x12 Deluxe Tweed" says what it
+ * is. So the Cabs family is marked as one where no lineage is EXPECTED, and
+ * the lists stop apologising for its absence — "nobody has recorded what this
+ * one is based on" under every cabinet would be 45 apologies for something
+ * that was never missing.
  */
 import ampTypes from '../data/amp-types.json' with { type: 'json' }
 import driveTypes from '../data/drive-types.json' with { type: 'json' }
+import cabTypes from '../data/cab-types.json' with { type: 'json' }
 import effectFamilies from '../data/effect-lineage.json' with { type: 'json' }
 import { lineageFor } from './lineage.js'
 
@@ -51,7 +61,20 @@ function fromCatalog(slug, list) {
     if (!name || seen.has(name.toLowerCase())) continue
     seen.add(name.toLowerCase())
     const found = lineageFor(slug, name)
-    out.push({ name, gear: found?.basedOn || found?.manufacturer || null })
+    /*
+     * `slug` rides along with every entry, and it has to: the catalog is the
+     * only place that still knows which BLOCK a name came from, and both the
+     * description and the photograph are looked up per block kind. Without it
+     * a row in this list is a bare string, and a bare string cannot be asked
+     * what it is a picture of.
+     */
+    out.push({
+      slug,
+      name,
+      gear: found?.basedOn || found?.manufacturer || null,
+      basedOn: found?.basedOn || null,
+      manufacturer: found?.manufacturer || null
+    })
   }
   return out.sort(byName)
 }
@@ -60,7 +83,13 @@ function fromCatalog(slug, list) {
 function fromFamilies(slug) {
   return (effectFamilies[slug] || [])
     .filter((e) => e?.family && (e.basedOn || e.manufacturer))
-    .map((e) => ({ name: e.family, gear: e.basedOn || e.manufacturer }))
+    .map((e) => ({
+      slug,
+      name: e.family,
+      gear: e.basedOn || e.manufacturer,
+      basedOn: e.basedOn || null,
+      manufacturer: e.manufacturer || null
+    }))
     .sort(byName)
 }
 
@@ -73,6 +102,9 @@ function fromFamilies(slug) {
 export const GEAR_FAMILIES = [
   { key: 'amp', label: 'Amps' },
   { key: 'drive', label: 'Drives' },
+  /* `lineage: false` — these are named after what they are, so there is no
+     "based on" to be missing and nothing to apologise for. */
+  { key: 'cab', label: 'Cabs', lineage: false },
   { key: 'wah', label: 'Wahs' },
   { key: 'comp', label: 'Compressors' },
   { key: 'delay', label: 'Delays' }
@@ -82,6 +114,7 @@ export const GEAR_FAMILIES = [
 const CATALOG = {
   amp: () => fromCatalog('amp', ampTypes),
   drive: () => fromCatalog('drive', driveTypes),
+  cab: () => fromCatalog('cab', cabTypes),
   wah: () => fromFamilies('wah'),
   comp: () => fromFamilies('comp'),
   delay: () => fromFamilies('delay')

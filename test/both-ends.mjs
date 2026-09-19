@@ -530,4 +530,111 @@ export function run(test) {
       }
     }
   })
+  /*
+   * COLOUR MEANS THE SAME THING AT BOTH ENDS, or it means nothing.
+   *
+   * "The dot next to the unit name was changed to green a while back. Looks
+   * like it didn't hit the web app. We need to be better at keeping all
+   * versions of the app in sync with changes."
+   *
+   * The survey above walks both apps for the WORDS on their buttons, which is
+   * why a rename cannot land at one end only. Colour had no such check, and
+   * the lamp beside the unit name drifted for weeks: green on the phone, cyan
+   * in the browser, for the same fact about the same rig. Cyan is not a
+   * near-miss either — it is the colour that means "the computer is
+   * answering", one link further back down the chain, so the browser was
+   * quietly saying something different rather than something faded.
+   *
+   * Two checks, because there are two ways for this to go wrong. The palettes
+   * can disagree about what a colour IS, and the lamps can disagree about
+   * which colour a state GETS.
+   */
+  test('the two apps paint the same palette', () => {
+    /*
+     * mobile/src/lib/theme.js says in its own first paragraph that it is "the
+     * same palette as the web app's :root, and for the same reason: nothing
+     * is coloured for decoration". That was true when it was written and
+     * nothing has ever held it true since.
+     */
+    const css = read('src/styles.css')
+    const root = css.slice(css.indexOf(':root {'), css.indexOf('}', css.indexOf(':root {')))
+    const cssVar = (name) => {
+      const hit = root.match(new RegExp(`--${name}:\\s*([^;]+);`))
+      return hit ? hit[1].trim().toLowerCase() : null
+    }
+
+    const theme = read('mobile/src/lib/theme.js')
+    const dark = theme.slice(theme.indexOf('const DARK = {'), theme.indexOf('\n}', theme.indexOf('const DARK = {')))
+    const phoneColour = (key) => {
+      const hit = dark.match(new RegExp(`\\b${key}:\\s*'([^']+)'`))
+      return hit ? hit[1].trim().toLowerCase() : null
+    }
+
+    /* The semantic four and the ink they sit on. Anything decorative is
+       deliberately not here — the two apps are different shapes and are
+       allowed to be. What has to match is what a colour MEANS. */
+    for (const [phone, web] of [
+      ['signal', 'signal'],
+      ['live', 'live'],
+      ['fault', 'fault'],
+      ['ok', 'ok'],
+      ['chassis', 'chassis'],
+      ['panel', 'panel'],
+      ['rule', 'rule'],
+      ['silk', 'silk'],
+      ['silkDim', 'silk-dim'],
+      ['silkFaint', 'silk-faint']
+    ]) {
+      const a = phoneColour(phone)
+      const b = cssVar(web)
+      assert.ok(a, `the phone has no ${phone}`)
+      assert.ok(b, `the browser has no --${web}`)
+      assert.equal(a, b, `${phone} is ${a} on the phone and ${b} in the browser`)
+    }
+  })
+
+  test('a lamp means the same thing at both ends', () => {
+    /*
+     * Three lamps in each app and two colours that are easy to confuse,
+     * because they are next to each other in the chain: the COMPUTER
+     * answering is cyan, the UNIT answering is green. A rig with a sleeping
+     * computer and a rig with an unplugged FM3 are different evenings, and
+     * the dot is the fastest way to tell which one you are having.
+     */
+    const lamp = read('mobile/src/components/Lamp.js')
+    const css = read('src/styles.css')
+
+    /* What the phone paints for each state — the FILL, not the halo. Read
+       whole, the halo line's `color.okHalo` overwrites the fill's `color.ok`
+       and the check then compares the wrong pair. */
+    const fill = lamp.slice(lamp.indexOf('const fill ='), lamp.indexOf('const halo ='))
+    assert.ok(fill.length > 40, 'the lamp was rewritten; this check reads its fill')
+    const phone = Object.fromEntries(
+      [...fill.matchAll(/state === '(\w+)' \? color\.(\w+)/g)].map((m) => [m[1], m[2]])
+    )
+    assert.equal(phone.good, 'ok', 'the phone no longer paints an answering unit green')
+    assert.equal(phone.live, 'live', 'the phone no longer paints an answering computer cyan')
+    assert.equal(phone.fault, 'fault', 'the phone no longer paints a fault red')
+
+    /* And what the browser paints, per lamp. The unit's is scoped to the top
+       bar; the link lamps take the unscoped rule. */
+    const ruleFor = (selector) => {
+      const at = css.indexOf(`${selector} {`)
+      assert.notEqual(at, -1, `${selector} is gone, so a lamp lost its colour`)
+      return css.slice(at, css.indexOf('}', at))
+    }
+    assert.match(ruleFor(".topbar .lamp[data-state='live']"), /background: var\(--ok\)/, 'the browser paints an answering unit something other than green')
+    assert.match(ruleFor(".lamp[data-state='live']"), /background: var\(--live\)/, 'the browser paints an answering computer something other than cyan')
+    assert.match(ruleFor(".lamp[data-state='fault']"), /background: var\(--fault\)/, 'the browser paints a fault something other than red')
+
+    /*
+     * And the browser's unit lamp really is the top bar's. If TopBar stopped
+     * drawing it inside .topbar the scoped rule above would silently stop
+     * applying and the dot would go back to cyan with every check still green.
+     */
+    const bar = read('src/components/TopBar.jsx')
+    assert.match(bar, /<div className="topbar"/, 'the top bar is not .topbar any more, so the unit lamp loses its colour')
+    assert.match(bar, /<span className="lamp" data-state=\{lampState\} \/>/, 'the unit lamp is not in the top bar')
+  })
+
 }

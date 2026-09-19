@@ -59,7 +59,7 @@ import { useAsks } from './lib/asks'
 import { SIZES, loadSize, saveSize, clampSize, loadFit, saveFit } from './lib/gigSize'
 import { editButtonShows } from './lib/playMode'
 import { FIXES, FIRMWARE_NOTE, fixById, fixFor, versionsInSync } from '../shared/troubleshooting.mjs'
-import { osGuess, waysFor } from '../shared/ways-in.mjs'
+import { osGuess, waysFor, waysWord } from '../shared/ways-in.mjs'
 import { AFFILIATION } from '../shared/affiliation.mjs'
 import { remember as rememberPreset, CHANGED as MARKS_CHANGED } from './lib/presetMarks'
 import { CHANGED as SETLISTS_CHANGED } from './lib/setlists'
@@ -154,6 +154,7 @@ import {
   subscribeRemoteState
 } from './lib/remote'
 import { newEntry, append } from './lib/log'
+import { watchEvery, probeSays, countQuiet, unitGone } from '../shared/unit-watch.mjs'
 
 
 /**
@@ -315,11 +316,28 @@ const HAND_EDIT_KINDS = new Set([
 ])
 
 /** The pages behind Setup's rows, by key, in the words on the rows. */
+/*
+ * The doors, in the order somebody meets them.
+ *
+ * "Unit" was the top row and it held two unrelated things: whether the unit
+ * is answering, and the way in to renaming presets and scenes. The first of
+ * those is what "Phone & computer" is ABOUT — the cable, the computer, the
+ * unit on the end of it, one chain — and splitting the chain over two rows
+ * meant neither row could say whether it was working. So the state went
+ * there, the row kept the errand, and the row is named after the errand:
+ * "Rename presets and scenes" is a thing you came here to DO, where "Unit"
+ * was a thing you had to open to find out what was inside.
+ *
+ * "Help & fixes" is "Troubleshooting" for the same reason the log and the
+ * feedback form now live behind it: they are three stages of one errand —
+ * read what to try, read what happened, tell somebody — and they were three
+ * rows that each looked like a different errand.
+ */
 const SETUP_PAGES = {
-  unit: 'Unit',
   link: 'Phone & computer',
+  rename: 'Rename presets and scenes',
   play: 'Play screen',
-  help: 'Help & fixes',
+  help: 'Troubleshooting',
   about: 'About'
 }
 const THEME_WORD = { auto: 'Auto', light: 'Light', dark: 'Dark' }
@@ -1160,9 +1178,19 @@ export default function App() {
    * turns the confirmation off.
    */
   const liveRef = useRef(false)
+  /*
+   * Whether a read is already in flight, for the timed check below to stand
+   * clear of. In a ref rather than the dependency list: the check is a loop
+   * that schedules itself, and restarting that loop every time a button goes
+   * busy would reset its own timer and mean it never reached the end of one.
+   */
+  const busyRef = useRef(false)
   useEffect(() => {
     liveRef.current = status === 'live'
   }, [status])
+  useEffect(() => {
+    busyRef.current = busy
+  }, [busy])
 
   /*
    * `settling` is for a read that follows an order this app gave the unit —
@@ -1388,6 +1416,70 @@ export default function App() {
       live = false
     }
   }, [lostUnit, read])
+
+  /*
+   * Ask, on a timer, whether the unit is still there.
+   *
+   * "I purposefully unplugged the FM3 from the computer and it still said
+   * connected. I waited a few minutes, went ahead and tried to click some
+   * buttons, go to different presets, still said connected, so it's lying."
+   *
+   * It was, and nothing here ever asked. `status` was set by the last read
+   * that ran, and after startup a read only runs when something on screen
+   * wants a fresh answer — so "connected" was a fact about the past, drawn
+   * as a fact about now, ageing quietly.
+   *
+   * Pressing buttons did not settle it, and that is the part worth knowing:
+   * a preset change is a WRITE, and a write to a port whose far end has gone
+   * away does not have to fail. The bytes leave. Only an ANSWER proves the
+   * unit is there, so this asks for one — which preset is loaded, the first
+   * thing a unit that has gone stops being able to say.
+   *
+   * It does not touch the screen when the answer is good. A poll that also
+   * applied what it read would fight whoever is working at the Mac, and the
+   * question here is only whether anybody is home. When the answer is bad
+   * twice running it hands over to read(), which confirms it properly and
+   * puts up the notice that says what to check.
+   *
+   * See shared/unit-watch.mjs for the two numbers and why they are those.
+   */
+  useEffect(() => {
+    if (status !== 'live') return undefined
+    let live = true
+    let timer = null
+    let quiet = 0
+    const every = watchEvery(remoteActive())
+    const ask = async () => {
+      if (!live) return
+      /* A tab nobody is looking at is a tab that can be wrong for free, and a
+         phone in a pocket should not be holding a relay open to ask. */
+      const hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden'
+      if (hidden || busyRef.current) {
+        timer = setTimeout(ask, every)
+        return
+      }
+      let said = 'quiet'
+      try {
+        said = probeSays({ preset: await currentPreset() })
+      } catch {
+        said = probeSays({ failed: true })
+      }
+      if (!live) return
+      quiet = countQuiet(quiet, said)
+      if (unitGone(quiet)) {
+        logDebug('unit', 'the unit stopped answering the timed check', `${quiet} quiet answers`)
+        quiet = 0
+        await read()
+        if (!live) return
+      }
+      timer = setTimeout(ask, every)
+    }
+    timer = setTimeout(ask, every)
+    return () => {
+      live = false
+      clearTimeout(timer)
+    }
+  }, [status, read])
 
   /**
    * What a reload does, without the reload.
@@ -3507,7 +3599,16 @@ export default function App() {
 
       <Sheet
         open={sheet === 'scenes'}
-        onClose={() => setSheet(null)}
+        /*
+         * Back to whatever opened it. The scene chip on the Edit screen wants
+         * the Edit screen; Setup's rename page wants Setup — "when you go
+         * deeper into the settings menu have swiping down or clicking the X
+         * take you back to the settings menu instead of the home screen".
+         */
+        onClose={() => {
+          setSheet(sheetBack)
+          setSheetBack(null)
+        }}
         title="Scenes"
         alert={sheetAlert}
       >
@@ -3621,23 +3722,76 @@ export default function App() {
           <>
             <div className="device-meta mono setup-version">{FULL}</div>
             <div className="setup-rows">
-              <SetupRow key="unit" title="Unit" status={status === 'live' ? `${device?.short || device?.name || 'Unit'} · connected` : 'Not connected'} onClick={() => setSetupPage('unit')} />
-              <SetupRow key="link" title="Phone & computer" status={describeLink(link).note || 'Phone remote off'} onClick={() => setSetupPage('link')} />
-              <SetupRow key="play" title="Play screen" status={[fit ? 'Fit to screen' : SIZES[size].name, THEME_WORD[getMode()] || null].filter(Boolean).join(' · ')} onClick={() => setSetupPage('play')} />
+              {/* The whole chain on one line: the computer, and the unit on
+                  the end of it. Two rows could each only say half of it, and
+                  half of a chain is never the answer to "why is nothing
+                  happening". */}
+              <SetupRow key="link" title="Phone & computer" status={[describeLink(link).note || 'Phone remote off', status === 'live' ? `${device?.short || device?.name || 'Unit'} · connected` : 'No unit'].join(' · ')} onClick={() => setSetupPage('link')} />
+              <SetupRow key="rename" title="Rename presets and scenes" status={status === 'live' ? 'Give them names you will know on a dark stage' : 'Connect a unit first'} onClick={() => setSetupPage('rename')} />
+              {/* The theme is behind this row and the status says so, because
+                  "Play screen" is not where anybody looks for light and dark —
+                  "I'm not seeing where the light/dark/auto theme buttons are
+                  anymore." Both settings really are about how the thing on the
+                  stand LOOKS, so they stay together; the row now says which
+                  theme is on, which is what makes it findable by scanning. */}
+              <SetupRow key="play" title="Play screen" status={['Buttons ' + (fit ? 'fit to screen' : SIZES[size].name.toLowerCase()), (THEME_WORD[getMode()] || 'Auto') + ' theme'].join(' · ')} onClick={() => setSetupPage('play')} />
               <SetupRow key="gear-names" title="Amp & pedal names" status="What each model on your unit really is" onClick={() => setSheet('gear')} />
-              <SetupRow key="help" title="Help & fixes" status={`${getDebugLog().length} line${getDebugLog().length === 1 ? '' : 's'} in the log`} onClick={() => setSetupPage('help')} />
+              <SetupRow key="help" title="Troubleshooting" status={`${getDebugLog().length} line${getDebugLog().length === 1 ? '' : 's'} in the log`} onClick={() => setSetupPage('help')} />
               <SetupRow key="about" title="About" status={FULL} onClick={() => setSetupPage('about')} />
             </div>
           </>
         ) : null}
 
-        {setupPage === 'unit' ? (
+        {setupPage === 'rename' ? (
           <div className="setup-page">
             <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
               ‹ Setup
             </button>
-            <p className="setup-page-title">{SETUP_PAGES.unit}</p>
-            <DeviceDetail status={status} device={device} onRetry={reconnect} busy={busy} onRename={() => setSheet('scenes')} />
+            <p className="setup-page-title">{SETUP_PAGES.rename}</p>
+            {/*
+              One errand, said in the words of the errand.
+
+              The button used to sit in the row of connection buttons on the
+              Unit page, between "Reconnect" and the address box, where it was
+              the only one of them that changed anything on the unit. Here it
+              is the page.
+            */}
+            <p className="hint">
+              The names your unit came with are numbers and abbreviations. These are the words you
+              read off a phone on a dark stage, so they are worth the minute it takes.
+            </p>
+            {status === 'live' ? (
+              <button
+                className="primary"
+                disabled={busy}
+                onClick={() => {
+                  setSheetBack('settings')
+                  setSheet('scenes')
+                }}
+              >
+                Rename preset or scenes
+              </button>
+            ) : (
+              <p className="hint">
+                Nothing to rename until a unit is answering. Phone &amp; computer, one row up, says
+                what the chain is doing.
+              </p>
+            )}
+          </div>
+        ) : null}
+
+        {setupPage === 'link' ? (
+          <div className="setup-page">
+            <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
+              ‹ Setup
+            </button>
+            <p className="setup-page-title">{SETUP_PAGES.link}</p>
+            {/*
+              The unit's own state leads, because it is the far end of the
+              chain this page is about and the thing that was hardest to find:
+              it used to be behind a row called "Unit", one door along.
+            */}
+            <DeviceDetail status={status} device={device} onRetry={reconnect} busy={busy} />
 <Section key="connection" title="Connection" note="Which unit this app is talking to">
             <Ports
               busy={busy}
@@ -3648,15 +3802,6 @@ export default function App() {
               }}
             />
           </Section>
-          </div>
-        ) : null}
-
-        {setupPage === 'link' ? (
-          <div className="setup-page">
-            <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
-              ‹ Setup
-            </button>
-            <p className="setup-page-title">{SETUP_PAGES.link}</p>
 <Section key="phone-remote" title="Phone remote" note={describeLink(link).note}>
             {/*
               One panel for both ends. It says which end this is, whether the
@@ -3681,10 +3826,10 @@ export default function App() {
             title="Connect a computer"
             note={
               thisComputer === 'mac'
-                ? 'Four ways, with the Mac ones first'
+                ? `${waysWord()} ways, with the Mac one first`
                 : thisComputer === 'windows'
-                  ? 'Four ways, with the Windows ones first'
-                  : 'Four ways, and what each one costs you'
+                  ? `${waysWord()} ways, with the Windows one first`
+                  : `${waysWord()} ways, and what each one costs you`
             }
           >
             <p className="hint">
@@ -3694,7 +3839,21 @@ export default function App() {
             </p>
             <div className="ways">
               {waysFor(thisComputer).map((way, i) => (
-                <details key={way.id} className="way" data-status={way.status} open={i === 0}>
+                /*
+                  All four shut. "When opening the connect a computer menu the
+                  Mac app is expanded by default. Have it collapsed like the
+                  windows and Linux apps."
+
+                  The first one used to open itself, on the reasoning that
+                  waysFor puts the route for YOUR computer first so the open
+                  one is the one you want. What that actually produced was a
+                  page where one route is a wall of steps and the other three
+                  are one line each — which reads as one real answer with
+                  three footnotes, rather than a set of ways to choose between.
+                  Four summaries, each saying what it costs you, is the list
+                  somebody came here to read; the steps are for after choosing.
+                */
+                <details key={way.id} className="way" data-status={way.status}>
                   <summary>
                     <span className="way-n">{i + 1}</span>
                     <span className="way-title">{way.title}</span>

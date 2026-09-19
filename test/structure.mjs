@@ -773,13 +773,43 @@ export function run(test) {
     const code = panel.slice(panel.indexOf('export default')).replace(/\{?\/\*[\s\S]*?\*\/\}?/g, '')
 
     /*
-     * The rows are not buttons. There is nothing to choose here, and a row
-     * that depresses under a thumb promises an action it does not have —
-     * picking a model is the editor's job, on a row that really is a button.
+     * THE ROWS ARE BUTTONS, and they were not. "There is nothing to choose
+     * here, and a row that depresses under a thumb promises an action it does
+     * not have" — half right. Nothing to choose, but something to READ: the
+     * photographs and the descriptions existed the whole time and were
+     * reachable only from the block editor's panel, for the model already
+     * chosen, which is the one model nobody is wondering about.
+     *
+     * "Still not seeing any amp cab and pedal photos or descriptions. Should
+     * be able to tap on the card and open a detailed page like this." So a row
+     * opens the model's own page; picking a model is still the editor's job.
      */
     const rows = code.slice(code.indexOf('gear-list'))
-    assert.ok(!/<button/.test(rows), 'the reference rows became buttons that do nothing')
-    assert.match(rows, /<li className="gear-row"/, 'the list is not a list')
+    assert.match(rows, /<button type="button" className="gear-row" onClick=\{\(\) => setOpen\(e\)\}>/, 'the rows cannot be opened')
+    assert.match(code, /if \(open\) return <GearCard entry=\{open\} onBack=\{\(\) => setOpen\(null\)\} \/>/, 'there is nothing behind a row')
+
+    /*
+     * And the page is the three things that were missing, in the order the
+     * questions come in: what it really is, what it is like, what it looks
+     * like. The credit cannot be separated from the photograph — every one of
+     * these is Creative Commons and naming the photographer is the condition
+     * of showing it at all.
+     */
+    const card = readFileSync(new URL('../src/components/GearCard.jsx', import.meta.url), 'utf8')
+    assert.match(card, /descriptionFor\(entry\.slug, entry\.name\)/, 'the page never asks what the model is like')
+    assert.match(card, /photoFor\(entry\.name\)/, 'the page never asks what the model looks like')
+    assert.ok(
+      card.indexOf('<img src={photo.src}') < card.indexOf('{photo.credit}'),
+      'the photograph is drawn somewhere the credit is not'
+    )
+    assert.ok(
+      card.indexOf('{about}') < card.indexOf('<img src={photo.src}'),
+      'the picture comes before the words that say what it is'
+    )
+    /* A row with the slug dropped cannot be looked up at all, which is the
+       whole reason the catalog carries it. */
+    const catalog = readFileSync(new URL('../src/lib/gearCatalog.js', import.meta.url), 'utf8')
+    assert.match(catalog, /out\.push\(\{\s*slug,/, 'a catalog row no longer knows which block it came from')
 
     // The search field clears the iOS zoom floor like every other one.
     const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
@@ -1017,20 +1047,32 @@ export function run(test) {
      * "I wanna overhaul this whole settings set-up screen." Four doors under
      * a pile of unrelated buttons became: the version line at the top (kept
      * on purpose — "I like that there"), rows each carrying one live fact,
-     * each opening its own page. Rename stays on the Unit page beside Read the
-     * unit again (he asked for it there), the theme switch in with the Play
+     * each opening its own page. The theme switch went in with the Play
      * screen, and the real amp names — "I do like that as well" — got a row of
      * their own.
      *
      * There were seven. "AI & cost" held the two switches, the token ledger
      * and the history of every tone designed, and went with the AI.
+     *
+     * Then "Unit" split in two. It held the unit's state AND the way in to
+     * renaming, and those are not one thing: the state is the far end of the
+     * chain Phone & computer is about, and renaming is an errand. So the
+     * state moved there and the row took the errand's name. "Help & fixes"
+     * became "Troubleshooting" in the same pass.
      */
     const setup = sheet('Setup')
     assert.match(setup, /<div className="device-meta mono setup-version">\{FULL\}<\/div>/, 'the version line is not at the top')
     const rows = [...setup.matchAll(/<SetupRow key="([^"]+)" title="([^"]+)" status=/g)].map((m) => m[2])
     assert.deepEqual(
       rows,
-      ['Unit', 'Phone & computer', 'Play screen', 'Amp & pedal names', 'Help & fixes', 'About'],
+      [
+        'Phone & computer',
+        'Rename presets and scenes',
+        'Play screen',
+        'Amp & pedal names',
+        'Troubleshooting',
+        'About'
+      ],
       `Setup opens on ${rows.length} rows: ${rows.join(', ')}`
     )
     assert.ok(!setup.includes('<Group'), 'the doors are back')
@@ -1042,11 +1084,15 @@ export function run(test) {
       return [...setup.slice(at, next === -1 ? undefined : next).matchAll(/<Section\s+key="([^"]+)"/g)].map((m) => m[1])
     }
     for (const [page, panels] of [
-      ['unit', ['connection']],
-      /* The guide to getting a computer on the other end sits above the
-         details about the line to it: it is the question somebody has when
-         there is nothing on the other end at all. */
-      ['link', ['phone-remote', 'ways-in', 'link-details']],
+      /* Renaming is the page, with nothing in front of it. It is one button
+         and the sentence saying why it is worth pressing, so it needs no
+         folds at all. */
+      ['rename', []],
+      /* Which unit and which port lead, because they are the far end of the
+         chain this page is about. The guide to getting a computer on the
+         other end sits above the details about the line to it: it is the
+         question somebody has when there is nothing on the other end at all. */
+      ['link', ['connection', 'phone-remote', 'ways-in', 'link-details']],
       /* 'playing' was the play-mode switch, whose only job was hiding the
                  ✦ Ask button. Both went with the AI. */
       ['play', ['size', 'appearance']],
@@ -1060,7 +1106,12 @@ export function run(test) {
     ]) {
       assert.deepEqual(behind(page), panels, `the ${page} page holds ${behind(page).join(', ')}`)
     }
-    assert.ok(setup.slice(setup.indexOf("setupPage === 'unit'")).includes('<DeviceDetail'), 'the unit header is not on the Unit page')
+    const linkPage = setup.slice(setup.indexOf("setupPage === 'link'"), setup.indexOf("setupPage === 'play'"))
+    assert.ok(linkPage.includes('<DeviceDetail'), 'the unit header is not on the Phone & computer page')
+    const renamePage = setup.slice(setup.indexOf("setupPage === 'rename'"), setup.indexOf("setupPage === 'link'"))
+    assert.ok(!renamePage.includes('<DeviceDetail'), 'the unit header is back in front of the rename button')
+    assert.match(renamePage, /setSheet\('scenes'\)/, 'the rename page does not open the names sheet')
+    assert.match(renamePage, /setSheetBack\('settings'\)/, 'closing the names sheet would drop out of Setup')
     const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
     assert.match(css, /button\.setup-row \{[^}]*min-height: 60px/, 'a Setup row is under thumb height')
     const row = readFileSync(new URL('../src/components/SetupRow.jsx', import.meta.url), 'utf8')
@@ -3092,7 +3143,13 @@ export function run(test) {
     assert.match(bar, /Tuner/, 'the tuner left the bar')
     assert.match(bar, /Tap/, 'tap tempo left the bar')
     assert.ok(!/className="gig-modes"/.test(g), 'the tuner is back in a row of its own mid-screen')
-    assert.match(g, /tapBeat\(\)/, 'nothing taps, so the button does nothing')
+    /*
+     * The button sends a NUMBER, not a tap. Forwarding the presses let the
+     * network decide the rhythm — see shared/tempo.mjs — so what goes over
+     * is the tempo this end worked out.
+     */
+    assert.match(g, /sender\.current\.push\(guess\)/, 'nothing taps, so the button does nothing')
+    assert.ok(!/tapBeat\(\)/.test(g), 'the taps are being forwarded again, so the wifi decides the tempo')
 
     /*
      * And the tempo is ON the button that sets it.
@@ -3129,14 +3186,22 @@ export function run(test) {
      * figure lagged the last press by nearly a second. Tapping is how you find
      * a tempo; one you cannot see while tapping is one you cannot aim.
      *
-     * Both halves are held: the arithmetic happens before the request goes,
-     * and it is cleared when the unit answers so the two never disagree on
-     * screen.
+     * Both halves are held: the arithmetic happens before anything crosses
+     * the network, and it is cleared when the unit answers so the two never
+     * disagree on screen.
+     *
+     * The arithmetic is also now the ONLY thing that decides the tempo. What
+     * goes over is the number it produced, so "read the device" can only ever
+     * hand back what was sent.
      */
     assert.match(tapFn, /tappedBpm\(/, 'the taps are no longer turned into a tempo on this end')
     assert.ok(
-      tapFn.indexOf('setTapped(') < tapFn.indexOf('await tapBeat()'),
+      tapFn.indexOf('setTapped(guess)') < tapFn.indexOf('sender.current.push(guess)'),
       'the number waits for the request, so it still lags the tap'
+    )
+    assert.ok(
+      !/await (setTempo|tapBeat|selectPreset)\(/.test(tapFn),
+      'a tap waits on the network before it returns, which makes the next tap late and the rhythm wrong'
     )
     assert.match(tapFn, /setTapped\(null\)/, 'our own figure is never cleared, so the unit can never correct it')
 
@@ -3826,7 +3891,7 @@ export function run(test) {
      * `/D:/a/...` — a leading slash in front of the drive letter, which
      * readdirSync refuses outright. And a short name built by slicing on the
      * repository's own folder name finds the wrong occurrence on a runner,
-     * where the checkout is `D:/a/fractal-ai-builder/fractal-ai-builder`.
+     * where the checkout is `D:/a/fractal-remote/fractal-remote`.
      * Both of those failed here before this comment existed.
      */
     const root = fileURLToPath(new URL('../', import.meta.url)).replaceAll('\\', '/')
@@ -3866,4 +3931,140 @@ export function run(test) {
 
     assert.deepEqual(broken, [], `\n${broken.join('\n')}\n`)
   })
+  test('one repository name, everywhere it decides where something goes', () => {
+    /*
+     * "Rename the repo fractal-remote instead of fractal-AI-builder and update
+     * anything that requires knowing that repo name."
+     *
+     * Most of what knew the old name was prose. Three places were not, and
+     * those are the ones worth a check, because each of them sends somebody
+     * or something to a URL:
+     *
+     *   - electron-builder's publish block, which is BOTH where a release
+     *     build uploads to and where the installed Mac app looks for the next
+     *     version. Those two cannot be allowed to disagree.
+     *   - the Releases link the phone and the browser offer for downloading
+     *     the computer app.
+     *   - the same link in the Mac app's own menu.
+     *
+     * GitHub redirects the old name, so none of these broke on the day. That
+     * is exactly why they are checked rather than trusted: a redirect makes a
+     * wrong name work, which means nothing fails until the day somebody makes
+     * a NEW repository under the old name and the redirect stops.
+     */
+    const REPO = 'fractal-remote'
+    const OLD = ['fractal', 'ai', 'builder'].join('-')
+
+    const yml = readFileSync(new URL('../desktop/electron-builder.yml', import.meta.url), 'utf8')
+    assert.match(yml, new RegExp(`^\\s*repo: ${REPO}$`, 'm'), 'the Mac app publishes to, and updates from, another repository')
+    assert.match(yml, /^\s*owner: justinnewbold$/m, 'the publish block has no owner')
+
+    const ways = readFileSync(new URL('../shared/ways-in.mjs', import.meta.url), 'utf8')
+    assert.match(ways, new RegExp(`github\\.com/justinnewbold/${REPO}/releases`), 'the download link points at another repository')
+
+    const main = readFileSync(new URL('../desktop/main.js', import.meta.url), 'utf8')
+    assert.match(main, new RegExp(`github\\.com/justinnewbold/${REPO}/releases`), 'the Mac app menu points at another repository')
+
+    /*
+     * And nothing that decides a destination still carries the old name. The
+     * two Supabase files are exempt and say why in their own text: that is
+     * the name of the SUPABASE project, which a GitHub rename does not touch.
+     */
+    for (const file of [
+      '../package.json',
+      '../desktop/package.json',
+      '../shared/ways-in.mjs',
+      '../mobile/src/lib/ways-in.js',
+      '../desktop/main.js',
+      '../desktop/electron-builder.yml',
+      '../.github/workflows/desktop.yml'
+    ]) {
+      const text = readFileSync(new URL(file, import.meta.url), 'utf8')
+      assert.ok(!text.includes(OLD), `${file} still carries the old repository name`)
+    }
+  })
+
+  test('no screen shows anybody the account service\u2019s settings', () => {
+    /*
+     * "There is only 3 ways to connect. Mac, Windows or Linux. We removed the
+     * terminal. There is no reason a user should be seeing supabase developer
+     * jargon."
+     *
+     * Link details used to print three environment variables — the account
+     * service's URL and its publishable key — to paste into a server's .env.
+     * The first attempt at this only MOVED them: hidden from phones, folded
+     * away at the computer, on the reasoning that running ForgeFX by hand was
+     * one of the ways in and needed them.
+     *
+     * That route was taken out in 7.352.0: "I think that we should just drop
+     * the helpers completely, nobody wants to deal with that kind of stuff in
+     * order for it to work." All three that remain are applications that start
+     * the device server themselves and set those values without being asked.
+     * So the block had no audience at all, at either end.
+     *
+     * Nothing was leaked — the key is the publishable one and a signed-in user
+     * can only reach their own channel — but a person who cannot act on
+     * something should not be shown it, least of all on the screen they open
+     * when the link is broken.
+     */
+    const files = [
+      '../src/components/LinkDetails.jsx',
+      '../src/App.jsx',
+      '../src/components/PhoneRemote.jsx',
+      '../mobile/src/screens/Settings.js',
+      '../mobile/src/screens/Connect.js'
+    ]
+    /*
+     * Comments stripped first. This file has been here before: an assertion
+     * that reads a source for a word finds the word in the paragraph
+     * EXPLAINING why the word is not there any more, and fails on its own
+     * documentation. What is on a screen is what is outside a comment.
+     */
+    const bare = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    for (const file of files) {
+      const text = bare(readFileSync(new URL(file, import.meta.url), 'utf8'))
+      for (const jargon of ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'AXIS_CLOUD', '.env']) {
+        assert.ok(!text.includes(jargon), `${file} puts "${jargon}" on a screen`)
+      }
+    }
+
+    /* What is left is the one thing here anybody can act on: a step-by-step
+       test of THIS device's own connection, stopping at the first fault. */
+    const src = readFileSync(new URL('../src/components/LinkDetails.jsx', import.meta.url), 'utf8')
+    assert.match(src, /Test the link/, 'the link test went with the jargon')
+    assert.ok(!/DEFAULT_PROJECT/.test(src), 'the panel still reaches for the project settings')
+
+    /*
+     * And the count is counted, not typed. Both apps said "Four ways" for
+     * weeks after the fourth was removed, because a number written into prose
+     * cannot notice that the list under it changed.
+     */
+    const ways = readFileSync(new URL('../shared/ways-in.mjs', import.meta.url), 'utf8')
+    const ids = [...ways.matchAll(/^\s{4}id: '([^']+)'/gm)].map((m) => m[1])
+    assert.deepEqual(ids, ['mac-app', 'windows-app', 'linux-app'], `the ways in are now ${ids.join(', ')}`)
+    for (const file of ['../src/App.jsx', '../mobile/src/screens/Connect.js']) {
+      const text = bare(readFileSync(new URL(file, import.meta.url), 'utf8'))
+      assert.match(text, /waysWord\(\)/, `${file} types the number of ways rather than counting them`)
+      assert.ok(!/Four ways/.test(text), `${file} still says there are four ways in`)
+    }
+  })
+
+  test('the ways to connect a computer start level with each other', () => {
+    /*
+     * "When opening the connect a computer menu the Mac app is expanded by
+     * default. Have it collapsed like the windows and Linux apps."
+     *
+     * The first route used to open itself, on the reasoning that waysFor puts
+     * the one for YOUR computer first. What that produced was a page where
+     * one route is a wall of steps and the rest are a line each, which reads
+     * as one answer with footnotes rather than a choice. The summaries say
+     * what each one costs; the steps are for after somebody has picked.
+     */
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    const ways = app.slice(app.indexOf('<div className="ways">'), app.indexOf('</div>', app.indexOf('<div className="ways">')))
+    assert.ok(ways.length > 100, 'the ways list moved; this check reads it')
+    assert.match(ways, /<details key=\{way\.id\} className="way" data-status=\{way\.status\}>/, 'the routes are no longer folds')
+    assert.ok(!/open=/.test(ways), 'one of the routes opens itself again')
+  })
+
 }

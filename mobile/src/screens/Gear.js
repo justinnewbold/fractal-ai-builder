@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FlatList, Platform, Text, TextInput, View } from 'react-native'
+import { FlatList, Platform, Pressable, Text, TextInput, View } from 'react-native'
 
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
 import { GEAR_FAMILIES, GEAR_GROUPS, gearTotal, groupsFor, searchAll } from '../lib/gearCatalog'
@@ -7,6 +7,7 @@ import { blockTypes } from '../lib/device'
 import { useRig } from '../lib/rig'
 import Note from '../components/Note'
 import Press from '../components/Press'
+import GearCard from '../components/GearCard'
 
 const face = Platform.select(mono)
 
@@ -31,12 +32,27 @@ const face = Platform.select(mono)
  * screamer" while Amps is open finds nothing, and a row of tabs still reading
  * "Amps 331" gives no hint that the five answers are one tap away.
  *
- * The rows are not buttons. There is nothing to choose here: it is a reference,
- * and a row that depresses under a thumb promises something it cannot do.
+ * THE ROWS ARE BUTTONS, and they were not. "There is nothing to choose here,
+ * and a row that depresses under a thumb promises something it cannot do" was
+ * the reasoning — half right. Nothing to choose, but something to READ: the
+ * photographs and the descriptions existed the whole time and were reachable
+ * from one place only, the panel inside the block editor, for the model
+ * already chosen. Which is the one model nobody is wondering about.
+ *
+ * "Still not seeing any amp cab and pedal photos or descriptions. Should be
+ * able to tap on the card and open a detailed page like this." So a row opens
+ * the model's own page. See GearCard.
  */
 export default function Gear({ onBack }) {
   const [query, setQuery] = useState('')
   const [group, setGroup] = useState(GEAR_GROUPS[0].key)
+  /*
+   * Which model is open, as the whole entry rather than a name. A name on its
+   * own cannot be looked up — the description and the photograph are per block
+   * kind, and "Brit JVM" means nothing without knowing it came from the amp
+   * list. The row is holding both already, so it hands over both.
+   */
+  const [open, setOpen] = useState(null)
 
   /*
    * What THIS unit has, asked of the unit.
@@ -89,6 +105,14 @@ export default function Gear({ onBack }) {
   /* Said plainly, because "your unit's models" was a claim the screen could not
      back up until it started asking. */
   const asked = built.some((g) => g.fromUnit)
+
+  /*
+   * The page replaces the list rather than stacking on top of it. The search
+   * text, the chosen tab and the list's scroll position are all still here
+   * underneath, so closing the page lands back where it was opened from —
+   * which matters on a list four hundred rows long.
+   */
+  if (open) return <GearCard entry={open} onBack={() => setOpen(null)} />
 
   return (
     <View style={{ flex: 1 }}>
@@ -160,25 +184,31 @@ export default function Gear({ onBack }) {
         initialNumToRender={20}
         windowSize={7}
         renderItem={({ item }) => (
-          <View
-            style={{
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${item.name}${item.gear ? `, ${item.gear}` : ''}`}
+            onPress={() => setOpen(item)}
+            style={({ pressed }) => ({
               paddingVertical: space.sm,
               paddingHorizontal: space.md,
               borderRadius: radius.md,
               borderWidth: 1,
               borderColor: color.rule,
-              backgroundColor: color.panel
-            }}
+              backgroundColor: pressed ? color.panelHi : color.panel
+            })}
           >
             <Text style={{ color: color.silk, fontSize: font.body, fontFamily: face }}>{item.name}</Text>
             {item.gear ? (
               <Text style={{ color: color.ok, fontSize: font.small, marginTop: 2 }}>{item.gear}</Text>
-            ) : (
+            ) : here?.lineage === false ? null : (
+              /* Only where a "based on" was expected. A cabinet is named after
+                 what it is, so there is nothing missing to apologise for, and
+                 45 apologies under 45 cabinets would say the opposite. */
               <Text style={{ color: color.silkFaint, fontSize: font.micro, marginTop: 2 }}>
                 Nobody has recorded what this one is based on.
               </Text>
             )}
-          </View>
+          </Pressable>
         )}
         ListEmptyComponent={
           <Note>{`Nothing here matches “${query.trim()}”. The other tabs above may have it.`}</Note>

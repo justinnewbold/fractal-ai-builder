@@ -281,18 +281,18 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
               is the same row either way.
             */}
             {/*
-              The way to the bench, beside the other thing that takes you off
-              this screen. Everything below the preset name acts on the rig you
-              are playing; neither of these does.
+              EDIT IS NOT HERE ANY MORE. "On the phone versions move the edit
+              button down to the bottom tab bar exactly like it's set up on the
+              web app." It sat up here beside the preset name on the reasoning
+              that neither of them acts on the rig you are playing — true, and
+              it put the way to the bench in the row your eye goes to first,
+              at 36 points, above everything you actually press on a stage.
+
+              The browser has always had it on the bottom bar beside the tuner
+              and the tempo. That bar is the strip for what you do BETWEEN
+              songs rather than during one, which is exactly what opening the
+              chain is.
             */}
-            {onOpenEdit ? (
-              <Press
-                label="Edit"
-                height={36}
-                style={{ paddingHorizontal: space.md }}
-                onPress={onOpenEdit}
-              />
-            ) : null}
           </View>
         </View>
 
@@ -502,6 +502,13 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
             onPress={tapTempo}
             onLongPress={() => setTyping(true)}
           />
+          {/*
+            And the way to the bench, third on the same bar the browser puts
+            it on. Last of the three because it is the only one that leaves
+            this screen: a button that takes you somewhere else does not belong
+            between two that do not.
+          */}
+          {onOpenEdit ? <Press grow label="Edit" height={foot} onPress={onOpenEdit} /> : null}
         </View>
 
 

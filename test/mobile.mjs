@@ -747,7 +747,8 @@ export function run(test) {
     assert.match(rig, /if \(tempoJustSet\(\) && Number\.isFinite\(state\.bpm\) && bpm !== state\.bpm\) return set\(\{ bpm \}\)/, 'a re-read still overwrites a tempo the phone just set')
     /* The read after a burst of taps is the tempo the unit settled on, and
        from then it is held; a typed tempo is held from the moment it is typed. */
-    assert.match(rig, /reread = setTimeout\(\(\) => readTappedTempo\(\), TAP_REREAD_MS\)/, 'the read after the taps does not start the hold')
+    assert.match(rig, /reread = setTimeout\(function settle\(\) \{ if \(!sendTempo\.idle\)/, 'the read after the taps does not start the hold')
+    assert.match(rig, /readTappedTempo\(\) \}, TAP_REREAD_MS\)/, 'the read after the taps never happens')
     assert.match(rig, /async function readTappedTempo\(\) \{ tempoSetAt = 0 await refreshTempo\(\) tempoSetAt = Date\.now\(\) \}/, 'the read after the taps is itself blocked by an earlier hold, or does not start one')
     assert.match(rig, /expect\('bpm', bpm\) tempoSetAt = Date\.now\(\)/, 'a typed tempo is not held')
   })
@@ -1809,13 +1810,21 @@ export function run(test) {
      * it. Nobody opens Setup to rename scene 6.
      *
      * A list of rows, each carrying the one fact you would have opened it to
-     * learn, each opening its own page. Renaming lives on the Unit page, which
-     * is where the browser put it: "move the rename presets and scenes button
-     * to the settings menu".
+     * learn, each opening its own page. Renaming lives behind its own row —
+     * "move the rename presets and scenes button to the settings menu" — and
+     * that row is named after the errand rather than after the unit, because
+     * the unit's own state belongs with the rest of the chain on Phone &
+     * computer.
      */
     const settings = read('mobile/src/screens/Settings.js')
 
-    for (const row of ['Unit', 'Phone & computer', 'Play screen', 'About']) {
+    for (const row of [
+      'Phone & computer',
+      'Rename presets and scenes',
+      'Play screen',
+      'Troubleshooting',
+      'About'
+    ]) {
       assert.match(
         settings,
         new RegExp(`title="${row.replace('&', '&')}"`),
@@ -1825,7 +1834,7 @@ export function run(test) {
     assert.match(settings, /const \[page, setPage\] = useState\(null\)/, 'Setup is one scroll again rather than a list of pages')
 
     /*
-     * The renaming boxes are behind the Unit row, not in front of everything.
+     * The renaming boxes are behind their own row, not in front of everything.
      * Checked by position: what is drawn for `page === null` must not contain
      * them.
      */
@@ -1834,13 +1843,29 @@ export function run(test) {
     assert.ok(!/UnitBits/.test(root), 'the scene-name boxes are back on the front page of Setup')
     assert.ok(!/TileSize/.test(root), 'the tile size buttons are on the front page rather than behind Play screen')
 
-    const unit = settings.slice(settings.indexOf("{page === 'unit' ?"), settings.indexOf("{page === 'link' ?"))
-    assert.match(unit, /<UnitBits \/>/, 'renaming is not on the Unit page')
+    const unit = settings.slice(settings.indexOf("{page === 'unit' ?"), settings.indexOf("{page === 'trouble' ?"))
+    assert.match(unit, /<UnitBits \/>/, 'renaming is not on the rename page')
+
+    /*
+     * Fixes, the log and the feedback form are three stages of one errand, so
+     * they are behind one door rather than three rows deep in the list.
+     */
+    const trouble = settings.slice(settings.indexOf("{page === 'trouble' ?"), settings.indexOf("{page === 'link' ?"))
+    assert.ok(trouble.length > 200, 'the Troubleshooting page moved; this check reads it')
+    for (const [inside, why] of [
+      [/onPress=\{onOpenFixes\}/, 'the fixes'],
+      [/onPress=\{onOpenLog\}/, 'the log'],
+      [/onPress=\{onOpenReport\}/, 'the feedback form']
+    ]) {
+      assert.match(trouble, inside, `Troubleshooting has no way into ${why}`)
+    }
 
     /* Each row says something true about the state it leads to, which is the
        whole point of the list: it answers most questions without a tap. */
-    assert.match(settings, /status=\{\s*link !== 'connected'\s*\?\s*'Not connected'[\s\S]{0,300}?`\$\{deviceName \|\| 'Unit'\} · not answering`[\s\S]{0,120}?`\$\{deviceName \|\| 'Unit'\} · connected`/)
-    assert.match(settings, /status=\{SIZES\[loadSize\(sync\)\]\?\.name/)
+    assert.match(settings, /status=\{\s*demo\s*\?\s*'Demo — simulated FM3'[\s\S]{0,500}?`\$\{deviceName \|\| 'Unit'\} · connected`/)
+    /* Both things behind the Play screen row, so somebody hunting for the
+       theme can tell from the list that it is in there. */
+    assert.match(settings, /status=\{\[SIZES\[loadSize\(sync\)\]\?\.name \|\| 'Small', THEME_WORD\[getMode\(\)\] \|\| 'Auto'\]\.join/)
   })
 
   test('the version on the About page is the version that was built', async () => {
@@ -1892,7 +1917,10 @@ export function run(test) {
     assert.ok(tap.length > 100, 'tapTempo moved; this check reads it')
 
     assert.match(tap, /clearTimeout\(reread\)/, 'each tap does not cancel the read-back the one before it scheduled')
-    assert.match(tap, /setTimeout\(\(\) => readTappedTempo\(\), TAP_REREAD_MS\)/, 'the tempo is never read back after a tap')
+    assert.match(tap, /readTappedTempo\(\)/, 'the tempo is never read back after a tap')
+    /* And it waits for the write to land first, or it reads back the number
+       from before the last tap and reports that as the answer. */
+    assert.match(tap, /if \(!sendTempo\.idle\)/, 'the read-back can overtake the write it is meant to confirm')
     assert.ok(
       !/await refreshTempo\(\)/.test(tap),
       'the read-back is awaited inside the tap, which makes the tap itself late and the rhythm wrong'
@@ -1910,8 +1938,12 @@ export function run(test) {
      */
     assert.match(tap, /tappedBpm\(/, 'the phone no longer works out what the taps mean')
     assert.ok(
-      tap.indexOf('set({ bpm:') < tap.indexOf('await device.tapTempo()'),
+      tap.indexOf('set({ bpm: guess })') < tap.indexOf('sendTempo.push(guess)'),
       'the phone shows the number only after the request, so it still lags the tap'
+    )
+    assert.ok(
+      !/await device\./.test(tap),
+      'a tap waits on the network before it returns, which makes the next tap late and the rhythm wrong'
     )
 
     /* Both apps do it the same way. */
@@ -2017,8 +2049,20 @@ export function run(test) {
     assert.match(app, /BENCH && screen === 'edit'/, 'the route no longer reads the switch, so turning it off would leave the screen reachable')
     assert.match(app, /BENCH && link\.link === 'connected'/, 'the Edit button no longer reads the switch')
 
-    /* Absent rather than disabled when there is nowhere to go. */
-    assert.match(read('mobile/src/screens/Stage.js'), /\{onOpenEdit \? \(/, 'the Edit button is drawn whether or not there is anywhere to go')
+    /*
+     * Absent rather than disabled when there is nowhere to go — and now on the
+     * bottom bar rather than up beside the preset name. "On the phone versions
+     * move the edit button down to the bottom tab bar exactly like it's set up
+     * on the web app": the browser has always had it there, beside the tuner
+     * and the tempo, on the strip for what you do BETWEEN songs.
+     */
+    const stageSrc = read('mobile/src/screens/Stage.js')
+    assert.match(stageSrc, /\{onOpenEdit \? <Press grow label="Edit" height=\{foot\} onPress=\{onOpenEdit\} \/> : null\}/, 'the Edit button is drawn whether or not there is anywhere to go')
+    /* On the foot, which is after the tempo, not in the preset row above it. */
+    assert.ok(
+      stageSrc.indexOf('label="Tap Tempo"') < stageSrc.indexOf('label="Edit"'),
+      'Edit is back above the stage, where a thumb looking for a scene finds it first'
+    )
   })
 
   test('a knob keeps the finger the scroll view would otherwise take', () => {
@@ -3004,7 +3048,7 @@ export function run(test) {
     assert.match(screen, /WAYS\.map/, 'the phone no longer draws the routes')
 
     assert.match(src, /The Mac app/, 'the route that actually works is not offered')
-    assert.match(src, /github\.com\/justinnewbold\/fractal-ai-builder\/releases/, 'there is nowhere to get the Mac app from')
+    assert.match(src, /github\.com\/justinnewbold\/fractal-remote\/releases/, 'there is nowhere to get the Mac app from')
     /*
      * The list, not `/releases/latest`.
      *
@@ -4091,7 +4135,15 @@ export function run(test) {
        has a Refresh button, and says how full it is. */
     const rig = read('mobile/src/lib/rig.js')
     assert.match(rig, /adoptNames\(device\.nameOwner\(slug\)\)\.catch/, 'the rig never takes the computer’s list, or the demo’s names land on the real unit’s slots')
-    assert.ok(rig.indexOf('adoptNames(') < rig.indexOf('await refreshPreset()'), 'the names are taken after the slow reads instead of alongside them')
+    /*
+     * Inside refreshAll, not anywhere in the file. Read whole, this compared
+     * the first `adoptNames(` against the first `await refreshPreset()` — and
+     * the timed unit check higher up the file calls refreshPreset too, so the
+     * ordering it measured was between two unrelated functions.
+     */
+    const refreshAll = rig.slice(rig.indexOf('export async function refreshAll()'), rig.indexOf('export function notePresetName'))
+    assert.ok(refreshAll.length > 200, 'refreshAll moved; this check reads it')
+    assert.ok(refreshAll.indexOf('adoptNames(') < refreshAll.indexOf('await refreshPreset()'), 'the names are taken after the slow reads instead of alongside them')
     const dev = read('mobile/src/lib/device.js')
     assert.match(dev, /if \(!slug \|\| demoDevice\(\)\) return null/, 'the demo asks a computer it does not have for a list')
     const screen = read('mobile/src/screens/Presets.js')
@@ -4271,7 +4323,10 @@ export function run(test) {
     assert.match(stage, /height=\{tight \? TAP : TAP \+ 12\}/, 'the preset button keeps its extra height at the smallest size')
     assert.match(stage, /height=\{Math\.max\(tight \? 44 : TAP, size\.tile - 12\)\}/, 'a chain tile is held at 56 beside scene tiles of 48')
     assert.match(stage, /const foot = tight \? 48 : TAP/, 'the foot does not give at the smallest size')
-    assert.equal((stage.match(/height=\{foot\}/g) || []).length, 5, 'not every button in the foot follows the foot height')
+    /* Six: Previous, Setlists, Next, Tuner, Tap Tempo and Edit — the last of
+       which joined the bar when it came down off the preset row, "exactly like
+       it's set up on the web app". */
+    assert.equal((stage.match(/height=\{foot\}/g) || []).length, 6, 'not every button in the foot follows the foot height')
     /* And never below the platform floor. */
     assert.doesNotMatch(stage, /tight \? (4[0-3]|[0-3]\d) :/, 'something pressable goes below 44 at the smallest size')
   })
@@ -4884,7 +4939,7 @@ export function run(test) {
     /* It says what it is, every time, rather than letting somebody think a
        simulated FM3 is their FM3. */
     assert.match(settings, /This is the demo — a simulated FM3/, 'the demo does not say it is one')
-    assert.match(settings, /status=\{demo \? 'Demo — simulated FM3' : linkWord\}/, 'Setup does not show that the demo is on')
+    assert.match(settings, /status=\{ demo \? 'Demo — simulated FM3' :/, 'Setup does not show that the demo is on')
 
     /* The link reads as connected, because from every screen's point of view it
        is: the questions get answered. Otherwise the app refuses to open the
@@ -4977,6 +5032,274 @@ export function run(test) {
     assert.match(rig, /const unit = caps\?\.connected === false \? 'missing' : 'present'/, 'a Mac with no unit is not noticed')
     assert.match(rig, /fresh\?\.number === -1 \? \{ unit: 'silent' \}/, 'a unit that stops answering its name is not noticed')
     const settings = read('mobile/src/screens/Settings.js').replace(/\s+/g, ' ')
-    assert.match(settings, /unitState === 'silent' \? `\$\{deviceName \|\| 'Unit'\} · not answering`/, 'Setup still says connected over a silent unit')
+    assert.match(settings, /unitState === 'silent' \? `Computer connected · \$\{deviceName \|\| 'unit'\} not answering`/, 'Setup still says connected over a silent unit')
   })
+
+  test('somebody asks whether the unit is still there, rather than waiting to be told', async () => {
+    /*
+     * "I purposefully unplugged the FM3 from the computer and it still said
+     * connected. I waited a few minutes, went ahead and tried to click some
+     * buttons, go to different presets, still said connected, so it's lying.
+     * There needs to be a way for it to actually show disconnected when it
+     * disconnects. which gave us the whole problem before where the unit froze
+     * and we still thought it was connected."
+     *
+     * Every piece of the answer was already here except the question. The
+     * store knows what a silent unit looks like (-1 where a preset number
+     * should be), the top bar draws it in red, Setup says it in words — and
+     * nothing ever asked, because refreshAll runs once at the moment of
+     * connecting and the stage screens read everything they draw out of the
+     * store.
+     *
+     * Note what does NOT count as asking: pressing buttons. A preset change
+     * is a write, and a write into a port whose far end has been pulled out
+     * does not have to fail. Only an answer proves anybody is home.
+     */
+    const watch = await import('../shared/unit-watch.mjs')
+
+    /* A preset number is an answer. Anything else is silence, whether it came
+       back as -1, as nothing, or as a thrown error. */
+    assert.equal(watch.probeSays({ preset: { number: 12 } }), 'answering')
+    assert.equal(watch.probeSays({ preset: { number: 0 } }), 'answering', 'slot zero is a real slot')
+    assert.equal(watch.probeSays({ preset: { number: -1 } }), 'quiet', 'the computer said the unit did not answer')
+    assert.equal(watch.probeSays({ preset: null }), 'quiet')
+    assert.equal(watch.probeSays({ failed: true }), 'quiet')
+
+    /*
+     * One quiet answer is not evidence. "My Mac is connected just fine. The
+     * phone app says it has lost the unit" — the computer asks that same port
+     * several times a second, and a question that loses the race looks exactly
+     * like a unit that has gone.
+     */
+    assert.equal(watch.unitGone(watch.countQuiet(0, 'quiet')), false, 'one missed answer tears the screen down')
+    assert.equal(watch.unitGone(watch.countQuiet(1, 'quiet')), true, 'two in a row still is not enough')
+    assert.equal(watch.countQuiet(1, 'answering'), 0, 'an answer does not clear the run of silence')
+
+    /* Cheaper to ask at the machine holding the cable than from a phone on a
+       cell connection, so the two are not the same number. */
+    assert.ok(watch.watchEvery(false) < watch.watchEvery(true), 'the relay is asked as often as a loopback')
+    assert.ok(watch.watchEvery(false) >= 5000, 'the unit is asked so often it is being interrogated')
+
+    /* And both apps ask. A phone and a Mac disagreeing about whether a unit is
+       plugged in is not a difference between them; it is one of them lying. */
+    const rig = read('mobile/src/lib/rig.js').replace(/\s+/g, ' ')
+    assert.match(rig, /export function watchUnit\(\)/, 'the phone never asks')
+    assert.match(rig, /probeSays\(\{ preset: await device\.currentPreset\(\) \}\)/, 'the phone asks something a write could fake')
+    assert.match(rig, /if \(unitGone\(quiet\)\) \{/, 'the phone believes one quiet answer')
+    const link = read('mobile/src/lib/link.js').replace(/\s+/g, ' ')
+    assert.match(link, /watchUnit\(\)/, 'nothing starts the phone asking')
+    /* A phone in a pocket has no screen to be wrong on. */
+    assert.match(link, /if \(status === 'active'\) watchUnit\(\) else stopWatching\(\)/, 'the asking does not stop with the screen')
+
+    const app = read('src/App.jsx').replace(/\s+/g, ' ')
+    assert.match(app, /if \(status !== 'live'\) return undefined/, 'the browser asks about a unit it never had')
+    assert.match(app, /said = probeSays\(\{ preset: await currentPreset\(\) \}\)/, 'the browser asks something a write could fake')
+    assert.match(app, /if \(unitGone\(quiet\)\) \{/, 'the browser believes one quiet answer')
+    assert.match(app, /document\.visibilityState === 'hidden'/, 'a tab nobody is looking at keeps asking')
+    assert.match(app, /await read\(\)/, 'the browser never confirms what the check found')
+  })
+  test('the tempo is worked out here, so the wifi cannot change it', async () => {
+    /*
+     * "Right now after I tap it a few times slowly, it'll send a number and
+     * then I'm done tapping and it sends back a different one, so maybe do a
+     * little more research on it or figure out why it's not working
+     * correctly, but and I understand it's going over Wi-Fi and stuff, so but
+     * there's gotta be way to do it and make it work."
+     *
+     * The wifi was the whole of it. Each press was forwarded to the unit as a
+     * TAP, and the unit worked the tempo out from the spacing between them AS
+     * THEY ARRIVED THERE — thumb spacing plus whatever the network and the
+     * computer's queue added to each one, differently every time. The unit
+     * then answered, correctly, about a rhythm nobody played, and the slower
+     * the taps the more room the jitter had to accumulate.
+     *
+     * This is what that looked like, and why no amount of work at the far end
+     * could have fixed it: the information is destroyed on the way.
+     */
+    const { tappedBpm, keepTaps, tempoSender, TAP_AVERAGE } = await import('../shared/tempo.mjs')
+
+    /* A steady 100 BPM: presses 600ms apart. */
+    const played = [0, 600, 1200, 1800]
+    let list = []
+    for (const at of played) list = keepTaps(list, at)
+    assert.equal(tappedBpm(list), 100, 'a press every 600ms is not 100 BPM')
+
+    /*
+     * The same thumb, seen through a network that held each press up a little
+     * longer than the one before it — which is what a queue does when writes
+     * start stacking behind each other on a busy link. Nothing here is
+     * unreasonable: the worst of it is a third of a second.
+     *
+     * Note which way this goes wrong. Plain random jitter partly cancels in
+     * the average, so the unit is only a few BPM out; delay that GROWS
+     * stretches every gap in the same direction and none of it cancels. That
+     * is why "a few times slowly" was the case that showed it up — a longer
+     * burst gives the queue more time to build.
+     */
+    const jitter = [0, 80, 180, 320]
+    let asArrived = []
+    for (let i = 0; i < played.length; i += 1) asArrived = keepTaps(asArrived, played[i] + jitter[i])
+    const heard = tappedBpm(asArrived)
+    assert.notEqual(heard, 100, 'this jitter happens to cancel out; pick numbers that do not')
+    assert.ok(Math.abs(heard - 100) >= 5, `the unit would have heard ${heard}, which is too close to make the point`)
+
+    /*
+     * So the taps do not leave. "It should basically take the last three taps
+     * and use that to calculate the tempo" — three taps, two gaps, averaged,
+     * and the ANSWER is what crosses the network.
+     */
+    assert.equal(TAP_AVERAGE, 3, 'the tempo is worked out from a different number of taps than he asked for')
+    assert.equal(tappedBpm([0, 600, 1200]), 100, 'three taps 600ms apart are not 100 BPM')
+    /* A fourth tap does not drag the answer back towards the older gaps. */
+    assert.equal(tappedBpm([0, 2000, 600, 1200]), 100, 'a tap older than the last three still counts')
+
+    /*
+     * And a burst does not queue writes behind each other. One in the air at
+     * a time, newest number replacing whatever is waiting — because the last
+     * number shown has to be the last number sent, and a queue makes it the
+     * last to LAND, possibly after the read-back meant to confirm it.
+     */
+    const reached = []
+    const send = tempoSender((bpm) => new Promise((go) => { reached.push(bpm); setTimeout(go, 20) }))
+    send.push(90)
+    send.push(95)
+    send.push(100)
+    assert.equal(send.idle, false, 'a write in the air reads as nothing happening')
+    await new Promise((go) => setTimeout(go, 150))
+    assert.equal(send.idle, true, 'the sender never finishes')
+    assert.equal(send.sent, 100, 'the last number tapped is not the last number the unit was told')
+    assert.equal(reached[reached.length - 1], 100, 'the unit ends up on a tempo from the middle of the burst')
+    assert.ok(reached.length < 3, 'every intermediate tempo took its own round trip')
+
+    /* A failed write is reported rather than swallowed, and does not wedge the
+       sender shut for the next tap. */
+    const said = []
+    const bad = tempoSender(() => Promise.reject(new Error('port not open')), (err) => said.push(err.message))
+    await bad.push(120)
+    assert.deepEqual(said, ['port not open'], 'a refused tempo says nothing')
+    assert.equal(bad.idle, true, 'one refusal stops the button working for good')
+  })
+
+  test('a model in the reference opens its own page, with the picture and the words', async () => {
+    /*
+     * "Still not seeing any amp cab and pedal photos or descriptions. Should
+     * be able to tap on the card and open a detailed page like this."
+     *
+     * Both were written months ago and wired into one place: the panel inside
+     * the block editor, for the model ALREADY CHOSEN — the one model nobody
+     * is wondering about. The reference list, whose entire purpose is "what
+     * have I got", had rows that could not be opened, on the reasoning that
+     * there was nothing to choose. Nothing to choose; something to read.
+     */
+    const gear = read('mobile/src/screens/Gear.js')
+    assert.match(gear, /onPress=\{\(\) => setOpen\(item\)\}/, 'the phone\u2019s rows still cannot be opened')
+    assert.match(gear, /if \(open\) return <GearCard entry=\{open\} onBack=\{\(\) => setOpen\(null\)\} \/>/, 'there is nothing behind a row')
+    assert.match(gear, /accessibilityRole="button"/, 'a row that opens a page does not say it is a button')
+
+    const card = read('mobile/src/components/GearCard.js')
+    assert.match(card, /descriptionFor\(entry\.slug, entry\.name\)/, 'the page never asks what the model is like')
+    assert.match(card, /photoFor\(entry\.name, `\$\{HOSTED_ORIGIN\}\/gear`\)/, 'the phone looks for the photographs somewhere it has no files')
+    /* The credit cannot be separated from the picture: every one is Creative
+       Commons and naming the photographer is the condition of showing it. */
+    assert.ok(
+      card.indexOf('source={{ uri: photo.src }}') < card.indexOf('{photo.credit}'),
+      'the photograph is drawn somewhere the credit is not'
+    )
+
+    /*
+     * Both ends match models to photographs by the same rule, from the same
+     * generated file. A second copy of the family-prefix matching would drift,
+     * and drift here shows up as a picture of the WRONG amp under the right
+     * name — the exact failure that threw away the first batch of two hundred.
+     */
+    const web = await import('../src/lib/gearPhotos.js')
+    const phone = await import('../mobile/src/lib/gearPhotos.js')
+    assert.equal(phone.photoCount, web.photoCount, 'the two apps carry different numbers of photographs')
+    for (const name of ['1959SLP Normal', 'Brit JVM', 'Nothing At All XYZ']) {
+      const a = web.photoFor(name)
+      const b = phone.photoFor(name, '/gear')
+      assert.deepEqual(b, a, `the two apps disagree about the photograph for ${name}`)
+    }
+
+    /* A relative path is right for a web page and wrong for a phone, which has
+       no site root to be relative to. */
+    const remote = phone.photoFor('1959SLP Normal', 'https://example.test/gear')
+    assert.ok(remote.src.startsWith('https://example.test/gear/'), 'the phone cannot be told where the files are')
+
+    /* And a catalog row carries the block it came from, or nothing above can
+       be looked up at all. */
+    const { groupsFor } = await import('../mobile/src/lib/gearCatalog.js')
+    const amps = groupsFor({}).find((g) => g.key === 'amp')
+    assert.ok(amps.entries.length > 0, 'the amp list is empty')
+    assert.ok(amps.entries.every((e) => e.slug === 'amp'), 'a catalog row does not know which block it came from')
+  })
+
+  test('the phone has light, dark and auto, and every screen follows', async () => {
+    /*
+     * "I'm not seeing where the light/dark/auto theme buttons are anymore.
+     * Please put that back on Setup."
+     *
+     * The browser has had all three for a long time. The phone had none: it
+     * was dark whatever the handset was set to, which is the wrong answer in
+     * a lit room and the wrong answer on a phone in light mode.
+     *
+     * HOW IT WORKS WITHOUT 252 EDITS. There are 252 reads of `color.x` across
+     * 25 files and not one StyleSheet.create in the app — normally a small
+     * inefficiency, and here the thing that makes a theme possible at all.
+     * Inline styles are read fresh on every render, so swapping the VALUES on
+     * the one exported palette and re-rendering the root repaints everything
+     * with no call site changing. Which means the object must be MUTATED and
+     * never replaced: an `export const color = next` would leave every module
+     * that already imported it pointing at the old one.
+     */
+    const theme = await import('../mobile/src/lib/theme.js')
+    const before = theme.color
+    assert.deepEqual(theme.MODES, ['auto', 'light', 'dark'], 'the three settings are not the three the browser has')
+
+    theme.setMode('light')
+    assert.equal(theme.color, before, 'the palette object was replaced, so every screen still holds the old one')
+    assert.equal(theme.isDark(), false)
+    const light = theme.color.chassis
+    theme.setMode('dark')
+    assert.equal(theme.isDark(), true)
+    assert.notEqual(theme.color.chassis, light, 'light and dark are the same colour')
+
+    /* Auto follows the handset rather than guessing. */
+    theme.setMode('auto')
+    theme.setSystemDark(false)
+    assert.equal(theme.isDark(), false, 'auto ignores a phone set to light')
+    theme.setSystemDark(true)
+    assert.equal(theme.isDark(), true, 'auto ignores a phone set to dark')
+
+    /*
+     * Every key is written on every change. A colour that existed in one
+     * palette and not the other would otherwise keep the previous theme's
+     * value, which shows up as one wrong-coloured thing on one screen in one
+     * mode — the kind of bug nobody reproduces.
+     */
+    const src = read('mobile/src/lib/theme.js')
+    const dark = src.match(/const DARK = \{([\s\S]*?)\n\}/)[1]
+    const lightSrc = src.match(/const LIGHT = \{([\s\S]*?)\n\}/)[1]
+    const keys = (t) => [...t.matchAll(/^\s{2}([a-zA-Z]+):/gm)].map((m) => m[1]).sort()
+    assert.deepEqual(keys(lightSrc), keys(dark), 'the two palettes do not carry the same colours')
+
+    /* Subscribed once, at the root, because one re-render there is every
+       screen's next render. */
+    const app = read('mobile/App.js')
+    assert.match(app, /useSyncExternalStore\(watchTheme, themeVersion, themeVersion\)/, 'nothing repaints when the theme changes')
+    assert.match(app, /Appearance\.addChangeListener/, 'auto never hears the handset change')
+    assert.match(app, /hydrate\(\)\.then\(\(\) => loadMode\(sync\)\)/, 'the chosen theme is forgotten between launches')
+    /* The clock and the battery have to be readable against what is behind
+       them, which is the one thing a palette swap cannot reach. */
+    assert.match(app, /<StatusBar style=\{isDark\(\) \? 'light' : 'dark'\} \/>/, 'the status bar is light ink on a light screen')
+
+    /* And it is reachable: on Setup, beside the other setting about how the
+       thing on the stand looks. */
+    const settings = read('mobile/src/screens/Settings.js')
+    assert.match(settings, /<Section>Appearance<\/Section>/, 'there is nowhere to choose a theme')
+    assert.match(settings, /setMode\(m, sync\)/, 'choosing a theme does not remember it')
+
+    theme.setMode('auto')
+  })
+
 }

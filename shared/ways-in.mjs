@@ -40,7 +40,7 @@
  * aimed at the Mac app landed on an .apk. The list page shows all of them with
  * their names, and the step below says which file to take.
  */
-export const RELEASES = 'https://github.com/justinnewbold/fractal-ai-builder/releases'
+export const RELEASES = 'https://github.com/justinnewbold/fractal-remote/releases'
 
 /**
  * `ready` is a thing you can download and run today.
@@ -99,6 +99,18 @@ export const WAYS = [
 ]
 
 export const wayById = (id) => WAYS.find((w) => w.id === id) || null
+
+/**
+ * How many routes there are, as the word a sentence needs.
+ *
+ * Counted rather than typed. Both apps said "Four ways" for weeks after the
+ * fourth one — running the device server from a terminal — was taken out, and
+ * a number in prose has no way of noticing that the list under it changed.
+ * "There is only 3 ways to connect. Mac, Windows or Linux. We removed the
+ * terminal."
+ */
+const WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six']
+export const waysWord = (list = WAYS) => WORDS[list.length] || String(list.length)
 
 /**
  * Which computer this browser is running on.

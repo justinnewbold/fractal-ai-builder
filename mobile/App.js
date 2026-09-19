@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
-import { ActivityIndicator, Text, View } from 'react-native'
+import { useEffect, useState, useSyncExternalStore } from 'react'
+import { ActivityIndicator, Appearance, Text, View } from 'react-native'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 
-import { color, font, space } from './src/lib/theme'
+import { color, font, space, isDark, loadMode, setSystemDark, themeVersion, watchTheme } from './src/lib/theme'
 import { haveSession, linkState, probeNow, startLink, stopLink, subscribeLink } from './src/lib/link'
 import { signOut } from './src/lib/relay'
 import Note from './src/components/Note'
@@ -19,7 +19,7 @@ import Report from './src/screens/Report'
 import Presets from './src/screens/Presets'
 import Setlists from './src/screens/Setlists'
 import Stage from './src/screens/Stage'
-import { hydrate } from './src/lib/store'
+import { hydrate, sync } from './src/lib/store'
 import { keepSetlistsInStep } from './src/lib/cloudSetlists'
 import { useRig } from './src/lib/rig'
 import { keepLog } from './src/lib/logKeep'
@@ -40,6 +40,28 @@ import { BENCH } from './src/lib/features'
  * to a Mac that stopped answering four minutes ago" look identical as a dot.
  */
 export default function App() {
+  /*
+   * Light, dark, or whatever the phone is set to.
+   *
+   * "I'm not seeing where the light/dark/auto theme buttons are anymore.
+   * Please put that back on Setup." The browser has had all three for a long
+   * time; the phone had none and was dark whatever the handset was set to.
+   *
+   * Subscribed HERE, at the root, and nowhere else. lib/theme swaps the values
+   * on the one exported `color` object rather than handing out a new one, so
+   * every screen's inline styles pick the new palette up on their next render
+   * — and one re-render at the top is every screen's next render. See the note
+   * on `color` for why that works and what it depends on.
+   */
+  useSyncExternalStore(watchTheme, themeVersion, themeVersion)
+  useEffect(() => {
+    setSystemDark(Appearance.getColorScheme() !== 'light')
+    const off = Appearance.addChangeListener(({ colorScheme }) => {
+      setSystemDark(colorScheme !== 'light')
+    })
+    return () => off?.remove?.()
+  }, [])
+
   /** 'checking' | 'out' | 'in' */
   const [auth, setAuth] = useState('checking')
   const [screen, setScreen] = useState('stage')
@@ -108,7 +130,10 @@ export default function App() {
    * re-draw when it does. See lib/store.
    */
   useEffect(() => {
-    hydrate()
+    /* And the theme, from the same store, as soon as it has landed. Before
+       that it is Auto, which follows the handset — the right answer to show
+       somebody on their first launch anyway. */
+    hydrate().then(() => loadMode(sync))
   }, [])
 
   /*
@@ -207,7 +232,9 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" />
+      {/* The clock and the battery, which have to be readable against whatever
+          is behind them: light ink on the dark palette, dark on the light one. */}
+      <StatusBar style={isDark() ? 'light' : 'dark'} />
       <SafeAreaView style={{ flex: 1, backgroundColor: color.chassis }} edges={['top', 'bottom']}>
         {auth === 'checking' ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>

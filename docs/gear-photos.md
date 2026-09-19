@@ -11,7 +11,7 @@ adding fifty more never costs an App Store build and never needs a release.
 
 | | |
 |---|---|
-| Project | `fractal-ai-builder` — `biznwrqeckviawjuhvyg` |
+| Project | `fractal-ai-builder` — `biznwrqeckviawjuhvyg` (the Supabase project's own name; the GitHub repository is `fractal-remote`, and renaming that did not rename this) |
 | Bucket | `gear` (public, 1 MB per file, JPEG / PNG / WebP only) |
 | Table | `public.gear` |
 | Public URL | `https://biznwrqeckviawjuhvyg.supabase.co/storage/v1/object/public/gear/<file>` |

@@ -53,7 +53,7 @@ import {
   remoteSignUp
 } from './remote.js'
 import { isPairAccount, makePairCode, normalizePairCode, NOT_A_PAIR_CODE, pairCredentials, pairCodeFromUrl } from '../../shared/pairing.mjs'
-export { isPairAccount, formatPairCode, pairLink, normalizePairCode, isPairCode } from '../../shared/pairing.mjs'
+export { isPairAccount, formatPairCode, pairLink, normalizePairCode, isPairCode, HOSTED_ORIGIN } from '../../shared/pairing.mjs'
 
 /**
  * Which end this is.

@@ -9,10 +9,9 @@ import {
   writeScene,
   writeBypass,
   writeTuner,
-  tapBeat,
   refreshTempo
 } from '../lib/deviceState'
-import { keepTaps, tappedBpm, TAP_REREAD_MS } from '../../shared/tempo.mjs'
+import { keepTaps, tappedBpm, tempoSender, TAP_REREAD_MS } from '../../shared/tempo.mjs'
 import { remoteActive } from '../lib/remote'
 import { EXCLUDED_BLOCKS } from '../lib/guardrails'
 import { blockColor } from '../lib/blockColors'
@@ -414,34 +413,57 @@ export default function Gig({
    * so the two never both hold a figure.
    */
   const [tapped, setTapped] = useState(null)
+  /*
+   * The number goes to the unit; the taps never leave this machine.
+   *
+   * "Right now after I tap it a few times slowly, it'll send a number and
+   * then I'm done tapping and it sends back a different one."
+   *
+   * Because the taps themselves were being forwarded, one POST per press, and
+   * the unit worked the tempo out from the spacing between them AS THEY
+   * ARRIVED — which is the thumb's spacing plus whatever the wifi, the relay
+   * and the computer's queue added to each one, differently each time. The
+   * unit then reported, correctly, the tempo of what it had actually heard.
+   * See the note at the top of shared/tempo.mjs.
+   *
+   * Nothing at the far end could fix that: the timing is destroyed on the
+   * way. So the gaps are measured here and what crosses the network is the
+   * NUMBER — the same call a typed tempo makes.
+   */
+  const sender = useRef(null)
+  if (!sender.current) sender.current = tempoSender((bpm) => setTempo(bpm), (err) => onError(err.message))
   const tap = async () => {
     /*
-     * The tap goes NOW; the read-back waits for the burst to end.
+     * The number goes NOW; the read-back waits for the burst to end.
      *
-     * deviceState.tapBeat says why the two must not be folded together: the
-     * unit works the tempo out from the spacing between taps, so a tap held
-     * back by a debounce is not a tap. The unit also cannot be asked mid-burst,
-     * because it answers with the tempo of the taps BEFORE this one.
-     *
-     * So: fire every press, show what the presses mean, and re-read once,
-     * 900ms after the last one.
+     * The read still cannot follow each press — it would answer about the
+     * number sent one tap ago — but it can no longer surprise anybody, which
+     * was the complaint. The unit is told 132 rather than asked to work
+     * something out, so 132 is what it says.
      */
     clearTimeout(reread.current)
     haptic()
     taps.current = keepTaps(taps.current, Date.now())
     const guess = tappedBpm(taps.current)
-    if (guess != null) setTapped(guess)
-    try {
-      await tapBeat()
-    } catch (err) {
-      onError(err.message)
-      return
+    if (guess != null) {
+      setTapped(guess)
+      sender.current.push(guess)
     }
     reread.current = setTimeout(async () => {
-      await refreshTempo()
-      /* The unit has now spoken, so stop showing our own arithmetic. */
-      setTapped(null)
+      /* Never read over a write still in the air: that read answers with the
+         tempo from before it. */
+      if (!sender.current.idle) {
+        reread.current = setTimeout(() => tapSettled(), TAP_REREAD_MS)
+        return
+      }
+      await tapSettled()
     }, TAP_REREAD_MS)
+  }
+
+  /** Confirm what the unit ended up on, and stop showing our own arithmetic. */
+  const tapSettled = async () => {
+    await refreshTempo()
+    setTapped(null)
   }
 
   /* A pending read on a screen that has gone is a write into nothing. */
