@@ -458,12 +458,22 @@ export async function refreshTempo() {
 }
 
 /**
- * One tap.
+ * One tap, forwarded to the unit for the unit to make sense of.
  *
- * Deliberately not "tap and read": the device computes the tempo from the
- * spacing between taps, so the tap must go the moment the button is pressed
- * while the read-back is debounced past the last one. Fold the two together and
- * a debounce swallows the whole burst into a single tap, which is not a tempo.
+ * NOT USED BY THE TAP BUTTON ANY MORE, and the reason is worth keeping where
+ * anybody reaching for it will read it. The unit computes the tempo from the
+ * spacing between taps as they ARRIVE, and over a network that spacing is the
+ * thumb's plus whatever the wifi, the relay and the computer's queue added to
+ * each press — different every time. So the unit answered, correctly, with
+ * the tempo of something nobody played: "I tap it a few times slowly, it'll
+ * send a number and then I'm done tapping and it sends back a different one."
+ *
+ * The timing is destroyed on the way, so nothing at the far end can recover
+ * it. The gaps are measured in the app now and the tempo goes over as a
+ * NUMBER — see Gig.jsx and shared/tempo.mjs.
+ *
+ * This is kept because it is the right call for a unit on the end of a cable
+ * in the same room, with no network in between, if that case ever wants it.
  */
 export function tapBeat() {
   return driver.tapTempo()

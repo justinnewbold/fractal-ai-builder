@@ -18,7 +18,7 @@ import { useSyncExternalStore } from 'react'
 
 import * as device from './device'
 import { idOf, sameBlock } from './unit.mjs'
-import { TAP_REREAD_MS, keepTaps, tappedBpm } from './tempo'
+import { TAP_REREAD_MS, keepTaps, tappedBpm, tempoSender } from './tempo'
 import { watchEvery, probeSays, countQuiet, unitGone } from './unit-watch'
 import { DEFAULT_SLUG, deviceSlug } from './device-slug'
 import { adopt as adoptNames, forget as forgetNames, learn as learnName, nameOf } from './presetNames'
@@ -764,39 +764,62 @@ async function readTappedTempo() {
    rhythm however many screens come and go during it. */
 let taps = []
 
+/*
+ * What crosses the network is the NUMBER, not the taps.
+ *
+ * "Right now after I tap it a few times slowly, it'll send a number and then
+ * I'm done tapping and it sends back a different one."
+ *
+ * Because every press was forwarded as a tap — POST /tempo/tap — and the unit
+ * worked the tempo out from the spacing between them AS THEY ARRIVED. That is
+ * the thumb's spacing plus whatever the wifi, the relay server and the
+ * computer's own queue added to each press, differently each time, and the
+ * further apart the taps the more of it accumulates. The unit then reported,
+ * correctly, the tempo of what it had actually heard.
+ *
+ * Nothing at the far end can undo that; the timing is gone by the time it
+ * arrives. The only clock that knows the rhythm is the one in the hand. So
+ * the gaps are measured here and the answer is SET, with the same call a
+ * typed tempo uses. See shared/tempo.mjs.
+ *
+ * One write in the air at a time, newest number wins — a burst of taps must
+ * not queue five writes and have the last one land after the read-back.
+ */
+const sendTempo = tempoSender(
+  (bpm) => device.setTempo(bpm),
+  (err) => set({ error: err.message })
+)
+
 export async function tapTempo() {
   clearTimeout(reread)
   /*
-   * WHAT THE TAPS MEAN, SHOWN NOW.
+   * WHAT THE TAPS MEAN, SHOWN NOW AND SENT NOW.
    *
    * "It should change the tempo based on the tap and change the number
-   * immediately and then read the device … right now it takes a few seconds
-   * after doing the tap, so you can't even tell the tempo you're tapping at."
-   *
-   * The figure used to come only from the unit, and the unit cannot be asked
-   * until tapping stops — see TAP_REREAD_MS — so it lagged the last press by
-   * nearly a second. Tapping is how you FIND a tempo; one you cannot see while
-   * tapping is one you cannot aim.
+   * immediately … you can't even tell the tempo you're tapping at."
    *
    * tempoSetAt is stamped so the ordinary stale-read guard protects this the
    * same way it protects a typed tempo. readTappedTempo clears it deliberately,
-   * which is how the unit's own answer gets to win a moment later.
+   * which is how the unit's own answer gets to win a moment later — and now
+   * that answer is the number this sent, so it agrees.
    */
   taps = keepTaps(taps, Date.now())
   const guess = tappedBpm(taps)
   if (guess != null) {
     set({ bpm: guess })
     tempoSetAt = Date.now()
+    expect('bpm', guess)
+    sendTempo.push(guess)
   }
-  try {
-    await device.tapTempo()
-  } catch (err) {
-    set({ error: err.message })
-    return false
-  }
-  /* The read after the burst is the tempo the unit settled on; from then it
-     is this phone's figure, held against a stale copy. See TEMPO_KEEP_MS. */
-  reread = setTimeout(() => readTappedTempo(), TAP_REREAD_MS)
+  /* The read after the burst confirms what the unit ended up on. It waits for
+     the last write to land, or it answers about the one before it. */
+  reread = setTimeout(function settle() {
+    if (!sendTempo.idle) {
+      reread = setTimeout(settle, TAP_REREAD_MS)
+      return
+    }
+    readTappedTempo()
+  }, TAP_REREAD_MS)
   return true
 }
 

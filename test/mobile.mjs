@@ -747,7 +747,8 @@ export function run(test) {
     assert.match(rig, /if \(tempoJustSet\(\) && Number\.isFinite\(state\.bpm\) && bpm !== state\.bpm\) return set\(\{ bpm \}\)/, 'a re-read still overwrites a tempo the phone just set')
     /* The read after a burst of taps is the tempo the unit settled on, and
        from then it is held; a typed tempo is held from the moment it is typed. */
-    assert.match(rig, /reread = setTimeout\(\(\) => readTappedTempo\(\), TAP_REREAD_MS\)/, 'the read after the taps does not start the hold')
+    assert.match(rig, /reread = setTimeout\(function settle\(\) \{ if \(!sendTempo\.idle\)/, 'the read after the taps does not start the hold')
+    assert.match(rig, /readTappedTempo\(\) \}, TAP_REREAD_MS\)/, 'the read after the taps never happens')
     assert.match(rig, /async function readTappedTempo\(\) \{ tempoSetAt = 0 await refreshTempo\(\) tempoSetAt = Date\.now\(\) \}/, 'the read after the taps is itself blocked by an earlier hold, or does not start one')
     assert.match(rig, /expect\('bpm', bpm\) tempoSetAt = Date\.now\(\)/, 'a typed tempo is not held')
   })
@@ -1914,7 +1915,10 @@ export function run(test) {
     assert.ok(tap.length > 100, 'tapTempo moved; this check reads it')
 
     assert.match(tap, /clearTimeout\(reread\)/, 'each tap does not cancel the read-back the one before it scheduled')
-    assert.match(tap, /setTimeout\(\(\) => readTappedTempo\(\), TAP_REREAD_MS\)/, 'the tempo is never read back after a tap')
+    assert.match(tap, /readTappedTempo\(\)/, 'the tempo is never read back after a tap')
+    /* And it waits for the write to land first, or it reads back the number
+       from before the last tap and reports that as the answer. */
+    assert.match(tap, /if \(!sendTempo\.idle\)/, 'the read-back can overtake the write it is meant to confirm')
     assert.ok(
       !/await refreshTempo\(\)/.test(tap),
       'the read-back is awaited inside the tap, which makes the tap itself late and the rhythm wrong'
@@ -1932,8 +1936,12 @@ export function run(test) {
      */
     assert.match(tap, /tappedBpm\(/, 'the phone no longer works out what the taps mean')
     assert.ok(
-      tap.indexOf('set({ bpm:') < tap.indexOf('await device.tapTempo()'),
+      tap.indexOf('set({ bpm: guess })') < tap.indexOf('sendTempo.push(guess)'),
       'the phone shows the number only after the request, so it still lags the tap'
+    )
+    assert.ok(
+      !/await device\./.test(tap),
+      'a tap waits on the network before it returns, which makes the next tap late and the rhythm wrong'
     )
 
     /* Both apps do it the same way. */
@@ -5073,4 +5081,86 @@ export function run(test) {
     assert.match(app, /document\.visibilityState === 'hidden'/, 'a tab nobody is looking at keeps asking')
     assert.match(app, /await read\(\)/, 'the browser never confirms what the check found')
   })
+  test('the tempo is worked out here, so the wifi cannot change it', async () => {
+    /*
+     * "Right now after I tap it a few times slowly, it'll send a number and
+     * then I'm done tapping and it sends back a different one, so maybe do a
+     * little more research on it or figure out why it's not working
+     * correctly, but and I understand it's going over Wi-Fi and stuff, so but
+     * there's gotta be way to do it and make it work."
+     *
+     * The wifi was the whole of it. Each press was forwarded to the unit as a
+     * TAP, and the unit worked the tempo out from the spacing between them AS
+     * THEY ARRIVED THERE — thumb spacing plus whatever the network and the
+     * computer's queue added to each one, differently every time. The unit
+     * then answered, correctly, about a rhythm nobody played, and the slower
+     * the taps the more room the jitter had to accumulate.
+     *
+     * This is what that looked like, and why no amount of work at the far end
+     * could have fixed it: the information is destroyed on the way.
+     */
+    const { tappedBpm, keepTaps, tempoSender, TAP_AVERAGE } = await import('../shared/tempo.mjs')
+
+    /* A steady 100 BPM: presses 600ms apart. */
+    const played = [0, 600, 1200, 1800]
+    let list = []
+    for (const at of played) list = keepTaps(list, at)
+    assert.equal(tappedBpm(list), 100, 'a press every 600ms is not 100 BPM')
+
+    /*
+     * The same thumb, seen through a network that held each press up a little
+     * longer than the one before it — which is what a queue does when writes
+     * start stacking behind each other on a busy link. Nothing here is
+     * unreasonable: the worst of it is a third of a second.
+     *
+     * Note which way this goes wrong. Plain random jitter partly cancels in
+     * the average, so the unit is only a few BPM out; delay that GROWS
+     * stretches every gap in the same direction and none of it cancels. That
+     * is why "a few times slowly" was the case that showed it up — a longer
+     * burst gives the queue more time to build.
+     */
+    const jitter = [0, 80, 180, 320]
+    let asArrived = []
+    for (let i = 0; i < played.length; i += 1) asArrived = keepTaps(asArrived, played[i] + jitter[i])
+    const heard = tappedBpm(asArrived)
+    assert.notEqual(heard, 100, 'this jitter happens to cancel out; pick numbers that do not')
+    assert.ok(Math.abs(heard - 100) >= 5, `the unit would have heard ${heard}, which is too close to make the point`)
+
+    /*
+     * So the taps do not leave. "It should basically take the last three taps
+     * and use that to calculate the tempo" — three taps, two gaps, averaged,
+     * and the ANSWER is what crosses the network.
+     */
+    assert.equal(TAP_AVERAGE, 3, 'the tempo is worked out from a different number of taps than he asked for')
+    assert.equal(tappedBpm([0, 600, 1200]), 100, 'three taps 600ms apart are not 100 BPM')
+    /* A fourth tap does not drag the answer back towards the older gaps. */
+    assert.equal(tappedBpm([0, 2000, 600, 1200]), 100, 'a tap older than the last three still counts')
+
+    /*
+     * And a burst does not queue writes behind each other. One in the air at
+     * a time, newest number replacing whatever is waiting — because the last
+     * number shown has to be the last number sent, and a queue makes it the
+     * last to LAND, possibly after the read-back meant to confirm it.
+     */
+    const reached = []
+    const send = tempoSender((bpm) => new Promise((go) => { reached.push(bpm); setTimeout(go, 20) }))
+    send.push(90)
+    send.push(95)
+    send.push(100)
+    assert.equal(send.idle, false, 'a write in the air reads as nothing happening')
+    await new Promise((go) => setTimeout(go, 150))
+    assert.equal(send.idle, true, 'the sender never finishes')
+    assert.equal(send.sent, 100, 'the last number tapped is not the last number the unit was told')
+    assert.equal(reached[reached.length - 1], 100, 'the unit ends up on a tempo from the middle of the burst')
+    assert.ok(reached.length < 3, 'every intermediate tempo took its own round trip')
+
+    /* A failed write is reported rather than swallowed, and does not wedge the
+       sender shut for the next tap. */
+    const said = []
+    const bad = tempoSender(() => Promise.reject(new Error('port not open')), (err) => said.push(err.message))
+    await bad.push(120)
+    assert.deepEqual(said, ['port not open'], 'a refused tempo says nothing')
+    assert.equal(bad.idle, true, 'one refusal stops the button working for good')
+  })
+
 }

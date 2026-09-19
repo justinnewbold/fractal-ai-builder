@@ -3113,7 +3113,13 @@ export function run(test) {
     assert.match(bar, /Tuner/, 'the tuner left the bar')
     assert.match(bar, /Tap/, 'tap tempo left the bar')
     assert.ok(!/className="gig-modes"/.test(g), 'the tuner is back in a row of its own mid-screen')
-    assert.match(g, /tapBeat\(\)/, 'nothing taps, so the button does nothing')
+    /*
+     * The button sends a NUMBER, not a tap. Forwarding the presses let the
+     * network decide the rhythm — see shared/tempo.mjs — so what goes over
+     * is the tempo this end worked out.
+     */
+    assert.match(g, /sender\.current\.push\(guess\)/, 'nothing taps, so the button does nothing')
+    assert.ok(!/tapBeat\(\)/.test(g), 'the taps are being forwarded again, so the wifi decides the tempo')
 
     /*
      * And the tempo is ON the button that sets it.
@@ -3150,14 +3156,22 @@ export function run(test) {
      * figure lagged the last press by nearly a second. Tapping is how you find
      * a tempo; one you cannot see while tapping is one you cannot aim.
      *
-     * Both halves are held: the arithmetic happens before the request goes,
-     * and it is cleared when the unit answers so the two never disagree on
-     * screen.
+     * Both halves are held: the arithmetic happens before anything crosses
+     * the network, and it is cleared when the unit answers so the two never
+     * disagree on screen.
+     *
+     * The arithmetic is also now the ONLY thing that decides the tempo. What
+     * goes over is the number it produced, so "read the device" can only ever
+     * hand back what was sent.
      */
     assert.match(tapFn, /tappedBpm\(/, 'the taps are no longer turned into a tempo on this end')
     assert.ok(
-      tapFn.indexOf('setTapped(') < tapFn.indexOf('await tapBeat()'),
+      tapFn.indexOf('setTapped(guess)') < tapFn.indexOf('sender.current.push(guess)'),
       'the number waits for the request, so it still lags the tap'
+    )
+    assert.ok(
+      !/await (setTempo|tapBeat|selectPreset)\(/.test(tapFn),
+      'a tap waits on the network before it returns, which makes the next tap late and the rhythm wrong'
     )
     assert.match(tapFn, /setTapped\(null\)/, 'our own figure is never cleared, so the unit can never correct it')
 

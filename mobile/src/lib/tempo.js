@@ -36,24 +36,47 @@ export function checkBpm(text) {
 }
 
 /**
- * How long after the last tap to ask the unit what tempo it worked out.
+ * WHY TAPPING USED TO ANSWER WITH A TEMPO NOBODY PLAYED.
  *
- * THE TAP AND THE READ-BACK MUST NOT BE FOLDED TOGETHER, and that is the whole
- * reason this number exists rather than a plain "tap and read". The unit works
- * the tempo out from the SPACING between taps, so a tap held back by a debounce
- * is not a tap — it is a different rhythm. And the figure can only be read once
- * tapping has stopped, because reading mid-burst answers with the tempo of the
- * taps before this one and puts a stale number on the button still under your
- * thumb.
+ * "Right now after I tap it a few times slowly, it'll send a number and then
+ * I'm done tapping and it sends back a different one … I understand it's
+ * going over wifi and stuff, so but there's gotta be way to do it and make it
+ * work."
  *
- * So: every press goes immediately, and the tempo is read once, this long after
- * the last one. Four taps at 60 BPM are three seconds apart — the slowest
- * anybody counts in — and this sits comfortably inside that.
+ * There is, and the wifi is the whole of it. Every press used to be forwarded
+ * to the unit as a TAP — POST /tempo/tap, one per press — and the unit worked
+ * the tempo out from the spacing between the taps AS THEY ARRIVED THERE.
  *
- * Shared because the phone got it wrong by not having it: it tapped, the unit
- * changed, and the number on screen waited on an event the relay does not
- * always carry. The tempo was right everywhere except the screen you were
- * looking at.
+ * That spacing is not the spacing of a thumb. A tap leaving a phone crosses a
+ * wifi network, a relay server somewhere on the internet, and a computer's own
+ * queue before the unit sees it, and each of those adds a delay that is
+ * different every time. Tap four times exactly one second apart and the unit
+ * might receive them 1.00, 0.88, 1.15 and 0.97 seconds apart. It then reports,
+ * correctly, the tempo of what it actually heard — which is not what was
+ * played. The slower the taps, the longer the burst, the more room for the
+ * jitter to add up.
+ *
+ * Nothing at the far end can fix that, because the information is destroyed
+ * on the way. The only clock that knows what was tapped is the one in the
+ * hand doing the tapping.
+ *
+ * SO THE TAPS NEVER LEAVE. The gaps are measured here, the tempo is worked
+ * out here, and what goes to the unit is the NUMBER — the same call a typed
+ * tempo uses. "Whatever it shows is what should get sent to the device", and
+ * now it is, exactly. A read-back that follows can only confirm it: the unit
+ * was told 132, so it says 132.
+ */
+
+/**
+ * How long after the last tap to ask the unit what tempo it is on.
+ *
+ * Only a confirmation now. The unit has been told an exact number rather than
+ * asked to work one out, so this can no longer come back with a surprise —
+ * which is the point. What it still catches is a unit that refused the write
+ * or rounded it, and that is worth one small read.
+ *
+ * It waits for the burst to end rather than following each press, because a
+ * read mid-burst answers about the number sent one tap ago.
  */
 export const TAP_REREAD_MS = 900
 
@@ -70,16 +93,16 @@ export const TAP_REREAD_MS = 900
  * nearly a second. Which defeats the point: you tap to FIND a tempo, and a
  * tempo you cannot see while tapping is one you cannot aim.
  *
- * The unit is still the authority and still gets asked. This is what to show
- * in the meantime, and the two agree within a BPM or so because they are
- * working from the same taps.
+ * And since 7.365.0 it is also what gets SENT — see the note above on why
+ * forwarding the taps themselves could never work over a network.
  *
- * HOW MANY TAPS TO AVERAGE. The gaps, not the taps: four presses give three
- * gaps. Averaging the last few smooths an unsteady hand without making the
- * button feel like it is ignoring you — too long a memory and a deliberate
- * change of tempo takes several presses to show up.
+ * HOW MANY TAPS. "It should basically take the last three taps and use that
+ * to calculate the tempo." Three taps, which is two gaps between them,
+ * averaged. Two gaps is enough to take the edge off an unsteady hand and
+ * short enough that changing your mind about the tempo shows up on the very
+ * next press rather than three presses later.
  */
-export const TAP_AVERAGE = 4
+export const TAP_AVERAGE = 3
 
 /**
  * A gap longer than this starts a new count rather than joining the old one.
@@ -126,4 +149,62 @@ export function keepTaps(taps = [], now = Date.now()) {
   const last = times[times.length - 1]
   const fresh = last != null && now - last > TAP_GAP_MAX_MS ? [] : times
   return [...fresh, now].slice(-TAP_AVERAGE)
+}
+
+/**
+ * Send tempo numbers without letting them pile up behind each other.
+ *
+ * Every tap past the second has a number to send, and a burst is several taps
+ * in a couple of seconds. Firing all of them at a computer across a relay
+ * queues writes behind writes: the last one — the only one that matters — is
+ * then the last to land, possibly after the read-back that was meant to
+ * confirm it.
+ *
+ * So: one write in the air at a time, and while one is in the air the newest
+ * number replaces whatever was waiting rather than joining a queue. An
+ * intermediate tempo nobody held their thumb still for is not worth a round
+ * trip; the newest one always is. What this guarantees, which a plain queue
+ * does not, is that THE LAST NUMBER SHOWN IS THE LAST NUMBER SENT.
+ *
+ * `send` is the app's own write — setTempo, whatever that means at this end.
+ * `onError` gets anything it throws, once, rather than each caller wrapping
+ * every press in a try.
+ */
+export function tempoSender(send, onError) {
+  let inFlight = false
+  let waiting = null
+  let sent = null
+
+  const pump = async () => {
+    if (inFlight) return
+    while (waiting != null) {
+      const bpm = waiting
+      waiting = null
+      inFlight = true
+      try {
+        await send(bpm)
+        sent = bpm
+      } catch (err) {
+        onError?.(err)
+      } finally {
+        inFlight = false
+      }
+    }
+  }
+
+  return {
+    /** Put this number next in line, replacing any that has not gone yet. */
+    push(bpm) {
+      waiting = bpm
+      return pump()
+    },
+    /** Nothing in the air and nothing waiting: safe to read the unit back. */
+    get idle() {
+      return !inFlight && waiting == null
+    },
+    /** The last number that actually reached the unit, or null. */
+    get sent() {
+      return sent
+    }
+  }
 }
