@@ -69,6 +69,25 @@ on:
       - 'shared/**'
       - 'scripts/sync-relay-rules.mjs'
       - '.github/workflows/mobile.yml'
+  # AND ON MAIN, WHICH PUBLISHES THE UPDATE AND NEVER BUILDS.
+  #
+  # "It's supposed to be doing updates, right? For small changes without
+  # having to do any build?" That was the intent and the job existed, gated on
+  # somebody opening this workflow and ticking a box — which nobody ever did,
+  # so a handset sat on the version it was installed at while thirty changes
+  # went past it.
+  #
+  # Safe because `build` is gated on the event being a workflow_dispatch, so a
+  # push cannot reach it whatever else changes here. An iOS build slot is
+  # still only ever spent by hand. Publishing a JS bundle costs nothing and is
+  # the whole point of having the fingerprint pinned.
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+      - 'shared/**'
+      - 'scripts/sync-relay-rules.mjs'
+      - '.github/workflows/mobile.yml'
 
 jobs:
   check:
@@ -309,7 +328,14 @@ jobs:
   # bundle going to both is harmless; a bundle going to the one channel the
   # phone in your hand is not on is a confusing half hour.
   update:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.update }}
+    # By hand with the box ticked, or on every change that lands on main.
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.update) || github.event_name == 'push' }}
+    # Never ahead of the checks. `check` bundles both platforms and proves the
+    # generated copies are current, and a bundle that does not build is a
+    # bundle no phone should be asked to run — least of all one published
+    # without anybody watching. It runs on every trigger, so this holds for a
+    # dispatch as well, and `needs` takes a name rather than an expression.
+    needs: check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -359,7 +385,7 @@ jobs:
         working-directory: mobile
         run: |
           set -euo pipefail
-          want="${{ inputs.update_channel }}"
+          want="${{ inputs.update_channel || 'both' }}"
           [ "$want" = "both" ] && targets="production preview" || targets="$want"
           for branch in $targets; do
             echo "── $branch ──"
@@ -371,5 +397,5 @@ jobs:
 
       - name: What was published
         run: |
-          echo "Published to: ${{ inputs.update_channel }}"
+          echo "Published to: ${{ inputs.update_channel || 'both' }}"
           echo "An installed app picks this up on its next launch, if its fingerprint matches the build."
