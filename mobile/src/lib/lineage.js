@@ -36,6 +36,7 @@
  */
 import ampTypes from '../data/amp-types.json' with { type: 'json' }
 import driveTypes from '../data/drive-types.json' with { type: 'json' }
+import cabTypes from '../data/cab-types.json' with { type: 'json' }
 import ampFamilies from '../data/amp-lineage.json' with { type: 'json' }
 import effectFamilies from '../data/effect-lineage.json' with { type: 'json' }
 
@@ -213,6 +214,44 @@ export function gearLine(slug, name) {
   const found = lineageFor(slug, name)
   if (!found) return null
   return found.basedOn || found.manufacturer
+}
+
+/**
+ * What the real thing is like to play, in a sentence.
+ *
+ * "Then work on the amp and cab descriptions and effects pedals."
+ *
+ * The line above this one says WHICH amp a model is — "Based on Marshall
+ * JCM800" — which is the fact, and is useless to somebody who has never
+ * played a JCM800. That is most people who have just bought one of these
+ * units: they can read that a model is a Rectifier and still have no idea
+ * whether it is the one they want for the song in front of them.
+ *
+ * WRITTEN HERE RATHER THAN QUOTED FROM ANYWHERE. Yek's Guide and Fractal's
+ * own Blocks Guide are where the lineage facts came from, and a fact — this
+ * model is that amp — is not something anybody owns. A paragraph describing
+ * how an amp sounds is somebody's writing, so none of these are from either.
+ *
+ * AND NOTHING IS DESCRIBED THAT IS NOT KNOWN. Ten of the 119 amp families are
+ * boutique amps obscure enough that anything written about their character
+ * would be invention, and eleven of the drives are Fractal's own designs with
+ * no real pedal behind them. Those say nothing. The file's own rule at the top
+ * applies here more than anywhere: the person reading this knows the gear
+ * better than the app does, and a confident wrong sentence about an amp they
+ * own costs more than a blank space.
+ *
+ * Per model first, then the family. A drive and a cab are each themselves; an
+ * amp model is one voicing of a family, and "1959SLP Treble" wants what is
+ * written about the Super Lead.
+ */
+const DESCRIBED = { amp: ampTypes, drive: driveTypes, cab: cabTypes }
+
+export function descriptionFor(slug, name) {
+  const model = key(name)
+  if (!model) return null
+  const own = (DESCRIBED[slug] || []).find((m) => key(m.name) === model)
+  if (own?.description) return own.description
+  return familyFor(slug, name)?.description || null
 }
 
 /**

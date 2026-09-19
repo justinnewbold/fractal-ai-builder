@@ -1,121 +1,706 @@
 [
-  { "family": "1959SLP", "manufacturer": "Marshall", "basedOn": "Marshall SLP1959, Vintage Re-Issue Series" },
-  { "family": "1987X", "manufacturer": "Marshall", "basedOn": "Marshall 1987X, Vintage Re-Issue Series" },
-  { "family": "5153", "manufacturer": "EVH", "basedOn": "EVH 5150 III" },
-  { "family": "59 Bassguy", "manufacturer": "Fender", "basedOn": "1959 Fender Narrow Panel Tweed Bassman, 5F6-A" },
-  { "family": "65 Bassguy", "manufacturer": "Fender", "basedOn": "Dweezil Zappa's 1965 blackface Fender Bassman, AB165" },
-  { "family": "5F1 Tweed", "manufacturer": "Fender", "basedOn": "Fender Narrow Panel Tweed Champ, 5F1" },
-  { "family": "5F8 Tweed", "manufacturer": "Fender", "basedOn": "Fender Narrow Panel high-powered Tweed Twin, 5F8" },
-  { "family": "6G4 Super", "manufacturer": "Fender", "basedOn": "1960 brown Fender Super, 6G4" },
-  { "family": "6G12 Concert", "manufacturer": "Fender", "basedOn": "1960 brown Fender Concert, 6G12" },
-  { "family": "AC-20", "manufacturer": "Morgan", "basedOn": "Morgan AC20 Deluxe" },
-  { "family": "Angle Severe", "manufacturer": "Engl", "basedOn": "Engl Savage 120" },
-  { "family": "Archean", "manufacturer": "PRS", "basedOn": "PRS Archon" },
-  { "family": "Atomica", "manufacturer": "Cameron", "basedOn": "Cameron Atomica" },
-  { "family": "Band-Commander", "manufacturer": "Fender", "basedOn": "1968 Fender Bandmaster, AB763" },
-  { "family": "Blankenship Leeds", "manufacturer": "Blankenship", "basedOn": "Blankenship Leeds 21" },
-  { "family": "Bludojai", "manufacturer": "Bludotone", "basedOn": "Bludotone Ojai" },
-  { "family": "Bogfish", "manufacturer": "Bogner", "basedOn": "Bogner Fish preamp" },
-  { "family": "Brit 800", "manufacturer": "Marshall", "basedOn": "Marshall JCM800" },
-  { "family": "Brit 800 Studio 20", "manufacturer": "Marshall", "basedOn": "Marshall Studio Classic SC20, a 20-watt JCM800" },
-  { "family": "Brit AFS100", "manufacturer": "Marshall", "basedOn": "Marshall AFD100, Slash's signature amp" },
-  { "family": "Brit Super", "manufacturer": "Marshall", "basedOn": "Marshall AFD100, Slash's signature amp" },
-  { "family": "Brit JM45", "manufacturer": "Marshall", "basedOn": "Marshall JTM45" },
-  { "family": "Brit JVM", "manufacturer": "Marshall", "basedOn": "Marshall JVM410H" },
-  { "family": "Brit Pre", "manufacturer": "Marshall", "basedOn": "Marshall JMP-1 preamp" },
-  { "family": "Brit Silver", "manufacturer": "Marshall", "basedOn": "Marshall Silver Jubilee" },
-  { "family": "Buddah DuoMaster", "manufacturer": "Budda", "basedOn": "Budda Twinmaster" },
-  { "family": "CA3+", "manufacturer": "Custom Audio Amplifiers", "basedOn": "Custom Audio Amplifiers 3+ SE preamp" },
-  { "family": "Cameron CCV", "manufacturer": "Cameron", "basedOn": "Cameron CCV-100" },
-  { "family": "Capt Hook", "manufacturer": "HOOK", "basedOn": "HOOK Captain 34" },
-  { "family": "Car Ambler", "manufacturer": "Carr", "basedOn": "Carr Rambler" },
-  { "family": "Carol-Ann OD-2", "manufacturer": "Carol-Ann", "basedOn": "Carol-Ann OD2" },
-  { "family": "Carol-Ann Triptik", "manufacturer": "Carol-Ann", "basedOn": "Carol-Ann Triptik" },
-  { "family": "Carol-Ann Tucana", "manufacturer": "Carol-Ann", "basedOn": "Carol-Ann Tucana 3" },
-  { "family": "Citrus A30", "manufacturer": "Orange", "basedOn": "Orange AD30HTC" },
-  { "family": "Citrus Bass 200", "manufacturer": "Orange", "basedOn": "Orange AD200B" },
-  { "family": "Citrus RV50", "manufacturer": "Orange", "basedOn": "Orange Rockerverb 50 MK II" },
-  { "family": "Citrus Terrier", "manufacturer": "Orange", "basedOn": "Orange Tiny Terror" },
-  { "family": "Class-A 15W TB", "manufacturer": "Vox", "basedOn": "Vox AC15 Top Boost" },
-  { "family": "Class-A 30W", "manufacturer": "Vox", "basedOn": "Vox AC30" },
-  { "family": "Class-A 30W TB", "manufacturer": "Vox", "basedOn": "Vox AC30 Top Boost" },
-  { "family": "Comet 60", "manufacturer": "Komet", "basedOn": "Komet 60" },
-  { "family": "Comet Concourse", "manufacturer": "Komet", "basedOn": "Komet Concorde" },
-  { "family": "Cornfed M50", "manufacturer": "Cornford", "basedOn": "Cornford MK50 II" },
-  { "family": "Das Metall", "manufacturer": "Diezel", "basedOn": "Diezel VH4" },
-  { "family": "Deluxe 6G3", "manufacturer": "Fender", "basedOn": "1961 brown Fender Deluxe, 6G3" },
-  { "family": "Deluxe Tweed", "manufacturer": "Fender", "basedOn": "Fender Tweed Deluxe, 5E3" },
-  { "family": "Deluxe Verb", "manufacturer": "Fender", "basedOn": "1965 blackface Fender Deluxe Reverb, AB763" },
-  { "family": "Diamante", "manufacturer": "Diamond", "basedOn": "Diamond Del Fuego" },
-  { "family": "Dirty Shirley", "manufacturer": "Friedman", "basedOn": "Friedman Dirty Shirley" },
-  { "family": "Div/13 CJ", "manufacturer": "Divided By 13", "basedOn": "Divided By 13 CJ 11" },
-  { "family": "Div/13 FT37", "manufacturer": "Divided By 13", "basedOn": "Divided By 13 FTR 37" },
-  { "family": "Dizzy V4", "manufacturer": "Diezel", "basedOn": "Diezel VH4" },
-  { "family": "Double Verb", "manufacturer": "Fender", "basedOn": "Fender Twin Reverb" },
-  { "family": "Dweezil's Bassguy", "manufacturer": "Fender", "basedOn": "Dweezil Zappa's modded 1965 blackface Fender Bassman, AB165" },
-  { "family": "Energyball", "manufacturer": "Engl", "basedOn": "Engl Powerball" },
-  { "family": "Euro", "manufacturer": "Bogner", "basedOn": "Bogner Ecstasy, 20th Anniversary edition" },
-  { "family": "Euro Uber", "manufacturer": "Bogner", "basedOn": "Bogner Uberschall" },
-  { "family": "Fox ODS", "manufacturer": "Fuchs", "basedOn": "Fuchs Overdrive Supreme" },
-  { "family": "Friedman BE", "manufacturer": "Friedman", "basedOn": "Friedman BE-100" },
-  { "family": "Friedman HBE", "manufacturer": "Friedman", "basedOn": "Friedman BE-100, HBE (hot British eq) channel" },
-  { "family": "Friedman Small Box", "manufacturer": "Friedman", "basedOn": "Friedman Small Box" },
-  { "family": "Fryette D60", "manufacturer": "Fryette", "basedOn": "Fryette Deliverance 60" },
-  { "family": "Gibtone Scout", "manufacturer": "Gibson", "basedOn": "1964 Gibson Scout" },
-  { "family": "Herbie", "manufacturer": "Diezel", "basedOn": "Diezel Herbert" },
-  { "family": "Hipower", "manufacturer": "Hiwatt", "basedOn": "Hiwatt DR103" },
-  { "family": "Hot Kitty", "manufacturer": "Bad Cat", "basedOn": "Bad Cat Hot Cat 30" },
-  { "family": "JMPre-1", "manufacturer": "Marshall", "basedOn": "Marshall JMP-1 preamp" },
-  { "family": "JR Blues", "manufacturer": "Fender", "basedOn": "Fender Blues Junior" },
-  { "family": "JS410", "manufacturer": "Marshall", "basedOn": "Marshall JVM410HJS, Joe Satriani's signature amp" },
-  { "family": "Jazz 120", "manufacturer": "Roland", "basedOn": "Roland JC-120 Jazz Chorus" },
-  { "family": "Legend 100", "manufacturer": "Carvin", "basedOn": "Carvin Legacy VL100, Steve Vai's signature amp" },
-  { "family": "Matchbox Chiefman", "manufacturer": "Matchless", "basedOn": "Matchless Chieftain" },
-  { "family": "Matchbox D-30", "manufacturer": "Matchless", "basedOn": "Matchless DC-30" },
-  { "family": "Mr Z Highway 66", "manufacturer": "Dr. Z", "basedOn": "Dr. Z Route 66" },
-  { "family": "Mr Z MZ-8", "manufacturer": "Dr. Z", "basedOn": "Dr. Z Maz 8" },
-  { "family": "Mr Z MZ-38", "manufacturer": "Dr. Z", "basedOn": "Dr. Z Maz 38" },
-  { "family": "Nuclear-Tone", "manufacturer": "Swart", "basedOn": "Swart Atomic Space Tone" },
-  { "family": "ODS-100", "manufacturer": "Dumble", "basedOn": "Dumble Overdrive Special" },
-  { "family": "PVH 6160 Block", "manufacturer": "Peavey", "basedOn": "Block-letter Peavey EVH 5150, the 6505" },
-  { "family": "PVH 6160+", "manufacturer": "Peavey", "basedOn": "Peavey 6505+, the EVH 5150 II" },
-  { "family": "Plexi", "manufacturer": "Marshall", "basedOn": "Marshall Plexi Super Lead" },
-  { "family": "Plexi Studio 20", "manufacturer": "Marshall", "basedOn": "Marshall Studio Vintage SV20, a 20-watt Plexi" },
-  { "family": "Princetone", "manufacturer": "Fender", "basedOn": "Fender Princeton" },
-  { "family": "Princetone Reverb", "manufacturer": "Fender", "basedOn": "Blackface Fender Princeton Reverb" },
-  { "family": "Recto1", "manufacturer": "Mesa/Boogie", "basedOn": "Mesa/Boogie two-channel Dual Rectifier" },
-  { "family": "Recto2", "manufacturer": "Mesa/Boogie", "basedOn": "Mesa/Boogie three-channel Dual Rectifier" },
-  { "family": "Revv Gen", "manufacturer": "Revv", "basedOn": "Revv Generator 120" },
-  { "family": "Ruby Rocket", "manufacturer": "Paul Ruby", "basedOn": "Paul Ruby Rocket" },
-  { "family": "SV Bass", "manufacturer": "Ampeg", "basedOn": "Ampeg SVT" },
-  { "family": "Shiver", "manufacturer": "Bogner", "basedOn": "Bogner Shiva, 20th Anniversary edition" },
-  { "family": "Solo 88", "manufacturer": "Soldano", "basedOn": "Soldano X88R preamp" },
-  { "family": "Solo 99", "manufacturer": "Soldano", "basedOn": "Soldano X99 preamp" },
-  { "family": "Solo 100", "manufacturer": "Soldano", "basedOn": "Soldano SLO-100" },
-  { "family": "Spawn Nitrous", "manufacturer": "Splawn", "basedOn": "Splawn Nitro" },
-  { "family": "Spawn Q-Rod", "manufacturer": "Splawn", "basedOn": "Splawn Quick Rod" },
-  { "family": "Suhr Badger 18", "manufacturer": "Suhr", "basedOn": "Suhr Badger 18" },
-  { "family": "Suhr Badger 30", "manufacturer": "Suhr", "basedOn": "Suhr Badger 30" },
-  { "family": "Super Verb", "manufacturer": "Fender", "basedOn": "1964 blackface Fender Super Reverb, AB763" },
-  { "family": "Supremo Trem", "manufacturer": "Supro", "basedOn": "Supro 1964T Dual-Tone" },
-  { "family": "Supro Black Magick", "manufacturer": "Supro", "basedOn": "Supro Black Magick" },
-  { "family": "Texas Star", "manufacturer": "Mesa/Boogie", "basedOn": "Mesa/Boogie Lone Star" },
-  { "family": "Thordendal", "manufacturer": "Mesa/Boogie", "basedOn": "Pre-Rev-G Mesa/Boogie Dual Rectifier" },
-  { "family": "Tremolo Lux", "manufacturer": "Fender", "basedOn": "Blackface Fender Tremolux, AA763" },
-  { "family": "Triple Crest", "manufacturer": "Mesa/Boogie", "basedOn": "Mesa/Boogie Triple Crown" },
-  { "family": "Two Stone J35", "manufacturer": "Two-Rock", "basedOn": "Two-Rock Jet 35" },
-  { "family": "USA Bass 400", "manufacturer": "Mesa/Boogie", "basedOn": "Mesa/Boogie Bass 400" },
-  { "family": "USA JP", "manufacturer": "Mesa/Boogie", "basedOn": "Mesa/Boogie JP-2C, the John Petrucci Mark IIC+" },
-  { "family": "USA MK IIC+", "manufacturer": "Mesa/Boogie", "basedOn": "Mesa/Boogie Mark IIC+" },
-  { "family": "USA MK IIC++", "manufacturer": "Mesa/Boogie", "basedOn": "Modded Mesa/Boogie Mark IIC+" },
-  { "family": "USA MK IV", "manufacturer": "Mesa/Boogie", "basedOn": "Mesa/Boogie Mark IV" },
-  { "family": "USA MK V", "manufacturer": "Mesa/Boogie", "basedOn": "Mesa/Boogie Mark V" },
-  { "family": "USA Metro Blues", "manufacturer": "Mesa/Boogie", "basedOn": "Mesa/Boogie Subway Blues" },
-  { "family": "USA Pre", "manufacturer": "Mesa/Boogie", "basedOn": "Mesa/Boogie TriAxis preamp" },
-  { "family": "Vibra-King", "manufacturer": "Fender", "basedOn": "Custom Fender Vibro-King" },
-  { "family": "Vibrato Lux", "manufacturer": "Fender", "basedOn": "Fender Vibrolux, 6G11" },
-  { "family": "Vibrato Verb", "manufacturer": "Fender", "basedOn": "Fender Vibroverb" },
-  { "family": "Wrecker Express", "manufacturer": "Trainwreck", "basedOn": "Trainwreck Express" },
-  { "family": "Wrecker Liverpool", "manufacturer": "Trainwreck", "basedOn": "Trainwreck Liverpool" },
-  { "family": "Wrecker Rocket", "manufacturer": "Trainwreck", "basedOn": "Trainwreck Rocket" }
+  {
+    "family": "1959SLP",
+    "manufacturer": "Marshall",
+    "basedOn": "Marshall SLP1959, Vintage Re-Issue Series",
+    "description": "The 100-watt Super Lead behind most British rock — almost clean at low volume, and a roar once the power section is working."
+  },
+  {
+    "family": "1987X",
+    "manufacturer": "Marshall",
+    "basedOn": "Marshall 1987X, Vintage Re-Issue Series",
+    "description": "The 50-watt Plexi. Same voice as its bigger brother but it breaks up sooner, which is why it turns up on more records than the 100."
+  },
+  {
+    "family": "5153",
+    "manufacturer": "EVH",
+    "basedOn": "EVH 5150 III",
+    "description": "Eddie Van Halen's last amp design — a tighter, more modern take on the 5150 he made famous, with the low end kept under control."
+  },
+  {
+    "family": "59 Bassguy",
+    "manufacturer": "Fender",
+    "basedOn": "1959 Fender Narrow Panel Tweed Bassman, 5F6-A",
+    "description": "Built for a bass and adopted by guitarists instead. The tweed Bassman is where the Marshall sound came from, and it still does blues better than anything."
+  },
+  {
+    "family": "65 Bassguy",
+    "manufacturer": "Fender",
+    "basedOn": "Dweezil Zappa's 1965 blackface Fender Bassman, AB165",
+    "description": "The blackface Bassman — cleaner and stiffer than the tweed, with the scooped mids Fender moved to in the sixties."
+  },
+  {
+    "family": "5F1 Tweed",
+    "manufacturer": "Fender",
+    "basedOn": "Fender Narrow Panel Tweed Champ, 5F1",
+    "description": "A five-watt one-knob Champ. Too small for a stage and perfect in front of a microphone, which is why so many famous solos were cut on one."
+  },
+  {
+    "family": "5F8 Tweed",
+    "manufacturer": "Fender",
+    "basedOn": "Fender Narrow Panel high-powered Tweed Twin, 5F8",
+    "description": "The high-powered tweed Twin — the loudest thing Fender built before the blackface era, and it stays thick rather than getting brittle."
+  },
+  {
+    "family": "6G4 Super",
+    "manufacturer": "Fender",
+    "basedOn": "1960 brown Fender Super, 6G4",
+    "description": "Brown-panel Fender: the halfway house between tweed warmth and blackface clarity, with the tremolo that era is loved for."
+  },
+  {
+    "family": "6G12 Concert",
+    "manufacturer": "Fender",
+    "basedOn": "1960 brown Fender Concert, 6G12",
+    "description": "A brown-panel four-by-ten. Loud, round, and famously hard to make sound bad — a clean platform with a little hair on top."
+  },
+  {
+    "family": "AC-20",
+    "manufacturer": "Morgan",
+    "basedOn": "Morgan AC20 Deluxe",
+    "description": "A modern boutique take on the AC30 idea, built to get the chime at a volume that does not clear the room."
+  },
+  {
+    "family": "Angle Severe",
+    "manufacturer": "Engl",
+    "basedOn": "Engl Savage 120",
+    "description": "German high gain — very tight, very controlled, and voiced for fast picking to stay separated rather than turning to mush."
+  },
+  {
+    "family": "Archean",
+    "manufacturer": "PRS",
+    "basedOn": "PRS Archon",
+    "description": "PRS's modern high-gain amp. Clean and lead voices a long way apart, with a tight bottom end aimed at drop tunings."
+  },
+  {
+    "family": "Atomica",
+    "manufacturer": "Cameron",
+    "basedOn": "Cameron Atomica"
+  },
+  {
+    "family": "Band-Commander",
+    "manufacturer": "Fender",
+    "basedOn": "1968 Fender Bandmaster, AB763",
+    "description": "A blackface Bandmaster. The same circuit family as the Deluxe Reverb without the reverb, so the top end stays dry and direct."
+  },
+  {
+    "family": "Blankenship Leeds",
+    "manufacturer": "Blankenship",
+    "basedOn": "Blankenship Leeds 21"
+  },
+  {
+    "family": "Bludojai",
+    "manufacturer": "Bludotone",
+    "basedOn": "Bludotone Ojai"
+  },
+  {
+    "family": "Bogfish",
+    "manufacturer": "Bogner",
+    "basedOn": "Bogner Fish preamp",
+    "description": "Bogner's rack preamp — the Ecstasy family's voices in a box that lived in the racks of late-eighties session players."
+  },
+  {
+    "family": "Brit 800",
+    "manufacturer": "Marshall",
+    "basedOn": "Marshall JCM800",
+    "description": "The JCM800: bright, mid-forward, and tight. Most eighties rock and a good deal of the metal after it went through one of these."
+  },
+  {
+    "family": "Brit 800 Studio 20",
+    "manufacturer": "Marshall",
+    "basedOn": "Marshall Studio Classic SC20, a 20-watt JCM800",
+    "description": "A 20-watt JCM800. The same voice at a volume that works in a room with a ceiling."
+  },
+  {
+    "family": "Brit AFS100",
+    "manufacturer": "Marshall",
+    "basedOn": "Marshall AFD100, Slash's signature amp",
+    "description": "Slash's signature Marshall, aimed at the sound of the first Guns N' Roses record — a hot-rodded Plexi with more gain than the original had."
+  },
+  {
+    "family": "Brit Super",
+    "manufacturer": "Marshall",
+    "basedOn": "Marshall AFD100, Slash's signature amp",
+    "description": "The same Slash-voiced Marshall, taken from its cleaner side."
+  },
+  {
+    "family": "Brit JM45",
+    "manufacturer": "Marshall",
+    "basedOn": "Marshall JTM45",
+    "description": "The JTM45 — Marshall's first amp, and still close enough to the tweed Bassman it was copied from to sound like one."
+  },
+  {
+    "family": "Brit JVM",
+    "manufacturer": "Marshall",
+    "basedOn": "Marshall JVM410H",
+    "description": "A modern four-channel Marshall that covers the whole history of the brand, from clean to more gain than a Plexi ever had."
+  },
+  {
+    "family": "Brit Pre",
+    "manufacturer": "Marshall",
+    "basedOn": "Marshall JMP-1 preamp",
+    "description": "The JMP-1 preamp, which lived in a rack with a power amp under it. The sound of a lot of early-nineties rock records."
+  },
+  {
+    "family": "Brit Silver",
+    "manufacturer": "Marshall",
+    "basedOn": "Marshall Silver Jubilee",
+    "description": "The Silver Jubilee — a Marshall with a diode-clipped gain stage that gives it a slightly compressed, vocal quality all its own."
+  },
+  {
+    "family": "Buddah DuoMaster",
+    "manufacturer": "Budda",
+    "basedOn": "Budda Twinmaster",
+    "description": "A small class-A boutique combo — warm, compressed, and happiest overdriven."
+  },
+  {
+    "family": "CA3+",
+    "manufacturer": "Custom Audio Amplifiers",
+    "basedOn": "Custom Audio Amplifiers 3+ SE preamp",
+    "description": "The CAA 3+ preamp — a rack unit with a famous clean and a very usable high-gain channel, from the era when everyone played racks."
+  },
+  {
+    "family": "Cameron CCV",
+    "manufacturer": "Cameron",
+    "basedOn": "Cameron CCV-100"
+  },
+  {
+    "family": "Capt Hook",
+    "manufacturer": "HOOK",
+    "basedOn": "HOOK Captain 34"
+  },
+  {
+    "family": "Car Ambler",
+    "manufacturer": "Carr",
+    "basedOn": "Carr Rambler",
+    "description": "A boutique American combo built around the blackface Fender idea, with more headroom and better reverb than the original."
+  },
+  {
+    "family": "Carol-Ann OD-2",
+    "manufacturer": "Carol-Ann",
+    "basedOn": "Carol-Ann OD2"
+  },
+  {
+    "family": "Carol-Ann Triptik",
+    "manufacturer": "Carol-Ann",
+    "basedOn": "Carol-Ann Triptik"
+  },
+  {
+    "family": "Carol-Ann Tucana",
+    "manufacturer": "Carol-Ann",
+    "basedOn": "Carol-Ann Tucana 3"
+  },
+  {
+    "family": "Citrus A30",
+    "manufacturer": "Orange",
+    "basedOn": "Orange AD30HTC",
+    "description": "Orange's hand-wired 30-watter. Thick and woody rather than bright, with a midrange that sits over a band instead of under it."
+  },
+  {
+    "family": "Citrus Bass 200",
+    "manufacturer": "Orange",
+    "basedOn": "Orange AD200B",
+    "description": "Orange's big valve bass head — round, warm, and happy to be pushed until the low end starts to move."
+  },
+  {
+    "family": "Citrus RV50",
+    "manufacturer": "Orange",
+    "basedOn": "Orange Rockerverb 50 MK II",
+    "description": "A modern Orange with real gain on tap. Keeps the thick midrange and adds enough saturation for heavy music."
+  },
+  {
+    "family": "Citrus Terrier",
+    "manufacturer": "Orange",
+    "basedOn": "Orange Tiny Terror",
+    "description": "The Tiny Terror. Fifteen watts, two knobs and a tone control — famous for being far louder and nastier than it looks."
+  },
+  {
+    "family": "Class-A 15W TB",
+    "manufacturer": "Vox",
+    "basedOn": "Vox AC15 Top Boost",
+    "description": "An AC15 with Top Boost. The chime of the bigger Vox at a volume you can actually use, and it breaks up early."
+  },
+  {
+    "family": "Class-A 30W",
+    "manufacturer": "Vox",
+    "basedOn": "Vox AC30",
+    "description": "The AC30 without Top Boost — darker and rounder than the version most people picture, and the sound of the early British invasion."
+  },
+  {
+    "family": "Class-A 30W TB",
+    "manufacturer": "Vox",
+    "basedOn": "Vox AC30 Top Boost",
+    "description": "The AC30 Top Boost: the jangle. Chimey and bright, and it compresses in a way no Fender does."
+  },
+  {
+    "family": "Comet 60",
+    "manufacturer": "Komet",
+    "basedOn": "Komet 60",
+    "description": "A Trainwreck-inspired boutique amp — touch sensitive to the point of being demanding, and enormous when you dig in."
+  },
+  {
+    "family": "Comet Concourse",
+    "manufacturer": "Komet",
+    "basedOn": "Komet Concorde",
+    "description": "A boutique amp in the Trainwreck tradition, with more headroom than the Komet 60 and the same touch response."
+  },
+  {
+    "family": "Cornfed M50",
+    "manufacturer": "Cornford",
+    "basedOn": "Cornford MK50 II",
+    "description": "A British boutique high-gain head — tight and aggressive, with a hard-edged midrange."
+  },
+  {
+    "family": "Das Metall",
+    "manufacturer": "Diezel",
+    "basedOn": "Diezel VH4",
+    "description": "Diezel's VH4 — German high gain built for tightness above everything, with a low end that stays defined under heavy distortion."
+  },
+  {
+    "family": "Deluxe 6G3",
+    "manufacturer": "Fender",
+    "basedOn": "1961 brown Fender Deluxe, 6G3",
+    "description": "A brown-panel Deluxe. Small, warm, and it starts to break up early, which is most of the appeal."
+  },
+  {
+    "family": "Deluxe Tweed",
+    "manufacturer": "Fender",
+    "basedOn": "Fender Tweed Deluxe, 5E3",
+    "description": "The 5E3 Tweed Deluxe — two controls that fight each other, almost no headroom, and a raggedness people spend a lot of money to get."
+  },
+  {
+    "family": "Deluxe Verb",
+    "manufacturer": "Fender",
+    "basedOn": "1965 blackface Fender Deluxe Reverb, AB763",
+    "description": "The Deluxe Reverb: the studio clean amp. Loud enough for a small stage, with the reverb and tremolo everyone copies."
+  },
+  {
+    "family": "Diamante",
+    "manufacturer": "Diamond",
+    "basedOn": "Diamond Del Fuego"
+  },
+  {
+    "family": "Dirty Shirley",
+    "manufacturer": "Friedman",
+    "basedOn": "Friedman Dirty Shirley",
+    "description": "Friedman's lower-gain amp — a hot-rodded British voice aimed at classic rock rather than metal."
+  },
+  {
+    "family": "Div/13 CJ",
+    "manufacturer": "Divided By 13",
+    "basedOn": "Divided By 13 CJ 11",
+    "description": "A small boutique combo built for touch response — clean to crunch on the guitar's volume knob rather than a footswitch."
+  },
+  {
+    "family": "Div/13 FT37",
+    "manufacturer": "Divided By 13",
+    "basedOn": "Divided By 13 FTR 37",
+    "description": "A boutique amp with a British flavour and boutique headroom — clean, then progressively rude, without ever getting fizzy."
+  },
+  {
+    "family": "Dizzy V4",
+    "manufacturer": "Diezel",
+    "basedOn": "Diezel VH4",
+    "description": "The Diezel VH4 taken from another of its channels — the same tight, modern German high gain."
+  },
+  {
+    "family": "Double Verb",
+    "manufacturer": "Fender",
+    "basedOn": "Fender Twin Reverb",
+    "description": "The Twin Reverb. Loud, clean, and hard to overdrive, which is exactly why it is the reference clean amp for pedals."
+  },
+  {
+    "family": "Dweezil's Bassguy",
+    "manufacturer": "Fender",
+    "basedOn": "Dweezil Zappa's modded 1965 blackface Fender Bassman, AB165",
+    "description": "A modified blackface Bassman — more gain than the original, but still the stiff, clean-edged Fender bottom end."
+  },
+  {
+    "family": "Energyball",
+    "manufacturer": "Engl",
+    "basedOn": "Engl Powerball",
+    "description": "Engl's Powerball — aggressive, modern and scooped, built squarely for heavy music."
+  },
+  {
+    "family": "Euro",
+    "manufacturer": "Bogner",
+    "basedOn": "Bogner Ecstasy, 20th Anniversary edition",
+    "description": "The Bogner Ecstasy — a boutique British-voiced amp that covers Plexi warmth through to modern gain without changing character."
+  },
+  {
+    "family": "Euro Uber",
+    "manufacturer": "Bogner",
+    "basedOn": "Bogner Uberschall",
+    "description": "The Uberschall. Bogner's heavy amp: enormous low end and a midrange voiced to cut through it."
+  },
+  {
+    "family": "Fox ODS",
+    "manufacturer": "Fuchs",
+    "basedOn": "Fuchs Overdrive Supreme",
+    "description": "A Dumble-style overdrive amp made in numbers. Smooth, singing lead sounds with a clean that stays out of the way."
+  },
+  {
+    "family": "Friedman BE",
+    "manufacturer": "Friedman",
+    "basedOn": "Friedman BE-100",
+    "description": "The BE-100 — a modded Marshall made into a product. Tight, saturated and famously good at rhythm playing."
+  },
+  {
+    "family": "Friedman HBE",
+    "manufacturer": "Friedman",
+    "basedOn": "Friedman BE-100, HBE (hot British eq) channel",
+    "description": "The BE-100's hotter channel, with more gain and a fatter midrange than the standard voice."
+  },
+  {
+    "family": "Friedman Small Box",
+    "manufacturer": "Friedman",
+    "basedOn": "Friedman Small Box",
+    "description": "Friedman's Plexi-flavoured amp — less gain than the BE and more of the old Marshall bark."
+  },
+  {
+    "family": "Fryette D60",
+    "manufacturer": "Fryette",
+    "basedOn": "Fryette Deliverance 60",
+    "description": "A modern high-gain amp with unusually good clean headroom, so the distortion stays tight rather than woolly."
+  },
+  {
+    "family": "Gibtone Scout",
+    "manufacturer": "Gibson",
+    "basedOn": "1964 Gibson Scout",
+    "description": "A small sixties Gibson combo — dark, loose and characterful, nothing like a Fender of the same size."
+  },
+  {
+    "family": "Herbie",
+    "manufacturer": "Diezel",
+    "basedOn": "Diezel Herbert",
+    "description": "The Diezel Herbert — more midrange and more personality than the VH4, with a famously useful mid-cut control."
+  },
+  {
+    "family": "Hipower",
+    "manufacturer": "Hiwatt",
+    "basedOn": "Hiwatt DR103",
+    "description": "The Hiwatt DR103. Huge clean headroom and a very flat, honest response — the loud amp that stays clean."
+  },
+  {
+    "family": "Hot Kitty",
+    "manufacturer": "Bad Cat",
+    "basedOn": "Bad Cat Hot Cat 30",
+    "description": "A boutique British-voiced amp with more gain than a Vox and more chime than a Marshall."
+  },
+  {
+    "family": "JMPre-1",
+    "manufacturer": "Marshall",
+    "basedOn": "Marshall JMP-1 preamp",
+    "description": "Marshall's JMP-1 rack preamp — the sound of a lot of early-nineties guitar, and still a very usable clean."
+  },
+  {
+    "family": "JR Blues",
+    "manufacturer": "Fender",
+    "basedOn": "Fender Blues Junior",
+    "description": "The Blues Junior. A small, cheap, honest Fender combo that breaks up early and has been on more pub stages than anything else."
+  },
+  {
+    "family": "JS410",
+    "manufacturer": "Marshall",
+    "basedOn": "Marshall JVM410HJS, Joe Satriani's signature amp",
+    "description": "Joe Satriani's JVM — the Marshall platform voiced for sustained lead playing."
+  },
+  {
+    "family": "Jazz 120",
+    "manufacturer": "Roland",
+    "basedOn": "Roland JC-120 Jazz Chorus",
+    "description": "The Roland JC-120. Solid state, relentlessly clean, and the chorus built into it is the sound of a lot of eighties records."
+  },
+  {
+    "family": "Legend 100",
+    "manufacturer": "Carvin",
+    "basedOn": "Carvin Legacy VL100, Steve Vai's signature amp",
+    "description": "Steve Vai's Carvin signature — a high-gain amp built for smooth sustain rather than aggression."
+  },
+  {
+    "family": "Matchbox Chiefman",
+    "manufacturer": "Matchless",
+    "basedOn": "Matchless Chieftain",
+    "description": "A hand-wired boutique amp in the British class-A tradition, with more headroom than a Vox."
+  },
+  {
+    "family": "Matchbox D-30",
+    "manufacturer": "Matchless",
+    "basedOn": "Matchless DC-30",
+    "description": "The Matchless DC-30 — two very different channels, huge chime, and the amp that started the boutique era."
+  },
+  {
+    "family": "Mr Z Highway 66",
+    "manufacturer": "Dr. Z",
+    "basedOn": "Dr. Z Route 66",
+    "description": "A Dr. Z with an American voice — more Fender than Vox, with plenty of clean before it goes."
+  },
+  {
+    "family": "Mr Z MZ-8",
+    "manufacturer": "Dr. Z",
+    "basedOn": "Dr. Z Maz 8",
+    "description": "An eight-watt Dr. Z. Small enough to overdrive in a bedroom and still sound like a real amp."
+  },
+  {
+    "family": "Mr Z MZ-38",
+    "manufacturer": "Dr. Z",
+    "basedOn": "Dr. Z Maz 38",
+    "description": "The Maz 38 — a boutique amp with a bright, cutting top end and the headroom to stay clean with a band."
+  },
+  {
+    "family": "Nuclear-Tone",
+    "manufacturer": "Swart",
+    "basedOn": "Swart Atomic Space Tone",
+    "description": "A small Swart combo famous for its built-in tube reverb and tremolo — dark, atmospheric, and lovely quiet."
+  },
+  {
+    "family": "ODS-100",
+    "manufacturer": "Dumble",
+    "basedOn": "Dumble Overdrive Special",
+    "description": "The Dumble Overdrive Special. The most mythologised amp ever built: a glassy clean and a lead voice that sings without getting harsh."
+  },
+  {
+    "family": "PVH 6160 Block",
+    "manufacturer": "Peavey",
+    "basedOn": "Block-letter Peavey EVH 5150, the 6505",
+    "description": "The block-letter 5150 — Eddie Van Halen's amp, and then the amp every nu-metal and hardcore band used. Raw, loud, and unsubtle."
+  },
+  {
+    "family": "PVH 6160+",
+    "manufacturer": "Peavey",
+    "basedOn": "Peavey 6505+, the EVH 5150 II",
+    "description": "The 6505+, the second-generation 5150. Tighter and a little more refined than the block-letter, and still a rhythm machine."
+  },
+  {
+    "family": "Plexi",
+    "manufacturer": "Marshall",
+    "basedOn": "Marshall Plexi Super Lead",
+    "description": "The Super Lead in its most famous form. Everything about the sound of loud British rock starts here."
+  },
+  {
+    "family": "Plexi Studio 20",
+    "manufacturer": "Marshall",
+    "basedOn": "Marshall Studio Vintage SV20, a 20-watt Plexi",
+    "description": "A 20-watt Plexi. The same amp at a volume that does not require a stage."
+  },
+  {
+    "family": "Princetone",
+    "manufacturer": "Fender",
+    "basedOn": "Fender Princeton",
+    "description": "A small Fender with no reverb — quiet, warm, and very easy to record."
+  },
+  {
+    "family": "Princetone Reverb",
+    "manufacturer": "Fender",
+    "basedOn": "Blackface Fender Princeton Reverb",
+    "description": "The blackface Princeton Reverb. The small studio amp: it breaks up at a usable volume and the reverb is the good one."
+  },
+  {
+    "family": "Recto1",
+    "manufacturer": "Mesa/Boogie",
+    "basedOn": "Mesa/Boogie two-channel Dual Rectifier",
+    "description": "The two-channel Dual Rectifier — loose, huge and scooped. The sound of nineties heavy music."
+  },
+  {
+    "family": "Recto2",
+    "manufacturer": "Mesa/Boogie",
+    "basedOn": "Mesa/Boogie three-channel Dual Rectifier",
+    "description": "The three-channel Rectifier. Tighter and more controlled than the original, with more usable clean."
+  },
+  {
+    "family": "Revv Gen",
+    "manufacturer": "Revv",
+    "basedOn": "Revv Generator 120",
+    "description": "A modern Canadian high-gain amp built for tight, articulate metal rhythm playing."
+  },
+  {
+    "family": "Ruby Rocket",
+    "manufacturer": "Paul Ruby",
+    "basedOn": "Paul Ruby Rocket"
+  },
+  {
+    "family": "SV Bass",
+    "manufacturer": "Ampeg",
+    "basedOn": "Ampeg SVT",
+    "description": "The Ampeg SVT — the loud bass amp. Round and warm clean, and it growls beautifully when pushed."
+  },
+  {
+    "family": "Shiver",
+    "manufacturer": "Bogner",
+    "basedOn": "Bogner Shiva, 20th Anniversary edition",
+    "description": "Bogner's Shiva — a mid-gain amp with a rich, complex clean and an overdrive that never sounds sterile."
+  },
+  {
+    "family": "Solo 88",
+    "manufacturer": "Soldano",
+    "basedOn": "Soldano X88R preamp",
+    "description": "A Soldano rack preamp with the SLO voice, for a rig built around a separate power amp."
+  },
+  {
+    "family": "Solo 99",
+    "manufacturer": "Soldano",
+    "basedOn": "Soldano X99 preamp",
+    "description": "The later Soldano preamp — the same lineage with more control over the gain structure."
+  },
+  {
+    "family": "Solo 100",
+    "manufacturer": "Soldano",
+    "basedOn": "Soldano SLO-100",
+    "description": "The Soldano SLO-100. The high-gain amp: smooth, singing, and the blueprint nearly every boutique hot-rod followed."
+  },
+  {
+    "family": "Spawn Nitrous",
+    "manufacturer": "Splawn",
+    "basedOn": "Splawn Nitro",
+    "description": "A modern hot-rodded Marshall type with more gain than Marshall ever shipped, and the tightness to use it."
+  },
+  {
+    "family": "Spawn Q-Rod",
+    "manufacturer": "Splawn",
+    "basedOn": "Splawn Quick Rod",
+    "description": "The same Marshall-derived platform from its higher-gain side — aggressive and tight."
+  },
+  {
+    "family": "Suhr Badger 18",
+    "manufacturer": "Suhr",
+    "basedOn": "Suhr Badger 18",
+    "description": "An 18-watt British-voiced amp with a power-scaling control, so it sounds cranked at any volume."
+  },
+  {
+    "family": "Suhr Badger 30",
+    "manufacturer": "Suhr",
+    "basedOn": "Suhr Badger 30",
+    "description": "The bigger Badger — the same idea with the headroom to stay clean with a drummer."
+  },
+  {
+    "family": "Super Verb",
+    "manufacturer": "Fender",
+    "basedOn": "1964 blackface Fender Super Reverb, AB763",
+    "description": "The blackface Super Reverb. Four ten-inch speakers, a huge clean, and the blues amp of choice for a lot of players."
+  },
+  {
+    "family": "Supremo Trem",
+    "manufacturer": "Supro",
+    "basedOn": "Supro 1964T Dual-Tone",
+    "description": "A sixties Supro — small, gritty, and nothing like a Fender. Jimmy Page's early studio sound."
+  },
+  {
+    "family": "Supro Black Magick",
+    "manufacturer": "Supro",
+    "basedOn": "Supro Black Magick",
+    "description": "A modern Supro. Keeps the old raggedness and adds enough volume to use it with a band."
+  },
+  {
+    "family": "Texas Star",
+    "manufacturer": "Mesa/Boogie",
+    "basedOn": "Mesa/Boogie Lone Star",
+    "description": "Mesa's Lone Star. A clean Fender-style amp by Mesa standards, with the build quality and a proper lead channel behind it."
+  },
+  {
+    "family": "Thordendal",
+    "manufacturer": "Mesa/Boogie",
+    "basedOn": "Pre-Rev-G Mesa/Boogie Dual Rectifier",
+    "description": "An early Dual Rectifier, before the revisions — looser and more open than the ones that followed, and much loved for it."
+  },
+  {
+    "family": "Tremolo Lux",
+    "manufacturer": "Fender",
+    "basedOn": "Blackface Fender Tremolux, AA763",
+    "description": "A blackface Tremolux. A small Fender with the tremolo rather than the reverb, and it overdrives sooner than a Deluxe."
+  },
+  {
+    "family": "Triple Crest",
+    "manufacturer": "Mesa/Boogie",
+    "basedOn": "Mesa/Boogie Triple Crown",
+    "description": "A modern Mesa. Much tighter and more contemporary than a Rectifier, aimed at players who found those too loose."
+  },
+  {
+    "family": "Two Stone J35",
+    "manufacturer": "Two-Rock",
+    "basedOn": "Two-Rock Jet 35",
+    "description": "A Two-Rock — Dumble-inspired, beautifully clean, and built to be the platform a pedalboard sits in front of."
+  },
+  {
+    "family": "USA Bass 400",
+    "manufacturer": "Mesa/Boogie",
+    "basedOn": "Mesa/Boogie Bass 400",
+    "description": "Mesa's big valve bass head — clean, punchy, and with far more control than most bass amps of its era."
+  },
+  {
+    "family": "USA JP",
+    "manufacturer": "Mesa/Boogie",
+    "basedOn": "Mesa/Boogie JP-2C, the John Petrucci Mark IIC+",
+    "description": "John Petrucci's Mark IIC+, made again as a product. The classic Mesa lead voice with modern tightness."
+  },
+  {
+    "family": "USA MK IIC+",
+    "manufacturer": "Mesa/Boogie",
+    "basedOn": "Mesa/Boogie Mark IIC+",
+    "description": "The Mark IIC+: the most sought-after Mesa ever built. Compressed, midrange-heavy lead sounds and the amp behind a lot of eighties metal."
+  },
+  {
+    "family": "USA MK IIC++",
+    "manufacturer": "Mesa/Boogie",
+    "basedOn": "Modded Mesa/Boogie Mark IIC+",
+    "description": "A modified Mark IIC+, pushed further than the factory took it."
+  },
+  {
+    "family": "USA MK IV",
+    "manufacturer": "Mesa/Boogie",
+    "basedOn": "Mesa/Boogie Mark IV",
+    "description": "The Mark IV — a Mark with three real channels, and the graphic EQ that makes the family's sound what it is."
+  },
+  {
+    "family": "USA MK V",
+    "manufacturer": "Mesa/Boogie",
+    "basedOn": "Mesa/Boogie Mark V",
+    "description": "The Mark V. Every Mark voice in one amp, with the tightness of the modern ones."
+  },
+  {
+    "family": "USA Metro Blues",
+    "manufacturer": "Mesa/Boogie",
+    "basedOn": "Mesa/Boogie Subway Blues",
+    "description": "A small Mesa combo, voiced far cleaner and more American than the Marks — easy to like and easy to record."
+  },
+  {
+    "family": "USA Pre",
+    "manufacturer": "Mesa/Boogie",
+    "basedOn": "Mesa/Boogie TriAxis preamp",
+    "description": "The Mesa TriAxis — the Mark preamp voices in a rack unit, and the sound of a lot of nineties studio guitar."
+  },
+  {
+    "family": "Vibra-King",
+    "manufacturer": "Fender",
+    "basedOn": "Custom Fender Vibro-King",
+    "description": "A custom Fender built around the old tweed and brown voices, with a proper valve tremolo."
+  },
+  {
+    "family": "Vibrato Lux",
+    "manufacturer": "Fender",
+    "basedOn": "Fender Vibrolux, 6G11",
+    "description": "A brown-panel Vibrolux. Small, warm, and the tremolo is the reason to reach for it."
+  },
+  {
+    "family": "Vibrato Verb",
+    "manufacturer": "Fender",
+    "basedOn": "Fender Vibroverb",
+    "description": "The Vibroverb — a blackface Fender with a fifteen-inch speaker, so the low end is looser and rounder than a Deluxe."
+  },
+  {
+    "family": "Wrecker Express",
+    "manufacturer": "Trainwreck",
+    "basedOn": "Trainwreck Express",
+    "description": "A Trainwreck Express. Ferociously touch-sensitive, no master volume, and it rewards playing harder more than any other amp here."
+  },
+  {
+    "family": "Wrecker Liverpool",
+    "manufacturer": "Trainwreck",
+    "basedOn": "Trainwreck Liverpool",
+    "description": "The Vox-flavoured Trainwreck — chime and bite, and the same demanding responsiveness."
+  },
+  {
+    "family": "Wrecker Rocket",
+    "manufacturer": "Trainwreck",
+    "basedOn": "Trainwreck Rocket",
+    "description": "The Trainwreck with the most gain of the three, and still entirely controlled from the guitar."
+  }
 ]

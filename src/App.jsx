@@ -979,19 +979,6 @@ export default function App() {
    * and the jump lands exactly when someone is reaching for it.
    */
   /*
-   * Playing, or at the desk.
-   *
-   * The switch that takes the Ask button off the stage screen. Read
-   * synchronously for the first paint for the same reason the size is: a
-   * button that appears a frame after the screen does is a button that can be
-   * hit by somebody reaching for what used to be there.
-   *
-   * Why the button is back on a phone at all, and why a switch rather than a
-   * rule the app infers, is written down in lib/playMode.js.
-   */
-  const [playing, setPlaying] = useState(loadPlayMode)
-
-  /*
    * Whether the Ask button is drawn, decided once and named.
    *
    * It used to end in `views.includes('ask')`, which is false on a phone — the
@@ -1505,25 +1492,6 @@ export default function App() {
 
 
   
-  /*
-   * Pick an old conversation back up.
-   *
-   * The one on screen is shelved first, under its own id, so nothing is lost
-   * by looking — and the one being opened keeps its id, so saying one more
-   * thing in it updates that row rather than laying down a copy.
-   */
-  
-  
-  /*
-   * A conversation that has never been shelved still gets an id the moment it
-   * has something in it, so the debounced cloud write below and the shelf agree
-   * on which chat this is even if the page dies before New chat is ever tapped.
-   */
-  useEffect(() => {
-    if (chatId || !worthKeeping(turns)) return
-    setChatId(newChatId())
-  }, [turns, chatId])
-
   /*
    * The setlists and the stars, with the account.
    *
@@ -3655,7 +3623,7 @@ export default function App() {
             <div className="setup-rows">
               <SetupRow key="unit" title="Unit" status={status === 'live' ? `${device?.short || device?.name || 'Unit'} · connected` : 'Not connected'} onClick={() => setSetupPage('unit')} />
               <SetupRow key="link" title="Phone & computer" status={describeLink(link).note || 'Phone remote off'} onClick={() => setSetupPage('link')} />
-              <SetupRow key="play" title="Play screen" status={[fit ? 'Fit to screen' : SIZES[size].name, playing ? 'Play mode' : null, THEME_WORD[getMode()] || null].filter(Boolean).join(' · ')} onClick={() => setSetupPage('play')} />
+              <SetupRow key="play" title="Play screen" status={[fit ? 'Fit to screen' : SIZES[size].name, THEME_WORD[getMode()] || null].filter(Boolean).join(' · ')} onClick={() => setSetupPage('play')} />
               <SetupRow key="gear-names" title="Amp & pedal names" status="What each model on your unit really is" onClick={() => setSheet('gear')} />
               <SetupRow key="help" title="Help & fixes" status={`${getDebugLog().length} line${getDebugLog().length === 1 ? '' : 's'} in the log`} onClick={() => setSetupPage('help')} />
               <SetupRow key="about" title="About" status={FULL} onClick={() => setSetupPage('about')} />

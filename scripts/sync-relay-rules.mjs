@@ -208,6 +208,7 @@ export const FILES = [
   { source: '../src/data/amp-types.json', target: '../mobile/src/data/amp-types.json', raw: true },
   { source: '../src/data/drive-types.json', target: '../mobile/src/data/drive-types.json', raw: true },
   { source: '../src/data/amp-lineage.json', target: '../mobile/src/data/amp-lineage.json', raw: true },
+  { source: '../src/data/gear-photos.json', target: '../mobile/src/data/gear-photos.json', raw: true },
   { source: '../src/data/effect-lineage.json', target: '../mobile/src/data/effect-lineage.json', raw: true },
   /*
    * THE SIMULATED FM3, so the phone has something to be without a rig.
