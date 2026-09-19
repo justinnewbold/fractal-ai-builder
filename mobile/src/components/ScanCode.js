@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Modal, Text, View } from 'react-native'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 
@@ -24,15 +24,49 @@ import { logDebug } from '../lib/debugLog'
  * link — one rule for what a pairing link means, not a second one here that
  * could drift. A QR holding nothing but the bare code is taken too, because a
  * code is a code and refusing it would be arbitrary.
+ *
+ * THE COMPUTER SHOWS TWO SQUARES AND ONLY ONE OF THEM IS FOR THIS APP, which
+ * is the thing that made this screen look broken. "Android phone scanner
+ * doesn't work. It pulls up the camera and everything fine, but nothing scans
+ * the QR code when it's in the viewfinder. It does nothing."
+ *
+ * The computer's page shows a "same wifi" square carrying its own address —
+ * http://192.168.x.x:5056 — under the words "point your phone's camera at
+ * this". That one is meant for the phone's BROWSER, which then loads the app
+ * from the computer directly. This app cannot use it: every call it makes goes
+ * through the relay, and it has no idea what to do with an address on a local
+ * network. So it read that square perfectly, found no pairing code in it, and
+ * said nothing at all — which is indistinguishable from a camera that is not
+ * scanning.
+ *
+ * Silence was deliberate and was wrong. The reasoning was that a camera
+ * pointed at a room sees barcodes on everything and a sheet that complains
+ * about each one cannot be held still. True — but this reader is restricted to
+ * QR codes, rooms are not full of those, and somebody deliberately aiming at a
+ * square has earned an answer. So an unreadable square now says so, and the
+ * one square people actually aim at by mistake is named specifically.
  */
 export default function ScanCode({ open, onClose, onCode }) {
   const [permission, ask] = useCameraPermissions()
   /* The reader fires many times a second on the same square. Without this the
      screen would take one code and then go on taking it while it closed. */
   const [taken, setTaken] = useState(false)
+  /* What to say about a square that was read and cannot be used. Null until
+     something is actually wrong, so the sheet opens quiet. */
+  const [trouble, setTrouble] = useState(null)
+
+  /* Cleared on open rather than on close, so a complaint from last time is not
+     the first thing the next scan shows. */
+  useEffect(() => {
+    if (open) {
+      setTaken(false)
+      setTrouble(null)
+    }
+  }, [open])
 
   const close = () => {
     setTaken(false)
+    setTrouble(null)
     onClose?.()
   }
 
@@ -40,13 +74,16 @@ export default function ScanCode({ open, onClose, onCode }) {
     if (taken) return
     const code = pairCodeFromUrl({ hash: String(data || ''), search: '' }) || normalizePairCode(data)
     if (!code) {
-      /* Not said on screen. A camera pointed at a room sees barcodes on
-         everything, and a sheet that complains about each one is a sheet you
-         cannot hold still. The log keeps it for a scan that should have worked. */
       logDebug('pair', 'scanned something that is not a pairing code')
+      setTrouble(
+        looksLikeTheWifiSquare(data)
+          ? 'That is the “same wifi” square, which is for a web browser. This app needs the pairing code — on the computer it is the square with letters and numbers written under it.'
+          : 'That square does not hold a pairing code. On the computer, choose Set up phone remote and use the square with letters and numbers under it.'
+      )
       return
     }
     setTaken(true)
+    setTrouble(null)
     logDebug('pair', `scanned a ${code.length}-character code`)
     onCode?.(code)
     close()
@@ -89,13 +126,31 @@ export default function ScanCode({ open, onClose, onCode }) {
           </View>
         ) : (
           <View style={{ flex: 1 }}>
-            <CameraView
-              style={{ flex: 1 }}
-              facing="back"
-              barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-              onBarcodeScanned={taken ? undefined : read}
-            />
+            {/*
+              Mounted only while the sheet is up.
+              
+              A Modal on Android is its own window, and a camera left mounted
+              behind a hidden one is a camera attached to nothing — it comes
+              back showing a preview and never delivering a scan. Rendering it
+              on `open` means every visit gets a camera that was started while
+              something was actually on screen.
+            */}
+            {open ? (
+              <CameraView
+                style={{ flex: 1 }}
+                facing="back"
+                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                onBarcodeScanned={taken ? undefined : read}
+              />
+            ) : (
+              <View style={{ flex: 1 }} />
+            )}
             <View style={{ padding: space.lg, gap: space.sm }}>
+              {trouble ? (
+                <Note tone="warn" onDismiss={() => setTrouble(null)}>
+                  {trouble}
+                </Note>
+              ) : null}
               <Note>
                 On the computer, open Fractal Remote and choose Set up phone remote. Point this at the
                 square it shows.
@@ -109,4 +164,20 @@ export default function ScanCode({ open, onClose, onCode }) {
       </View>
     </Modal>
   )
+}
+
+/**
+ * The computer's OTHER square: its own address on the local network.
+ *
+ * Recognised by shape rather than by a list of addresses — anything that is a
+ * plain http(s) URL with no pairing code in it, pointing at a private address
+ * or a .local name, is that square or something very like it. Worth naming
+ * precisely because it is the one somebody holds the phone up to first: it is
+ * the one the computer captions "point your phone's camera at this".
+ */
+export function looksLikeTheWifiSquare(text) {
+  const s = String(text || '').trim()
+  if (!/^https?:\/\//i.test(s)) return false
+  if (/pair=/i.test(s)) return false
+  return /(^https?:\/\/)(localhost|[\w-]+\.local|10\.|127\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/i.test(s)
 }

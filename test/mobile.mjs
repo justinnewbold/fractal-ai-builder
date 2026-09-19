@@ -3488,6 +3488,56 @@ export function run(test) {
     assert.equal(scripts.fingerprint, 'node scripts/fingerprint.mjs', 'npm run fingerprint no longer runs the check')
   })
 
+  test('a square the scanner cannot use says so, instead of doing nothing', async () => {
+    /*
+     * "Android phone scanner doesn't work. It pulls up the camera and
+     * everything fine, but nothing scans the QR code when it's in the
+     * viewfinder. It does nothing."
+     *
+     * THE COMPUTER SHOWS TWO SQUARES AND ONLY ONE IS FOR THIS APP. The page
+     * served from the computer shows a "same wifi" square carrying its own
+     * address — http://192.168.x.x:5056 — captioned "point your phone's
+     * camera at this". That one is for the phone's BROWSER, which loads the
+     * app from the computer directly. This app cannot use it: every call it
+     * makes goes through the relay and there is no direct-to-host path
+     * anywhere in mobile/. So it read the square perfectly, found no pairing
+     * code, and said nothing — which looks exactly like a camera that is not
+     * scanning.
+     *
+     * The silence was deliberate and was wrong: a reader restricted to QR
+     * codes is not going to be swamped by a room, and somebody deliberately
+     * aiming at a square has earned an answer.
+     */
+    const src = read('mobile/src/components/ScanCode.js')
+
+    /* The props are the ones this Expo version actually reads. onBarCodeScanned
+       with a capital C is the old name and fails silently, which is the other
+       way this screen could look broken. */
+    assert.match(src, /onBarcodeScanned=/, 'the scanner has no barcode handler')
+    assert.ok(!/onBarCodeScanned/.test(src), 'the pre-SDK-51 prop name is back, and it never fires')
+    assert.match(src, /barcodeTypes: \['qr'\]/, 'the reader is no longer restricted to QR codes')
+
+    /* A square that cannot be used is now said out loud. */
+    assert.match(src, /setTrouble\(/, 'an unusable square is silently ignored again')
+    assert.match(src, /tone="warn"/, 'the complaint is not shown on screen')
+
+    /* And the camera is mounted only while the sheet is up — a Modal on
+       Android is its own window, and a camera left behind a hidden one comes
+       back showing a preview that never delivers a scan. */
+    assert.match(src, /\{open \? \(\s*<CameraView/, 'the camera is mounted behind a closed modal again')
+
+    const { looksLikeTheWifiSquare } = await import('../mobile/src/components/ScanCode.js')
+      .catch(() => ({ looksLikeTheWifiSquare: null }))
+    if (looksLikeTheWifiSquare) {
+      for (const yes of ['http://192.168.1.47:5056', 'http://fractal-macbook.local:5056', 'http://10.0.0.5:5056']) {
+        assert.equal(looksLikeTheWifiSquare(yes), true, `${yes} is the wifi square and is not being recognised`)
+      }
+      for (const no of ['https://fractal.newbold.cloud/#pair=ABCD2345', 'ABCD2345', 'https://example.com', '']) {
+        assert.equal(looksLikeTheWifiSquare(no), false, `${no} is being called the wifi square`)
+      }
+    }
+  })
+
   test('the gear descriptions say what a model is like, and never guess', async () => {
     /*
      * "Then work on the amp and cab descriptions and effects pedals."
