@@ -3,7 +3,7 @@
     "name": "Fractal Remote",
     "slug": "fractal-remote",
     "owner": "justinnewbold",
-    "version": "7.397.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "fractalremote",
@@ -59,6 +59,10 @@
     "extra": {
       "eas": {
         "projectId": "f590cdd2-a0b7-4a94-9027-0a00ab60bdc6"
+      },
+      "revenuecat": {
+        "ios": null,
+        "android": null
       }
     }
   }

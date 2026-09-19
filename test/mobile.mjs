@@ -5621,4 +5621,118 @@ export function run(test) {
     assert.match(web, /aria-label=\{demo \? 'Which unit the demo is' : 'About this unit'\}/, 'the browser’s unit name stopped being two destinations')
   })
 
+
+  /**
+   * THE PAYWALL, AND THE ONE WAY IT COULD RUIN SOMEBODY'S NIGHT.
+   *
+   * "The app is gonna be a free download and then they can access the demo for
+   * free and then we need to do an in app purchase to unlock it."
+   *
+   * The money is not the risky part. The risky part is the app deciding, on a
+   * stage, in a room with bad wifi, that somebody who paid has not paid. The
+   * rule is written to fail OPEN for exactly that reason, and a fail-open rule
+   * is one careless edit from a fail-closed one — the edit would look like a
+   * tidy-up and would be invisible until it happened to somebody.
+   *
+   * So the rule lives in a module with no imports at all, and this walks every
+   * combination of it rather than trusting the source to read correctly.
+   */
+  test('nobody is locked out by a question the app could not answer', async () => {
+    const { mayDrive, shouldAskToPay } = await import(
+      new URL('../mobile/src/lib/unlock-rule.js', import.meta.url).href
+    )
+
+    /* Paid is paid, however the rest of the world is behaving. */
+    for (const available of [true, false]) {
+      assert.equal(mayDrive({ unlocked: true, available }), true, 'a paid person was refused')
+    }
+
+    /* Not paid, and the store IS reachable, is the only refusal there is. */
+    assert.equal(mayDrive({ unlocked: false, available: true }), false, 'the paywall never closes')
+
+    /*
+     * And every shape of "don't know" lets them in. Each of these is a real
+     * situation: a build made before purchasing existed, an app with no API key
+     * yet, a phone that cannot reach RevenueCat.
+     */
+    assert.equal(mayDrive({ unlocked: false, available: false }), true, 'an unanswerable check locked the app')
+    assert.equal(mayDrive({}), true, 'the empty case locks the app')
+    assert.equal(mayDrive(), true, 'no answer at all locks the app')
+
+    /*
+     * The paywall itself asks only when all four are certain. Walked as a full
+     * truth table: sixteen combinations, exactly one of which may charge.
+     */
+    const asked = []
+    for (const demo of [true, false]) {
+      for (const checking of [true, false]) {
+        for (const available of [true, false]) {
+          for (const unlocked of [true, false]) {
+            if (shouldAskToPay({ inApp: true, demo, checking, available, unlocked })) {
+              asked.push({ demo, checking, available, unlocked })
+            }
+          }
+        }
+      }
+    }
+    assert.deepEqual(
+      asked,
+      [{ demo: false, checking: false, available: true, unlocked: false }],
+      'the paywall appears in a case where the app is not certain the person should pay'
+    )
+
+    /* And never before somebody is through the door. */
+    assert.equal(
+      shouldAskToPay({ inApp: false, demo: false, checking: false, available: true, unlocked: false }),
+      false,
+      'the paywall meets people before the sign-in screen does'
+    )
+  })
+
+  /**
+   * The demo is never behind the paywall, and Apple's reviewer needs it not to be.
+   *
+   * A reviewer has no Fractal unit. docs/app-store.md tells them to open the
+   * demo, and if the demo were gated the app would be rejected as broken — which
+   * has a way of costing a week rather than an evening.
+   */
+  test('the demo stays in front of the paywall', () => {
+    const app = read('mobile/App.js')
+    /* Not `[^>]*` — the arrow in `() =>` is a `>` and would end the class. */
+    assert.match(
+      app,
+      /<SignIn\s+onSignedIn=\{[^}]*\}\s+onDemo=\{\(\) => setAuth\('in'\)\}/,
+      'the demo no longer goes straight in from the sign-in screen'
+    )
+    const paywall = read('mobile/src/screens/Paywall.js')
+    assert.match(paywall, /Keep using the demo/, 'the paywall offers no way back to the demo')
+    assert.match(paywall, /Restore a purchase/, 'there is no restore button, which Apple rejects apps for')
+  })
+
+  /**
+   * And the door nobody thinks of: a phone that cannot pay in the first place.
+   *
+   * The APK on the Releases page is installed from a link, not from the Play
+   * Store, and an app installed outside Play has no Play Billing. RevenueCat
+   * answers perfectly — "no purchase" — and every sideloaded copy would sit
+   * behind a button that cannot take money, the developer's own test handset
+   * first among them. Parental controls and managed work phones land here too.
+   *
+   * So the store being REACHABLE is not enough to lock anybody; it also has to
+   * be able to sell them something.
+   */
+  test('a phone that cannot buy anything is never locked out', () => {
+    const src = read('mobile/src/lib/purchases.js')
+    assert.match(src, /canMakePayments/, 'nothing asks whether this install can pay at all')
+    assert.match(
+      src,
+      /available:\s*canPay/,
+      'the answer to "can this phone pay" does not decide whether anything is locked'
+    )
+    /* And it must not be able to throw its way into locking the app. */
+    const block = src.slice(src.indexOf('let canPay'), src.indexOf('set({\n      available'))
+    assert.match(block, /catch/, 'a failed canMakePayments check is not caught')
+    assert.match(block, /canPay = true/, 'the unknown case does not default to "can pay"')
+  })
+
 }

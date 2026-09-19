@@ -25,8 +25,11 @@ import { keepSetlistsInStep } from './src/lib/cloudSetlists'
 import { useRig } from './src/lib/rig'
 import { keepLog } from './src/lib/logKeep'
 import { installCrashCapture } from './src/lib/debugLog'
-import { restoreDemo, useDemo } from './src/lib/demo'
+import { restoreDemo, setDemo, useDemo } from './src/lib/demo'
 import { BENCH } from './src/lib/features'
+import Paywall from './src/screens/Paywall'
+import { startPurchases, usePurchase } from './src/lib/purchases'
+import { shouldAskToPay } from './src/lib/unlock-rule'
 
 /**
  * Fractal Remote.
@@ -113,6 +116,16 @@ export default function App() {
    */
   const demo = useDemo()
 
+  /*
+   * And whether this person has paid to point the app at a real unit.
+   *
+   * The demo above is the free half of the same question, which is why the two
+   * are read together: `demo` says nothing is being driven, `purchase` says
+   * whether anything MAY be. Neither is allowed to be a guess — see the effect
+   * further down, which is the only thing that raises the paywall.
+   */
+  const purchase = usePurchase()
+
   const caps = useRig(ofCaps)
   const readFailed = useRig(ofError)
   const settling =
@@ -138,6 +151,39 @@ export default function App() {
        somebody on their first launch anyway. */
     hydrate().then(() => loadMode(sync))
   }, [])
+
+  /* Ask the store what this person owns. Never throws, never blocks a frame,
+     and answers "not locked" to anything it cannot find out. */
+  useEffect(() => {
+    startPurchases()
+  }, [])
+
+  /*
+   * THE ONE PLACE THE PAYWALL IS RAISED, and it waits to be sure.
+   *
+   * Both ways in land on `auth === 'in'` — a code typed just now, and a
+   * session left over from last time — so gating either one of them at the
+   * door would have meant gating both, in two places, differently. This is
+   * after the door instead: whatever let somebody in, the question of whether
+   * they may drive a REAL unit is asked here and only here.
+   *
+   * Every one of the four conditions below is a reason NOT to charge, and
+   * three of them are reasons not to be certain:
+   *
+   *   demo               — free for ever, and the whole point of the free half
+   *   purchase.checking  — no answer yet; an unanswered question is not a "no"
+   *   !purchase.available— no module, no key, or the store is unreachable
+   *   purchase.unlocked  — they paid
+   *
+   * Which means a cold start on a dead network shows the app, not a paywall.
+   * That is deliberate and it is the rule the purchase module is built around:
+   * the people most likely to be on bad wifi are the ones standing on a stage,
+   * and an app that locks itself there is worse than one that occasionally
+   * lets an unpaid launch through.
+   */
+  useEffect(() => {
+    if (shouldAskToPay({ inApp: auth === 'in', demo, ...purchase })) setAuth('paywall')
+  }, [auth, demo, purchase.checking, purchase.available, purchase.unlocked])
 
   /*
    * Keep the end of this run on disk from the first frame.
@@ -245,6 +291,21 @@ export default function App() {
           </View>
         ) : auth === 'out' ? (
           <SignIn onSignedIn={() => setAuth('in')} onDemo={() => setAuth('in')} />
+        ) : auth === 'paywall' ? (
+          <Paywall
+            onUnlocked={() => setAuth('in')}
+            onDemo={() => {
+              /* Out of the paid path entirely: the demo needs no account and
+                 no unit, so the leftover session goes with it. */
+              setDemo(true)
+              signOut().catch(() => {})
+              setAuth('in')
+            }}
+            onBack={() => {
+              signOut().catch(() => {})
+              setAuth('out')
+            }}
+          />
         ) : (
           <>
             {/*

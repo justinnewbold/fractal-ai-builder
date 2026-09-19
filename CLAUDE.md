@@ -47,7 +47,7 @@ to say a new APK is ready, or to name the version: paste the URL.
 The shape is fixed and the version is the only part that moves:
 
 ```
-https://github.com/justinnewbold/fractal-ai-builder/releases/download/apk-v<VERSION>/fractal-remote-v<VERSION>.apk
+https://github.com/justinnewbold/fractal-remote/releases/download/apk-v<VERSION>/fractal-remote-v<VERSION>.apk
 ```
 
 Anything that ends with him needing to install an APK — a native change, a
