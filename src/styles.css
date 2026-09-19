@@ -5799,6 +5799,17 @@ button.add-btn[aria-expanded='true'] {
   flex: 1 1 260px;
 }
 
+/* Folded away, because three of the four ways to connect a computer never
+   need any of this and the fourth needs it once. The summary is a question
+   somebody can answer about themselves rather than a heading they have to
+   already understand. */
+.env-fold > summary {
+  cursor: pointer;
+  color: var(--silk-dim);
+  font-size: var(--f-1);
+  padding: var(--s-2) 0;
+}
+
 /* The .env block is meant to be copied, so it wraps rather than scrolls and
    keeps its line breaks. */
 .env-block {

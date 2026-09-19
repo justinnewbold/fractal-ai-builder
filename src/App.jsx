@@ -3865,7 +3865,7 @@ export default function App() {
           </Section>
 
           <Section key="link-details" title="Link details" note="What the phone and the computer say about the line between them">
-            <LinkDetails />
+            <LinkDetails role={link.role} />
           </Section>
           </div>
         ) : null}

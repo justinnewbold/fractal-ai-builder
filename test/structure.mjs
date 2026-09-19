@@ -3954,4 +3954,45 @@ export function run(test) {
     }
   })
 
+  test('the server settings are shown to the machine that has a server', () => {
+    /*
+     * "Is all this weird information still needed with supabase links and
+     * stuff?" — asked over a screenshot of a PHONE showing three environment
+     * variables to paste into a .env file.
+     *
+     * Still needed, and never there. Running ForgeFX by hand is one of the
+     * four ways to connect a computer, and somebody doing that has to tell it
+     * where the account service is. But the machine that needs those lines is
+     * the one with the cable in it. A phone has no .env to put them in and no
+     * server to read one, so it was configuration shown to the only person
+     * who can do nothing whatever with it.
+     *
+     * Role 'mac' is the page being served from localhost — the machine
+     * running the device server, whether the Fractal app started it or
+     * somebody started it by hand. A phone is 'wifi' or 'remote'.
+     */
+    const src = readFileSync(new URL('../src/components/LinkDetails.jsx', import.meta.url), 'utf8')
+    assert.match(src, /const atTheComputer = role === 'mac'/, 'the env block no longer asks which machine this is')
+    const block = src.slice(src.indexOf('atTheComputer ?'))
+    assert.match(block, /SUPABASE_ANON_KEY/, 'the env block is not behind that question')
+    assert.ok(
+      src.indexOf('SUPABASE_ANON_KEY') > src.indexOf('atTheComputer ?'),
+      'the env block is drawn before anything checks which machine is looking at it'
+    )
+    /* And folded even there: three of the four ways in never need it. */
+    assert.match(block, /<details className="env-fold">/, 'the env block is open on the page at the computer')
+
+    /* Test the link is the opposite case and stays everywhere. It is about
+       THIS device's own connection, which is what somebody on a phone with a
+       dead link is trying to find out. */
+    assert.ok(
+      src.indexOf('Test the link') < src.indexOf('atTheComputer ?'),
+      'the link test went behind the computer-only check with the env block'
+    )
+
+    /* The role has to actually reach it, or the check above is decorative. */
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    assert.match(app, /<LinkDetails role=\{link\.role\} \/>/, 'LinkDetails is never told which machine it is on')
+  })
+
 }
