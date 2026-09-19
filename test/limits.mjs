@@ -629,6 +629,234 @@ export function run(test) {
     assert.match(mac.trimEnd(), /fractal_remote_setup$/, 'mac.sh does not call itself on its last line, so a truncated download would run half of it')
   })
 
+  test('the app says whose it is not, everywhere somebody would look', async () => {
+    /*
+     * "Leave the name, but add a disclaimer that we are in no way affiliated
+     * or endorsed by Fractal Audio Systems."
+     *
+     * Keeping "Fractal" in the name of a paid app makes this the sentence that
+     * matters, and the version of it that matters is whichever one somebody's
+     * lawyer happens to read. So there is one string and four places show it,
+     * rather than four hand-typed copies that drift — a disclaimer saying three
+     * different things in three places reads as carelessness about exactly the
+     * point it is making.
+     *
+     * It is also inherited rather than invented: the preset codec is
+     * Apache-2.0 and its NOTICE carries the same statement about its own
+     * author, which section 4(d) requires we pass on.
+     */
+    const { AFFILIATION, NOT_AFFILIATED, TRADEMARKS } = await import('../shared/affiliation.mjs')
+
+    /* The words themselves have to do the job. "Independent" alone is a
+       positioning word; the disclaimer is the part about endorsement. */
+    assert.match(NOT_AFFILIATED, /in no way affiliated with, endorsed by, or sponsored by/)
+    assert.match(NOT_AFFILIATED, /Fractal Audio Systems/)
+    assert.match(TRADEMARKS, /trademarks of Fractal Audio Systems/)
+    assert.ok(AFFILIATION.includes(NOT_AFFILIATED) && AFFILIATION.includes(TRADEMARKS))
+
+    /* Both apps show it, from the shared string rather than a copy. */
+    for (const [where, file] of [
+      ['the browser', 'src/App.jsx'],
+      ['the phone', 'mobile/src/screens/Settings.js']
+    ]) {
+      const src = read(file)
+      assert.match(src, /import \{ AFFILIATION \}/, `${where} does not import the shared disclaimer`)
+      assert.match(src, /\{AFFILIATION\}/, `${where} imports the disclaimer and never shows it`)
+    }
+
+    /* The generated notices take it from the same place. */
+    assert.match(read('scripts/notices.mjs'), /NOT_AFFILIATED, TRADEMARKS/, 'the notices generator keeps its own copy')
+    assert.ok(read('NOTICES.md').includes(NOT_AFFILIATED), 'the notices file does not carry the disclaimer')
+
+    /*
+     * And the privacy page, which is static HTML and cannot import — so it
+     * carries the words and this holds the two to each other. Compared with
+     * the typographic quotes normalised, because the page writes them as
+     * entities and the module writes them as characters.
+     */
+    const plain = (s) =>
+      s
+        .replace(/&ldquo;|&rdquo;/g, '“')
+        .replace(/[“”]/g, '"')
+        .replace(/\s+/g, ' ')
+        .trim()
+    const page = plain(read('public/privacy.html'))
+    assert.ok(page.includes(plain(NOT_AFFILIATED)), 'the privacy page no longer matches the shared disclaimer')
+    assert.ok(page.includes(plain(TRADEMARKS)), 'the privacy page no longer matches the shared trademark line')
+  })
+
+  test('the privacy policy describes what the app actually does', () => {
+    /*
+     * A store will not take a paid app without a privacy policy at a URL, and
+     * a policy that is wrong is worse than the missing one it replaced —
+     * it is a published claim nobody checked.
+     *
+     * SO THIS IS TIED TO THE CODE RATHER THAN TO A MEMO. The set of tables the
+     * apps write to is read out of the source here; if a new one appears, this
+     * fails until somebody has decided what the policy says about it. That is
+     * the whole mechanism — it does not know what is private, it refuses to
+     * let the question go unasked.
+     *
+     * It was written by reading that set rather than from memory, which is how
+     * `rig_lookups` turned out to be a table the app had stopped writing to
+     * when the tone builder came out: dead code whose test still passed.
+     */
+    const policy = read('public/privacy.html')
+
+    const sources = [...walk(new URL('../src/', import.meta.url))]
+      .concat([...walk(new URL('../mobile/src/', import.meta.url))])
+      .map((f) => readFileSync(f, 'utf8'))
+      .join('\n')
+
+    /* `.from('x')` and `.from(TABLE)` with a const above it: both are used. */
+    const tables = new Set()
+    for (const m of sources.matchAll(/\.from\('([a-z_]+)'\)/g)) tables.add(m[1])
+    for (const m of sources.matchAll(/const TABLE = '([a-z_]+)'/g)) tables.add(m[1])
+
+    assert.deepEqual(
+      [...tables].sort(),
+      ['feedback', 'stage_lists'],
+      'the apps write to a table the privacy policy has never been checked against'
+    )
+
+    /* And each of those is described, in the words a person would search for
+       rather than the table's name. */
+    assert.match(policy, /setlist/i, 'nothing is said about the setlists that sync')
+    assert.match(policy, /[Bb]ug reports? and suggestions|Something is broken/, 'nothing is said about reports')
+    assert.match(policy, /email address/i, 'nothing is said about the account')
+
+    /*
+     * THE LEAD, because it is the true and reassuring thing and it is what most
+     * people do: on your own wifi, nothing leaves the room.
+     */
+    assert.match(policy, /sends nothing anywhere|nothing leaves the room/i, 'the policy buries the local-mode answer')
+
+    /* No analytics, said plainly — and true, which is checked rather than
+       claimed. A tracking SDK arriving later fails this. */
+    assert.match(policy, /[Nn]o analytics and no tracking/, 'the policy does not say there is no tracking')
+    for (const sdk of ['@sentry', 'mixpanel', 'amplitude', 'posthog', 'segment', 'react-ga']) {
+      for (const manifest of ['package.json', 'mobile/package.json']) {
+        assert.ok(
+          !JSON.stringify(JSON.parse(read(manifest)).dependencies || {}).includes(sdk),
+          `${manifest} installs ${sdk}, and the privacy policy claims there is no analytics`
+        )
+      }
+    }
+
+    /* The two things a regulator and a store both look for. */
+    assert.match(policy, /justinnewbold@gmail\.com/, 'there is no way to ask for deletion')
+    assert.match(policy, /children|under 13/i, 'nothing is said about children')
+
+    /* And the debug log, which is the one thing here somebody might be
+       surprised by — so the policy has to be straight about when it goes and
+       that a suggestion never carries one. */
+    assert.match(policy, /debug log/i, 'the log is not mentioned at all')
+    assert.match(policy, /never/, 'the policy does not say a suggestion never carries the log')
+
+    /*
+     * Reachable from inside both apps. A policy at a URL nobody can find from
+     * the thing it describes satisfies a form and nobody else.
+     */
+    assert.match(read('src/App.jsx'), /privacy\.html/, 'the browser never links its privacy policy')
+    assert.match(read('mobile/src/screens/Settings.js'), /privacy\.html/, 'the phone never links its privacy policy')
+    for (const [where, src] of [
+      ['the browser', read('src/App.jsx')],
+      ['the phone', read('mobile/src/screens/Settings.js')]
+    ]) {
+      assert.match(src, /notices\.txt/, `${where} never links the licences it ships under`)
+    }
+  })
+
+  test('the licences of what we ship travel with it', () => {
+    /*
+     * THIS IS THE ONE THAT BECOMES A PROBLEM ONLY ONCE MONEY IS INVOLVED, which
+     * is why it was missing: the app has been free and private, and neither
+     * licence has ever been shipped anywhere.
+     *
+     * The desktop apps bundle two separate projects and they are not under the
+     * same terms. ForgeFX is MIT — its copyright notice "shall be included in
+     * all copies or substantial portions" — and we put a copy inside a signed
+     * installer. forgefx-midi is Apache-2.0, which asks for three things: the
+     * licence, the contents of its NOTICE file (section 4(d)), and prominent
+     * notices stating that we changed the files (section 4(b)). We changed
+     * both, heavily.
+     *
+     * So this checks that the texts are present and that the generated file
+     * carries them, rather than that somebody remembered.
+     */
+    for (const [file, mustSay] of [
+      ['licences/forgefx-MIT.txt', /MIT License/],
+      ['licences/forgefx-midi-APACHE-2.0.txt', /Apache License/],
+      ['licences/forgefx-midi-NOTICE.txt', /Apache License, Version 2\.0/]
+    ]) {
+      const text = read(file)
+      assert.ok(text.trim().length > 200, `${file} is empty or a stub`)
+      assert.match(text, mustSay, `${file} is not the licence it claims to be`)
+      /* A licence with its copyright line stripped is the one failure mode
+         that looks fine and satisfies nothing. */
+      assert.match(text, /Copyright/i, `${file} has lost its copyright line`)
+    }
+
+    /* Section 4(b): say what we changed. The lock file records every change
+       with the symptom that caused it; this is the notice that points at it. */
+    const mods = read('licences/MODIFICATIONS.md')
+    assert.match(mods, /forgefx-midi/, 'the modifications notice does not mention the codec')
+    assert.match(mods, /Apache-2\.0 requires it|section 4\(b\)|Section 4\(b\)/, 'nothing says why the notice exists')
+    for (const branch of ['claude/address-one-host', 'claude/huffman-guard']) {
+      assert.ok(
+        read('desktop/forgefx.lock.json').includes(branch),
+        `the lock no longer pins ${branch}, so MODIFICATIONS.md describes something we do not ship`
+      )
+    }
+
+    /*
+     * And the generated file carries all of it. Checked by content rather than
+     * by regenerating: the walk reads node_modules, which differs between a
+     * machine that has vendored the device server and one that has not, so a
+     * byte-for-byte staleness check would fail for a reason that is not a
+     * fault.
+     */
+    const notices = read('NOTICES.md')
+    assert.match(notices, /MIT License/, 'the notices file carries no MIT licence')
+    assert.match(notices, /Apache License/, 'the notices file carries no Apache licence')
+    assert.match(notices, /Stephen Staker/, "the codec's copyright holder is not named")
+    assert.match(notices, /sKuhLight/, "the server's copyright holder is not named")
+
+    /*
+     * The trademark line, which is the upstream author's own and now ours. An
+     * app sold under a name that includes somebody else's mark says plainly
+     * that it is not theirs.
+     */
+    /* The wording itself is held by `the app says whose it is not` below,
+       against shared/affiliation.mjs. Here it is only that the notices file
+       carries a disclaimer at all — matched on the part of the sentence that
+       is doing the work rather than on its opening words, which have already
+       changed once. */
+    assert.match(
+      notices,
+      /affiliated with, endorsed by, or sponsored by/i,
+      'nothing disclaims affiliation with Fractal Audio Systems'
+    )
+
+    /*
+     * EVERY PLACE THAT INSTALLS SOMETHING A USER RECEIVES, and the desktop
+     * shell is the one that was missed: `desktop/package.json` brings
+     * bonjour-service and electron-updater into the signed installer and
+     * neither appeared in the first generated file. Electron itself is a
+     * devDependency that ships anyway.
+     */
+    const gen = read('scripts/notices.mjs')
+    for (const manifest of ['package.json', 'desktop/package.json', 'mobile/package.json']) {
+      assert.ok(gen.includes(`'${manifest}'`), `the notices generator never walks ${manifest}`)
+    }
+    assert.match(notices, /### Electron/, 'Electron ships inside the apps and is not named')
+    assert.match(notices, /serialport/, 'the compiled USB addon is not named')
+
+    /* And it is reachable as a plain URL, which is what a store listing and an
+       About screen can both be given. `public/` is served at the site root. */
+    assert.ok(read('public/notices.txt').length > 1000, 'there is no plain-text copy to link to')
+  })
+
   test('the Mac app has a face, and claims only entitlements it uses', () => {
     /*
      * The first real Mac build reported "default Electron icon is used —

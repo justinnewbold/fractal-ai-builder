@@ -4380,63 +4380,20 @@ test('a shelved conversation is readable only by the account that wrote it', () 
   assert.match(sql, /id text primary key/)
 })
 
-console.log('\na band looked up once')
+/*
+ * The band-lookup cache went with the AI that used it.
+ *
+ * src/lib/rigCache.js kept what a band was found to play, so a second request
+ * about the same band cost no tokens. Nothing has imported it since the tone
+ * builder came out in 7.336.0 — it was left behind rather than removed, and
+ * its test kept passing, which is how dead code survives a deletion.
+ *
+ * Found while writing the privacy policy, by asking what the app actually
+ * writes to the database rather than what it used to. The `rig_lookups` table
+ * it wrote to still holds rows; whether to drop it is Justin's call, because
+ * dropping a table is not something to do on a hunch.
+ */
 
-test('a rig found once is not looked up again', async () => {
-  /*
-   * "Isn't there a band database we can download and have in the app to look
-   * up most of the info and save some tokens?"
-   *
-   * There is not one. MusicBrainz, Discogs and Wikidata carry releases,
-   * credits and personnel and none of them carry what amp anybody played;
-   * Equipboard is that database and publishes no API and no export. So the
-   * fact is found out once and kept, which is most of what a download would
-   * have bought — a band's rig does not change between Tuesday and Wednesday.
-   */
-  const { artistOf, pickRig, tidy } = await import('../src/lib/rigCache.js')
-
-  /* Keyed on the band, from the briefing's own first line — the lookup is told
-     to open with it precisely so this does not have to guess. */
-  assert.equal(artistOf('ARTIST: Three Days Grace\nRIG\nAMPS: Diezel VH4'), 'Three Days Grace')
-  assert.equal(artistOf('artist:  Papa Roach \nRIG'), 'Papa Roach')
-  assert.equal(artistOf('RIG\nAMPS: Diezel VH4'), null, 'a briefing with no band was filed anyway')
-  assert.equal(artistOf(''), null)
-
-  const rows = [
-    { artist: 'Three Days Grace', songs: 8, rig: 'ARTIST: Three Days Grace', at: Date.now() },
-    { artist: 'Metallica', songs: 4, rig: 'ARTIST: Metallica', at: Date.now() }
-  ]
-
-  /* The sentence is not the key. "Make me a Three Days Grace preset with 8
-     scenes" and "three days grace, all eight" are the same lookup. */
-  assert.equal(pickRig(rows, 'Make me a Three Days Grace preset with 8 scenes', 8).artist, 'Three Days Grace')
-  assert.equal(pickRig(rows, 'three days grace!! all eight scenes', 8).artist, 'Three Days Grace')
-  assert.equal(pickRig(rows, 'a tight modern metal rhythm', 4), null, 'a tone with no band in it matched one')
-  assert.equal(pickRig(rows, 'make me a Papa Roach preset', 4), null)
-
-  /* Four songs researched cannot answer a request for eight — the other four
-     were never looked up. Four can answer three. */
-  assert.equal(pickRig(rows, 'metallica, four scenes', 4).artist, 'Metallica')
-  assert.equal(pickRig(rows, 'metallica, three scenes', 3).artist, 'Metallica')
-  assert.equal(pickRig(rows, 'metallica, eight scenes', 8), null, 'four songs answered a request for eight')
-
-  /* Gear does change. Ninety days is far longer than any run of requests about
-     one band and far shorter than a career. */
-  const old = [{ artist: 'Metallica', songs: 8, rig: 'ARTIST: Metallica', at: 1 }]
-  assert.equal(pickRig(old, 'metallica', 4, Date.now()), null, 'a year-old rig was still trusted')
-
-  /* The specific name wins where two are in the same sentence. */
-  const both = [
-    { artist: 'Grace', songs: 8, rig: 'ARTIST: Grace', at: Date.now() },
-    { artist: 'Three Days Grace', songs: 8, rig: 'ARTIST: Three Days Grace', at: Date.now() }
-  ]
-  assert.equal(pickRig(both, 'a three days grace preset', 8).artist, 'Three Days Grace')
-
-  // A word inside another word is not that band.
-  assert.equal(pickRig([{ artist: 'Rush', songs: 4, rig: 'x', at: Date.now() }], 'brushed clean tone', 4), null)
-  assert.equal(tidy('  Three Days Grace!  '), 'three days grace')
-  assert.deepEqual(pickRig(null, 'anything', 0), null)
-})
 
 
 console.log('\nwhat made this sound')
