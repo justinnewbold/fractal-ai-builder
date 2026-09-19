@@ -4198,8 +4198,21 @@ test('a value written for another scene lands on that scene’s channel and nowh
 
     const map = await fx.sceneChannels()
     assert.ok(map && Array.isArray(map[amp.effectId]), 'the demo hands over no channel map')
-    assert.equal(map[amp.effectId][1], 'D', 'the lead scene is not on its own channel any more')
-    assert.notEqual(map[amp.effectId][0], map[amp.effectId][1])
+    /*
+     * THE TWO SCENES ARE ON DIFFERENT CHANNELS. Which letters they are is the
+     * opening preset's business, not this test's: it read 'D' while the demo
+     * opened on the invented slot 500 and its generic chain, and the demo now
+     * opens on the first preset the unit really ships with, whose lead scene
+     * is somewhere else. What this is about is a write to one scene landing on
+     * that scene's channel and nowhere else, which needs the two to differ and
+     * does not care how.
+     */
+    assert.ok(map[amp.effectId][1], 'the lead scene is not on a channel at all')
+    assert.notEqual(
+      map[amp.effectId][0],
+      map[amp.effectId][1],
+      'both scenes are on one channel, so this proves nothing about writing to one of them'
+    )
 
     const res = await fx.setSceneParam(1, amp.effectId, treble.id, target, treble)
     assert.equal(res?.ok, true, 'the write into scene 2 did not land')

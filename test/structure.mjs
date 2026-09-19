@@ -530,6 +530,94 @@ export function run(test) {
     assert.match(phone, /onPress=\{onOpenUnit \|\| onOpenSettings\}/, 'the phone still reads its unit name without pressing it')
   })
 
+  test('the preset picker keeps its controls while the list runs past them', async () => {
+    /*
+     * "Can we lock the top portion of the part where it shows the numbers you
+     * can choose between, like 100, 200, 300, 400, and 500, and then
+     * underneath it where there's the filter. So those are always visible...
+     * That way, if you're down on like 400, you don't have to scroll all the
+     * way back to the top to find a new preset quickly."
+     *
+     * THE OBVIOUS FIX IS THE ONE ALREADY RULED OUT. Giving the list its own
+     * scroll window and leaving the controls outside it is what the rule
+     * beside `.sheet-body .preset-scroll` forbids: two scrollers in one sheet
+     * fight the same thumb, seven rows at a time. Sticky keeps the single
+     * scroller and pins the controls to the top of it.
+     *
+     * ONE WRAPPER, NOT TWO STICKY ELEMENTS. The head wraps to two rows on a
+     * narrow phone, so a separately-pinned search box would need a top offset
+     * equal to a height nothing in CSS can know. Pinning the pair as one block
+     * needs no such number.
+     */
+    const con = readFileSync(new URL('../src/components/Console.jsx', import.meta.url), 'utf8')
+    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+
+    const pinned = con.indexOf('<div className="preset-pinned">')
+    assert.notEqual(pinned, -1, 'the controls are not pinned any more')
+    const head = con.indexOf('<div className="panel-head">')
+    const box = con.indexOf('className="preset-filter"')
+    const list = con.indexOf('<div className="preset-scroll"')
+    assert.ok(pinned < head, 'the jumps are outside the pinned block')
+    assert.ok(pinned < box && box < list, 'the search box is outside the pinned block, or below the list')
+
+    const rule = css.slice(css.indexOf('.sheet-body .preset-pinned {'))
+    assert.notEqual(rule.indexOf('.sheet-body .preset-pinned {'), -1, 'the pinned block has no styling at all')
+    const decl = rule.slice(0, rule.indexOf('}'))
+    assert.match(decl, /position: sticky/, 'the pinned block does not stick')
+    assert.match(decl, /background:/, 'rows pass behind the pinned block with nothing to hide them')
+    /*
+     * And it reaches up into the sheet's own padding. At `top: 0` it pinned
+     * twelve pixels down and the list went on moving through the strip above
+     * it — half a preset row sliding along behind the word PRESETS, which
+     * reads as a rendering fault rather than as a fixed header.
+     */
+    assert.match(decl, /top: calc\(var\(--s-3\) \* -1\)/, 'the list shows through the gap above the pinned block')
+    assert.match(decl, /padding-top: var\(--s-3\)/, 'the controls sit twelve pixels high of where they were')
+
+    /* Only in a sheet: on a wide screen the list has its own box and the
+       controls never leave the screen, so there is nothing to stick to. */
+    assert.ok(!/^\.preset-pinned \{/m.test(css), 'the pinned block sticks outside a sheet too, where nothing scrolls past it')
+
+    /* "Lastly, change the word filter to search." */
+    assert.match(con, /placeholder="Search"/, 'the box says Filter again')
+    assert.match(con, /aria-label="Search presets"/, 'a screen reader is still told it is a filter')
+    assert.ok(!/placeholder="Filter"/.test(con), 'the box says Filter again')
+  })
+
+  test('the demo opens on the first preset the unit really ships with', async () => {
+    /*
+     * "In demo mode, can we set it up so that it starts at preset one... and
+     * that that is the one that loads first in the demo is whatever's on
+     * preset one across all five demo units."
+     *
+     * It opened on 500, a slot outside the factory bank, invented in the mock
+     * and named DEMO. Two things wrong with that: it is not a preset anybody's
+     * unit has, which is the one promise this demo makes; and it put the
+     * picker five hundred rows down a list of 512, so the first thing anybody
+     * did on opening it was scroll back to the top — the same journey the
+     * pinned controls above exist to save.
+     *
+     * Read off each unit's own bank rather than written as 0, so it stays the
+     * first preset if a bank ever starts elsewhere.
+     */
+    const { createMockDevice } = await import('../src/lib/mockDevice.js')
+    const { UNIT_KEYS } = await import('../src/lib/demoUnits.js')
+    const { presetsFor } = await import('../src/lib/factoryPresets.js')
+
+    for (const key of UNIT_KEYS) {
+      const first = presetsFor(key).find((p) => p.name)
+      assert.ok(first, `${key} has no factory bank to open on`)
+      const open = createMockDevice(key).preset()
+      assert.equal(open.number, first.number, `the ${key} demo does not open on its first preset`)
+      assert.ok(open.name, `the ${key} demo opens on a preset with no name`)
+      assert.notEqual(open.number, 500, `the ${key} demo still opens on the invented slot 500`)
+    }
+
+    /* Each unit's own, which is the whole point of carrying five banks. */
+    const names = UNIT_KEYS.map((k) => createMockDevice(k).preset().name)
+    assert.ok(new Set(names).size > 1, 'all five demo units open on the same preset name')
+  })
+
   test('the block editor arrives over the screen, not below it', () => {
     /*
      * It used to be the last row of the console grid. Tapping a block on a

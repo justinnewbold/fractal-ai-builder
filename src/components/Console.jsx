@@ -529,6 +529,20 @@ export function PresetList({
         they are the first thing in the panel after its name, which is the
         order somebody opening a list of 512 wants them in.
       */}
+      {/*
+        THE JUMPS AND THE SEARCH BOX STAY PUT WHILE THE LIST MOVES.
+        *
+        "Can we lock the top portion... so those are always visible, and then
+        below that will scroll. That way, if you're down on like 400, you
+        don't have to scroll all the way back to the top to find a new preset
+        quickly."
+        *
+        One wrapper rather than two sticky elements, because the head wraps to
+        two rows on a narrow phone and the box below it would then need a top
+        offset equal to a height nothing can know in CSS. Pinning the pair as
+        one block needs no such number.
+      */}
+      <div className="preset-pinned">
       <div className="panel-head">
         <p className="panel-title">Presets</p>
         {jumps.length && !needle && view === 'all' ? (
@@ -558,10 +572,11 @@ export function PresetList({
         type="text"
         className="preset-filter"
         value={filter}
-        placeholder="Filter"
+        placeholder="Search"
         onChange={(e) => setFilter(e.target.value)}
-        aria-label="Filter presets"
+        aria-label="Search presets"
       />
+      </div>
 
       {/*
         Three ways to look at 512 presets: all of them, the ones you starred,
