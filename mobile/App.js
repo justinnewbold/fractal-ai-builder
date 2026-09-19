@@ -125,6 +125,16 @@ export default function App() {
    * further down, which is the only thing that raises the paywall.
    */
   const purchase = usePurchase()
+  /*
+   * ASKED FOR, as opposed to imposed.
+   *
+   * `auth === 'paywall'` is the gate: somebody with a real rig who has not
+   * paid, stopped on the way in. This is the other direction — somebody in
+   * the DEMO who has decided they want the thing, or anybody looking for the
+   * purchase they already made. It opens over whatever is on screen and closes
+   * back to it, because nothing is being withheld: they came looking.
+   */
+  const [buying, setBuying] = useState(false)
 
   const caps = useRig(ofCaps)
   const readFailed = useRig(ofError)
@@ -319,9 +329,21 @@ export default function App() {
             <TopBar
               link={link}
               onOpenSettings={() => setScreen('settings')}
+              onUnlock={() => setBuying(true)}
               onOpenUnit={() => (demo ? setPickUnit(true) : setScreen('settings'))}
             />
             <DemoUnit open={pickUnit} onClose={() => setPickUnit(false)} />
+            {/* Over the top of whatever is on screen, and gone again on a
+                tap. Nothing behind it is being withheld — they came looking
+                for this, so Back means back, not out. */}
+            {buying ? (
+              <Paywall
+                asked
+                onUnlocked={() => setBuying(false)}
+                onDemo={() => setBuying(false)}
+                onBack={() => setBuying(false)}
+              />
+            ) : null}
             {picked ? <Arrived picked={picked} /> : null}
             {/*
               The bar stays up while this waits, which is what makes the wait
@@ -369,6 +391,7 @@ export default function App() {
               />
             ) : screen === 'settings' ? (
               <Settings
+                onUnlock={() => setBuying(true)}
                 link={link.link}
                 macName={link.macName}
                 hostVersion={link.hostVersion}
