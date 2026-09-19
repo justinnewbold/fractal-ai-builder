@@ -4291,7 +4291,37 @@ export function run(test) {
     assert.ok(refreshAll.length > 200, 'refreshAll moved; this check reads it')
     assert.ok(refreshAll.indexOf('adoptNames(') < refreshAll.indexOf('await refreshPreset()'), 'the names are taken after the slow reads instead of alongside them')
     const dev = read('mobile/src/lib/device.js')
-    assert.match(dev, /if \(!slug \|\| demoDevice\(\)\) return null/, 'the demo asks a computer it does not have for a list')
+    /*
+     * AND IN THE DEMO THE UNIT ANSWERS IT, which is the whole of the fix for
+     * a list that drew 512 rows of "Empty" over a bank sitting right there.
+     *
+     * This used to assert the demo returned null — correct on the face of it,
+     * since there is no computer to have filed anything. What it missed is
+     * that the OTHER way a name is learned, GET /presets/{n}, is a stub on
+     * every gen-3 unit and in the mock alike. Null plus a stub is no source
+     * at all, and "all presets are blank in the demo" is what that looks like
+     * to somebody holding the phone.
+     */
+    assert.match(dev, /const mock = demoDevice\(\)/, 'the demo has no source of preset names again')
+    assert.match(
+      dev,
+      /typeof mock\.storedNames === 'function' \? mock\.storedNames\(\)/,
+      'the demo does not ask the unit for its own bank'
+    )
+    assert.match(dev, /if \(!slug\) return null/, 'a real unit with no slug still asks the computer')
+
+    /* And the mock can actually answer that. */
+    const mockSrc = read('src/lib/mockDevice.js')
+    assert.match(
+      mockSrc,
+      /storedNames: \(\) => Object\.fromEntries\(state\.stored\)/,
+      'the mock cannot hand over its bank, so the demo list is blank'
+    )
+    assert.match(
+      mockSrc,
+      /presetName: \(number\) => \(\{ number, name: '' \}\)/,
+      'the per-slot stub is gone — the mock now claims an answer gen-3 hardware cannot give'
+    )
     const screen = read('mobile/src/screens/Presets.js')
     assert.match(screen, /label=\{refreshing \? 'Reading…' : 'Refresh'\}/, 'there is no Refresh button')
     assert.match(screen, /names known/, 'the list does not say how full it is')

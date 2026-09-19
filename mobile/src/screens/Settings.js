@@ -10,6 +10,7 @@ import { UNITS as DEMO_UNITS } from '../lib/demoUnits'
 import { getDebugLog } from '../lib/debugLog'
 import { tick } from '../lib/feedback'
 import { usePurchase } from '../lib/purchases'
+import { applyNow, checkNow, describeRunning, useUpdates } from '../lib/updates'
 import {
   changePassword,
   currentAccount,
@@ -129,6 +130,12 @@ export default function Settings({
 
   const [page, setPage] = useState(null)
   const purchase = usePurchase()
+  const updates = useUpdates()
+  /* Which bundle is running, asked once when Setup opens. It settles "did an
+     update ever land" without anybody comparing numbers off two screens. */
+  useEffect(() => {
+    describeRunning()
+  }, [])
 
   const linkWord =
     link === 'connected'
@@ -279,6 +286,49 @@ export default function Settings({
               onPress={onUnlock}
             />
             <SetupRow title="About" status={`v${APP_VERSION}`} onPress={() => setPage('about')} />
+            {/*
+              * WHAT IS RUNNING, AND HOW TO GET THE NEWEST.
+              *
+              * "I have not yet successfully had a single over-the-air update
+              * work correctly. They never come through, so I keep refreshing
+              * the android app, closing it, force closing it, reopening it
+              * over and over again."
+              *
+              * They were arriving. What was missing was any way to SEE it,
+              * plus one detail that makes a working app look stuck: this app
+              * never waits for a download at launch — app.json sets
+              * fallbackToCacheTimeout to 0, so it starts on the bundle it
+              * already has, fetches the new one in the BACKGROUND, and runs it
+              * the NEXT time it opens.
+              *
+              * First launch downloads. Second launch shows it. Somebody
+              * force-closing once, seeing the same number and concluding
+              * nothing happened was one restart short, with nothing on screen
+              * to say so.
+              *
+              * That default is right for a stage and is not what changes here.
+              * This says what is going on, and offers the restart instead of
+              * waiting for it to happen by accident.
+              */}
+            <SetupRow
+              title="Updates"
+              status={
+                updates.phase === 'ready'
+                  ? 'Ready — tap to restart into it'
+                  : updates.phase === 'downloading'
+                    ? 'Downloading…'
+                    : updates.phase === 'checking'
+                      ? 'Checking…'
+                      : updates.phase === 'current'
+                        ? 'Up to date'
+                        : updates.phase === 'off'
+                          ? 'Not available in this build'
+                          : updates.error
+                            ? 'Could not check — tap to try again'
+                            : `Running ${updates.source === 'update' ? 'an update' : 'the installed build'} · tap to check`
+              }
+              onPress={() => (updates.phase === 'ready' ? applyNow() : checkNow())}
+            />
           </View>
         </>
       ) : null}
