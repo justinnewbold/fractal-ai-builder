@@ -1,4 +1,5 @@
-import { isDemo } from '../lib/forgefx'
+import { isDemo, demoUnit } from '../lib/forgefx'
+import { demoSentence } from '../lib/demoUnits'
 import { describeUnit } from '../lib/link'
 import { presetLabel } from '../lib/presetName'
 import { FULL, VERSION } from '../lib/version'
@@ -106,7 +107,7 @@ export default function TopBar({
                banner has been put away, so a hover still says what DEMO means. */
             title={
               demo
-                ? 'Simulated FM3 — nothing here reaches hardware. Real models and parameter ranges, real write behaviour including the silent clamp.'
+                ? demoSentence(demoUnit())
                 : undefined
             }
           >

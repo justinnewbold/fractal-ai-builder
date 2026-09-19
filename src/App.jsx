@@ -92,7 +92,8 @@ import {
   setTelemetryMode,
   placeableBlocks
 } from './lib/forgefx'
-import { isDemo, setDemo, resetCacheClear } from './lib/forgefx'
+import { isDemo, setDemo, resetCacheClear, demoUnit, setDemoUnit } from './lib/forgefx'
+import { UNITS as DEMO_UNITS, demoSentence, unitByKey } from './lib/demoUnits'
 import {
   detect,
   currentPreset,
@@ -335,6 +336,7 @@ const HAND_EDIT_KINDS = new Set([
  */
 const SETUP_PAGES = {
   link: 'Phone & computer',
+  demo: 'Which unit the demo is',
   rename: 'Rename presets and scenes',
   play: 'Play screen',
   help: 'Troubleshooting',
@@ -2923,10 +2925,7 @@ export default function App() {
       */}
       {isDemo() && status === 'live' && !demoNoteSeen ? (
         <p className="demo-banner">
-          <span>
-            Simulated FM3 &mdash; nothing here reaches hardware. Real models and parameter ranges,
-            real write behaviour including the silent clamp.
-          </span>
+          <span>{demoSentence(demoUnit())}</span>
           <button className="chip" onClick={dismissDemoNote}>
             Got it
           </button>
@@ -3736,6 +3735,19 @@ export default function App() {
                   half of a chain is never the answer to "why is nothing
                   happening". */}
               <SetupRow key="link" title="Phone & computer" status={[describeLink(link).note || 'Phone remote off', status === 'live' ? `${device?.short || device?.name || 'Unit'} · connected` : 'No unit'].join(' · ')} onClick={() => setSetupPage('link')} />
+              {/*
+                Which Fractal the demo is, at the top of Setup rather than two
+                doors inside "Phone & computer", where it had been living.
+                "Only shows FM3 is the only model available" — and from where
+                he was sitting that was true: every way into the demo starts it
+                as an FM3, and the one picker was behind a row named after
+                pairing a phone, which is not where anybody looks for it. The
+                phone has had it at this level since the demo learned the five
+                units; this is the browser catching up.
+              */}
+              {isDemo() ? (
+                <SetupRow key="demo-unit" title="Which unit the demo is" status={`${unitByKey(demoUnit()).name} · five to choose from`} onClick={() => setSetupPage('demo')} />
+              ) : null}
               <SetupRow key="rename" title="Rename presets and scenes" status={status === 'live' ? 'Give them names you will know on a dark stage' : 'Connect a unit first'} onClick={() => setSetupPage('rename')} />
               {/* The theme is behind this row and the status says so, because
                   "Play screen" is not where anybody looks for light and dark —
@@ -3749,6 +3761,39 @@ export default function App() {
               <SetupRow key="about" title="About" status={FULL} onClick={() => setSetupPage('about')} />
             </div>
           </>
+        ) : null}
+
+        {setupPage === 'demo' ? (
+          <div className="setup-page">
+            <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
+              &lsaquo; Setup
+            </button>
+            <p className="setup-page-title">{SETUP_PAGES.demo}</p>
+            {/*
+              Each of these carries its own real factory bank — the preset and
+              scene names the unit ships with — so picking one is not a label
+              change. It is a different simulated rig, which is why it reloads.
+            */}
+            <p className="hint">
+              Each one holds the factory presets and scenes that unit really ships with, and the
+              right number of scenes and slots. Picking one starts the demo again as that unit.
+            </p>
+            <div className="demo-units" role="group" aria-label="Which unit the demo is">
+              {DEMO_UNITS.map((u) => (
+                <button
+                  key={u.key}
+                  className={`chip${u.key === demoUnit() ? ' active' : ''}`}
+                  aria-pressed={u.key === demoUnit()}
+                  onClick={() => {
+                    setDemoUnit(u.key)
+                    window.location.reload()
+                  }}
+                >
+                  {u.name}
+                </button>
+              ))}
+            </div>
+          </div>
         ) : null}
 
         {setupPage === 'rename' ? (
