@@ -17,6 +17,7 @@
  * are not stage controls — is in unit.mjs, where the tests can reach it.
  */
 import { remoteRequest as overTheWire } from './relay'
+import { firmwareOf } from './firmware'
 import { demoDevice } from './demo'
 import { demoRequest } from './demoWire'
 import { logDebug } from './debugLog'
@@ -93,7 +94,24 @@ const told = (what, req) =>
  * is. An AM4 is four slots in a chain with no routing; an FM3 is a matrix with
  * eight scenes. The shape of every other answer depends on this one.
  */
-export const detect = () => remoteRequest('/device/detect')
+export const detect = async () => {
+  const res = await remoteRequest('/device/detect')
+  /*
+   * AND THE FIRMWARE, WHICH IS ON THE OTHER ENDPOINT. `/device/detect` answers
+   * with the capabilities rather than the whole unit, so a version read only
+   * from here is a version this app never sees. Best-effort: the capabilities
+   * above decide what every screen draws and are already in hand, while the
+   * firmware is one line on Setup — a host too old to answer, or a relay that
+   * drops it, costs that line and never the connection. The browser does the
+   * same thing for the same reason; see src/lib/forgefx.js.
+   */
+  try {
+    const whole = await remoteRequest('/device')
+    return { ...whole, ...res, firmware: firmwareOf(whole) ?? firmwareOf(res) }
+  } catch {
+    return res
+  }
+}
 
 /** The loaded preset, with the empty marker read rather than printed. */
 export async function currentPreset() {

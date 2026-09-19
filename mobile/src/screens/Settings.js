@@ -33,6 +33,7 @@ import Sheet from '../components/Sheet'
 const face = Platform.select(mono)
 
 const ofDeviceName = (s) => s.deviceName
+const ofFirmware = (s) => s.firmware
 
 /** What each theme setting is called, for the row that has to say which. */
 const THEME_WORD = { auto: 'Auto', light: 'Light', dark: 'Dark' }
@@ -62,6 +63,7 @@ export default function Settings({
   onOpenReport
 }) {
   const deviceName = useRig(ofDeviceName)
+  const firmware = useRig(ofFirmware)
   const unitState = useRig(ofUnitState)
   const [account, setAccount] = useState(null)
   const [hosts, setHosts] = useState(remoteHosts())
@@ -329,6 +331,23 @@ export default function Settings({
                       : `Connected to ${macName || 'your computer'}${deviceName ? ` — ${deviceName}` : ''}`}
               </Text>
             </View>
+
+            {/*
+              What the unit is running, under what it is.
+
+              "It definitely pulls the firmware version so I'm not sure why you
+              can't do it." It does, and this app had simply never asked for
+              it — the version lives on `/device` and both ends were reading
+              only `/device/detect`. Drawn only when the unit said one: the
+              demo has no firmware and neither has a host too old to report
+              it, and "firmware —" under a unit's name reads as a version
+              rather than as a silence.
+            */}
+            {firmware ? (
+              <Text style={{ color: color.silkDim, fontSize: font.small, marginTop: space.xs }}>
+                {`Firmware ${firmware}`}
+              </Text>
+            ) : null}
 
             {/*
               The demo says what it is and offers the way out, first, because

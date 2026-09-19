@@ -15,6 +15,7 @@
  * app is that what it shows is what the unit holds.
  */
 import { useSyncExternalStore } from 'react'
+import { firmwareOf } from './firmware'
 
 import * as device from './device'
 import { idOf, sameBlock } from './unit.mjs'
@@ -30,6 +31,7 @@ import { logDebug } from './debugLog'
 const initial = {
   /** null until the unit has said what it is. */
   capabilities: null,
+  firmware: null,
   deviceName: '',
   /*
    * Whether the unit is there and answering, as distinct from whether the
@@ -343,6 +345,10 @@ export async function refreshAll() {
   set({
     capabilities: caps?.capabilities ?? null,
     deviceName: caps?.short || caps?.name || '',
+    /* Kept rather than dropped on the floor, which is what happened to the
+       computer's own version for eighty releases. A unit that does not report
+       one leaves this null and the screen draws nothing. */
+    firmware: firmwareOf(caps),
     deviceSlug: slug,
     unit
   })

@@ -17,6 +17,7 @@ import { cleanPresetName, isEmptySlotName } from './presetName.js'
 import { zeroBasedChain, wrongSlot } from './slots.js'
 import { cableColumns, toWireCable, toWireCell } from '../../shared/grid-plan.mjs'
 import { DEFAULT_SLUG, deviceSlug } from '../../shared/device-slug.mjs'
+import { firmwareOf } from '../../shared/firmware.mjs'
 import { toNormalized } from './scale.js'
 import { withLineage } from './lineage.js'
 import { remoteActive, remoteRequest, subscribeRemoteEvents } from './remote.js'
@@ -397,13 +398,38 @@ export const currentDeviceSlug = () => unitSlug
  */
 let lastCaps = null
 
-/** Full capability report: grid size, scene count, preset count, what writes are allowed. */
+/**
+ * Full capability report: grid size, scene count, preset count, what writes are
+ * allowed — and what firmware the unit is running.
+ *
+ * TWO ENDPOINTS, BECAUSE THE FIRMWARE IS ONLY ON THE SECOND ONE. This asked
+ * `/device/detect` and stopped, and `/device/detect` answers with the
+ * capabilities rather than the whole unit. So the app had never once seen a
+ * firmware version, and the reason written down for that was that nothing it
+ * talks to carries one — which was an assumption nobody had checked. The host
+ * carries it; this end was not asking.
+ *
+ * `/device` is best-effort on purpose. The capabilities decide what every
+ * screen is allowed to draw and they are already in hand by this point; the
+ * firmware is a line on a Setup page. A host too old to answer the second
+ * question, or a relay that drops it, must cost a line of text and never a
+ * connection — so the failure is swallowed and the unit still detects.
+ */
 export const detect = async () => {
   const res = mock ? (await tick(), mock.detect()) : await request('/device/detect')
   const label = res?.short || res?.name
   if (label) unitSlug = deviceSlug(label)
   lastCaps = res?.capabilities ?? null
-  return res
+  if (mock) return res
+  try {
+    const whole = await request('/device')
+    /* The detect payload wins on anything both answer: it is the one every
+       screen is built from, and a second opinion about the grid is the kind of
+       drift that shows up as a chain drawn one row short. */
+    return { ...whole, ...res, firmware: firmwareOf(whole) ?? firmwareOf(res) }
+  } catch {
+    return res
+  }
 }
 
 /**
