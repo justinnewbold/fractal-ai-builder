@@ -3909,6 +3909,48 @@ button.preset-jump:active {
   max-height: none;
 }
 
+/*
+ * SO THE CONTROLS ARE PINNED INSTEAD OF THE LIST BEING BOXED.
+ *
+ * "If you're down on like 400, you don't have to scroll all the way back to
+ * the top to find a new preset quickly."
+ *
+ * The obvious fix is the one the rule above forbids: give the list its own
+ * scroll window and leave the controls outside it. That was tried and it is
+ * why the rule exists — two scrollers inside one sheet fight the same thumb.
+ *
+ * Sticky keeps the single scroller and pins the controls to the top of it, so
+ * the jumps and the search box are reachable from row 400 without the list
+ * losing the sheet's own momentum.
+ *
+ * Only in a sheet. On a wide screen the panel is a fixed-height box with the
+ * list scrolling inside it, so the controls never leave the screen and a
+ * sticky element with nothing to stick to only risks a seam.
+ */
+.sheet-body .preset-pinned {
+  position: sticky;
+  /*
+   * Up into the sheet's own top padding, not flush with the content edge.
+   *
+   * At `top: 0` it pinned twelve pixels down — the sheet's padding — and the
+   * list went on moving through the strip above it. What you saw was half a
+   * preset row sliding along behind the word PRESETS, which reads as a
+   * rendering fault rather than as a fixed header. The padding is given back
+   * below, so the controls sit where they always did and only the background
+   * reaches higher.
+   */
+  top: calc(var(--s-3) * -1);
+  padding-top: var(--s-3);
+  z-index: 2;
+  /* The panel's own colour, because rows pass behind this and a transparent
+     header over moving text is unreadable in exactly the dark room this app
+     is used in. */
+  background: var(--panel);
+  /* The rule reads as the edge of the fixed part once rows are moving under
+     it; without it the list appears to start mid-air. */
+  border-bottom: 1px solid var(--rule);
+}
+
 button.preset-row {
   display: flex;
   align-items: baseline;

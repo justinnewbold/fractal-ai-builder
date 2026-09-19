@@ -229,9 +229,28 @@ export function createMockDevice(unitKey = DEFAULT_UNIT) {
      sceneStateOf, and the two names in one scope is a temporal-dead-zone
      error at the first preset load rather than anything visible here. */
   const rigSeeds = unit.key === DEFAULT_UNIT ? SEEDS : new Map()
+  /*
+   * THE DEMO OPENS ON THE FIRST PRESET THE UNIT REALLY SHIPS WITH.
+   *
+   * "In demo mode, can we set it up so that it starts at preset one... and
+   * that that is the one that loads first in the demo is whatever's on preset
+   * one across all five demo units."
+   *
+   * It opened on 500 — a slot outside the factory bank, invented here and
+   * named DEMO. Two things were wrong with that. It is not a preset anybody's
+   * unit has, which is the one promise this demo makes; and it put the picker
+   * five hundred rows down a list of 512, so the first thing anybody did on
+   * opening it was scroll back to the top.
+   *
+   * Read off the bank rather than written as 0, so it stays the first preset
+   * if a unit's bank ever starts somewhere else. All five start at 0 today —
+   * "59 Bassguy" on the three grid units, "AM4 Gig Rig", "Virtual Pedalboard"
+   * — and each is that unit's own, which is the point of five banks.
+   */
+  const firstPreset = presetsFor(UNIT).find((p) => p.name)?.number ?? 0
   const state = {
-    presetNumber: 500,
-    presetName: 'DEMO',
+    presetNumber: firstPreset,
+    presetName: '',
     scene: 0,
     sceneNames: [],
     // Bypass and channel both live per scene, not on the block — see sceneState.js.
