@@ -3661,16 +3661,45 @@ export function run(test) {
     assert.equal(descriptionFor('amp'), null, 'descriptionFor throws rather than answering for a missing name')
     assert.equal(descriptionFor('reverb', 'Ambient'), null, 'a family with no catalog is being answered for')
 
-    /* Every description is a sentence rather than a fragment, and none of them
-       is long enough to need scrolling on a phone. */
+    /*
+     * Every paragraph is a sentence rather than a fragment, and none of them
+     * runs on.
+     *
+     * THE CAP MOVED FROM THE DESCRIPTION TO THE PARAGRAPH, and it had to.
+     * "None of them is long enough to need scrolling on a phone" was written
+     * when this page held one sentence and no photograph; it now holds a
+     * picture, a line of numbers and as many paragraphs as were written,
+     * which is a scrolling page on purpose. A 200-character cap on the whole
+     * thing was a cap on how much anybody could say about an amp, enforced by
+     * a test — the wrong thing to hold still.
+     *
+     * What is still worth holding is the shape of one paragraph: long enough
+     * to be a thought, short enough to read on a handset. A wall of text is
+     * not more informative than three paragraphs, it is just harder to read
+     * in a dark room with a guitar on.
+     */
+    const { paragraphsOf } = await import('../src/lib/lineage.js')
     const ampFams = JSON.parse(read('src/data/amp-lineage.json'))
     const described = ampFams.filter((f) => f.description)
     assert.ok(described.length > 100, `only ${described.length} amp families are described`)
     for (const f of [...described, ...JSON.parse(read('src/data/cab-types.json')).filter((c) => c.description)]) {
-      const d = f.description
-      assert.ok(d.length >= 40 && d.length <= 200, `${f.family || f.name}: a description of ${d.length} characters`)
-      assert.match(d, /[.!?]$/, `${f.family || f.name}: does not end as a sentence`)
-      assert.ok(!/^\s|\s$/.test(d), `${f.family || f.name}: has stray whitespace`)
+      const who = f.family || f.name
+      const paras = paragraphsOf(f.description)
+      assert.ok(paras.length >= 1, `${who}: a description that is not a paragraph`)
+      assert.ok(paras.length <= 6, `${who}: ${paras.length} paragraphs, which is an essay`)
+      for (const d of paras) {
+        assert.ok(d.length >= 40 && d.length <= 320, `${who}: a paragraph of ${d.length} characters`)
+        assert.match(d, /[.!?]$/, `${who}: a paragraph that does not end as a sentence`)
+      }
+      assert.ok(!/^\s|\s$/.test(f.description), `${who}: has stray whitespace`)
+    }
+
+    /* And the spec line, where one is written, is numbers rather than prose:
+       it is read at a glance and set apart from the paragraphs for that. */
+    for (const f of ampFams.filter((a) => a.specs)) {
+      assert.ok(f.specs.length <= 60, `${f.family}: a spec line of ${f.specs.length} characters is a sentence`)
+      assert.ok(!/[.!?]$/.test(f.specs), `${f.family}: the spec line ends as a sentence`)
+      assert.ok(!/^\s|\s$/.test(f.specs), `${f.family}: the spec line has stray whitespace`)
     }
 
     const console_ = read('src/components/Console.jsx')

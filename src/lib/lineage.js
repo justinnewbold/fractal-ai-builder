@@ -242,12 +242,55 @@ export function gearLine(slug, name) {
  */
 const DESCRIBED = { amp: ampTypes, drive: driveTypes, cab: cabTypes }
 
-export function descriptionFor(slug, name) {
+/**
+ * One written field for a model: its own if it has one, else its family's.
+ *
+ * `description` and `specs` resolve identically and there is no reason for two
+ * copies of the same three lines.
+ */
+function writtenFor(slug, name, field) {
   const model = key(name)
   if (!model) return null
   const own = (DESCRIBED[slug] || []).find((m) => key(m.name) === model)
-  if (own?.description) return own.description
-  return familyFor(slug, name)?.description || null
+  if (own?.[field]) return own[field]
+  return familyFor(slug, name)?.[field] || null
+}
+
+export function descriptionFor(slug, name) {
+  return writtenFor(slug, name, 'description')
+}
+
+/**
+ * The line of numbers under the photograph: "100 watt · ECC83 / EL34".
+ *
+ * Its own field rather than the first line of the description, because it is
+ * read differently — a glance, not a sentence — and it is the one part of
+ * this page that is pure fact. Optional everywhere: a family with nothing
+ * written here draws no line at all rather than an empty one.
+ */
+export function specsFor(slug, name) {
+  return writtenFor(slug, name, 'specs')
+}
+
+/**
+ * A written description, split into the paragraphs it was written as.
+ *
+ * "I didn't say I wanted a scrape of anything. I said I wanted it 'like'
+ * this" — the reference is a spec line and several paragraphs, where this
+ * page had room for one sentence and drew whatever it was given as a single
+ * block. Blank lines in the source are paragraph breaks, which is how anybody
+ * writing one of these in a text field will expect them to behave.
+ *
+ * A one-sentence description comes back as an array of one, so every existing
+ * entry keeps working untouched.
+ */
+export function paragraphsOf(text) {
+  const written = String(text || '').trim()
+  if (!written) return []
+  return written
+    .split(/\n\s*\n/)
+    .map((p) => p.replace(/\s*\n\s*/g, ' ').trim())
+    .filter(Boolean)
 }
 
 /**

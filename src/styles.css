@@ -10057,10 +10057,24 @@ button.setup-back {
   text-underline-offset: 2px;
 }
 
-/* What the real amp is like to play, between the lineage line and the photo.
-   Slightly roomier than the hint above it because it is a sentence rather than
-   a label, and a sentence set at label spacing is hard to read on a phone. */
+/* What the real amp is like to play, under the photograph. Slightly roomier
+   than the hint above it because it is prose rather than a label, and prose
+   set at label spacing is hard to read on a phone. As many of these as were
+   written, so they need space between them and not just inside them. */
 .gear-about {
   line-height: 1.45;
   max-width: 62ch;
+}
+
+.gear-about + .gear-about {
+  margin-top: var(--s-2);
+}
+
+/* The line of numbers: "100 watt · ECC83 / EL34". Read at a glance rather
+   than left to right, so it is the model's own voice — full strength, not the
+   dimmed grey the prose under it uses. */
+.gear-specs {
+  margin: 0;
+  font-weight: 600;
+  color: var(--silk);
 }
