@@ -15,6 +15,7 @@
  */
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 /* The grid rules both apps share, so the checks below can RUN them rather than
    read them out of whichever file happens to hold them this month. */
 import { cableColumns, doubtfulWrite, toWireCell as wireCell } from '../shared/grid-plan.mjs'
@@ -3797,15 +3798,25 @@ export function run(test) {
       'process', 'global', '__DEV__', 'requestIdleCallback', 'cancelIdleCallback', 'alert'
     ])
 
+    /*
+     * Walked as URLs and normalised to forward slashes, which this repository
+     * has now learned twice. `new URL(...).pathname` on Windows is
+     * `/D:/a/...` — a leading slash in front of the drive letter, which
+     * readdirSync refuses outright. And a short name built by slicing on the
+     * repository's own folder name finds the wrong occurrence on a runner,
+     * where the checkout is `D:/a/fractal-ai-builder/fractal-ai-builder`.
+     * Both of those failed here before this comment existed.
+     */
+    const root = fileURLToPath(new URL('../', import.meta.url)).replaceAll('\\', '/')
     const files = []
     const walk = (dir) => {
-      for (const entry of readdirSync(dir)) {
-        const full = `${dir}/${entry}`
-        if (statSync(full).isDirectory()) walk(full)
-        else if (/\.(jsx?|mjs)$/.test(entry)) files.push(full)
+      for (const entry of readdirSync(fileURLToPath(dir))) {
+        const full = fileURLToPath(new URL(entry, dir))
+        if (statSync(full).isDirectory()) walk(new URL(`${entry}/`, dir))
+        else if (/\.(jsx?|mjs)$/.test(entry)) files.push(full.replaceAll('\\', '/'))
       }
     }
-    for (const dir of ['src', 'shared', 'mobile/src']) walk(new URL(`../${dir}`, import.meta.url).pathname)
+    for (const dir of ['src/', 'shared/', 'mobile/src/']) walk(new URL(`../${dir}`, import.meta.url))
     assert.ok(files.length > 50, `only found ${files.length} source files to check`)
 
     const broken = []
@@ -3826,7 +3837,7 @@ export function run(test) {
       })
       const unknown = globals.filter((name) => !KNOWN.has(name)).sort()
       if (unknown.length) {
-        const short = file.slice(file.indexOf('/fractal-ai-builder/') + 20)
+        const short = file.startsWith(root) ? file.slice(root.length) : file
         broken.push(`${short} uses ${unknown.join(', ')} — defined nowhere, so it throws when that line runs`)
       }
     }
