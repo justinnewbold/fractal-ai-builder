@@ -138,18 +138,24 @@
         document.getElementById('card').appendChild(a)
       }
 
-      /* Highest version wins, rather than whatever GitHub listed first.
-         It sorts that list by when a release was CREATED, and the Android
-         build and the Mac one are cut from the same commit — so they can
-         carry the same timestamp and come back either way round. The number
-         in the tag is the one thing that cannot be ambiguous.
-
+      /* MOST RECENTLY PUBLISHED WINS, not the highest number.
+         
+         It sorted by the number in the tag, which was right for the problem
+         it was written for — GitHub orders the list by when a release was
+         created, and the Android build and the Mac one are cut from the same
+         commit, so they carry the same timestamp and come back either way
+         round. What that never survives is the numbering being RESET. Going
+         from 7.397.0 to 1.0.0 for the first public release makes every old
+         build rank above every new one, and this page would have gone on
+         handing out 7.397.0 for ever.
+         
+         The filter is what separates the Android builds from the Mac ones,
+         and it does that job on its own. Within what is left, every APK is
+         published by a different run at a different minute, so the clock is
+         both unambiguous and immune to any renumbering.
+         
          Thirty is several days of builds, and both kinds share the list. */
-      const rank = (tag) =>
-        String(tag)
-          .replace(/^apk-v/, '')
-          .split('.')
-          .reduce((n, part) => n * 100000 + (parseInt(part, 10) || 0), 0)
+      const when = (r) => Date.parse(r.published_at || r.created_at || 0) || 0
 
       fetch('https://api.github.com/repos/' + REPO + '/releases?per_page=30', {
         headers: { Accept: 'application/vnd.github+json' }
@@ -158,14 +164,14 @@
         .then((list) => {
           const rel = list
             .filter((r) => !r.draft && String(r.tag_name).indexOf('apk-v') === 0)
-            .sort((a, b) => rank(b.tag_name) - rank(a.tag_name))[0]
+            .sort((a, b) => when(b) - when(a))[0]
           if (!rel) throw new Error('no Android build in the list')
           const apk = (rel.assets || []).find((a) => /\.apk$/i.test(a.name))
           if (!apk) throw new Error('that build has no APK on it')
-          const when = rel.published_at ? new Date(rel.published_at) : null
+          const built = rel.published_at ? new Date(rel.published_at) : null
           say(
             'Version ' + String(rel.tag_name).replace(/^apk-v/, ''),
-            when ? 'Built ' + when.toLocaleString() : 'Latest Android build',
+            built ? 'Built ' + built.toLocaleString() : 'Latest Android build',
             { href: apk.browser_download_url, text: 'Download and install' }
           )
         })

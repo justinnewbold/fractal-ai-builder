@@ -1310,7 +1310,30 @@ export function run(test) {
     assert.match(page, /api\.github\.com\/repos\/' \+ REPO/, 'the page no longer asks GitHub what exists')
     assert.match(page, /justinnewbold\/fractal-ai-builder/, 'the page names no repository')
     assert.match(page, /indexOf\('apk-v'\) === 0/, 'the page would offer a Mac release to a phone')
-    assert.match(page, /\.sort\(\(a, b\) => rank\(b\.tag_name\) - rank\(a\.tag_name\)\)/, 'the page trusts the order GitHub happened to list, which is not the newest first')
+    /*
+     * AND THE NEWEST IS THE MOST RECENTLY PUBLISHED, not the highest number.
+     *
+     * This sorted on the number in the tag, which was right for the problem it
+     * was written for and wrong the moment the numbering was reset. The first
+     * public release renumbers 7.397.0 down to 1.0.0, which puts every old
+     * build above every new one — and this page would have gone on handing out
+     * 7.397.0 for ever, to everybody, silently.
+     *
+     * The filter above already separates the Android builds from the Mac ones,
+     * which is the job the number was doing. Within what is left, every APK is
+     * published by a different run at a different minute, so the clock is
+     * unambiguous and survives any renumbering.
+     */
+    assert.match(
+      page,
+      /\.sort\(\(a, b\) => when\(b\) - when\(a\)\)/,
+      'the page picks the highest version number again, which freezes on the old builds the moment the numbering is reset'
+    )
+    assert.match(page, /Date\.parse\(r\.published_at/, 'the newest build is not decided by when it was published')
+    assert.ok(
+      !/const rank =/.test(page),
+      'the version-number ranking is back; two ways to pick the newest is one way to pick the wrong one'
+    )
     assert.match(page, /\/\\\.apk\$\/i/, 'the button no longer points at the APK itself')
     assert.match(page, /r\.draft/, 'a half-published build can be offered as the current one')
 

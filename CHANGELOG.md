@@ -1,7 +1,42 @@
 # Changelog
 
-Versions are `MAJOR.PHASE.PATCH` — major is the architecture, phase tracks the
-roadmap in the README, patch is everything since.
+Versions are ordinary semver from 1.0.0 on: major for a break, minor for
+something new, patch for a fix.
+
+**They used to mean something else, and that is why 1.0.0 comes after 7.397.0.**
+The old scheme was `MAJOR.PHASE.PATCH` — major for the architecture, the middle
+number tracking the roadmap phase in the README, patch for everything since.
+Every phase in that roadmap is finished, so the middle number had stopped
+tracking anything and had become a count of changes; by the end it was on 397.
+
+None of those were public. "We're at like version seven, which is weird,
+because we're still basically on version zero — we haven't published a public
+version yet." Nothing was ever wrong with the old numbers; they just described
+the build rather than the app, and the first thing anybody downloads should not
+introduce itself as version seven of something they have never seen.
+
+So the count starts where the public does.
+
+## 1.0.0 The first public version.
+
+The number is the whole of the change. Same app as 7.397.0, renumbered for the
+people who are about to meet it for the first time.
+
+Two things had to move with it, because a version going DOWN is not something
+either of them expected:
+
+- **The Android download page** picked the highest version number out of the
+  releases list, which would have pinned it to 7.397.0 for ever. It takes the
+  most recently published build now — the filter already tells the Android
+  builds from the Mac ones, so the clock can do the rest, and a clock does not
+  care how the numbering is arranged.
+- **The Mac app will not update itself across this.** `electron-updater`
+  refuses to go backwards, and from where an installed copy is standing 1.0.0
+  is backwards. It needs installing once by hand; after that it follows along
+  as usual.
+
+Nothing else moved. The runtime fingerprint is unchanged — checked, not assumed
+— so this ships to an installed phone as an ordinary update and costs no build.
 
 ## 7.228.0 A volume request is a vocabulary, not a list of shapes.
 
