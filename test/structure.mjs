@@ -1017,20 +1017,32 @@ export function run(test) {
      * "I wanna overhaul this whole settings set-up screen." Four doors under
      * a pile of unrelated buttons became: the version line at the top (kept
      * on purpose — "I like that there"), rows each carrying one live fact,
-     * each opening its own page. Rename stays on the Unit page beside Read the
-     * unit again (he asked for it there), the theme switch in with the Play
+     * each opening its own page. The theme switch went in with the Play
      * screen, and the real amp names — "I do like that as well" — got a row of
      * their own.
      *
      * There were seven. "AI & cost" held the two switches, the token ledger
      * and the history of every tone designed, and went with the AI.
+     *
+     * Then "Unit" split in two. It held the unit's state AND the way in to
+     * renaming, and those are not one thing: the state is the far end of the
+     * chain Phone & computer is about, and renaming is an errand. So the
+     * state moved there and the row took the errand's name. "Help & fixes"
+     * became "Troubleshooting" in the same pass.
      */
     const setup = sheet('Setup')
     assert.match(setup, /<div className="device-meta mono setup-version">\{FULL\}<\/div>/, 'the version line is not at the top')
     const rows = [...setup.matchAll(/<SetupRow key="([^"]+)" title="([^"]+)" status=/g)].map((m) => m[2])
     assert.deepEqual(
       rows,
-      ['Unit', 'Phone & computer', 'Play screen', 'Amp & pedal names', 'Help & fixes', 'About'],
+      [
+        'Phone & computer',
+        'Rename presets and scenes',
+        'Play screen',
+        'Amp & pedal names',
+        'Troubleshooting',
+        'About'
+      ],
       `Setup opens on ${rows.length} rows: ${rows.join(', ')}`
     )
     assert.ok(!setup.includes('<Group'), 'the doors are back')
@@ -1042,11 +1054,15 @@ export function run(test) {
       return [...setup.slice(at, next === -1 ? undefined : next).matchAll(/<Section\s+key="([^"]+)"/g)].map((m) => m[1])
     }
     for (const [page, panels] of [
-      ['unit', ['connection']],
-      /* The guide to getting a computer on the other end sits above the
-         details about the line to it: it is the question somebody has when
-         there is nothing on the other end at all. */
-      ['link', ['phone-remote', 'ways-in', 'link-details']],
+      /* Renaming is the page, with nothing in front of it. It is one button
+         and the sentence saying why it is worth pressing, so it needs no
+         folds at all. */
+      ['rename', []],
+      /* Which unit and which port lead, because they are the far end of the
+         chain this page is about. The guide to getting a computer on the
+         other end sits above the details about the line to it: it is the
+         question somebody has when there is nothing on the other end at all. */
+      ['link', ['connection', 'phone-remote', 'ways-in', 'link-details']],
       /* 'playing' was the play-mode switch, whose only job was hiding the
                  ✦ Ask button. Both went with the AI. */
       ['play', ['size', 'appearance']],
@@ -1060,7 +1076,12 @@ export function run(test) {
     ]) {
       assert.deepEqual(behind(page), panels, `the ${page} page holds ${behind(page).join(', ')}`)
     }
-    assert.ok(setup.slice(setup.indexOf("setupPage === 'unit'")).includes('<DeviceDetail'), 'the unit header is not on the Unit page')
+    const linkPage = setup.slice(setup.indexOf("setupPage === 'link'"), setup.indexOf("setupPage === 'play'"))
+    assert.ok(linkPage.includes('<DeviceDetail'), 'the unit header is not on the Phone & computer page')
+    const renamePage = setup.slice(setup.indexOf("setupPage === 'rename'"), setup.indexOf("setupPage === 'link'"))
+    assert.ok(!renamePage.includes('<DeviceDetail'), 'the unit header is back in front of the rename button')
+    assert.match(renamePage, /setSheet\('scenes'\)/, 'the rename page does not open the names sheet')
+    assert.match(renamePage, /setSheetBack\('settings'\)/, 'closing the names sheet would drop out of Setup')
     const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
     assert.match(css, /button\.setup-row \{[^}]*min-height: 60px/, 'a Setup row is under thumb height')
     const row = readFileSync(new URL('../src/components/SetupRow.jsx', import.meta.url), 'utf8')

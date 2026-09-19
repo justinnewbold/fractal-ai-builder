@@ -1809,13 +1809,21 @@ export function run(test) {
      * it. Nobody opens Setup to rename scene 6.
      *
      * A list of rows, each carrying the one fact you would have opened it to
-     * learn, each opening its own page. Renaming lives on the Unit page, which
-     * is where the browser put it: "move the rename presets and scenes button
-     * to the settings menu".
+     * learn, each opening its own page. Renaming lives behind its own row —
+     * "move the rename presets and scenes button to the settings menu" — and
+     * that row is named after the errand rather than after the unit, because
+     * the unit's own state belongs with the rest of the chain on Phone &
+     * computer.
      */
     const settings = read('mobile/src/screens/Settings.js')
 
-    for (const row of ['Unit', 'Phone & computer', 'Play screen', 'About']) {
+    for (const row of [
+      'Phone & computer',
+      'Rename presets and scenes',
+      'Play screen',
+      'Troubleshooting',
+      'About'
+    ]) {
       assert.match(
         settings,
         new RegExp(`title="${row.replace('&', '&')}"`),
@@ -1825,7 +1833,7 @@ export function run(test) {
     assert.match(settings, /const \[page, setPage\] = useState\(null\)/, 'Setup is one scroll again rather than a list of pages')
 
     /*
-     * The renaming boxes are behind the Unit row, not in front of everything.
+     * The renaming boxes are behind their own row, not in front of everything.
      * Checked by position: what is drawn for `page === null` must not contain
      * them.
      */
@@ -1834,12 +1842,26 @@ export function run(test) {
     assert.ok(!/UnitBits/.test(root), 'the scene-name boxes are back on the front page of Setup')
     assert.ok(!/TileSize/.test(root), 'the tile size buttons are on the front page rather than behind Play screen')
 
-    const unit = settings.slice(settings.indexOf("{page === 'unit' ?"), settings.indexOf("{page === 'link' ?"))
-    assert.match(unit, /<UnitBits \/>/, 'renaming is not on the Unit page')
+    const unit = settings.slice(settings.indexOf("{page === 'unit' ?"), settings.indexOf("{page === 'trouble' ?"))
+    assert.match(unit, /<UnitBits \/>/, 'renaming is not on the rename page')
+
+    /*
+     * Fixes, the log and the feedback form are three stages of one errand, so
+     * they are behind one door rather than three rows deep in the list.
+     */
+    const trouble = settings.slice(settings.indexOf("{page === 'trouble' ?"), settings.indexOf("{page === 'link' ?"))
+    assert.ok(trouble.length > 200, 'the Troubleshooting page moved; this check reads it')
+    for (const [inside, why] of [
+      [/onPress=\{onOpenFixes\}/, 'the fixes'],
+      [/onPress=\{onOpenLog\}/, 'the log'],
+      [/onPress=\{onOpenReport\}/, 'the feedback form']
+    ]) {
+      assert.match(trouble, inside, `Troubleshooting has no way into ${why}`)
+    }
 
     /* Each row says something true about the state it leads to, which is the
        whole point of the list: it answers most questions without a tap. */
-    assert.match(settings, /status=\{\s*link !== 'connected'\s*\?\s*'Not connected'[\s\S]{0,300}?`\$\{deviceName \|\| 'Unit'\} · not answering`[\s\S]{0,120}?`\$\{deviceName \|\| 'Unit'\} · connected`/)
+    assert.match(settings, /status=\{\s*demo\s*\?\s*'Demo — simulated FM3'[\s\S]{0,500}?`\$\{deviceName \|\| 'Unit'\} · connected`/)
     assert.match(settings, /status=\{SIZES\[loadSize\(sync\)\]\?\.name/)
   })
 
@@ -4884,7 +4906,7 @@ export function run(test) {
     /* It says what it is, every time, rather than letting somebody think a
        simulated FM3 is their FM3. */
     assert.match(settings, /This is the demo — a simulated FM3/, 'the demo does not say it is one')
-    assert.match(settings, /status=\{demo \? 'Demo — simulated FM3' : linkWord\}/, 'Setup does not show that the demo is on')
+    assert.match(settings, /status=\{ demo \? 'Demo — simulated FM3' :/, 'Setup does not show that the demo is on')
 
     /* The link reads as connected, because from every screen's point of view it
        is: the questions get answered. Otherwise the app refuses to open the
@@ -4977,6 +4999,6 @@ export function run(test) {
     assert.match(rig, /const unit = caps\?\.connected === false \? 'missing' : 'present'/, 'a Mac with no unit is not noticed')
     assert.match(rig, /fresh\?\.number === -1 \? \{ unit: 'silent' \}/, 'a unit that stops answering its name is not noticed')
     const settings = read('mobile/src/screens/Settings.js').replace(/\s+/g, ' ')
-    assert.match(settings, /unitState === 'silent' \? `\$\{deviceName \|\| 'Unit'\} · not answering`/, 'Setup still says connected over a silent unit')
+    assert.match(settings, /unitState === 'silent' \? `Computer connected · \$\{deviceName \|\| 'unit'\} not answering`/, 'Setup still says connected over a silent unit')
   })
 }

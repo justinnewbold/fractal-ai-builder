@@ -315,11 +315,28 @@ const HAND_EDIT_KINDS = new Set([
 ])
 
 /** The pages behind Setup's rows, by key, in the words on the rows. */
+/*
+ * The doors, in the order somebody meets them.
+ *
+ * "Unit" was the top row and it held two unrelated things: whether the unit
+ * is answering, and the way in to renaming presets and scenes. The first of
+ * those is what "Phone & computer" is ABOUT — the cable, the computer, the
+ * unit on the end of it, one chain — and splitting the chain over two rows
+ * meant neither row could say whether it was working. So the state went
+ * there, the row kept the errand, and the row is named after the errand:
+ * "Rename presets and scenes" is a thing you came here to DO, where "Unit"
+ * was a thing you had to open to find out what was inside.
+ *
+ * "Help & fixes" is "Troubleshooting" for the same reason the log and the
+ * feedback form now live behind it: they are three stages of one errand —
+ * read what to try, read what happened, tell somebody — and they were three
+ * rows that each looked like a different errand.
+ */
 const SETUP_PAGES = {
-  unit: 'Unit',
   link: 'Phone & computer',
+  rename: 'Rename presets and scenes',
   play: 'Play screen',
-  help: 'Help & fixes',
+  help: 'Troubleshooting',
   about: 'About'
 }
 const THEME_WORD = { auto: 'Auto', light: 'Light', dark: 'Dark' }
@@ -3507,7 +3524,16 @@ export default function App() {
 
       <Sheet
         open={sheet === 'scenes'}
-        onClose={() => setSheet(null)}
+        /*
+         * Back to whatever opened it. The scene chip on the Edit screen wants
+         * the Edit screen; Setup's rename page wants Setup — "when you go
+         * deeper into the settings menu have swiping down or clicking the X
+         * take you back to the settings menu instead of the home screen".
+         */
+        onClose={() => {
+          setSheet(sheetBack)
+          setSheetBack(null)
+        }}
         title="Scenes"
         alert={sheetAlert}
       >
@@ -3621,23 +3647,70 @@ export default function App() {
           <>
             <div className="device-meta mono setup-version">{FULL}</div>
             <div className="setup-rows">
-              <SetupRow key="unit" title="Unit" status={status === 'live' ? `${device?.short || device?.name || 'Unit'} · connected` : 'Not connected'} onClick={() => setSetupPage('unit')} />
-              <SetupRow key="link" title="Phone & computer" status={describeLink(link).note || 'Phone remote off'} onClick={() => setSetupPage('link')} />
+              {/* The whole chain on one line: the computer, and the unit on
+                  the end of it. Two rows could each only say half of it, and
+                  half of a chain is never the answer to "why is nothing
+                  happening". */}
+              <SetupRow key="link" title="Phone & computer" status={[describeLink(link).note || 'Phone remote off', status === 'live' ? `${device?.short || device?.name || 'Unit'} · connected` : 'No unit'].join(' · ')} onClick={() => setSetupPage('link')} />
+              <SetupRow key="rename" title="Rename presets and scenes" status={status === 'live' ? 'Give them names you will know on a dark stage' : 'Connect a unit first'} onClick={() => setSetupPage('rename')} />
               <SetupRow key="play" title="Play screen" status={[fit ? 'Fit to screen' : SIZES[size].name, THEME_WORD[getMode()] || null].filter(Boolean).join(' · ')} onClick={() => setSetupPage('play')} />
               <SetupRow key="gear-names" title="Amp & pedal names" status="What each model on your unit really is" onClick={() => setSheet('gear')} />
-              <SetupRow key="help" title="Help & fixes" status={`${getDebugLog().length} line${getDebugLog().length === 1 ? '' : 's'} in the log`} onClick={() => setSetupPage('help')} />
+              <SetupRow key="help" title="Troubleshooting" status={`${getDebugLog().length} line${getDebugLog().length === 1 ? '' : 's'} in the log`} onClick={() => setSetupPage('help')} />
               <SetupRow key="about" title="About" status={FULL} onClick={() => setSetupPage('about')} />
             </div>
           </>
         ) : null}
 
-        {setupPage === 'unit' ? (
+        {setupPage === 'rename' ? (
           <div className="setup-page">
             <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
               ‹ Setup
             </button>
-            <p className="setup-page-title">{SETUP_PAGES.unit}</p>
-            <DeviceDetail status={status} device={device} onRetry={reconnect} busy={busy} onRename={() => setSheet('scenes')} />
+            <p className="setup-page-title">{SETUP_PAGES.rename}</p>
+            {/*
+              One errand, said in the words of the errand.
+
+              The button used to sit in the row of connection buttons on the
+              Unit page, between "Reconnect" and the address box, where it was
+              the only one of them that changed anything on the unit. Here it
+              is the page.
+            */}
+            <p className="hint">
+              The names your unit came with are numbers and abbreviations. These are the words you
+              read off a phone on a dark stage, so they are worth the minute it takes.
+            </p>
+            {status === 'live' ? (
+              <button
+                className="primary"
+                disabled={busy}
+                onClick={() => {
+                  setSheetBack('settings')
+                  setSheet('scenes')
+                }}
+              >
+                Rename preset or scenes
+              </button>
+            ) : (
+              <p className="hint">
+                Nothing to rename until a unit is answering. Phone &amp; computer, one row up, says
+                what the chain is doing.
+              </p>
+            )}
+          </div>
+        ) : null}
+
+        {setupPage === 'link' ? (
+          <div className="setup-page">
+            <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
+              ‹ Setup
+            </button>
+            <p className="setup-page-title">{SETUP_PAGES.link}</p>
+            {/*
+              The unit's own state leads, because it is the far end of the
+              chain this page is about and the thing that was hardest to find:
+              it used to be behind a row called "Unit", one door along.
+            */}
+            <DeviceDetail status={status} device={device} onRetry={reconnect} busy={busy} />
 <Section key="connection" title="Connection" note="Which unit this app is talking to">
             <Ports
               busy={busy}
@@ -3648,15 +3721,6 @@ export default function App() {
               }}
             />
           </Section>
-          </div>
-        ) : null}
-
-        {setupPage === 'link' ? (
-          <div className="setup-page">
-            <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
-              ‹ Setup
-            </button>
-            <p className="setup-page-title">{SETUP_PAGES.link}</p>
 <Section key="phone-remote" title="Phone remote" note={describeLink(link).note}>
             {/*
               One panel for both ends. It says which end this is, whether the

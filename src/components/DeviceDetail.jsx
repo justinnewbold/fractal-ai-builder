@@ -14,7 +14,7 @@ import { FULL } from '../lib/version'
  * This was DeviceBar, whose collapsed summary the top bar carries. What
  * survives is the fold, opened by the gear.
  */
-export default function DeviceDetail({ status, device, onRetry, busy, onRename }) {
+export default function DeviceDetail({ status, device, onRetry, busy }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(getHost())
 
@@ -123,14 +123,6 @@ export default function DeviceDetail({ status, device, onRetry, busy, onRename }
             <button onClick={onRetry} disabled={busy}>
               {busy ? 'Reading…' : status === 'live' ? 'Read the unit again' : 'Reconnect'}
             </button>
-            {/* "Move the rename presets and scenes button to the settings menu
-                next to read this unit again." Only with a unit answering — there
-                is nothing to name otherwise. */}
-            {onRename && status === 'live' ? (
-              <button onClick={onRename} disabled={busy}>
-                Rename preset or scenes
-              </button>
-            ) : null}
           </>
         )}
       </div>
