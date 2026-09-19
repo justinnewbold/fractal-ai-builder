@@ -49,7 +49,20 @@ export const SIZES = [
   { name: 'Largest', tile: 120, col: 190, scenes: 1, fx: 1 }
 ]
 
-export const DEFAULT_SIZE = 1
+/*
+ * Smallest, so the whole rig is on the screen the first time it is seen.
+ *
+ * "Make the default play screen button sizes (smallest) so that everything
+ * fits on the screen. Currently, it's set to small, as the default. You have
+ * to scroll up and down a little to see everything."
+ *
+ * One step up put the scenes and the effects over the bottom of a phone, so
+ * the first impression of the stage screen was one you had to scroll — and a
+ * stage screen you scroll is one you cannot use with a guitar on. Anybody who
+ * wants bigger targets can still have them, and that choice is remembered;
+ * the DEFAULT is the one that fits.
+ */
+export const DEFAULT_SIZE = 0
 
 const KEY = 'fractal.gigSize'
 

@@ -279,7 +279,7 @@ export const AREAS = [
     phone: ['mobile/src/screens/Stage.js'],
     buttons: [
       { does: 'open the block editor', web: 'Edit', phone: 'Edit' },
-      { does: 'tap a tempo in', web: 'Tap', phone: 'Tap' },
+      { does: 'tap a tempo in', web: 'Tap Tempo', phone: 'Tap Tempo' },
       {
         does: 'turn the tuner on and off',
         web: 'Tuner',

@@ -3112,11 +3112,33 @@ export function run(test) {
        handler still found a clearTimeout and the test passed. It does not now. */
     const tapFn = g.slice(g.indexOf('const tap = async'), g.indexOf('useEffect(() => () => clearTimeout'))
     assert.match(tapFn, /clearTimeout\(reread\.current\)/, 'a second tap no longer cancels the pending read')
-    assert.match(tapFn, /setTimeout\(\(\) => refreshTempo\(\)/, 'the tempo is never re-read, so the number goes stale')
+    assert.match(tapFn, /refreshTempo\(\)/, 'the tempo is never re-read, so the number goes stale')
     assert.ok(
       tapFn.indexOf('await tapBeat()') < tapFn.indexOf('setTimeout'),
       'the read is scheduled before the tap is sent'
     )
+
+    /*
+     * AND THE NUMBER MOVES ON THE TAP, not on the read that follows it.
+     *
+     * "It should change the tempo based on the tap and change the number
+     * immediately and then read the device … right now it takes a few seconds
+     * after doing the tap, so you can't even tell the tempo you're tapping
+     * at." The readout used to come only from the unit, and the unit cannot be
+     * asked until the burst ends — which is the paragraph above — so the
+     * figure lagged the last press by nearly a second. Tapping is how you find
+     * a tempo; one you cannot see while tapping is one you cannot aim.
+     *
+     * Both halves are held: the arithmetic happens before the request goes,
+     * and it is cleared when the unit answers so the two never disagree on
+     * screen.
+     */
+    assert.match(tapFn, /tappedBpm\(/, 'the taps are no longer turned into a tempo on this end')
+    assert.ok(
+      tapFn.indexOf('setTapped(') < tapFn.indexOf('await tapBeat()'),
+      'the number waits for the request, so it still lags the tap'
+    )
+    assert.match(tapFn, /setTapped\(null\)/, 'our own figure is never cleared, so the unit can never correct it')
 
     /*
      * The size control lives in Setup now, and Play carries none of it.

@@ -493,7 +493,7 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
           */}
           <Press
             grow
-            label="Tap"
+            label="Tap Tempo"
             sub={Number.isFinite(bpm) ? String(Math.round(bpm)) : undefined}
             tone="signal"
             height={foot}

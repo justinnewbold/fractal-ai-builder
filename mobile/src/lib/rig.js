@@ -18,7 +18,7 @@ import { useSyncExternalStore } from 'react'
 
 import * as device from './device'
 import { idOf, sameBlock } from './unit.mjs'
-import { TAP_REREAD_MS } from './tempo'
+import { TAP_REREAD_MS, keepTaps, tappedBpm } from './tempo'
 import { DEFAULT_SLUG, deviceSlug } from './device-slug'
 import { adopt as adoptNames, forget as forgetNames, learn as learnName, nameOf } from './presetNames'
 import { forget as forgetControls } from './paramIndex'
@@ -678,8 +678,35 @@ async function readTappedTempo() {
   tempoSetAt = Date.now()
 }
 
+/* When each tap happened, so the tempo they mean can be shown at once rather
+   than waited for. Module-level beside `reread` because a burst of taps is one
+   rhythm however many screens come and go during it. */
+let taps = []
+
 export async function tapTempo() {
   clearTimeout(reread)
+  /*
+   * WHAT THE TAPS MEAN, SHOWN NOW.
+   *
+   * "It should change the tempo based on the tap and change the number
+   * immediately and then read the device … right now it takes a few seconds
+   * after doing the tap, so you can't even tell the tempo you're tapping at."
+   *
+   * The figure used to come only from the unit, and the unit cannot be asked
+   * until tapping stops — see TAP_REREAD_MS — so it lagged the last press by
+   * nearly a second. Tapping is how you FIND a tempo; one you cannot see while
+   * tapping is one you cannot aim.
+   *
+   * tempoSetAt is stamped so the ordinary stale-read guard protects this the
+   * same way it protects a typed tempo. readTappedTempo clears it deliberately,
+   * which is how the unit's own answer gets to win a moment later.
+   */
+  taps = keepTaps(taps, Date.now())
+  const guess = tappedBpm(taps)
+  if (guess != null) {
+    set({ bpm: guess })
+    tempoSetAt = Date.now()
+  }
   try {
     await device.tapTempo()
   } catch (err) {
