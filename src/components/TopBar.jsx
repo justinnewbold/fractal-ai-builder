@@ -39,6 +39,19 @@ export default function TopBar({
   dirty,
   onOpenPresets,
   onOpenSettings,
+  /*
+   * The unit's name, tapped. "Make it so that if you tap the top left button
+   * where it shows the current device in the demo mode, that it'll bring up
+   * that same list where you can change which one you're on."
+   *
+   * It goes two places, because the name means two different things. In the
+   * demo it is a choice — which of the five this is pretending to be — and
+   * the picker is the answer. On a real rig it is a fact, and the question
+   * behind tapping it is "what IS this thing" — firmware, grid, scenes,
+   * slots, and what it is connected through. App decides which; the bar only
+   * knows the name is worth pressing.
+   */
+  onOpenUnit,
   /* Given only when there is an output level to move — see the speaker below. */
   onOpenVolume,
   link,
@@ -97,7 +110,19 @@ export default function TopBar({
     <div className="topbar" data-status={lampState}>
       <div className="topbar-row">
         <span className="lamp" data-state={lampState} />
-        <span className="topbar-unit silk-label">{unit}</span>
+        {/*
+          A button, because the name was the one thing in this bar that looked
+          like a label and was the first thing anybody pressed. The preset
+          beside it has been a button for the same reason since the bar was
+          built: it is what you would change.
+        */}
+        <button
+          className="topbar-unit silk-label"
+          onClick={onOpenUnit}
+          aria-label={demo ? 'Which unit the demo is' : 'About this unit'}
+        >
+          {unit}
+        </button>
         {/* The word carries the state as well as saying it: green when the unit
             is answering, red when it isn't, so the bar reads at a glance. */}
         {how ? (

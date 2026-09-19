@@ -315,9 +315,24 @@ button.scene-line:active:not(:disabled) {
   min-height: 44px;
 }
 
-.topbar-unit {
+/* A button that has to keep reading as the label it was. Same reset as the
+   preset and the gear beside it — no chrome of its own, the bar's own colour,
+   and the 44px floor met by the row rather than by a box drawn around the
+   word, which at this size would be a badge in the middle of the bar. */
+button.topbar-unit {
   flex: 0 0 auto;
   font-size: var(--f-3);
+  padding: var(--s-1) var(--s-2);
+  margin-left: calc(var(--s-2) * -1);
+  background: none;
+  border-color: transparent;
+  border-radius: var(--r-2);
+  color: inherit;
+  min-height: 44px;
+}
+
+button.topbar-unit:active:not(:disabled) {
+  background: var(--panel);
 }
 
 /* "demo" in the mono face at 10px with no tracking read as "deno". The word
@@ -1050,8 +1065,9 @@ input[type='text']:focus-visible {
     display: none;
   }
 
-  .topbar-unit {
+  button.topbar-unit {
     font-size: var(--f-2);
+    padding: var(--s-1);
     max-width: 9ch;
     overflow: hidden;
     text-overflow: ellipsis;

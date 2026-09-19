@@ -35,7 +35,7 @@ const face = Platform.select(mono)
  * The words come from shared/link-word.mjs rather than from here, so the two
  * apps cannot drift into saying different things about the same link.
  */
-export default function TopBar({ link, onOpenSettings }) {
+export default function TopBar({ link, onOpenSettings, onOpenUnit }) {
   const unit = useRig(ofDeviceName)
   const unitState = useRig(ofUnitState)
   const blocks = useRig(ofAllBlocks)
@@ -118,12 +118,31 @@ export default function TopBar({ link, onOpenSettings }) {
     >
       <Lamp state={unitLamp} />
 
-      <Text
-        numberOfLines={1}
-        style={{ color: unitSaid ? color.fault : color.silk, fontSize: font.small, fontWeight: '700', letterSpacing: 1.5 }}
+      {/*
+        The name is pressed, not just read. "If you tap the top left button
+        where it shows the current device in the demo mode, that it'll bring
+        up that same list where you can change which one you're on."
+
+        It goes to Setup, which is where both answers already live: the five
+        units under Which unit while the demo is on, and what this rig is and
+        what it is connected through when it is not. The browser can open Setup
+        already standing on the right page and this cannot — Setup is one
+        screen here, not a stack — so the phone lands at the top of it, with
+        the demo block first on the screen when the demo is what is running.
+      */}
+      <Pressable
+        onPress={onOpenUnit || onOpenSettings}
+        accessibilityRole="button"
+        accessibilityLabel={demo ? 'Which unit the demo is' : 'About this unit'}
+        hitSlop={8}
       >
-        {named}
-      </Text>
+        <Text
+          numberOfLines={1}
+          style={{ color: unitSaid ? color.fault : color.silk, fontSize: font.small, fontWeight: '700', letterSpacing: 1.5 }}
+        >
+          {named}
+        </Text>
+      </Pressable>
 
       {/*
         The version, where it can be read without opening anything.
