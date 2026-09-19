@@ -642,7 +642,7 @@ export function run(test) {
     assert.match(lists, /listsForIn\(device, sync\)/, 'lib/lists is not handing the storage down')
   })
 
-  test('Previous and Next on the phone follow the setlist, and the SOURCE button says which', () => {
+  test('Previous and Next on the phone follow the setlist, and the Setlists button says which', () => {
     /*
      * "Hitting next or previous cycles through songs on the favorites or
      * setlists." The phone's two buttons walked slot numbers, which is the
@@ -665,7 +665,7 @@ export function run(test) {
 
     /* The button between them, and the word above it: a lone "All" reads as a
        caption rather than as the thing that decides what the other two do. */
-    assert.match(stage, /caption="Source"/, 'nothing on the stage screen says what the buttons walk')
+    assert.match(stage, /caption="Setlists"/, 'nothing on the stage screen says what the buttons walk')
     assert.match(stage, /onPress=\{onOpenSetlists\}/, 'the source button does not open anything')
     assert.match(read('mobile/App.js'), /screen === 'setlists'/, 'there is no setlist screen to open')
   })

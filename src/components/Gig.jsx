@@ -967,8 +967,10 @@ export default function Gig({
         >
           {/* The word above the name: a lone "All" between Previous and Next
               read as a caption, not as the button that picks what those two
-              step through. */}
-          <span className="gig-nav-source-kind">Source</span>
+              step through. It says Setlist rather than Source because that is
+              the name of the thing on every other screen; "source" named the
+              mechanism, which is the app's business and not the player's. */}
+          <span className="gig-nav-source-kind">Setlists</span>
           <span className="gig-nav-source-name">{order ? sourceName : 'All'}</span>
           {sourceWhere ? <span className="gig-nav-source-pos mono">{sourceWhere}</span> : null}
         </button>

@@ -203,9 +203,11 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
    *
    * "Starred 3/7" is the third starred preset of seven; a setlist shows its
    * name. Off the list altogether it shows only the count, and Next goes to the
-   * first song. The word SOURCE sits above it because a lone "All" between
-   * Previous and Next reads as a caption rather than as the button that decides
-   * what those two do.
+   * The word SETLIST sits above it because a lone "All" between Previous and
+   * Next reads as a caption rather than as the button that decides what those
+   * two do — and because setlist is what the thing IS called everywhere else
+   * in the app. "Source" was the word for the mechanism: All, Starred or a
+   * list, three things a programmer would group and nobody else would.
    */
   const at = order ? positionIn(order, preset?.number) : 0
   const where = order ? (at ? `${at}/${order.length}` : `${order.length}`) : ''
@@ -449,7 +451,7 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
           <Press grow label="‹ Previous" height={foot} disabled={landing(-1) === null} onPress={() => step(-1)} />
           <Press
             grow
-            caption="Source"
+            caption="Setlists"
             label={order ? sourceLabel(source, { favourites, lists }) : 'All'}
             sub={where || undefined}
             tone="signal"
