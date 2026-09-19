@@ -3231,10 +3231,10 @@ export function run(test) {
      */
     const ways = await import('../shared/ways-in.mjs')
 
-    assert.equal(ways.WAYS.length, 4, 'there are not four ways in')
+    assert.equal(ways.WAYS.length, 5, 'there are not five ways in')
     const ids = ways.WAYS.map((w) => w.id)
-    assert.equal(new Set(ids).size, 4, 'two routes share an id')
-    for (const want of ['mac-app', 'windows-app', 'mac-terminal', 'windows-terminal']) {
+    assert.equal(new Set(ids).size, 5, 'two routes share an id')
+    for (const want of ['mac-app', 'windows-app', 'linux-app', 'mac-terminal', 'windows-terminal']) {
       assert.ok(ids.includes(want), `there is no route for ${want}`)
     }
     for (const way of ways.WAYS) {
@@ -3251,10 +3251,16 @@ export function run(test) {
     /* Two are downloadable now — the app for each computer. The terminal
        routes stay `manual`, because building a server from source is not the
        same offer as an installer and should not read like one. */
+    /*
+     * THREE APPS NOW, and the Linux one exists because the answer to "what
+     * does a Linux user do" was nothing. The one-paste installer looked like
+     * the answer and was not: it clones three repositories, two of them
+     * private, so a stranger stops at the first fetch.
+     */
     assert.deepEqual(
       ways.WAYS.filter((w) => w.status === 'ready').map((w) => w.id),
-      ['mac-app', 'windows-app'],
-      'the downloadable routes are not the two apps'
+      ['mac-app', 'windows-app', 'linux-app'],
+      'the downloadable routes are not the three apps'
     )
     assert.deepEqual(
       ways.WAYS.filter((w) => w.status === 'manual').map((w) => w.id),
@@ -3272,10 +3278,21 @@ export function run(test) {
       iphone: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
       /* An iPad's user agent says Macintosh, which is exactly the trap. */
       ipad: 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) Macintosh',
-      android: 'Mozilla/5.0 (Linux; Android 14)'
+      android: 'Mozilla/5.0 (Linux; Android 14)',
+      linux: 'Mozilla/5.0 (X11; Linux x86_64)',
+      chromebook: 'Mozilla/5.0 (X11; CrOS x86_64 14541.0.0)'
     }
     assert.equal(ways.osGuess(UA.windows), 'windows')
     assert.equal(ways.osGuess(UA.mac), 'mac')
+    assert.equal(ways.osGuess(UA.linux), 'linux')
+    /*
+     * And the two that LOOK like Linux and are not. Every Android user agent
+     * says "Linux", and a Chromebook says "X11; CrOS" — so both match the
+     * Linux test unless they are ruled out before it. Android must not be
+     * offered an AppImage, and ChromeOS's Linux environment is a container
+     * whose USB access varies by machine.
+     */
+    assert.equal(ways.osGuess(UA.chromebook), null, 'a Chromebook was offered a Linux download')
     for (const handset of ['iphone', 'ipad', 'android'])
       assert.equal(ways.osGuess(UA[handset]), null, `a ${handset} was read as a computer`)
     assert.equal(ways.osGuess(''), null)
@@ -3284,12 +3301,11 @@ export function run(test) {
     /* Sorted for this computer, and within it the thing that WORKS first — a
        Windows visitor used to open on "The Windows app — not built yet", which
        is a page that begins by saying it cannot help you. */
-    assert.deepEqual(ways.waysFor('windows').map((w) => w.id), [
+    assert.deepEqual(ways.waysFor('windows').map((w) => w.id).slice(0, 2), [
       'windows-app',
-      'windows-terminal',
-      'mac-app',
-      'mac-terminal'
+      'windows-terminal'
     ])
+    assert.equal(ways.waysFor('linux')[0].id, 'linux-app', 'a Linux visitor does not open on the Linux app')
     /*
      * Both Windows routes work now, so that order is the list's own and the
      * sort no longer moves anything. The rule the sort exists for is checked

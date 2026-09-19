@@ -444,8 +444,22 @@ export function run(test) {
     assert.match(read('scripts/icon.mjs'), /TRAY_WIN/, 'nothing generates the Windows tray icon, so it cannot be regenerated from the artwork')
 
     const wf = read('.github/workflows/desktop.yml')
-    const job = wf.slice(wf.indexOf('\n  windows:'))
-    assert.ok(wf.includes('\n  windows:'), 'nothing builds it')
+    /*
+     * Bounded at the next job, not at the end of the file.
+     *
+     * This read from `windows:` to EOF, which was right while windows was
+     * last and silently wrong the moment a linux job was added after it: the
+     * slice swallowed linux's own `Package` step and the publish-flag check
+     * below failed against a step that was never meant to match. A slice that
+     * depends on being last is a slice that breaks when somebody appends.
+     */
+    const jobBody = (name) => {
+      const at = wf.indexOf(`\n  ${name}:\n`)
+      assert.notEqual(at, -1, `the ${name} job is gone`)
+      const next = wf.slice(at + 1).search(/\n {2}[a-z][a-z0-9-]*:\n/)
+      return next === -1 ? wf.slice(at) : wf.slice(at, at + 1 + next)
+    }
+    const job = jobBody('windows')
     assert.match(job, /runs-on: windows-latest/, 'the Windows app is being built somewhere that is not Windows')
     /* bash for every step in that job: the heredoc, the loops over release/,
        and the publish flag below. */
@@ -506,6 +520,168 @@ export function run(test) {
     /* And it still only ever publishes deliberately, from the default branch. */
     assert.match(unsigned, /github\.event_name != 'pull_request'/, 'a pull request could publish a release')
     assert.match(unsigned, /github\.ref == 'refs\/heads\/main'/, "a build from any branch could publish under main's name")
+  })
+
+  test('the Linux app builds both formats, and the .deb has the fields Debian demands', async () => {
+    /*
+     * "Do the Linux app."
+     *
+     * WHAT THIS TEST IS ACTUALLY FOR. The first Linux build failed, on both
+     * architectures, at the very last step — the AppImage was already made,
+     * the native modules had already been proved to load — because the .deb
+     * target refused to assemble without a Homepage field and a maintainer
+     * address. Neither is a thing anybody notices missing: the Mac and Windows
+     * installers have never wanted them, and the config reads as complete.
+     *
+     * A whole CI cycle to be told a package needs an email address in it. That
+     * is the kind of failure that is cheap to catch here and expensive to
+     * catch there, so it is caught here.
+     */
+    const yml = read('desktop/electron-builder.yml')
+    assert.ok(yml.includes('\nlinux:'), 'there is no Linux target at all')
+    const linux = yml.slice(yml.indexOf('\nlinux:'))
+
+    /*
+     * BOTH FORMATS, AND THEY ARE NOT INTERCHANGEABLE. AppImage is the one that
+     * runs anywhere without an install step, and it is the ONLY Linux format
+     * electron-updater knows how to update — a .deb can never replace itself.
+     * The .deb is for the box in a rack that stays on, where `apt install
+     * ./file.deb` is a thing somebody already knows. Drop either and a real
+     * person loses something.
+     */
+    assert.match(linux, /AppImage/, 'no AppImage, so there is no Linux download that updates itself')
+    assert.match(linux, /deb/, 'no .deb, so the rack machine has no package it recognises')
+
+    /*
+     * THE TWO FIELDS THE BUILD DIED ON, AND THEY LIVE IN DIFFERENT FILES.
+     *
+     * electron-builder reports them in one breath — "specify project homepage"
+     * and "specify author email" — which makes it read as one missing block.
+     * It is not. `maintainer` is a deb option and belongs in the yml;
+     * `homepage` is package.json METADATA and is not a configuration key at
+     * all. Putting it in the yml, which is the obvious response to the error,
+     * fails the whole config on `unknown property 'homepage'` before anything
+     * is packaged — a worse failure than the one being fixed, and the second
+     * red CI run this test exists to have prevented.
+     */
+    const pkg = JSON.parse(read('desktop/package.json'))
+    assert.match(
+      String(pkg.homepage),
+      /^https:\/\//,
+      'desktop/package.json has no homepage, and the .deb build stops rather than defaulting'
+    )
+    assert.ok(
+      !/^homepage:/m.test(yml),
+      "homepage is in electron-builder.yml, where it is not a real option — electron-builder rejects the whole config"
+    )
+    const deb = yml.slice(yml.indexOf('\ndeb:'))
+    assert.match(
+      deb,
+      /maintainer: .+ <[^@\s]+@[^>\s]+>/,
+      'the .deb names no maintainer with a working address, and the build refuses to guess one'
+    )
+
+    /*
+     * AND NO INVENTED KEYS ANYWHERE AT THE TOP LEVEL, which is the general
+     * form of the mistake above.
+     *
+     * electron-builder validates its whole config against a schema before it
+     * does any work, so one misremembered key name costs a full CI cycle and
+     * produces nothing. This is that schema's top-level property list, copied
+     * from electron-builder 25's own rejection message. It only needs revising
+     * when the pinned electron-builder major moves.
+     */
+    const VALID_TOP_LEVEL = new Set(
+      `afterAllArtifactBuild afterExtract afterPack afterSign apk appId appImage appx
+       appxManifestCreated artifactBuildCompleted artifactBuildStarted artifactName asar
+       asarUnpack beforeBuild beforePack buildDependenciesFromSource buildNumber buildVersion
+       compression copyright cscKeyPassword cscLink deb defaultArch detectUpdateChannel
+       directories disableDefaultIgnoredFiles disableSanityCheckAsar dmg downloadAlternateFFmpeg
+       electronBranding electronCompile electronDist electronDownload electronLanguages
+       electronUpdaterCompatibility electronVersion executableName extends extraFiles
+       extraMetadata extraResources fileAssociations files flatpak forceCodeSigning framework
+       freebsd generateUpdatesFilesForAllChannels icon includePdb includeSubNodeModules
+       launchUiVersion linux mac mas masDev msi msiProjectCreated msiWrapped nativeRebuilder
+       nodeGypRebuild nodeVersion npmArgs npmRebuild nsis nsisWeb onNodeModuleFile p5p pacman
+       pkg portable productName protocols publish releaseInfo removePackageKeywords
+       removePackageScripts rpm snap squirrelWindows target win $schema`.split(/\s+/)
+    )
+    const topLevel = yml.split('\n').flatMap((line) => {
+      const m = /^([A-Za-z$][A-Za-z0-9$]*):/.exec(line)
+      return m ? [m[1]] : []
+    })
+    for (const key of topLevel) {
+      assert.ok(
+        VALID_TOP_LEVEL.has(key),
+        `electron-builder has no top-level option "${key}" — it rejects the entire config and builds nothing`
+      )
+    }
+
+    /*
+     * AND NO ARCHITECTURE LIST, which is the one thing here that is a decision
+     * rather than a requirement. serialport and @julusian/midi are compiled
+     * for whatever machine ran `npm ci`, so an x64 runner asked to emit an
+     * arm64 package produces an installer that opens and never finds the unit.
+     * Two jobs, each building only for itself, is what makes the Raspberry Pi
+     * download real. A list here would quietly undo that.
+     */
+    const target = linux.slice(linux.indexOf('target:'))
+    assert.ok(
+      !/arch:/.test(target.slice(0, target.indexOf('\ndeb:') === -1 ? undefined : target.indexOf('\ndeb:'))),
+      'the Linux target names architectures, so one runner will cross-build a package whose device layer cannot load'
+    )
+
+    /* No shell syntax in the script, for the same reason dist:win has none. */
+    const scripts = JSON.parse(read('desktop/package.json')).scripts
+    assert.ok(!/[$][{]/.test(scripts['dist:linux']), 'dist:linux carries shell syntax, which npm runs through its own shell')
+
+    /*
+     * AND THE ARM BUILD HAS A PACKAGER IT CAN ACTUALLY RUN.
+     *
+     * electron-builder shells out to fpm to make a .deb, and the copy it
+     * downloads is published for linux-x86 only — there is no arm64 build of
+     * it. On the arm runner the AppImage finishes, the .deb starts, and a
+     * 32-bit x86 Ruby meets an arm64 kernel: "cannot execute binary file".
+     * fpm is a gem, so installing it and pointing app-builder at PATH fixes
+     * it; that is what the arm-only step does.
+     *
+     * THE FLAG HAS TO BE EXPORTED FROM THAT STEP, not set on Package with a
+     * conditional value, and this is the part worth holding. app-builder
+     * checks whether USE_SYSTEM_FPM is PRESENT and never reads its value, so
+     * the natural `${{ ... || '' }}` spelling gives x64 an empty string that
+     * still means yes — and x64 then hunts for an fpm nobody installed. The
+     * variable must not exist there at all.
+     */
+    const wfL = read('.github/workflows/desktop.yml')
+    const linuxJob = (() => {
+      const at = wfL.indexOf('\n  linux:\n')
+      assert.notEqual(at, -1, 'the linux job is gone')
+      const next = wfL.slice(at + 1).search(/\n {2}[a-z][a-z0-9-]*:\n/)
+      return next === -1 ? wfL.slice(at) : wfL.slice(at, at + 1 + next)
+    })()
+    assert.match(linuxJob, /gem install --no-document fpm/, 'nothing installs fpm, so the arm .deb cannot be built at all')
+    assert.match(
+      linuxJob,
+      /echo "USE_SYSTEM_FPM=true" >> "\$GITHUB_ENV"/,
+      'the system-fpm switch is not exported from the step that installs it, so the two can disagree'
+    )
+    /* Real YAML lines only — the paragraph above spells the bad form out in
+       prose, and a naive search finds its own explanation. */
+    const setsAsEnv = linuxJob
+      .split('\n')
+      .map((line) => line.trim())
+      .some((line) => !line.startsWith('#') && line.startsWith('USE_SYSTEM_FPM:'))
+    assert.ok(
+      !setsAsEnv,
+      'USE_SYSTEM_FPM is set as a step env — an empty value there still reads as ON, and x64 would look for an fpm it never installed'
+    )
+    /* And the install is arm-only: x64's bundled fpm works and needs no gem. */
+    const fpmStep = linuxJob.slice(linuxJob.indexOf('- name: A packager that runs on this machine'))
+    assert.match(
+      fpmStep.slice(0, fpmStep.indexOf('- name: Package')),
+      /if: matrix\.arch == 'arm64'/,
+      'the fpm install is not limited to arm64, so the x64 build grew a dependency it does not need'
+    )
   })
 
   test('the two one-paste installers are real files, and say the same things', async () => {
