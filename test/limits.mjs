@@ -1287,6 +1287,55 @@ export function run(test) {
     assert.match(gen, /omitBackground: !out\.opaque/, 'the icon script ignores its own opaque flag')
   })
 
+  /**
+   * A DOWNLOAD PAGE, BECAUSE A RELEASES PAGE IS NOT ONE.
+   *
+   * "Right now it's just taking users to GitHub, which can be kind of
+   * confusing to a lot of people I feel."
+   *
+   * A release carries twenty files. Two disk images, two zips, two AppImages,
+   * two .deb packages, an .exe, four .yml and a pile of .blockmaps — and four
+   * of those are the UPDATER's, which would do nothing at all if a person
+   * downloaded one. Exactly one file is the one they want and nothing on that
+   * page says which.
+   */
+  test('the download page offers one file, not twenty', () => {
+    const page = read('public/downloads.html')
+
+    /* Only the computer builds. The Android ones share the same list under
+       apk-v, and GitHub's own /releases/latest hands back whichever of the
+       two was published last. */
+    assert.match(page, /\/\^v\\d\/\.test\(String\(r\.tag_name\)\)/, 'the page does not separate computer builds from Android ones')
+
+    /* Newest by CLOCK, not by number — the same trap the Android page fell
+       into. 1.0.1 loses to 7.397.0 on the number for ever. */
+    assert.match(page, /when\(b\) - when\(a\)/, 'the page picks the highest version number, which the renumber broke')
+    assert.match(page, /Date\.parse\(r\.published_at/, 'the newest build is not decided by when it was published')
+
+    /* Both Macs, because the user agent cannot tell them apart and a wrong
+       guess is a download that will not open. */
+    assert.match(page, /-arm64\\\.dmg\$/, 'no Apple Silicon build is offered')
+    assert.match(page, /About This Mac/, 'nothing tells somebody how to find out which Mac they have')
+
+    /* And never a file that is not a program. A .blockmap or a latest.yml is
+       for the updater and is a dead end in a person's downloads folder. */
+    for (const dead of ['blockmap', 'latest-mac', 'latest.yml']) {
+      assert.ok(
+        !new RegExp(`href[^\n]*${dead}`).test(page),
+        `the page offers ${dead}, which is for the updater and does nothing on its own`
+      )
+    }
+
+    /* Routed before the catch-all, or /downloads is swallowed by the app. */
+    const vercel = JSON.parse(read('vercel.json'))
+    const paths = vercel.rewrites.map((r) => r.source)
+    assert.ok(paths.includes('/downloads'), '/downloads is not routed')
+    assert.ok(
+      paths.indexOf('/downloads') < paths.indexOf('/(.*)'),
+      '/downloads sits after the catch-all, so it never reaches the page'
+    )
+  })
+
   test('the Android link is a bookmark rather than a thing to ask for', () => {
     /*
      * "Is there a link that I can just save to my bookmarks that will take me
