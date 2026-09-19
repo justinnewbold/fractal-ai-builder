@@ -781,10 +781,14 @@ export function run(test) {
       assert.match(specsFor('amp', jvm), /watt/, `${where} has no spec line for the JVM`)
       assert.ok(paragraphsOf(descriptionFor('amp', jvm)).length > 1, `${where} draws the JVM as one block`)
 
-      /* And every one-sentence entry still draws, untouched: an array of one,
-         and no spec line rather than an empty one. */
-      assert.equal(paragraphsOf(descriptionFor('amp', '1987X Treble')).length, 1, `${where} changed an existing description`)
-      assert.equal(specsFor('amp', '1987X Treble'), null, `${where} invents a spec line`)
+      /* And a model inherits its family's page whole — spec line and all
+         the paragraphs — rather than only the first sentence of it. */
+      assert.ok(paragraphsOf(descriptionFor('amp', '1987X Treble')).length > 1, `${where} gives a voicing only part of its family's page`)
+      assert.match(specsFor('amp', '1987X Treble'), /50 watt/, `${where} loses the family's spec line on a voicing`)
+
+      /* Nothing written is still nothing drawn: a block with no catalog at
+         all must not acquire a spec line from somewhere. */
+      assert.equal(specsFor('reverb', 'Ambient'), null, `${where} invents a spec line`)
     }
 
     /* Both pages read all three, or the fields exist and nothing draws them. */

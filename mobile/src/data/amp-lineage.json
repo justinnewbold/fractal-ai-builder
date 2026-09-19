@@ -3,705 +3,833 @@
     "family": "1959SLP",
     "manufacturer": "Marshall",
     "basedOn": "Marshall SLP1959, Vintage Re-Issue Series",
-    "description": "The 100-watt Super Lead behind most British rock — almost clean at low volume, and a roar once the power section is working."
+    "specs": "100 watt · ECC83 / EL34",
+    "description": "The Super Lead, and 1959 is its part number rather than its year — it arrived in 1965 and defined everything after it.\n\nTwo channels with four inputs, meant to be jumpered together with a short cable so you can blend the bright channel against the normal one. That trick is half the sound, and it is the first thing to try here.\n\nIt wants to be loud and it rewards you for it. Below halfway it is a stiff clean amp; past that the power section starts to give and the whole thing opens up."
   },
   {
     "family": "1987X",
     "manufacturer": "Marshall",
     "basedOn": "Marshall 1987X, Vintage Re-Issue Series",
-    "description": "The 50-watt Plexi. Same voice as its bigger brother but it breaks up sooner, which is why it turns up on more records than the 100."
+    "specs": "50 watt · ECC83 / EL34",
+    "description": "The 50-watt Plexi, and the one that actually turns up on records more than its bigger brother does.\n\nHalf the power means it breaks up at a volume a room can survive, and a 50-watt Marshall pushed hard has a looser, warmer low end than a 100 doing the same job. Engineers worked this out early and never went back.\n\nSame four inputs, same jumper trick, same absence of a gain knob. If the 100 feels too tight and too clean for where you have the volume set, this is the one."
   },
   {
     "family": "5153",
     "manufacturer": "EVH",
     "basedOn": "EVH 5150 III",
-    "description": "Eddie Van Halen's last amp design — a tighter, more modern take on the 5150 he made famous, with the low end kept under control."
+    "specs": "100 watt · 12AX7 / EL34 or 6L6",
+    "description": "The 5150 III, and Eddie Van Halen's last amp design — built with EVH rather than Peavey, and a deliberate correction of the original.\n\nThree channels, EL34s in the 100-watt version, and a tighter, more modern low end with the 5150's harshness sanded off. The blue channel is the one everybody uses."
   },
   {
     "family": "59 Bassguy",
     "manufacturer": "Fender",
     "basedOn": "1959 Fender Narrow Panel Tweed Bassman, 5F6-A",
-    "description": "Built for a bass and adopted by guitarists instead. The tweed Bassman is where the Marshall sound came from, and it still does blues better than anything."
+    "specs": "45 watt · 12AX7 / 5881",
+    "description": "The 5F6-A tweed Bassman: built for a bass guitar, ignored by bass players, and adopted by everybody else.\n\nFour 10-inch speakers and a tone stack that became the tone stack — Jim Marshall copied this circuit almost exactly to build his first amp, so every British amp in this list is descended from it.\n\nIt does not stay clean for long and it was never meant to. Pushed, it is the sound of a Telecaster in a small room, and it still does blues better than anything built since."
   },
   {
     "family": "65 Bassguy",
     "manufacturer": "Fender",
     "basedOn": "Dweezil Zappa's 1965 blackface Fender Bassman, AB165",
-    "description": "The blackface Bassman — cleaner and stiffer than the tweed, with the scooped mids Fender moved to in the sixties."
+    "specs": "50 watt · 12AX7 / 6L6",
+    "description": "The blackface Bassman, which is a different amp from the tweed despite the name. Fender scooped the midrange and stiffened the power section.\n\nCleaner, louder and far less willing to break up — a pedal platform before anybody used that phrase. Where the tweed gives you its own character, this one gives you yours."
   },
   {
     "family": "5F1 Tweed",
     "manufacturer": "Fender",
     "basedOn": "Fender Narrow Panel Tweed Champ, 5F1",
-    "description": "A five-watt one-knob Champ. Too small for a stage and perfect in front of a microphone, which is why so many famous solos were cut on one."
+    "specs": "5 watt · 12AX7 / 6V6",
+    "description": "The Champ. One volume knob, one 8-inch speaker, five watts, and an unreasonable number of famous solos.\n\nIt is far too small for a stage and exactly right in front of a microphone, which is why it lived in studios for decades. Turn it up and it distorts immediately — there is nothing else for it to do.\n\nThe sound is small, urgent and slightly falling apart, and no big amp turned down will imitate it."
   },
   {
     "family": "5F8 Tweed",
     "manufacturer": "Fender",
     "basedOn": "Fender Narrow Panel high-powered Tweed Twin, 5F8",
-    "description": "The high-powered tweed Twin — the loudest thing Fender built before the blackface era, and it stays thick rather than getting brittle."
+    "specs": "80 watt · 12AX7 / 6L6",
+    "description": "The high-powered tweed Twin — the loudest thing Fender made in the fifties and, for a while, the loudest thing anyone made.\n\nTwo 12s and four output valves, with enough headroom to stay clean at volumes the smaller tweeds could not approach. Push it past that and you get an enormous, slow, three-dimensional distortion that the blackface amps traded away for cleanliness."
   },
   {
     "family": "6G4 Super",
     "manufacturer": "Fender",
     "basedOn": "1960 brown Fender Super, 6G4",
-    "description": "Brown-panel Fender: the halfway house between tweed warmth and blackface clarity, with the tremolo that era is loved for."
+    "specs": "40 watt · 12AX7 / 6L6",
+    "description": "A brown-panel Super from 1960 — the short window between the tweed amps and the blackface ones, when Fender was still figuring out what it wanted.\n\nTwo 10s, harmonic tremolo, and a midrange that sits between the warmth of the tweeds and the glass of the blackface. The brown amps are the connoisseur's Fenders for exactly this reason."
   },
   {
     "family": "6G12 Concert",
     "manufacturer": "Fender",
     "basedOn": "1960 brown Fender Concert, 6G12",
-    "description": "A brown-panel four-by-ten. Loud, round, and famously hard to make sound bad — a clean platform with a little hair on top."
+    "specs": "40 watt · 12AX7 / 6L6",
+    "description": "The brown Concert: four 10-inch speakers, which is the Bassman cabinet, wearing the brown-era circuit.\n\nMore punch and a firmer low end than the two-speaker amps of the same period, and the same slightly woody midrange."
   },
   {
     "family": "AC-20",
     "manufacturer": "Morgan",
     "basedOn": "Morgan AC20 Deluxe",
-    "description": "A modern boutique take on the AC30 idea, built to get the chime at a volume that does not clear the room."
+    "specs": "20 watt · ECC83 / EL84",
+    "description": "Morgan's AC20 — a modern British-voiced amp with an AC30 heart and twenty watts of it.\n\nChime and grind at a volume that works in a small room, with better build quality than the amp it descends from."
   },
   {
     "family": "Angle Severe",
     "manufacturer": "Engl",
     "basedOn": "Engl Savage 120",
-    "description": "German high gain — very tight, very controlled, and voiced for fast picking to stay separated rather than turning to mush."
+    "specs": "120 watt · ECC83 / EL34",
+    "description": "The Engl Savage: a lot of gain, a lot of control, and a very tight low end.\n\nGerman high gain is a recognisable thing — more compressed and more focused than British or American amps, with an almost synthetic evenness to the distortion. This is the archetype."
   },
   {
     "family": "Archean",
     "manufacturer": "PRS",
     "basedOn": "PRS Archon",
-    "description": "PRS's modern high-gain amp. Clean and lead voices a long way apart, with a tight bottom end aimed at drop tunings."
+    "specs": "100 watt · 12AX7 / 6L6",
+    "description": "The PRS Archon: a lot of gain from a company better known for guitars, and a genuinely excellent clean channel underneath it.\n\nSmooth rather than aggressive, with a clarity in the high end that suits it to lead playing."
   },
   {
     "family": "Atomica",
     "manufacturer": "Cameron",
-    "basedOn": "Cameron Atomica"
+    "basedOn": "Cameron Atomica",
+    "specs": "100 watt · 12AX7 / EL34",
+    "description": "Mark Cameron built his reputation modifying Marshalls to an extreme degree, and the Atomica is one of his own designs rather than a modified amp.\n\nMade in small numbers and rarely seen. If you own one you know more about it than this catalogue does."
   },
   {
     "family": "Band-Commander",
     "manufacturer": "Fender",
     "basedOn": "1968 Fender Bandmaster, AB763",
-    "description": "A blackface Bandmaster. The same circuit family as the Deluxe Reverb without the reverb, so the top end stays dry and direct."
+    "specs": "40 watt · 12AX7 / 6L6",
+    "description": "A blackface Bandmaster head — the AB763 circuit, which is the one Fender got right and then used in almost everything.\n\nClean, bright, and generous with headroom, with the scooped midrange that makes a Stratocaster sound like a Stratocaster. It is a platform more than a voice."
   },
   {
     "family": "Blankenship Leeds",
     "manufacturer": "Blankenship",
-    "basedOn": "Blankenship Leeds 21"
+    "basedOn": "Blankenship Leeds 21",
+    "specs": "21 watt · 12AX7 / EL84",
+    "description": "The Blankenship Leeds 21 — a hand-built California amp in the British tradition, voiced closer to a Hiwatt than to a Vox.\n\nClean, firm and made in very small numbers, which is most of why you have not heard one."
   },
   {
     "family": "Bludojai",
     "manufacturer": "Bludotone",
-    "basedOn": "Bludotone Ojai"
+    "basedOn": "Bludotone Ojai",
+    "specs": "100 watt · 12AX7 / 6L6",
+    "description": "The Bludotone Ojai, one of the better-regarded Dumble-style builds.\n\nA Fender-voiced clean with a smooth overdrive on top, and the responsiveness to the guitar volume that the whole style is built around."
   },
   {
     "family": "Bogfish",
     "manufacturer": "Bogner",
     "basedOn": "Bogner Fish preamp",
-    "description": "Bogner's rack preamp — the Ecstasy family's voices in a box that lived in the racks of late-eighties session players."
+    "specs": "ECC83 · preamp only",
+    "description": "The Fish — Bogner's rack preamp from the early nineties, and one of the strangest-looking pieces of gear in this catalogue.\n\nFive voicings covering the Bogner range, all in one rack unit. Steve Vai used one for years."
   },
   {
     "family": "Brit 800",
     "manufacturer": "Marshall",
     "basedOn": "Marshall JCM800",
-    "description": "The JCM800: bright, mid-forward, and tight. Most eighties rock and a good deal of the metal after it went through one of these."
+    "specs": "100 watt · ECC83 / EL34",
+    "description": "The JCM800 2203, and the sound of the eighties with the volume up. Marshall added a master volume, which meant for the first time you could get the amp's distortion without the amp's full output.\n\nThat one change made thrash possible. It is tighter and more mid-forward than a Plexi, with a hard edge to the top that cuts through anything — and it stays articulate when you play fast, which the older amps do not.\n\nVery little gain by modern standards. If it sounds thin, that is the amp asking for a pedal in front of it, which is exactly how most of those records were made."
   },
   {
     "family": "Brit 800 Studio 20",
     "manufacturer": "Marshall",
     "basedOn": "Marshall Studio Classic SC20, a 20-watt JCM800",
-    "description": "A 20-watt JCM800. The same voice at a volume that works in a room with a ceiling."
+    "specs": "20 watt · ECC83 / EL34",
+    "description": "The JCM800 shrunk to 20 watts. Same preamp, same master volume, far less air being moved.\n\nIt gives up some of the big amp's authority in the low end and gains a little immediacy in return. For recording it is arguably the more useful of the two."
   },
   {
     "family": "Brit AFS100",
     "manufacturer": "Marshall",
     "basedOn": "Marshall AFD100, Slash's signature amp",
-    "description": "Slash's signature Marshall, aimed at the sound of the first Guns N' Roses record — a hot-rodded Plexi with more gain than the original had."
+    "specs": "100 watt · ECC83 / EL34",
+    "description": "Marshall's attempt to bottle one specific night: Slash's rhythm sound on Appetite for Destruction, which came from a heavily modified amp nobody could buy.\n\nSo they built it. More gain and more low end than a stock Plexi, with the midrange pushed forward where a Les Paul lives, and a presence control that will take your head off if you let it."
   },
   {
     "family": "Brit Super",
     "manufacturer": "Marshall",
     "basedOn": "Marshall AFD100, Slash's signature amp",
-    "description": "The same Slash-voiced Marshall, taken from its cleaner side."
+    "specs": "100 watt · ECC83 / EL34",
+    "description": "The other side of the AFD100 — Marshall's signature Slash head, voiced towards the older, cleaner Super Lead behaviour rather than its modified channel.\n\nUse it where you want the Appetite amp's body without its gain."
   },
   {
     "family": "Brit JM45",
     "manufacturer": "Marshall",
     "basedOn": "Marshall JTM45",
-    "description": "The JTM45 — Marshall's first amp, and still close enough to the tweed Bassman it was copied from to sound like one."
+    "specs": "30 watt · ECC83 / KT66",
+    "description": "The first Marshall. Jim Marshall's shop copied a Fender Bassman almost part for part, then changed the valves and the speakers — and got something that sounded nothing like a Fender.\n\nKT66 output valves and a valve rectifier give it a soft, forgiving compression: notes swell rather than snap. Clapton made the Beano record with one and set the template for British blues rock in about forty minutes.\n\nWarmer and rounder than every Marshall that followed. If a Plexi sounds too aggressive, this is where to go."
   },
   {
     "family": "Brit JVM",
     "manufacturer": "Marshall",
     "basedOn": "Marshall JVM410H",
     "specs": "100 watt · ECC83 / EL34",
-    "description": "A modern four-channel Marshall that covers the whole history of the brand, from clean to more gain than a Plexi ever had.\n\nFour channels, three voices each, which is the whole point of it: twelve settings that walk from a JTM 45 up to something with more gain than any Marshall sold before it. The models here are the two overdrive channels.\n\nThey have a lot of gain on tap. Start with Input Drive lower than feels right and come up — this is an amp that will happily give you more than the song wants."
+    "description": "Marshall's own answer to the question of which Marshall you want: all of them.\n\nFour channels, three voices each, which walks from a JTM 45 through a Plexi and a JCM800 to more gain than Marshall had ever put in a production amp. The models here are the two overdrive channels, which is where most people live.\n\nThey have a great deal of gain on tap. Start with Input Drive lower than feels right and come up — this amp will happily give you more than the song wants."
   },
   {
     "family": "Brit Pre",
     "manufacturer": "Marshall",
     "basedOn": "Marshall JMP-1 preamp",
-    "description": "The JMP-1 preamp, which lived in a rack with a power amp under it. The sound of a lot of early-nineties rock records."
+    "specs": "ECC83 · preamp only",
+    "description": "The JMP-1, a rack preamp from 1992, and for a decade the quiet centre of an awful lot of professional rigs.\n\nIt is Marshall's voicings under MIDI control with no power section of its own, which made it the first Marshall you could switch silently mid-song. That convenience is why it turns up on so many records from that period."
   },
   {
     "family": "Brit Silver",
     "manufacturer": "Marshall",
     "basedOn": "Marshall Silver Jubilee",
-    "description": "The Silver Jubilee — a Marshall with a diode-clipped gain stage that gives it a slightly compressed, vocal quality all its own."
+    "specs": "100 watt · ECC83 / EL34",
+    "description": "The Silver Jubilee, built in 1987 for Marshall's twenty-fifth year and then wanted forever afterwards.\n\nIt runs its output valves in a half-power pentode mode and uses diode clipping in the preamp, which sounds like it should be a compromise and instead produces a thick, vocal midrange that no other Marshall has. Slash toured on them; Frusciante recorded on one.\n\nMore gain than a JCM800 and more body than a JVM. The rhythm/lead clip switch is the whole amp in one button."
   },
   {
     "family": "Buddah DuoMaster",
     "manufacturer": "Budda",
     "basedOn": "Budda Twinmaster",
-    "description": "A small class-A boutique combo — warm, compressed, and happiest overdriven."
+    "specs": "18 watt · 12AX7 / EL84",
+    "description": "Budda's Twinmaster — a small EL84 amp from the nineties, voiced warm and loose rather than chimey.\n\nIt was one of the first modern low-wattage boutique amps and a lot of what followed took its cue from it."
   },
   {
     "family": "CA3+",
     "manufacturer": "Custom Audio Amplifiers",
     "basedOn": "Custom Audio Amplifiers 3+ SE preamp",
-    "description": "The CAA 3+ preamp — a rack unit with a famous clean and a very usable high-gain channel, from the era when everyone played racks."
+    "specs": "ECC83 · preamp only",
+    "description": "The Custom Audio 3+ SE: Bob Bradshaw's rack preamp, and the heart of an enormous number of professional rigs in the late eighties and nineties.\n\nThree channels, MIDI switching, and a clean channel good enough that people used the preamp for that alone. Bradshaw built the rigs; this is what was usually in them."
   },
   {
     "family": "Cameron CCV",
     "manufacturer": "Cameron",
-    "basedOn": "Cameron CCV-100"
+    "basedOn": "Cameron CCV-100",
+    "specs": "100 watt · 12AX7 / EL34",
+    "description": "The amp Mark Cameron's Marshall modifications eventually turned into — a British circuit taken a long way past where Marshall left it.\n\nBuilt in small numbers and hard to find second hand."
   },
   {
     "family": "Capt Hook",
     "manufacturer": "HOOK",
-    "basedOn": "HOOK Captain 34"
+    "basedOn": "HOOK Captain 34",
+    "specs": "34 watt · 12AX7 / EL34",
+    "description": "The HOOK Captain 34 — a hand-built European boutique amp made in very small numbers.\n\nThere is little written about it anywhere, and this catalogue would rather say that than guess."
   },
   {
     "family": "Car Ambler",
     "manufacturer": "Carr",
     "basedOn": "Carr Rambler",
-    "description": "A boutique American combo built around the blackface Fender idea, with more headroom and better reverb than the original."
+    "specs": "28 watt · 12AX7 / 6L6",
+    "description": "The Carr Rambler — a boutique American amp built around the blackface Fender idea, with an attenuator so it can break up at any volume.\n\nClean, chiming, and unusually well made."
   },
   {
     "family": "Carol-Ann OD-2",
     "manufacturer": "Carol-Ann",
-    "basedOn": "Carol-Ann OD2"
+    "basedOn": "Carol-Ann OD2",
+    "specs": "100 watt · 12AX7 / EL34",
+    "description": "Carol-Ann's OD2, a hand-built American amp aimed at high gain, made in very small numbers by one builder.\n\nRare enough that most players will never meet one outside a model like this."
   },
   {
     "family": "Carol-Ann Triptik",
     "manufacturer": "Carol-Ann",
-    "basedOn": "Carol-Ann Triptik"
+    "basedOn": "Carol-Ann Triptik",
+    "specs": "100 watt · 12AX7 / EL34",
+    "description": "The Carol-Ann Triptik: three channels, hand built, and produced in tiny quantities.\n\nAnother amp most people will only ever hear as a model rather than in a room."
   },
   {
     "family": "Carol-Ann Tucana",
     "manufacturer": "Carol-Ann",
-    "basedOn": "Carol-Ann Tucana 3"
+    "basedOn": "Carol-Ann Tucana 3",
+    "specs": "100 watt · 12AX7 / 6L6",
+    "description": "The Tucana 3 — Carol-Ann's American-voiced amp, built around clean headroom rather than modern high gain.\n\nHand built in very small numbers, and seldom seen outside the hands of the people who ordered one."
   },
   {
     "family": "Citrus A30",
     "manufacturer": "Orange",
     "basedOn": "Orange AD30HTC",
-    "description": "Orange's hand-wired 30-watter. Thick and woody rather than bright, with a midrange that sits over a band instead of under it."
+    "specs": "30 watt · ECC83 / EL84",
+    "description": "The Orange AD30: EL84s, no master volume, and a midrange that will not be argued with.\n\nBritish class A in the Vox tradition but darker and thicker, with far more low-mid weight. It is a very forward-sounding amp and it does not disappear in a band."
   },
   {
     "family": "Citrus Bass 200",
     "manufacturer": "Orange",
     "basedOn": "Orange AD200B",
-    "description": "Orange's big valve bass head — round, warm, and happy to be pushed until the low end starts to move."
+    "specs": "200 watt · ECC83 / KT88",
+    "description": "Orange's AD200B: valve bass amplification with the Orange midrange, which is thick, warm and slightly rude.\n\nLess scooped than an SVT and more obviously coloured. Geezer Butler's sound in a box."
   },
   {
     "family": "Citrus RV50",
     "manufacturer": "Orange",
     "basedOn": "Orange Rockerverb 50 MK II",
-    "description": "A modern Orange with real gain on tap. Keeps the thick midrange and adds enough saturation for heavy music."
+    "specs": "50 watt · ECC83 / EL34",
+    "description": "The Rockerverb — Orange's high-gain amp, and the one that made the brand credible to metal players.\n\nThick, warm saturation with the Orange midrange underneath it, and a clean channel with real reverb. Less scooped than an American high-gain amp and much easier to hear in a mix."
   },
   {
     "family": "Citrus Terrier",
     "manufacturer": "Orange",
     "basedOn": "Orange Tiny Terror",
-    "description": "The Tiny Terror. Fifteen watts, two knobs and a tone control — famous for being far louder and nastier than it looks."
+    "specs": "15 watt · ECC83 / EL84",
+    "description": "The Tiny Terror: fifteen watts, two knobs and a handle, and the amp that started the entire small-valve-head boom of the 2000s.\n\nAlmost no controls and no clean headroom to speak of. Turn it up, play, and it does one very good thing."
   },
   {
     "family": "Class-A 15W TB",
     "manufacturer": "Vox",
     "basedOn": "Vox AC15 Top Boost",
-    "description": "An AC15 with Top Boost. The chime of the bigger Vox at a volume you can actually use, and it breaks up early."
+    "specs": "15 watt · ECC83 / EL84",
+    "description": "The AC15 with Top Boost — half the power and a single 12, which is the AC30 sound at a volume a normal room can take.\n\nIt breaks up considerably earlier than the 30, which for most people is an advantage rather than a compromise."
   },
   {
     "family": "Class-A 30W",
     "manufacturer": "Vox",
     "basedOn": "Vox AC30",
-    "description": "The AC30 without Top Boost — darker and rounder than the version most people picture, and the sound of the early British invasion."
+    "specs": "30 watt · ECC83 / EL84",
+    "description": "The AC30 without Top Boost — the original, which is brighter and more raw than the version everyone means when they say AC30.\n\nNo negative feedback and cathode bias, so it compresses and blooms rather than staying stiff. The Beatles made their early records on these.\n\nChiming when clean, and when pushed it gets a ragged upper-midrange bark that nothing else quite does."
   },
   {
     "family": "Class-A 30W TB",
     "manufacturer": "Vox",
     "basedOn": "Vox AC30 Top Boost",
-    "description": "The AC30 Top Boost: the jangle. Chimey and bright, and it compresses in a way no Fender does."
+    "specs": "30 watt · ECC83 / EL84",
+    "description": "The AC30 Top Boost: an extra valve stage and a proper treble and bass control, added because players kept asking for more high end.\n\nThat circuit is the British jangle — Brian May's entire sound is one of these with a treble booster in front, and The Edge built U2 on the clean channel with delay.\n\nPush the volume and it does not so much distort as fray, brilliantly, in the upper mids."
   },
   {
     "family": "Comet 60",
     "manufacturer": "Komet",
     "basedOn": "Komet 60",
-    "description": "A Trainwreck-inspired boutique amp — touch sensitive to the point of being demanding, and enormous when you dig in."
+    "specs": "60 watt · 12AX7 / EL34",
+    "description": "The Komet 60, built to a Ken Fischer design after his death — the Trainwreck idea in a slightly more practical amp.\n\nExtremely touch-sensitive, very little compression, and expensive."
   },
   {
     "family": "Comet Concourse",
     "manufacturer": "Komet",
     "basedOn": "Komet Concorde",
-    "description": "A boutique amp in the Trainwreck tradition, with more headroom than the Komet 60 and the same touch response."
+    "specs": "60 watt · 12AX7 / EL34",
+    "description": "Komet's Concorde: more gain and more modern voicing than the Komet 60, while keeping the responsiveness that the brand is built on."
   },
   {
     "family": "Cornfed M50",
     "manufacturer": "Cornford",
     "basedOn": "Cornford MK50 II",
-    "description": "A British boutique high-gain head — tight and aggressive, with a hard-edged midrange."
+    "specs": "50 watt · ECC83 / EL34",
+    "description": "The Cornford MK50 II — a British hand-built amp with a tight, modern gain structure over a traditional EL34 power section.\n\nCornford made relatively few amps and they are well regarded by people who found them."
   },
   {
     "family": "Das Metall",
     "manufacturer": "Diezel",
     "basedOn": "Diezel VH4",
-    "description": "Diezel's VH4 — German high gain built for tightness above everything, with a low end that stays defined under heavy distortion."
+    "specs": "100 watt · ECC83 / EL34",
+    "description": "The Diezel VH4, and the sound of German engineering applied to distortion.\n\nFour independent channels, each with its own everything, and a high-gain voice that is tight, dark and enormous all at once. Adam Jones built Tool's sound on one; Metallica have used them for years.\n\nIt is not a warm amp. It is a precise one, and at high gain that precision is the entire appeal."
   },
   {
     "family": "Deluxe 6G3",
     "manufacturer": "Fender",
     "basedOn": "1961 brown Fender Deluxe, 6G3",
-    "description": "A brown-panel Deluxe. Small, warm, and it starts to break up early, which is most of the appeal."
+    "specs": "20 watt · 12AX7 / 6V6",
+    "description": "The brown Deluxe. Twenty watts, one 12, and the brown-panel harmonic tremolo, which is a genuinely different effect from the amplitude tremolo that replaced it.\n\nIt breaks up early and gracefully and it is one of the best small amps Fender ever built."
   },
   {
     "family": "Deluxe Tweed",
     "manufacturer": "Fender",
     "basedOn": "Fender Tweed Deluxe, 5E3",
-    "description": "The 5E3 Tweed Deluxe — two controls that fight each other, almost no headroom, and a raggedness people spend a lot of money to get."
+    "specs": "15 watt · 12AX7 / 6V6",
+    "description": "The 5E3 tweed Deluxe, and the most copied small amp in the world.\n\nCathode-biased with no negative feedback, which in practice means it sags, blooms and compresses under your hands in a way modern amps do not. The two volume controls interact — turning one up changes the other — and learning that interaction is learning the amp.\n\nNeil Young has used one for fifty years. It is small, loose and completely alive."
   },
   {
     "family": "Deluxe Verb",
     "manufacturer": "Fender",
     "basedOn": "1965 blackface Fender Deluxe Reverb, AB763",
-    "description": "The Deluxe Reverb: the studio clean amp. Loud enough for a small stage, with the reverb and tremolo everyone copies."
+    "specs": "22 watt · 12AX7 / 6V6",
+    "description": "The blackface Deluxe Reverb: probably the most recorded guitar amp ever built.\n\nTwenty-two watts is loud enough for a club and quiet enough to break up on stage, and the reverb and tremolo are the standard everyone else is measured against. Clean up to about five, then a warm, gentle overdrive after that.\n\nIf you do not know which amp to start from, start from this one."
   },
   {
     "family": "Diamante",
     "manufacturer": "Diamond",
-    "basedOn": "Diamond Del Fuego"
+    "basedOn": "Diamond Del Fuego",
+    "specs": "50 watt · 12AX7 / EL34",
+    "description": "The Diamond Del Fuego, a hand-built amp from a small Canadian maker better known for its pedals.\n\nProduced in limited numbers and not widely documented anywhere."
   },
   {
     "family": "Dirty Shirley",
     "manufacturer": "Friedman",
     "basedOn": "Friedman Dirty Shirley",
-    "description": "Friedman's lower-gain amp — a hot-rodded British voice aimed at classic rock rather than metal."
+    "specs": "40 watt · ECC83 / EL34",
+    "description": "Friedman's blues amp: a single channel, 40 watts, and none of the BE-100's gain.\n\nBuilt around an old JTM-ish voice rather than a modern one — it cleans up completely with the guitar volume and it wants a Les Paul."
   },
   {
     "family": "Div/13 CJ",
     "manufacturer": "Divided By 13",
     "basedOn": "Divided By 13 CJ 11",
-    "description": "A small boutique combo built for touch response — clean to crunch on the guitar's volume knob rather than a footswitch."
+    "specs": "9 watt · 12AX7 / 6V6",
+    "description": "Divided by 13's CJ 11 — a small, beautifully built American-voiced amp in the tweed tradition.\n\nLow powered and quick to break up, with a midrange richer than the wattage suggests."
   },
   {
     "family": "Div/13 FT37",
     "manufacturer": "Divided By 13",
     "basedOn": "Divided By 13 FTR 37",
-    "description": "A boutique amp with a British flavour and boutique headroom — clean, then progressively rude, without ever getting fizzy."
+    "specs": "37 watt · 12AX7 / 6L6",
+    "description": "The FTR 37, Divided by 13's best-known amp: 37 watts, with real reverb and tremolo and a clean sound somewhere between a Fender and a Vox.\n\nIt stays clean far longer than the small Div/13 amps and it takes pedals well."
   },
   {
     "family": "Dizzy V4",
     "manufacturer": "Diezel",
     "basedOn": "Diezel VH4",
-    "description": "The Diezel VH4 taken from another of its channels — the same tight, modern German high gain."
+    "specs": "100 watt · ECC83 / EL34",
+    "description": "The VH4 again — four channels, each fully independent, and a high-gain character that is tight and dark rather than bright and raw.\n\nThe amp for people who found Rectifiers too loose and Marshalls too thin."
   },
   {
     "family": "Double Verb",
     "manufacturer": "Fender",
     "basedOn": "Fender Twin Reverb",
-    "description": "The Twin Reverb. Loud, clean, and hard to overdrive, which is exactly why it is the reference clean amp for pedals."
+    "specs": "85 watt · 12AX7 / 6L6",
+    "description": "The Twin Reverb. Eighty-five watts into two 12s, and effectively impossible to make distort at any volume a human can be in a room with.\n\nThat is the point of it. It is the reference clean amp — country, jazz, funk, anything with a pedalboard in front of it — and the loudest clean sound in this catalogue."
   },
   {
     "family": "Dweezil's Bassguy",
     "manufacturer": "Fender",
     "basedOn": "Dweezil Zappa's modded 1965 blackface Fender Bassman, AB165",
-    "description": "A modified blackface Bassman — more gain than the original, but still the stiff, clean-edged Fender bottom end."
+    "specs": "50 watt · 12AX7 / 6L6",
+    "description": "Dweezil Zappa's blackface Bassman, modified away from clean and towards gain.\n\nThe blackface chassis with more preamp in front of it: the tight, scooped bottom end of the original with something to push against."
   },
   {
     "family": "Energyball",
     "manufacturer": "Engl",
     "basedOn": "Engl Powerball",
-    "description": "Engl's Powerball — aggressive, modern and scooped, built squarely for heavy music."
+    "specs": "100 watt · ECC83 / 6L6",
+    "description": "The Engl Powerball, built for speed. Extremely tight, extremely fast, with a treble response that cuts through anything.\n\nA generation of European metal bands recorded on these."
   },
   {
     "family": "Euro",
     "manufacturer": "Bogner",
     "basedOn": "Bogner Ecstasy, 20th Anniversary edition",
-    "description": "The Bogner Ecstasy — a boutique British-voiced amp that covers Plexi warmth through to modern gain without changing character."
+    "specs": "100 watt · ECC83 / EL34",
+    "description": "The Bogner Ecstasy: Reinhold Bogner's take on what a hot-rodded Marshall should have been, and one of the most flattering amps ever built.\n\nThree channels, and a set of small switches — structure, excursion, plexi mode — that change the amp's character far more than they sound like they should. The midrange is rich and slightly compressed and it makes almost everything sound expensive.\n\nLess aggressive than a Friedman, more complex than a JCM800."
   },
   {
     "family": "Euro Uber",
     "manufacturer": "Bogner",
     "basedOn": "Bogner Uberschall",
-    "description": "The Uberschall. Bogner's heavy amp: enormous low end and a midrange voiced to cut through it."
+    "specs": "120 watt · ECC83 / EL34",
+    "description": "The Uberschall — Bogner's high-gain amp, and a genuinely nasty one.\n\nHuge saturated low end with a tight attack on top of it, built for downtuned playing. Where the Ecstasy flatters, this one flattens."
   },
   {
     "family": "Fox ODS",
     "manufacturer": "Fuchs",
     "basedOn": "Fuchs Overdrive Supreme",
-    "description": "A Dumble-style overdrive amp made in numbers. Smooth, singing lead sounds with a clean that stays out of the way."
+    "specs": "100 watt · 12AX7 / 6L6",
+    "description": "Fuchs's Overdrive Supreme — one of the amps built to make the Dumble sound available to people without a Dumble.\n\nThe same idea: a clean Fender-derived voice with a smooth, vocal overdrive stacked on top, and unusual sensitivity to picking."
   },
   {
     "family": "Friedman BE",
     "manufacturer": "Friedman",
     "basedOn": "Friedman BE-100",
-    "description": "The BE-100 — a modded Marshall made into a product. Tight, saturated and famously good at rhythm playing."
+    "specs": "100 watt · ECC83 / EL34",
+    "description": "The BE-100. Dave Friedman spent twenty years modifying Marshalls for touring professionals and then built the amp those modifications were reaching for.\n\nIt is a Plexi with the gain, low end and tightness that a Plexi never had, and it keeps the original's feel underneath. Jerry Cantrell's rig is built on one.\n\nBE stands for Brown Eye. It is the most Marshall-sounding amp that is not a Marshall."
   },
   {
     "family": "Friedman HBE",
     "manufacturer": "Friedman",
     "basedOn": "Friedman BE-100, HBE (hot British eq) channel",
-    "description": "The BE-100's hotter channel, with more gain and a fatter midrange than the standard voice."
+    "specs": "100 watt · ECC83 / EL34",
+    "description": "The BE-100's other channel — HBE, for Hot British Eq, which is the same amp with considerably more gain and a bigger bottom end.\n\nWhere BE is a hot Plexi, this is a hot JCM800 with the restraint removed."
   },
   {
     "family": "Friedman Small Box",
     "manufacturer": "Friedman",
     "basedOn": "Friedman Small Box",
-    "description": "Friedman's Plexi-flavoured amp — less gain than the BE and more of the old Marshall bark."
+    "specs": "50 watt · ECC83 / EL34",
+    "description": "Friedman's smaller head, voiced closer to a 50-watt Plexi than to the BE-100.\n\nLess gain, more immediacy, and a looser feel. The one to reach for when the BE is too much amp."
   },
   {
     "family": "Fryette D60",
     "manufacturer": "Fryette",
     "basedOn": "Fryette Deliverance 60",
-    "description": "A modern high-gain amp with unusually good clean headroom, so the distortion stays tight rather than woolly."
+    "specs": "60 watt · 12AX7 / EL34",
+    "description": "Steven Fryette's Deliverance: high gain without the scooped midrange that most high-gain amps rely on.\n\nThe result is an amp that sits in a mix instead of disappearing under the bass. Drier and more honest than a Rectifier."
   },
   {
     "family": "Gibtone Scout",
     "manufacturer": "Gibson",
     "basedOn": "1964 Gibson Scout",
-    "description": "A small sixties Gibson combo — dark, loose and characterful, nothing like a Fender of the same size."
+    "specs": "15 watt · 12AX7 / 6V6",
+    "description": "A mid-sixties Gibson Scout. Gibson made amplifiers for decades and almost nobody remembers them, which is why the good ones are still affordable.\n\nDark, loose and woody, with a soft break-up. A different flavour of American small amp from the Fenders everyone reaches for."
   },
   {
     "family": "Herbie",
     "manufacturer": "Diezel",
     "basedOn": "Diezel Herbert",
-    "description": "The Diezel Herbert — more midrange and more personality than the VH4, with a famously useful mid-cut control."
+    "specs": "180 watt · ECC83 / EL34",
+    "description": "The Diezel Herbert: more power than the VH4 and a mid-cut control that lets you scoop or push the midrange without touching the EQ.\n\nBrutal, articulate, and one of the few amps that stays clear with everything turned up."
   },
   {
     "family": "Hipower",
     "manufacturer": "Hiwatt",
     "basedOn": "Hiwatt DR103",
-    "description": "The Hiwatt DR103. Huge clean headroom and a very flat, honest response — the loud amp that stays clean."
+    "specs": "100 watt · ECC83 / EL34",
+    "description": "The Hiwatt DR103: built in London by Dave Reeves to military wiring standards, and the cleanest 100-watt valve amp ever made.\n\nWhere a Marshall breaks up, a Hiwatt just gets louder. Pete Townshend used them because nothing else survived him; Gilmour used them because the headroom let every pedal in front be heard exactly as it was.\n\nIf you want an amp that adds nothing and takes nothing away, this is it."
   },
   {
     "family": "Hot Kitty",
     "manufacturer": "Bad Cat",
     "basedOn": "Bad Cat Hot Cat 30",
-    "description": "A boutique British-voiced amp with more gain than a Vox and more chime than a Marshall."
+    "specs": "30 watt · ECC83 / EL84",
+    "description": "The Bad Cat Hot Cat: class A EL84 power with far more gain than that arrangement usually has.\n\nBritish top end over an American amount of distortion, which is an unusual combination and the reason people buy them."
   },
   {
     "family": "JMPre-1",
     "manufacturer": "Marshall",
     "basedOn": "Marshall JMP-1 preamp",
-    "description": "Marshall's JMP-1 rack preamp — the sound of a lot of early-nineties guitar, and still a very usable clean."
+    "specs": "ECC83 · preamp only",
+    "description": "The JMP-1 again — Marshall's MIDI rack preamp, which put four switchable Marshall voices in one rack space and changed how touring rigs were built.\n\nNo power valves of its own, so it leans harder on whatever comes after it than a head does."
   },
   {
     "family": "JR Blues",
     "manufacturer": "Fender",
     "basedOn": "Fender Blues Junior",
-    "description": "The Blues Junior. A small, cheap, honest Fender combo that breaks up early and has been on more pub stages than anything else."
+    "specs": "15 watt · 12AX7 / EL84",
+    "description": "The Blues Junior: fifteen watts, one 12, EL84s, and the most common small valve amp of the last thirty years.\n\nEL84s give it a brighter, more aggressive break-up than the 6V6 Fenders. It is not subtle and it was never expensive, and it has been on more bar stages than anything else here."
   },
   {
     "family": "JS410",
     "manufacturer": "Marshall",
     "basedOn": "Marshall JVM410HJS, Joe Satriani's signature amp",
-    "description": "Joe Satriani's JVM — the Marshall platform voiced for sustained lead playing."
+    "specs": "100 watt · ECC83 / EL34",
+    "description": "Joe Satriani's JVM, rebuilt around how he actually uses an amp: fewer voices, cleaner switching, and a lead channel with the low end tightened so fast legato stays readable.\n\nSmoother and less grainy than the standard JVM. Built for sustained single notes rather than chugging."
   },
   {
     "family": "Jazz 120",
     "manufacturer": "Roland",
     "basedOn": "Roland JC-120 Jazz Chorus",
-    "description": "The Roland JC-120. Solid state, relentlessly clean, and the chorus built into it is the sound of a lot of eighties records."
+    "specs": "120 watt · solid state",
+    "description": "The Roland JC-120: solid state, 120 watts, and the only transistor amp in this list that anybody wants on purpose.\n\nIt has no valve warmth at all, which is the point — it is relentlessly clean and it has the best stereo chorus ever built into an amplifier. Andy Summers, Robert Smith and a whole generation of post-punk built their sound on that chorus.\n\nMetallica have used them for clean tones for decades."
   },
   {
     "family": "Legend 100",
     "manufacturer": "Carvin",
     "basedOn": "Carvin Legacy VL100, Steve Vai's signature amp",
-    "description": "Steve Vai's Carvin signature — a high-gain amp built for smooth sustain rather than aggression."
+    "specs": "100 watt · 12AX7 / EL34",
+    "description": "Carvin's Legacy — Steve Vai's signature amp, and the one his live sound ran on for years.\n\nVoiced for sustain and smoothness rather than attack, with a midrange that keeps single notes singing."
   },
   {
     "family": "Matchbox Chiefman",
     "manufacturer": "Matchless",
     "basedOn": "Matchless Chieftain",
-    "description": "A hand-wired boutique amp in the British class-A tradition, with more headroom than a Vox."
+    "specs": "40 watt · ECC83 / EL34",
+    "description": "The Matchless Chieftain: EL34s rather than the EL84s Matchless are known for, which gives it more headroom and a more American low end.\n\nThe Matchless build quality applied to a cleaner, bigger-sounding amp."
   },
   {
     "family": "Matchbox D-30",
     "manufacturer": "Matchless",
     "basedOn": "Matchless DC-30",
-    "description": "The Matchless DC-30 — two very different channels, huge chime, and the amp that started the boutique era."
+    "specs": "30 watt · ECC83 / EL84",
+    "description": "The Matchless DC-30: a Vox AC30 rebuilt by people who cared about every component in it, with two quite different channels.\n\nOne channel is chime and the other is a darker, fatter sound closer to a tweed Fender. Point-to-point wired, absurdly expensive, and genuinely one of the best amps ever built."
   },
   {
     "family": "Mr Z Highway 66",
     "manufacturer": "Dr. Z",
     "basedOn": "Dr. Z Route 66",
-    "description": "A Dr. Z with an American voice — more Fender than Vox, with plenty of clean before it goes."
+    "specs": "45 watt · 12AX7 / 6L6",
+    "description": "The Dr. Z Route 66 — the bigger, American-voiced amp in the line, with 6L6s and considerably more headroom.\n\nCleaner and firmer than the Maz amps, and a fine pedal platform."
   },
   {
     "family": "Mr Z MZ-8",
     "manufacturer": "Dr. Z",
     "basedOn": "Dr. Z Maz 8",
-    "description": "An eight-watt Dr. Z. Small enough to overdrive in a bedroom and still sound like a real amp."
+    "specs": "8 watt · 12AX7 / EL84",
+    "description": "The Maz 8: eight watts, and a genuinely usable recording amp that breaks up almost immediately.\n\nSmall, warm and very easy to work with in front of a microphone."
   },
   {
     "family": "Mr Z MZ-38",
     "manufacturer": "Dr. Z",
     "basedOn": "Dr. Z Maz 38",
-    "description": "The Maz 38 — a boutique amp with a bright, cutting top end and the headroom to stay clean with a band."
+    "specs": "38 watt · 12AX7 / EL34",
+    "description": "Dr. Z's Maz 38 — EL34s, a cut control rather than a conventional treble, and a big, thick clean sound.\n\nDr. Z amps are built around the idea that fewer controls, chosen well, beat a full tone stack. Brad Paisley has used them for years."
   },
   {
     "family": "Nuclear-Tone",
     "manufacturer": "Swart",
     "basedOn": "Swart Atomic Space Tone",
-    "description": "A small Swart combo famous for its built-in tube reverb and tremolo — dark, atmospheric, and lovely quiet."
+    "specs": "18 watt · 12AX7 / 6V6",
+    "description": "The Swart Atomic Space Tone: a small, dark, tweed-descended amp with real spring reverb and a tube tremolo that is the reason most people buy one.\n\nIt is not a loud amp or a clean one. It is atmosphere in a box."
   },
   {
     "family": "ODS-100",
     "manufacturer": "Dumble",
     "basedOn": "Dumble Overdrive Special",
-    "description": "The Dumble Overdrive Special. The most mythologised amp ever built: a glassy clean and a lead voice that sings without getting harsh."
+    "specs": "100 watt · 12AX7 / 6L6",
+    "description": "A Dumble Overdrive Special, which is the most mythologised amplifier in existence: Howard Dumble built them one at a time, for people he approved of, and potted the circuit so nobody could copy it.\n\nWhat it actually does is turn a clean Fender voice into a singing overdrive that keeps every bit of the guitar's character underneath. Robben Ford and Larry Carlton built entire careers on that sound.\n\nIt is extremely responsive to the guitar's volume control. Roll back and it cleans up completely."
   },
   {
     "family": "PVH 6160 Block",
     "manufacturer": "Peavey",
     "basedOn": "Block-letter Peavey EVH 5150, the 6505",
-    "description": "The block-letter 5150 — Eddie Van Halen's amp, and then the amp every nu-metal and hardcore band used. Raw, loud, and unsubtle."
+    "specs": "120 watt · 12AX7 / 6L6",
+    "description": "The block-letter 5150 — Peavey building Eddie Van Halen an amp in 1992, and accidentally building the amp that metalcore would run on for the next thirty years.\n\nIt is not subtle and it is not refined. It has a hard upper midrange, an enormous amount of gain, and an attack that cuts through a mix with no help at all.\n\nCheap, everywhere, and completely unkillable."
   },
   {
     "family": "PVH 6160+",
     "manufacturer": "Peavey",
     "basedOn": "Peavey 6505+, the EVH 5150 II",
-    "description": "The 6505+, the second-generation 5150. Tighter and a little more refined than the block-letter, and still a rhythm machine."
+    "specs": "120 watt · 12AX7 / 6L6",
+    "description": "The 6505+, which added a second channel with its own controls and became the standard amp of an entire scene.\n\nMarginally tighter and better behaved than the block-letter. If a record between 2000 and 2015 has a rhythm guitar sound you like, there is a fair chance this is it."
   },
   {
     "family": "Plexi",
     "manufacturer": "Marshall",
     "basedOn": "Marshall Plexi Super Lead",
-    "description": "The Super Lead in its most famous form. Everything about the sound of loud British rock starts here."
+    "specs": "100 watt · ECC83 / EL34",
+    "description": "The amp the electric guitar sounds like. Four inputs, no master volume, and one decision to make: how loud you are willing to be.\n\nTurned down it is a clean amp with a bit of hair. Turned up it does the thing nothing else does — the note blooms, sits still for a second, then starts to sing. That is the whole sixties and most of the seventies in one circuit.\n\nThere is no gain control because there is no gain stage to control. Volume IS the gain, which is why the records were made in rooms nobody could stand to be in."
   },
   {
     "family": "Plexi Studio 20",
     "manufacturer": "Marshall",
     "basedOn": "Marshall Studio Vintage SV20, a 20-watt Plexi",
-    "description": "A 20-watt Plexi. The same amp at a volume that does not require a stage."
+    "specs": "20 watt · ECC83 / EL34",
+    "description": "A Plexi that fits in a cupboard. Marshall built the Studio Vintage as a real 20-watt valve amp rather than a smaller-sounding imitation of a big one.\n\nThe point is that it saturates at a volume you can use. Everything the big Plexi does at deafening it does at loud, which on a modelled version matters less — but the voicing is genuinely a little tighter and drier, and that is worth having as a choice."
   },
   {
     "family": "Princetone",
     "manufacturer": "Fender",
     "basedOn": "Fender Princeton",
-    "description": "A small Fender with no reverb — quiet, warm, and very easy to record."
+    "specs": "12 watt · 12AX7 / 6V6",
+    "description": "The Princeton without the reverb: twelve watts, a 10-inch speaker, and almost no controls.\n\nA practice amp that turned into a studio amp because it does one thing extremely well — it distorts politely at a volume that does not need a separate room."
   },
   {
     "family": "Princetone Reverb",
     "manufacturer": "Fender",
     "basedOn": "Blackface Fender Princeton Reverb",
-    "description": "The blackface Princeton Reverb. The small studio amp: it breaks up at a usable volume and the reverb is the good one."
+    "specs": "12 watt · 12AX7 / 6V6",
+    "description": "The blackface Princeton Reverb, which is the small Fender everybody eventually wants.\n\nIt has the Deluxe's reverb and tremolo in a cabinet half the size, and it starts breaking up around four — early enough to be useful on a session and late enough to stay clean when you roll the guitar back."
   },
   {
     "family": "Recto1",
     "manufacturer": "Mesa/Boogie",
     "basedOn": "Mesa/Boogie two-channel Dual Rectifier",
-    "description": "The two-channel Dual Rectifier — loose, huge and scooped. The sound of nineties heavy music."
+    "specs": "100 watt · 12AX7 / 6L6",
+    "description": "The two-channel Dual Rectifier — the amp the nineties sounded like once grunge turned into everything after it.\n\nEnormous, loose low end and a scooped, saturated midrange, with a valve rectifier you can switch in to make the whole thing sag and bloom under a hard pick attack. It is not a tight amp and that is the point of it.\n\nIt needs a cabinet that can move air and it does not reward timid playing."
   },
   {
     "family": "Recto2",
     "manufacturer": "Mesa/Boogie",
     "basedOn": "Mesa/Boogie three-channel Dual Rectifier",
-    "description": "The three-channel Rectifier. Tighter and more controlled than the original, with more usable clean."
+    "specs": "100 watt · 12AX7 / 6L6",
+    "description": "The three-channel Rectifier, which added a proper clean channel and tidied up the gain structure.\n\nEach channel has its own voicing switch — Raw, Vintage and Modern — and Modern is where the metal is: more gain, tighter bottom, more aggression. Vintage is the older Recto sound.\n\nSmoother and more controllable than the two-channel, which is a trade some people never accepted."
   },
   {
     "family": "Revv Gen",
     "manufacturer": "Revv",
     "basedOn": "Revv Generator 120",
-    "description": "A modern Canadian high-gain amp built for tight, articulate metal rhythm playing."
+    "specs": "120 watt · 12AX7 / 6L6",
+    "description": "The Revv Generator: a modern Canadian high-gain amp built for tight, aggressive, downtuned playing.\n\nFour aggression levels per channel and a low end that stays defined no matter how far down you tune. One of the tightest amps here."
   },
   {
     "family": "Ruby Rocket",
     "manufacturer": "Paul Ruby",
-    "basedOn": "Paul Ruby Rocket"
+    "basedOn": "Paul Ruby Rocket",
+    "specs": "50 watt · 12AX7 / EL84",
+    "description": "Paul Ruby's Rocket, built by hand in quantities small enough that most owners know each other.\n\nAlmost nothing is documented about it, so nothing about its character is claimed here."
   },
   {
     "family": "SV Bass",
     "manufacturer": "Ampeg",
     "basedOn": "Ampeg SVT",
-    "description": "The Ampeg SVT — the loud bass amp. Round and warm clean, and it growls beautifully when pushed."
+    "specs": "300 watt · 12AX7 / 6550",
+    "description": "The Ampeg SVT. Three hundred valve watts into eight 10-inch speakers, weighing more than the person carrying it, and the standard by which rock bass is measured.\n\nIt has an enormous midrange and it grinds rather than distorts when pushed. Every record you think has a big bass sound probably has one of these on it."
   },
   {
     "family": "Shiver",
     "manufacturer": "Bogner",
     "basedOn": "Bogner Shiva, 20th Anniversary edition",
-    "description": "Bogner's Shiva — a mid-gain amp with a rich, complex clean and an overdrive that never sounds sterile."
+    "specs": "100 watt · ECC83 / EL34",
+    "description": "The Shiva: Bogner's middle ground, with more clean headroom than an Ecstasy and a drive channel that stops short of the Uberschall.\n\nThe most usable Bogner for someone playing more than one style in a night."
   },
   {
     "family": "Solo 88",
     "manufacturer": "Soldano",
     "basedOn": "Soldano X88R preamp",
-    "description": "A Soldano rack preamp with the SLO voice, for a rig built around a separate power amp."
+    "specs": "ECC83 · preamp only",
+    "description": "The X88R: the SLO preamp in a rack, from the years when everybody's rig was a rack.\n\nSoldano's overdrive voice with no power section of its own."
   },
   {
     "family": "Solo 99",
     "manufacturer": "Soldano",
     "basedOn": "Soldano X99 preamp",
-    "description": "The later Soldano preamp — the same lineage with more control over the gain structure."
+    "specs": "ECC83 · preamp only",
+    "description": "The X99, Soldano's programmable rack preamp — the SLO sound under MIDI control."
   },
   {
     "family": "Solo 100",
     "manufacturer": "Soldano",
     "basedOn": "Soldano SLO-100",
-    "description": "The Soldano SLO-100. The high-gain amp: smooth, singing, and the blueprint nearly every boutique hot-rod followed."
+    "specs": "100 watt · 12AX7 / EL34",
+    "description": "The SLO-100: Mike Soldano took a Marshall, added preamp stages and built it to a standard nobody was building amps to in 1987.\n\nThe result is the template for every modern high-gain amp that followed — enormous smooth sustain with the note still intact underneath it, and a clean channel that is genuinely good rather than an afterthought.\n\nClapton used one, Gary Moore used one, and Bogner and Friedman both grew out of what it proved was possible."
   },
   {
     "family": "Spawn Nitrous",
     "manufacturer": "Splawn",
     "basedOn": "Splawn Nitro",
-    "description": "A modern hot-rodded Marshall type with more gain than Marshall ever shipped, and the tightness to use it."
+    "specs": "100 watt · ECC83 / EL34",
+    "description": "Splawn's Nitro — a modified Marshall taken further, with switchable gear settings that stack more preamp in front of you.\n\nBritish bones, modern gain, and a very aggressive upper midrange."
   },
   {
     "family": "Spawn Q-Rod",
     "manufacturer": "Splawn",
     "basedOn": "Splawn Quick Rod",
-    "description": "The same Marshall-derived platform from its higher-gain side — aggressive and tight."
+    "specs": "100 watt · ECC83 / EL34",
+    "description": "The Splawn Quick Rod: three gears of gain over a Marshall-derived circuit, with a tighter and more scooped voice than the Nitro.\n\nBuilt for people who wanted a JCM800 that could keep up with a Rectifier."
   },
   {
     "family": "Suhr Badger 18",
     "manufacturer": "Suhr",
     "basedOn": "Suhr Badger 18",
-    "description": "An 18-watt British-voiced amp with a power-scaling control, so it sounds cranked at any volume."
+    "specs": "18 watt · 12AX7 / EL84",
+    "description": "The Badger 18: a small British-voiced amp with a built-in power scaling control, so you can get full power-section saturation at almost any volume.\n\nThat control is the whole idea of the amp and it works."
   },
   {
     "family": "Suhr Badger 30",
     "manufacturer": "Suhr",
     "basedOn": "Suhr Badger 30",
-    "description": "The bigger Badger — the same idea with the headroom to stay clean with a drummer."
+    "specs": "30 watt · 12AX7 / EL34",
+    "description": "The Badger 30 — the bigger Badger, with EL34s and more headroom before it gives way.\n\nSame power scaling, and enough headroom to stay clean with a band behind you."
   },
   {
     "family": "Super Verb",
     "manufacturer": "Fender",
     "basedOn": "1964 blackface Fender Super Reverb, AB763",
-    "description": "The blackface Super Reverb. Four ten-inch speakers, a huge clean, and the blues amp of choice for a lot of players."
+    "specs": "45 watt · 12AX7 / 6L6",
+    "description": "The blackface Super Reverb: four 10-inch speakers, forty-five watts, and the loudest small-speaker sound Fender made.\n\nFour 10s move air differently from a pair of 12s — tighter, faster, with more bite in the upper mids. It is the blues amp for people who found the Twin too polite and the Deluxe too small."
   },
   {
     "family": "Supremo Trem",
     "manufacturer": "Supro",
     "basedOn": "Supro 1964T Dual-Tone",
-    "description": "A sixties Supro — small, gritty, and nothing like a Fender. Jimmy Page's early studio sound."
+    "specs": "24 watt · 12AX7 / 6973",
+    "description": "A Supro Dual-Tone. Supro amps were cheap in the sixties and are not now — Jimmy Page recorded the first Led Zeppelin record on one.\n\nSmall, raw and mid-heavy, with a tremolo that is part of the sound rather than an effect on top of it. It distorts almost immediately and it sounds enormous on tape."
   },
   {
     "family": "Supro Black Magick",
     "manufacturer": "Supro",
     "basedOn": "Supro Black Magick",
-    "description": "A modern Supro. Keeps the old raggedness and adds enough volume to use it with a band."
+    "specs": "25 watt · 12AX7 / 6973",
+    "description": "Supro's modern reissue-in-spirit: the vintage Supro voice, built properly, with a little more control.\n\nThick, woolly, mid-forward, and completely unlike a Fender of the same size."
   },
   {
     "family": "Texas Star",
     "manufacturer": "Mesa/Boogie",
     "basedOn": "Mesa/Boogie Lone Star",
-    "description": "Mesa's Lone Star. A clean Fender-style amp by Mesa standards, with the build quality and a proper lead channel behind it."
+    "specs": "100 watt · 12AX7 / 6L6",
+    "description": "The Lone Star, which is Boogie building a Fender rather than a Boogie.\n\nA genuinely beautiful clean channel with real headroom, and a drive channel that stays warm and open instead of going for gain. Made for people who want a Twin that can also get dirty."
   },
   {
     "family": "Thordendal",
     "manufacturer": "Mesa/Boogie",
     "basedOn": "Pre-Rev-G Mesa/Boogie Dual Rectifier",
-    "description": "An early Dual Rectifier, before the revisions — looser and more open than the ones that followed, and much loved for it."
+    "specs": "100 watt · 12AX7 / 6L6",
+    "description": "A pre-Rev-G Dual Rectifier, which is the early production revision collectors chase and Meshuggah built a career on.\n\nThe earliest Rectos had less low-end cut and a more aggressive upper midrange than the ones that followed. Played clean it is unremarkable; played through a downtuned guitar with the gain up it is unmistakable."
   },
   {
     "family": "Tremolo Lux",
     "manufacturer": "Fender",
     "basedOn": "Blackface Fender Tremolux, AA763",
-    "description": "A blackface Tremolux. A small Fender with the tremolo rather than the reverb, and it overdrives sooner than a Deluxe."
+    "specs": "35 watt · 12AX7 / 6L6",
+    "description": "The Tremolux — a Deluxe with more power and a separate cabinet, sitting between the Deluxe Reverb and the Bassman.\n\n6L6s rather than 6V6s, so it stays cleaner longer, and the tremolo is the reason to own one."
   },
   {
     "family": "Triple Crest",
     "manufacturer": "Mesa/Boogie",
     "basedOn": "Mesa/Boogie Triple Crown",
-    "description": "A modern Mesa. Much tighter and more contemporary than a Rectifier, aimed at players who found those too loose."
+    "specs": "100 watt · 12AX7 / EL34",
+    "description": "Boogie's Triple Crown, which is the company deliberately building a British-sounding amp — EL34 output valves rather than their usual 6L6s.\n\nTighter and more mid-forward than a Rectifier, and much closer to a hot-rodded Marshall than anything else in the Boogie line."
   },
   {
     "family": "Two Stone J35",
     "manufacturer": "Two-Rock",
     "basedOn": "Two-Rock Jet 35",
-    "description": "A Two-Rock — Dumble-inspired, beautifully clean, and built to be the platform a pedalboard sits in front of."
+    "specs": "35 watt · 12AX7 / 6L6",
+    "description": "Two-Rock's Jet 35 — another amp in the Dumble tradition, built for clean headroom and a thick, singing lead sound.\n\nBeautifully made, very clean, and expensive."
   },
   {
     "family": "USA Bass 400",
     "manufacturer": "Mesa/Boogie",
     "basedOn": "Mesa/Boogie Bass 400",
-    "description": "Mesa's big valve bass head — clean, punchy, and with far more control than most bass amps of its era."
+    "specs": "300 watt · 12AX7 / 6L6",
+    "description": "A wall of 6L6s. Boogie's Bass 400 uses twelve output valves, which is an absurd way to build a bass amp and produces a warmth solid-state rigs cannot get near.\n\nHeavy in both senses. Still used by people who will carry it."
   },
   {
     "family": "USA JP",
     "manufacturer": "Mesa/Boogie",
     "basedOn": "Mesa/Boogie JP-2C, the John Petrucci Mark IIC+",
-    "description": "John Petrucci's Mark IIC+, made again as a product. The classic Mesa lead voice with modern tightness."
+    "specs": "100 watt · 12AX7 / 6L6",
+    "description": "Boogie's reissue of the IIC+ built to John Petrucci's specification, which is to say: the famous amp, available again, with a second lead channel and proper MIDI switching.\n\nThe IIC+ voice with none of the maintenance and none of the price."
   },
   {
     "family": "USA MK IIC+",
     "manufacturer": "Mesa/Boogie",
     "basedOn": "Mesa/Boogie Mark IIC+",
-    "description": "The Mark IIC+: the most sought-after Mesa ever built. Compressed, midrange-heavy lead sounds and the amp behind a lot of eighties metal."
+    "specs": "100 watt · 12AX7 / 6L6",
+    "description": "The most expensive used amp in this list, and the reason is one record: Master of Puppets.\n\nBoogie built the Mark series around a cascading preamp and a five-band graphic EQ, and the IIC+ is the revision where all of it came together. The famous setting is a V shape on the EQ sliders, which scoops the mids out and leaves an attack like a hammer.\n\nIt is tight where a Rectifier is loose, and it stays readable under fast picking in a way almost nothing else does."
   },
   {
     "family": "USA MK IIC++",
     "manufacturer": "Mesa/Boogie",
     "basedOn": "Modded Mesa/Boogie Mark IIC+",
-    "description": "A modified Mark IIC+, pushed further than the factory took it."
+    "specs": "100 watt · 12AX7 / 6L6",
+    "description": "A IIC+ that has been modified further — more gain, more low end, and less of the original's restraint.\n\nIf the standard IIC+ feels like it is holding something back, this is the version that does not."
   },
   {
     "family": "USA MK IV",
     "manufacturer": "Mesa/Boogie",
     "basedOn": "Mesa/Boogie Mark IV",
-    "description": "The Mark IV — a Mark with three real channels, and the graphic EQ that makes the family's sound what it is."
+    "specs": "85 watt · 12AX7 / 6L6",
+    "description": "The Mark IV: three channels, the graphic EQ, and more usable range than any Boogie before it.\n\nSmoother and more polished than the IIC+, with a lead channel that sings rather than barks. John Petrucci and Mark Tremonti both spent years on one.\n\nThe graphic EQ is not a fine adjustment, it is the main tone control. Move the sliders a long way."
   },
   {
     "family": "USA MK V",
     "manufacturer": "Mesa/Boogie",
     "basedOn": "Mesa/Boogie Mark V",
-    "description": "The Mark V. Every Mark voice in one amp, with the tightness of the modern ones."
+    "specs": "90 watt · 12AX7 / 6L6",
+    "description": "The Mark V, which contains most of the Mark series inside it — three channels with three modes each, covering everything from the tweed-voiced clean up to the IIC+ and IV lead sounds.\n\nThe most versatile amp Boogie has built, and the most complicated."
   },
   {
     "family": "USA Metro Blues",
     "manufacturer": "Mesa/Boogie",
     "basedOn": "Mesa/Boogie Subway Blues",
-    "description": "A small Mesa combo, voiced far cleaner and more American than the Marks — easy to like and easy to record."
+    "specs": "20 watt · 12AX7 / EL84",
+    "description": "The Subway Blues — a tiny Boogie with EL84s, made for club stages and people who had decided Boogies were too clinical.\n\nLoose, bright and quick to break up. Nothing like the Mark series."
   },
   {
     "family": "USA Pre",
     "manufacturer": "Mesa/Boogie",
     "basedOn": "Mesa/Boogie TriAxis preamp",
-    "description": "The Mesa TriAxis — the Mark preamp voices in a rack unit, and the sound of a lot of nineties studio guitar."
+    "specs": "ECC83 · preamp only",
+    "description": "The TriAxis — Boogie's Mark series compressed into a rack preamp, and the cornerstone of an awful lot of early-nineties rigs.\n\nFive voicings, MIDI control and the graphic EQ, with no output valves of its own. Petrucci, Vai and Lukather all built rigs around it."
   },
   {
     "family": "Vibra-King",
     "manufacturer": "Fender",
     "basedOn": "Custom Fender Vibro-King",
-    "description": "A custom Fender built around the old tweed and brown voices, with a proper valve tremolo."
+    "specs": "60 watt · 12AX7 / 6L6",
+    "description": "The Vibro-King: Fender's Custom Shop building a tweed-and-blackface hybrid that never actually existed in the sixties.\n\nThree 10-inch speakers, real spring reverb, and the best tremolo Fender has ever put in a production amp. Expensive, heavy, and worth it."
   },
   {
     "family": "Vibrato Lux",
     "manufacturer": "Fender",
     "basedOn": "Fender Vibrolux, 6G11",
-    "description": "A brown-panel Vibrolux. Small, warm, and the tremolo is the reason to reach for it."
+    "specs": "30 watt · 12AX7 / 6L6",
+    "description": "A brown-panel Vibrolux — the 6G11 circuit, with the harmonic tremolo the brown amps are collected for.\n\nThirty watts and a single 12. Warmer and woodier than the blackface Vibrolux Reverb that replaced it."
   },
   {
     "family": "Vibrato Verb",
     "manufacturer": "Fender",
     "basedOn": "Fender Vibroverb",
-    "description": "The Vibroverb — a blackface Fender with a fifteen-inch speaker, so the low end is looser and rounder than a Deluxe."
+    "specs": "40 watt · 12AX7 / 6L6",
+    "description": "The Vibroverb, the first Fender amp with reverb built into it, and made for barely a year.\n\nStevie Ray Vaughan built his sound on a pair of them. Forty watts, and a bottom end considerably bigger than the size of the amp suggests."
   },
   {
     "family": "Wrecker Express",
     "manufacturer": "Trainwreck",
     "basedOn": "Trainwreck Express",
-    "description": "A Trainwreck Express. Ferociously touch-sensitive, no master volume, and it rewards playing harder more than any other amp here."
+    "specs": "40 watt · 12AX7 / EL34",
+    "description": "A Trainwreck. Ken Fischer built about a hundred amps by hand before he died and they now cost more than a car.\n\nThe Express is the aggressive one — enormously touch-sensitive, with almost no compression, so everything you do with your hands comes straight out. It is unforgiving and it is the reason people talk about these in the way they do.\n\nNo master volume, no effects loop, nothing but the circuit."
   },
   {
     "family": "Wrecker Liverpool",
     "manufacturer": "Trainwreck",
     "basedOn": "Trainwreck Liverpool",
-    "description": "The Vox-flavoured Trainwreck — chime and bite, and the same demanding responsiveness."
+    "specs": "30 watt · 12AX7 / EL84",
+    "description": "The Liverpool is Fischer's British-voiced Trainwreck — EL84s, and a chimier, more open sound than the Express.\n\nSame brutal honesty about your playing, in a Vox accent rather than a Marshall one."
   },
   {
     "family": "Wrecker Rocket",
     "manufacturer": "Trainwreck",
     "basedOn": "Trainwreck Rocket",
-    "description": "The Trainwreck with the most gain of the three, and still entirely controlled from the guitar."
+    "specs": "30 watt · 12AX7 / 6V6",
+    "description": "The Rocket: the smallest Trainwreck, with 6V6s and an American flavour.\n\nWarmer and rounder than the other two, and the most forgiving of the three — which for a Trainwreck is not saying a great deal."
   }
 ]
