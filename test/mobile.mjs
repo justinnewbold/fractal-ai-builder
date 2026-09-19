@@ -5465,20 +5465,43 @@ export function run(test) {
      */
     const { createTunerStream } = await import('../mobile/src/lib/tunerStream.js')
 
-    /* It reads a note most of the time, and it reads every string. A tuner
-       that is silent more than it rings is one nobody would call working. */
-    const stream = createTunerStream()
-    const strings = new Set()
-    let ringing = 0
-    for (let i = 0; i < 2000; i += 1) {
-      const said = stream.next()
-      if (said.note) {
-        ringing += 1
-        strings.add(`${said.note}${said.octave}`)
-      }
+    /*
+     * SEEDED, BECAUSE THIS ASKED CHANCE A QUESTION IT COULD ANSWER WRONG.
+     *
+     * The stream picks a string at random coming out of each quiet gap, and
+     * 2000 polls hold somewhere around forty-six gaps. The odds of one string
+     * never coming up are about one in seven hundred — which is rare enough to
+     * read as a solid test and common enough to fail a pull request that had
+     * nothing to do with the tuner. It did exactly that: "the demo tuner only
+     * ever finds E2, B3, E4, A2, D3", on a change to a workflow file.
+     *
+     * `createTunerStream` has always taken its own random function for this
+     * reason; the test simply never passed one. Several seeds rather than one,
+     * so this still says the stream visits all six strings whatever it is fed,
+     * rather than that one lucky sequence does.
+     */
+    const seeded = (seed) => () => {
+      seed = (seed + 0x6d2b79f5) | 0
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296
     }
-    assert.ok(ringing > 1000, `the demo tuner is quiet ${100 - Math.round(ringing / 20)}% of the time`)
-    assert.equal(strings.size, 6, `the demo tuner only ever finds ${[...strings].join(', ')}`)
+    for (const seed of [1, 7, 42, 1337, 90210]) {
+      const stream = createTunerStream(seeded(seed))
+      const strings = new Set()
+      let ringing = 0
+      for (let i = 0; i < 2000; i += 1) {
+        const said = stream.next()
+        if (said.note) {
+          ringing += 1
+          strings.add(`${said.note}${said.octave}`)
+        }
+      }
+      /* A tuner that is silent more than it rings is one nobody would call
+         working. */
+      assert.ok(ringing > 1000, `seed ${seed}: the demo tuner is quiet ${100 - Math.round(ringing / 20)}% of the time`)
+      assert.equal(strings.size, 6, `seed ${seed}: the demo tuner only ever finds ${[...strings].join(', ')}`)
+    }
 
     /* A ring never hops mid-note: the note only changes across a silent gap,
        which is the failure this stream was written to fix. */

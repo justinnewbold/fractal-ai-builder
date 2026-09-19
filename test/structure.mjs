@@ -3031,11 +3031,26 @@ export function run(test) {
       /permissions:\s*\n\s*contents:\s*write/,
       'the release build cannot publish what it built'
     )
-    assert.match(
-      flow,
-      /inputs\.publish && github\.ref == 'refs\/heads\/main'/,
-      'a branch build could publish a release tagged against main'
+    /*
+     * Held as the rule rather than as the line it was written on. This used to
+     * match `inputs.publish && github.ref == 'refs/heads/main'` exactly, and
+     * the expression grew a second way in — a merge to main now publishes,
+     * so the Mac app follows the browser and the phone instead of sitting on
+     * whatever release was last cut by hand.
+     *
+     * What must not change is the half after the `&&`: whatever asks for a
+     * publish, it only ever happens from the default branch.
+     */
+    const ways = [...flow.matchAll(/\(\(?inputs\.publish[^)]*\)?[^)]*\)/g)].map((m) =>
+      m[0].replace(/\s+/g, ' ')
     )
+    assert.ok(ways.length > 0, 'a release can no longer be asked for without pushing a tag')
+    for (const way of ways) {
+      assert.ok(
+        way.includes("github.ref == 'refs/heads/main'"),
+        `a build off the default branch could publish a release tagged against main: ${way}`
+      )
+    }
   })
 
   

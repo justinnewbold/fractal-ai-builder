@@ -923,6 +923,69 @@ export function run(test) {
     )
   })
 
+  test('the Mac app is published when main moves, and never from a pull request', () => {
+    /*
+     * "When you make an update on phone versions, they need to make it on the
+     * web version and Mac app as well, which I think that those are running
+     * the same web app versions anyways."
+     *
+     * SAME CODE, NOT THE SAME COPY. The browser gets the new bundle from
+     * Vercel the moment main moves. The Mac app serves `dist/` from INSIDE
+     * the packaged app — `process.resourcesPath/dist` in desktop/main.js — so
+     * it carries whatever web app it was built with, and nothing reaches that
+     * machine until a new one is published.
+     *
+     * Nobody had published one. This built on pull requests and on a
+     * `desktop-v*` tag, and published only from a tag or a ticked box, so the
+     * last release went out at 7.372.0 while the browser and the phone moved
+     * on without it. electron-updater was working the whole time and had
+     * nothing to find.
+     */
+    const wf = read('.github/workflows/desktop.yml')
+    assert.match(wf, /\n {2}push:\n {4}branches: \[main\]/, 'the desktop app is no longer built when something lands on main')
+    assert.match(wf, /tags: \['desktop-v\*'\]/, 'the release tag no longer builds anything')
+
+    /*
+     * EVERY PUBLISH GATE AGREES. There are four — the Mac's signed package,
+     * Windows signed and unsigned, and Linux — and a release is assembled from
+     * all of them. One left behind does not publish a smaller release; it
+     * publishes one missing the platform somebody is on.
+     */
+    const gates = [...wf.matchAll(/PUBLISH: >-\n([\s\S]*?)\n\s+(?:GH_TOKEN|run:)/g)].map((m) =>
+      m[1].replace(/\s+/g, ' ').trim()
+    )
+    assert.equal(gates.length, 4, `expected four publish gates, found ${gates.length}`)
+    for (const gate of gates) {
+      assert.ok(
+        gate.includes("github.event_name == 'push'") && gate.includes("github.ref == 'refs/heads/main'"),
+        `a publish gate does not fire when main moves: ${gate}`
+      )
+    }
+
+    /*
+     * AND NONE OF THEM CAN FIRE FROM A PULL REQUEST. This is the one that
+     * costs something if it is ever wrong: `createRelease` does not send a
+     * commit to tag, so GitHub tags the default branch's head — a release
+     * published from a branch would carry main's name and somebody else's
+     * code, and electron-updater would hand it to every Mac on launch.
+     *
+     * The guard is allowed to be on the step or inside the expression; what
+     * is held is that one of them is there.
+     */
+    const steps = wf.split(/\n      - name: /).slice(1)
+    let checked = 0
+    for (const step of steps) {
+      if (!step.includes('PUBLISH: >-')) continue
+      checked++
+      const body = step.replace(/\s+/g, ' ')
+      assert.ok(
+        body.includes("github.event_name != 'pull_request'"),
+        `a step publishes without ruling out a pull request: ${body.slice(0, 60)}`
+      )
+    }
+    assert.equal(checked, 4, `expected four publishing steps, checked ${checked}`)
+  })
+
   test('an APK is built able to take the updates that are published', () => {
     /*
      * "The android app is still on 3.171. It's supposed to be doing updates,
