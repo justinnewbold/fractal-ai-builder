@@ -2,7 +2,17 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/android", "destination": "/android.html" },
-    { "source": "/(.*)", "destination": "/" }
+    {
+      "source": "/android",
+      "destination": "/android.html"
+    },
+    {
+      "source": "/downloads",
+      "destination": "/downloads.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/"
+    }
   ]
 }

@@ -4596,12 +4596,44 @@ export function run(test) {
      * THE TWELVE HAND-BUILT PRESETS ARE FM3 PRESETS and appear only there.
      * They are an FM3 chain with FM3 amp numbers in it, and "Drop D Chug" is
      * not a name any AM4 has ever shown.
+     *
+     * AND THEY NO LONGER SIT ON THE FACTORY BANK. They used to hold slots
+     * 0-11, which is where the FM3 keeps 59 Bassguy, 65 Bassguy, Vibrato Lux
+     * and nine more — so the one unit with hand-built content was the one
+     * unit whose bank you could not check against the thing on your desk.
+     *
+     * "With the FM3, they are not the actual default presets. One of them
+     * says Papa's Roach, which definitely is not a preset that should be in
+     * the demo. It should have the real factory presets like all the others
+     * do."
+     *
+     * They start after the bank now, where a player's own presets live.
      */
-    assert.equal(createMockDevice('fm3').presetSummary(0).name, 'Drop D Chug')
+    const { presetsFor, nameFor } = await import('../src/lib/factoryPresets.js')
+    const fm3 = createMockDevice('fm3')
+
+    /* Every factory slot reads the way the unit does — checked across the
+       whole bank rather than at slot 0, which is where this last slipped. */
+    for (const p of presetsFor('fm3').filter((x) => x.name)) {
+      assert.equal(
+        fm3.presetSummary(p.number).name,
+        p.name,
+        `fm3 slot ${p.number} reads "${fm3.presetSummary(p.number).name}" where the unit ships "${p.name}"`
+      )
+    }
+    assert.equal(fm3.presetSummary(0).name, nameFor('fm3', 0), 'the FM3 demo does not open on its own first preset')
+
+    /* The hand-built rigs are still there, past the bank. */
+    assert.equal(fm3.presetSummary(386).name, "Papa's Roach", 'the hand-built rigs are gone entirely')
+    assert.ok(
+      presetsFor('fm3').every((x) => x.number < 384),
+      'the FM3 factory bank now reaches past 384, so the hand-built rigs are back on top of it'
+    )
+
     for (const key of ['fm9', 'axefx3', 'am4', 'vp4']) {
       assert.notEqual(
-        createMockDevice(key).presetSummary(0).name,
-        'Drop D Chug',
+        createMockDevice(key).presetSummary(386).name,
+        "Papa's Roach",
         `the FM3's hand-built presets leaked onto the ${key}`
       )
     }

@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Download Fractal Remote</title>
+    <meta
+      name="description"
+      content="Fractal Remote for Mac, Windows and Linux — the current build, and the right file for your computer."
+    />
+    <!--
+      A download page, because a Releases page is not one.
+
+      "Right now it's just taking users to GitHub, which can be kind of
+      confusing to a lot of people I feel."
+
+      It is. A GitHub release lists twenty files: two disk images, two zips,
+      two AppImages, two .deb packages, an .exe, four .yml files and a handful
+      of .blockmaps. Exactly one of them is the file any given person wants,
+      and nothing on that page says which. Four of them are for the updater
+      and would do nothing at all if you downloaded them.
+
+      This page asks what you are on, and offers the one file.
+
+      SAME TRICK AS /android, and the same two traps avoided. The address never
+      moves; what it finds does — it asks GitHub which releases exist and picks
+      the newest. It keeps only the tags starting `v`, because the Android
+      builds share the same list under `apk-v`. And it sorts by WHEN A RELEASE
+      WAS PUBLISHED rather than by the number in its tag, because the version
+      was reset from 7.397.0 to 1.0.0 for the first public release and every
+      old build outranks every new one on the number alone.
+
+      Plain HTML, no build step, no dependencies. The repository is public, so
+      the list is public, and this works with nothing installed and nobody
+      signed in.
+    -->
+    <style>
+      :root {
+        --chassis: #0d0f12;
+        --panel: #15181d;
+        --panel-hi: #1c2027;
+        --rule: #262b33;
+        --silk: #e6e3dc;
+        --silk-dim: #878d97;
+        --signal: #f0a73c;
+        --ok: #63c68c;
+        --fault: #e0684f;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 48px 20px 96px;
+        background: var(--chassis);
+        color: var(--silk);
+        font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      main { max-width: 620px; margin: 0 auto; }
+      h1 { font-size: 32px; line-height: 1.15; margin: 0 0 6px; }
+      h2 { font-size: 15px; letter-spacing: 1.4px; text-transform: uppercase;
+           color: var(--silk-dim); margin: 40px 0 12px; font-weight: 700; }
+      .lede { color: var(--silk-dim); margin: 0 0 8px; }
+      .ver { color: var(--silk-dim); font-size: 14px; margin: 0 0 28px; }
+      a { color: var(--signal); }
+
+      .card {
+        padding: 18px 20px;
+        border: 1px solid var(--rule);
+        border-radius: 12px;
+        background: var(--panel);
+        margin: 0 0 12px;
+      }
+      /* The one the visitor is almost certainly here for. */
+      .card.yours { border-color: var(--signal); background: var(--panel-hi); }
+      .card h3 { margin: 0 0 2px; font-size: 19px; }
+      .card p { margin: 0 0 14px; color: var(--silk-dim); font-size: 14px; }
+
+      .get {
+        display: block;
+        min-height: 52px;
+        padding: 13px 18px;
+        border-radius: 8px;
+        background: var(--ok);
+        color: #10221a;
+        font-size: 17px;
+        font-weight: 700;
+        text-align: center;
+        text-decoration: none;
+      }
+      .get + .get { margin-top: 10px; }
+      .get.second { background: transparent; color: var(--silk);
+                    border: 1px solid var(--rule); }
+      .size { font-weight: 400; opacity: 0.75; font-size: 14px; }
+
+      .hint { margin: 12px 0 0; font-size: 14px; color: var(--silk-dim); }
+      .hint strong { color: var(--silk); font-weight: 600; }
+      .bad { color: var(--fault); }
+      ul { padding-left: 20px; margin: 0; }
+      li { margin: 7px 0; color: var(--silk-dim); }
+      li strong { color: var(--silk); font-weight: 600; }
+      footer {
+        margin-top: 52px; padding-top: 20px;
+        border-top: 1px solid var(--rule);
+        color: var(--silk-dim); font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Download Fractal Remote</h1>
+      <p class="lede">
+        Control your Fractal rig from across the room — scenes, presets, tempo and the tuner.
+      </p>
+      <p class="ver" id="ver">Looking for the current build&hellip;</p>
+
+      <div id="downloads"></div>
+
+      <h2>What you need</h2>
+      <ul>
+        <li><strong>A Fractal unit</strong> — FM3, FM9, Axe-Fx III, AM4 or VP4.</li>
+        <li><strong>A USB cable</strong> from the unit to this computer. That is the only wire.</li>
+        <li>
+          <strong>Nothing else.</strong> No account, no subscription, no internet for the
+          computer app itself.
+        </li>
+      </ul>
+
+      <h2>Want it on your phone too?</h2>
+      <ul>
+        <li>
+          The computer app holds the cable; the phone drives it from a stage.
+          <a href="/android">Android is here</a>, and iPhone is on the way.
+        </li>
+        <li>
+          The phone shows a code, you type it once, and that is the pairing done.
+        </li>
+      </ul>
+
+      <h2>Not ready to install anything?</h2>
+      <ul>
+        <li>
+          <a href="/">Open the app in this browser</a> and try the demo — a simulated
+          FM3, FM9, Axe-Fx III, AM4 or VP4, with the real factory presets on it. No unit
+          needed and nothing to install.
+        </li>
+      </ul>
+
+      <footer>
+        <a href="https://github.com/justinnewbold/fractal-remote/releases">Every build, newest first</a>
+        &middot; <a href="/support.html">Support</a>
+        &middot; <a href="/privacy.html">Privacy</a>
+      </footer>
+    </main>
+
+    <script>
+      var REPO = 'justinnewbold/fractal-remote'
+      var ALL = 'https://github.com/' + REPO + '/releases'
+
+      /* Most recently PUBLISHED wins, not the highest number — the version was
+         reset from 7.397.0 to 1.0.0 and every old build outranks every new one
+         on the number alone. The `v` filter separates these from the Android
+         builds, which share the list under `apk-v`. */
+      function when(r) {
+        return Date.parse(r.published_at || r.created_at || 0) || 0
+      }
+
+      function mb(n) {
+        return (n / 1048576).toFixed(0) + ' MB'
+      }
+
+      /* What this visitor is on. Android reports Linux too, so it goes first. */
+      function platform() {
+        var ua = navigator.userAgent || ''
+        if (/Android/i.test(ua)) return 'android'
+        if (/iPhone|iPad|iPod/i.test(ua)) return 'ios'
+        if (/Mac/i.test(ua)) return 'mac'
+        if (/Win/i.test(ua)) return 'windows'
+        if (/Linux|X11/i.test(ua)) return 'linux'
+        return null
+      }
+
+      /*
+       * Apple Silicon or Intel, as a HINT and never as a decision.
+       *
+       * Safari reports "MacIntel" on every Mac ever made, including the ones
+       * with an Apple chip in them, so the user agent cannot answer this. The
+       * GPU name can: an Apple Silicon Mac renders through "Apple GPU". It is
+       * a good guess and not a certainty — a browser can refuse the question,
+       * and a virtual machine can lie — so it only ever moves one button above
+       * the other. Both stay, and the sentence under them tells anybody how to
+       * check for themselves in two taps.
+       */
+      function appleSilicon() {
+        try {
+          var c = document.createElement('canvas')
+          var gl = c.getContext('webgl') || c.getContext('experimental-webgl')
+          if (!gl) return null
+          var ext = gl.getExtension('WEBGL_debug_renderer_info')
+          if (!ext) return null
+          var name = String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || '')
+          if (/apple/i.test(name)) return true
+          if (/intel|radeon|amd|nvidia|geforce/i.test(name)) return false
+          return null
+        } catch (e) {
+          return null
+        }
+      }
+
+      function find(assets, test) {
+        for (var i = 0; i < assets.length; i++) if (test(assets[i].name)) return assets[i]
+        return null
+      }
+
+      function button(asset, label, second) {
+        if (!asset) return ''
+        return (
+          '<a class="get' + (second ? ' second' : '') + '" href="' + asset.browser_download_url + '">' +
+          label + ' <span class="size">' + mb(asset.size) + '</span></a>'
+        )
+      }
+
+      function card(id, title, blurb, body, hint) {
+        return (
+          '<div class="card" id="card-' + id + '">' +
+          '<h3>' + title + '</h3>' +
+          '<p>' + blurb + '</p>' +
+          body +
+          (hint ? '<p class="hint">' + hint + '</p>' : '') +
+          '</div>'
+        )
+      }
+
+      function say(msg, bad) {
+        document.getElementById('ver').innerHTML = msg
+        if (bad) document.getElementById('ver').className = 'ver bad'
+      }
+
+      fetch('https://api.github.com/repos/' + REPO + '/releases?per_page=30', {
+        headers: { Accept: 'application/vnd.github+json' }
+      })
+        .then(function (r) {
+          if (!r.ok) throw new Error('GitHub said ' + r.status)
+          return r.json()
+        })
+        .then(function (list) {
+          var rel = list
+            .filter(function (r) {
+              return !r.draft && /^v\d/.test(String(r.tag_name))
+            })
+            .sort(function (a, b) {
+              return when(b) - when(a)
+            })[0]
+          if (!rel) throw new Error('no computer build in the list')
+
+          var a = rel.assets || []
+          var macArm = find(a, function (n) { return /-arm64\.dmg$/i.test(n) })
+          var macIntel = find(a, function (n) { return /\.dmg$/i.test(n) && !/arm64/i.test(n) })
+          var win = find(a, function (n) { return /Setup-.*\.exe$/i.test(n) })
+          var linux = find(a, function (n) { return /\.AppImage$/i.test(n) && !/arm64/i.test(n) })
+          var deb = find(a, function (n) { return /_amd64\.deb$/i.test(n) })
+
+          var built = rel.published_at ? new Date(rel.published_at) : null
+          say(
+            'Version ' + String(rel.tag_name).replace(/^v/, '') +
+            (built ? ' &middot; built ' + built.toLocaleDateString() : '')
+          )
+
+          var me = platform()
+          var silicon = me === 'mac' ? appleSilicon() : null
+
+          /* Apple Silicon first unless the GPU says otherwise. Most Macs sold
+             since 2020 have one, so it is the better default when unsure. */
+          var macBody =
+            silicon === false
+              ? button(macIntel, 'Download for Mac &mdash; Intel') +
+                button(macArm, 'Apple Silicon (M1&ndash;M5) instead', true)
+              : button(macArm, 'Download for Mac &mdash; Apple Silicon') +
+                button(macIntel, 'Intel Mac instead', true)
+
+          var cards = []
+          cards.push({
+            id: 'mac',
+            html: card(
+              'mac',
+              'macOS',
+              'macOS 11 Big Sur or newer.',
+              macBody,
+              'Not sure which Mac you have? <strong>Apple menu &rarr; About This Mac</strong>. ' +
+                'If it says Apple M1, M2, M3, M4 or M5, take Apple Silicon. If it says Intel, take Intel.'
+            )
+          })
+          cards.push({
+            id: 'windows',
+            html: card('windows', 'Windows', 'Windows 10 or 11, 64-bit.', button(win, 'Download for Windows'))
+          })
+          cards.push({
+            id: 'linux',
+            html: card(
+              'linux',
+              'Linux',
+              'Any 64-bit desktop.',
+              button(linux, 'Download for Linux &mdash; AppImage') +
+                button(deb, 'Debian / Ubuntu package (.deb)', true),
+              'An AppImage runs as it is &mdash; mark it executable and open it. ' +
+                'Other builds, including ARM, are on the <a href="' + ALL + '">releases page</a>.'
+            )
+          })
+
+          /* Yours first, and marked. The rest stay, in their usual order. */
+          var order = cards
+            .slice()
+            .sort(function (x, y) {
+              return (y.id === me ? 1 : 0) - (x.id === me ? 1 : 0)
+            })
+          document.getElementById('downloads').innerHTML = order
+            .map(function (c) {
+              return c.id === me ? c.html.replace('class="card"', 'class="card yours"') : c.html
+            })
+            .join('')
+
+          if (me === 'android' || me === 'ios') {
+            say('Version ' + String(rel.tag_name).replace(/^v/, '') +
+                ' &middot; these are the COMPUTER apps &mdash; the phone app is <a href="/android">here</a>')
+          }
+        })
+        .catch(function (err) {
+          /* Never a dead end: the releases page still has everything on it. */
+          say('Could not reach GitHub just now &mdash; ' + String(err.message || err), true)
+          document.getElementById('downloads').innerHTML =
+            '<div class="card"><h3>Every build is still on GitHub</h3>' +
+            '<p>The list did not load, but the files are all there.</p>' +
+            '<a class="get" href="' + ALL + '">Open the releases page</a></div>'
+        })
+    </script>
+  </body>
+</html>

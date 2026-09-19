@@ -4291,7 +4291,37 @@ export function run(test) {
     assert.ok(refreshAll.length > 200, 'refreshAll moved; this check reads it')
     assert.ok(refreshAll.indexOf('adoptNames(') < refreshAll.indexOf('await refreshPreset()'), 'the names are taken after the slow reads instead of alongside them')
     const dev = read('mobile/src/lib/device.js')
-    assert.match(dev, /if \(!slug \|\| demoDevice\(\)\) return null/, 'the demo asks a computer it does not have for a list')
+    /*
+     * AND IN THE DEMO THE UNIT ANSWERS IT, which is the whole of the fix for
+     * a list that drew 512 rows of "Empty" over a bank sitting right there.
+     *
+     * This used to assert the demo returned null — correct on the face of it,
+     * since there is no computer to have filed anything. What it missed is
+     * that the OTHER way a name is learned, GET /presets/{n}, is a stub on
+     * every gen-3 unit and in the mock alike. Null plus a stub is no source
+     * at all, and "all presets are blank in the demo" is what that looks like
+     * to somebody holding the phone.
+     */
+    assert.match(dev, /const mock = demoDevice\(\)/, 'the demo has no source of preset names again')
+    assert.match(
+      dev,
+      /typeof mock\.storedNames === 'function' \? mock\.storedNames\(\)/,
+      'the demo does not ask the unit for its own bank'
+    )
+    assert.match(dev, /if \(!slug\) return null/, 'a real unit with no slug still asks the computer')
+
+    /* And the mock can actually answer that. */
+    const mockSrc = read('src/lib/mockDevice.js')
+    assert.match(
+      mockSrc,
+      /storedNames: \(\) => Object\.fromEntries\(state\.stored\)/,
+      'the mock cannot hand over its bank, so the demo list is blank'
+    )
+    assert.match(
+      mockSrc,
+      /presetName: \(number\) => \(\{ number, name: '' \}\)/,
+      'the per-slot stub is gone — the mock now claims an answer gen-3 hardware cannot give'
+    )
     const screen = read('mobile/src/screens/Presets.js')
     assert.match(screen, /label=\{refreshing \? 'Reading…' : 'Refresh'\}/, 'there is no Refresh button')
     assert.match(screen, /names known/, 'the list does not say how full it is')
@@ -5762,6 +5792,55 @@ export function run(test) {
         `${f} contains what looks like a RevenueCat SECRET key — it can refund and grant, and this repository is public`
       )
     }
+  })
+
+  /**
+   * THERE IS A WAY TO BUY IT FROM INSIDE THE DEMO, which there was not.
+   *
+   * The paywall was raised at exactly one moment — somebody with a pairing
+   * code who had not paid — so the demo, which is the entire shop window and
+   * where a person spends an hour before deciding, had no way to buy anything
+   * at all. "Where is the unlock button to unlock to the full version? I don't
+   * see it anywhere in the app." It was not buried; it was not there.
+   *
+   * And the half of it that is not about money: RESTORE was on that same
+   * unreachable paywall. Somebody who had paid, changed handset and opened
+   * the demo had no way back to what they owned — which Apple rejects apps
+   * for, and rightly.
+   */
+  test('the demo can reach the purchase, and a purchase already made', () => {
+    const bar = read('mobile/src/components/TopBar.js')
+    assert.match(bar, /usePurchase/, 'the bar cannot know whether there is anything to sell')
+    assert.match(
+      bar,
+      /demo && purchase\.available && !purchase\.unlocked && onUnlock/,
+      'the Unlock button is gone from the bar, or shows when there is nothing to buy'
+    )
+    assert.match(bar, /Unlock the full version/, 'the Unlock button has no accessible name')
+
+    /* Settings carries it too — for reading before tapping, and for restoring
+       on a handset that has never paid but whose owner has. */
+    const set = read('mobile/src/screens/Settings.js')
+    assert.match(set, /onUnlock,/, 'Settings cannot open the paywall')
+    assert.match(set, /Unlock the full version/, 'there is no purchase row in Settings')
+    assert.match(set, /Restore a purchase/, 'Settings offers no way back to a purchase already made')
+
+    /* And both are wired to a paywall that opens OVER the app rather than
+       replacing it: nothing is being withheld, they came looking. */
+    const app = read('mobile/App.js')
+    assert.equal(
+      (app.match(/onUnlock=\{\(\) => setBuying\(true\)\}/g) || []).length,
+      2,
+      'the bar and Settings do not both open the paywall'
+    )
+    assert.match(app, /\{buying \? \(\s*<Paywall\s+asked/, 'the asked-for paywall is not rendered')
+
+    /* Asked for, it does not offer the demo they are already in, and it does
+       not show a buy button that cannot take money. */
+    const pay = read('mobile/src/screens/Paywall.js')
+    assert.match(pay, /asked \? null : \(/, 'the asked-for paywall still offers the demo it was opened from')
+    assert.match(pay, /disabled=\{busy \|\| !available\}/, 'the Unlock button works when purchasing does not')
+    assert.match(pay, /asked \? \(\s*<Sheet/, 'the asked-for paywall replaces the screen instead of sitting over it')
   })
 
   test('a phone that cannot buy anything is never locked out', () => {

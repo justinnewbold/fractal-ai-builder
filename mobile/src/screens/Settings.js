@@ -9,6 +9,8 @@ import { setDemo, useDemo, useDemoUnit, setDemoUnit } from '../lib/demo'
 import { UNITS as DEMO_UNITS } from '../lib/demoUnits'
 import { getDebugLog } from '../lib/debugLog'
 import { tick } from '../lib/feedback'
+import { usePurchase } from '../lib/purchases'
+import { applyNow, checkNow, describeRunning, useUpdates } from '../lib/updates'
 import {
   changePassword,
   currentAccount,
@@ -50,6 +52,7 @@ const ofUnitState = (s) => s.unit
    under "Unit" in its own Setup: renaming is bench work, not something a thumb
    crosses between songs, which is exactly why neither app puts it on Play. */
 export default function Settings({
+  onUnlock,
   onOpenConnect,
   link,
   macName,
@@ -126,6 +129,13 @@ export default function Settings({
   const behind = !!hostVersion && isOlder(hostVersion, APP_VERSION) === true
 
   const [page, setPage] = useState(null)
+  const purchase = usePurchase()
+  const updates = useUpdates()
+  /* Which bundle is running, asked once when Setup opens. It settles "did an
+     update ever land" without anybody comparing numbers off two screens. */
+  useEffect(() => {
+    describeRunning()
+  }, [])
 
   const linkWord =
     link === 'connected'
@@ -248,7 +258,77 @@ export default function Settings({
                 onPress={() => setPage('trouble')}
               />
             ) : null}
+            {/*
+              * THE FULL VERSION, AND THE WAY BACK TO ONE ALREADY PAID FOR.
+              *
+              * The top bar carries an Unlock button while the demo is on,
+              * which is where somebody deciding will find it. This row is for
+              * the two people that button cannot serve: somebody who wants to
+              * read about it before tapping anything, and somebody who has
+              * ALREADY PAID and is on a new handset.
+              *
+              * That second one is not a nicety. Apple requires a purchase to
+              * be restorable and rejects apps that hide it, and until this row
+              * existed the only Restore button in the app was on a paywall
+              * you could reach by exactly one route: signing in with a pairing
+              * code you had not paid for. A person who paid, changed phones
+              * and opened the demo had no way back to what they owned.
+              */}
+            <SetupRow
+              title={purchase.unlocked ? 'Full version' : 'Unlock the full version'}
+              status={
+                purchase.unlocked
+                  ? 'Unlocked — thank you'
+                  : purchase.available
+                    ? `Drive a real rig${purchase.price ? ` · ${purchase.price}` : ''}`
+                    : 'Restore a purchase'
+              }
+              onPress={onUnlock}
+            />
             <SetupRow title="About" status={`v${APP_VERSION}`} onPress={() => setPage('about')} />
+            {/*
+              * WHAT IS RUNNING, AND HOW TO GET THE NEWEST.
+              *
+              * "I have not yet successfully had a single over-the-air update
+              * work correctly. They never come through, so I keep refreshing
+              * the android app, closing it, force closing it, reopening it
+              * over and over again."
+              *
+              * They were arriving. What was missing was any way to SEE it,
+              * plus one detail that makes a working app look stuck: this app
+              * never waits for a download at launch — app.json sets
+              * fallbackToCacheTimeout to 0, so it starts on the bundle it
+              * already has, fetches the new one in the BACKGROUND, and runs it
+              * the NEXT time it opens.
+              *
+              * First launch downloads. Second launch shows it. Somebody
+              * force-closing once, seeing the same number and concluding
+              * nothing happened was one restart short, with nothing on screen
+              * to say so.
+              *
+              * That default is right for a stage and is not what changes here.
+              * This says what is going on, and offers the restart instead of
+              * waiting for it to happen by accident.
+              */}
+            <SetupRow
+              title="Updates"
+              status={
+                updates.phase === 'ready'
+                  ? 'Ready — tap to restart into it'
+                  : updates.phase === 'downloading'
+                    ? 'Downloading…'
+                    : updates.phase === 'checking'
+                      ? 'Checking…'
+                      : updates.phase === 'current'
+                        ? 'Up to date'
+                        : updates.phase === 'off'
+                          ? 'Not available in this build'
+                          : updates.error
+                            ? 'Could not check — tap to try again'
+                            : `Running ${updates.source === 'update' ? 'an update' : 'the installed build'} · tap to check`
+              }
+              onPress={() => (updates.phase === 'ready' ? applyNow() : checkNow())}
+            />
           </View>
         </>
       ) : null}
