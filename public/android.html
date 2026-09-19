@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fractal Remote for Android</title>
+    <meta
+      name="description"
+      content="The current Android build of Fractal Remote, and the link to install it."
+    />
+    <!--
+      A page to bookmark, so the link never has to be asked for again.
+
+      "Is there a link that I can just save to my bookmarks that will take me
+      and always show me what the latest link is, even if it doesn't download
+      directly, that way I don't have to keep asking for it."
+
+      The APK lands on a GitHub Releases page whose address carries the version
+      in it TWICE, so every new build is a new address and the old bookmark is
+      stale the moment it is made. THIS address never moves. What moves is what
+      it finds: it asks GitHub which releases exist, keeps the ones tagged
+      `apk-v`, and points at the newest.
+
+      Releases from the Mac app are tagged `v` and share the same list, so the
+      filter is the whole trick — GitHub's own /releases/latest would hand back
+      whichever of the two was published last, which on a normal afternoon is a
+      coin toss.
+
+      It is plain HTML with no build step and no dependencies, next to the
+      privacy and support pages, and it works with nothing installed and nobody
+      signed in: the repository is public, so the list is public.
+    -->
+    <style>
+      :root {
+        --chassis: #0d0f12;
+        --panel: #15181d;
+        --rule: #262b33;
+        --silk: #e6e3dc;
+        --silk-dim: #878d97;
+        --signal: #f0a73c;
+        --ok: #63c68c;
+        --fault: #e0684f;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 48px 20px 96px;
+        background: var(--chassis);
+        color: var(--silk);
+        font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      main { max-width: 560px; margin: 0 auto; }
+      h1 { font-size: 30px; line-height: 1.2; margin: 0 0 4px; }
+      .when { color: var(--silk-dim); margin: 0 0 32px; font-size: 14px; }
+      a { color: var(--signal); }
+      .card {
+        padding: 20px;
+        border: 1px solid var(--rule);
+        border-radius: 10px;
+        background: var(--panel);
+      }
+      .ver { font-size: 22px; font-weight: 700; margin: 0; }
+      .sub { color: var(--silk-dim); font-size: 14px; margin: 2px 0 18px; }
+      /* The whole point of the page, and a target for a thumb on a handset. */
+      .get {
+        display: block;
+        min-height: 56px;
+        padding: 15px 20px;
+        border-radius: 8px;
+        background: var(--ok);
+        color: #10221a;
+        font-size: 18px;
+        font-weight: 700;
+        text-align: center;
+        text-decoration: none;
+      }
+      .note { color: var(--silk-dim); font-size: 14px; margin: 18px 0 0; }
+      .bad { color: var(--fault); }
+      ol { padding-left: 22px; }
+      li { margin: 6px 0; }
+      footer {
+        margin-top: 48px;
+        padding-top: 20px;
+        border-top: 1px solid var(--rule);
+        color: var(--silk-dim);
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Fractal Remote for Android</h1>
+      <p class="when">Bookmark this page. It always shows the current build.</p>
+
+      <div class="card" id="card">
+        <p class="ver" id="ver">Looking for the latest build&hellip;</p>
+        <p class="sub" id="sub">One moment.</p>
+      </div>
+
+      <p class="note">
+        Tap the button on the phone itself. Android asks once whether this browser may install
+        apps &mdash; say yes. It installs over an earlier one without removing anything, and your
+        setlists and pairing stay where they are.
+      </p>
+
+      <p class="note">
+        Most changes reach the app on their own and need none of this. A new build is only needed
+        when something about the app itself changed &mdash; a new phone, or a fresh start.
+      </p>
+
+      <footer>
+        <a href="https://github.com/justinnewbold/fractal-ai-builder/releases">Every build, newest first</a>
+        &middot; <a href="/support.html">Support</a>
+        &middot; <a href="/privacy.html">Privacy</a>
+      </footer>
+    </main>
+
+    <script>
+      const REPO = 'justinnewbold/fractal-ai-builder'
+      const ALL = 'https://github.com/' + REPO + '/releases'
+
+      const say = (title, sub, link) => {
+        document.getElementById('ver').textContent = title
+        document.getElementById('sub').textContent = sub
+        const old = document.getElementById('get')
+        if (old) old.remove()
+        if (!link) return
+        const a = document.createElement('a')
+        a.id = 'get'
+        a.className = 'get'
+        a.href = link.href
+        a.textContent = link.text
+        document.getElementById('card').appendChild(a)
+      }
+
+      /* Highest version wins, rather than whatever GitHub listed first.
+         It sorts that list by when a release was CREATED, and the Android
+         build and the Mac one are cut from the same commit — so they can
+         carry the same timestamp and come back either way round. The number
+         in the tag is the one thing that cannot be ambiguous.
+
+         Thirty is several days of builds, and both kinds share the list. */
+      const rank = (tag) =>
+        String(tag)
+          .replace(/^apk-v/, '')
+          .split('.')
+          .reduce((n, part) => n * 100000 + (parseInt(part, 10) || 0), 0)
+
+      fetch('https://api.github.com/repos/' + REPO + '/releases?per_page=30', {
+        headers: { Accept: 'application/vnd.github+json' }
+      })
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error('GitHub said ' + r.status))))
+        .then((list) => {
+          const rel = list
+            .filter((r) => !r.draft && String(r.tag_name).indexOf('apk-v') === 0)
+            .sort((a, b) => rank(b.tag_name) - rank(a.tag_name))[0]
+          if (!rel) throw new Error('no Android build in the list')
+          const apk = (rel.assets || []).find((a) => /\.apk$/i.test(a.name))
+          if (!apk) throw new Error('that build has no APK on it')
+          const when = rel.published_at ? new Date(rel.published_at) : null
+          say(
+            'Version ' + String(rel.tag_name).replace(/^apk-v/, ''),
+            when ? 'Built ' + when.toLocaleString() : 'Latest Android build',
+            { href: apk.browser_download_url, text: 'Download and install' }
+          )
+        })
+        .catch((err) => {
+          /* Never a dead end: the releases page is one tap away and the newest
+             Android build is near the top of it. */
+          document.getElementById('sub').className = 'sub bad'
+          say('Could not reach GitHub just now', String(err.message || err), {
+            href: ALL,
+            text: 'Open the releases page'
+          })
+        })
+    </script>
+  </body>
+</html>

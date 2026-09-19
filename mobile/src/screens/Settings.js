@@ -165,6 +165,20 @@ export default function Settings({
           </Text>
           <View style={{ gap: 0 }}>
             {/*
+              First, because it is the only row here anybody opens for the fun
+              of it. "Move the amp and pedals button to the top of the list."
+              Every other row is plumbing you go to when something needs
+              sorting out; this one answers "what IS a Das Metall, really",
+              which is a question you have while playing.
+            */}
+            {onOpenGear ? (
+              <SetupRow
+                title="Amp & pedal names"
+                status="What each model on your unit really is"
+                onPress={onOpenGear}
+              />
+            ) : null}
+            {/*
               One row for the whole chain: this phone, the computer, and the
               unit plugged into it.
 
@@ -214,13 +228,6 @@ export default function Settings({
               status={[SIZES[loadSize(sync)]?.name || 'Small', THEME_WORD[getMode()] || 'Auto'].join(' · ')}
               onPress={() => setPage('play')}
             />
-            {onOpenGear ? (
-              <SetupRow
-                title="Amp & pedal names"
-                status="What each model on your unit really is"
-                onPress={onOpenGear}
-              />
-            ) : null}
             {/*
               Three rows became one door.
 
@@ -641,8 +648,11 @@ function SetupRow({ title, status, onPress }) {
     >
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={{ color: color.silk, fontSize: font.lead, fontWeight: '600' }}>{title}</Text>
+        {/* Green, like the browser's: each of these is a live answer rather
+            than small print, and `ok` is already what both apps use for a
+            thing said in words they are sure of. */}
         {status ? (
-          <Text numberOfLines={1} style={{ color: color.silkDim, fontSize: font.small }}>
+          <Text numberOfLines={1} style={{ color: color.ok, fontSize: font.small }}>
             {status}
           </Text>
         ) : null}

@@ -1336,6 +1336,35 @@ export function run(test) {
     )
   })
 
+  test('the phone leads Setup with the gear too, and says its facts in green', () => {
+    /*
+     * Both ends. "On the set-up screen, let's change the text underneath the
+     * button labels to green. Also let's move the amp and pedals button to the
+     * top of the list" — said once, about one screen, which exists twice.
+     *
+     * The line under each row is not small print: it is the live answer to the
+     * question the row is named after, and the whole point of the list is that
+     * most of it needs no tap. Grey said the opposite.
+     *
+     * `ok` rather than a green of its own. It is already what both apps use
+     * for a thing said in words they are sure of, and it is already tuned per
+     * theme — a second near-match would drift the moment one of them is.
+     */
+    const phone = readFileSync(new URL('../mobile/src/screens/Settings.js', import.meta.url), 'utf8')
+
+    const titles = [...phone.matchAll(/<SetupRow\s+title="([^"]+)"/g)].map((m) => m[1])
+    assert.equal(titles[0], 'Amp & pedal names', `the phone's Setup opens on ${titles.join(', ')}`)
+
+    /* The row's own component, not a colour pasted per row: one place to be
+       wrong, and the same one the browser has. */
+    const row = phone.slice(phone.indexOf('function SetupRow({ title, status, onPress })'))
+    assert.match(
+      row.slice(0, row.indexOf('\n}')),
+      /color: color\.ok,\s*fontSize: font\.small/,
+      'the phone still says its live facts in grey'
+    )
+  })
+
   test('Setup is a list of rows with live status, each opening a page', () => {
     /*
      * "I wanna overhaul this whole settings set-up screen." Four doors under
@@ -1360,19 +1389,27 @@ export function run(test) {
     assert.deepEqual(
       rows,
       [
+        /*
+         * First, and asked for: "move the amp and pedals button to the top of
+         * the list". Every other row here is plumbing — what is connected,
+         * what the screen looks like, what went wrong — and each is opened
+         * when something needs sorting out. This one answers "what IS a Das
+         * Metall, really", which is a question somebody has mid-song, and it
+         * was fifth.
+         */
+        'Amp & pedal names',
         'Phone & computer',
         /*
          * Only drawn while the demo is on, and this reads App.jsx as text
-         * rather than running it, so it is always in this list. It sits
-         * second because the demo is the whole app for somebody who has not
-         * plugged anything in yet, and because it was unfindable where it
-         * used to be: two doors inside Phone & computer, a row named after
-         * pairing a phone. "Only shows FM3 is the only model available."
+         * rather than running it, so it is always in this list. It sits high
+         * because the demo is the whole app for somebody who has not plugged
+         * anything in yet, and because it was unfindable where it used to be:
+         * two doors inside Phone & computer, a row named after pairing a
+         * phone. "Only shows FM3 is the only model available."
          */
         'Which unit the demo is',
         'Rename presets and scenes',
         'Play screen',
-        'Amp & pedal names',
         'Troubleshooting',
         'About'
       ],

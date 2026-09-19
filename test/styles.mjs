@@ -475,6 +475,43 @@ export function run(test) {
     )
   })
 
+  test('the line under a Setup row is green, and readable in both themes', () => {
+    /*
+     * "On the set-up screen, let's change the text underneath the button
+     * labels to green."
+     *
+     * Faint grey read as small print, and these lines are the opposite: each
+     * is the live answer to the question its row is named after — which unit
+     * the demo is, which theme is on, how far along the chain gets — and the
+     * list is built so that most of it needs no tap.
+     *
+     * `--ok` rather than a green of its own: it is already what this app uses
+     * for a thing said in words it is sure of, and the amp's real name under
+     * its code name has been using it for exactly that.
+     */
+    const at = code.indexOf('.setup-row-status {')
+    assert.ok(at !== -1, 'the line under a Setup row has no styling at all')
+    const rule = code.slice(at, code.indexOf('}', at))
+    assert.match(rule, /color: var\(--ok\)/, 'the Setup rows say their live facts in grey again')
+
+    /*
+     * And it has to READ. A colour asked for is still a colour somebody uses
+     * on a phone in daylight, so both themes are measured on the ground these
+     * rows actually sit on.
+     */
+    const lum = (hex) => {
+      const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+      return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+    }
+    const ratio = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05)
+    for (const [name, open] of [['dark', ':root {'], ['light', "[data-theme='light'] {"]]) {
+      const block = code.slice(code.indexOf(open), code.indexOf('}', code.indexOf(open)))
+      const token = (t) => block.match(new RegExp(`--${t}: (#[0-9a-f]{6})`))?.[1]
+      const r = ratio(token('ok'), token('panel'))
+      assert.ok(r >= 4.5, `--ok on --panel is ${r.toFixed(2)}:1 in the ${name} theme — that is every line in Setup`)
+    }
+  })
+
   test('the Macs to choose between both fit on the screen', () => {
     /*
      * A Mac is called whatever its owner called it, so the buttons here read
