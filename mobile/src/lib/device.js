@@ -267,7 +267,24 @@ export async function presetName(number) {
  * in the demo, which has no computer.
  */
 export async function storedNames(slug) {
-  if (!slug || demoDevice()) return null
+  /*
+   * IN THE DEMO, THE UNIT ITSELF ANSWERS THIS.
+   *
+   * This used to return null in demo — correctly, on the face of it, since
+   * there is no computer to have filed anything. But the other way a name can
+   * be learned is GET /presets/{n}, and that is a stub on every gen-3 unit
+   * and in the mock: 200 OK with an empty name. So the demo had NO source of
+   * preset names at all, and the list drew 512 rows of "Empty" over a bank
+   * that was sitting in the mock the whole time.
+   *
+   * "All presets are blank in the demo."
+   *
+   * The mock answers the same shape the computer's file does, so this is the
+   * same read with a different post office.
+   */
+  const mock = demoDevice()
+  if (mock) return typeof mock.storedNames === 'function' ? mock.storedNames() : null
+  if (!slug) return null
   const doc = await remoteRequest(`/store/config/preset-names-${encodeURIComponent(slug)}`)
   const data = doc && typeof doc === 'object' && 'data' in doc ? doc.data : doc
   return data && typeof data === 'object' && !Array.isArray(data) ? data : null

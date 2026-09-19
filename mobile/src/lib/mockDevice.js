@@ -574,6 +574,26 @@ export function createMockDevice(unitKey = DEFAULT_UNIT) {
      */
     presetName: (number) => ({ number, name: '' }),
 
+    /*
+     * ...AND THE WAY ROUND IT, which the demo needs and hardware does not.
+     *
+     * The stub above is right: a gen-3 unit genuinely cannot answer "what is
+     * the name of slot 41" and the mock must not pretend otherwise. On real
+     * hardware the phone gets the names from the COMPUTER instead — the
+     * browser at the cable reads them in the background and files them, and
+     * device.storedNames fetches that file in one request.
+     *
+     * The demo has no computer, so that read returned null and the per-slot
+     * read returned '' — which left the phone's preset list showing 512 rows
+     * of "Empty" with a real bank sitting right here. "All presets are blank
+     * in the demo."
+     *
+     * This is the demo's answer to the same question the computer's file
+     * answers: every name this unit would report, in one go. Slot number to
+     * name, exactly the shape storedNames already returns.
+     */
+    storedNames: () => Object.fromEntries(state.stored),
+
     setPresetName: (name) => {
       state.presetName = name
       return { ok: true }

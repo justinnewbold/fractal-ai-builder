@@ -4,6 +4,7 @@ import { ScrollView, Text, View } from 'react-native'
 import { color, font, radius, space } from '../lib/theme'
 import Note from '../components/Note'
 import Press from '../components/Press'
+import Sheet from '../components/Sheet'
 import { buyUnlock, restorePurchase, usePurchase } from '../lib/purchases'
 
 /**
@@ -24,8 +25,8 @@ import { buyUnlock, restorePurchase, usePurchase } from '../lib/purchases'
  * anyway: the person tapping it has already paid, and hiding their way back in
  * behind the thing that charges them again would be a poor way to treat them.
  */
-export default function Paywall({ onUnlocked, onDemo, onBack }) {
-  const { price, unlocked } = usePurchase()
+export default function Paywall({ onUnlocked, onDemo, onBack, asked = false }) {
+  const { price, unlocked, available, why } = usePurchase()
   const [busy, setBusy] = useState(false)
   const [said, setSaid] = useState(null)
 
@@ -50,7 +51,7 @@ export default function Paywall({ onUnlocked, onDemo, onBack }) {
     setSaid({ tone: 'warn', text: out.message })
   }
 
-  return (
+  const body = (
     <ScrollView
       contentContainerStyle={{ padding: space.lg, gap: space.lg }}
       keyboardShouldPersistTaps="handled"
@@ -88,19 +89,27 @@ export default function Paywall({ onUnlocked, onDemo, onBack }) {
 
       {said ? <Note tone={said.tone}>{said.text}</Note> : null}
 
+      {/* A dead Unlock button is worse than an explained one. Restore still
+          shows, because a purchase made elsewhere is worth trying for. */}
+      {!available ? <Note tone="warn">{why || 'Purchases are not available here.'}</Note> : null}
+
       <View style={{ gap: space.md }}>
         <Press
           label={price ? `Unlock — ${price}` : 'Unlock'}
           tone="signal"
-          disabled={busy}
+          disabled={busy || !available}
           onPress={buy}
         />
         <Press label="Restore a purchase" disabled={busy} onPress={restore} />
       </View>
 
       <View style={{ gap: space.md }}>
-        <Press label="Keep using the demo" disabled={busy} onPress={() => onDemo?.()} />
-        <Press label="Back" disabled={busy} onPress={() => onBack?.()} />
+        {/* Somebody STOPPED on the way in needs a way past this; somebody who
+            came looking is already in the demo and only needs out. */}
+        {asked ? null : (
+          <Press label="Keep using the demo" disabled={busy} onPress={() => onDemo?.()} />
+        )}
+        <Press label={asked ? 'Not now' : 'Back'} disabled={busy} onPress={() => onBack?.()} />
       </View>
 
       <Text style={{ color: color.silkDim, fontSize: font.small, lineHeight: font.small * 1.5 }}>
@@ -108,5 +117,14 @@ export default function Paywall({ onUnlocked, onDemo, onBack }) {
         against a simulated unit — nothing in it is cut short.
       </Text>
     </ScrollView>
+  )
+
+  /* Imposed, it IS the screen. Asked for, it lies over the one they were on. */
+  return asked ? (
+    <Sheet open onClose={() => onBack?.()} title="Unlock" note="One payment, once">
+      {body}
+    </Sheet>
+  ) : (
+    body
   )
 }

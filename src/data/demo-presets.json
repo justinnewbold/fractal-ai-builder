@@ -1,40 +1,8 @@
 {
-  "_why": [
-    "The presets demo mode pretends the unit is holding.",
-    "",
-    "Demo mode existed so somebody with no FM3 could see the app work, and for",
-    "a long time it showed one preset with one chain and 511 empty slots. Every",
-    "screen that reads a LIST — the preset list, the setlists, the scene tiles —",
-    "was therefore being demonstrated empty, which is the one thing a demo must",
-    "not do.",
-    "",
-    "So this is twelve presets that look like a working rig. Every amp, cab and",
-    "drive number here is a real model on a real FM3, taken from the same",
-    "rosters the app already ships (src/data/amp-types.json and its neighbours),",
-    "not invented — a demo that names an amp nobody makes teaches the wrong",
-    "thing.",
-    "",
-    "Each preset carries FOUR named scenes that actually differ: which blocks",
-    "are off, which channel the amp is on, and where the levels sit. A scene",
-    "list whose entries are identical is the same failure as an empty list, one",
-    "step later.",
-    "",
-    "`chain` is the blocks in signal order. Only the slugs the mock's LAYOUT",
-    "knows may appear, because those effect ids were captured off hardware and",
-    "the block catalogue is built from them. `levels` is in dB for the amp and",
-    "for anything whose Level is in dB; `off` is by slug, not effect id, so this",
-    "file stays readable.",
-    "",
-    "A LEVEL BELONGS TO A CHANNEL, NOT TO A SCENE, and that is why every scene",
-    "here selects a different amp channel. The first draft of this file gave two",
-    "scenes the same channel and different levels; the second one silently won,",
-    "because that is what the hardware does — a scene chooses a channel and the",
-    "channel holds the value. Blocks a scene does not switch keep one setting",
-    "for the whole preset, under `levels` on the preset rather than on a scene."
-  ],
+  "_why": "The hand-built demo rigs, and WHY THEY ARE NOT ON SLOTS 0-11 ANY MORE. They used to sit on 0-11, which is where the FM3 keeps 59 Bassguy, 65 Bassguy, Vibrato Lux and nine more real factory presets — so the one unit with hand-built content was the one unit whose factory bank you could not check against the thing on your desk. \"With the FM3, they are not the actual default presets. One of them says Papa’s Roach, which definitely is not a preset that should be in the demo. It should have the real factory presets like all the others do.\" The FM3 bank is 384 entries, 0-383, so these start at 384 — which on a real FM3 is where a player’s own presets go. Nothing is lost: the Edit screen still has twelve rigs with real models and named scenes to demonstrate, and every factory slot now reads the way the unit does.",
   "presets": [
     {
-      "number": 0,
+      "number": 384,
       "name": "Drop D Chug",
       "note": "The everyday rhythm sound: tube screamer into a Recto, 4x12 behind it.",
       "chain": [
@@ -54,9 +22,9 @@
         "drive": 45
       },
       "levels": {
-        "drive": -2.0,
-        "delay": -6.0,
-        "reverb": -8.0
+        "drive": -2,
+        "delay": -6,
+        "reverb": -8
       },
       "scenes": [
         {
@@ -71,7 +39,7 @@
             "amp": "A"
           },
           "levels": {
-            "amp": -8.0
+            "amp": -8
           }
         },
         {
@@ -83,7 +51,7 @@
             "amp": "B"
           },
           "levels": {
-            "amp": -4.0
+            "amp": -4
           }
         },
         {
@@ -96,7 +64,7 @@
             "amp": "C"
           },
           "levels": {
-            "amp": -10.0
+            "amp": -10
           }
         },
         {
@@ -110,13 +78,13 @@
             "amp": "D"
           },
           "levels": {
-            "amp": -12.0
+            "amp": -12
           }
         }
       ]
     },
     {
-      "number": 1,
+      "number": 385,
       "name": "Master of None",
       "note": "Gallop rhythm into a 5153 green channel, tight and dry.",
       "chain": [
@@ -136,8 +104,8 @@
         "drive": 16
       },
       "levels": {
-        "delay": -8.0,
-        "drive": 4.0
+        "delay": -8,
+        "drive": 4
       },
       "scenes": [
         {
@@ -152,7 +120,7 @@
             "amp": "A"
           },
           "levels": {
-            "amp": -7.0
+            "amp": -7
           }
         },
         {
@@ -165,7 +133,7 @@
             "amp": "B"
           },
           "levels": {
-            "amp": -3.0
+            "amp": -3
           }
         },
         {
@@ -178,7 +146,7 @@
             "amp": "C"
           },
           "levels": {
-            "amp": -9.0
+            "amp": -9
           }
         },
         {
@@ -190,13 +158,13 @@
             "amp": "D"
           },
           "levels": {
-            "amp": -1.0
+            "amp": -1
           }
         }
       ]
     },
     {
-      "number": 2,
+      "number": 386,
       "name": "Papa's Roach",
       "note": "Friedman BE with a clean boost, four sections of one song.",
       "chain": [
@@ -215,8 +183,8 @@
         "drive": 12
       },
       "levels": {
-        "reverb": -10.0,
-        "delay": -7.0
+        "reverb": -10,
+        "delay": -7
       },
       "scenes": [
         {
@@ -230,7 +198,7 @@
             "amp": "A"
           },
           "levels": {
-            "amp": -9.0
+            "amp": -9
           }
         },
         {
@@ -242,7 +210,7 @@
             "amp": "B"
           },
           "levels": {
-            "amp": -5.0
+            "amp": -5
           }
         },
         {
@@ -255,7 +223,7 @@
             "amp": "C"
           },
           "levels": {
-            "amp": -11.0
+            "amp": -11
           }
         },
         {
@@ -265,13 +233,13 @@
             "amp": "D"
           },
           "levels": {
-            "amp": -3.0
+            "amp": -3
           }
         }
       ]
     },
     {
-      "number": 3,
+      "number": 387,
       "name": "Ouija Clean",
       "note": "Blackface clean with a Klone in front, for the quiet parts.",
       "chain": [
@@ -290,9 +258,9 @@
         "drive": 59
       },
       "levels": {
-        "reverb": -9.0,
-        "delay": -12.0,
-        "drive": 1.0
+        "reverb": -9,
+        "delay": -12,
+        "drive": 1
       },
       "scenes": [
         {
@@ -305,7 +273,7 @@
             "amp": "A"
           },
           "levels": {
-            "amp": -12.0
+            "amp": -12
           }
         },
         {
@@ -317,7 +285,7 @@
             "amp": "B"
           },
           "levels": {
-            "amp": -11.0
+            "amp": -11
           }
         },
         {
@@ -329,7 +297,7 @@
             "amp": "C"
           },
           "levels": {
-            "amp": -8.0
+            "amp": -8
           }
         },
         {
@@ -339,13 +307,13 @@
             "amp": "D"
           },
           "levels": {
-            "amp": -9.0
+            "amp": -9
           }
         }
       ]
     },
     {
-      "number": 4,
+      "number": 388,
       "name": "Plexi Bark",
       "note": "Treble boost into a 50W Plexi. Four steps of the same gain staircase.",
       "chain": [
@@ -363,8 +331,8 @@
         "drive": 4
       },
       "levels": {
-        "drive": 3.0,
-        "delay": -9.0
+        "drive": 3,
+        "delay": -9
       },
       "scenes": [
         {
@@ -377,7 +345,7 @@
             "amp": "A"
           },
           "levels": {
-            "amp": -9.0
+            "amp": -9
           }
         },
         {
@@ -389,7 +357,7 @@
             "amp": "B"
           },
           "levels": {
-            "amp": -6.0
+            "amp": -6
           }
         },
         {
@@ -399,7 +367,7 @@
             "amp": "C"
           },
           "levels": {
-            "amp": -3.0
+            "amp": -3
           }
         },
         {
@@ -411,13 +379,13 @@
             "amp": "D"
           },
           "levels": {
-            "amp": -1.0
+            "amp": -1
           }
         }
       ]
     },
     {
-      "number": 5,
+      "number": 389,
       "name": "Mk IV Rhythm",
       "note": "The Mark IV rhythm voice — mids up, gain moderate.",
       "chain": [
@@ -436,8 +404,8 @@
         "drive": 45
       },
       "levels": {
-        "delay": -8.0,
-        "drive": 2.0
+        "delay": -8,
+        "drive": 2
       },
       "scenes": [
         {
@@ -451,7 +419,7 @@
             "amp": "A"
           },
           "levels": {
-            "amp": -8.0
+            "amp": -8
           }
         },
         {
@@ -463,7 +431,7 @@
             "amp": "B"
           },
           "levels": {
-            "amp": -4.0
+            "amp": -4
           }
         },
         {
@@ -476,7 +444,7 @@
             "amp": "C"
           },
           "levels": {
-            "amp": -10.0
+            "amp": -10
           }
         },
         {
@@ -488,13 +456,13 @@
             "amp": "D"
           },
           "levels": {
-            "amp": -6.0
+            "amp": -6
           }
         }
       ]
     },
     {
-      "number": 6,
+      "number": 390,
       "name": "6160 Block",
       "note": "Block-letter 6160, with the wah live in its own scene.",
       "chain": [
@@ -514,7 +482,7 @@
         "drive": 16
       },
       "levels": {
-        "delay": -7.0
+        "delay": -7
       },
       "scenes": [
         {
@@ -529,7 +497,7 @@
             "amp": "A"
           },
           "levels": {
-            "amp": -7.0
+            "amp": -7
           }
         },
         {
@@ -541,7 +509,7 @@
             "amp": "B"
           },
           "levels": {
-            "amp": -3.0
+            "amp": -3
           }
         },
         {
@@ -554,7 +522,7 @@
             "amp": "C"
           },
           "levels": {
-            "amp": -6.0
+            "amp": -6
           }
         },
         {
@@ -567,13 +535,13 @@
             "amp": "D"
           },
           "levels": {
-            "amp": -11.0
+            "amp": -11
           }
         }
       ]
     },
     {
-      "number": 7,
+      "number": 391,
       "name": "AC Jangle",
       "note": "A30 clean into a 1x12. The short chain, on purpose.",
       "chain": [
@@ -589,7 +557,7 @@
         "drive": 34
       },
       "levels": {
-        "reverb": -9.0
+        "reverb": -9
       },
       "scenes": [
         {
@@ -601,7 +569,7 @@
             "amp": "A"
           },
           "levels": {
-            "amp": -10.0
+            "amp": -10
           }
         },
         {
@@ -611,7 +579,7 @@
             "amp": "B"
           },
           "levels": {
-            "amp": -10.0
+            "amp": -10
           }
         },
         {
@@ -623,7 +591,7 @@
             "amp": "C"
           },
           "levels": {
-            "amp": -7.0
+            "amp": -7
           }
         },
         {
@@ -633,13 +601,13 @@
             "amp": "D"
           },
           "levels": {
-            "amp": -8.0
+            "amp": -8
           }
         }
       ]
     },
     {
-      "number": 8,
+      "number": 392,
       "name": "Euro Blue Lead",
       "note": "Euro Blue with a Riot in front for the solo.",
       "chain": [
@@ -657,9 +625,9 @@
         "drive": 37
       },
       "levels": {
-        "delay": -6.0,
-        "reverb": -10.0,
-        "drive": 5.0
+        "delay": -6,
+        "reverb": -10,
+        "drive": 5
       },
       "scenes": [
         {
@@ -672,7 +640,7 @@
             "amp": "A"
           },
           "levels": {
-            "amp": -8.0
+            "amp": -8
           }
         },
         {
@@ -682,7 +650,7 @@
             "amp": "B"
           },
           "levels": {
-            "amp": -3.0
+            "amp": -3
           }
         },
         {
@@ -695,7 +663,7 @@
             "amp": "C"
           },
           "levels": {
-            "amp": -11.0
+            "amp": -11
           }
         },
         {
@@ -707,13 +675,13 @@
             "amp": "D"
           },
           "levels": {
-            "amp": -1.0
+            "amp": -1
           }
         }
       ]
     },
     {
-      "number": 9,
+      "number": 393,
       "name": "Bludo Smooth",
       "note": "The smooth overdrive voice, four degrees of it.",
       "chain": [
@@ -732,9 +700,9 @@
         "drive": 59
       },
       "levels": {
-        "reverb": -8.0,
-        "drive": 2.0,
-        "delay": -8.0
+        "reverb": -8,
+        "drive": 2,
+        "delay": -8
       },
       "scenes": [
         {
@@ -748,7 +716,7 @@
             "amp": "A"
           },
           "levels": {
-            "amp": -10.0
+            "amp": -10
           }
         },
         {
@@ -761,7 +729,7 @@
             "amp": "B"
           },
           "levels": {
-            "amp": -9.0
+            "amp": -9
           }
         },
         {
@@ -773,7 +741,7 @@
             "amp": "C"
           },
           "levels": {
-            "amp": -6.0
+            "amp": -6
           }
         },
         {
@@ -783,13 +751,13 @@
             "amp": "D"
           },
           "levels": {
-            "amp": -4.0
+            "amp": -4
           }
         }
       ]
     },
     {
-      "number": 10,
+      "number": 394,
       "name": "Brit 800",
       "note": "2204 on the high input. The sound most pedals were designed against.",
       "chain": [
@@ -807,9 +775,9 @@
         "drive": 45
       },
       "levels": {
-        "delay": -8.0,
-        "drive": 4.0,
-        "reverb": -12.0
+        "delay": -8,
+        "drive": 4,
+        "reverb": -12
       },
       "scenes": [
         {
@@ -822,7 +790,7 @@
             "amp": "A"
           },
           "levels": {
-            "amp": -8.0
+            "amp": -8
           }
         },
         {
@@ -834,7 +802,7 @@
             "amp": "B"
           },
           "levels": {
-            "amp": -4.0
+            "amp": -4
           }
         },
         {
@@ -847,7 +815,7 @@
             "amp": "C"
           },
           "levels": {
-            "amp": -11.0
+            "amp": -11
           }
         },
         {
@@ -857,13 +825,13 @@
             "amp": "D"
           },
           "levels": {
-            "amp": -2.0
+            "amp": -2
           }
         }
       ]
     },
     {
-      "number": 11,
+      "number": 395,
       "name": "Fuzz Garage",
       "note": "Face Fuzz into a Shiver clean — the fuzz IS the amp here.",
       "chain": [
@@ -881,9 +849,9 @@
         "drive": 21
       },
       "levels": {
-        "drive": 7.0,
-        "reverb": -6.0,
-        "delay": -9.0
+        "drive": 7,
+        "reverb": -6,
+        "delay": -9
       },
       "scenes": [
         {
@@ -896,7 +864,7 @@
             "amp": "A"
           },
           "levels": {
-            "amp": -9.0
+            "amp": -9
           }
         },
         {
@@ -909,7 +877,7 @@
             "amp": "B"
           },
           "levels": {
-            "amp": -11.0
+            "amp": -11
           }
         },
         {
@@ -921,7 +889,7 @@
             "amp": "C"
           },
           "levels": {
-            "amp": -6.0
+            "amp": -6
           }
         },
         {
@@ -931,7 +899,7 @@
             "amp": "D"
           },
           "levels": {
-            "amp": -4.0
+            "amp": -4
           }
         }
       ]
