@@ -41,6 +41,13 @@ export const FILES = [
   /* What counts as a tempo somebody typed. The unit's range, once, for both boxes. */
   { source: '../shared/tempo.mjs', target: '../mobile/src/lib/tempo.js' },
   /*
+   * What firmware the unit is running, read out of the host's answer. Shared
+   * because the two ends showing different versions for one unit is not a
+   * difference, it is one of them being wrong — and because the shapes it
+   * tolerates were learned once and should not be learned twice.
+   */
+  { source: '../shared/firmware.mjs', target: '../mobile/src/lib/firmware.js' },
+  /*
    * How often to check the unit is still there, and how much silence counts.
    *
    * Belongs here for the reason the word at the top of the screen does: two

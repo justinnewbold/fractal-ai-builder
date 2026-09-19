@@ -973,6 +973,86 @@ export function run(test) {
     )
   })
 
+  test('the unit is asked what firmware it is running, at both ends', async () => {
+    /*
+     * "I have another app I'm building called axiom... it definitely pulls the
+     * firmware version so I'm not sure why you can't do it. It's basically the
+     * same app."
+     *
+     * It was right, and what this app had written down was wrong. There was no
+     * firmware anywhere on any screen, and the reason given was that nothing
+     * this talks to carries one — an assumption that had never been checked,
+     * stated as a fact about the protocol.
+     *
+     * The host carries it. This end was asking `/device/detect`, which answers
+     * with the capabilities rather than the whole unit, and stopping there.
+     * The other app asks `/device` as well and merges the two, which is all
+     * that was ever between this app and a firmware version.
+     *
+     * BEST-EFFORT ON PURPOSE. The capabilities decide what every screen is
+     * allowed to draw and are already in hand by then; the firmware is one
+     * line on a Setup page. A host too old to answer the second question must
+     * cost that line and never the connection, so the failure is swallowed and
+     * the unit still detects.
+     */
+    for (const [where, file] of [
+      ['the browser', 'src/lib/forgefx.js'],
+      ['the phone', 'mobile/src/lib/device.js']
+    ]) {
+      const code = read(file).replace(/\s+/g, ' ')
+      assert.match(code, /\/device\/detect/, `${where} no longer detects the unit at all`)
+      /* The browser calls it `request` and the phone `remoteRequest`, so the
+         match is on the path with a call bracket in front of it rather than on
+         either name. */
+      assert.match(code, /equest\('\/device'\)/, `${where} asks only for the capabilities, so it can never see a firmware version`)
+      assert.match(code, /firmwareOf\(/, `${where} reads the firmware field raw rather than through the shared reader`)
+      assert.match(code, /\} catch \{ return res \}/, `${where} would fail to detect a unit because the firmware read failed`)
+    }
+
+    /*
+     * And the detect payload wins on anything both endpoints answer. `/device`
+     * is the looser of the two and a second opinion about the grid is the kind
+     * of drift that shows up as a chain drawn one row short.
+     */
+    const web = read('src/lib/forgefx.js').replace(/\s+/g, ' ')
+    assert.match(web, /\{ \.\.\.whole, \.\.\.res, firmware:/, 'the looser payload now overrides the capabilities every screen is built from')
+
+    /*
+     * NOTHING IS INVENTED FOR A UNIT THAT DID NOT SAY. A simulated unit has no
+     * firmware, a host too old to report one has nothing to report, and a host
+     * that answers with a dash is saying it does not know. All three are the
+     * same answer and all three draw nothing — a version number under a
+     * simulated FM3 would be the confident wrong fact this project refuses
+     * everywhere else.
+     */
+    const { firmwareOf } = await import('../shared/firmware.mjs')
+    assert.equal(firmwareOf({ firmware: '27.01' }), '27.01')
+    assert.equal(firmwareOf({ firmware: { version: '27.01' } }), '27.01', 'an object-shaped version is not read')
+    assert.equal(firmwareOf({ fw: '8.02' }), '8.02', 'the short spelling is not read')
+    for (const nothing of [{}, null, undefined, { firmware: '' }, { firmware: '—' }, { firmware: 'unknown' }]) {
+      assert.equal(firmwareOf(nothing), null, `${JSON.stringify(nothing)} is being drawn as a firmware version`)
+    }
+
+    /* The demo says nothing, because a simulation has no firmware to report.
+       Asked of the mock rather than grepped out of its source: the file
+       mentions the word in a comment about stored preset names, and a test
+       that reads comments is a test that fails on prose. */
+    const { createMockDevice } = await import('../src/lib/mockDevice.js')
+    for (const unit of ['fm3', 'am4', 'vp4']) {
+      assert.equal(
+        firmwareOf(createMockDevice(unit).detect()),
+        null,
+        `the demo invents a firmware version for a simulated ${unit}`
+      )
+    }
+
+    /* And both screens draw it only when there is one. */
+    /* Either bracket: the browser's fits on one line and opens a tag, the
+       phone's wraps and opens a paren. What is held is the guard. */
+    assert.match(read('src/components/DeviceDetail.jsx'), /\{firmware \? [(<]/, 'the browser draws a firmware line for a unit that never reported one')
+    assert.match(read('mobile/src/screens/Settings.js'), /\{firmware \? [(<]/, 'the phone draws a firmware line for a unit that never reported one')
+  })
+
   test('the phone icon is one Apple will accept, and the others keep their alpha', () => {
     /*
      * "The app icon can't contain alpha channels or transparencies" is an

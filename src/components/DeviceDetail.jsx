@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { getHost, setHost, isDemo, setDemo, demoUnit, setDemoUnit } from '../lib/forgefx'
 import { remoteActive } from '../lib/remote'
 import { UNITS as DEMO_UNITS } from '../lib/demoUnits'
+import { firmwareOf } from '../../shared/firmware.mjs'
 import { FULL } from '../lib/version'
 
 /**
@@ -34,6 +35,10 @@ export default function DeviceDetail({ status, device, onRetry, busy }) {
    */
   const remote = remoteActive()
   const grid = device?.capabilities?.grid
+  /* Read through the shared reader rather than off the object, because the
+     host has answered with a string, an object and a short `fw` across
+     versions and only one of those is a version by accident. */
+  const firmware = firmwareOf(device)
 
   /*
    * A reload, not a re-read. Which end this is was decided when the page
@@ -101,6 +106,11 @@ export default function DeviceDetail({ status, device, onRetry, busy }) {
             ) : null}
             <span className="device-meta-fact">{device.capabilities?.sceneCount} scenes</span>
             <span className="device-meta-fact">{device.capabilities?.presets?.count} slots</span>
+            {/* The unit's own version, where the app's version already is. Only
+                when the unit said one: a host too old to report it, and the
+                demo, both leave this out rather than drawing "firmware —",
+                which reads as a version rather than as a silence. */}
+            {firmware ? <span className="device-meta-fact">firmware {firmware}</span> : null}
           </span>
         </div>
       ) : null}
