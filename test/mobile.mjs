@@ -3676,9 +3676,29 @@ export function run(test) {
       assert.ok(d.length < 280, `${obscure}: ${d.length} characters is a character description of an amp nobody here has played`)
     }
 
-    /* A pedal that models nothing real still says nothing, and that has not
-       changed: there is no original to have a history. */
-    assert.equal(descriptionFor('drive', 'FAS Boost'), null, "Fractal's own pedal is being given a history it does not have")
+    /*
+     * A PEDAL THAT MODELS NOTHING REAL HAS NO HISTORY, AND STILL HAS A JOB.
+     *
+     * Eleven of the drives are Fractal's own designs with no pedal behind
+     * them, and they used to say nothing at all for that reason. Half right:
+     * there is no story to tell about a FAS Boost and inventing one would be
+     * exactly the failure this file exists to prevent. But what it DOES is a
+     * plain fact — it is a clean boost — and a reader staring at "nothing
+     * written down about this one yet" learns less than one told that.
+     *
+     * So they describe the function and say outright that there is no pedal
+     * behind them. Held here: each must name itself as Fractal's own, so
+     * nobody can quietly give one a heritage later.
+     */
+    for (const own of ['FAS Boost', 'Bit Crusher', 'Tape Distortion', 'Mid Boost']) {
+      const d = descriptionFor('drive', own)
+      assert.ok(d, `${own} says nothing at all, not even what it does`)
+      assert.match(
+        d,
+        /Fractal|not a pedal|not analogue|no pedal behind/i,
+        `${own} reads as if there were a real pedal behind it`
+      )
+    }
     assert.equal(descriptionFor('amp', ''), null)
     assert.equal(descriptionFor('amp'), null, 'descriptionFor throws rather than answering for a missing name')
     assert.equal(descriptionFor('reverb', 'Ambient'), null, 'a family with no catalog is being answered for')
@@ -3704,7 +3724,11 @@ export function run(test) {
     const ampFams = JSON.parse(read('src/data/amp-lineage.json'))
     const described = ampFams.filter((f) => f.description)
     assert.ok(described.length > 100, `only ${described.length} amp families are described`)
-    for (const f of [...described, ...JSON.parse(read('src/data/cab-types.json')).filter((c) => c.description)]) {
+    const alsoDescribed = [
+      ...JSON.parse(read('src/data/cab-types.json')).filter((c) => c.description),
+      ...JSON.parse(read('src/data/drive-types.json')).filter((c) => c.description)
+    ]
+    for (const f of [...described, ...alsoDescribed]) {
       const who = f.family || f.name
       const paras = paragraphsOf(f.description)
       assert.ok(paras.length >= 1, `${who}: a description that is not a paragraph`)
@@ -3718,10 +3742,11 @@ export function run(test) {
 
     /* And the spec line, where one is written, is numbers rather than prose:
        it is read at a glance and set apart from the paragraphs for that. */
-    for (const f of ampFams.filter((a) => a.specs)) {
-      assert.ok(f.specs.length <= 60, `${f.family}: a spec line of ${f.specs.length} characters is a sentence`)
-      assert.ok(!/[.!?]$/.test(f.specs), `${f.family}: the spec line ends as a sentence`)
-      assert.ok(!/^\s|\s$/.test(f.specs), `${f.family}: the spec line has stray whitespace`)
+    for (const f of [...ampFams, ...alsoDescribed].filter((a) => a.specs)) {
+      const who = f.family || f.name
+      assert.ok(f.specs.length <= 60, `${who}: a spec line of ${f.specs.length} characters is a sentence`)
+      assert.ok(!/[.!?]$/.test(f.specs), `${who}: the spec line ends as a sentence`)
+      assert.ok(!/^\s|\s$/.test(f.specs), `${who}: the spec line has stray whitespace`)
     }
 
     const console_ = read('src/components/Console.jsx')
