@@ -107,6 +107,36 @@ const CARDS = [
         </p>
       </>
     )
+  },
+  {
+    /*
+     * "We need to add to the tutorial about holding down the amp in effect
+     * buttons to switch channels by tapping and holding."
+     *
+     * The card before this one explains what a channel IS and never says how
+     * to reach one. The gesture is a long press on the block's own tile on
+     * Play — there is no visible control, which is the whole reason it needs
+     * saying out loud here rather than being left to be discovered.
+     */
+    title: 'Hold a block to change its channel',
+    body: (
+      <>
+        <p>
+          On Play, every block in the chain is a button. A tap switches it on and off. <strong>Hold
+          it down</strong> and its four channels come up &mdash; A, B, C, D &mdash; and you pick
+          which one this scene should play.
+        </p>
+        <p>
+          That is how a scene gets a hotter amp or a different drive without another preset. The amp
+          and the drive are the two worth holding first; most blocks carry four channels and each
+          one keeps its own settings.
+        </p>
+        <p className="hint">
+          Nothing on the tile says so, because on a dark stage the tile has room for the block and
+          not much else. Hold anything on Play and see what it offers.
+        </p>
+      </>
+    )
   }
 ]
 
@@ -135,9 +165,9 @@ const phoneCard = ({ connected, email }) => ({
     <>
       <p>
         This computer holds the cable to your unit. Your phone becomes the remote &mdash; point its
-        camera at this, and you can work the rig from the other end of a stage.
+        camera at this, and sign in with the same account you used here.
       </p>
-      <PhoneQr connected={connected} email={email} />
+      <PhoneQr connected={connected} email={email} showAccount={false} />
       <p className="hint">
         It is in Setup &rarr; Phone &amp; computer whenever you want it again.
       </p>

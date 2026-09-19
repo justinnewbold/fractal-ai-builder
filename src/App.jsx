@@ -204,6 +204,38 @@ const ofSceneNames = (s) => s.sceneNames
 /** How long the "Done" card stays on a screen before it takes itself off. */
 const DID_STAYS_MS = 20000
 
+/**
+ * The one-time note on Play about holding a block for its channels.
+ *
+ * "On the play screen the first time it's opened, have another pop up that
+ * also tells them to hold down those buttons to switch channels... I actually
+ * believe we had this previously set up, but I'm not seeing it working."
+ *
+ * It was not. Nothing on Play has ever said this, which is why it reads as
+ * something that used to work: the gesture is real and has been since the
+ * channel sheet was built, and a gesture with nothing on screen pointing at it
+ * is indistinguishable from one that is broken.
+ *
+ * Its own key rather than the tour's. Somebody who skipped the introduction,
+ * or who met this app before the card existed, still gets told once — and put
+ * away, it stays away.
+ */
+const HOLD_NOTE_KEY = 'fab.play.hold'
+const holdNoteWasSeen = () => {
+  try {
+    return localStorage.getItem(HOLD_NOTE_KEY) === 'seen'
+  } catch {
+    return false
+  }
+}
+const rememberHoldNote = () => {
+  try {
+    localStorage.setItem(HOLD_NOTE_KEY, 'seen')
+  } catch {
+    // Private windows throw; it comes back next time, which is fine.
+  }
+}
+
 /** The one-time note about the demo, once put away. */
 const DEMO_NOTE_KEY = 'fab.demo.note'
 const demoNoteWasSeen = () => {
@@ -869,6 +901,11 @@ export default function App() {
   /* The count the profile was last updated at, so ten more messages mean one
      more update and not one per render. */
       /* Whether the line explaining the demo has been put away. */
+  const [holdNoteSeen, setHoldNoteSeen] = useState(() => holdNoteWasSeen())
+  const dismissHoldNote = () => {
+    rememberHoldNote()
+    setHoldNoteSeen(true)
+  }
   const [demoNoteSeen, setDemoNoteSeen] = useState(() => demoNoteWasSeen())
   const dismissDemoNote = () => {
     setDemoNoteSeen(true)
@@ -3178,6 +3215,27 @@ export default function App() {
       */}
       <Screens view={view} enabled={status === 'live'} order={views} onChange={changeView}>
       {status === 'live' && view === 'play' ? (
+        <>
+        {/*
+          Said once, on the screen it is about, and cleared for good.
+
+          Inside the Play view rather than above it on purpose: the strip
+          between the bar and the first screen is held to the bar, the states
+          that mean the app cannot work yet, and the assistant — see the chrome
+          check in test/structure.mjs. A hint belongs with the thing it hints
+          at anyway.
+        */}
+        {!holdNoteSeen ? (
+          <p className="play-hint">
+            <span>
+              Hold a block &mdash; the amp, the drive, any of them &mdash; to bring up its channels
+              and pick the one this scene plays. A tap just switches it on and off.
+            </span>
+            <button className="chip" onClick={dismissHoldNote}>
+              Got it
+            </button>
+          </p>
+        ) : null}
         <Gig
           preset={preset}
           device={device}
@@ -3203,6 +3261,7 @@ export default function App() {
               : null
           }
         />
+        </>
       ) : null}
 
       {status === 'live' && view === 'shape' ? (
@@ -4114,23 +4173,6 @@ export default function App() {
 <Section key="what-s-changed-this-session" title="What's changed this session">
             <ChangeLog log={log} onClear={() => setLog([])} />
           </Section>
-<Section key="how-this-works" title="How this works" note="A short introduction">
-          <p className="hint">
-            Four cards: what the three screens are for, how to ask for a sound, where a change
-            actually goes, and what a scene is. It appears once the first time you connect.
-          </p>
-          <div className="history-actions">
-            <button
-              className="chip"
-              onClick={() => {
-                setSheet(null)
-                setTour(true)
-              }}
-            >
-              Show the introduction
-            </button>
-          </div>
-        </Section>
           </div>
         ) : null}
 
@@ -4141,6 +4183,32 @@ export default function App() {
             </button>
             <p className="setup-page-title">{SETUP_PAGES.about}</p>
             <p className="device-meta mono">{FULL} · built {BUILT_AT} UTC</p>
+            {/*
+              THE INTRODUCTION LIVES HERE NOW, not under Troubleshooting.
+              "Move the tutorial to replay it later into the about section
+              instead of under troubleshooting."
+              It is right: nothing about it is a fault being fixed. It is what
+              the app is and how it works, which is what About is for, and
+              somebody looking for it under Troubleshooting has first had to
+              decide they have a problem.
+            */}
+            <Section key="how-this-works" title="How this works" note="A short introduction">
+              <p className="hint">
+                What the screens are for, where a change actually goes, what a scene is, and how to
+                reach a block&rsquo;s channels. It appears once, the first time you connect.
+              </p>
+              <div className="history-actions">
+                <button
+                  className="chip"
+                  onClick={() => {
+                    setSheet(null)
+                    setTour(true)
+                  }}
+                >
+                  Show the introduction
+                </button>
+              </div>
+            </Section>
 {inDesktopApp() ? (
             <Section key="updates" title="Updates" note="This app, not your unit">
               <Updates />

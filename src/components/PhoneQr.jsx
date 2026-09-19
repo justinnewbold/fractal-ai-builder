@@ -25,7 +25,7 @@ import { PairCard, AccountCard } from './PhoneRemote'
  * It stays correct for anybody on a desktop build older than this one, and a
  * wrong square is still a thing a camera can find.
  */
-export default function PhoneQr({ connected, email, onAction, busy }) {
+export default function PhoneQr({ connected, email, onAction, busy, showAccount = true }) {
   return (
     <div className="phone-qr-block">
       {isPairAccount(email) ? (
@@ -35,7 +35,7 @@ export default function PhoneQr({ connected, email, onAction, busy }) {
            — and PairCard already disables its own button when busy. */
         <PairCard on={connected} onAction={onAction || (() => {})} busy={busy ?? true} />
       ) : (
-        <AccountCard on={connected} email={email} />
+        <AccountCard on={connected} email={email} showAccount={showAccount} />
       )}
     </div>
   )

@@ -206,7 +206,15 @@ export function PairCard({ on, onAction, busy }) {
  * account to sign into written under it. Scanning gets the phone to the
  * right place; the line under it says what to do when it arrives.
  */
-export function AccountCard({ on, email }) {
+/**
+ * @param showAccount  Whether to print the address. The Setup page does: it is
+ *   answering "which account is this", and it is his own screen. THE TOUR DOES
+ *   NOT — "the first shot that pops up in the tutorial literally shows my
+ *   personal email address on it". That card is the first thing the app ever
+ *   shows, it is what gets photographed and screen-shared, and the sentence
+ *   above the square already says what to do without naming anybody.
+ */
+export function AccountCard({ on, email, showAccount = true }) {
   const url = HOSTED_ORIGIN
   const [qr, setQr] = useState(null)
 
@@ -230,9 +238,11 @@ export function AccountCard({ on, email }) {
       {qr ? (
         <img className="phone-qr" src={qr} alt={`Code for ${url}`} width={160} height={160} />
       ) : null}
-      <p className="pair-code mono" aria-label="The account to sign in as">
-        {email}
-      </p>
+      {showAccount ? (
+        <p className="pair-code mono" aria-label="The account to sign in as">
+          {email}
+        </p>
+      ) : null}
       {/* The sentence that was missing. Somebody who has read about pairing
           codes will otherwise keep looking for one. */}
       <p className="footnote">
