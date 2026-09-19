@@ -168,7 +168,29 @@ function fromRoster(slug, models) {
     if (!name || seen.has(name.toLowerCase())) continue
     seen.add(name.toLowerCase())
     const found = model?.basedOn ? model : lineageFor(slug, name)
-    out.push({ name, gear: found?.basedOn || found?.manufacturer || null })
+    /*
+     * THE SAME FIVE FIELDS `fromCatalog` BUILDS, and for the same reason.
+     *
+     * "I thought you were creating the descriptions...." — they were written,
+     * and every one of them was invisible the moment a unit was plugged in.
+     * This row used to be `{ name, gear }`, which draws the LIST correctly and
+     * loses the model's page: the description and the photograph are looked up
+     * per block kind, and a row that has forgotten which block it came from
+     * cannot be asked what it is a picture of. So "1987X Treble" read off an
+     * FM3 opened a page saying nothing was written about it, with the sentence
+     * sitting in amp-lineage.json the whole time.
+     *
+     * Worse than a plain blank, because the printed catalog DID carry the slug
+     * — so the descriptions were there until the app could reach a unit, and
+     * then went away.
+     */
+    out.push({
+      slug,
+      name,
+      gear: found?.basedOn || found?.manufacturer || null,
+      basedOn: found?.basedOn || null,
+      manufacturer: found?.manufacturer || null
+    })
   }
   return out.sort(byName)
 }

@@ -669,4 +669,74 @@ export function run(test) {
     assert.ok(!/setlist-name/.test(read('src/styles.css')), 'the second name box is styled, so something still draws it')
   })
 
+  test('a model read off the unit can still be looked up, at both ends', async () => {
+    /*
+     * "I thought you were creating the descriptions...."
+     *
+     * They were created. 109 of the 119 amp families, 75 of the 86 drives and
+     * all 45 cabs have one written, and the ten and eleven that do not are the
+     * deliberate blanks — boutique amps nobody here has played and Fractal's
+     * own designs with no real pedal behind them. Every one of the written
+     * ones was INVISIBLE the moment a unit was plugged in.
+     *
+     * The gear sheet builds its rows two ways. `fromCatalog` is the printed
+     * list, used when nothing is connected, and it carries `slug` — the block
+     * the name came from. `fromRoster` is the list the unit itself hands over,
+     * and it built `{ name, gear }` and stopped there.
+     *
+     * That draws the LIST correctly, which is why it survived: both columns
+     * are there and the sheet looks finished. It is the model's PAGE that
+     * breaks, because the description and the photograph are both looked up
+     * per block kind, and a row that has forgotten which block it came from
+     * cannot be asked for either. So "1987X Treble" on a real FM3 opened a
+     * page reading "Nothing written down about this one yet", with the
+     * sentence sitting in amp-lineage.json the whole time.
+     *
+     * Backwards, too: the descriptions were there until the app could reach a
+     * unit, and then went away.
+     */
+    const ends = {
+      browser: await import('../src/lib/gearCatalog.js'),
+      phone: await import('../mobile/src/lib/gearCatalog.js')
+    }
+    const lines = {
+      browser: await import('../src/lib/lineage.js'),
+      phone: await import('../mobile/src/lib/lineage.js')
+    }
+
+    /* A roster shaped like the one a unit answers with: names and nothing
+       else, which is exactly what an AM4 gives back. */
+    const said = { amp: [{ name: '1987X Treble' }], drive: [{ name: 'T808 OD' }] }
+
+    for (const [where, { groupsFor }] of Object.entries(ends)) {
+      const { descriptionFor } = lines[where]
+      const built = groupsFor(said).filter((g) => g.fromUnit)
+      assert.ok(built.length >= 2, `${where} did not take the unit's own lists`)
+
+      for (const group of built) {
+        for (const row of group.entries) {
+          assert.equal(row.slug, group.key, `${where} loses which block "${row.name}" came from`)
+          assert.ok(
+            descriptionFor(row.slug, row.name),
+            `${where} cannot find the description for "${row.name}" once the unit has answered`
+          )
+        }
+      }
+    }
+
+    /*
+     * And the printed list and the unit's list agree about a row's shape, or
+     * the page works on one path and not the other — which is the bug, one
+     * layer up.
+     */
+    for (const [where, { groupsFor }] of Object.entries(ends)) {
+      const printed = groupsFor({}).find((g) => g.key === 'amp')
+      const asked = groupsFor(said).find((g) => g.key === 'amp')
+      for (const field of ['slug', 'name', 'gear', 'basedOn', 'manufacturer']) {
+        assert.ok(field in printed.entries[0], `${where}'s printed row has no ${field}`)
+        assert.ok(field in asked.entries[0], `${where}'s row from the unit has no ${field}`)
+      }
+    }
+  })
+
 }
