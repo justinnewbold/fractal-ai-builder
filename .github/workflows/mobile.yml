@@ -94,6 +94,25 @@ jobs:
         working-directory: mobile
         run: npx expo-doctor
 
+      # WHETHER THIS CHANGE COSTS A BUILD, ANSWERED BEFORE IT MERGES.
+      #
+      # An update only reaches a build whose fingerprint matches it. Move
+      # anything native and every phone already carrying this app stops
+      # receiving updates — silently, with no error, until somebody spends a
+      # build. On iOS that is a handful a month, and when they run out
+      # development stops until the month turns over.
+      #
+      # It has happened. Three native changes landed after the last build and
+      # nothing said so; an update was published, reported as published, and
+      # could never have reached anything. This is that check, done by a
+      # machine on every pull request instead of by somebody remembering.
+      #
+      # It runs here because this job has already installed the app's own
+      # dependencies, and the fingerprint hashes those rather than just the
+      # config — so it costs seconds rather than another install.
+      - name: This change still ships as an update, not a build
+        run: npm run fingerprint
+
       # Both platforms, because they resolve differently: a module with a
       # `.ios.js` variant, or a native package missing on one side, bundles on
       # one and not the other.
