@@ -173,7 +173,39 @@ export const startPurchases = async () => {
     const info = await api.getCustomerInfo()
     const yes = entitled(info)
     await remember(yes)
-    set({ available: true, unlocked: yes, checking: false, why: null })
+
+    /*
+     * AND WHETHER THIS PHONE CAN PAY AT ALL, which is not the same question as
+     * whether RevenueCat answered.
+     *
+     * The APK on the Releases page is installed from a link rather than from
+     * the Play Store, and an app installed outside Play has no Play Billing —
+     * so the store would say "no purchase" for ever and every sideloaded copy
+     * would be locked behind a button that cannot take money. That is the
+     * exact trap this whole file exists to avoid, arriving through a door I
+     * had not thought of: the developer's own test phone.
+     *
+     * The same covers a device with purchases switched off in parental
+     * controls, and a corporate handset with billing disabled.
+     *
+     * A person who HAS paid is unlocked either way — entitlement is read
+     * above, and it does not care whether this handset can buy anything.
+     */
+    let canPay = true
+    try {
+      canPay = (await api.canMakePayments?.()) !== false
+    } catch (err) {
+      /* Could not find out. Assume it can, and let the rule below fail open. */
+      logDebug(`purchases: canMakePayments unknown (${err?.message || err})`)
+    }
+
+    set({
+      available: canPay,
+      unlocked: yes,
+      checking: false,
+      why: canPay ? null : 'This copy of the app cannot take payments.'
+    })
+    if (!canPay) logDebug('purchases: this install cannot pay — nothing is locked')
     api.addCustomerInfoUpdateListener?.((next) => {
       const now = entitled(next)
       remember(now)

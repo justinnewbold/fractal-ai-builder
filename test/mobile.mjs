@@ -5709,4 +5709,30 @@ export function run(test) {
     assert.match(paywall, /Restore a purchase/, 'there is no restore button, which Apple rejects apps for')
   })
 
+  /**
+   * And the door nobody thinks of: a phone that cannot pay in the first place.
+   *
+   * The APK on the Releases page is installed from a link, not from the Play
+   * Store, and an app installed outside Play has no Play Billing. RevenueCat
+   * answers perfectly — "no purchase" — and every sideloaded copy would sit
+   * behind a button that cannot take money, the developer's own test handset
+   * first among them. Parental controls and managed work phones land here too.
+   *
+   * So the store being REACHABLE is not enough to lock anybody; it also has to
+   * be able to sell them something.
+   */
+  test('a phone that cannot buy anything is never locked out', () => {
+    const src = read('mobile/src/lib/purchases.js')
+    assert.match(src, /canMakePayments/, 'nothing asks whether this install can pay at all')
+    assert.match(
+      src,
+      /available:\s*canPay/,
+      'the answer to "can this phone pay" does not decide whether anything is locked'
+    )
+    /* And it must not be able to throw its way into locking the app. */
+    const block = src.slice(src.indexOf('let canPay'), src.indexOf('set({\n      available'))
+    assert.match(block, /catch/, 'a failed canMakePayments check is not caught')
+    assert.match(block, /canPay = true/, 'the unknown case does not default to "can pay"')
+  })
+
 }
