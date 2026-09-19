@@ -101,6 +101,18 @@ export const WAYS = [
 export const wayById = (id) => WAYS.find((w) => w.id === id) || null
 
 /**
+ * How many routes there are, as the word a sentence needs.
+ *
+ * Counted rather than typed. Both apps said "Four ways" for weeks after the
+ * fourth one — running the device server from a terminal — was taken out, and
+ * a number in prose has no way of noticing that the list under it changed.
+ * "There is only 3 ways to connect. Mac, Windows or Linux. We removed the
+ * terminal."
+ */
+const WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six']
+export const waysWord = (list = WAYS) => WORDS[list.length] || String(list.length)
+
+/**
  * Which computer this browser is running on.
  *
  * TAKES THE USER AGENT RATHER THAN REACHING FOR ONE. This module is bundled by

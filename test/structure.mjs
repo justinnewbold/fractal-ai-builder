@@ -3984,64 +3984,87 @@ export function run(test) {
     }
   })
 
-  test('the server settings are shown to the machine that has a server', () => {
+  test('no screen shows anybody the account service\u2019s settings', () => {
     /*
-     * "Is all this weird information still needed with supabase links and
-     * stuff?" — asked over a screenshot of a PHONE showing three environment
-     * variables to paste into a .env file.
+     * "There is only 3 ways to connect. Mac, Windows or Linux. We removed the
+     * terminal. There is no reason a user should be seeing supabase developer
+     * jargon."
      *
-     * Still needed, and never there. Running ForgeFX by hand is one of the
-     * four ways to connect a computer, and somebody doing that has to tell it
-     * where the account service is. But the machine that needs those lines is
-     * the one with the cable in it. A phone has no .env to put them in and no
-     * server to read one, so it was configuration shown to the only person
-     * who can do nothing whatever with it.
+     * Link details used to print three environment variables — the account
+     * service's URL and its publishable key — to paste into a server's .env.
+     * The first attempt at this only MOVED them: hidden from phones, folded
+     * away at the computer, on the reasoning that running ForgeFX by hand was
+     * one of the ways in and needed them.
      *
-     * Role 'mac' is the page being served from localhost — the machine
-     * running the device server, whether the Fractal app started it or
-     * somebody started it by hand. A phone is 'wifi' or 'remote'.
+     * That route was taken out in 7.352.0: "I think that we should just drop
+     * the helpers completely, nobody wants to deal with that kind of stuff in
+     * order for it to work." All three that remain are applications that start
+     * the device server themselves and set those values without being asked.
+     * So the block had no audience at all, at either end.
+     *
+     * Nothing was leaked — the key is the publishable one and a signed-in user
+     * can only reach their own channel — but a person who cannot act on
+     * something should not be shown it, least of all on the screen they open
+     * when the link is broken.
      */
+    const files = [
+      '../src/components/LinkDetails.jsx',
+      '../src/App.jsx',
+      '../src/components/PhoneRemote.jsx',
+      '../mobile/src/screens/Settings.js',
+      '../mobile/src/screens/Connect.js'
+    ]
+    /*
+     * Comments stripped first. This file has been here before: an assertion
+     * that reads a source for a word finds the word in the paragraph
+     * EXPLAINING why the word is not there any more, and fails on its own
+     * documentation. What is on a screen is what is outside a comment.
+     */
+    const bare = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    for (const file of files) {
+      const text = bare(readFileSync(new URL(file, import.meta.url), 'utf8'))
+      for (const jargon of ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'AXIS_CLOUD', '.env']) {
+        assert.ok(!text.includes(jargon), `${file} puts "${jargon}" on a screen`)
+      }
+    }
+
+    /* What is left is the one thing here anybody can act on: a step-by-step
+       test of THIS device's own connection, stopping at the first fault. */
     const src = readFileSync(new URL('../src/components/LinkDetails.jsx', import.meta.url), 'utf8')
-    assert.match(src, /const atTheComputer = role === 'mac'/, 'the env block no longer asks which machine this is')
-    const block = src.slice(src.indexOf('atTheComputer ?'))
-    assert.match(block, /SUPABASE_ANON_KEY/, 'the env block is not behind that question')
-    assert.ok(
-      src.indexOf('SUPABASE_ANON_KEY') > src.indexOf('atTheComputer ?'),
-      'the env block is drawn before anything checks which machine is looking at it'
-    )
-    /* And folded even there: three of the four ways in never need it. */
-    assert.match(block, /<details className="env-fold">/, 'the env block is open on the page at the computer')
+    assert.match(src, /Test the link/, 'the link test went with the jargon')
+    assert.ok(!/DEFAULT_PROJECT/.test(src), 'the panel still reaches for the project settings')
 
-    /* Test the link is the opposite case and stays everywhere. It is about
-       THIS device's own connection, which is what somebody on a phone with a
-       dead link is trying to find out. */
-    assert.ok(
-      src.indexOf('Test the link') < src.indexOf('atTheComputer ?'),
-      'the link test went behind the computer-only check with the env block'
-    )
-
-    /* The role has to actually reach it, or the check above is decorative. */
-    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
-    assert.match(app, /<LinkDetails role=\{link\.role\} \/>/, 'LinkDetails is never told which machine it is on')
+    /*
+     * And the count is counted, not typed. Both apps said "Four ways" for
+     * weeks after the fourth was removed, because a number written into prose
+     * cannot notice that the list under it changed.
+     */
+    const ways = readFileSync(new URL('../shared/ways-in.mjs', import.meta.url), 'utf8')
+    const ids = [...ways.matchAll(/^\s{4}id: '([^']+)'/gm)].map((m) => m[1])
+    assert.deepEqual(ids, ['mac-app', 'windows-app', 'linux-app'], `the ways in are now ${ids.join(', ')}`)
+    for (const file of ['../src/App.jsx', '../mobile/src/screens/Connect.js']) {
+      const text = bare(readFileSync(new URL(file, import.meta.url), 'utf8'))
+      assert.match(text, /waysWord\(\)/, `${file} types the number of ways rather than counting them`)
+      assert.ok(!/Four ways/.test(text), `${file} still says there are four ways in`)
+    }
   })
 
-  test('the four ways to connect a computer start level with each other', () => {
+  test('the ways to connect a computer start level with each other', () => {
     /*
      * "When opening the connect a computer menu the Mac app is expanded by
      * default. Have it collapsed like the windows and Linux apps."
      *
      * The first route used to open itself, on the reasoning that waysFor puts
      * the one for YOUR computer first. What that produced was a page where
-     * one route is a wall of steps and the other three are a line each, which
-     * reads as one answer with three footnotes rather than a choice between
-     * four. The summaries say what each one costs; the steps are for after
-     * somebody has picked.
+     * one route is a wall of steps and the rest are a line each, which reads
+     * as one answer with footnotes rather than a choice. The summaries say
+     * what each one costs; the steps are for after somebody has picked.
      */
     const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
     const ways = app.slice(app.indexOf('<div className="ways">'), app.indexOf('</div>', app.indexOf('<div className="ways">')))
     assert.ok(ways.length > 100, 'the ways list moved; this check reads it')
     assert.match(ways, /<details key=\{way\.id\} className="way" data-status=\{way\.status\}>/, 'the routes are no longer folds')
-    assert.ok(!/open=/.test(ways), 'one of the four routes opens itself again')
+    assert.ok(!/open=/.test(ways), 'one of the routes opens itself again')
   })
 
 }

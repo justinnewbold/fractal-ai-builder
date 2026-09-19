@@ -59,7 +59,7 @@ import { useAsks } from './lib/asks'
 import { SIZES, loadSize, saveSize, clampSize, loadFit, saveFit } from './lib/gigSize'
 import { editButtonShows } from './lib/playMode'
 import { FIXES, FIRMWARE_NOTE, fixById, fixFor, versionsInSync } from '../shared/troubleshooting.mjs'
-import { osGuess, waysFor } from '../shared/ways-in.mjs'
+import { osGuess, waysFor, waysWord } from '../shared/ways-in.mjs'
 import { AFFILIATION } from '../shared/affiliation.mjs'
 import { remember as rememberPreset, CHANGED as MARKS_CHANGED } from './lib/presetMarks'
 import { CHANGED as SETLISTS_CHANGED } from './lib/setlists'
@@ -3826,10 +3826,10 @@ export default function App() {
             title="Connect a computer"
             note={
               thisComputer === 'mac'
-                ? 'Four ways, with the Mac ones first'
+                ? `${waysWord()} ways, with the Mac one first`
                 : thisComputer === 'windows'
-                  ? 'Four ways, with the Windows ones first'
-                  : 'Four ways, and what each one costs you'
+                  ? `${waysWord()} ways, with the Windows one first`
+                  : `${waysWord()} ways, and what each one costs you`
             }
           >
             <p className="hint">
@@ -3849,7 +3849,7 @@ export default function App() {
                   one is the one you want. What that actually produced was a
                   page where one route is a wall of steps and the other three
                   are one line each — which reads as one real answer with
-                  three footnotes, rather than four ways to choose between.
+                  three footnotes, rather than a set of ways to choose between.
                   Four summaries, each saying what it costs you, is the list
                   somebody came here to read; the steps are for after choosing.
                 */
@@ -3885,7 +3885,7 @@ export default function App() {
           </Section>
 
           <Section key="link-details" title="Link details" note="What the phone and the computer say about the line between them">
-            <LinkDetails role={link.role} />
+            <LinkDetails />
           </Section>
           </div>
         ) : null}
