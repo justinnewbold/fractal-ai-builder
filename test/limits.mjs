@@ -629,6 +629,84 @@ export function run(test) {
     assert.match(mac.trimEnd(), /fractal_remote_setup$/, 'mac.sh does not call itself on its last line, so a truncated download would run half of it')
   })
 
+  test('the phone icon is one Apple will accept, and the others keep their alpha', () => {
+    /*
+     * "The app icon can't contain alpha channels or transparencies" is an
+     * automated rejection: it happens before a human opens the build, and it
+     * costs a submission round trip to learn.
+     *
+     * The artwork is a rounded square filled #0d0f12, so only its four corners
+     * were clear — enough to fail. It is rendered opaque for iOS now, which is
+     * right because iOS applies its own corner mask to a full square anyway.
+     *
+     * THE OTHER THREE MUST KEEP THEIR TRANSPARENCY, which is why this is not
+     * simply "no alpha anywhere". Android's adaptive icon is a foreground
+     * layer the system masks itself, so filling its corners would put a dark
+     * square inside Android's circle. The splash mark sits on the splash
+     * colour. macOS does not mask app icons at all and wants the rounded
+     * shape.
+     */
+    const png = (p) => readFileSync(new URL(`../${p}`, import.meta.url))
+    const head = (b) => ({
+      width: b.readUInt32BE(16),
+      height: b.readUInt32BE(20),
+      /* IHDR colour type: 4 and 6 carry an alpha channel, 0/2/3 do not. */
+      alpha: b[25] === 4 || b[25] === 6
+    })
+
+    const ios = head(png('mobile/assets/icon.png'))
+    assert.equal(ios.width, 1024, 'the iOS icon is not 1024 wide')
+    assert.equal(ios.height, 1024, 'the iOS icon is not 1024 tall')
+    assert.equal(ios.alpha, false, 'the iOS app icon has an alpha channel, which Apple rejects outright')
+
+    for (const rel of ['mobile/assets/adaptive-icon.png', 'mobile/assets/splash-icon.png']) {
+      assert.equal(head(png(rel)).alpha, true, `${rel} lost its transparency, which it needs`)
+    }
+
+    /* And the generator says which is which, so a regeneration cannot quietly
+       put the alpha back. */
+    const gen = read('scripts/icon.mjs')
+    assert.match(gen, /opaque: true/, 'the icon script no longer renders any output opaque')
+    assert.match(gen, /omitBackground: !out\.opaque/, 'the icon script ignores its own opaque flag')
+  })
+
+  test('a store has somewhere to send people, and the app can be reviewed without hardware', () => {
+    /*
+     * Two things App Store Connect will not proceed without, and one that
+     * decides whether the review succeeds.
+     *
+     * A support URL is required. And the reviewer will have no Fractal unit
+     * and no computer running the device server — they open the app, see "no
+     * computer", and reject it as non-functional. The demo is one tap away on
+     * the first screen, but only if the review notes say so.
+     */
+    const support = read('public/support.html')
+    assert.match(support, /justinnewbold@gmail\.com/, 'the support page offers no way to reach anybody')
+    assert.match(support, /Tell us/, 'the support page never points at the in-app report')
+    assert.match(support, /privacy\.html/, 'the support page does not link the privacy policy')
+
+    /* Linked both ways, so somebody landing on either finds the other. */
+    assert.match(read('public/privacy.html'), /notices\.txt/, 'the privacy page does not link the licences')
+
+    const store = read('docs/app-store.md')
+    assert.match(store, /support\.html/, 'the store notes give no support URL')
+    assert.match(store, /privacy\.html/, 'the store notes give no privacy URL')
+
+    /*
+     * THE REVIEW NOTE, checked against the actual button. If somebody renames
+     * that button, the instruction handed to Apple becomes wrong and this
+     * fails rather than the submission.
+     */
+    const signIn = read('mobile/src/screens/SignIn.js')
+    const label = signIn.match(/label="(Just looking\?[^"]*)"/)
+    assert.ok(label, 'the demo button on the sign-in screen has been renamed or removed')
+    assert.ok(
+      store.includes(label[1]),
+      `the review notes tell Apple to tap "…" but the button now says "${label[1]}"`
+    )
+    assert.match(store, /Review notes/, 'there are no review notes at all')
+  })
+
   test('the app says whose it is not, everywhere somebody would look', async () => {
     /*
      * "Leave the name, but add a disclaimer that we are in no way affiliated
