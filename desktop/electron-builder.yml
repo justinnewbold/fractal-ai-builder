@@ -56,7 +56,12 @@ afterPack: afterPack.js
 publish:
   provider: github
   owner: justinnewbold
-  repo: fractal-remote
+  # The repository's name TODAY. Not fractal-remote: that rename has not
+  # happened on GitHub yet, and a name that has never existed does not
+  # redirect — it 404s. Setting it early failed every desktop build at the
+  # publish step and would have pointed installed apps at nothing.
+  # See shared/ways-in.mjs REPO for what to change on the day.
+  repo: fractal-ai-builder
   # Published, not drafted.
   #
   # electron-builder's own default here is `draft`, and a draft release is

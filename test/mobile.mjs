@@ -3023,7 +3023,7 @@ export function run(test) {
     assert.match(flat, /Finding \$\{link\.macName \|\| 'your computer'\}/, 'the wait does not say what it is waiting for')
   })
 
-  test('the phone can teach somebody how to connect a computer', () => {
+  test('the phone can teach somebody how to connect a computer', async () => {
     /*
      * "We also need to make instructions that teach people how to connect by
      * either downloading the Mac app, installing forgefx with a helper file for
@@ -3048,7 +3048,15 @@ export function run(test) {
     assert.match(screen, /WAYS\.map/, 'the phone no longer draws the routes')
 
     assert.match(src, /The Mac app/, 'the route that actually works is not offered')
-    assert.match(src, /github\.com\/justinnewbold\/fractal-remote\/releases/, 'there is nowhere to get the Mac app from')
+    /*
+     * Whatever repository this code lives in — see shared/ways-in.mjs REPO,
+     * which is now the one place that name is written down. Read as a VALUE
+     * rather than searched for in the source: the source builds the link from
+     * REPO, so the literal URL does not appear in it any more.
+     */
+    const { RELEASES, REPO } = await import('../shared/ways-in.mjs')
+    assert.equal(RELEASES, `https://github.com/${REPO}/releases`, 'there is nowhere to get the Mac app from')
+    assert.ok(read('mobile/src/lib/ways-in.js').includes('RELEASES'), 'the phone carries no download link at all')
     /*
      * The list, not `/releases/latest`.
      *
