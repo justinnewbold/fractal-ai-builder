@@ -5,6 +5,11 @@
 # `process.resourcesPath/dist`, which is what makes ForgeFX able to serve it.
 appId: cloud.newbold.fractal
 productName: Fractal Remote
+# Where the app says it comes from. Only the .deb build actually demands this —
+# a Debian package with no Homepage field is rejected outright by the tool that
+# assembles it — but it is true of every target, so it sits at the top rather
+# than inside the linux block.
+homepage: https://fractal.newbold.cloud
 directories:
   output: release
 # An allowlist, not a filter. Anything main.js reaches for at runtime has to be
@@ -191,6 +196,12 @@ linux:
     - deb
 
 deb:
+  # A Debian package has to name a person who is answerable for it, with an
+  # address that reaches them, and the build fails rather than guessing. It is
+  # the same address the privacy and support pages already give, which is the
+  # point — somebody who has a problem with the package should not have to find
+  # a different door to knock on than somebody who has a problem with the app.
+  maintainer: Justin Newbold <justinnewbold@gmail.com>
   # The two the device layer actually needs. udev is what gives a non-root
   # user access to the USB serial device, and libasound is what the MIDI
   # backend links against — a package that installs and then cannot see the

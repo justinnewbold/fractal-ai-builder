@@ -522,6 +522,64 @@ export function run(test) {
     assert.match(unsigned, /github\.ref == 'refs\/heads\/main'/, "a build from any branch could publish under main's name")
   })
 
+  test('the Linux app builds both formats, and the .deb has the fields Debian demands', async () => {
+    /*
+     * "Do the Linux app."
+     *
+     * WHAT THIS TEST IS ACTUALLY FOR. The first Linux build failed, on both
+     * architectures, at the very last step — the AppImage was already made,
+     * the native modules had already been proved to load — because the .deb
+     * target refused to assemble without a Homepage field and a maintainer
+     * address. Neither is a thing anybody notices missing: the Mac and Windows
+     * installers have never wanted them, and the config reads as complete.
+     *
+     * A whole CI cycle to be told a package needs an email address in it. That
+     * is the kind of failure that is cheap to catch here and expensive to
+     * catch there, so it is caught here.
+     */
+    const yml = read('desktop/electron-builder.yml')
+    assert.ok(yml.includes('\nlinux:'), 'there is no Linux target at all')
+    const linux = yml.slice(yml.indexOf('\nlinux:'))
+
+    /*
+     * BOTH FORMATS, AND THEY ARE NOT INTERCHANGEABLE. AppImage is the one that
+     * runs anywhere without an install step, and it is the ONLY Linux format
+     * electron-updater knows how to update — a .deb can never replace itself.
+     * The .deb is for the box in a rack that stays on, where `apt install
+     * ./file.deb` is a thing somebody already knows. Drop either and a real
+     * person loses something.
+     */
+    assert.match(linux, /AppImage/, 'no AppImage, so there is no Linux download that updates itself')
+    assert.match(linux, /deb/, 'no .deb, so the rack machine has no package it recognises')
+
+    /* The two fields the build died on. */
+    assert.match(yml, /\nhomepage: https:/, 'no homepage, and the .deb build fails outright rather than defaulting')
+    const deb = yml.slice(yml.indexOf('\ndeb:'))
+    assert.match(
+      deb,
+      /maintainer: .+ <[^@\s]+@[^>\s]+>/,
+      'the .deb names no maintainer with a working address, and the build refuses to guess one'
+    )
+
+    /*
+     * AND NO ARCHITECTURE LIST, which is the one thing here that is a decision
+     * rather than a requirement. serialport and @julusian/midi are compiled
+     * for whatever machine ran `npm ci`, so an x64 runner asked to emit an
+     * arm64 package produces an installer that opens and never finds the unit.
+     * Two jobs, each building only for itself, is what makes the Raspberry Pi
+     * download real. A list here would quietly undo that.
+     */
+    const target = linux.slice(linux.indexOf('target:'))
+    assert.ok(
+      !/arch:/.test(target.slice(0, target.indexOf('\ndeb:') === -1 ? undefined : target.indexOf('\ndeb:'))),
+      'the Linux target names architectures, so one runner will cross-build a package whose device layer cannot load'
+    )
+
+    /* No shell syntax in the script, for the same reason dist:win has none. */
+    const scripts = JSON.parse(read('desktop/package.json')).scripts
+    assert.ok(!/[$][{]/.test(scripts['dist:linux']), 'dist:linux carries shell syntax, which npm runs through its own shell')
+  })
+
   test('the two one-paste installers are real files, and say the same things', async () => {
     /*
      * "Create terminal helper scripts — a shell script for Mac and a
