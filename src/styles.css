@@ -46,6 +46,7 @@
   --knob-edge: #2c323b;
   --signal-wash: rgba(240, 167, 60, 0.12);
   --live-halo: rgba(95, 191, 209, 0.2);
+  --ok-halo: rgba(99, 198, 140, 0.2);
   --fault-halo: rgba(224, 104, 79, 0.2);
   --dim-halo: rgba(135, 141, 151, 0.16);
 
@@ -622,6 +623,26 @@ button.device-summary {
 .lamp[data-state='fault'] {
   background: var(--fault);
   box-shadow: 0 0 0 3px var(--fault-halo);
+}
+
+/*
+ * The unit's own lamp is GREEN when the unit answers. The link lamps stay
+ * cyan, and the difference is the whole point of having two colours.
+ *
+ * "The dot next to the unit name was changed to green a while back. Looks
+ * like it didn't hit the web app." It did not: the phone's top bar has had
+ * `unitLamp` on --ok since the day the two lamps were split apart, and the
+ * browser kept drawing the unit on --live — which is the colour that means
+ * "the computer is answering", one link further back down the chain. Two
+ * apps, one rig, two different colours for the same fact.
+ *
+ * Scoped to .topbar rather than changing `live` everywhere, because the OTHER
+ * two lamps in this app — LinkChip and PhoneRemote — really are about the
+ * computer, and cyan is right for them at both ends.
+ */
+.topbar .lamp[data-state='live'] {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px var(--ok-halo);
 }
 
 .device-name {
@@ -5177,6 +5198,7 @@ ol.action-list li.destructive::marker {
   --knob-edge: #c7c2b7;
   --signal-wash: rgba(181, 113, 26, 0.12);
   --live-halo: rgba(31, 127, 146, 0.18);
+  --ok-halo: rgba(31, 122, 69, 0.18);
   --fault-halo: rgba(178, 59, 35, 0.16);
   --dim-halo: rgba(95, 102, 112, 0.14);
 }
