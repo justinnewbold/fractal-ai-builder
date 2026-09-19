@@ -4922,7 +4922,8 @@ export function run(test) {
        phone's storage, neither of which exists here. */
     const demo = read('mobile/src/lib/demo.js')
     assert.match(demo, /export const demoDevice = \(\) => mock/, 'nothing hands the simulated unit out')
-    assert.match(demo, /mock = want \? createMockDevice\(\) : null/, 'the switch does not build a unit')
+    /* Built AS the chosen unit — the demo is five units now, not one. */
+    assert.match(demo, /mock = want \? createMockDevice\(unit\) : null/, 'the switch does not build a unit')
     assert.match(
       read('mobile/src/lib/device.js').replace(/\s+/g, ' '),
       /const demo = demoDevice\(\) return demo \? demoRequest\(demo, path, options\) : overTheWire\(path, options\)/,
@@ -4946,7 +4947,10 @@ export function run(test) {
     assert.match(settings, /onPress=\{\(\) => setDemo\(false\)\}/, 'the way out does not turn it off')
     /* It says what it is, every time, rather than letting somebody think a
        simulated FM3 is their FM3. */
-    assert.match(settings, /This is the demo — a simulated FM3/, 'the demo does not say it is one')
+    /* It names whichever unit it is being, which is the whole point of
+       offering five of them. */
+    assert.match(settings, /This is the demo — a simulated \$\{/, 'the demo does not say it is one')
+    assert.match(settings, /DEMO_UNITS\.find\(\(u\) => u\.key === demoUnit\(\)\)/, 'the demo says a unit it may not be')
     assert.match(settings, /status=\{ demo \? 'Demo — simulated FM3' :/, 'Setup does not show that the demo is on')
 
     /* The link reads as connected, because from every screen's point of view it
@@ -5308,6 +5312,65 @@ export function run(test) {
     assert.match(settings, /setMode\(m, sync\)/, 'choosing a theme does not remember it')
 
     theme.setMode('auto')
+  })
+
+  test('the demo tuner moves on the phone, not just in the browser', async () => {
+    /*
+     * "Demo tuner animations." The needle never moved on a phone.
+     *
+     * The simulation has had a proper tuner in it the whole time —
+     * lib/tunerStream holds a note for the life of a ring and picks a new
+     * string only coming out of a quiet gap, because a real detector cannot
+     * hop mid-note. The BROWSER subscribes to it and animates.
+     *
+     * The phone never did. Its readings arrive as events off the relay, and
+     * in the demo there is no relay to carry them, so the tuner opened, the
+     * timer ran, and nothing reached the needle. On that screen "nothing is
+     * happening" and "this is broken" look identical.
+     */
+    const { createTunerStream } = await import('../mobile/src/lib/tunerStream.js')
+
+    /* It reads a note most of the time, and it reads every string. A tuner
+       that is silent more than it rings is one nobody would call working. */
+    const stream = createTunerStream()
+    const strings = new Set()
+    let ringing = 0
+    for (let i = 0; i < 2000; i += 1) {
+      const said = stream.next()
+      if (said.note) {
+        ringing += 1
+        strings.add(`${said.note}${said.octave}`)
+      }
+    }
+    assert.ok(ringing > 1000, `the demo tuner is quiet ${100 - Math.round(ringing / 20)}% of the time`)
+    assert.equal(strings.size, 6, `the demo tuner only ever finds ${[...strings].join(', ')}`)
+
+    /* A ring never hops mid-note: the note only changes across a silent gap,
+       which is the failure this stream was written to fix. */
+    const held = createTunerStream()
+    let last = null
+    for (let i = 0; i < 2000; i += 1) {
+      const said = held.next()
+      if (!said.note) {
+        last = null
+        continue
+      }
+      const now = `${said.note}${said.octave}`
+      if (last) assert.equal(now, last, 'the demo tuner changed string without a gap')
+      last = now
+    }
+
+    /* And the phone drives it, into the same handler every real reading goes
+       through — a second copy of the tuner screen would prove nothing. */
+    const rig = read('mobile/src/lib/rig.js')
+    assert.match(rig, /setInterval\(\(\) => handleEvent\(source\.next\(\)\), 400\)/, 'the phone never feeds the demo tuner')
+    assert.match(rig, /if \(on\) startDemoTuner\(\)/, 'the demo tuner never starts')
+    assert.match(rig, /if \(!on\) stopDemoTuner\(\)/, 'the demo tuner runs after it is switched off')
+    const device = read('mobile/src/lib/device.js')
+    assert.match(device, /export const demoTuner = \(\) => demoDevice\(\)\?\.tunerStream\?\.\(\) \|\| null/, 'there is nothing for the phone to read')
+    /* Null on a real rig, where the relay carries the readings and a second
+       source would fight them. */
+    assert.match(device, /demoDevice\(\)\?\./, 'the phone would drive a tuner over a real unit too')
   })
 
 }

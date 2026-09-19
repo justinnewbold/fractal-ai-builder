@@ -7316,6 +7316,15 @@ button.gig-bar-btn:disabled {
   background: var(--panel-deep, rgba(255, 255, 255, 0.04));
 }
 
+/* The five units the demo can be. A row of chips rather than a select: five
+   short names fit, and a picker you can see the options of is one you use. */
+.demo-units {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1);
+  margin-bottom: var(--s-2);
+}
+
 /* ---------- one model, on a page of its own ---------- */
 
 .gear-card-name {

@@ -2,8 +2,14 @@ import { useSyncExternalStore } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
 import { createMockDevice } from './mockDevice'
+import { DEFAULT_UNIT, UNIT_KEYS } from './demoUnits'
 
 const KEY = 'fractal.demo'
+const UNIT_KEY = 'fractal.demoUnit'
+
+/* Which Fractal the demo is. Held here as well as on disk so the mock can be
+   rebuilt without waiting on a read. */
+let unit = DEFAULT_UNIT
 
 /**
  * A simulated FM3, for a phone with no rig on the other end.
@@ -42,10 +48,33 @@ export const demoDevice = () => mock
 /** Whether the demo is on. Read everywhere; it decides what `device.js` asks. */
 export const isDemo = () => mock !== null
 
+/** Which Fractal the demo is pretending to be. */
+export const demoUnit = () => unit
+
+/**
+ * Become a different unit.
+ *
+ * The mock is rebuilt rather than adjusted: every preset name, scene list and
+ * capability in it belongs to the unit it was made for, and there is no
+ * sensible way to turn a simulated AM4 into a simulated FM9 in place without
+ * leaving one unit's chain under another's name.
+ */
+export function setDemoUnit(key) {
+  const want = UNIT_KEYS.includes(key) ? key : DEFAULT_UNIT
+  if (want === unit) return unit
+  unit = want
+  if (mock) mock = createMockDevice(unit)
+  announce()
+  AsyncStorage.setItem(UNIT_KEY, unit).catch(() => {
+    /* Costs the next launch its choice of unit, and nothing else. */
+  })
+  return unit
+}
+
 export function setDemo(on) {
   const want = !!on
   if (want === isDemo()) return
-  mock = want ? createMockDevice() : null
+  mock = want ? createMockDevice(unit) : null
   announce()
   AsyncStorage.setItem(KEY, want ? '1' : '0').catch(() => {
     /* Costs the next launch its demo, and nothing else. */
@@ -60,8 +89,10 @@ export function setDemo(on) {
  */
 export async function restoreDemo() {
   try {
+    const saved = await AsyncStorage.getItem(UNIT_KEY)
+    if (UNIT_KEYS.includes(saved)) unit = saved
     if ((await AsyncStorage.getItem(KEY)) === '1' && !mock) {
-      mock = createMockDevice()
+      mock = createMockDevice(unit)
       announce()
     }
   } catch {

@@ -36,6 +36,7 @@ import { preferredEncoding, rememberEncoding, getEncodingMap, disambiguate } fro
 
 export { preferredEncoding, rememberEncoding, getEncodingMap, disambiguate }
 import { createMockDevice } from './mockDevice.js'
+import { DEFAULT_UNIT, UNIT_KEYS } from './demoUnits.js'
 
 /**
  * Where the device server is, when nobody has said otherwise.
@@ -78,8 +79,44 @@ let mock = null
 
 export const isDemo = () => mock !== null
 
+const UNIT_KEY = 'forgefx.demoUnit'
+
+/**
+ * Which Fractal the demo is pretending to be, remembered between visits.
+ *
+ * "Demo for all Fractal units." Anything unrecognised reads as the FM3 rather
+ * than throwing: this comes out of storage somebody else's code may have
+ * written, and a demo that refuses to start is worse than one that starts as
+ * the wrong unit and can be changed in two taps.
+ */
+export function demoUnit() {
+  try {
+    const saved = typeof localStorage === 'undefined' ? null : localStorage.getItem(UNIT_KEY)
+    return UNIT_KEYS.includes(saved) ? saved : DEFAULT_UNIT
+  } catch {
+    return DEFAULT_UNIT
+  }
+}
+
+/**
+ * Become a different unit. Rebuilds the mock, because every rig, scene list
+ * and preset name in it belongs to the unit it was made for — there is no
+ * sensible way to change a simulated AM4 into a simulated FM9 in place, and
+ * pretending otherwise would leave an FM3 chain under an AM4's name.
+ */
+export function setDemoUnit(key) {
+  const want = UNIT_KEYS.includes(key) ? key : DEFAULT_UNIT
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(UNIT_KEY, want)
+  } catch {
+    /* Costs the next reload, not this press. */
+  }
+  if (mock) mock = createMockDevice(want)
+  return want
+}
+
 export function setDemo(on) {
-  mock = on ? createMockDevice() : null
+  mock = on ? createMockDevice(demoUnit()) : null
   /*
    * Remembering the demo across reloads is a browser's job, and this is not
    * only called in a browser: the tests drive the mock device through here to
@@ -97,7 +134,7 @@ export function setDemo(on) {
 }
 
 if (typeof localStorage !== 'undefined' && localStorage.getItem('forgefx.demo') === '1') {
-  mock = createMockDevice()
+  mock = createMockDevice(demoUnit())
 }
 
 /** Simulated latency, so progress indicators behave as they do on real serial. */

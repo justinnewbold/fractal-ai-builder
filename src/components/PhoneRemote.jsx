@@ -141,7 +141,7 @@ function MacSide({ link, email, onAction, busy }) {
  * account to sign into written under it. Scanning gets the phone to the
  * right place; the line under it says what to do when it arrives.
  */
-function AccountCard({ on, email }) {
+export function AccountCard({ on, email }) {
   const url = HOSTED_ORIGIN
   const [qr, setQr] = useState(null)
 
@@ -183,7 +183,7 @@ function AccountCard({ on, email }) {
  * served from it, which is exactly when this route exists: point the phone's
  * camera at it and the phone is talking to the unit directly.
  */
-function WifiCard() {
+export function WifiCard() {
   const local = servedLocally()
   const url = local ? window.location.origin : null
   const [qr, setQr] = useState(null)
@@ -220,7 +220,7 @@ function WifiCard() {
  * at the same Mac knows the Mac is paired but not with what, and the only
  * honest offer is to pair again.
  */
-function PairCard({ on, onAction, busy }) {
+export function PairCard({ on, onAction, busy }) {
   const code = savedPairCode()
   const url = code ? pairLink(code) : null
   const [qr, setQr] = useState(null)
