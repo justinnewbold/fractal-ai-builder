@@ -5751,6 +5751,49 @@ export function run(test) {
    * So the store being REACHABLE is not enough to lock anybody; it also has to
    * be able to sell them something.
    */
+  /**
+   * THE KEYS ARE IN, AND THE ONE THAT MUST NEVER BE IS NOT.
+   *
+   * RevenueCat issues two kinds of key and they are easy to confuse because
+   * they arrive on the same dashboard page. The PUBLIC ones belong in the app
+   * — they are compiled into every copy of it and can be read out of any
+   * handset, which is why RevenueCat says to embed them. The SECRET one, `sk_`,
+   * can refund purchases and grant entitlements, and this repository is
+   * public.
+   *
+   * So this holds both halves: the public keys are present and the right shape
+   * for their platform, and no `sk_` key appears anywhere in the tree. The
+   * second is the one that matters, and it is cheap enough to check for ever.
+   */
+  test('the purchase keys are the public ones, and no secret key is committed', () => {
+    const app = JSON.parse(read('mobile/app.json'))
+    const keys = app.expo?.extra?.revenuecat || {}
+
+    assert.match(String(keys.ios), /^appl_[A-Za-z0-9]+$/, 'the Apple key is missing or not an Apple public key')
+    assert.match(String(keys.android), /^goog_[A-Za-z0-9]+$/, 'the Google key is missing or not a Google public key')
+
+    /* A secret key anywhere under version control, whatever it is called. */
+    const hunted = [
+      'mobile/app.json',
+      'mobile/src/lib/purchases.js',
+      'eas.json',
+      'app.json',
+      'package.json'
+    ]
+    for (const f of hunted) {
+      let text
+      try {
+        text = read(f)
+      } catch {
+        continue
+      }
+      assert.ok(
+        !/\bsk_[A-Za-z0-9]{8,}/.test(text),
+        `${f} contains what looks like a RevenueCat SECRET key — it can refund and grant, and this repository is public`
+      )
+    }
+  })
+
   test('a phone that cannot buy anything is never locked out', () => {
     const src = read('mobile/src/lib/purchases.js')
     assert.match(src, /canMakePayments/, 'nothing asks whether this install can pay at all')
