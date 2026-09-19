@@ -3728,7 +3728,13 @@ export default function App() {
                   happening". */}
               <SetupRow key="link" title="Phone & computer" status={[describeLink(link).note || 'Phone remote off', status === 'live' ? `${device?.short || device?.name || 'Unit'} · connected` : 'No unit'].join(' · ')} onClick={() => setSetupPage('link')} />
               <SetupRow key="rename" title="Rename presets and scenes" status={status === 'live' ? 'Give them names you will know on a dark stage' : 'Connect a unit first'} onClick={() => setSetupPage('rename')} />
-              <SetupRow key="play" title="Play screen" status={[fit ? 'Fit to screen' : SIZES[size].name, THEME_WORD[getMode()] || null].filter(Boolean).join(' · ')} onClick={() => setSetupPage('play')} />
+              {/* The theme is behind this row and the status says so, because
+                  "Play screen" is not where anybody looks for light and dark —
+                  "I'm not seeing where the light/dark/auto theme buttons are
+                  anymore." Both settings really are about how the thing on the
+                  stand LOOKS, so they stay together; the row now says which
+                  theme is on, which is what makes it findable by scanning. */}
+              <SetupRow key="play" title="Play screen" status={['Buttons ' + (fit ? 'fit to screen' : SIZES[size].name.toLowerCase()), (THEME_WORD[getMode()] || 'Auto') + ' theme'].join(' · ')} onClick={() => setSetupPage('play')} />
               <SetupRow key="gear-names" title="Amp & pedal names" status="What each model on your unit really is" onClick={() => setSheet('gear')} />
               <SetupRow key="help" title="Troubleshooting" status={`${getDebugLog().length} line${getDebugLog().length === 1 ? '' : 's'} in the log`} onClick={() => setSetupPage('help')} />
               <SetupRow key="about" title="About" status={FULL} onClick={() => setSetupPage('about')} />

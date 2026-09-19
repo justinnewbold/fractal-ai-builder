@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Linking, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 
-import { color, font, mono, radius, space, TAP } from '../lib/theme'
+import { color, font, mono, radius, space, TAP, MODES, getMode, setMode } from '../lib/theme'
 import { APP_VERSION } from '../lib/version'
 import { AFFILIATION } from '../lib/affiliation'
 import { isOlder } from '../lib/versions'
@@ -32,6 +32,9 @@ import Sheet from '../components/Sheet'
 const face = Platform.select(mono)
 
 const ofDeviceName = (s) => s.deviceName
+
+/** What each theme setting is called, for the row that has to say which. */
+const THEME_WORD = { auto: 'Auto', light: 'Light', dark: 'Dark' }
 const ofUnitState = (s) => s.unit
 
 /**
@@ -203,7 +206,9 @@ export default function Settings({
             />
             <SetupRow
               title="Play screen"
-              status={SIZES[loadSize(sync)]?.name || 'Small'}
+              /* Both of the things behind this row, so somebody looking for
+                 the theme can see from the list that it is in here. */
+              status={[SIZES[loadSize(sync)]?.name || 'Small', THEME_WORD[getMode()] || 'Auto'].join(' · ')}
               onPress={() => setPage('play')}
             />
             {onOpenGear ? (
@@ -506,6 +511,20 @@ export default function Settings({
             <TileSize />
           </View>
 
+          {/*
+            Light, dark, or whatever the phone is set to.
+
+            "I'm not seeing where the light/dark/auto theme buttons are
+            anymore. Please put that back on Setup." The browser has had these
+            three for a long time and keeps them here, under Play screen,
+            because both of these settings are about how the thing you look at
+            on a stand LOOKS. The phone had none of them and was dark whatever
+            the handset was set to, which is the wrong answer in a lit room.
+          */}
+          <View style={{ gap: space.md }}>
+            <Section>Appearance</Section>
+            <Appearance />
+          </View>
         </>
       ) : null}
 
@@ -783,5 +802,36 @@ function Section({ children }) {
     >
       {children}
     </Text>
+  )
+}
+
+/**
+ * Light, dark, or the handset's own setting.
+ *
+ * Auto first, and it is the default: a phone that already knows whether its
+ * owner wants light or dark is a better guess than anything this app could
+ * make, and somebody who has never thought about it gets the right answer
+ * without choosing.
+ */
+function Appearance() {
+  const [mode, setLocal] = useState(getMode())
+  const LABEL = { auto: 'Auto', light: 'Light', dark: 'Dark' }
+  return (
+    <View style={{ flexDirection: 'row', gap: space.sm }}>
+      {MODES.map((m) => (
+        <Press
+          key={m}
+          grow
+          label={LABEL[m]}
+          tone="signal"
+          on={m === mode}
+          height={TAP}
+          onPress={() => {
+            setMode(m, sync)
+            setLocal(m)
+          }}
+        />
+      ))}
+    </View>
   )
 }

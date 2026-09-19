@@ -1863,7 +1863,9 @@ export function run(test) {
     /* Each row says something true about the state it leads to, which is the
        whole point of the list: it answers most questions without a tap. */
     assert.match(settings, /status=\{\s*demo\s*\?\s*'Demo — simulated FM3'[\s\S]{0,500}?`\$\{deviceName \|\| 'Unit'\} · connected`/)
-    assert.match(settings, /status=\{SIZES\[loadSize\(sync\)\]\?\.name/)
+    /* Both things behind the Play screen row, so somebody hunting for the
+       theme can tell from the list that it is in there. */
+    assert.match(settings, /status=\{\[SIZES\[loadSize\(sync\)\]\?\.name \|\| 'Small', THEME_WORD\[getMode\(\)\] \|\| 'Auto'\]\.join/)
   })
 
   test('the version on the About page is the version that was built', async () => {
@@ -2047,8 +2049,20 @@ export function run(test) {
     assert.match(app, /BENCH && screen === 'edit'/, 'the route no longer reads the switch, so turning it off would leave the screen reachable')
     assert.match(app, /BENCH && link\.link === 'connected'/, 'the Edit button no longer reads the switch')
 
-    /* Absent rather than disabled when there is nowhere to go. */
-    assert.match(read('mobile/src/screens/Stage.js'), /\{onOpenEdit \? \(/, 'the Edit button is drawn whether or not there is anywhere to go')
+    /*
+     * Absent rather than disabled when there is nowhere to go — and now on the
+     * bottom bar rather than up beside the preset name. "On the phone versions
+     * move the edit button down to the bottom tab bar exactly like it's set up
+     * on the web app": the browser has always had it there, beside the tuner
+     * and the tempo, on the strip for what you do BETWEEN songs.
+     */
+    const stageSrc = read('mobile/src/screens/Stage.js')
+    assert.match(stageSrc, /\{onOpenEdit \? <Press grow label="Edit" height=\{foot\} onPress=\{onOpenEdit\} \/> : null\}/, 'the Edit button is drawn whether or not there is anywhere to go')
+    /* On the foot, which is after the tempo, not in the preset row above it. */
+    assert.ok(
+      stageSrc.indexOf('label="Tap Tempo"') < stageSrc.indexOf('label="Edit"'),
+      'Edit is back above the stage, where a thumb looking for a scene finds it first'
+    )
   })
 
   test('a knob keeps the finger the scroll view would otherwise take', () => {
@@ -4309,7 +4323,10 @@ export function run(test) {
     assert.match(stage, /height=\{tight \? TAP : TAP \+ 12\}/, 'the preset button keeps its extra height at the smallest size')
     assert.match(stage, /height=\{Math\.max\(tight \? 44 : TAP, size\.tile - 12\)\}/, 'a chain tile is held at 56 beside scene tiles of 48')
     assert.match(stage, /const foot = tight \? 48 : TAP/, 'the foot does not give at the smallest size')
-    assert.equal((stage.match(/height=\{foot\}/g) || []).length, 5, 'not every button in the foot follows the foot height')
+    /* Six: Previous, Setlists, Next, Tuner, Tap Tempo and Edit — the last of
+       which joined the bar when it came down off the preset row, "exactly like
+       it's set up on the web app". */
+    assert.equal((stage.match(/height=\{foot\}/g) || []).length, 6, 'not every button in the foot follows the foot height')
     /* And never below the platform floor. */
     assert.doesNotMatch(stage, /tight \? (4[0-3]|[0-3]\d) :/, 'something pressable goes below 44 at the smallest size')
   })
@@ -5215,6 +5232,74 @@ export function run(test) {
     const amps = groupsFor({}).find((g) => g.key === 'amp')
     assert.ok(amps.entries.length > 0, 'the amp list is empty')
     assert.ok(amps.entries.every((e) => e.slug === 'amp'), 'a catalog row does not know which block it came from')
+  })
+
+  test('the phone has light, dark and auto, and every screen follows', async () => {
+    /*
+     * "I'm not seeing where the light/dark/auto theme buttons are anymore.
+     * Please put that back on Setup."
+     *
+     * The browser has had all three for a long time. The phone had none: it
+     * was dark whatever the handset was set to, which is the wrong answer in
+     * a lit room and the wrong answer on a phone in light mode.
+     *
+     * HOW IT WORKS WITHOUT 252 EDITS. There are 252 reads of `color.x` across
+     * 25 files and not one StyleSheet.create in the app — normally a small
+     * inefficiency, and here the thing that makes a theme possible at all.
+     * Inline styles are read fresh on every render, so swapping the VALUES on
+     * the one exported palette and re-rendering the root repaints everything
+     * with no call site changing. Which means the object must be MUTATED and
+     * never replaced: an `export const color = next` would leave every module
+     * that already imported it pointing at the old one.
+     */
+    const theme = await import('../mobile/src/lib/theme.js')
+    const before = theme.color
+    assert.deepEqual(theme.MODES, ['auto', 'light', 'dark'], 'the three settings are not the three the browser has')
+
+    theme.setMode('light')
+    assert.equal(theme.color, before, 'the palette object was replaced, so every screen still holds the old one')
+    assert.equal(theme.isDark(), false)
+    const light = theme.color.chassis
+    theme.setMode('dark')
+    assert.equal(theme.isDark(), true)
+    assert.notEqual(theme.color.chassis, light, 'light and dark are the same colour')
+
+    /* Auto follows the handset rather than guessing. */
+    theme.setMode('auto')
+    theme.setSystemDark(false)
+    assert.equal(theme.isDark(), false, 'auto ignores a phone set to light')
+    theme.setSystemDark(true)
+    assert.equal(theme.isDark(), true, 'auto ignores a phone set to dark')
+
+    /*
+     * Every key is written on every change. A colour that existed in one
+     * palette and not the other would otherwise keep the previous theme's
+     * value, which shows up as one wrong-coloured thing on one screen in one
+     * mode — the kind of bug nobody reproduces.
+     */
+    const src = read('mobile/src/lib/theme.js')
+    const dark = src.match(/const DARK = \{([\s\S]*?)\n\}/)[1]
+    const lightSrc = src.match(/const LIGHT = \{([\s\S]*?)\n\}/)[1]
+    const keys = (t) => [...t.matchAll(/^\s{2}([a-zA-Z]+):/gm)].map((m) => m[1]).sort()
+    assert.deepEqual(keys(lightSrc), keys(dark), 'the two palettes do not carry the same colours')
+
+    /* Subscribed once, at the root, because one re-render there is every
+       screen's next render. */
+    const app = read('mobile/App.js')
+    assert.match(app, /useSyncExternalStore\(watchTheme, themeVersion, themeVersion\)/, 'nothing repaints when the theme changes')
+    assert.match(app, /Appearance\.addChangeListener/, 'auto never hears the handset change')
+    assert.match(app, /hydrate\(\)\.then\(\(\) => loadMode\(sync\)\)/, 'the chosen theme is forgotten between launches')
+    /* The clock and the battery have to be readable against what is behind
+       them, which is the one thing a palette swap cannot reach. */
+    assert.match(app, /<StatusBar style=\{isDark\(\) \? 'light' : 'dark'\} \/>/, 'the status bar is light ink on a light screen')
+
+    /* And it is reachable: on Setup, beside the other setting about how the
+       thing on the stand looks. */
+    const settings = read('mobile/src/screens/Settings.js')
+    assert.match(settings, /<Section>Appearance<\/Section>/, 'there is nowhere to choose a theme')
+    assert.match(settings, /setMode\(m, sync\)/, 'choosing a theme does not remember it')
+
+    theme.setMode('auto')
   })
 
 }
