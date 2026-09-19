@@ -2997,26 +2997,34 @@ export function run(test) {
      */
     assert.match(src, /Windows protected your PC/, 'nothing warns about the SmartScreen box the unsigned installer causes')
     assert.match(src, /Run anyway/, 'the SmartScreen warning is named with no way past it')
-    assert.match(src, /ForgeFX in a terminal/, 'the only route a Windows or Linux machine has today is missing')
-    assert.match(src, /github\.com\/sKuhLight\/ForgeFX/, 'the terminal route names no repository to go and find')
+    /* Linux has its own download now, which is what the terminal route used
+       to stand in for — and it says which file to take, because AppImage and
+       .deb are not the same decision. */
+    assert.match(src, /Linux/, 'Linux is not mentioned at all')
+    assert.match(src, /AppImage/, 'the Linux route does not say which file to take')
 
     /*
      * AND NO COMMAND IS INVENTED, which is the rule that has not changed —
-     * only the answer has. The page used to say there was no one-line
-     * installer, because there was not. There are two now, they are files in
-     * this repository, and `the two one-line helpers are real files` below
-     * holds each printed command to the file it fetches. A command that fails
-     * at the far end of somebody's evening with nothing to go on is worse
-     * than no command at all, which is why that test exists rather than this
-     * one merely asserting a string is present.
+     * only the answer has, twice.
+     *
+     * The page first said there was no one-line installer, because there was
+     * not. Then there were two, and a test held each printed command to the
+     * file it fetched. Now there are none again: both cloned private
+     * repositories and could not work without a token, so they were removed
+     * rather than left as a wall with instructions.
+     *
+     * What survives is the rule underneath all three versions — nothing on
+     * this page may be a command that was never run. So there is no shell
+     * line here at all, and the check is that none appears.
      */
+    const shellish = /curl -fsSL|irm https?:|\| *(bash|iex)\b/
     assert.ok(
-      !/no one-file installer for this yet/.test(src),
-      'the page still says there is no installer, and there are two'
+      !shellish.test(src),
+      'the connect screen prints a shell command again — if it is real it needs a file behind it, and if it needs a token it is not a route'
     )
-    assert.match(src, /fractal\.newbold\.cloud/, 'neither terminal route fetches anything')
-    assert.match(src, /mac\.sh/, 'the Mac terminal route prints no command')
-    assert.match(src, /windows\.ps1/, 'the Windows terminal route prints no command')
+    for (const gone of ['mac.sh', 'windows.ps1']) {
+      assert.ok(!src.includes(gone), `the connect screen still points at ${gone}, which no longer exists`)
+    }
 
     /* The thing nobody knows and everything else depends on. */
     assert.match(screen, /Your unit plugs into a computer with a USB cable/, 'the page never says why a computer is involved')
@@ -3214,7 +3222,7 @@ export function run(test) {
     assert.match(read('mobile/src/screens/Log.js'), /onReport/, 'the log screen offers no way to send it')
   })
 
-  test('the four ways in are sorted for this computer, and never guessed at on a phone', async () => {
+  test('the three ways in are sorted for this computer, and never guessed at on a phone', async () => {
     /*
      * "Detect the user's OS and surface the matching option first."
      *
@@ -3231,10 +3239,10 @@ export function run(test) {
      */
     const ways = await import('../shared/ways-in.mjs')
 
-    assert.equal(ways.WAYS.length, 5, 'there are not five ways in')
+    assert.equal(ways.WAYS.length, 3, 'there are not three ways in')
     const ids = ways.WAYS.map((w) => w.id)
-    assert.equal(new Set(ids).size, 5, 'two routes share an id')
-    for (const want of ['mac-app', 'windows-app', 'linux-app', 'mac-terminal', 'windows-terminal']) {
+    assert.equal(new Set(ids).size, 3, 'two routes share an id')
+    for (const want of ['mac-app', 'windows-app', 'linux-app']) {
       assert.ok(ids.includes(want), `there is no route for ${want}`)
     }
     for (const way of ways.WAYS) {
@@ -3262,10 +3270,16 @@ export function run(test) {
       ['mac-app', 'windows-app', 'linux-app'],
       'the downloadable routes are not the three apps'
     )
-    assert.deepEqual(
-      ways.WAYS.filter((w) => w.status === 'manual').map((w) => w.id),
-      ['mac-terminal', 'windows-terminal'],
-      'a terminal route is being offered as though it were an installer'
+    /*
+     * AND THERE IS NO `manual` ROUTE ANY MORE. The two terminal ones cloned
+     * private repositories and had to tell the reader to ask the author for a
+     * token, which is a correspondence rather than a route. The apps cover
+     * every computer, so the download is the only way in.
+     */
+    assert.equal(
+      ways.WAYS.filter((w) => w.status === 'manual').length,
+      0,
+      'a terminal route is back — check it does not need a token before believing in it'
     )
     /* Nothing is `planned` any more, and the status stays in the vocabulary
        on purpose: the next route written will start out that way, and
@@ -3301,23 +3315,28 @@ export function run(test) {
     /* Sorted for this computer, and within it the thing that WORKS first — a
        Windows visitor used to open on "The Windows app — not built yet", which
        is a page that begins by saying it cannot help you. */
-    assert.deepEqual(ways.waysFor('windows').map((w) => w.id).slice(0, 2), [
-      'windows-app',
-      'windows-terminal'
-    ])
+    assert.equal(ways.waysFor('windows')[0].id, 'windows-app')
     assert.equal(ways.waysFor('linux')[0].id, 'linux-app', 'a Linux visitor does not open on the Linux app')
     /*
-     * Both Windows routes work now, so that order is the list's own and the
-     * sort no longer moves anything. The rule the sort exists for is checked
-     * against a route pretended `planned` rather than against whichever
-     * statuses happen to be true today — the day it stopped being checked is
-     * the day somebody's page opens on a download that is not built.
+     * THE SORT NOW HAS NOTHING TO SORT, and is checked anyway.
+     *
+     * There is one route per computer, so within an operating system the order
+     * is the list's own. The rule still matters for the route after next: a
+     * Windows visitor once opened on "The Windows app — not built yet", a page
+     * whose first line says it cannot help you. Checked against a made-up pair
+     * rather than against whichever statuses happen to be true today, because
+     * the day this stops being checked is the day it silently stops working.
      */
-    const pretend = ways.WAYS.map((w) => (w.id === 'windows-app' ? { ...w, status: 'planned' } : w))
-    const worksFirst = pretend
-      .filter((w) => w.os === 'windows')
-      .sort((a, b) => (a.status === 'planned' ? 1 : 0) - (b.status === 'planned' ? 1 : 0))
-    assert.equal(worksFirst[0].id, 'windows-terminal', 'a route that does not exist would open the page')
+    const works = (w) => (w.status === 'planned' ? 1 : 0)
+    const madeUp = [
+      { id: 'not-built', os: 'windows', status: 'planned' },
+      { id: 'real', os: 'windows', status: 'ready' }
+    ]
+    assert.equal(
+      [...madeUp].sort((a, b) => works(a) - works(b))[0].id,
+      'real',
+      'a route that does not exist would open the page'
+    )
     assert.equal(ways.waysFor('mac')[0].id, 'mac-app')
     /* And nothing is reordered when nobody knows. */
     assert.deepEqual(ways.waysFor(null).map((w) => w.id), ways.WAYS.map((w) => w.id))

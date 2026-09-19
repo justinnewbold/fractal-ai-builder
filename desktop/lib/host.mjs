@@ -711,8 +711,8 @@ export const MISSING_FORGEFX =
   '  git clone https://github.com/sKuhLight/forgefx-midi ~/src/forgefx-midi\n' +
   '  cd ~/src/forgefx-midi && npm install && npm run build\n' +
   '  cd ~/src/forgefx/server && npm install\n\n' +
-  'On Windows there is a script that does all of it:\n\n' +
-  '  irm https://fractal.newbold.cloud/windows.ps1 | iex\n'
+  'Or run `npm run vendor:forgefx` from the repository root, which is what the\n' +
+  'packaged apps are built with.\n'
 
 /**
  * Stop serving, and actually stop.

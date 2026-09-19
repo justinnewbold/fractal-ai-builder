@@ -5,35 +5,35 @@
 /**
  * How to get a computer on the other end of this, and what each route costs.
  *
- * "We also need to make instructions that teach people how to connect by
- * either downloading the Mac app, installing forgefx with a helper file for
- * terminal or a windows app (after we build those ones later)."
- *
  * WHAT THIS IS FOR is the person holding a phone that says NO COMPUTER, who
  * has no idea a computer was ever part of the arrangement. Nothing in the app
  * said so: the sign-in screen asked for a code "your computer shows" and there
  * was no way from there to find out which computer, or how to make one show
  * anything.
  *
- * FOUR ROUTES AND ALL FOUR EXIST NOW, which is new. The page was written when
- * only the Mac app was real, and each route carries a `status` for exactly
- * that reason — so nobody is sent looking for a download that was never built.
- * The Windows app and the two one-line helpers have since been built, so what
- * is left is the honest difference between them: the Mac app is signed by
- * Apple and opens without argument, the Windows app is not signed yet and
- * Windows says so in a blue box, and the terminal route builds the server from
- * source and asks real effort of you.
+ * THREE ROUTES, ONE PER COMPUTER, AND ALL THREE ARE A DOWNLOAD. The page was
+ * written when only the Mac app was real, and each route carries a `status`
+ * for exactly that reason — so nobody is sent looking for a download that was
+ * never built. What is left is the honest difference between them: the Mac app
+ * is signed by Apple and opens without argument, the Windows app is not signed
+ * yet and Windows says so in a blue box, and Linux gets an AppImage that runs
+ * anywhere plus a .deb for the box in the rack.
  *
- * NO COMMANDS ARE INVENTED HERE. The one-liners below are the two setup
- * scripts in `public/`, served from the app's own domain, and they are the
- * same two commands written at the top of those files. If one of them moves,
- * a test fails.
+ * THE TWO TERMINAL ROUTES ARE GONE, and the reason is worth keeping because it
+ * is the reason not to write them again.
  *
- * AND BOTH TERMINAL ROUTES NEED A TOKEN, which is the part that has to be said
- * before somebody pastes a line and watches it stop. They fetch three private
- * repositories — the app and the two projects the device server is made of —
- * so there is no tokenless version of this route, and a page that did not say
- * so up front would be sending people at a wall.
+ * They pasted one line into a shell and built the device server from source,
+ * which reads like the expert's shortcut. It never was one. The line fetched
+ * three private repositories, so it stopped at the first `git fetch` for
+ * everybody on earth except the person holding the token — and the steps had
+ * to say "ask Justin for one" out loud, which is not a route, it is a
+ * correspondence. The apps carry that same server inside them, signed and
+ * vendored at build time, and they now cover all three computers. A route
+ * whose first instruction is to email the author is worse than no route:
+ * it costs a reader their time before it tells them it cannot help.
+ *
+ * So there is no tokenless version of this idea to go back and build. The
+ * download IS the tokenless version.
  */
 
 /*
@@ -45,23 +45,9 @@
  * their names, and the step below says which file to take.
  */
 export const RELEASES = 'https://github.com/justinnewbold/fractal-ai-builder/releases'
-export const FORGEFX = 'https://github.com/sKuhLight/ForgeFX'
-export const CODEC = 'https://github.com/sKuhLight/forgefx-midi'
-
-/*
- * Served from the app's own domain rather than from raw.githubusercontent.
- *
- * Both files live in `public/`, which Vite copies to the root of the deployed
- * site, so these are short enough to read down a phone to somebody and they do
- * not go stale when a branch is renamed.
- */
-const SITE = 'https://fractal.newbold.cloud'
-export const HELPER_SH = `curl -fsSL ${SITE}/mac.sh | bash`
-export const HELPER_PS1 = `irm ${SITE}/windows.ps1 | iex`
 
 /**
  * `ready` is a thing you can download and run today.
- * `manual` works today and asks real technical effort of you.
  * `planned` does not exist — say so, and say what to do instead.
  */
 export const WAYS = [
@@ -114,61 +100,6 @@ export const WAYS = [
     ],
     links: [{ label: 'Download Fractal Remote for Linux', url: RELEASES }]
   },
-  {
-    id: 'mac-terminal',
-    os: 'mac',
-    title: 'ForgeFX in a terminal, on a Mac',
-    status: 'manual',
-    note: 'Works today, and is properly technical',
-    /*
-     * The line to paste, named as well as listed.
-     *
-     * It appears in `steps` because that is where it belongs in the reading
-     * order — after "open Terminal", before "it downloads". It appears here
-     * too so both screens can tell that one step apart from the prose around
-     * it and draw it as something you copy rather than something you read.
-     * Matching on `steps.includes(way.command)` rather than on what the text
-     * looks like: a guess about which lines are commands would eventually
-     * dress a sentence up as one.
-     */
-    command: HELPER_SH,
-    steps: [
-      'Only worth doing if you do not want the app. The Mac and Linux apps carry this same server inside them and set it up for you.',
-      'It needs git, Node 20, and a GitHub token that can read the project — the repositories are private, so ask Justin for one. Then open Terminal and paste both lines:',
-      'export FORGEFX_TOKEN="the-token"',
-      HELPER_SH,
-      'It fetches the app and the two projects the device server is made of, builds them, and starts everything. The first run takes a few minutes; after that it is quick.',
-      'It finishes by printing a QR code. Scan it with your phone on the same wifi — no account, nothing to sign into, same as the Mac app.',
-      'macOS asks whether to let node accept incoming connections the first time. Say yes, or the phone cannot reach this machine.',
-      'Everything lands in ~/src, and running the same line again updates it rather than starting over.'
-    ],
-    links: [
-      { label: 'ForgeFX', url: FORGEFX },
-      { label: 'forgefx-midi (the codec)', url: CODEC }
-    ]
-  },
-  {
-    id: 'windows-terminal',
-    os: 'windows',
-    title: 'ForgeFX in a terminal, on Windows',
-    status: 'manual',
-    note: 'Works today, and skips the installer entirely',
-    command: HELPER_PS1,
-    steps: [
-      'Only worth doing if you would rather not install the Windows app. The app carries this same server inside it and sets it up for you.',
-      'It needs git, Node 20, and a GitHub token that can read the project — the repositories are private, so ask Justin for one. Then open PowerShell and paste both lines:',
-      '$env:FORGEFX_TOKEN = "the-token"',
-      HELPER_PS1,
-      'It fetches the app and the two projects the device server is made of, builds them, and starts everything. The first run takes a few minutes; after that it is quick.',
-      'It finishes by printing a QR code. Scan it with your phone on the same wifi — no account, nothing to sign into, same as the apps.',
-      'Windows will ask whether to let node through the firewall. Say yes, or the phone cannot reach this PC over wifi.',
-      'Everything lands in your user folder under src, and running the same lines again updates it rather than starting over.'
-    ],
-    links: [
-      { label: 'ForgeFX', url: FORGEFX },
-      { label: 'forgefx-midi (the codec)', url: CODEC }
-    ]
-  }
 ]
 
 export const wayById = (id) => WAYS.find((w) => w.id === id) || null

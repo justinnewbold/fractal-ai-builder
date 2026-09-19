@@ -714,47 +714,6 @@ test('and so does the script that puts the server inside the app', () => {
   )
 })
 
-test('the Windows installer keeps the layout the server needs', () => {
-  /*
-   * The one-paste installer. It cannot be run from here — there is no
-   * PowerShell in CI — so what is checked is the handful of decisions that are
-   * silent when wrong.
-   */
-  const ps = readSrc(new URL('../public/windows.ps1', import.meta.url), 'utf8')
-
-  /* Siblings. The server depends on the codec by relative path, so nesting the
-     two makes that link dangle and the build fails somewhere unrelated. */
-  assert.match(ps, /\$server = Join-Path \$Root 'forgefx'/, 'the server moved out of the shared root')
-  assert.match(ps, /\$codec = Join-Path \$Root 'forgefx-midi'/, 'the codec moved out of the shared root')
-
-  /* The pins come from the app's own lock file rather than being copied here,
-     which is the only way this and the Mac build cannot drift. */
-  assert.match(ps, /forgefx\.lock\.json/, 'the installer no longer reads the pinned versions')
-  assert.ok(
-    !/d7b17a305c1f|553d24b74093/.test(ps),
-    'a commit is hard-coded in the installer — it will rot the moment the lock file moves'
-  )
-
-  /* The codec builds before the server, whose build reads its types. */
-  assert.ok(
-    ps.indexOf("'building the preset codec'") < ps.indexOf("'building the device server'"),
-    'the server is built before the codec it compiles against'
-  )
-
-  /* The token never reaches a URL: one in a remote URL is written into
-     .git/config and reprinted in every error git gives about that remote. */
-  assert.ok(
-    !/https:\/\/[^'"\s]*\$(Token|env:FORGEFX_TOKEN)/.test(ps),
-    'the token is embedded in a git URL, where it persists in .git/config'
-  )
-  assert.match(ps, /credential\.helper=/, 'the credential helper is gone, so a private fetch cannot authenticate')
-
-  /* `exit` in a script piped into iex closes the whole window, taking the
-     message with it — which is every guard clause here. */
-  assert.ok(!/^\s*exit\b/m.test(ps), 'an exit would close the terminal of anyone who piped this into iex')
-  assert.match(ps, /^Install-FractalRemote$/m, 'nothing calls the installer, so pasting it does nothing')
-})
-
 test('a phone that cannot reach the computer is told the likely reason', async () => {
   /*
    * The address in the menu works from the Mac and fails from a phone, and
