@@ -56,7 +56,7 @@ afterPack: afterPack.js
 publish:
   provider: github
   owner: justinnewbold
-  repo: fractal-ai-builder
+  repo: fractal-remote
   # Published, not drafted.
   #
   # electron-builder's own default here is `draft`, and a draft release is

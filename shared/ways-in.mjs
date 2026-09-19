@@ -40,7 +40,7 @@
  * aimed at the Mac app landed on an .apk. The list page shows all of them with
  * their names, and the step below says which file to take.
  */
-export const RELEASES = 'https://github.com/justinnewbold/fractal-ai-builder/releases'
+export const RELEASES = 'https://github.com/justinnewbold/fractal-remote/releases'
 
 /**
  * `ready` is a thing you can download and run today.

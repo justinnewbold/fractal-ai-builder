@@ -19,6 +19,9 @@ way they did before.
 month, which is several orders of magnitude more than this will ever send.
 
 **2. Put it in Supabase.** Supabase dashboard → the `fractal-ai-builder` project
+(that is the SUPABASE project's name, which did not change when the GitHub
+repository was renamed to `fractal-remote` — renaming one does not rename the
+other, and the dashboard still lists it under the old one)
 → **Edge Functions** → **Secrets** → add:
 
 | name | value | needed? |

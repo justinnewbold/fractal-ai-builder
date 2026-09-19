@@ -373,7 +373,7 @@ sidesteps the rule:
 
 ```bash
 npm run build
-FORGEFX_STATIC=/path/to/fractal-ai-builder/dist npm run dev   # in ForgeFX/server
+FORGEFX_STATIC=/path/to/fractal-remote/dist npm run dev   # in ForgeFX/server
 ```
 
 Then browse to `http://<your-machine-ip>:5056` from the phone. Gig mode works

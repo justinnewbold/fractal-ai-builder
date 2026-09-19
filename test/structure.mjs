@@ -3847,7 +3847,7 @@ export function run(test) {
      * `/D:/a/...` — a leading slash in front of the drive letter, which
      * readdirSync refuses outright. And a short name built by slicing on the
      * repository's own folder name finds the wrong occurrence on a runner,
-     * where the checkout is `D:/a/fractal-ai-builder/fractal-ai-builder`.
+     * where the checkout is `D:/a/fractal-remote/fractal-remote`.
      * Both of those failed here before this comment existed.
      */
     const root = fileURLToPath(new URL('../', import.meta.url)).replaceAll('\\', '/')
@@ -3887,4 +3887,57 @@ export function run(test) {
 
     assert.deepEqual(broken, [], `\n${broken.join('\n')}\n`)
   })
+  test('one repository name, everywhere it decides where something goes', () => {
+    /*
+     * "Rename the repo fractal-remote instead of fractal-AI-builder and update
+     * anything that requires knowing that repo name."
+     *
+     * Most of what knew the old name was prose. Three places were not, and
+     * those are the ones worth a check, because each of them sends somebody
+     * or something to a URL:
+     *
+     *   - electron-builder's publish block, which is BOTH where a release
+     *     build uploads to and where the installed Mac app looks for the next
+     *     version. Those two cannot be allowed to disagree.
+     *   - the Releases link the phone and the browser offer for downloading
+     *     the computer app.
+     *   - the same link in the Mac app's own menu.
+     *
+     * GitHub redirects the old name, so none of these broke on the day. That
+     * is exactly why they are checked rather than trusted: a redirect makes a
+     * wrong name work, which means nothing fails until the day somebody makes
+     * a NEW repository under the old name and the redirect stops.
+     */
+    const REPO = 'fractal-remote'
+    const OLD = ['fractal', 'ai', 'builder'].join('-')
+
+    const yml = readFileSync(new URL('../desktop/electron-builder.yml', import.meta.url), 'utf8')
+    assert.match(yml, new RegExp(`^\\s*repo: ${REPO}$`, 'm'), 'the Mac app publishes to, and updates from, another repository')
+    assert.match(yml, /^\s*owner: justinnewbold$/m, 'the publish block has no owner')
+
+    const ways = readFileSync(new URL('../shared/ways-in.mjs', import.meta.url), 'utf8')
+    assert.match(ways, new RegExp(`github\\.com/justinnewbold/${REPO}/releases`), 'the download link points at another repository')
+
+    const main = readFileSync(new URL('../desktop/main.js', import.meta.url), 'utf8')
+    assert.match(main, new RegExp(`github\\.com/justinnewbold/${REPO}/releases`), 'the Mac app menu points at another repository')
+
+    /*
+     * And nothing that decides a destination still carries the old name. The
+     * two Supabase files are exempt and say why in their own text: that is
+     * the name of the SUPABASE project, which a GitHub rename does not touch.
+     */
+    for (const file of [
+      '../package.json',
+      '../desktop/package.json',
+      '../shared/ways-in.mjs',
+      '../mobile/src/lib/ways-in.js',
+      '../desktop/main.js',
+      '../desktop/electron-builder.yml',
+      '../.github/workflows/desktop.yml'
+    ]) {
+      const text = readFileSync(new URL(file, import.meta.url), 'utf8')
+      assert.ok(!text.includes(OLD), `${file} still carries the old repository name`)
+    }
+  })
+
 }

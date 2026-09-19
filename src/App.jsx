@@ -154,6 +154,7 @@ import {
   subscribeRemoteState
 } from './lib/remote'
 import { newEntry, append } from './lib/log'
+import { watchEvery, probeSays, countQuiet, unitGone } from '../shared/unit-watch.mjs'
 
 
 /**
@@ -1177,9 +1178,19 @@ export default function App() {
    * turns the confirmation off.
    */
   const liveRef = useRef(false)
+  /*
+   * Whether a read is already in flight, for the timed check below to stand
+   * clear of. In a ref rather than the dependency list: the check is a loop
+   * that schedules itself, and restarting that loop every time a button goes
+   * busy would reset its own timer and mean it never reached the end of one.
+   */
+  const busyRef = useRef(false)
   useEffect(() => {
     liveRef.current = status === 'live'
   }, [status])
+  useEffect(() => {
+    busyRef.current = busy
+  }, [busy])
 
   /*
    * `settling` is for a read that follows an order this app gave the unit —
@@ -1405,6 +1416,70 @@ export default function App() {
       live = false
     }
   }, [lostUnit, read])
+
+  /*
+   * Ask, on a timer, whether the unit is still there.
+   *
+   * "I purposefully unplugged the FM3 from the computer and it still said
+   * connected. I waited a few minutes, went ahead and tried to click some
+   * buttons, go to different presets, still said connected, so it's lying."
+   *
+   * It was, and nothing here ever asked. `status` was set by the last read
+   * that ran, and after startup a read only runs when something on screen
+   * wants a fresh answer — so "connected" was a fact about the past, drawn
+   * as a fact about now, ageing quietly.
+   *
+   * Pressing buttons did not settle it, and that is the part worth knowing:
+   * a preset change is a WRITE, and a write to a port whose far end has gone
+   * away does not have to fail. The bytes leave. Only an ANSWER proves the
+   * unit is there, so this asks for one — which preset is loaded, the first
+   * thing a unit that has gone stops being able to say.
+   *
+   * It does not touch the screen when the answer is good. A poll that also
+   * applied what it read would fight whoever is working at the Mac, and the
+   * question here is only whether anybody is home. When the answer is bad
+   * twice running it hands over to read(), which confirms it properly and
+   * puts up the notice that says what to check.
+   *
+   * See shared/unit-watch.mjs for the two numbers and why they are those.
+   */
+  useEffect(() => {
+    if (status !== 'live') return undefined
+    let live = true
+    let timer = null
+    let quiet = 0
+    const every = watchEvery(remoteActive())
+    const ask = async () => {
+      if (!live) return
+      /* A tab nobody is looking at is a tab that can be wrong for free, and a
+         phone in a pocket should not be holding a relay open to ask. */
+      const hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden'
+      if (hidden || busyRef.current) {
+        timer = setTimeout(ask, every)
+        return
+      }
+      let said = 'quiet'
+      try {
+        said = probeSays({ preset: await currentPreset() })
+      } catch {
+        said = probeSays({ failed: true })
+      }
+      if (!live) return
+      quiet = countQuiet(quiet, said)
+      if (unitGone(quiet)) {
+        logDebug('unit', 'the unit stopped answering the timed check', `${quiet} quiet answers`)
+        quiet = 0
+        await read()
+        if (!live) return
+      }
+      timer = setTimeout(ask, every)
+    }
+    timer = setTimeout(ask, every)
+    return () => {
+      live = false
+      clearTimeout(timer)
+    }
+  }, [status, read])
 
   /**
    * What a reload does, without the reload.

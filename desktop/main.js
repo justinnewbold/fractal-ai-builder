@@ -24,7 +24,7 @@ const { existsSync, readFileSync, writeFileSync, unlinkSync } = require('node:fs
 const net = require('node:net')
 
 /** Where the new version can always be fetched by hand. */
-const RELEASES_URL = 'https://github.com/justinnewbold/fractal-ai-builder/releases/latest'
+const RELEASES_URL = 'https://github.com/justinnewbold/fractal-remote/releases/latest'
 
 let tray = null
 let win = null

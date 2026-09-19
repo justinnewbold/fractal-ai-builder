@@ -3026,7 +3026,7 @@ export function run(test) {
     assert.match(screen, /WAYS\.map/, 'the phone no longer draws the routes')
 
     assert.match(src, /The Mac app/, 'the route that actually works is not offered')
-    assert.match(src, /github\.com\/justinnewbold\/fractal-ai-builder\/releases/, 'there is nowhere to get the Mac app from')
+    assert.match(src, /github\.com\/justinnewbold\/fractal-remote\/releases/, 'there is nowhere to get the Mac app from')
     /*
      * The list, not `/releases/latest`.
      *
@@ -4113,7 +4113,15 @@ export function run(test) {
        has a Refresh button, and says how full it is. */
     const rig = read('mobile/src/lib/rig.js')
     assert.match(rig, /adoptNames\(device\.nameOwner\(slug\)\)\.catch/, 'the rig never takes the computer’s list, or the demo’s names land on the real unit’s slots')
-    assert.ok(rig.indexOf('adoptNames(') < rig.indexOf('await refreshPreset()'), 'the names are taken after the slow reads instead of alongside them')
+    /*
+     * Inside refreshAll, not anywhere in the file. Read whole, this compared
+     * the first `adoptNames(` against the first `await refreshPreset()` — and
+     * the timed unit check higher up the file calls refreshPreset too, so the
+     * ordering it measured was between two unrelated functions.
+     */
+    const refreshAll = rig.slice(rig.indexOf('export async function refreshAll()'), rig.indexOf('export function notePresetName'))
+    assert.ok(refreshAll.length > 200, 'refreshAll moved; this check reads it')
+    assert.ok(refreshAll.indexOf('adoptNames(') < refreshAll.indexOf('await refreshPreset()'), 'the names are taken after the slow reads instead of alongside them')
     const dev = read('mobile/src/lib/device.js')
     assert.match(dev, /if \(!slug \|\| demoDevice\(\)\) return null/, 'the demo asks a computer it does not have for a list')
     const screen = read('mobile/src/screens/Presets.js')
@@ -5000,5 +5008,69 @@ export function run(test) {
     assert.match(rig, /fresh\?\.number === -1 \? \{ unit: 'silent' \}/, 'a unit that stops answering its name is not noticed')
     const settings = read('mobile/src/screens/Settings.js').replace(/\s+/g, ' ')
     assert.match(settings, /unitState === 'silent' \? `Computer connected · \$\{deviceName \|\| 'unit'\} not answering`/, 'Setup still says connected over a silent unit')
+  })
+
+  test('somebody asks whether the unit is still there, rather than waiting to be told', async () => {
+    /*
+     * "I purposefully unplugged the FM3 from the computer and it still said
+     * connected. I waited a few minutes, went ahead and tried to click some
+     * buttons, go to different presets, still said connected, so it's lying.
+     * There needs to be a way for it to actually show disconnected when it
+     * disconnects. which gave us the whole problem before where the unit froze
+     * and we still thought it was connected."
+     *
+     * Every piece of the answer was already here except the question. The
+     * store knows what a silent unit looks like (-1 where a preset number
+     * should be), the top bar draws it in red, Setup says it in words — and
+     * nothing ever asked, because refreshAll runs once at the moment of
+     * connecting and the stage screens read everything they draw out of the
+     * store.
+     *
+     * Note what does NOT count as asking: pressing buttons. A preset change
+     * is a write, and a write into a port whose far end has been pulled out
+     * does not have to fail. Only an answer proves anybody is home.
+     */
+    const watch = await import('../shared/unit-watch.mjs')
+
+    /* A preset number is an answer. Anything else is silence, whether it came
+       back as -1, as nothing, or as a thrown error. */
+    assert.equal(watch.probeSays({ preset: { number: 12 } }), 'answering')
+    assert.equal(watch.probeSays({ preset: { number: 0 } }), 'answering', 'slot zero is a real slot')
+    assert.equal(watch.probeSays({ preset: { number: -1 } }), 'quiet', 'the computer said the unit did not answer')
+    assert.equal(watch.probeSays({ preset: null }), 'quiet')
+    assert.equal(watch.probeSays({ failed: true }), 'quiet')
+
+    /*
+     * One quiet answer is not evidence. "My Mac is connected just fine. The
+     * phone app says it has lost the unit" — the computer asks that same port
+     * several times a second, and a question that loses the race looks exactly
+     * like a unit that has gone.
+     */
+    assert.equal(watch.unitGone(watch.countQuiet(0, 'quiet')), false, 'one missed answer tears the screen down')
+    assert.equal(watch.unitGone(watch.countQuiet(1, 'quiet')), true, 'two in a row still is not enough')
+    assert.equal(watch.countQuiet(1, 'answering'), 0, 'an answer does not clear the run of silence')
+
+    /* Cheaper to ask at the machine holding the cable than from a phone on a
+       cell connection, so the two are not the same number. */
+    assert.ok(watch.watchEvery(false) < watch.watchEvery(true), 'the relay is asked as often as a loopback')
+    assert.ok(watch.watchEvery(false) >= 5000, 'the unit is asked so often it is being interrogated')
+
+    /* And both apps ask. A phone and a Mac disagreeing about whether a unit is
+       plugged in is not a difference between them; it is one of them lying. */
+    const rig = read('mobile/src/lib/rig.js').replace(/\s+/g, ' ')
+    assert.match(rig, /export function watchUnit\(\)/, 'the phone never asks')
+    assert.match(rig, /probeSays\(\{ preset: await device\.currentPreset\(\) \}\)/, 'the phone asks something a write could fake')
+    assert.match(rig, /if \(unitGone\(quiet\)\) \{/, 'the phone believes one quiet answer')
+    const link = read('mobile/src/lib/link.js').replace(/\s+/g, ' ')
+    assert.match(link, /watchUnit\(\)/, 'nothing starts the phone asking')
+    /* A phone in a pocket has no screen to be wrong on. */
+    assert.match(link, /if \(status === 'active'\) watchUnit\(\) else stopWatching\(\)/, 'the asking does not stop with the screen')
+
+    const app = read('src/App.jsx').replace(/\s+/g, ' ')
+    assert.match(app, /if \(status !== 'live'\) return undefined/, 'the browser asks about a unit it never had')
+    assert.match(app, /said = probeSays\(\{ preset: await currentPreset\(\) \}\)/, 'the browser asks something a write could fake')
+    assert.match(app, /if \(unitGone\(quiet\)\) \{/, 'the browser believes one quiet answer')
+    assert.match(app, /document\.visibilityState === 'hidden'/, 'a tab nobody is looking at keeps asking')
+    assert.match(app, /await read\(\)/, 'the browser never confirms what the check found')
   })
 }

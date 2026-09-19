@@ -19,6 +19,7 @@ import { useSyncExternalStore } from 'react'
 import * as device from './device'
 import { idOf, sameBlock } from './unit.mjs'
 import { TAP_REREAD_MS, keepTaps, tappedBpm } from './tempo'
+import { watchEvery, probeSays, countQuiet, unitGone } from './unit-watch'
 import { DEFAULT_SLUG, deviceSlug } from './device-slug'
 import { adopt as adoptNames, forget as forgetNames, learn as learnName, nameOf } from './presetNames'
 import { forget as forgetControls } from './paramIndex'
@@ -233,6 +234,86 @@ export function stopListening() {
   const off = stopEvents
   stopEvents = null
   off()
+  stopWatching()
+}
+
+/* ---------------------------------------------------------------- */
+/* Is the unit still there?                                          */
+/* ---------------------------------------------------------------- */
+
+/*
+ * "I purposefully unplugged the FM3 from the computer and it still said
+ * connected. I waited a few minutes, went ahead and tried to click some
+ * buttons, go to different presets, still said connected, so it's lying."
+ *
+ * Nothing asked. `unit` was set by refreshAll at the moment of connecting
+ * and by whatever reads a screen happened to make after that — and the
+ * screens that matter most on stage make none, because everything they draw
+ * is already in this store.
+ *
+ * Pressing buttons could not settle it either. A preset change, a bypass, a
+ * scene: those are writes, and a write into a port whose far end has been
+ * pulled out does not have to come back as an error. Only an ANSWER proves
+ * anybody is home, so this asks for one on a timer — which preset is loaded,
+ * the first thing a unit that has gone stops being able to say.
+ *
+ * refreshPreset already knows that rule (-1 means the computer asked and the
+ * unit said nothing) and already sets `unit: 'silent'`, which the top bar
+ * already draws in red. Everything needed was here except somebody asking.
+ */
+let watchTimer = null
+/*
+ * Which run of the watch this is.
+ *
+ * A read is in the air for as long as the far end takes, and stopWatching can
+ * land in the middle of one. Clearing the timer does not reach that read, so
+ * without a generation the tick it belongs to would come back and arm the
+ * next one — a watch that carries on after it was stopped, invisibly, and a
+ * second watchUnit() would then leave two of them running.
+ */
+let watchRun = 0
+
+/** Ask about the unit from now on. Safe to call repeatedly. */
+export function watchUnit() {
+  if (watchTimer) return stopWatching
+  const run = ++watchRun
+  let quiet = 0
+  const tick = async () => {
+    watchTimer = null
+    let said = 'quiet'
+    try {
+      said = probeSays({ preset: await device.currentPreset() })
+    } catch {
+      said = probeSays({ failed: true })
+    }
+    if (run !== watchRun) return
+    quiet = countQuiet(quiet, said)
+    /*
+     * One quiet answer is not evidence — the computer asks this same port
+     * several times a second and a question that loses that race looks
+     * exactly like a unit that has gone. Two in a row is not a race.
+     */
+    if (unitGone(quiet)) {
+      quiet = 0
+      if (state.unit !== 'silent' && state.unit !== 'missing') {
+        logDebug('unit', 'the unit stopped answering the timed check')
+      }
+      /* refreshPreset is what decides the word, so it decides it here too
+         rather than this reaching into the store with its own opinion. */
+      await refreshPreset()
+      if (run !== watchRun) return
+    }
+    watchTimer = setTimeout(tick, watchEvery(true))
+  }
+  watchTimer = setTimeout(tick, watchEvery(true))
+  return stopWatching
+}
+
+export function stopWatching() {
+  watchRun += 1
+  if (!watchTimer) return
+  clearTimeout(watchTimer)
+  watchTimer = null
 }
 
 /* ---------------------------------------------------------------- */

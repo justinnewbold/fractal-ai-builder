@@ -34,7 +34,7 @@ import {
   subscribeHostSeen,
   subscribeRemoteState
 } from './relay'
-import { listen, refreshAll, reset as resetRig } from './rig'
+import { listen, refreshAll, reset as resetRig, watchUnit, stopWatching } from './rig'
 
 export const PROBE_FIRST = 3000
 export const PROBE_CAP = 30000
@@ -198,6 +198,17 @@ async function join() {
   } catch {
     // The rig store keeps what it learned, including the failure.
   }
+
+  /*
+   * And from here on, keep asking.
+   *
+   * refreshAll is the only thing that ever established whether the unit is
+   * there, and it runs once, here. "I purposefully unplugged the FM3 from
+   * the computer and it still said connected" — it had, because after this
+   * line nothing on a stage screen asks the unit anything: everything those
+   * screens draw is already in the store. See rig.watchUnit.
+   */
+  watchUnit()
 }
 
 async function countHosts() {
@@ -319,6 +330,15 @@ export function startLink() {
       // Back from a locked screen or another app: ask now rather than waiting
       // out whatever backoff the loop had reached while nobody was looking.
       if (status === 'active') probeNow()
+      /*
+       * A phone in a pocket has no screen to be wrong on, so the unit check
+       * stops with it — and starts again on the way back, where its first
+       * answer lands before anybody has read anything. Android cuts the
+       * connection on sleep anyway, so the checks that would run in there
+       * would only be a column of failures in the log.
+       */
+      if (status === 'active') watchUnit()
+      else stopWatching()
     })
   ]
 
