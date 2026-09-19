@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { Platform, Pressable, Text, View } from 'react-native'
 
-import { color, font, mono, space } from '../lib/theme'
+import { color, font, mono, radius, space } from '../lib/theme'
+import { tick } from '../lib/feedback'
 import { linkTone, linkWord, toneOfRemote, unitWord } from '../lib/link-word'
 import { APP_VERSION } from '../lib/version'
 import { useRig } from '../lib/rig'
 import { useDemo } from '../lib/demo'
+import { usePurchase } from '../lib/purchases'
 import { idOf } from '../lib/device'
 import Lamp from './Lamp'
 import Volume from './Volume'
@@ -35,12 +37,13 @@ const face = Platform.select(mono)
  * The words come from shared/link-word.mjs rather than from here, so the two
  * apps cannot drift into saying different things about the same link.
  */
-export default function TopBar({ link, onOpenSettings, onOpenUnit }) {
+export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
   const unit = useRig(ofDeviceName)
   const unitState = useRig(ofUnitState)
   const blocks = useRig(ofAllBlocks)
   const [volume, setVolume] = useState(false)
   const [failed, setFailed] = useState(null)
+  const purchase = usePurchase()
 
   /*
    * The demo says DEMO, not CONNECTED.
@@ -188,6 +191,59 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit }) {
       >
         {word.toUpperCase()}
       </Text>
+
+      {/*
+       * THE WAY OUT OF THE DEMO AND INTO THE PAID APP, and until now there
+       * was not one.
+       *
+       * The paywall was shown at one moment only: somebody with a pairing
+       * code who had not paid. Which meant the demo — the entire shop window,
+       * the thing a person spends an hour in before deciding — had no way to
+       * buy anything at all. "Where is the unlock button to unlock to the
+       * full version? I don't see it anywhere in the app."
+       *
+       * It was not buried. It was not there.
+       *
+       * So it sits next to the word DEMO, which is the one part of this bar
+       * that is already saying "this is not your real rig". Amber, because
+       * every other amber thing in this app is the signal path and this is
+       * the one exception worth making: it has to be findable by somebody who
+       * is not looking for it.
+       *
+       * Only in the demo, only when there is something to buy, and never once
+       * it is bought — a button that charges a person twice, or that cannot
+       * take money at all, is worse than no button.
+       */}
+      {demo && purchase.available && !purchase.unlocked && onUnlock ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Unlock the full version"
+          onPress={() => {
+            tick()
+            onUnlock()
+          }}
+          hitSlop={8}
+          style={({ pressed }) => ({
+            paddingHorizontal: space.sm,
+            paddingVertical: 3,
+            borderRadius: radius.pill,
+            borderWidth: 1,
+            borderColor: color.signal,
+            backgroundColor: pressed ? color.signalWash : 'transparent'
+          })}
+        >
+          <Text
+            style={{
+              color: color.signal,
+              fontSize: font.micro,
+              fontWeight: '700',
+              letterSpacing: 0.6
+            }}
+          >
+            Unlock
+          </Text>
+        </Pressable>
+      ) : null}
 
       {hasOutput ? (
         <Pressable

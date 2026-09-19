@@ -9,6 +9,7 @@ import { setDemo, useDemo, useDemoUnit, setDemoUnit } from '../lib/demo'
 import { UNITS as DEMO_UNITS } from '../lib/demoUnits'
 import { getDebugLog } from '../lib/debugLog'
 import { tick } from '../lib/feedback'
+import { usePurchase } from '../lib/purchases'
 import { applyNow, checkNow, describeRunning, useUpdates } from '../lib/updates'
 import {
   changePassword,
@@ -51,6 +52,7 @@ const ofUnitState = (s) => s.unit
    under "Unit" in its own Setup: renaming is bench work, not something a thumb
    crosses between songs, which is exactly why neither app puts it on Play. */
 export default function Settings({
+  onUnlock,
   onOpenConnect,
   link,
   macName,
@@ -127,6 +129,7 @@ export default function Settings({
   const behind = !!hostVersion && isOlder(hostVersion, APP_VERSION) === true
 
   const [page, setPage] = useState(null)
+  const purchase = usePurchase()
   const updates = useUpdates()
   /* Which bundle is running, asked once when Setup opens. It settles "did an
      update ever land" without anybody comparing numbers off two screens. */
@@ -255,6 +258,33 @@ export default function Settings({
                 onPress={() => setPage('trouble')}
               />
             ) : null}
+            {/*
+              * THE FULL VERSION, AND THE WAY BACK TO ONE ALREADY PAID FOR.
+              *
+              * The top bar carries an Unlock button while the demo is on,
+              * which is where somebody deciding will find it. This row is for
+              * the two people that button cannot serve: somebody who wants to
+              * read about it before tapping anything, and somebody who has
+              * ALREADY PAID and is on a new handset.
+              *
+              * That second one is not a nicety. Apple requires a purchase to
+              * be restorable and rejects apps that hide it, and until this row
+              * existed the only Restore button in the app was on a paywall
+              * you could reach by exactly one route: signing in with a pairing
+              * code you had not paid for. A person who paid, changed phones
+              * and opened the demo had no way back to what they owned.
+              */}
+            <SetupRow
+              title={purchase.unlocked ? 'Full version' : 'Unlock the full version'}
+              status={
+                purchase.unlocked
+                  ? 'Unlocked — thank you'
+                  : purchase.available
+                    ? `Drive a real rig${purchase.price ? ` · ${purchase.price}` : ''}`
+                    : 'Restore a purchase'
+              }
+              onPress={onUnlock}
+            />
             <SetupRow title="About" status={`v${APP_VERSION}`} onPress={() => setPage('about')} />
             {/*
               * WHAT IS RUNNING, AND HOW TO GET THE NEWEST.

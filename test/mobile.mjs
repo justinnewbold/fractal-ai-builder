@@ -5794,6 +5794,55 @@ export function run(test) {
     }
   })
 
+  /**
+   * THERE IS A WAY TO BUY IT FROM INSIDE THE DEMO, which there was not.
+   *
+   * The paywall was raised at exactly one moment — somebody with a pairing
+   * code who had not paid — so the demo, which is the entire shop window and
+   * where a person spends an hour before deciding, had no way to buy anything
+   * at all. "Where is the unlock button to unlock to the full version? I don't
+   * see it anywhere in the app." It was not buried; it was not there.
+   *
+   * And the half of it that is not about money: RESTORE was on that same
+   * unreachable paywall. Somebody who had paid, changed handset and opened
+   * the demo had no way back to what they owned — which Apple rejects apps
+   * for, and rightly.
+   */
+  test('the demo can reach the purchase, and a purchase already made', () => {
+    const bar = read('mobile/src/components/TopBar.js')
+    assert.match(bar, /usePurchase/, 'the bar cannot know whether there is anything to sell')
+    assert.match(
+      bar,
+      /demo && purchase\.available && !purchase\.unlocked && onUnlock/,
+      'the Unlock button is gone from the bar, or shows when there is nothing to buy'
+    )
+    assert.match(bar, /Unlock the full version/, 'the Unlock button has no accessible name')
+
+    /* Settings carries it too — for reading before tapping, and for restoring
+       on a handset that has never paid but whose owner has. */
+    const set = read('mobile/src/screens/Settings.js')
+    assert.match(set, /onUnlock,/, 'Settings cannot open the paywall')
+    assert.match(set, /Unlock the full version/, 'there is no purchase row in Settings')
+    assert.match(set, /Restore a purchase/, 'Settings offers no way back to a purchase already made')
+
+    /* And both are wired to a paywall that opens OVER the app rather than
+       replacing it: nothing is being withheld, they came looking. */
+    const app = read('mobile/App.js')
+    assert.equal(
+      (app.match(/onUnlock=\{\(\) => setBuying\(true\)\}/g) || []).length,
+      2,
+      'the bar and Settings do not both open the paywall'
+    )
+    assert.match(app, /\{buying \? \(\s*<Paywall\s+asked/, 'the asked-for paywall is not rendered')
+
+    /* Asked for, it does not offer the demo they are already in, and it does
+       not show a buy button that cannot take money. */
+    const pay = read('mobile/src/screens/Paywall.js')
+    assert.match(pay, /asked \? null : \(/, 'the asked-for paywall still offers the demo it was opened from')
+    assert.match(pay, /disabled=\{busy \|\| !available\}/, 'the Unlock button works when purchasing does not')
+    assert.match(pay, /asked \? \(\s*<Sheet/, 'the asked-for paywall replaces the screen instead of sitting over it')
+  })
+
   test('a phone that cannot buy anything is never locked out', () => {
     const src = read('mobile/src/lib/purchases.js')
     assert.match(src, /canMakePayments/, 'nothing asks whether this install can pay at all')
