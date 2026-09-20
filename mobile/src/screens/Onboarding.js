@@ -1,0 +1,440 @@
+import { useState } from 'react'
+import { Linking, ScrollView, Text, TextInput, View } from 'react-native'
+
+import { CHAIN, P1, P2, P3, P4, P6, P7, P8, P9 } from '../lib/onboarding'
+import { color, font, mono, radius, space, TAP } from '../lib/theme'
+import { Platform } from 'react-native'
+import { UNITS } from '../lib/demoUnits'
+import { setDemo, setDemoUnit } from '../lib/demo'
+import { formatPairCode, isPairCode, pairCredentials } from '../lib/pairing'
+import { signIn } from '../lib/relay'
+import { buyUnlock, restorePurchase, usePurchase } from '../lib/purchases'
+import { sendDownloadLink, DOWNLOADS_URL } from '../lib/downloadLink'
+import ScanCode from '../components/ScanCode'
+import Note from '../components/Note'
+import Press from '../components/Press'
+
+/**
+ * The first minute, on the phone.
+ *
+ * Nine screens in the PDF, and the shape of them is a decision rather than a
+ * sequence: this phone cannot reach a Fractal unit on its own, ever. It talks
+ * to a computer, and the computer holds the cable. Everything here is either
+ * explaining that or getting one of the two ends in place.
+ *
+ * WHICH IS WHY THE DEMO COMES FIRST AND COSTS NOTHING. Somebody who has just
+ * installed this may have no computer running, no code, and no idea a
+ * computer was part of the arrangement. Sending them to a pairing screen
+ * would be sending them to a dead end. The demo is a whole app against a
+ * simulated unit, so the answer to "can I look around" is yes, immediately.
+ *
+ * AND THE PURCHASE IS OFFERED LAST, AFTER THE COMPUTER IS PROVEN. P8 says
+ * "Connection verified" because by the time it is drawn, it has been — the
+ * pairing on P7 succeeded. Asking for money before knowing the thing they are
+ * buying can work at all is how refunds happen.
+ *
+ * Not one word is typed here: every string is from lib/onboarding, generated
+ * from shared/onboarding.mjs. "Do not change any wording without asking me
+ * first."
+ */
+const face = Platform.select(mono)
+
+export default function Onboarding({ onDone, onEnterDemo }) {
+  const [at, setAt] = useState('welcome')
+  const [unit, setUnit] = useState(UNITS[0].key)
+  const [code, setCode] = useState('')
+  const [email, setEmail] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [scanning, setScanning] = useState(false)
+  const [said, setSaid] = useState(null)
+  const [error, setError] = useState(null)
+  const purchase = usePurchase()
+
+  const unitName = UNITS.find((u) => u.key === unit)?.name || UNITS[0].name
+
+  /* The demo, started for real: the mock is built and the app opens on it. */
+  const intoDemo = () => {
+    setDemoUnit(unit)
+    setDemo(true)
+    onEnterDemo()
+  }
+
+  /*
+   * The code becomes a session, through the same call the sign-in screen
+   * makes. One way a phone gets paired, not two that can drift.
+   */
+  const connect = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await signIn(pairCredentials(code))
+      /* Straight to the unlock, which can now say the connection is verified
+         because it has just been. */
+      setAt('unlock')
+    } catch (err) {
+      setError(
+        /didn’t match|invalid login/i.test(err.message || '')
+          ? 'No computer is paired with that code. Check it against the code your computer shows.'
+          : err.message
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const buy = async () => {
+    setBusy(true)
+    setError(null)
+    const out = await buyUnlock()
+    setBusy(false)
+    if (out.ok) return setAt('connected')
+    if (!out.cancelled) setError(out.message)
+  }
+
+  const restore = async () => {
+    setBusy(true)
+    setError(null)
+    const out = await restorePurchase()
+    setBusy(false)
+    if (out.ok) return setAt('connected')
+    setSaid(out.message)
+  }
+
+  const mail = async () => {
+    setBusy(true)
+    setError(null)
+    setSaid(null)
+    const out = await sendDownloadLink(email)
+    setBusy(false)
+    if (out.ok) setSaid(`Sent to ${email.trim()}.`)
+    else setError(out.message)
+  }
+
+  return (
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxl }}
+      keyboardShouldPersistTaps="handled"
+    >
+      {at === 'welcome' ? (
+        <>
+          <Head>{P1.head}</Head>
+          <Sub>{P1.sub}</Sub>
+          <Press label={P1.go} tone="signal" on height={TAP} onPress={() => setAt('how')} />
+          <Press label={P1.haveCode} height={TAP} onPress={() => setAt('scan')} />
+        </>
+      ) : null}
+
+      {at === 'how' ? (
+        <>
+          <Count>{P2.count}</Count>
+          <Eyebrow>{P2.eyebrow}</Eyebrow>
+          <Head>{P2.head}</Head>
+          {CHAIN.map((box) => (
+            <View key={box.key} style={{ gap: space.xs }}>
+              <Card>
+                <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.2 }}>
+                  {box.n}
+                </Text>
+                <Text style={{ color: color.silk, fontSize: font.body, fontWeight: '700' }}>
+                  {box.phoneTitle}
+                </Text>
+                <Text style={{ color: color.silkDim, fontSize: font.small }}>{box.phoneBody}</Text>
+              </Card>
+              {box.phoneWire ? (
+                <Text
+                  style={{
+                    color: color.silkFaint,
+                    fontSize: font.micro,
+                    letterSpacing: 1.2,
+                    textAlign: 'center'
+                  }}
+                >
+                  {box.phoneWire}
+                </Text>
+              ) : null}
+            </View>
+          ))}
+          <Note>{P2.foot}</Note>
+          <Press label={P2.go} tone="signal" on height={TAP} onPress={() => setAt('mode')} />
+        </>
+      ) : null}
+
+      {at === 'mode' ? (
+        <>
+          <Count>{P3.count}</Count>
+          <Head>{P3.head}</Head>
+
+          <Card>
+            <Text style={{ color: color.signal, fontSize: font.micro, letterSpacing: 1.2 }}>
+              {P3.demo.tag}
+            </Text>
+            <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.2 }}>
+              {P3.demo.eyebrow}
+            </Text>
+            <Text style={{ color: color.silk, fontSize: font.lead, fontWeight: '700' }}>
+              {P3.demo.title}
+            </Text>
+            <Text style={{ color: color.silkDim, fontSize: font.small }}>{P3.demo.body}</Text>
+            <Press
+              label={P3.demo.go}
+              tone="signal"
+              on
+              height={TAP}
+              onPress={() => setAt('pick')}
+            />
+          </Card>
+
+          <Card>
+            <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.2 }}>
+              {P3.real.eyebrow}
+            </Text>
+            <Text style={{ color: color.silk, fontSize: font.lead, fontWeight: '700' }}>
+              {P3.real.title}
+            </Text>
+            <Text style={{ color: color.silkDim, fontSize: font.small }}>{P3.real.body}</Text>
+            {/* The store's price where it knows one, his wording where it
+                does not — see FALLBACK_PRICE in shared/onboarding.mjs. */}
+            <Press label={P3.real.go(purchase.price)} height={TAP} onPress={() => setAt('app')} />
+          </Card>
+
+          <Press label={P3.restore} disabled={busy} height={TAP} onPress={restore} />
+          {said ? <Note>{said}</Note> : null}
+          <Note>{P3.foot}</Note>
+        </>
+      ) : null}
+
+      {at === 'pick' ? (
+        <>
+          <Eyebrow>{P4.tag}</Eyebrow>
+          <Eyebrow>{P4.eyebrow}</Eyebrow>
+          <Head>{P4.head}</Head>
+          <Sub>{P4.sub}</Sub>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+            {UNITS.map((u) => (
+              <Press
+                key={u.key}
+                label={u.name}
+                tone="signal"
+                on={u.key === unit}
+                height={44}
+                style={{ paddingHorizontal: space.md }}
+                onPress={() => setUnit(u.key)}
+              />
+            ))}
+          </View>
+          {/* Named by whichever is lit, so the button says what pressing it
+              gets you rather than "continue". */}
+          <Press label={P4.go(unitName)} tone="signal" on height={TAP} onPress={intoDemo} />
+        </>
+      ) : null}
+
+      {at === 'app' ? (
+        <>
+          <Eyebrow>{P6.tag}</Eyebrow>
+          <Eyebrow>{P6.eyebrow}</Eyebrow>
+          <Head>{P6.head}</Head>
+          {/*
+            Both, from the one button the copy gives us. "Yes - show me the
+            scanner" promises a scanner, so it opens one rather than landing
+            on a screen with a camera you have to ask for again. Arriving here
+            from "I already have a pairing code" does NOT open it: that route
+            says they have the code, and a camera nobody asked for is a
+            permission prompt nobody asked for.
+          */}
+          <Press
+            label={P6.yes}
+            tone="signal"
+            on
+            height={TAP}
+            onPress={() => {
+              setAt('scan')
+              setScanning(true)
+            }}
+          />
+
+          <Eyebrow>{P6.notYet}</Eyebrow>
+          {/*
+            The address, on screen, for anybody happy to type it. The button
+            under it is for everybody else — this phone is not the computer
+            that needs the download, which is the whole difficulty.
+          */}
+          <Press
+            label={DOWNLOADS_URL}
+            height={TAP}
+            onPress={() => Linking.openURL(`https://${DOWNLOADS_URL}`)}
+          />
+          <Field
+            value={email}
+            onChangeText={setEmail}
+            placeholder="you@example.com"
+            keyboardType="email-address"
+          />
+          <Press
+            label={P6.platforms[0].go}
+            disabled={busy || !email.includes('@')}
+            height={TAP}
+            onPress={mail}
+          />
+          <Note>{P6.foot}</Note>
+          {said ? <Note>{said}</Note> : null}
+          {error ? <Note tone="fault">{error}</Note> : null}
+          <Press label={P6.back} height={TAP} onPress={() => setAt('mode')} />
+        </>
+      ) : null}
+
+      {at === 'scan' ? (
+        <>
+          <Eyebrow>{P7.tag}</Eyebrow>
+          <Eyebrow>{P7.eyebrow}</Eyebrow>
+          <Head>{P7.head}</Head>
+          {/*
+            The same scanner the sign-in screen uses, opened the same way. It
+            is a modal over the screen rather than a camera embedded in it —
+            passing it no `open` would have left a camera that never appears
+            and a button that does nothing.
+          */}
+          <ScanCode
+            open={scanning}
+            onClose={() => setScanning(false)}
+            onCode={(found) => {
+              setCode(formatPairCode(found))
+              setScanning(false)
+            }}
+          />
+          <Eyebrow>{P7.codeLabel}</Eyebrow>
+          <Field
+            value={code}
+            onChangeText={(t) => setCode(formatPairCode(t))}
+            placeholder="XXXX-XXXX"
+            autoCapitalize="characters"
+            mono
+          />
+          <Note>{P7.foot}</Note>
+          {error ? <Note tone="fault">{error}</Note> : null}
+          <Press
+            label={P7.go}
+            tone="signal"
+            on
+            disabled={busy || !isPairCode(code)}
+            height={TAP}
+            onPress={connect}
+          />
+          <Press label={P7.noCode} height={TAP} onPress={() => setAt('app')} />
+        </>
+      ) : null}
+
+      {at === 'unlock' ? (
+        <>
+          <Eyebrow>{P8.tag}</Eyebrow>
+          {/* It has been verified, because the pairing above just succeeded. */}
+          <Text style={{ color: color.ok, fontSize: font.small, fontFamily: face }}>
+            {P8.verified(unitName)}
+          </Text>
+          <Eyebrow>{P8.eyebrow}</Eyebrow>
+          <Head>{P8.head(purchase.price)}</Head>
+          <Sub>{P8.sub}</Sub>
+          {P8.gets.map((g) => (
+            <Card key={g.key}>
+              <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.2 }}>
+                {g.label}
+              </Text>
+              <Text style={{ color: color.silk, fontSize: font.body }}>{g.body}</Text>
+            </Card>
+          ))}
+          {error ? <Note tone="fault">{error}</Note> : null}
+          {said ? <Note>{said}</Note> : null}
+          <Press
+            label={P8.go(purchase.price)}
+            tone="signal"
+            on
+            disabled={busy}
+            height={TAP}
+            onPress={buy}
+          />
+          <Press label={P8.restore} disabled={busy} height={TAP} onPress={restore} />
+          <Press label={P8.keep} height={TAP} onPress={() => setAt('pick')} />
+          <Note>{P8.foot}</Note>
+        </>
+      ) : null}
+
+      {at === 'connected' ? (
+        <>
+          <Eyebrow>{P9.tag(unitName)}</Eyebrow>
+          <Head>{P9.head}</Head>
+          <Sub>{P9.status({ unit: unitName, scenes: null })}</Sub>
+          {P9.tips.map((tip) => (
+            <Card key={tip.key}>
+              <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.2 }}>
+                {tip.label}
+              </Text>
+              <Text style={{ color: color.silkDim, fontSize: font.small }}>{tip.body}</Text>
+            </Card>
+          ))}
+          <Press label={P9.go} tone="signal" on height={TAP} onPress={onDone} />
+          <Note>{P9.foot}</Note>
+        </>
+      ) : null}
+    </ScrollView>
+  )
+}
+
+const Head = ({ children }) => (
+  <Text accessibilityRole="header" style={{ color: color.silk, fontSize: font.title, fontWeight: '700' }}>
+    {children}
+  </Text>
+)
+
+const Sub = ({ children }) => (
+  <Text style={{ color: color.silkDim, fontSize: font.body, lineHeight: font.body * 1.45 }}>
+    {children}
+  </Text>
+)
+
+const Eyebrow = ({ children }) => (
+  <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.5 }}>
+    {children}
+  </Text>
+)
+
+const Count = ({ children }) => (
+  <Text style={{ color: color.signal, fontSize: font.micro, letterSpacing: 1.5 }}>{children}</Text>
+)
+
+const Card = ({ children }) => (
+  <View
+    style={{
+      gap: space.sm,
+      padding: space.lg,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: color.rule,
+      backgroundColor: color.panel
+    }}
+  >
+    {children}
+  </View>
+)
+
+/** One box to type in, the app's own shape. */
+function Field({ mono: isMono, ...rest }) {
+  return (
+    <TextInput
+      {...rest}
+      placeholderTextColor={color.silkFaint}
+      autoCorrect={false}
+      style={{
+        color: color.silk,
+        fontSize: font.body,
+        fontFamily: isMono ? face : undefined,
+        letterSpacing: isMono ? 2 : undefined,
+        padding: space.md,
+        minHeight: TAP,
+        borderRadius: radius.md,
+        borderWidth: 1,
+        borderColor: color.rule,
+        backgroundColor: color.panel
+      }}
+    />
+  )
+}

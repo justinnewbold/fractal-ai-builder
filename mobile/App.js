@@ -12,6 +12,8 @@ import DemoUnit from './src/components/DemoUnit'
 import Settings from './src/screens/Settings'
 import EdgeBack from './src/components/EdgeBack'
 import SignIn from './src/screens/SignIn'
+import Onboarding from './src/screens/Onboarding'
+import { walkthroughSeen, markWalkthrough } from './src/lib/walkthrough'
 import Edit from './src/screens/Edit'
 import Connect from './src/screens/Connect'
 import Fixes from './src/screens/Fixes'
@@ -69,6 +71,12 @@ export default function App() {
 
   /** 'checking' | 'out' | 'in' */
   const [auth, setAuth] = useState('checking')
+  /* Whether the walkthrough has been through on this phone. Read once, so a
+     re-render cannot put somebody back at the start of it. */
+  const [seenWalk, setSeenWalk] = useState(true)
+  useEffect(() => {
+    walkthroughSeen().then(setSeenWalk)
+  }, [])
   const [screen, setScreen] = useState('stage')
   /* Which fix the guide opens on, and which screen Done goes back to. */
   const [fixOpen, setFixOpen] = useState(null)
@@ -336,6 +344,30 @@ export default function App() {
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator color={color.silkDim} />
           </View>
+        ) : auth === 'out' && !seenWalk ? (
+          /*
+           * THE WALKTHROUGH IS THE WAY IN, not a thing laid over it.
+           *
+           * Everything the sign-in screen offers is inside it — the demo, a
+           * pairing code, the scanner, the purchase — reached in the order
+           * somebody actually needs them rather than as four choices on one
+           * screen. Sign-in is still there behind "I already have a pairing
+           * code" for anybody who has done this before, and is what they get
+           * once this has been through.
+           */
+          <Onboarding
+            onDone={() => {
+              markWalkthrough()
+              setSeenWalk(true)
+              checkOwner()
+              setAuth('in')
+            }}
+            onEnterDemo={() => {
+              markWalkthrough()
+              setSeenWalk(true)
+              setAuth('in')
+            }}
+          />
         ) : auth === 'out' ? (
           <SignIn
             onSignedIn={() => {
@@ -462,6 +494,13 @@ export default function App() {
                 /* Works with the Mac off: it is a reference sheet, not a
                    question for the unit. */
                 onOpenGear={() => setScreen('gear')}
+                /* Back to the start of the walkthrough. It replaces the
+                   whole app while it is up, the same as on a first run. */
+                onReplay={() => {
+                  setScreen('stage')
+                  setSeenWalk(false)
+                  setAuth('out')
+                }}
                 /* The screen somebody needs most when nothing is connected,
                    which is exactly when the rest of Setup can do nothing. */
                 onOpenConnect={() => setScreen('connect')}

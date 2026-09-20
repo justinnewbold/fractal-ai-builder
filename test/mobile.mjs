@@ -6405,6 +6405,83 @@ export function run(test) {
     assert.match(tile, /position: 'absolute'/, 'the sheen is in the layout, so it changes the tile height')
   })
 
+  /**
+   * THE PHONE'S WALKTHROUGH IS THE WAY IN, AND IT USES THE REAL THING AT
+   * EVERY STEP.
+   *
+   * Nine screens, and the order of them is a decision: this phone can never
+   * reach a Fractal unit on its own. It talks to a computer, and the computer
+   * holds the cable. So the demo comes first and costs nothing — somebody who
+   * has just installed this may have no computer running, no code, and no
+   * idea a computer was part of the arrangement — and the purchase comes last,
+   * after the computer has been proved to work.
+   */
+  test('the phone walkthrough pairs, buys and starts the demo for real', () => {
+    const onb = read('mobile/src/screens/Onboarding.js')
+
+    /* Not one word typed in: it all comes from the generated copy. */
+    assert.match(onb, /from '\.\.\/lib\/onboarding'/, 'the copy is not coming from the one file that holds it')
+    const bare = onb.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ')
+    for (const typed of ['Try the demo', 'Start free demo', 'Connection verified', '$9.99']) {
+      assert.ok(!bare.includes(typed), `"${typed}" is typed into the screen rather than read from the copy`)
+    }
+
+    /* The demo is really started — the mock is built and the unit is the one
+       they picked, not whatever the default was. */
+    assert.match(onb, /setDemoUnit\(unit\)\s*\n\s*setDemo\(true\)/, 'the demo is not actually started')
+    assert.match(onb, /P4\.go\(unitName\)/, 'the button does not say which unit it starts')
+
+    /* The code becomes a session through the same call the sign-in screen
+       makes. One way a phone gets paired, not two that drift. */
+    assert.match(onb, /await signIn\(pairCredentials\(code\)\)/, 'pairing is reimplemented rather than reused')
+    /* And the scanner is the same one, opened rather than embedded: it is a
+       modal, so without `open` it is a camera that never appears. */
+    assert.match(onb, /<ScanCode\s*\n?\s*open=\{scanning\}/, 'the scanner is never opened, so the button does nothing')
+
+    /* The purchase is the real one. */
+    assert.match(onb, /await buyUnlock\(\)/, 'the unlock screen does not buy anything')
+    assert.match(onb, /await restorePurchase\(\)/, 'there is no way to restore a purchase already made')
+    /* The store's price where it knows one. */
+    assert.match(onb, /P8\.go\(purchase\.price\)/, 'the price is not the store own')
+    assert.match(onb, /P3\.real\.go\(purchase\.price\)/, 'the price is not the store own')
+
+    /*
+     * VERIFIED MEANS VERIFIED. P8 says "Connection verified" and it is only
+     * reached from a pairing that succeeded — asking for money before knowing
+     * the thing being bought can work at all is how refunds happen.
+     */
+    const connect = onb.slice(onb.indexOf('const connect = async'), onb.indexOf('const buy = async'))
+    assert.match(connect, /setAt\('unlock'\)/, 'the unlock is reached without pairing first')
+    assert.ok(!/setAt\('unlock'\)/.test(onb.slice(0, onb.indexOf('const connect = async'))), 'the unlock is reachable before the connection is proved')
+
+    /* Seen once, and reachable again from Settings under the name its own
+       last screen promises. */
+    const app = read('mobile/App.js')
+    assert.match(app, /walkthroughSeen\(\)\.then\(setSeenWalk\)/, 'nothing decides whether the walkthrough has been through')
+    assert.match(app, /auth === 'out' && !seenWalk/, 'the walkthrough is not the way in')
+    assert.match(app, /onReplay=\{/, 'there is no way back into the walkthrough')
+    const set = read('mobile/src/screens/Settings.js')
+    assert.match(set, /title=\{REPLAY\}/, 'Settings does not offer the walkthrough again')
+
+    /*
+     * AND THE EMAIL NEVER THROWS. It is one optional convenience inside a
+     * first-run flow; a rejected promise halfway through somebody's first
+     * minute is a worse outcome than the mail not arriving.
+     */
+    const mail = read('mobile/src/lib/downloadLink.js')
+    assert.ok(!/throw /.test(mail.replace(/\/\*[\s\S]*?\*\//g, ' ')), 'the download-link helper throws')
+    assert.match(mail, /ok: false/, 'failures are not reported as an answer')
+    /* The address is on screen either way, so the button failing is never a
+       dead end. */
+    assert.match(onb, /DOWNLOADS_URL/, 'the download address is not shown, so a failed email is a dead end')
+    /* The controller is made before the timeout that aborts it — written the
+       other way round once, which is a ReferenceError on every call. */
+    assert.ok(
+      mail.indexOf('const controller = new AbortController()') < mail.indexOf('setTimeout(() => controller.abort()'),
+      'the abort timeout closes over a const that does not exist yet'
+    )
+  })
+
   test('the demo stays in front of the paywall', () => {
     const app = read('mobile/App.js')
     /* Not `[^>]*` — the arrow in `() =>` is a `>` and would end the class. */

@@ -23,6 +23,7 @@ import {
 import { notePresetName, noteSceneName, useRig } from '../lib/rig'
 import { dropReadCache, sceneShape, setPresetName, setSceneName } from '../lib/device'
 import { SIZES, clampSize, loadFit, loadSize, saveFit, saveSize } from '../lib/gigSize'
+import { REPLAY } from '../lib/onboarding'
 import { sync, useStored } from '../lib/store'
 import { isPairAccount } from '../lib/pairing'
 import Lamp from '../components/Lamp'
@@ -60,6 +61,7 @@ export default function Settings({
   onReconnect,
   onSignOut,
   onOpenGear,
+  onReplay,
   onOpenLog,
   onOpenFixes,
   onOpenReport
@@ -307,6 +309,12 @@ export default function Settings({
             {/* Openable again, because a tour worth showing once is worth
                 finding later — and somebody who skipped it on the first
                 launch has no other way back to it. */}
+            {/* The way back into the walkthrough, named the way its own last
+                screen promises: "Replay this anytime in Settings → Show the
+                walkthrough." */}
+            {onReplay ? (
+              <SetupRow title={REPLAY} status="The setup, from the start" onPress={onReplay} />
+            ) : null}
             <SetupRow title="About" status={`v${APP_VERSION}`} onPress={() => setPage('about')} />
             {/*
               * WHAT IS RUNNING, AND HOW TO GET THE NEWEST.
