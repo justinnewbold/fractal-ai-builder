@@ -6300,6 +6300,61 @@ export function run(test) {
     assert.ok(!/isDemo|demo/i.test(slugs), 'the slug now knows about the demo — then the flag above is redundant and one of them is wrong')
   })
 
+  /**
+   * A SONG IS SWIPED AWAY, AND THE ✕ ONLY APPEARS IF YOU HESITATE.
+   *
+   * "Make the setlist songs swipe to delete instead of the x. Make a full
+   * swipe delete it and a partial swipe show the x that can be tapped.
+   * Otherwise hide the X."
+   *
+   * Two gestures out of one movement: a short pull parks the row open and
+   * hands you a button to think about, a long pull means you were never in
+   * any doubt.
+   */
+  test('a setlist song is swiped away, and the cross is only there once it is', () => {
+    const swipe = read('mobile/src/components/SwipeAway.js')
+
+    /* Built on React Native itself, for the same reason the back swipe is:
+       a native gesture library moves the fingerprint and costs a build. */
+    assert.match(swipe, /PanResponder\.create/, 'the swipe no longer uses PanResponder')
+    const pkg = JSON.parse(read('mobile/package.json'))
+    assert.ok(
+      !pkg.dependencies['react-native-gesture-handler'],
+      'a native gesture library was added — that moves the fingerprint and costs a build'
+    )
+
+    /* Two thresholds, and the long one is the one that acts without asking. */
+    assert.match(swipe, /if \(total <= -FULL\)/, 'a full swipe does not remove the song')
+    assert.match(swipe, /if \(total <= -OPEN \/ 2\)/, 'a part swipe does not park the row open')
+    const full = Number(swipe.match(/const FULL = (\d+)/)?.[1])
+    const open = Number(swipe.match(/export const OPEN = (\d+)/)?.[1])
+    assert.ok(full > open * 1.5, `a full swipe is ${full}px and the open stop is ${open}px — too close to tell apart`)
+
+    /* Leftward only, and only when it is clearly sideways. */
+    assert.match(swipe, /Math\.abs\(g\.dx\) > Math\.abs\(g\.dy\) \* 2/, 'a vertical scroll can swipe a song away')
+    assert.match(swipe, /Math\.min\(0, rest\.current \+ g\.dx\)/, 'the row can be dragged to the right, where there is nothing')
+    assert.match(swipe, /onStartShouldSetPanResponder: \(\) => false/, 'the swipe claims plain taps')
+    /* Not capture: the drag grip beside it must keep its own gesture, or a
+       reorder turns into a row sliding open. */
+    assert.ok(
+      !/onMoveShouldSetPanResponderCapture/.test(swipe.replace(/\/\*[\s\S]*?\*\//g, ' ')),
+      'the swipe captures from its children, so the reorder grip loses its drag'
+    )
+
+    /*
+     * AND THE ROW NO LONGER CARRIES A STANDING OFFER TO DELETE IT.
+     */
+    const list = read('mobile/src/screens/Setlists.js')
+    assert.match(list, /<SwipeAway onRemove=\{onRemove\} label=\{`Remove \$\{name\}`\}>/, 'a song cannot be swiped away')
+    assert.ok(!/<Nudge/.test(list), 'the ✕ is back on every row')
+    assert.ok(!/function Nudge/.test(list), 'the button the ✕ used to be is still here with nothing using it')
+
+    /* The button behind stays in the tree rather than being drawn only once
+       the row has moved: a screen reader cannot swipe, and this is the only
+       other way to remove a song. */
+    assert.match(swipe, /accessibilityLabel=\{label\}/, 'the remove button behind the row has no accessible name')
+  })
+
   test('the demo stays in front of the paywall', () => {
     const app = read('mobile/App.js')
     /* Not `[^>]*` — the arrow in `() =>` is a `>` and would end the class. */

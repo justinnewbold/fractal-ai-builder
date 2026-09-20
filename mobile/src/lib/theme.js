@@ -26,6 +26,10 @@ const DARK = {
   ok: '#63c68c',
 
   onSignal: '#14161a', // ink on an amber ground
+  /* Ink on the red of a destructive ground. White in BOTH themes, unlike
+     onSignal: amber is light and takes dark ink, and both of these reds
+     are dark enough to need the opposite. */
+  onFault: '#fff6f3',
   signalWash: 'rgba(240, 167, 60, 0.12)',
   liveHalo: 'rgba(95, 191, 209, 0.2)',
   faultHalo: 'rgba(224, 104, 79, 0.2)',
@@ -61,6 +65,7 @@ const LIGHT = {
   ok: '#2c7a4b',
 
   onSignal: '#fffaf2',
+  onFault: '#fff6f3',
   signalWash: 'rgba(168, 101, 10, 0.12)',
   liveHalo: 'rgba(29, 107, 122, 0.18)',
   faultHalo: 'rgba(178, 60, 38, 0.18)',
