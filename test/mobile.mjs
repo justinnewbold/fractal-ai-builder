@@ -48,6 +48,20 @@ const PHONE_GLOBALS = new Set([
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
 
+/**
+ * A file's CODE, without the prose around it.
+ *
+ * Every rule worth writing down here is a rule some comment in the app
+ * explains — and explaining a rule means NAMING the thing it forbids. A
+ * file-wide grep for the forbidden thing then matches the sentence that
+ * forbids it, and the file fails for documenting itself.
+ *
+ * The tour is the case in hand: its own header says why a phone must never
+ * be told to press Save, and a check for "press Save" matched that sentence.
+ */
+const withoutComments = (t) =>
+  t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+
 /** Every .js under a directory, so a new screen cannot quietly opt out. */
 /*
  * Forward slashes, on every platform.
@@ -5726,6 +5740,60 @@ export function run(test) {
    * demo, and if the demo were gated the app would be rejected as broken — which
    * has a way of costing a week rather than an evening.
    */
+  /**
+   * THE PHONE HAS A TUTORIAL, which is the end that needed one most.
+   *
+   * "First issue is demo has no tutorial. Very important."
+   *
+   * The browser has had one since long before this app existed. The phone
+   * never did — which left the demo, the one place somebody arrives knowing
+   * nothing at all, as the end with no explanation.
+   *
+   * AND IT IS NOT THE BROWSER'S TOUR WITH THE WORDS CHANGED. The browser can
+   * save a preset into a slot and a phone cannot: the host refuses it from a
+   * distance, by REMOTE_FORBIDDEN in shared/relay-rules. A card saying "press
+   * Save" would send somebody hunting for a button that is deliberately
+   * absent, which is worse than saying nothing at all.
+   */
+  test('the phone tells a first-time player the four things', () => {
+    const tour = read('mobile/src/components/Tour.js')
+
+    /* The gesture with no visible control is the one that must be in here. */
+    assert.match(tour, /Hold a block to change its channel/, 'the long-press gesture is not taught')
+    assert.match(tour, /Scenes are one rig, several sounds/, 'scenes are not explained')
+
+    /* And the thing that is otherwise discovered as a disappointment. */
+    assert.match(tour, /This is a remote, not a workbench/, 'nothing says a phone cannot save')
+    /* `<?strong>?` made only the ANGLE BRACKETS optional, not the word — so
+       this asked for the literal "strongSave" and matched nothing ever. It is
+       the web tour's markup leaking into a file that has none. */
+    /* Code, not prose — see withoutComments. This file's own header explains
+       why a phone must not be told to press Save, and that sentence matched. */
+    assert.ok(
+      !/press\s+save/i.test(withoutComments(tour)),
+      'the tour tells a phone to press Save, which the host refuses from a distance'
+    )
+
+    /* Never twice. A tutorial that comes back after being dismissed is worse
+       than one nobody saw. */
+    assert.match(tour, /fractal\.tour\.v1/, 'seeing it is not remembered')
+    assert.match(tour, /markSeen\(\)/, 'closing it does not mark it seen')
+
+    /* Storage can refuse, and the kinder failure is to assume it was seen. */
+    assert.match(tour, /return true/, 'a phone that refuses storage gets the tour every launch')
+
+    /* It covers the screen rather than sitting in the stage layout. */
+    assert.match(tour, /<Modal visible animationType="slide"/, 'the tour is not a sheet and would push the rig down the page')
+
+    const app = read('mobile/App.js')
+    assert.match(app, /tourSeen\(\)\.then/, 'nothing decides whether to show it')
+    assert.match(app, /if \(auth !== 'in'\) return undefined/, 'the tour can arrive before the app does')
+
+    /* And it can be found again by somebody who skipped it. */
+    const set = read('mobile/src/screens/Settings.js')
+    assert.match(set, /How this works/, 'there is no way back to the tour')
+  })
+
   test('the demo stays in front of the paywall', () => {
     const app = read('mobile/App.js')
     /* Not `[^>]*` — the arrow in `() =>` is a `>` and would end the class. */
