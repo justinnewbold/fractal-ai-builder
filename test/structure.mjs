@@ -4581,7 +4581,19 @@ export function run(test) {
        */
       if (unit.grid) assert.deepEqual(caps.grid, unit.grid, `${unit.key} lost its layout`)
       else assert.ok(!('grid' in caps), `${unit.key} claims a grid it has not got`)
-      assert.equal(caps.slotModel, unit.grid ? 'grid' : 'chain')
+      /*
+       * 'linear' is the word, and it is not a free choice: gridShape, both
+       * copies of isLinearChain and the play screen's meter all test for it.
+       * The mock said 'chain', which matches none of them, so every one of
+       * them answered "grid" and a VP4 drew as a 4x12 with ROW 2, COLUMN 1
+       * under it. A bare assert.equal is how that survived — it asserted the
+       * mock against itself and never said what the word is for.
+       */
+      assert.equal(
+        caps.slotModel,
+        unit.grid ? 'grid' : 'linear',
+        `${unit.key} reports a slotModel the app does not read`
+      )
 
       /* No cab block on a VP4, so no impulse responses to offer. */
       assert.equal(caps.cabIrs, unit.amps, `${unit.key} offers the wrong cab support`)

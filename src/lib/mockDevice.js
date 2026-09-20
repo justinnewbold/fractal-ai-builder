@@ -467,8 +467,28 @@ export function createMockDevice(unitKey = DEFAULT_UNIT) {
          * An AM4 and a VP4 are a chain of four blocks and report no grid, so
          * the app must not be told they have one — "grid ×" with nothing
          * either side of it is not a fact about a unit. See demoUnits.js.
+         *
+         * 'linear', NOT 'chain', and the difference was a whole broken screen.
+         *
+         * This mock invented the word. Four places in the app ask
+         * `slotModel === 'linear'` — grid-plan's gridShape, slots.js's
+         * isLinearChain at both ends, and the meter on the play screen — and
+         * all four were written on 17 September against what ForgeFX really
+         * reports. This line arrived on the 19th with the five demo units and
+         * said 'chain', which matches nothing, so every one of those checks
+         * quietly answered "no, it is a grid".
+         *
+         * What that looked like on a handset: a VP4 drawn as a 4x12 grid with
+         * ROW 2, COLUMN 1 over a unit that has neither rows nor columns.
+         *
+         *   "My Demo version is saying it failed to read blocks."
+         *
+         * Which is exactly the fault the note further down this file warns
+         * about: a mock that invents its own shapes makes the broken path the
+         * only one anybody tests. A real AM4 was always fine; only the demo
+         * was wrong, and the demo is what somebody judges this app by.
          */
-        slotModel: unit.grid ? 'grid' : 'chain',
+        slotModel: unit.grid ? 'grid' : 'linear',
         ...(unit.grid ? { grid: unit.grid } : {}),
         hasScenes: true,
         sceneCount: unit.scenes,

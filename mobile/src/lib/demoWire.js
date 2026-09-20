@@ -63,7 +63,24 @@ export async function demoRequest(mock, path, options = {}) {
     if (path === '/scene') return mock.getScene()
     if (path === '/tempo') return mock.tempo()
     if (path === '/mod/model') return mock.modModel()
-    if (path === '/blocks/catalog') return mock.blockCatalog()
+    /*
+     * `/blocks`, NOT `/blocks/catalog`, and that one word was the error on
+     * screen.
+     *
+     * ForgeFX serves the catalogue at GET /blocks — BUILD-PROMPT says so
+     * ("the `page` field from GET /blocks"), the browser asks for it there,
+     * and the phone's device.blockCatalog asks for it there. This line
+     * answered a path nothing requests, so in the demo the request fell
+     * through, came back with nothing, and the Edit screen said:
+     *
+     *   "Couldn't read the list of blocks from your unit."
+     *
+     * The browser's demo never showed it because the browser holds the mock
+     * in-process and calls blockCatalog() directly; only the phone comes
+     * through this wire. Which is the whole hazard of a second copy of an
+     * API: it can be wrong in a way that is invisible from the other end.
+     */
+    if (path === '/blocks') return mock.blockCatalog()
     /* /presets/{n}/summary and /presets/{n} */
     if (part[0] === 'presets' && part.length === 3 && part[2] === 'summary') {
       return mock.presetSummary(num(1))
