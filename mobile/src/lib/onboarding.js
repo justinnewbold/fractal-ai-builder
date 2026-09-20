@@ -27,6 +27,22 @@
  * mobile/src/lib/onboarding.js is generated from this by `npm run sync:rules`.
  */
 
+/**
+ * The price when the store has not said one.
+ *
+ * "Change that one so it does know the correct price per app, and then default
+ * back if it doesn't know the price."
+ *
+ * The store is the only thing that knows what this costs to the person
+ * holding the phone: App Store and Play price by country, so a buyer in
+ * Sydney is quoted in Australian dollars and a buyer in Berlin in euros.
+ * Printing $9.99 at all of them would be quoting a price they cannot pay.
+ *
+ * His wording is what shows when the store has not answered yet — which is
+ * every launch for a moment, and every launch on a copy that cannot reach it.
+ */
+const FALLBACK_PRICE = '$9.99'
+
 /** The three boxes, in order, on both welcome screens. */
 export const CHAIN = [
   {
@@ -191,7 +207,7 @@ export const P3 = {
     eyebrow: 'CONTROL YOUR HARDWARE',
     title: 'Connect my real rig',
     body: 'We verify the computer connection before purchase.',
-    go: 'Set up  ·  $9.99 once'
+    go: (price) => `Set up  ·  ${price || FALLBACK_PRICE} once`
   },
   restore: 'Already bought it? Restore purchase',
   foot: 'The demo stays free forever.'
@@ -209,7 +225,10 @@ export const P4 = {
 
 /** P5 — the coach mark, shown on Play where the gesture lives. */
 export const P5 = {
-  count: '1 OF 2  ·  QUICK TIP',
+  /* "Remove one of two quicktip. No need to replace with anything." — so the
+     count goes and the label stays. There is one tip, and it does not
+     advertise a second that was never written. */
+  count: 'QUICK TIP',
   head: 'Hold a block to change its channel.',
   body: 'Tap toggles the block. Press and hold to choose channels A-D.',
   hold: 'Hold for channel',
@@ -251,14 +270,14 @@ export const P8 = {
   /** Connection verified · FM3 — and it has been, before this is drawn. */
   verified: (unit) => `Connection verified  ·  ${unit}`,
   eyebrow: 'CONTROL MY REAL RIG',
-  head: '$9.99 one-time',
+  head: (price) => `${price || FALLBACK_PRICE} one-time`,
   sub: 'One payment. Every device you own. Every future update. Every supported unit.',
   gets: [
     { key: 'presets', label: 'PRESETS', body: 'Scenes and blocks' },
     { key: 'perform', label: 'PERFORM', body: 'Tuner, tap tempo and setlists' },
     { key: 'hardware', label: 'HARDWARE', body: 'FM3, FM9, Axe-Fx III, AM4, VP4' }
   ],
-  go: 'Unlock real-rig control  ·  $9.99',
+  go: (price) => `Unlock real-rig control  ·  ${price || FALLBACK_PRICE}`,
   restore: 'Restore purchase',
   keep: 'Keep using the free demo',
   foot: 'Changes are live. Permanent preset saving stays on the computer.'

@@ -4681,8 +4681,26 @@ export function run(test) {
     assert.equal(c.D5.head, 'You\u2019re set.')
     assert.equal(c.P1.head, 'YOUR RIG, FROM ACROSS THE STAGE.')
     assert.equal(c.P3.demo.go, 'Start free demo')
-    assert.equal(c.P3.real.go, 'Set up  \u00b7  $9.99 once')
-    assert.equal(c.P8.go, 'Unlock real-rig control  \u00b7  $9.99')
+    /*
+     * THE PRICE IS THE STORE'S, AND HIS WORDS ARE THE FALLBACK.
+     *
+     * "Change that one so it does know the correct price per app, and then
+     * default back if it doesn't know the price."
+     *
+     * The store is the only thing that knows what this costs the person
+     * holding the phone — App Store and Play price by country — so printing
+     * $9.99 everywhere quotes a price most buyers cannot pay.
+     */
+    assert.equal(c.P3.real.go('$9.99'), 'Set up  \u00b7  $9.99 once')
+    assert.equal(c.P3.real.go('A$14.99'), 'Set up  \u00b7  A$14.99 once')
+    assert.equal(c.P3.real.go(null), 'Set up  \u00b7  $9.99 once', 'the fallback is no longer his wording')
+    assert.equal(c.P8.head(null), '$9.99 one-time')
+    assert.equal(c.P8.head('\u20ac10,99'), '\u20ac10,99 one-time')
+    assert.equal(c.P8.go(null), 'Unlock real-rig control  \u00b7  $9.99')
+    assert.equal(c.P8.go('\u00a37.99'), 'Unlock real-rig control  \u00b7  \u00a37.99')
+
+    /* One tip, and it does not advertise a second that was never written. */
+    assert.equal(c.P5.count, 'QUICK TIP')
     assert.equal(c.P9.head, 'You\u2019re connected.')
     assert.equal(c.REPLAY, 'Show the walkthrough')
 
