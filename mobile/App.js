@@ -487,6 +487,7 @@ export default function App() {
                 onOpenEdit={
                   BENCH && link.link === 'connected' ? () => setScreen('edit') : null
                 }
+                onUnlock={() => setBuying(true)}
               />
             )}
           </>

@@ -280,9 +280,13 @@ export default function Settings({
               status={
                 purchase.unlocked
                   ? 'Unlocked — thank you'
-                  : purchase.available
-                    ? `Drive a real rig${purchase.price ? ` · ${purchase.price}` : ''}`
-                    : 'Restore a purchase'
+                  : purchase.price
+                    ? `Drive a real rig · ${purchase.price}`
+                    : /* Never "Restore a purchase" as the only wording when the
+                         store is simply not ready — that reads as though buying
+                         is not on offer at all, which is how the whole thing
+                         came to be invisible. */
+                      'Drive a real rig, or restore a purchase'
               }
               onPress={onUnlock}
             />

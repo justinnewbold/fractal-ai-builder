@@ -33,6 +33,7 @@ import { nope, thud } from '../lib/feedback'
 import { blockColor } from '../lib/blockColors'
 import { sceneColor } from '../lib/sceneColors'
 import { shortBlock } from '../lib/shortName'
+import UnlockOffer from '../components/UnlockOffer'
 import Note from '../components/Note'
 import { fixById, fixFor } from '../lib/troubleshooting'
 import Press from '../components/Press'
@@ -66,7 +67,7 @@ const ofSlug = (s) => s.deviceSlug
  * button within reach of a stage tap is a hazard, and saving to a slot is
  * refused by the Mac anyway.
  */
-export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpenFix }) {
+export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpenFix, onUnlock }) {
   // The screen is the instrument panel for as long as this is open. A phone
   // that locks itself between songs is a phone you have to wake and unlock
   // while the count-in is happening.
@@ -242,6 +243,10 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
         <RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={color.silkDim} />
       }
     >
+      {/* Above the faults, because a fault is about right now and this is
+          about the app itself — and below nothing, because this is the first
+          screen and the top of it is where an eye starts. */}
+      <UnlockOffer onUnlock={onUnlock} />
       {conflict ? <Note tone="fault">{conflict}</Note> : null}
       {error ? (
         <Note tone="fault" onDismiss={clearError}>
