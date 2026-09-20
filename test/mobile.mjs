@@ -5729,9 +5729,12 @@ export function run(test) {
   test('the demo stays in front of the paywall', () => {
     const app = read('mobile/App.js')
     /* Not `[^>]*` — the arrow in `() =>` is a `>` and would end the class. */
+    /* Not one line any more — signing in also re-checks whether the account
+       carries an unlock. What matters is unchanged: onDemo goes straight in
+       and asks nothing of anybody. */
     assert.match(
       app,
-      /<SignIn\s+onSignedIn=\{[^}]*\}\s+onDemo=\{\(\) => setAuth\('in'\)\}/,
+      /onDemo=\{\(\) => setAuth\('in'\)\}/,
       'the demo no longer goes straight in from the sign-in screen'
     )
     const paywall = read('mobile/src/screens/Paywall.js')
@@ -5858,13 +5861,73 @@ export function run(test) {
     assert.match(pay, /asked \? \(\s*<Sheet/, 'the asked-for paywall replaces the screen instead of sitting over it')
   })
 
+  /**
+   * AN OWNER IS UNLOCKED WITHOUT BUYING, and the list that says who is public.
+   *
+   * "Is there any way we can set it up so that my email unlocks the app
+   * automatically? I still wanna be able to test with live connections."
+   *
+   * Somebody has to drive a real rig before the thing is on sale. The list
+   * grants nothing by being read — it names ACCOUNTS, and the app consults it
+   * only for an account somebody is already signed in as, which means the
+   * password is the gate exactly as it is everywhere else.
+   */
+  test('an owner account is unlocked, and no address is in the repository', async () => {
+    const { isOwner, fold } = await import(
+      new URL('../shared/owner-unlock.mjs', import.meta.url).href
+    )
+
+    assert.equal(isOwner('justinnewbold@gmail.com'), true, 'the author is not unlocked')
+    assert.equal(isOwner('  JustinNewbold@GMAIL.com '), true, 'case and spacing break the match')
+    assert.equal(isOwner('someone@else.com'), false, 'a stranger is unlocked')
+    assert.equal(isOwner('pair-abcd@fractal.local'), false, 'a pairing-code account is unlocked')
+    for (const nothing of ['', null, undefined, 'notanemail']) {
+      assert.equal(isOwner(nothing), false, `"${nothing}" counted as an owner`)
+    }
+
+    /* The hashing buys no secrecy and is not meant to — it keeps an address
+       out of a public file, where it would be scraped within a week. So the
+       file must not contain one. */
+    const src = readFileSync(new URL('../shared/owner-unlock.mjs', import.meta.url), 'utf8')
+    const found = src.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) || []
+    assert.deepEqual(
+      found.filter((a) => a !== 'someone@example.com'),
+      [],
+      'an email address is written into shared/owner-unlock.mjs'
+    )
+    assert.equal(typeof fold, 'function', 'fold is gone, so owners cannot be added')
+
+    /* And the app reads the account from the SESSION, never from a box. */
+    const lib = read('mobile/src/lib/purchases.js')
+    assert.match(lib, /await currentAccount\(\)/, 'the owner check trusts something other than the session')
+    assert.match(lib, /await checkOwner\(\)/, 'the owner check never runs at startup')
+    const app = read('mobile/App.js')
+    assert.match(app, /checkOwner\(\)/, 'signing in does not re-check the account')
+  })
+
   test('a phone that cannot buy anything is never locked out', () => {
     const src = read('mobile/src/lib/purchases.js')
     assert.match(src, /canMakePayments/, 'nothing asks whether this install can pay at all')
+
+    /*
+     * TWO facts now, not one, and the second is what was missing.
+     *
+     * `canMakePayments` answers "could this handset pay for something" and
+     * says nothing about whether a product EXISTS. Before the item is created
+     * in the stores there is no offering, so the gate closed over a paywall
+     * with nothing to sell — "I'm blocked now by the gate for the unlock" —
+     * and a failed offerings fetch would do the same to a real customer on a
+     * bad hotel network.
+     */
     assert.match(
       src,
-      /available:\s*canPay/,
-      'the answer to "can this phone pay" does not decide whether anything is locked'
+      /const sellable = await loadPrice\(\)/,
+      'nothing asks whether the store has anything to sell'
+    )
+    assert.match(
+      src,
+      /const available = canPay && sellable/,
+      'the gate no longer needs BOTH a phone that can pay and something to sell'
     )
     /* And it must not be able to throw its way into locking the app. */
     const block = src.slice(src.indexOf('let canPay'), src.indexOf('set({\n      available'))
