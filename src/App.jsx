@@ -368,7 +368,7 @@ const HAND_EDIT_KINDS = new Set([
  */
 const SETUP_PAGES = {
   link: 'Phone & computer',
-  demo: 'Which unit the demo is',
+  demo: 'Demo Unit',
   rename: 'Rename presets and scenes',
   play: 'Play screen',
   help: 'Troubleshooting',
@@ -3825,7 +3825,7 @@ export default function App() {
                 units; this is the browser catching up.
               */}
               {isDemo() ? (
-                <SetupRow key="demo-unit" title="Which unit the demo is" status={`${unitByKey(demoUnit()).name} · five to choose from`} onClick={() => setSetupPage('demo')} />
+                <SetupRow key="demo-unit" title="Demo Unit" status={`${unitByKey(demoUnit()).name} · five to choose from`} onClick={() => setSetupPage('demo')} />
               ) : null}
               <SetupRow key="rename" title="Rename presets and scenes" status={status === 'live' ? 'Give them names you will know on a dark stage' : 'Connect a unit first'} onClick={() => setSetupPage('rename')} />
               {/* The theme is behind this row and the status says so, because
@@ -3856,7 +3856,7 @@ export default function App() {
               Each one holds the factory presets and scenes that unit really ships with, and the
               right number of scenes and slots. Picking one starts the demo again as that unit.
             </p>
-            <div className="demo-units" role="group" aria-label="Which unit the demo is">
+            <div className="demo-units" role="group" aria-label="Demo Unit">
               {DEMO_UNITS.map((u) => (
                 <button
                   key={u.key}

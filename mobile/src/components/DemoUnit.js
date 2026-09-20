@@ -37,7 +37,7 @@ export default function DemoUnit({ open, onClose }) {
   const unit = useDemoUnit()
 
   return (
-    <Sheet open={open} onClose={onClose} title="Which unit the demo is" note="Five to choose from">
+    <Sheet open={open} onClose={onClose} title="Demo Unit" note="Five to choose from">
       <Note tone="warn">{demoSentence(unit)}</Note>
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.md }}>

@@ -5648,7 +5648,7 @@ export function run(test) {
     /* And the browser end still does the same thing, because this was asked
        for once about one app that exists twice. */
     const web = read('src/components/TopBar.jsx')
-    assert.match(web, /aria-label=\{demo \? 'Which unit the demo is' : 'About this unit'\}/, 'the browser’s unit name stopped being two destinations')
+    assert.match(web, /aria-label=\{demo \? 'Demo Unit' : 'About this unit'\}/, 'the browser’s unit name stopped being two destinations')
   })
 
 
@@ -5817,6 +5817,21 @@ export function run(test) {
       'the Unlock button is gone from the bar, or shows when there is nothing to buy'
     )
     assert.match(bar, /Unlock the full version/, 'the Unlock button has no accessible name')
+
+    /* And the word DEMO itself, which is the thing an eye lands on. Both it
+       and the pill are gated on ONE named condition, so they cannot drift
+       into disagreeing about whether there is anything to sell. */
+    assert.match(
+      bar,
+      /const canBuy = Boolean\(demo && purchase\.available && !purchase\.unlocked && onUnlock\)/,
+      'the word and the pill no longer share one condition'
+    )
+    assert.match(bar, /\{\.\.\.\(canBuy\s*\?\s*\{/, 'the word DEMO is not a way into the unlock page')
+    assert.equal(
+      (bar.match(/canBuy/g) || []).length,
+      3,
+      'the condition is declared and used twice — the word and the pill'
+    )
 
     /* Settings carries it too — for reading before tapping, and for restoring
        on a handset that has never paid but whose owner has. */

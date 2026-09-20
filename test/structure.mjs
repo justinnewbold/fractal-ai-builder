@@ -1453,7 +1453,7 @@ export function run(test) {
          * two doors inside Phone & computer, a row named after pairing a
          * phone. "Only shows FM3 is the only model available."
          */
-        'Which unit the demo is',
+        'Demo Unit',
         'Rename presets and scenes',
         'Play screen',
         'Troubleshooting',
