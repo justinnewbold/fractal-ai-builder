@@ -6384,6 +6384,80 @@ export function run(test) {
     assert.match(swipe, /accessibilityLabel=\{label\}/, 'the remove button behind the row has no accessible name')
   })
 
+  /**
+   * VIBRANT, AND STILL THE SAME COLOURS.
+   *
+   * "I want this to look more like the liquid glass type stuff that Apple
+   * does, and the color is a little bit more vibrant like it is in this
+   * mock-up."
+   *
+   * The trap this guards is the obvious way to do it: open blockColors and
+   * type sixty livelier hex values. Those are not a style choice — several are
+   * marked VERIFIED against FM3-Edit, because the promise that palette makes
+   * is that a drive is the red the unit itself shows. Sixty new values is
+   * sixty chances to break that quietly, and nobody would notice until they
+   * looked at the hardware.
+   */
+  test('the vibrancy is a lift, not a repaint — every hue stays put', async () => {
+    const { vivid, at, readHex } = await import('../mobile/src/lib/vivid.js')
+
+    /* Hue is identity and must not move. Saturation and lightness are what
+       vibrancy IS, so those are the only two that do. */
+    const hueOf = ({ r, g, b }) => {
+      const R = r / 255, G = g / 255, B = b / 255
+      const max = Math.max(R, G, B), min = Math.min(R, G, B), d = max - min
+      if (!d) return null
+      if (max === R) return (((G - B) / d + (G < B ? 6 : 0)) / 6) * 360
+      if (max === G) return (((B - R) / d + 2) / 6) * 360
+      return (((R - G) / d + 4) / 6) * 360
+    }
+    for (const hex of ['#b5502f', '#2f5f9c', '#94357a', '#c0392b', '#2a7f9c', '#4a8f7a']) {
+      const before = hueOf(readHex(hex))
+      const after = hueOf(readHex(vivid(hex)))
+      assert.ok(Math.abs(before - after) < 2, `${hex} moved hue from ${before} to ${after} — that is a different colour, not a brighter one`)
+      assert.notEqual(vivid(hex), hex, `${hex} came back unchanged, so nothing got more vibrant`)
+    }
+
+    /* Grey stays grey, out of the maths rather than a list of exceptions: a
+       slate scene and the utility blocks must not turn into pastels. */
+    const grey = '#5d626b'
+    const moved = Math.abs(readHex(vivid(grey)).r - readHex(grey).r)
+    assert.ok(moved < 16, `a grey shifted by ${moved} — the neutrals are being tinted`)
+
+    /* Anything it cannot read comes back untouched. The browser's palette
+       carries var(--panel-hi) for an unknown block, and turning that into
+       garbage would paint a tile black rather than leave it neutral. */
+    assert.equal(vivid('var(--panel-hi)'), 'var(--panel-hi)')
+    assert.equal(vivid(undefined), undefined)
+    assert.match(at('#b5502f', 0.14), /^#[0-9a-f]{8}$/, 'the alpha helper does not produce a colour RN can read')
+
+    /* The palettes themselves are untouched, which is the whole point — they
+       are shared with the browser through sync:rules. */
+    const scenes = read('mobile/src/lib/sceneColors.js')
+    assert.match(scenes, /#b5502f/, 'the scene palette was repainted rather than lifted')
+    const tile = read('mobile/src/components/Tile.js')
+    assert.match(tile, /const hue = vivid\(fill\)/, 'the tiles are not lifted')
+
+    /*
+     * AND THE GLASS COST NOTHING. expo-blur is already a dependency, which is
+     * the only reason this look was available without a build at all.
+     */
+    const pkg = JSON.parse(read('mobile/package.json'))
+    assert.ok(pkg.dependencies['expo-blur'], 'the blur package is gone, so the glass is gone with it')
+    assert.ok(
+      !pkg.dependencies['expo-linear-gradient'] && !pkg.dependencies['react-native-svg'],
+      'a native drawing package was added — that moves the fingerprint and costs a build'
+    )
+    const bar = read('mobile/src/components/TopBar.js')
+    assert.match(bar, /<BlurView/, 'the top bar is a flat panel again')
+    assert.match(bar, /experimentalBlurMethod="dimezisBlurView"/, 'the blur does nothing on Android without this')
+
+    /* The sheen is a stand-in for a gradient and must not affect layout: the
+       fit-to-screen arithmetic is budgeting this tile's height. */
+    assert.match(tile, /pointerEvents="none"/, 'the sheen swallows presses')
+    assert.match(tile, /position: 'absolute'/, 'the sheen is in the layout, so it changes the tile height')
+  })
+
   test('the demo stays in front of the paywall', () => {
     const app = read('mobile/App.js')
     /* Not `[^>]*` — the arrow in `() =>` is a `>` and would end the class. */
