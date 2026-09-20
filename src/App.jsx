@@ -372,11 +372,9 @@ const SETUP_PAGES = {
   phone: 'Get it on your phone',
   demo: 'Demo Unit',
   rename: 'Rename presets and scenes',
-  play: 'Play screen',
   help: 'Troubleshooting',
   about: 'About'
 }
-const THEME_WORD = { auto: 'Auto', light: 'Light', dark: 'Dark' }
 /** What the chat says when a request needed the model and the model is off. */
 
 export default function App() {
@@ -3781,7 +3779,7 @@ export default function App() {
           setSheet(null)
           return undefined
         }}
-        title="Setup"
+        title="Settings"
         note={device?.short || device?.name || null}
       >
         {/*
@@ -3846,15 +3844,90 @@ export default function App() {
                 onClick={() => setSetupPage('phone')}
               />
               <SetupRow key="rename" title="Rename presets and scenes" status={status === 'live' ? 'Give them names you will know on a dark stage' : 'Connect a unit first'} onClick={() => setSetupPage('rename')} />
-              {/* The theme is behind this row and the status says so, because
-                  "Play screen" is not where anybody looks for light and dark —
-                  "I'm not seeing where the light/dark/auto theme buttons are
-                  anymore." Both settings really are about how the thing on the
-                  stand LOOKS, so they stay together; the row now says which
-                  theme is on, which is what makes it findable by scanning. */}
-              <SetupRow key="play" title="Play screen" status={['Buttons ' + (fit ? 'fit to screen' : SIZES[size].name.toLowerCase()), (THEME_WORD[getMode()] || 'Auto') + ' theme'].join(' · ')} onClick={() => setSetupPage('play')} />
               <SetupRow key="help" title="Troubleshooting" status={`${getDebugLog().length} line${getDebugLog().length === 1 ? '' : 's'} in the log`} onClick={() => setSetupPage('help')} />
               <SetupRow key="about" title="About" status={FULL} onClick={() => setSetupPage('about')} />
+            </div>
+            {/*
+              THE TWO THAT ARE NOT DOORS, and they are here rather than behind one.
+
+              "Move this to the settings screen at the bottom below all the
+              other drop-down menus — we want it quickly available just by
+              clicking settings. Don't have it via a drop-down, have it always
+              visible."
+
+              Every row above opens something and then you come back. These
+              two are not errands: they are how the screen you play off LOOKS,
+              and the only way to judge either is to change it and look. Behind
+              a row called Play screen that was four moves a go — open
+              Settings, open the row, change it, come back out to see — and the
+              thing being judged was not on screen while you judged it.
+
+              Below the rows, because the rows are what somebody opens Settings
+              FOR. These want to be one click away, not first.
+            */}
+            <div className="setup-loose">
+              {/*
+                Not <Section>. That is a <details> that starts CLOSED, which is
+                the drop-down this was asked out of — moving a fold from one
+                page to another would have changed nothing. These are headings
+                over controls that are simply there.
+              */}
+              <div className="setup-open">
+                <p className="silk-label setup-open-title">Stage tiles</p>
+                <div className="size-steps" role="group" aria-label="Stage tiles">
+                  <button
+                    className="size-step"
+                    onClick={() => resize(-1)}
+                    disabled={fit || size <= 0}
+                    aria-label="Smaller buttons"
+                  >
+                    &minus;
+                  </button>
+                  <span className="size-name">{fit ? 'Fit to screen' : SIZES[size].name}</span>
+                  <button
+                    className="size-step"
+                    onClick={() => resize(1)}
+                    disabled={fit || size >= SIZES.length - 1}
+                    aria-label="Bigger buttons"
+                  >
+                    +
+                  </button>
+                </div>
+                <p className="hint">
+                  Bigger tiles are easier to hit without looking; smaller ones fit more of the rig
+                  on screen. This device remembers it.
+                </p>
+                {/*
+                  "It would be nice just to have everything static on the screen
+                  without being able to scroll." A step is a fixed height, so
+                  whether the rig fits depends on the preset. This hands the
+                  height to the screen instead: Play measures what is left and
+                  sizes the tiles so the last row of effects sits above the footer.
+                */}
+                <label className="rename-choice">
+                  <input
+                    type="checkbox"
+                    checked={fit}
+                    onChange={(e) => {
+                      const on = e.target.checked
+                      setFit(on)
+                      saveFit(on)
+                    }}
+                  />
+                  <span>
+                    Fit everything on one screen
+                    <span className="hint">
+                      Sizes the scenes and effects so the whole rig is on screen at once, with no
+                      scrolling. Bigger presets get smaller buttons, never under a thumb&rsquo;s
+                      width. Overrides the size above while it is on.
+                    </span>
+                  </span>
+                </label>
+              </div>
+              <div className="setup-open">
+                <p className="silk-label setup-open-title">Appearance</p>
+                <Theme />
+              </div>
             </div>
           </>
         ) : null}
@@ -3864,7 +3937,7 @@ export default function App() {
         {setupPage === 'demo' ? (
           <div className="setup-page">
             <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
-              &lsaquo; Setup
+              &lsaquo; Settings
             </button>
             <p className="setup-page-title">{SETUP_PAGES.demo}</p>
             {/*
@@ -3897,7 +3970,7 @@ export default function App() {
         {setupPage === 'rename' ? (
           <div className="setup-page">
             <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
-              ‹ Setup
+              ‹ Settings
             </button>
             <p className="setup-page-title">{SETUP_PAGES.rename}</p>
             {/*
@@ -3935,7 +4008,7 @@ export default function App() {
         {setupPage === 'link' ? (
           <div className="setup-page">
             <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
-              ‹ Setup
+              ‹ Settings
             </button>
             <p className="setup-page-title">{SETUP_PAGES.link}</p>
             {/*
@@ -4042,74 +4115,10 @@ export default function App() {
           </div>
         ) : null}
 
-        {setupPage === 'play' ? (
-          <div className="setup-page">
-            <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
-              ‹ Setup
-            </button>
-            <p className="setup-page-title">{SETUP_PAGES.play}</p>
-<Section key="size" title="Button size" note={fit ? 'Fit to screen' : SIZES[size].name}>
-            <div className="size-steps" role="group" aria-label="Button size">
-              <button
-                className="size-step"
-                onClick={() => resize(-1)}
-                disabled={fit || size <= 0}
-                aria-label="Smaller buttons"
-              >
-                −
-              </button>
-              <span className="size-name">{fit ? 'Fit to screen' : SIZES[size].name}</span>
-              <button
-                className="size-step"
-                onClick={() => resize(1)}
-                disabled={fit || size >= SIZES.length - 1}
-                aria-label="Bigger buttons"
-              >
-                +
-              </button>
-            </div>
-            <p className="hint">
-              The scenes, effects and preset tile on Play, bigger or smaller. This device
-              remembers it.
-            </p>
-            {/*
-              "It would be nice just to have everything static on the screen
-              without being able to scroll." A step is a fixed height, so
-              whether the rig fits depends on the preset. This hands the
-              height to the screen instead: Play measures what is left and
-              sizes the tiles so the last row of effects sits above the footer.
-            */}
-            <label className="rename-choice">
-              <input
-                type="checkbox"
-                checked={fit}
-                onChange={(e) => {
-                  const on = e.target.checked
-                  setFit(on)
-                  saveFit(on)
-                }}
-              />
-              <span>
-                Fit everything on one screen
-                <span className="hint">
-                  Sizes the scenes and effects so the whole rig is on screen at once, with no
-                  scrolling. Bigger presets get smaller buttons, never under a thumb&rsquo;s width.
-                  Overrides the size above while it is on.
-                </span>
-              </span>
-            </label>
-          </Section>
-          <Section key="appearance" title="Appearance" note={THEME_WORD[getMode()] || 'Auto'}>
-            <Theme />
-          </Section>
-          </div>
-        ) : null}
-
-
         {setupPage === 'help' ? (
           <div className="setup-page">
             <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
-              ‹ Setup
+              ‹ Settings
             </button>
             <p className="setup-page-title">{SETUP_PAGES.help}</p>
 <Section
@@ -4211,7 +4220,7 @@ export default function App() {
         {setupPage === 'about' ? (
           <div className="setup-page">
             <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
-              ‹ Setup
+              ‹ Settings
             </button>
             <p className="setup-page-title">{SETUP_PAGES.about}</p>
             <p className="device-meta mono">{FULL} · built {BUILT_AT} UTC</p>

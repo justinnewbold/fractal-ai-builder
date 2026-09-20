@@ -37,8 +37,6 @@ const face = Platform.select(mono)
 const ofDeviceName = (s) => s.deviceName
 const ofFirmware = (s) => s.firmware
 
-/** What each theme setting is called, for the row that has to say which. */
-const THEME_WORD = { auto: 'Auto', light: 'Light', dark: 'Dark' }
 const ofUnitState = (s) => s.unit
 
 /**
@@ -150,7 +148,7 @@ export default function Settings({
   const head = (title, onDone) => (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
       {onDone === 'back' ? (
-        <Press label="‹ Setup" height={40} onPress={() => setPage(null)} />
+        <Press label="‹ Settings" height={40} onPress={() => setPage(null)} />
       ) : (
         <Text accessibilityRole="header" style={{ color: color.silk, fontSize: font.title, fontWeight: '700' }}>
           {title}
@@ -174,7 +172,7 @@ export default function Settings({
     >
       {page === null ? (
         <>
-          {head('Setup')}
+          {head('Settings')}
           <Text style={{ color: color.silkFaint, fontSize: font.small, fontFamily: face }}>
             {`v${APP_VERSION}`}
           </Text>
@@ -235,13 +233,6 @@ export default function Settings({
                   : 'Connect a computer first'
               }
               onPress={() => setPage('unit')}
-            />
-            <SetupRow
-              title="Play screen"
-              /* Both of the things behind this row, so somebody looking for
-                 the theme can see from the list that it is in here. */
-              status={[SIZES[loadSize(sync)]?.name || 'Small', THEME_WORD[getMode()] || 'Auto'].join(' · ')}
-              onPress={() => setPage('play')}
             />
             {/*
               Three rows became one door.
@@ -344,6 +335,43 @@ export default function Settings({
               }
               onPress={() => (updates.phase === 'ready' ? applyNow() : checkNow())}
             />
+          </View>
+
+          {/*
+            * THE TWO THAT ARE NOT DOORS, and they are here rather than behind one.
+            *
+            * "Move this to the settings screen at the bottom below all the
+            * other drop-down menus — we want it quickly available just by
+            * clicking settings. Don't have it via a drop-down, have it always
+            * visible."
+            *
+            * Every row above opens something and then you come back. These two
+            * are not errands: they are how the screen you play off LOOKS, and
+            * the way anybody uses them is to change one and look at the result.
+            * Behind a row called Play screen that is four taps a go — open
+            * Settings, open the row, change it, come back out to see — and the
+            * thing you are judging is not even on screen while you are judging
+            * it.
+            *
+            * At the bottom because the rows above are what somebody opens
+            * Settings FOR. These want to be reachable in one tap, not first.
+            */}
+          <View style={{ gap: space.md }}>
+            <Section>Stage tiles</Section>
+            <TileSize />
+          </View>
+
+          {/*
+            Light, dark, or whatever the phone is set to.
+
+            "I'm not seeing where the light/dark/auto theme buttons are
+            anymore. Please put that back on Setup." The phone had none of
+            them and was dark whatever the handset was set to, which is the
+            wrong answer in a lit room.
+          */}
+          <View style={{ gap: space.md }}>
+            <Section>Appearance</Section>
+            <Appearance />
           </View>
         </>
       ) : null}
@@ -645,32 +673,6 @@ export default function Settings({
             }}
             onClose={() => setChanging(false)}
           />
-        </>
-      ) : null}
-
-      {/* ----------------------------------------------------- play screen */}
-      {page === 'play' ? (
-        <>
-          {head('Play screen', 'back')}
-          <View style={{ gap: space.md }}>
-            <Section>Stage tiles</Section>
-            <TileSize />
-          </View>
-
-          {/*
-            Light, dark, or whatever the phone is set to.
-
-            "I'm not seeing where the light/dark/auto theme buttons are
-            anymore. Please put that back on Setup." The browser has had these
-            three for a long time and keeps them here, under Play screen,
-            because both of these settings are about how the thing you look at
-            on a stand LOOKS. The phone had none of them and was dark whatever
-            the handset was set to, which is the wrong answer in a lit room.
-          */}
-          <View style={{ gap: space.md }}>
-            <Section>Appearance</Section>
-            <Appearance />
-          </View>
         </>
       ) : null}
 

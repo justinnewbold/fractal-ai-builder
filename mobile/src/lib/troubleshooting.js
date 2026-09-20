@@ -48,7 +48,7 @@ export const FIXES = [
     when: 'Things half-work: a screen is blank, a button does nothing, or something that worked yesterday does not.',
     steps: [
       'Check the versions below. The app and the computer app should be on the same number.',
-      'If the computer app is behind, let it update — it checks on its own, and there is an Updates panel in Setup.',
+      'If the computer app is behind, let it update — it checks on its own, and there is an Updates panel in Settings.',
       'Reload this page, or force-quit and reopen the phone app, once the computer has updated.'
     ]
   },
@@ -58,7 +58,7 @@ export const FIXES = [
     when: 'The name is stale, the blocks are from the preset before, or nothing changes when you pick one.',
     steps: [
       'Pick the preset again. The computer holds what it last read for a few seconds, and asking twice gets past it.',
-      'Use Read the unit again, under Setup, to throw away everything cached and start from the hardware.',
+      'Use Read the unit again, under Settings, to throw away everything cached and start from the hardware.',
       'If the names in the list are wrong or missing, scan the preset list again from the preset sheet.'
     ]
   }
@@ -133,4 +133,7 @@ export function versionsInSync({ app, host }) {
 
 /** What the guide says about the one version nobody can read. */
 export const FIRMWARE_NOTE =
+  /* "under Setup" is the FM3's OWN menu, on the unit's front panel — not this
+     app's Settings screen. The app's was renamed; the hardware's is what Fractal
+     calls it and renaming it here would send somebody looking in the wrong box. */
   'The unit’s own firmware version is not something this app can read — check it on the unit itself, under Setup.'

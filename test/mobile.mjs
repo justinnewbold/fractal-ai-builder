@@ -1835,7 +1835,8 @@ export function run(test) {
     for (const row of [
       'Phone & computer',
       'Rename presets and scenes',
-      'Play screen',
+      /* No 'Play screen'. Stage tiles and Appearance are open at the bottom of
+         this list now rather than behind a door. Asserted below. */
       'Troubleshooting',
       'About'
     ]) {
@@ -1855,7 +1856,26 @@ export function run(test) {
     const root = settings.slice(settings.indexOf('{page === null ? ('), settings.indexOf("{page === 'unit' ?"))
     assert.ok(root.length > 200, 'the Setup root moved; this check reads it')
     assert.ok(!/UnitBits/.test(root), 'the scene-name boxes are back on the front page of Setup')
-    assert.ok(!/TileSize/.test(root), 'the tile size buttons are on the front page rather than behind Play screen')
+    /*
+     * AND THE TWO THAT ARE NOT DOORS ARE ON IT, at the bottom.
+     *
+     * "Move this to the settings screen at the bottom below all the other
+     * drop-down menus — we want it quickly available just by clicking
+     * settings. Don't have it via a drop-down, have it always visible."
+     *
+     * This assertion used to say the opposite — that TileSize must NOT be on
+     * the front page — because these were behind a row called Play screen.
+     * Both are things you change and then LOOK at, and a door meant judging
+     * the result with the result off screen.
+     */
+    assert.match(root, /<TileSize \/>/, 'the tile size buttons are not on the front page of Settings')
+    assert.match(root, /<Appearance \/>/, 'the light and dark buttons are not on the front page of Settings')
+    /* Below the rows, not above: the rows are what somebody opens Settings
+       for, these are what they want in one tap once they are there. */
+    assert.ok(
+      root.indexOf('<SetupRow') < root.indexOf('<TileSize />'),
+      'the tile size buttons sit above the list of rows'
+    )
 
     const unit = settings.slice(settings.indexOf("{page === 'unit' ?"), settings.indexOf("{page === 'trouble' ?"))
     assert.match(unit, /<UnitBits \/>/, 'renaming is not on the rename page')
@@ -1877,9 +1897,6 @@ export function run(test) {
     /* Each row says something true about the state it leads to, which is the
        whole point of the list: it answers most questions without a tap. */
     assert.match(settings, /status=\{\s*demo\s*\?\s*'Demo — simulated FM3'[\s\S]{0,500}?`\$\{deviceName \|\| 'Unit'\} · connected`/)
-    /* Both things behind the Play screen row, so somebody hunting for the
-       theme can tell from the list that it is in there. */
-    assert.match(settings, /status=\{\[SIZES\[loadSize\(sync\)\]\?\.name \|\| 'Small', THEME_WORD\[getMode\(\)\] \|\| 'Auto'\]\.join/)
   })
 
   test('the version on the About page is the version that was built', async () => {

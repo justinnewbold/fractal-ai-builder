@@ -9967,6 +9967,33 @@ button.phone-chip.compact.bad {
   overflow: hidden;
 }
 
+/*
+ * The two settings that are not doors, under the rows that are.
+ *
+ * Stage tiles and Appearance used to be a <details> behind a row called Play
+ * screen. Both are things you change and then LOOK at, so a fold two clicks
+ * deep meant judging the result with the result off screen. They sit open.
+ *
+ * Spaced away from the list above so they read as their own thing rather than
+ * as two more rows that have lost their chevrons.
+ */
+.setup-loose {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+  margin-top: var(--s-5);
+}
+
+.setup-open {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.setup-open-title {
+  margin: 0;
+}
+
 /* Thumb-high rows on a rule, like the phone's own Settings. */
 button.setup-row {
   display: flex;
