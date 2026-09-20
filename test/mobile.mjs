@@ -1637,7 +1637,8 @@ export function run(test) {
     )
 
     const settings = read('mobile/src/screens/Settings.js')
-    assert.match(settings, /saveSize\(i, sync\)/, 'the size buttons do not save anything')
+    /* A stepper now, not five tabs: one step either side of the answer. */
+    assert.match(settings, /const step = \(by\) => saveSize\(clampSize\(now \+ by\), sync\)/, 'the size buttons do not save anything')
   })
 
   test('the phone can rename a preset and its scenes, and says what that means', () => {
@@ -6210,20 +6211,46 @@ export function run(test) {
        of wrong sizes this screen already learned to avoid. */
     assert.match(stage, /viewport > 0 && content > 0/, 'fit runs before the screen has been measured')
 
-    /* And the control, with fit first because it is the answer for anybody
-       who has not got an opinion yet. */
+    /*
+     * AND THE CONTROL IS THE BROWSER'S: a stepper, with fit as a tick box
+     * under it rather than a sixth step on the ladder.
+     *
+     * "Update the mobile app's tile size screen to look like this with the
+     * +/- buttons instead of the tab buttons."
+     */
     const set = read('mobile/src/screens/Settings.js')
-    assert.match(set, /label="Fit on screen"/, 'there is no way to ask for a screen that fits')
-    assert.match(set, /on=\{fit\}/, 'the Fit button never shows that it is on')
-    assert.ok(
-      set.indexOf('label="Fit on screen"') < set.indexOf('{SIZES.map('),
-      'the sizes come before Fit, which buries the thing most people want'
+    const tile = set.slice(set.indexOf('function TileSize()'), set.indexOf('function Choice('))
+    assert.ok(tile.length > 400, 'the tile size control moved; this check reads it')
+
+    assert.match(tile, /label="−"/, 'there is no way to step the tiles down')
+    assert.match(tile, /label="\+"/, 'there is no way to step the tiles up')
+    assert.ok(!/SIZES\.map\(/.test(tile), 'the five tab buttons are back')
+    /* The stepper says what it is set to, and says fit when fit is deciding. */
+    assert.match(tile, /fit \? 'Fit to screen' : SIZES\[now\]\?\.name/, 'the stepper does not say what it is set to')
+
+    /*
+     * GREYED WHILE FIT IS ON, not hidden. The value is being overridden, and
+     * "not now" is a different thing to say than "never" — hiding them would
+     * say the second.
+     */
+    assert.match(tile, /disabled=\{fit \|\| now <= 0\}/, 'the smaller button works while fit is deciding the size')
+    assert.match(tile, /disabled=\{fit \|\| now >= SIZES\.length - 1\}/, 'the bigger button works while fit is deciding the size')
+
+    /* Fit is the tick box, and it is a real checkbox to a screen reader. */
+    assert.match(tile, /label="Fit everything on one screen"/, 'there is no way to ask for a screen that fits')
+    assert.match(tile, /on=\{fit\}/, 'the tick box never shows that it is on')
+    assert.match(tile, /onPress=\{\(\) => saveFit\(!fit, sync\)\}/, 'the tick box does not toggle')
+    assert.match(set, /accessibilityRole="checkbox"/, 'the tick box announces itself as a button rather than a checkbox')
+
+    /* And the stepper's own buttons say something other than their shapes. */
+    assert.match(tile, /accessibilityLabel="Smaller tiles"/, 'the minus button reads out as a shape')
+    assert.match(tile, /accessibilityLabel="Bigger tiles"/, 'the plus button reads out as a shape')
+    const press = read('mobile/src/components/Press.js')
+    assert.match(
+      press,
+      /accessibilityLabel=\{accessibilityLabel \|\|/,
+      'Press ignores an explicit accessible name again, so the stepper is two shapes'
     )
-    /* Picking a size IS turning fit off. Leaving it on and ignoring the press
-       is how a setting stops being believed. */
-    const tile = set.slice(set.indexOf('function TileSize()'), set.indexOf('function TileSize()') + 2200)
-    assert.match(tile, /saveFit\(false, sync\)\s*\n\s*saveSize\(i, sync\)/, 'picking a size leaves fit on, so the press does nothing')
-    assert.match(tile, /on=\{!fit && i === now\}/, 'a size shows as chosen while fit is what is actually drawing the screen')
   })
 
   /**
