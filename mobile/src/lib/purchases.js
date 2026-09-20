@@ -5,6 +5,8 @@ import Constants from 'expo-constants'
 
 import { logDebug } from './debugLog'
 import { mayDrive } from './unlock-rule'
+import { isOwner } from './owner-unlock'
+import { currentAccount } from './relay'
 
 /**
  * The one purchase: paying to point this app at a real rig.
@@ -151,9 +153,43 @@ const entitled = (info) => Boolean(info?.entitlements?.active?.[ENTITLEMENT])
  * Never throws and never rejects: every failure inside becomes `available:
  * false`, which reads everywhere as "not locked".
  */
+/**
+ * The account, if it is one that carries an unlock without paying.
+ *
+ * "Is there any way we can set it up so that my email unlocks the app
+ * automatically? I still wanna be able to test with live connections."
+ *
+ * Read from the SESSION rather than from anything typed: currentAccount asks
+ * the account service who is signed in, so the check is on an identity
+ * somebody has already proved with a password. The list in
+ * shared/owner-unlock is public and grants nothing by being read.
+ *
+ * Never un-sets anything. Signing out of an owner account does not take an
+ * unlock away from somebody who also bought it, and an account service that
+ * cannot be reached is not evidence of anything.
+ */
+export const checkOwner = async () => {
+  try {
+    const account = await currentAccount()
+    if (account && isOwner(account.email)) {
+      await remember(true)
+      set({ unlocked: true })
+      logDebug('purchases: unlocked by account')
+      return true
+    }
+  } catch (err) {
+    logDebug(`purchases: could not check the account (${err?.message || err})`)
+  }
+  return false
+}
+
 export const startPurchases = async () => {
   const known = await remembered()
   if (known) set({ unlocked: true })
+
+  /* Before the store is asked anything: an owner is unlocked whether or not
+     RevenueCat is reachable, has a product, or exists. */
+  await checkOwner()
 
   const api = await load()
   if (!api) {
@@ -199,13 +235,45 @@ export const startPurchases = async () => {
       logDebug(`purchases: canMakePayments unknown (${err?.message || err})`)
     }
 
+    /*
+     * AND WHETHER THERE IS ANYTHING TO SELL, which is a different question
+     * again and the one that was missing.
+     *
+     * `canMakePayments` answers "could this handset pay for something". It
+     * says nothing about whether a product EXISTS. Before the $9.99 item is
+     * created in App Store Connect and Play, RevenueCat has no offering to
+     * return — so the app was in the worst possible state: the gate closed,
+     * and the paywall behind it had nothing to sell.
+     *
+     *   "I'm blocked now by the gate for the unlock."
+     *
+     * That is not only a problem before launch. An offerings fetch that fails
+     * for a real customer — a bad minute on a hotel network — would wall them
+     * out of a rig they already own, for a purchase the app could not have
+     * completed anyway.
+     *
+     * So the price is loaded BEFORE anything is decided, and `available`
+     * means what its name always implied: this person can pay, and there is
+     * something here to pay for. The rule fails open while `checking` is
+     * true, so the extra round trip costs a moment of nothing rather than a
+     * moment of being locked out.
+     */
+    const sellable = await loadPrice()
+
+    const available = canPay && sellable
     set({
-      available: canPay,
+      available,
       unlocked: yes,
       checking: false,
-      why: canPay ? null : 'This copy of the app cannot take payments.'
+      why: !canPay
+        ? 'This copy of the app cannot take payments.'
+        : !sellable
+          ? 'The store has nothing to sell yet.'
+          : null
     })
-    if (!canPay) logDebug('purchases: this install cannot pay — nothing is locked')
+    if (!available) {
+      logDebug(`purchases: nothing is locked (canPay ${canPay}, sellable ${sellable})`)
+    }
     api.addCustomerInfoUpdateListener?.((next) => {
       const now = entitled(next)
       remember(now)
@@ -223,10 +291,17 @@ export const startPurchases = async () => {
   }
 }
 
-/** Ask the store what it charges here, so the button can say so. */
+/**
+ * Ask the store what it charges here, so the button can say so.
+ *
+ * ANSWERS WHETHER THERE IS ANYTHING TO SELL, which the caller needs before it
+ * can decide whether to gate anybody. No offering and no product is not a
+ * price of zero — it is a shop with empty shelves, and a shop with empty
+ * shelves must not have a doorman.
+ */
 const loadPrice = async () => {
   const api = await load()
-  if (!api) return
+  if (!api) return false
   try {
     const offerings = await api.getOfferings()
     const found =
@@ -236,12 +311,20 @@ const loadPrice = async () => {
     if (found) {
       pkg = found
       set({ price: found.product?.priceString || null })
-      return
+      return true
     }
     const products = await api.getProducts([PRODUCT_ID])
-    if (products?.[0]) set({ price: products[0].priceString || null })
+    if (products?.[0]) {
+      set({ price: products[0].priceString || null })
+      return true
+    }
+    logDebug('purchases: the store returned no offering and no product')
+    return false
   } catch (err) {
+    /* Could not find out. Treat it as nothing to sell, which unlocks rather
+       than locks — the same direction every other unknown goes here. */
     logDebug(`purchases: no price (${err?.message || err})`)
+    return false
   }
 }
 

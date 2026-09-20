@@ -29,7 +29,7 @@ import { restoreDemo, setDemo, useDemo } from './src/lib/demo'
 import Tour, { tourSeen } from './src/components/Tour'
 import { BENCH } from './src/lib/features'
 import Paywall from './src/screens/Paywall'
-import { startPurchases, usePurchase } from './src/lib/purchases'
+import { checkOwner, startPurchases, usePurchase } from './src/lib/purchases'
 import { shouldAskToPay } from './src/lib/unlock-rule'
 
 /**
@@ -322,7 +322,16 @@ export default function App() {
             <ActivityIndicator color={color.silkDim} />
           </View>
         ) : auth === 'out' ? (
-          <SignIn onSignedIn={() => setAuth('in')} onDemo={() => setAuth('in')} />
+          <SignIn
+            onSignedIn={() => {
+              /* An owner signing in is unlocked from that moment, not from
+                 the next launch — the check at startup ran before there was
+                 an account to read. */
+              checkOwner()
+              setAuth('in')
+            }}
+            onDemo={() => setAuth('in')}
+          />
         ) : auth === 'paywall' ? (
           <Paywall
             onUnlocked={() => setAuth('in')}

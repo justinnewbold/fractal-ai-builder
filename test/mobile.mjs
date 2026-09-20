@@ -14,7 +14,7 @@
  * App.jsx, and import the plain modules where they can.
  */
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -5741,6 +5741,86 @@ export function run(test) {
    * has a way of costing a week rather than an evening.
    */
   /**
+   * EVERY RELATIVE IMPORT ON THE PHONE POINTS AT A FILE THAT IS THERE.
+   *
+   * purchases.js was pushed with `import { isOwner } from './owner-unlock'`
+   * and no such file beside it — the source lives in shared/, and Metro
+   * resolves a relative import inside mobile/src/lib and cannot reach up out
+   * of it. The result is not a missing owner check. It is:
+   *
+   *   Unable to resolve module ./owner-unlock
+   *
+   * which fails the whole bundle, so the app does not start. On a phone that
+   * is the worst failure this project can ship, and the entire suite was
+   * silent about it: the test for that file imports shared/owner-unlock.mjs
+   * directly, and nothing in `npm test` bundles the phone.
+   *
+   * CI caught it, in the `check` job, by running `npx expo export` — which is
+   * why CLAUDE.md calls that the real check that the app still bundles. This
+   * test is the cheap half of it: it cannot prove the app runs, but a missing
+   * file is most of what goes wrong here and it takes a few milliseconds
+   * rather than eight seconds of Metro.
+   *
+   * The fix for that one was a sync entry, not a hand-written copy. Anything
+   * shared with the browser is generated into mobile/src/lib by
+   * `npm run sync:rules`; see scripts/sync-relay-rules.mjs.
+   */
+  test('every file the phone imports is a file that exists', () => {
+    const dir = new URL('../mobile/src/', import.meta.url)
+    const walk = (at) => {
+      const out = []
+      for (const entry of readdirSync(at, { withFileTypes: true })) {
+        const next = new URL(entry.name + (entry.isDirectory() ? '/' : ''), at)
+        if (entry.isDirectory()) out.push(...walk(next))
+        else if (/\.jsx?$/.test(entry.name)) out.push(next)
+      }
+      return out
+    }
+
+    const files = [...walk(dir), new URL('../mobile/App.js', import.meta.url)]
+    assert.ok(files.length > 30, `only ${files.length} phone files were found; this check read nothing`)
+
+    /*
+     * The extensions Metro will try, taken from the resolver's own error
+     * message rather than guessed:
+     *
+     *   None of these files exist:
+     *     * src/lib/owner-unlock(.ios.ts|.native.ts|.ts|…|.mjs|…|.js|…)
+     *
+     * Guessing cost a false alarm already: a first draft listed only .js,
+     * .jsx and .json and accused relay.js of importing a missing './decode',
+     * which is decode.mjs and resolves perfectly. A guard that cries wolf
+     * about a working import is worse than no guard, because the next real
+     * one gets waved through with it.
+     */
+    const EXT = ['', '.ts', '.tsx', '.mjs', '.js', '.jsx', '.json', '.cjs']
+    const tries = (base) => [
+      ...EXT.map((e) => base + e),
+      ...EXT.filter(Boolean).map((e) => base + '/index' + e)
+    ]
+
+    const broken = []
+    for (const file of files) {
+      const text = readFileSync(file, 'utf8')
+      /* Relative imports only. A bare specifier is a package and npm's
+         problem, not this file's. */
+      for (const m of text.matchAll(/(?:^|\n)\s*(?:import[^'"\n]*from|export[^'"\n]*from)\s*['"](\.[^'"]*)['"]/g)) {
+        const target = new URL(m[1], file)
+        if (!tries(fileURLToPath(target)).some((p) => existsSync(p))) {
+          broken.push(`${fileURLToPath(file).split('/mobile/')[1]} imports ${m[1]}`)
+        }
+      }
+    }
+
+    assert.deepEqual(
+      broken,
+      [],
+      `the phone bundle cannot resolve:\n  ${broken.join('\n  ')}\n` +
+        'a shared file needs an entry in scripts/sync-relay-rules.mjs'
+    )
+  })
+
+  /**
    * THE PHONE HAS A TUTORIAL, which is the end that needed one most.
    *
    * "First issue is demo has no tutorial. Very important."
@@ -5797,9 +5877,12 @@ export function run(test) {
   test('the demo stays in front of the paywall', () => {
     const app = read('mobile/App.js')
     /* Not `[^>]*` — the arrow in `() =>` is a `>` and would end the class. */
+    /* Not one line any more — signing in also re-checks whether the account
+       carries an unlock. What matters is unchanged: onDemo goes straight in
+       and asks nothing of anybody. */
     assert.match(
       app,
-      /<SignIn\s+onSignedIn=\{[^}]*\}\s+onDemo=\{\(\) => setAuth\('in'\)\}/,
+      /onDemo=\{\(\) => setAuth\('in'\)\}/,
       'the demo no longer goes straight in from the sign-in screen'
     )
     const paywall = read('mobile/src/screens/Paywall.js')
@@ -5929,6 +6012,50 @@ export function run(test) {
   })
 
   /**
+   * AN OWNER IS UNLOCKED WITHOUT BUYING, and the list that says who is public.
+   *
+   * "Is there any way we can set it up so that my email unlocks the app
+   * automatically? I still wanna be able to test with live connections."
+   *
+   * Somebody has to drive a real rig before the thing is on sale. The list
+   * grants nothing by being read — it names ACCOUNTS, and the app consults it
+   * only for an account somebody is already signed in as, which means the
+   * password is the gate exactly as it is everywhere else.
+   */
+  test('an owner account is unlocked, and no address is in the repository', async () => {
+    const { isOwner, fold } = await import(
+      new URL('../shared/owner-unlock.mjs', import.meta.url).href
+    )
+
+    assert.equal(isOwner('justinnewbold@gmail.com'), true, 'the author is not unlocked')
+    assert.equal(isOwner('  JustinNewbold@GMAIL.com '), true, 'case and spacing break the match')
+    assert.equal(isOwner('someone@else.com'), false, 'a stranger is unlocked')
+    assert.equal(isOwner('pair-abcd@fractal.local'), false, 'a pairing-code account is unlocked')
+    for (const nothing of ['', null, undefined, 'notanemail']) {
+      assert.equal(isOwner(nothing), false, `"${nothing}" counted as an owner`)
+    }
+
+    /* The hashing buys no secrecy and is not meant to — it keeps an address
+       out of a public file, where it would be scraped within a week. So the
+       file must not contain one. */
+    const src = readFileSync(new URL('../shared/owner-unlock.mjs', import.meta.url), 'utf8')
+    const found = src.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) || []
+    assert.deepEqual(
+      found.filter((a) => a !== 'someone@example.com'),
+      [],
+      'an email address is written into shared/owner-unlock.mjs'
+    )
+    assert.equal(typeof fold, 'function', 'fold is gone, so owners cannot be added')
+
+    /* And the app reads the account from the SESSION, never from a box. */
+    const lib = read('mobile/src/lib/purchases.js')
+    assert.match(lib, /await currentAccount\(\)/, 'the owner check trusts something other than the session')
+    assert.match(lib, /await checkOwner\(\)/, 'the owner check never runs at startup')
+    const app = read('mobile/App.js')
+    assert.match(app, /checkOwner\(\)/, 'signing in does not re-check the account')
+  })
+
+  /**
    * THE OFFER MUST NEVER HIDE ITSELF, which is the bug that made the whole
    * purchase invisible on a real handset.
    *
@@ -6009,10 +6136,26 @@ export function run(test) {
   test('a phone that cannot buy anything is never locked out', () => {
     const src = read('mobile/src/lib/purchases.js')
     assert.match(src, /canMakePayments/, 'nothing asks whether this install can pay at all')
+
+    /*
+     * TWO facts now, not one, and the second is what was missing.
+     *
+     * `canMakePayments` answers "could this handset pay for something" and
+     * says nothing about whether a product EXISTS. Before the item is created
+     * in the stores there is no offering, so the gate closed over a paywall
+     * with nothing to sell — "I'm blocked now by the gate for the unlock" —
+     * and a failed offerings fetch would do the same to a real customer on a
+     * bad hotel network.
+     */
     assert.match(
       src,
-      /available:\s*canPay/,
-      'the answer to "can this phone pay" does not decide whether anything is locked'
+      /const sellable = await loadPrice\(\)/,
+      'nothing asks whether the store has anything to sell'
+    )
+    assert.match(
+      src,
+      /const available = canPay && sellable/,
+      'the gate no longer needs BOTH a phone that can pay and something to sell'
     )
     /* And it must not be able to throw its way into locking the app. */
     const block = src.slice(src.indexOf('let canPay'), src.indexOf('set({\n      available'))

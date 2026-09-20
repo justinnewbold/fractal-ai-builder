@@ -115,6 +115,21 @@ export const FILES = [
    * reads — so it is generated rather than typed twice.
    */
   { source: '../shared/affiliation.mjs', target: '../mobile/src/lib/affiliation.js' },
+  /*
+   * Who owns this copy, and the reason it is here rather than imported.
+   *
+   * purchases.js does `import { isOwner } from './owner-unlock'`, and Metro
+   * resolves that inside mobile/src/lib — it cannot reach up into shared/.
+   * Without this line the phone does not merely lose the owner check: the
+   * bundle fails to resolve and the app will not start at all. That is what
+   * it did, and `npm test` was silent about it because the test imports
+   * shared/owner-unlock.mjs directly and nothing in the suite bundles the
+   * phone. `npx expo export` is the check that catches it.
+   *
+   * There is nothing secret in the file. It carries folded hashes, never an
+   * address, so the generated copy is as public as the source.
+   */
+  { source: '../shared/owner-unlock.mjs', target: '../mobile/src/lib/owner-unlock.js' },
   {
     source: '../shared/troubleshooting.mjs',
     target: '../mobile/src/lib/troubleshooting.js',
