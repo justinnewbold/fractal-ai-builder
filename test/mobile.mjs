@@ -5228,7 +5228,14 @@ export function run(test) {
      */
     const bar = read('mobile/src/components/TopBar.js').replace(/\s+/g, ' ')
     assert.match(bar, /const demo = useDemo\(\)/, 'the bar cannot tell whether it is in the demo')
-    assert.match(bar, /const word = demo \? 'demo' : linkWord\(tone, 'remote'\)/, 'the bar still says CONNECTED in the demo')
+    /* `canBuy` is now the first rung — the word says UNLOCK where there is
+       one to sell. What this test is about is the rung after it: the demo
+       must never wear CONNECTED. */
+    assert.match(
+      bar,
+      /const word = canBuy \? 'unlock' : demo \? 'demo' : linkWord\(tone, 'remote'\)/,
+      'the bar still says CONNECTED in the demo'
+    )
     assert.match(bar, /const mark = demo \? 'wait' : linkTone\(tone\)/, 'the demo word is drawn in the colour a real connection gets')
   })
 
@@ -6089,11 +6096,51 @@ export function run(test) {
       /const canBuy = Boolean\(onUnlock\) && shouldOffer\(\{ demo \}\)/,
       'the word and the pill no longer share one condition'
     )
-    assert.match(bar, /\{\.\.\.\(canBuy\s*\?\s*\{/, 'the word DEMO is not a way into the unlock page')
+    assert.match(bar, /\{\.\.\.\(canBuy\s*\?\s*\{/, 'the word is not a way into the unlock page')
+    /* Comments stripped: the block above `word` explains the rule by naming
+       canBuy, and counting prose as a use is how this number goes wrong. */
+    const code = bar.replace(/\/\*[\s\S]*?\*\//g, ' ')
     assert.equal(
-      (bar.match(/canBuy/g) || []).length,
-      3,
-      'the condition is declared and used twice — the word and the pill'
+      (code.match(/canBuy/g) || []).length,
+      4,
+      'the condition is declared and used three times — the word, its press, and the pill'
+    )
+
+    /*
+     * AND IT IS DECLARED AFTER `demo`, WHICH IS NOT A STYLE POINT.
+     *
+     * canBuy sat ABOVE `const demo = useDemo()` and read `demo` off the line
+     * below it. A const read before its declaration is in the temporal dead
+     * zone, so depending on how the bundler lowers block scoping that is a
+     * ReferenceError on every render of this bar, or a silent `undefined` —
+     * and shouldOffer({ demo: undefined }) is false forever, so the unlock
+     * never appears in the demo at all.
+     *
+     * That is the exact fault the offer was written to fix ("where is the
+     * unlock button? I don't see it anywhere"), reintroduced one line above
+     * the fix, and invisible to every check here because the source still
+     * said all the right words in the right order.
+     */
+    assert.ok(
+      bar.indexOf('const demo = useDemo()') < bar.indexOf('const canBuy ='),
+      'canBuy reads `demo` before it is declared — the unlock never shows in the demo'
+    )
+
+    /*
+     * THE WORD ITSELF SAYS UNLOCK, and only where there is one to sell.
+     *
+     * "Change this word demo to Unlock and bring up the unlock page when it's
+     * tapped... Make sure it doesn't change how this button functions on
+     * unlocked versions when connected to an actual unit."
+     *
+     * So the ladder is canBuy, then demo, then the link word — a real unit is
+     * untouched, and somebody who already owns it still reads DEMO rather
+     * than being sold a thing they have.
+     */
+    assert.match(
+      bar,
+      /const word = canBuy \? 'unlock' : demo \? 'demo' : linkWord\(tone, 'remote'\)/,
+      'the word no longer says UNLOCK in the demo, or says it outside one'
     )
 
     /* Settings carries it too — for reading before tapping, and for restoring
@@ -6231,13 +6278,24 @@ export function run(test) {
     /* The price goes ON the buttons. Asking somebody to tap to find out what
        it costs is asking for the tap most people will not make. */
     const offer = read('mobile/src/components/UnlockOffer.js')
-    for (const [where, text] of [['the bar', bar], ['the stage offer', offer]]) {
-      assert.match(
-        text,
-        /purchase\.price \? `Unlock \$\{purchase\.price\}` : 'Unlock'/,
-        `${where} does not show the price on the button`
-      )
-    }
+    assert.match(
+      offer,
+      /purchase\.price \? `Unlock \$\{purchase\.price\}` : 'Unlock'/,
+      'the stage offer does not show the price on the button'
+    )
+    /*
+     * The bar is the exception, and only because the verb moved next to it.
+     * The word itself now reads UNLOCK, so the pill beside it carries the
+     * price alone — "Unlock" in both would be the same word twice in half an
+     * inch. Which also means the pill must not draw at all before a price
+     * arrives, or it is an empty amber blob.
+     */
+    assert.match(bar, /\{purchase\.price\}/, 'the bar does not show the price on the button')
+    assert.match(
+      bar,
+      /\{canBuy && purchase\.price \? \(/,
+      'the bar draws an empty pill while the store has no price yet'
+    )
 
     /* And it can be put away, or it is an advertisement rather than an offer —
        on a screen that is open on a dark stage between songs. */
