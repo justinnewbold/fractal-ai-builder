@@ -6021,6 +6021,107 @@ export function run(test) {
     assert.match(set, /How this works/, 'there is no way back to the tour')
   })
 
+  /**
+   * SWIPE IN FROM THE LEFT TO GO BACK, AND DONE LEAVES FROM ANY DEPTH.
+   *
+   * "Under the settings menu they could swipe on the left side of the screen
+   * to the right to go back to the play screen, or in one of the submenus on
+   * the settings screen, it would swipe and go back to the previous page they
+   * were on. Then add the done button to all submenus, and if they click
+   * done, it takes them directly back to the play screen, no matter how deep
+   * they are. Swiping back should always take them to the previous screen."
+   *
+   * Two gestures with two different jobs, and the test is mostly about them
+   * not being confused for one another: back is ONE step, Done is the whole
+   * way out.
+   */
+  test('a left-edge swipe goes back one step, and Done goes all the way out', () => {
+    const edge = read('mobile/src/components/EdgeBack.js')
+
+    /*
+     * PanResponder, NOT react-native-gesture-handler — and this is the part
+     * worth holding. The usual library is a native module, so adding it moves
+     * mobile/fingerprint.json, which stops every installed handset receiving
+     * updates until a new build is made. Spending an iOS build slot to add a
+     * swipe is the wrong trade. PanResponder is inside React Native.
+     */
+    assert.match(edge, /from 'react-native'/, 'the swipe is not built on React Native itself')
+    assert.match(edge, /PanResponder\.create/, 'the swipe no longer uses PanResponder')
+    const pkg = JSON.parse(read('mobile/package.json'))
+    assert.ok(
+      !pkg.dependencies['react-native-gesture-handler'],
+      'a native gesture library was added — that moves the fingerprint and costs a build'
+    )
+
+    /* It must not eat taps, and must not eat a knob. */
+    assert.match(edge, /onStartShouldSetPanResponder: \(\) => false/, 'the swipe claims plain taps')
+    assert.ok(
+      !/onMoveShouldSetPanResponderCapture/.test(edge.replace(/\/\*[\s\S]*?\*\//g, ' ')),
+      'the swipe captures gestures from its children — a slider at the left edge would lose its drag'
+    )
+    /* Started at the edge, going sideways, by a margin over vertical. */
+    assert.match(edge, /g\.x0 <= EDGE/, 'a drag from anywhere on screen counts as going back')
+    assert.match(edge, /Math\.abs\(g\.dx\) > Math\.abs\(g\.dy\) \* 2/, 'a vertical scroll can trigger the back swipe')
+
+    /*
+     * WHERE BACK GOES IS THE SAME PLACE DONE ALREADY WENT.
+     *
+     * App.js hands every screen an onBack; the swipe reads a map beside it.
+     * Two lists of the same facts drift, so this holds them to each other:
+     * every screen the map names must hand its own Done the same target.
+     */
+    const app = read('mobile/App.js')
+    const map = app.slice(app.indexOf('const BACK_TO = {'), app.indexOf('const backFrom ='))
+    assert.ok(map.length > 40, 'the back-target map moved; this check reads it')
+    for (const [screen, target] of [
+      ['presets', 'stage'],
+      ['setlists', 'stage'],
+      ['edit', 'stage'],
+      ['connect', 'settings'],
+      ['gear', 'settings'],
+      ['log', 'settings']
+    ]) {
+      assert.match(map, new RegExp(`${screen}: '${target}'`), `a swipe on ${screen} does not go to ${target}`)
+    }
+    /* The two that are not constants, because they are reached from two
+       places and going "back" to the wrong one is the wrong room. */
+    assert.match(map, /report: reportFrom/, 'the feedback form sends a swipe to a fixed screen')
+    assert.match(map, /fixes: fixFrom/, 'the guide sends a swipe to a fixed screen')
+
+    /* The stage is the bottom of the stack: no handler, rather than a
+       gesture that does nothing. */
+    assert.ok(!/\bstage: /.test(map), 'the stage screen has somewhere to swipe back to')
+    assert.match(
+      app,
+      /const backFrom = BACK_TO\[screen\] \? \(\) => setScreen\(BACK_TO\[screen\]\) : null/,
+      'the swipe is wired to something other than the map'
+    )
+
+    /*
+     * SETTINGS CARRIES ITS OWN, because it is the only screen with pages
+     * inside it. One step from a submenu is the list; one step from the list
+     * is the way out. The same function answers the Back button and the
+     * swipe, so they cannot disagree.
+     */
+    const set = read('mobile/src/screens/Settings.js')
+    assert.match(
+      set,
+      /const goBack = \(\) => \(page === null \? onBack\?\.\(\) : setPage\(null\)\)/,
+      'a swipe in Settings does not go back one step'
+    )
+    assert.match(set, /<EdgeBack onBack=\{goBack\}>/, 'Settings cannot be swiped out of')
+
+    /*
+     * AND EVERY SUBMENU HAS BOTH. It had Back and no Done, so leaving from
+     * three levels in was three taps; the list had Done and no Back.
+     */
+    const head = set.slice(set.indexOf('const head = (title, onDone) =>'), set.indexOf('const goBack ='))
+    assert.ok(head.length > 100, 'the page header moved; this check reads it')
+    const back = head.slice(head.indexOf("onDone === 'back' ?"), head.indexOf(') : ('))
+    assert.match(back, /label="‹ Settings"/, 'a submenu has no way back to the list')
+    assert.match(back, /label="Done" height=\{40\} onPress=\{onBack\}/, 'a submenu has no Done, so leaving takes a tap per level')
+  })
+
   test('the demo stays in front of the paywall', () => {
     const app = read('mobile/App.js')
     /* Not `[^>]*` — the arrow in `() =>` is a `>` and would end the class. */

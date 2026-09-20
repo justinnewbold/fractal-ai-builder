@@ -30,6 +30,7 @@ import Note from '../components/Note'
 import PasswordBox from '../components/PasswordBox'
 import Press from '../components/Press'
 import { SaveButton, SaveNotes, useSaveToSlot } from '../components/SaveToSlot'
+import EdgeBack from '../components/EdgeBack'
 import Sheet from '../components/Sheet'
 
 const face = Platform.select(mono)
@@ -145,26 +146,49 @@ export default function Settings({
           ? 'Your computer isn’t answering'
           : 'Not connected'
 
-  const head = (title, onDone) => (
-    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
-      {onDone === 'back' ? (
-        <Press label="‹ Settings" height={40} onPress={() => setPage(null)} />
-      ) : (
+  /*
+   * TWO WAYS OUT OF EVERY PAGE, and they go to different places on purpose.
+   *
+   * "Add the done button to all submenus, and if they click done, it takes
+   * them directly back to the play screen, no matter how deep they are in the
+   * submenus. Swiping back should always take them to the previous screen."
+   *
+   * Back is one step — a submenu to the list, the list to Play. Done is the
+   * whole way out from any depth. A submenu had only Back, so leaving from
+   * three levels in meant tapping out one level at a time; the list had only
+   * Done, so there was no step back from it at all. Both now have both.
+   *
+   * The submenu head is two rows rather than three things crammed across one:
+   * Back and Done on the top, the title under them with the width to itself.
+   * "Rename presets and scenes" is four words that will not share a line with
+   * two buttons on a phone.
+   */
+  const head = (title, onDone) =>
+    onDone === 'back' ? (
+      <View style={{ gap: space.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
+          <Press label="‹ Settings" height={40} onPress={() => setPage(null)} />
+          <Press label="Done" height={40} onPress={onBack} />
+        </View>
         <Text accessibilityRole="header" style={{ color: color.silk, fontSize: font.title, fontWeight: '700' }}>
           {title}
         </Text>
-      )}
-      {onDone === 'back' ? (
-        <Text accessibilityRole="header" style={{ color: color.silk, fontSize: font.lead, fontWeight: '700' }}>
+      </View>
+    ) : (
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
+        <Text accessibilityRole="header" style={{ color: color.silk, fontSize: font.title, fontWeight: '700' }}>
           {title}
         </Text>
-      ) : (
         <Press label="Done" height={40} onPress={onBack} />
-      )}
-    </View>
-  )
+      </View>
+    )
+
+  /* One step up, whatever that means from where you are standing. The swipe
+     and the Back button are the same errand, so they ask the same function. */
+  const goBack = () => (page === null ? onBack?.() : setPage(null))
 
   return (
+    <EdgeBack onBack={goBack}>
     <ScrollView
       style={{ flex: 1 }}
       contentContainerStyle={{ padding: space.lg, gap: space.xl, paddingBottom: space.xxl }}
@@ -716,6 +740,7 @@ export default function Settings({
         </>
       ) : null}
     </ScrollView>
+    </EdgeBack>
   )
 }
 
