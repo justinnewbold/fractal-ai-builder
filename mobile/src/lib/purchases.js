@@ -304,6 +304,31 @@ export const restorePurchase = async () => {
  */
 export const mayConnect = () => mayDrive(state)
 
+/**
+ * WHETHER TO SHOW THE WAY IN — which is NOT the same question as whether
+ * money can change hands this second, and treating them as one was a bad
+ * mistake.
+ *
+ * Every unlock route was gated on `available`, on the reasoning that a button
+ * which cannot take money is worse than no button. The consequence is worse
+ * than either: `available` is false whenever the store is not set up yet, or
+ * unreachable, or still propagating permissions — and in all of those the
+ * offer VANISHED COMPLETELY. An absent button is indistinguishable from a
+ * feature that does not exist.
+ *
+ *   "I'm building this app and I don't know where to unlock it."
+ *
+ * That is the proof. He wrote it, he knew it was there, and he could not find
+ * it, because on his handset the store was not ready and so the app had
+ * silently erased every trace of the thing it is selling.
+ *
+ * So: the offer shows whenever somebody is in the demo and has not paid. What
+ * `available` decides now is what the PAYWALL says when they get there —
+ * a price and a working button, or an honest line about why not. A route to
+ * an explanation beats no route at all, every time.
+ */
+export const shouldOffer = ({ demo }) => Boolean(demo) && !state.unlocked
+
 export const purchaseState = () => state
 
 const subscribe = (fn) => {
