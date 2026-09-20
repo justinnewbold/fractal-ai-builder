@@ -44,6 +44,8 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
   const [volume, setVolume] = useState(false)
   const [failed, setFailed] = useState(null)
   const purchase = usePurchase()
+  /* Named once, because the word and the pill below must agree about it. */
+  const canBuy = Boolean(demo && purchase.available && !purchase.unlocked && onUnlock)
 
   /*
    * The demo says DEMO, not CONNECTED.
@@ -136,7 +138,7 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
       <Pressable
         onPress={onOpenUnit || onOpenSettings}
         accessibilityRole="button"
-        accessibilityLabel={demo ? 'Which unit the demo is' : 'About this unit'}
+        accessibilityLabel={demo ? 'Demo Unit' : 'About this unit'}
         hitSlop={8}
       >
         <Text
@@ -172,9 +174,33 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
         {`v${APP_VERSION}`}
       </Text>
 
-      {/* The word carries the state as well as saying it. */}
+      {/*
+        The word carries the state as well as saying it — and in the demo it
+        carries the way out too.
+
+        "On the main screen, make it so demo can be clicked to bring up the
+        unlock page." The Unlock pill beside it says what it does in a word,
+        which is what makes it findable; DEMO is the thing an eye actually
+        lands on. Both go to the same place now, which costs nothing and
+        forgives a thumb.
+
+        Only while there is something to buy. Outside the demo this is
+        CONNECTED or FINDING and means nothing of the sort, so it stays a
+        plain label rather than a control that would do nothing.
+      */}
       <Text
         numberOfLines={1}
+        {...(canBuy
+          ? {
+              accessibilityRole: 'button',
+              accessibilityLabel: 'Unlock the full version',
+              suppressHighlighting: true,
+              onPress: () => {
+                tick()
+                onUnlock()
+              }
+            }
+          : null)}
         style={{
           color:
             mark === 'ok'
@@ -214,7 +240,7 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
        * it is bought — a button that charges a person twice, or that cannot
        * take money at all, is worse than no button.
        */}
-      {demo && purchase.available && !purchase.unlocked && onUnlock ? (
+      {canBuy ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Unlock the full version"

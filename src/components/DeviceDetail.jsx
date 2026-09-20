@@ -67,7 +67,7 @@ export default function DeviceDetail({ status, device, onRetry, busy }) {
   return (
     <div className="device-detail">
       {demo ? (
-        <div className="demo-units" role="group" aria-label="Which unit the demo is">
+        <div className="demo-units" role="group" aria-label="Demo Unit">
           {DEMO_UNITS.map((u) => (
             <button
               key={u.key}

@@ -451,10 +451,10 @@ export const AREAS = [
       },
       {
         does: 'choose which of the five Fractals the demo is',
-        web: 'Which unit the demo is',
-        phone: 'Which unit',
-        unreadable: ['phone'],
-        why: 'the phone says it as a section heading inside the demo block, where the sentence above it has already said this is the demo; the browser says it as a row in a list of unrelated rows and has to carry the whole errand in the title'
+        web: 'Demo Unit',
+        phone: 'Demo Unit',
+        unreadable: ['web', 'phone'],
+        why: 'both ends now say "Demo Unit" — it was "Which unit the demo is" at both, which is a sentence rather than a label and read as one in a list of two-word rows. NEITHER end is readable from here: the browser says it as a Setup row in App.jsx and the phone as a sheet title in components/DemoUnit.js, and this area scans the connect and sign-in screens at both ends. The old wording was five words, so LOOKS_LIKE_A_BUTTON never matched it and the check skipped itself silently; the new one is two words and matches, which is how the gap showed up at all.'
       },
       {
         does: 'read the pairing code off the computer’s screen with the camera',

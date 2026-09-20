@@ -131,7 +131,7 @@ export default function TopBar({
         <button
           className="topbar-unit silk-label"
           onClick={onOpenUnit}
-          aria-label={demo ? 'Which unit the demo is' : 'About this unit'}
+          aria-label={demo ? 'Demo Unit' : 'About this unit'}
         >
           {unit}
         </button>
