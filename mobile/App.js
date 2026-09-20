@@ -26,9 +26,10 @@ import { useRig } from './src/lib/rig'
 import { keepLog } from './src/lib/logKeep'
 import { installCrashCapture } from './src/lib/debugLog'
 import { restoreDemo, setDemo, useDemo } from './src/lib/demo'
+import Tour, { tourSeen } from './src/components/Tour'
 import { BENCH } from './src/lib/features'
 import Paywall from './src/screens/Paywall'
-import { startPurchases, usePurchase } from './src/lib/purchases'
+import { checkOwner, startPurchases, usePurchase } from './src/lib/purchases'
 import { shouldAskToPay } from './src/lib/unlock-rule'
 
 /**
@@ -135,6 +136,17 @@ export default function App() {
    * back to it, because nothing is being withheld: they came looking.
    */
   const [buying, setBuying] = useState(false)
+  /*
+   * THE TOUR, WHICH THIS END NEVER HAD. "First issue is demo has no
+   * tutorial. Very important."
+   *
+   * Starts hidden and appears only once disk has answered, so somebody who
+   * read it last week never sees it flash. It waits for the app to be past
+   * the door — there is nothing to tour from a sign-in screen, and a tutorial
+   * arriving on top of a real problem is noise over the one message that
+   * mattered.
+   */
+  const [touring, setTouring] = useState(false)
 
   const caps = useRig(ofCaps)
   const readFailed = useRig(ofError)
@@ -167,6 +179,16 @@ export default function App() {
   useEffect(() => {
     startPurchases()
   }, [])
+
+  /* Once, on the first launch that gets as far as the app itself. */
+  useEffect(() => {
+    if (auth !== 'in') return undefined
+    let alive = true
+    tourSeen().then((seen) => alive && !seen && setTouring(true))
+    return () => {
+      alive = false
+    }
+  }, [auth])
 
   /*
    * THE ONE PLACE THE PAYWALL IS RAISED, and it waits to be sure.
@@ -300,7 +322,16 @@ export default function App() {
             <ActivityIndicator color={color.silkDim} />
           </View>
         ) : auth === 'out' ? (
-          <SignIn onSignedIn={() => setAuth('in')} onDemo={() => setAuth('in')} />
+          <SignIn
+            onSignedIn={() => {
+              /* An owner signing in is unlocked from that moment, not from
+                 the next launch — the check at startup ran before there was
+                 an account to read. */
+              checkOwner()
+              setAuth('in')
+            }}
+            onDemo={() => setAuth('in')}
+          />
         ) : auth === 'paywall' ? (
           <Paywall
             onUnlocked={() => setAuth('in')}
@@ -333,6 +364,7 @@ export default function App() {
               onOpenUnit={() => (demo ? setPickUnit(true) : setScreen('settings'))}
             />
             <DemoUnit open={pickUnit} onClose={() => setPickUnit(false)} />
+            {touring ? <Tour onClose={() => setTouring(false)} /> : null}
             {/* Over the top of whatever is on screen, and gone again on a
                 tap. Nothing behind it is being withheld — they came looking
                 for this, so Back means back, not out. */}
@@ -391,6 +423,7 @@ export default function App() {
               />
             ) : screen === 'settings' ? (
               <Settings
+                onOpenTour={() => setTouring(true)}
                 onUnlock={() => setBuying(true)}
                 link={link.link}
                 macName={link.macName}
@@ -463,6 +496,7 @@ export default function App() {
                 onOpenEdit={
                   BENCH && link.link === 'connected' ? () => setScreen('edit') : null
                 }
+                onUnlock={() => setBuying(true)}
               />
             )}
           </>

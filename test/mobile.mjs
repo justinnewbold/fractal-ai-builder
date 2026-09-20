@@ -14,7 +14,7 @@
  * App.jsx, and import the plain modules where they can.
  */
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -47,6 +47,20 @@ const PHONE_GLOBALS = new Set([
 ])
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
+
+/**
+ * A file's CODE, without the prose around it.
+ *
+ * Every rule worth writing down here is a rule some comment in the app
+ * explains — and explaining a rule means NAMING the thing it forbids. A
+ * file-wide grep for the forbidden thing then matches the sentence that
+ * forbids it, and the file fails for documenting itself.
+ *
+ * The tour is the case in hand: its own header says why a phone must never
+ * be told to press Save, and a check for "press Save" matched that sentence.
+ */
+const withoutComments = (t) =>
+  t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
 
 /** Every .js under a directory, so a new screen cannot quietly opt out. */
 /*
@@ -5791,6 +5805,86 @@ export function run(test) {
   })
 
   /**
+   * EVERY RELATIVE IMPORT ON THE PHONE POINTS AT A FILE THAT IS THERE.
+   *
+   * purchases.js was pushed with `import { isOwner } from './owner-unlock'`
+   * and no such file beside it — the source lives in shared/, and Metro
+   * resolves a relative import inside mobile/src/lib and cannot reach up out
+   * of it. The result is not a missing owner check. It is:
+   *
+   *   Unable to resolve module ./owner-unlock
+   *
+   * which fails the whole bundle, so the app does not start. On a phone that
+   * is the worst failure this project can ship, and the entire suite was
+   * silent about it: the test for that file imports shared/owner-unlock.mjs
+   * directly, and nothing in `npm test` bundles the phone.
+   *
+   * CI caught it, in the `check` job, by running `npx expo export` — which is
+   * why CLAUDE.md calls that the real check that the app still bundles. This
+   * test is the cheap half of it: it cannot prove the app runs, but a missing
+   * file is most of what goes wrong here and it takes a few milliseconds
+   * rather than eight seconds of Metro.
+   *
+   * The fix for that one was a sync entry, not a hand-written copy. Anything
+   * shared with the browser is generated into mobile/src/lib by
+   * `npm run sync:rules`; see scripts/sync-relay-rules.mjs.
+   */
+  test('every file the phone imports is a file that exists', () => {
+    const dir = new URL('../mobile/src/', import.meta.url)
+    const walk = (at) => {
+      const out = []
+      for (const entry of readdirSync(at, { withFileTypes: true })) {
+        const next = new URL(entry.name + (entry.isDirectory() ? '/' : ''), at)
+        if (entry.isDirectory()) out.push(...walk(next))
+        else if (/\.jsx?$/.test(entry.name)) out.push(next)
+      }
+      return out
+    }
+
+    const files = [...walk(dir), new URL('../mobile/App.js', import.meta.url)]
+    assert.ok(files.length > 30, `only ${files.length} phone files were found; this check read nothing`)
+
+    /*
+     * The extensions Metro will try, taken from the resolver's own error
+     * message rather than guessed:
+     *
+     *   None of these files exist:
+     *     * src/lib/owner-unlock(.ios.ts|.native.ts|.ts|…|.mjs|…|.js|…)
+     *
+     * Guessing cost a false alarm already: a first draft listed only .js,
+     * .jsx and .json and accused relay.js of importing a missing './decode',
+     * which is decode.mjs and resolves perfectly. A guard that cries wolf
+     * about a working import is worse than no guard, because the next real
+     * one gets waved through with it.
+     */
+    const EXT = ['', '.ts', '.tsx', '.mjs', '.js', '.jsx', '.json', '.cjs']
+    const tries = (base) => [
+      ...EXT.map((e) => base + e),
+      ...EXT.filter(Boolean).map((e) => base + '/index' + e)
+    ]
+
+    const broken = []
+    for (const file of files) {
+      const text = readFileSync(file, 'utf8')
+      /* Relative imports only. A bare specifier is a package and npm's
+         problem, not this file's. */
+      for (const m of text.matchAll(/(?:^|\n)\s*(?:import[^'"\n]*from|export[^'"\n]*from)\s*['"](\.[^'"]*)['"]/g)) {
+        const target = new URL(m[1], file)
+        if (!tries(fileURLToPath(target)).some((p) => existsSync(p))) {
+          broken.push(`${fileURLToPath(file).split('/mobile/')[1]} imports ${m[1]}`)
+        }
+      }
+    }
+
+    assert.deepEqual(
+      broken,
+      [],
+      `the phone bundle cannot resolve:\n  ${broken.join('\n  ')}\n` +
+        'a shared file needs an entry in scripts/sync-relay-rules.mjs'
+    )
+  })
+
+  /**
    * AND THE WORD FOR A UNIT WITH NO GRID IS 'linear'.
    *
    * Four places ask `slotModel === 'linear'`: gridShape, isLinearChain at
@@ -5821,12 +5915,69 @@ export function run(test) {
     }
   })
 
+  /**
+   * THE PHONE HAS A TUTORIAL, which is the end that needed one most.
+   *
+   * "First issue is demo has no tutorial. Very important."
+   *
+   * The browser has had one since long before this app existed. The phone
+   * never did — which left the demo, the one place somebody arrives knowing
+   * nothing at all, as the end with no explanation.
+   *
+   * AND IT IS NOT THE BROWSER'S TOUR WITH THE WORDS CHANGED. The browser can
+   * save a preset into a slot and a phone cannot: the host refuses it from a
+   * distance, by REMOTE_FORBIDDEN in shared/relay-rules. A card saying "press
+   * Save" would send somebody hunting for a button that is deliberately
+   * absent, which is worse than saying nothing at all.
+   */
+  test('the phone tells a first-time player the four things', () => {
+    const tour = read('mobile/src/components/Tour.js')
+
+    /* The gesture with no visible control is the one that must be in here. */
+    assert.match(tour, /Hold a block to change its channel/, 'the long-press gesture is not taught')
+    assert.match(tour, /Scenes are one rig, several sounds/, 'scenes are not explained')
+
+    /* And the thing that is otherwise discovered as a disappointment. */
+    assert.match(tour, /This is a remote, not a workbench/, 'nothing says a phone cannot save')
+    /* `<?strong>?` made only the ANGLE BRACKETS optional, not the word — so
+       this asked for the literal "strongSave" and matched nothing ever. It is
+       the web tour's markup leaking into a file that has none. */
+    /* Code, not prose — see withoutComments. This file's own header explains
+       why a phone must not be told to press Save, and that sentence matched. */
+    assert.ok(
+      !/press\s+save/i.test(withoutComments(tour)),
+      'the tour tells a phone to press Save, which the host refuses from a distance'
+    )
+
+    /* Never twice. A tutorial that comes back after being dismissed is worse
+       than one nobody saw. */
+    assert.match(tour, /fractal\.tour\.v1/, 'seeing it is not remembered')
+    assert.match(tour, /markSeen\(\)/, 'closing it does not mark it seen')
+
+    /* Storage can refuse, and the kinder failure is to assume it was seen. */
+    assert.match(tour, /return true/, 'a phone that refuses storage gets the tour every launch')
+
+    /* It covers the screen rather than sitting in the stage layout. */
+    assert.match(tour, /<Modal visible animationType="slide"/, 'the tour is not a sheet and would push the rig down the page')
+
+    const app = read('mobile/App.js')
+    assert.match(app, /tourSeen\(\)\.then/, 'nothing decides whether to show it')
+    assert.match(app, /if \(auth !== 'in'\) return undefined/, 'the tour can arrive before the app does')
+
+    /* And it can be found again by somebody who skipped it. */
+    const set = read('mobile/src/screens/Settings.js')
+    assert.match(set, /How this works/, 'there is no way back to the tour')
+  })
+
   test('the demo stays in front of the paywall', () => {
     const app = read('mobile/App.js')
     /* Not `[^>]*` — the arrow in `() =>` is a `>` and would end the class. */
+    /* Not one line any more — signing in also re-checks whether the account
+       carries an unlock. What matters is unchanged: onDemo goes straight in
+       and asks nothing of anybody. */
     assert.match(
       app,
-      /<SignIn\s+onSignedIn=\{[^}]*\}\s+onDemo=\{\(\) => setAuth\('in'\)\}/,
+      /onDemo=\{\(\) => setAuth\('in'\)\}/,
       'the demo no longer goes straight in from the sign-in screen'
     )
     const paywall = read('mobile/src/screens/Paywall.js')
@@ -5908,8 +6059,8 @@ export function run(test) {
     assert.match(bar, /usePurchase/, 'the bar cannot know whether there is anything to sell')
     assert.match(
       bar,
-      /demo && purchase\.available && !purchase\.unlocked && onUnlock/,
-      'the Unlock button is gone from the bar, or shows when there is nothing to buy'
+      /const canBuy = Boolean\(onUnlock\) && shouldOffer\(\{ demo \}\)/,
+      'the Unlock button is gone from the bar, or decides for itself when to show'
     )
     assert.match(bar, /Unlock the full version/, 'the Unlock button has no accessible name')
 
@@ -5918,7 +6069,7 @@ export function run(test) {
        into disagreeing about whether there is anything to sell. */
     assert.match(
       bar,
-      /const canBuy = Boolean\(demo && purchase\.available && !purchase\.unlocked && onUnlock\)/,
+      /const canBuy = Boolean\(onUnlock\) && shouldOffer\(\{ demo \}\)/,
       'the word and the pill no longer share one condition'
     )
     assert.match(bar, /\{\.\.\.\(canBuy\s*\?\s*\{/, 'the word DEMO is not a way into the unlock page')
@@ -5938,10 +6089,12 @@ export function run(test) {
     /* And both are wired to a paywall that opens OVER the app rather than
        replacing it: nothing is being withheld, they came looking. */
     const app = read('mobile/App.js')
-    assert.equal(
-      (app.match(/onUnlock=\{\(\) => setBuying\(true\)\}/g) || []).length,
-      2,
-      'the bar and Settings do not both open the paywall'
+    /* The count itself is owned by the four-ways test below; this one only
+       cares that the routes reach the SAME paywall rather than each growing
+       its own. */
+    assert.ok(
+      (app.match(/onUnlock=\{\(\) => setBuying\(true\)\}/g) || []).length >= 2,
+      'the routes no longer open one shared paywall'
     )
     assert.match(app, /\{buying \? \(\s*<Paywall\s+asked/, 'the asked-for paywall is not rendered')
 
@@ -5953,13 +6106,151 @@ export function run(test) {
     assert.match(pay, /asked \? \(\s*<Sheet/, 'the asked-for paywall replaces the screen instead of sitting over it')
   })
 
+  /**
+   * AN OWNER IS UNLOCKED WITHOUT BUYING, and the list that says who is public.
+   *
+   * "Is there any way we can set it up so that my email unlocks the app
+   * automatically? I still wanna be able to test with live connections."
+   *
+   * Somebody has to drive a real rig before the thing is on sale. The list
+   * grants nothing by being read — it names ACCOUNTS, and the app consults it
+   * only for an account somebody is already signed in as, which means the
+   * password is the gate exactly as it is everywhere else.
+   */
+  test('an owner account is unlocked, and no address is in the repository', async () => {
+    const { isOwner, fold } = await import(
+      new URL('../shared/owner-unlock.mjs', import.meta.url).href
+    )
+
+    assert.equal(isOwner('justinnewbold@gmail.com'), true, 'the author is not unlocked')
+    assert.equal(isOwner('  JustinNewbold@GMAIL.com '), true, 'case and spacing break the match')
+    assert.equal(isOwner('someone@else.com'), false, 'a stranger is unlocked')
+    assert.equal(isOwner('pair-abcd@fractal.local'), false, 'a pairing-code account is unlocked')
+    for (const nothing of ['', null, undefined, 'notanemail']) {
+      assert.equal(isOwner(nothing), false, `"${nothing}" counted as an owner`)
+    }
+
+    /* The hashing buys no secrecy and is not meant to — it keeps an address
+       out of a public file, where it would be scraped within a week. So the
+       file must not contain one. */
+    const src = readFileSync(new URL('../shared/owner-unlock.mjs', import.meta.url), 'utf8')
+    const found = src.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) || []
+    assert.deepEqual(
+      found.filter((a) => a !== 'someone@example.com'),
+      [],
+      'an email address is written into shared/owner-unlock.mjs'
+    )
+    assert.equal(typeof fold, 'function', 'fold is gone, so owners cannot be added')
+
+    /* And the app reads the account from the SESSION, never from a box. */
+    const lib = read('mobile/src/lib/purchases.js')
+    assert.match(lib, /await currentAccount\(\)/, 'the owner check trusts something other than the session')
+    assert.match(lib, /await checkOwner\(\)/, 'the owner check never runs at startup')
+    const app = read('mobile/App.js')
+    assert.match(app, /checkOwner\(\)/, 'signing in does not re-check the account')
+  })
+
+  /**
+   * THE OFFER MUST NEVER HIDE ITSELF, which is the bug that made the whole
+   * purchase invisible on a real handset.
+   *
+   * Every route was gated on `purchase.available`, reasoning that a button
+   * which cannot take money is worse than no button. The consequence is worse
+   * than either: `available` is false whenever the store is not set up yet,
+   * unreachable, or still propagating permissions, and in all of those the
+   * offer VANISHED. An absent button is indistinguishable from a feature that
+   * does not exist.
+   *
+   * "I'm building this app and I don't know where to unlock it."
+   *
+   * He wrote it, knew it was there, and could not find it. So `shouldOffer`
+   * asks one thing — are they in the demo and have they not paid — and what
+   * `available` decides is what the PAYWALL says when they arrive.
+   */
+  test('the way to buy it is never hidden by the store not being ready', async () => {
+    const src = read('mobile/src/lib/purchases.js')
+    assert.match(
+      src,
+      /export const shouldOffer = \(\{ demo \}\) => Boolean\(demo\) && !state\.unlocked/,
+      'shouldOffer changed shape — it must not consult `available`'
+    )
+    const fn = src.slice(src.indexOf('export const shouldOffer'), src.indexOf('export const shouldOffer') + 200)
+    assert.ok(!/available/.test(fn), 'the offer is gated on the store being ready again')
+
+    /* And every route uses it rather than rolling its own condition. */
+    /* Comments explaining the fix necessarily NAME the thing they warn about,
+       so this reads the code with them stripped. A file-wide grep tripped on
+       its own explanation. */
+    const code = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+    for (const f of ['mobile/src/components/TopBar.js', 'mobile/src/components/UnlockOffer.js']) {
+      const text = code(read(f))
+      assert.match(text, /shouldOffer\(\{ demo \}\)/, `${f} decides for itself whether to offer`)
+      assert.ok(
+        !/purchase\.available/.test(text),
+        `${f} consults \`available\` again, which is what made the offer vanish`
+      )
+    }
+  })
+
+  /**
+   * FOUR WAYS IN, ONE DESTINATION.
+   *
+   * "We need lots of ways to unlock the phone from different menus and
+   * different screens, not to the point that it's annoying but to the point
+   * where there is a clear path."
+   */
+  test('there are four ways to the purchase and they all go to one place', () => {
+    const app = read('mobile/App.js')
+    assert.equal(
+      (app.match(/onUnlock=\{\(\) => setBuying\(true\)\}/g) || []).length,
+      3,
+      'the bar, Settings and the stage screen do not all open the same paywall'
+    )
+
+    /* The fourth is the word DEMO itself, inside the bar. */
+    const bar = read('mobile/src/components/TopBar.js')
+    assert.match(bar, /\{\.\.\.\(canBuy\s*\?\s*\{/, 'the word DEMO is no longer a way in')
+
+    /* The price goes ON the buttons. Asking somebody to tap to find out what
+       it costs is asking for the tap most people will not make. */
+    const offer = read('mobile/src/components/UnlockOffer.js')
+    for (const [where, text] of [['the bar', bar], ['the stage offer', offer]]) {
+      assert.match(
+        text,
+        /purchase\.price \? `Unlock \$\{purchase\.price\}` : 'Unlock'/,
+        `${where} does not show the price on the button`
+      )
+    }
+
+    /* And it can be put away, or it is an advertisement rather than an offer —
+       on a screen that is open on a dark stage between songs. */
+    assert.match(offer, /Put this away/, 'the stage offer cannot be dismissed')
+    assert.match(offer, /fractal\.offerDismissed/, 'dismissing it is not remembered')
+  })
+
   test('a phone that cannot buy anything is never locked out', () => {
     const src = read('mobile/src/lib/purchases.js')
     assert.match(src, /canMakePayments/, 'nothing asks whether this install can pay at all')
+
+    /*
+     * TWO facts now, not one, and the second is what was missing.
+     *
+     * `canMakePayments` answers "could this handset pay for something" and
+     * says nothing about whether a product EXISTS. Before the item is created
+     * in the stores there is no offering, so the gate closed over a paywall
+     * with nothing to sell — "I'm blocked now by the gate for the unlock" —
+     * and a failed offerings fetch would do the same to a real customer on a
+     * bad hotel network.
+     */
     assert.match(
       src,
-      /available:\s*canPay/,
-      'the answer to "can this phone pay" does not decide whether anything is locked'
+      /const sellable = await loadPrice\(\)/,
+      'nothing asks whether the store has anything to sell'
+    )
+    assert.match(
+      src,
+      /const available = canPay && sellable/,
+      'the gate no longer needs BOTH a phone that can pay and something to sell'
     )
     /* And it must not be able to throw its way into locking the app. */
     const block = src.slice(src.indexOf('let canPay'), src.indexOf('set({\n      available'))
