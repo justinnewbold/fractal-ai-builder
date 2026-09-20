@@ -32,6 +32,8 @@ import LinkChip from './LinkChip'
 export default function TopBar({
   status,
   device,
+  /* Where the DEMO word goes when there is one. See below. */
+  onGetPhoneApp,
   /* Which kind of fault this is, so the word beside the lamp is about the
      thing that is actually missing. See describeUnit. */
   faultReason = null,
@@ -137,7 +139,34 @@ export default function TopBar({
         </button>
         {/* The word carries the state as well as saying it: green when the unit
             is answering, red when it isn't, so the bar reads at a glance. */}
-        {how ? (
+        {/*
+          IN THE DEMO THE WORD IS A BUTTON, and it goes somewhere this app can
+          actually deliver.
+
+          "Make it so demo can be clicked to bring up the unlock page." On the
+          phone that is exactly what it does. HERE it cannot: this app has no
+          purchase in it and never will — the unlock is an in-app purchase,
+          which means Apple's and Google's, which means it happens on a phone.
+          A Buy button on a Mac would be a button that cannot take money.
+
+          What this end CAN do is hand somebody the phone app, which is the
+          thing being sold. So DEMO opens that: what the remote does, what it
+          costs, and a square to point a camera at.
+
+          Outside the demo the same word reads CONNECTED or FINDING, means
+          nothing of the sort, and stays a plain label rather than becoming a
+          control that would surprise somebody mid-set.
+        */}
+        {how && demo && onGetPhoneApp ? (
+          <button
+            className="topbar-how is-button" data-state={lampState}
+            onClick={onGetPhoneApp}
+            title={demoSentence(demoUnit())}
+            aria-label="Get Fractal Remote on your phone"
+          >
+            {how}
+          </button>
+        ) : how ? (
           <span
             className="topbar-how" data-state={lampState}
             /* The demo's one-line explanation lives behind its word once the

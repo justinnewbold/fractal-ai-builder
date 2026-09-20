@@ -20,6 +20,7 @@ import GridEditor from './components/GridEditor'
 import Ports from './components/Ports'
 import LocalLibrary from './components/LocalLibrary'
 import GearNames from './components/GearNames'
+import PhoneApp from './components/PhoneApp'
 import SetupRow from './components/SetupRow'
 import { FULL, BUILT_AT, VERSION } from './lib/version'
 import Theme from './components/Theme'
@@ -368,6 +369,7 @@ const HAND_EDIT_KINDS = new Set([
  */
 const SETUP_PAGES = {
   link: 'Phone & computer',
+  phone: 'Get it on your phone',
   demo: 'Demo Unit',
   rename: 'Rename presets and scenes',
   play: 'Play screen',
@@ -2909,7 +2911,13 @@ export default function App() {
         doesn't follow it.
       */}
       <TopBar
-        status={status}
+        onGetPhoneApp={() => {
+              /* Setup is a sheet here, so open the sheet AND land on the page
+                 — opening one without the other shows the wrong screen. */
+              setSheet('settings')
+              setSetupPage('phone')
+            }}
+            status={status}
         device={device}
         faultReason={faultReason}
         preset={preset}
@@ -3827,6 +3835,16 @@ export default function App() {
               {isDemo() ? (
                 <SetupRow key="demo-unit" title="Demo Unit" status={`${unitByKey(demoUnit()).name} · five to choose from`} onClick={() => setSetupPage('demo')} />
               ) : null}
+              {/* Not only behind the DEMO badge. Somebody who has a rig
+                  connected and wants the remote in their pocket is the likeliest
+                  buyer there is, and the badge they would have clicked is not
+                  on screen for them. */}
+              <SetupRow
+                key="phone-app"
+                title="Get it on your phone"
+                status="The remote, for a stage"
+                onClick={() => setSetupPage('phone')}
+              />
               <SetupRow key="rename" title="Rename presets and scenes" status={status === 'live' ? 'Give them names you will know on a dark stage' : 'Connect a unit first'} onClick={() => setSetupPage('rename')} />
               {/* The theme is behind this row and the status says so, because
                   "Play screen" is not where anybody looks for light and dark —
@@ -3840,6 +3858,8 @@ export default function App() {
             </div>
           </>
         ) : null}
+
+        {setupPage === 'phone' ? <PhoneApp /> : null}
 
         {setupPage === 'demo' ? (
           <div className="setup-page">
