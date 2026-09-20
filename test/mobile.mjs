@@ -5982,59 +5982,6 @@ export function run(test) {
     }
   })
 
-  /**
-   * THE PHONE HAS A TUTORIAL, which is the end that needed one most.
-   *
-   * "First issue is demo has no tutorial. Very important."
-   *
-   * The browser has had one since long before this app existed. The phone
-   * never did — which left the demo, the one place somebody arrives knowing
-   * nothing at all, as the end with no explanation.
-   *
-   * AND IT IS NOT THE BROWSER'S TOUR WITH THE WORDS CHANGED. The browser can
-   * save a preset into a slot and a phone cannot: the host refuses it from a
-   * distance, by REMOTE_FORBIDDEN in shared/relay-rules. A card saying "press
-   * Save" would send somebody hunting for a button that is deliberately
-   * absent, which is worse than saying nothing at all.
-   */
-  test('the phone tells a first-time player the four things', () => {
-    const tour = read('mobile/src/components/Tour.js')
-
-    /* The gesture with no visible control is the one that must be in here. */
-    assert.match(tour, /Hold a block to change its channel/, 'the long-press gesture is not taught')
-    assert.match(tour, /Scenes are one rig, several sounds/, 'scenes are not explained')
-
-    /* And the thing that is otherwise discovered as a disappointment. */
-    assert.match(tour, /This is a remote, not a workbench/, 'nothing says a phone cannot save')
-    /* `<?strong>?` made only the ANGLE BRACKETS optional, not the word — so
-       this asked for the literal "strongSave" and matched nothing ever. It is
-       the web tour's markup leaking into a file that has none. */
-    /* Code, not prose — see withoutComments. This file's own header explains
-       why a phone must not be told to press Save, and that sentence matched. */
-    assert.ok(
-      !/press\s+save/i.test(withoutComments(tour)),
-      'the tour tells a phone to press Save, which the host refuses from a distance'
-    )
-
-    /* Never twice. A tutorial that comes back after being dismissed is worse
-       than one nobody saw. */
-    assert.match(tour, /fractal\.tour\.v1/, 'seeing it is not remembered')
-    assert.match(tour, /markSeen\(\)/, 'closing it does not mark it seen')
-
-    /* Storage can refuse, and the kinder failure is to assume it was seen. */
-    assert.match(tour, /return true/, 'a phone that refuses storage gets the tour every launch')
-
-    /* It covers the screen rather than sitting in the stage layout. */
-    assert.match(tour, /<Modal visible animationType="slide"/, 'the tour is not a sheet and would push the rig down the page')
-
-    const app = read('mobile/App.js')
-    assert.match(app, /tourSeen\(\)\.then/, 'nothing decides whether to show it')
-    assert.match(app, /if \(auth !== 'in'\) return undefined/, 'the tour can arrive before the app does')
-
-    /* And it can be found again by somebody who skipped it. */
-    const set = read('mobile/src/screens/Settings.js')
-    assert.match(set, /How this works/, 'there is no way back to the tour')
-  })
 
   /**
    * SWIPE IN FROM THE LEFT TO GO BACK, AND DONE LEAVES FROM ANY DEPTH.

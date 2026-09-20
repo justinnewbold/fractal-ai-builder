@@ -27,7 +27,6 @@ import { useRig } from './src/lib/rig'
 import { keepLog } from './src/lib/logKeep'
 import { installCrashCapture } from './src/lib/debugLog'
 import { restoreDemo, setDemo, useDemo } from './src/lib/demo'
-import Tour, { tourSeen } from './src/components/Tour'
 import { BENCH } from './src/lib/features'
 import Paywall from './src/screens/Paywall'
 import { checkOwner, startPurchases, usePurchase } from './src/lib/purchases'
@@ -173,7 +172,6 @@ export default function App() {
    * arriving on top of a real problem is noise over the one message that
    * mattered.
    */
-  const [touring, setTouring] = useState(false)
 
   const caps = useRig(ofCaps)
   const readFailed = useRig(ofError)
@@ -206,16 +204,6 @@ export default function App() {
   useEffect(() => {
     startPurchases()
   }, [])
-
-  /* Once, on the first launch that gets as far as the app itself. */
-  useEffect(() => {
-    if (auth !== 'in') return undefined
-    let alive = true
-    tourSeen().then((seen) => alive && !seen && setTouring(true))
-    return () => {
-      alive = false
-    }
-  }, [auth])
 
   /*
    * THE ONE PLACE THE PAYWALL IS RAISED, and it waits to be sure.
@@ -391,7 +379,6 @@ export default function App() {
               onOpenUnit={() => (demo ? setPickUnit(true) : setScreen('settings'))}
             />
             <DemoUnit open={pickUnit} onClose={() => setPickUnit(false)} />
-            {touring ? <Tour onClose={() => setTouring(false)} /> : null}
             {/* Over the top of whatever is on screen, and gone again on a
                 tap. Nothing behind it is being withheld — they came looking
                 for this, so Back means back, not out. */}
@@ -467,7 +454,6 @@ export default function App() {
               />
             ) : screen === 'settings' ? (
               <Settings
-                onOpenTour={() => setTouring(true)}
                 onUnlock={() => setBuying(true)}
                 link={link.link}
                 macName={link.macName}

@@ -51,7 +51,6 @@ const ofUnitState = (s) => s.unit
    under "Unit" in its own Setup: renaming is bench work, not something a thumb
    crosses between songs, which is exactly why neither app puts it on Play. */
 export default function Settings({
-  onOpenTour,
   onUnlock,
   onOpenConnect,
   link,
@@ -308,13 +307,6 @@ export default function Settings({
             {/* Openable again, because a tour worth showing once is worth
                 finding later — and somebody who skipped it on the first
                 launch has no other way back to it. */}
-            {onOpenTour ? (
-              <SetupRow
-                title="How this works"
-                status="The four things worth knowing"
-                onPress={onOpenTour}
-              />
-            ) : null}
             <SetupRow title="About" status={`v${APP_VERSION}`} onPress={() => setPage('about')} />
             {/*
               * WHAT IS RUNNING, AND HOW TO GET THE NEWEST.
