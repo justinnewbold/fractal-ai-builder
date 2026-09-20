@@ -22,7 +22,7 @@ import {
 } from '../lib/relay'
 import { notePresetName, noteSceneName, useRig } from '../lib/rig'
 import { dropReadCache, sceneShape, setPresetName, setSceneName } from '../lib/device'
-import { SIZES, loadSize, saveSize } from '../lib/gigSize'
+import { SIZES, loadFit, loadSize, saveFit, saveSize } from '../lib/gigSize'
 import { sync, useStored } from '../lib/store'
 import { isPairAccount } from '../lib/pairing'
 import Lamp from '../components/Lamp'
@@ -942,25 +942,69 @@ function NameField({ label, value, onDone }) {
  * screen and Largest for somebody playing in the dark. Kept under the same key
  * as the browser's, so a phone and a laptop on one account agree.
  */
+/**
+ * Fit on screen, or a size of your own.
+ *
+ * "Make one that says fit on screen, and if they click that, it'll just make
+ * sure whatever size device they're on, all of those will fit onto the screen
+ * so they don't have to manually push up and down for sizes and then go back
+ * to the play screen to see what it did and then go back, so that way it's
+ * just always set up, good to go. Also make this the default setting from the
+ * beginning."
+ *
+ * FIT SITS FIRST AND IS ON OUT OF THE BOX, because it is the answer for
+ * everybody who has not got an opinion yet — which is everybody, on the first
+ * launch. The five steps underneath are still there and still remembered;
+ * they are now the thing you pick when fit has guessed wrong for you, rather
+ * than the only way to get a screen that fits.
+ *
+ * It is not a sixth step on the ladder, and drawing it as one would be a lie
+ * about what it does. A step is a height. Fit is a rule: the screen is
+ * measured and the tiles take what is left, so the same setting gives
+ * different pixels on a different phone, or on the same phone with a preset
+ * that has more blocks in it. That is the whole point — the round trip to Play
+ * and back to check ends here.
+ */
 function TileSize() {
   useStored()
   const now = loadSize(sync)
+  const fit = loadFit(sync, true)
   return (
     <View style={{ gap: space.sm }}>
+      <Press
+        label="Fit on screen"
+        sub="Sizes everything to your phone, whatever the preset holds"
+        tone="signal"
+        on={fit}
+        height={TAP}
+        onPress={() => saveFit(true, sync)}
+      />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
         {SIZES.map((size, i) => (
           <Press
             key={size.name}
             label={size.name}
             tone="signal"
-            on={i === now}
+            /* Never lit while fit is on: the stored step is still there and
+               comes back when it is picked, but it is not what the screen is
+               being drawn at, and showing it as chosen would say it was. */
+            on={!fit && i === now}
             height={44}
             style={{ paddingHorizontal: space.md }}
-            onPress={() => saveSize(i, sync)}
+            /* Picking a size IS turning fit off. Leaving it on and quietly
+               ignoring the press is how a setting stops being believed. */
+            onPress={() => {
+              saveFit(false, sync)
+              saveSize(i, sync)
+            }}
           />
         ))}
       </View>
-      <Note>Bigger tiles are easier to hit without looking; smaller ones fit more of the rig on screen.</Note>
+      <Note>
+        Fit does the work for you. Pick a size instead if you want bigger targets and do not mind
+        scrolling — bigger tiles are easier to hit without looking, smaller ones fit more of the rig
+        on screen.
+      </Note>
     </View>
   )
 }

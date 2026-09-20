@@ -1596,13 +1596,20 @@ export function run(test) {
      */
     const stage = read('mobile/src/screens/Stage.js')
     assert.match(stage, /const size = SIZES\[loadSize\(sync\)\]/, 'the stage screen never reads the tile size')
-    assert.match(stage, /height=\{size\.tile\}/, 'the scene tiles ignore the size setting')
+    /* `tileH` is the size setting OR the measured fit — see the fit test
+       below for which wins and when. Either way it is read, not ignored. */
+    assert.match(stage, /const tileH = fitted \? fitted\.tile : size\.tile/, 'the tile height is no longer the chosen size')
+    assert.match(stage, /height=\{tileH\}/, 'the scene tiles ignore the size setting')
     /* The tiles are measured rather than given a percentage now — a percentage
        cannot pay for the gaps, and the last tile of a short row stretched the
        width of the screen. The rule being checked is the same: how many go
        across comes from the setting. */
     assert.match(stage, /width: tileWidth\(row, size\.scenes\)/, 'the scenes are a fixed number across whatever the setting says')
-    assert.match(stage, /width: tileWidth\(row, size\.fx\)/, 'the chain is a fixed number across whatever the setting says')
+    /* Blocks take their column count from `fxCols`, which is the setting's
+       own `fx` until fit is measuring — fit widens the rows rather than let a
+       tile drop under a thumb. Either way it comes from the setting. */
+    assert.match(stage, /const fxCols = fitted \? fitted\.fxCols : size\.fx/, 'the chain column count is no longer the chosen one')
+    assert.match(stage, /width: tileWidth\(row, fxCols\)/, 'the chain is a fixed number across whatever the setting says')
     /*
      * And `row` is not the raw measurement, which is zero on the first frame of
      * every mount. "After going to setlists and going back it shows this screen
@@ -1619,7 +1626,11 @@ export function run(test) {
       /const row = grid \|\| Math\.max\(0, screen - space\.lg \* 2\)/,
       'the tiles are drawn from a width that is zero until the screen has been measured'
     )
-    assert.match(stage, /onLayout=\{\(e\) => setGrid\(e\.nativeEvent\.layout\.width\)\}/, 'nothing measures the row any more, so an unusual screen stays guessed at')
+    assert.match(stage, /setGrid\(e\.nativeEvent\.layout\.width\)/, 'nothing measures the row any more, so an unusual screen stays guessed at')
+    /* The same two onLayouts now take the HEIGHT as well, which is what fit
+       subtracts to find out how much screen is left for tiles. */
+    assert.match(stage, /setSceneGrid\(e\.nativeEvent\.layout\.height\)/, 'the scenes grid is not measured, so fit has nothing to subtract')
+    assert.match(stage, /setBlockGrid\(e\.nativeEvent\.layout\.height\)/, 'the chain grid is not measured, so fit has nothing to subtract')
     assert.ok(
       !/flexGrow: 1[\s\S]{0,40}flexBasis/.test(stage),
       'a tile can grow into the spare room again, so the last one in a short row fills the screen'
@@ -4528,7 +4539,10 @@ export function run(test) {
     assert.match(stage, /const tight = size === SIZES\[0\]/, 'the smallest step is not told apart')
     assert.match(stage, /gap: tight \? space\.md : space\.lg, paddingBottom: tight \? space\.lg : space\.xxl/, 'the gaps and the padding under the foot do not give at the smallest size')
     assert.match(stage, /height=\{tight \? TAP : TAP \+ 12\}/, 'the preset button keeps its extra height at the smallest size')
-    assert.match(stage, /height=\{Math\.max\(tight \? 44 : TAP, size\.tile - 12\)\}/, 'a chain tile is held at 56 beside scene tiles of 48')
+    /* `|| fitted` for the same reason `tight` is there: when the screen is
+       being asked to fit, a chain tile held at 56 beside scene tiles of 48 is
+       the thing that stops it fitting. */
+    assert.match(stage, /height=\{Math\.max\(tight \|\| fitted \? 44 : TAP, tileH - 12\)\}/, 'a chain tile is held at 56 beside scene tiles of 48')
     assert.match(stage, /const foot = tight \? 48 : TAP/, 'the foot does not give at the smallest size')
     /* Six: Previous, Setlists, Next, Tuner, Tap Tempo and Edit — the last of
        which joined the bar when it came down off the preset row, "exactly like
@@ -6120,6 +6134,96 @@ export function run(test) {
     const back = head.slice(head.indexOf("onDone === 'back' ?"), head.indexOf(') : ('))
     assert.match(back, /label="‹ Settings"/, 'a submenu has no way back to the list')
     assert.match(back, /label="Done" height=\{40\} onPress=\{onBack\}/, 'a submenu has no Done, so leaving takes a tap per level')
+  })
+
+  /**
+   * FIT ON SCREEN, AND IT IS WHAT A NEW PHONE GETS.
+   *
+   * "Make one that says fit on screen, and if they click that, it'll just make
+   * sure whatever size device they're on, all of those will fit onto the
+   * screen so they don't have to manually push up and down for sizes and then
+   * go back to the play screen to see what it did and then go back, so that
+   * way it's just always set up, good to go. Also make this the default
+   * setting from the beginning."
+   *
+   * The round trip is the complaint, and no fixed step can end it: a step is a
+   * number of pixels, and whether a rig fits at that number depends on the
+   * preset and the handset. Fit measures instead.
+   */
+  test('Play fits itself to the screen, and that is the setting out of the box', async () => {
+    const { loadFit, saveFit, fitTiles } = await import('../mobile/src/lib/gigSize.js')
+
+    /*
+     * THREE STATES, WHICH IS THE WHOLE TRICK.
+     *
+     * This stored '1' or nothing, so "off" and "never chosen" were the same
+     * value. That is fine while the default is off and impossible once it is
+     * on: turning fit off would be indistinguishable from never having
+     * touched it, and it would come back on at the next launch. So off is
+     * written down.
+     */
+    const store = () => {
+      const held = new Map()
+      return {
+        getItem: (k) => (held.has(k) ? held.get(k) : null),
+        setItem: (k, v) => held.set(k, String(v)),
+        removeItem: (k) => held.delete(k),
+        held
+      }
+    }
+
+    const fresh = store()
+    assert.equal(loadFit(fresh, true), true, 'a phone that has never chosen does not get fit')
+    assert.equal(loadFit(fresh), false, 'the browser default moved — it was not asked to')
+
+    const off = store()
+    saveFit(false, off)
+    assert.equal(loadFit(off, true), false, 'turning fit off does not stick, so it returns at the next launch')
+    const on = store()
+    saveFit(true, on)
+    assert.equal(loadFit(on, true), true, 'turning fit on does not stick')
+    assert.equal(loadFit(on), true, 'an explicit yes is ignored in the browser')
+
+    /* And it is never REMOVED, which would read as "never chosen" and hand
+       the answer back to the default — the bug this shape exists to avoid. */
+    assert.equal(off.held.get('fractal.gigFit'), '0', 'off is stored as absence, which means default')
+
+    /*
+     * THE ARITHMETIC ITSELF: more rig, smaller tiles, and never under a thumb.
+     */
+    const roomy = fitTiles({ available: 600, scenes: 4, blocks: 8 })
+    const packed = fitTiles({ available: 600, scenes: 8, blocks: 24 })
+    assert.ok(packed.tile <= roomy.tile, 'a bigger rig does not get smaller tiles')
+    assert.ok(packed.tile >= 44, `a tile came out at ${packed.tile}px, which is under a thumb`)
+    assert.ok(fitTiles({ available: 50, scenes: 8, blocks: 24 }).tile >= 44, 'a cramped screen draws tiles nobody can hit')
+
+    /*
+     * THE SCREEN ASKS FOR IT, and asks with the phone's default rather than
+     * the browser's.
+     */
+    const stage = read('mobile/src/screens/Stage.js')
+    assert.match(stage, /const fitOn = loadFit\(sync, true\)/, 'the stage screen does not default to fitting')
+    assert.match(stage, /const chrome = Math\.max\(0, content - sceneGrid - blockGrid\)/, 'nothing works out how much screen the tiles may have')
+    assert.match(stage, /available: viewport - chrome/, 'fit is measured against something other than what is left')
+    /* Not until everything has been measured: fitting against a chrome of
+       zero hands the grids the whole screen for a frame, which is the flash
+       of wrong sizes this screen already learned to avoid. */
+    assert.match(stage, /viewport > 0 && content > 0/, 'fit runs before the screen has been measured')
+
+    /* And the control, with fit first because it is the answer for anybody
+       who has not got an opinion yet. */
+    const set = read('mobile/src/screens/Settings.js')
+    assert.match(set, /label="Fit on screen"/, 'there is no way to ask for a screen that fits')
+    assert.match(set, /on=\{fit\}/, 'the Fit button never shows that it is on')
+    assert.ok(
+      set.indexOf('label="Fit on screen"') < set.indexOf('{SIZES.map('),
+      'the sizes come before Fit, which buries the thing most people want'
+    )
+    /* Picking a size IS turning fit off. Leaving it on and ignoring the press
+       is how a setting stops being believed. */
+    const tile = set.slice(set.indexOf('function TileSize()'), set.indexOf('function TileSize()') + 2200)
+    assert.match(tile, /saveFit\(false, sync\)\s*\n\s*saveSize\(i, sync\)/, 'picking a size leaves fit on, so the press does nothing')
+    assert.match(tile, /on=\{!fit && i === now\}/, 'a size shows as chosen while fit is what is actually drawing the screen')
   })
 
   test('the demo stays in front of the paywall', () => {

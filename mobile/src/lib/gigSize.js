@@ -175,21 +175,47 @@ export function fitTiles({
   }
 }
 
-/** Whether Play fits itself to the screen on this device. */
-export function loadFit(storage) {
+/**
+ * Whether Play fits itself to the screen on this device.
+ *
+ * THREE STATES, NOT TWO, and the third is why. This stored '1' or nothing, so
+ * "off" and "never chosen" were the same value — which is fine while the
+ * default is off and impossible the moment it is on. The phone wants fit ON
+ * out of the box:
+ *
+ *   "Make one that says fit on screen... so they don't have to manually push
+ *   up and down for sizes and then go back to the play screen to see what it
+ *   did and then go back, so that way it's just always set up, good to go.
+ *   Also make this the default setting from the beginning."
+ *
+ * With two states, somebody turning it off would be indistinguishable from
+ * somebody who had never touched it, and it would switch itself back on at
+ * the next launch. So off is written down as '0' and `fallback` decides only
+ * what an UNSET value means.
+ *
+ * The browser passes nothing and therefore keeps the default it has always
+ * had. Only the phone asks for true — see mobile/src/screens/Stage.js.
+ */
+export function loadFit(storage, fallback = false) {
   try {
     const store = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null)
-    return store?.getItem(FIT_KEY) === '1'
+    const raw = store?.getItem(FIT_KEY)
+    if (raw === '1') return true
+    if (raw === '0') return false
+    return fallback
   } catch {
-    return false
+    // Private windows and blocked site data both throw. Answer the default
+    // rather than refusing to draw the screen.
+    return fallback
   }
 }
 
 export function saveFit(on, storage) {
   try {
     const store = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null)
-    if (on) store?.setItem(FIT_KEY, '1')
-    else store?.removeItem(FIT_KEY)
+    /* Written either way, never removed: removing it would read as "never
+       chosen" and hand the answer back to the default. */
+    store?.setItem(FIT_KEY, on ? '1' : '0')
     return true
   } catch {
     return false
