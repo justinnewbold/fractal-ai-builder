@@ -5039,14 +5039,26 @@ export function run(test) {
     const send = (path, method = 'GET', body) =>
       demoRequest(unit, path, { method, body: body === undefined ? null : JSON.stringify(body) })
 
-    /* Every path in device.js, read off it rather than remembered. */
+    /*
+     * The list below is written out by hand, and that is the weakness in it:
+     * it was written from memory rather than from device.js, and it asked for
+     * `/blocks/catalog` — a route the phone has never requested. The demo
+     * answered that one happily while the real `/blocks` fell through, so
+     * this test passed green for as long as the Edit screen was broken.
+     *
+     * So the count below is not the guard it looks like. The guard is "the
+     * demo answers every path the phone asks for", further down this file,
+     * which reads the paths OUT of device.js and holds the wire to them.
+     * What this test is for is the other half: that each route, once found,
+     * comes back with something. Keep both.
+     */
     const device = read('mobile/src/lib/device.js')
     const paths = [...device.matchAll(/['`](\/[a-z][^'`\s]*)['`]/g)].map((m) => m[1])
     assert.ok(paths.length > 15, `only ${paths.length} routes were found in device.js; this check read nothing`)
 
     const answered = [
       ['/healthz'], ['/device/detect'], ['/preset'], ['/preset/blocks'], ['/preset/grid'],
-      ['/scene'], ['/tempo'], ['/mod/model'], ['/blocks/catalog'],
+      ['/scene'], ['/tempo'], ['/mod/model'], ['/blocks'],
       ['/presets/5/summary'], ['/presets/5'], ['/preset/blocks/58/params'],
       ['/blocks/amp/types'], ['/blocks/comp/types'],
       ['/preset/select', 'POST', { number: 7 }],
@@ -5726,6 +5738,89 @@ export function run(test) {
    * demo, and if the demo were gated the app would be rejected as broken — which
    * has a way of costing a week rather than an evening.
    */
+  /**
+   * THE DEMO ANSWERS EVERY PATH THE PHONE ASKS FOR — and it did not, twice.
+   *
+   * "My Demo version is saying it failed to read blocks."
+   *
+   * mobile/src/lib/demoWire.js is a SECOND COPY of the ForgeFX API, written
+   * to answer the phone from a simulated unit. A second copy of an API can be
+   * wrong in a way that is invisible from the other end, and both faults were
+   * exactly that:
+   *
+   *   - it answered `/blocks/catalog`, a path nothing requests. The real one
+   *     is `/blocks` — BUILD-PROMPT says so and the browser asks there. In
+   *     the demo the request fell through and the Edit screen said it could
+   *     not read the list of blocks.
+   *   - the mock reported `slotModel: 'chain'`, a word nothing reads. Four
+   *     places ask for 'linear', so a VP4 drew as a 4x12 grid.
+   *
+   * The browser's demo showed neither, because it holds the mock in-process
+   * and calls its methods directly. Only the phone comes through this wire.
+   *
+   * So this walks the paths out of device.js and holds the wire to them.
+   */
+  test('the demo answers every path the phone asks for', () => {
+    const dev = read('mobile/src/lib/device.js')
+    const wire = read('mobile/src/lib/demoWire.js')
+
+    const asked = new Set()
+    for (const m of dev.matchAll(/(?:remoteRequest|request|get|post|put|del)\(\s*[`'"]([^`'"$]+)[`'"]/g)) {
+      asked.add(m[1])
+    }
+    assert.ok(asked.size > 10, `only found ${asked.size} paths — the extractor stopped working`)
+
+    /*
+     * ONE EXEMPTION, and it is a decision rather than an oversight.
+     *
+     * `/device` is the whole device record, and the only thing the phone
+     * wants from it that /device/detect lacks is the FIRMWARE VERSION. A
+     * simulated unit has no firmware, and inventing one would be the same sin
+     * as the two faults above: a mock asserting a fact about hardware that is
+     * not true. device.js already wraps that call in a try and falls back, so
+     * the demo simply reports no firmware, which is the honest answer.
+     */
+    const exempt = new Set(['/device'])
+
+    const missing = [...asked].filter((p) => !exempt.has(p) && !wire.includes(`'${p}'`))
+    assert.deepEqual(
+      missing,
+      [],
+      `the demo does not answer ${missing.join(', ')} — the phone asks for it and would get nothing`
+    )
+  })
+
+  /**
+   * AND THE WORD FOR A UNIT WITH NO GRID IS 'linear'.
+   *
+   * Four places ask `slotModel === 'linear'`: gridShape, isLinearChain at
+   * both ends, and the play screen's meter. All were written against what
+   * ForgeFX reports. The mock said 'chain', which matches none of them, so
+   * every check answered "no, it is a grid" and a VP4 — four blocks in a line
+   * — drew as a 4x12 grid captioned ROW 2, COLUMN 1.
+   */
+  test('a unit with no grid says the word the app reads', async () => {
+    const { createMockDevice } = await import(
+      new URL('../src/lib/mockDevice.js', import.meta.url).href
+    )
+    const { gridShape } = await import(new URL('../shared/grid-plan.mjs', import.meta.url).href)
+
+    for (const key of ['vp4', 'am4']) {
+      const caps = createMockDevice(key).detect().capabilities
+      assert.equal(caps.slotModel, 'linear', `${key} reports a slotModel nothing in the app reads`)
+      const shape = gridShape(caps)
+      assert.equal(shape.linear, true, `${key} is drawn as a grid`)
+      assert.equal(shape.rows, 1, `${key} is drawn with ${shape.rows} rows`)
+    }
+
+    /* And a unit that HAS a grid still has one. */
+    for (const key of ['fm3', 'fm9', 'axefx3']) {
+      const caps = createMockDevice(key).detect().capabilities
+      assert.equal(caps.slotModel, 'grid', `${key} lost its grid`)
+      assert.equal(gridShape(caps).linear, false, `${key} is drawn as a chain`)
+    }
+  })
+
   test('the demo stays in front of the paywall', () => {
     const app = read('mobile/App.js')
     /* Not `[^>]*` — the arrow in `() =>` is a `>` and would end the class. */
