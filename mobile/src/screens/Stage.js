@@ -29,6 +29,7 @@ import {
   writeTuner
 } from '../lib/rig'
 import { useDemoUnit } from '../lib/demo'
+import { coachSeen, markCoach } from '../lib/coach'
 import { nope, thud } from '../lib/feedback'
 import { blockColor } from '../lib/blockColors'
 import { sceneColor } from '../lib/sceneColors'
@@ -38,6 +39,7 @@ import Note from '../components/Note'
 import { fixById, fixFor } from '../lib/troubleshooting'
 import Press from '../components/Press'
 import Tile from '../components/Tile'
+import Coach from '../components/Coach'
 import Sheet from '../components/Sheet'
 import TempoBox from '../components/TempoBox'
 import Tuner from '../components/Tuner'
@@ -234,6 +236,49 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
   const channels = caps?.channelNames
   const slots = slotCount(caps)
   const conflict = hostConflict(remoteHosts(), remoteChosenHost())
+
+  /*
+   * The channel tip, and the conditions it waits for.
+   *
+   * "This tip appears here - exactly when the gesture becomes useful." So it
+   * does not open on the first launch, or the first time this screen is
+   * drawn: it opens on the first preset that has blocks to hold AND a unit
+   * with more than one channel to choose between. On anything else the tip
+   * would be teaching a gesture that does nothing — the same hold is wired to
+   * `undefined` down in the grid for exactly that reason.
+   *
+   * The chain has to have been read, too. A chain that failed leaves the last
+   * blocks it knew on screen, and a tip over stale tiles is a tip about a
+   * preset that may not be loaded.
+   */
+  const holdDoesSomething = chain === 'ok' && blocks.length > 0 && channels?.length > 1
+  const [coach, setCoach] = useState(false)
+
+  useEffect(() => {
+    if (!holdDoesSomething) return undefined
+    let live = true
+    coachSeen().then((seen) => {
+      if (live && !seen) setCoach(true)
+    })
+    return () => {
+      live = false
+    }
+  }, [holdDoesSomething])
+
+  /* Shown once, and remembered the moment it is shown rather than when it is
+     answered — killing the app with the card up is not an accident to correct
+     on the next launch. */
+  const closeCoach = useCallback(() => {
+    markCoach()
+    setCoach(false)
+  }, [])
+
+  /* And it gets out of the way the moment somebody does the thing. Opening a
+     channel picker is the whole point of the card, so leaving it sitting
+     there afterwards would be the app failing to notice it had worked. */
+  useEffect(() => {
+    if (picking && coach) closeCoach()
+  }, [picking, coach, closeCoach])
 
   const reload = useCallback(async () => {
     setRefreshing(true)
@@ -486,6 +531,17 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
         {blocks.length === 0 && chain === 'ok' ? (
           <Note>Nothing in this preset but input and output.</Note>
         ) : null}
+
+        {/*
+          The channel tip, directly over the tiles it is about.
+
+          Inside the chain's own block rather than at the top of the screen,
+          because "this tip appears here" is a promise about WHERE: the
+          gesture it describes belongs to the squares eight points below it,
+          and a card up by the preset name would be describing something off
+          the bottom of somebody's phone.
+        */}
+        <Coach open={coach} onTry={closeCoach} onSkip={closeCoach} />
 
         {/*
           A wrapped grid of coloured tiles, which is the browser's chain and

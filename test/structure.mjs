@@ -4807,4 +4807,52 @@ export function run(test) {
     assert.equal(c.D5.status({ unit: null, phone: true }), 'iPhone connected')
   })
 
+  /*
+   * THE COACH MARK, AND THE PROMISE IN ITS OWN LAST LINE.
+   *
+   * "This tip appears here - exactly when the gesture becomes useful."
+   *
+   * So it is not a screen in the walkthrough and not a first-launch dialog.
+   * It is drawn on Play, among the blocks, and only on a preset where the
+   * hold it describes actually does something — which is the same condition
+   * the grid uses to decide whether to wire the hold at all. Teaching a
+   * gesture that is wired to `undefined` is worse than teaching nothing.
+   */
+  test('the channel tip waits for a preset where the hold does something', () => {
+    const stage = readFileSync(new URL('../mobile/src/screens/Stage.js', import.meta.url), 'utf8')
+    const coach = readFileSync(new URL('../mobile/src/components/Coach.js', import.meta.url), 'utf8')
+
+    assert.match(
+      stage,
+      /const holdDoesSomething =[^\n]*chain === 'ok'[^\n]*blocks\.length > 0[^\n]*channels\?\.length > 1/,
+      'the tip no longer waits for blocks with channels to hold'
+    )
+    assert.match(stage, /if \(!holdDoesSomething\) return undefined/, 'the tip is offered before the gesture works')
+    assert.match(stage, /coachSeen\(\)\.then/, 'the tip no longer asks whether it has been seen')
+    assert.match(stage, /markCoach\(\)/, 'the tip is not remembered, so it returns every launch')
+    assert.match(
+      stage,
+      /if \(picking && coach\) closeCoach\(\)/,
+      'the tip stays up after somebody has done the very thing it asked for'
+    )
+
+    /* Its own key. Sharing the walkthrough's would let finishing the
+       walkthrough cancel a tip that had never been drawn. */
+    const lib = readFileSync(new URL('../mobile/src/lib/coach.js', import.meta.url), 'utf8')
+    assert.match(lib, /fractal\.coach\./, 'the tip lost its own storage key')
+    assert.ok(
+      !/fractal\.walkthrough/.test(lib),
+      'the tip shares the walkthrough key, so finishing one silences the other'
+    )
+
+    /* And not one word of it is typed into the component. */
+    assert.match(coach, /import \{ P5 \} from '\.\.\/lib\/onboarding'/, 'the tip stopped reading the copy file')
+    for (const typed of ['Hold a block', 'Try it', 'QUICK TIP', 'Press and hold']) {
+      assert.ok(
+        !coach.includes(typed),
+        `"${typed}" is typed into Coach.js, so his wording can drift from the copy file`
+      )
+    }
+  })
+
 }
