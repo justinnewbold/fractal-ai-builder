@@ -6205,7 +6205,36 @@ export function run(test) {
     const stage = read('mobile/src/screens/Stage.js')
     assert.match(stage, /const fitOn = loadFit\(sync, true\)/, 'the stage screen does not default to fitting')
     assert.match(stage, /const chrome = Math\.max\(0, content - sceneGrid - blockGrid\)/, 'nothing works out how much screen the tiles may have')
-    assert.match(stage, /available: viewport - chrome/, 'fit is measured against something other than what is left')
+    assert.match(stage, /available: viewport - chrome - trim/, 'fit is measured against something other than what is left')
+
+    /*
+     * AND IT CORRECTS ITSELF AGAINST WHAT ACTUALLY HAPPENED.
+     *
+     * "This is set to the fit to screen setting but the tempo numbers are
+     * cutting off."
+     *
+     * fitTiles works out how tall a tile may be and assumes every row comes
+     * out that tall. Tiles take it as a MINIMUM — a scene tile carrying a
+     * number over a name grows past it — so the grids landed taller than
+     * their budget and the footer went off the bottom. And it was stable
+     * there: chrome and the budget both stay put, so it settled overflowing.
+     *
+     * Rather than teach the prediction about every way a tile can grow, the
+     * overflow is measured and taken off the budget. Monotone within a
+     * layout so it converges rather than oscillating, and thrown away when
+     * the thing being fitted changes.
+     */
+    assert.match(stage, /const over = content - viewport/, 'nothing notices when the fitted screen overflows anyway')
+    assert.match(stage, /setTrim\(\(was\) => was \+ over\)/, 'the overflow is measured and then not used')
+    assert.match(stage, /if \(over > 2\)/, 'a rounding pixel starts another fitting pass')
+    /* Reset when what is being fitted changes, or a preset with fewer blocks
+       inherits the trim from a bigger one and draws tiny tiles. */
+    assert.match(
+      stage,
+      /const fitKey = `\$\{viewport\}:\$\{scenes\.hasScenes \? scenes\.count : 0\}:\$\{blocks\.length\}:\$\{fitOn\}`/,
+      'the trim is not thrown away when the rig or the screen changes'
+    )
+    assert.match(stage, /if \(trim !== 0\) setTrim\(0\)/, 'the trim survives a change of preset, so a smaller rig gets a smaller tile')
     /* Not until everything has been measured: fitting against a chrome of
        zero hands the grids the whole screen for a frame, which is the flash
        of wrong sizes this screen already learned to avoid. */
