@@ -4649,4 +4649,90 @@ export function run(test) {
     assert.match(scan, /looksLikeTheWifiSquare/, 'the scanner no longer recognises the wrong square')
   })
 
+
+  /*
+   * THE WALKTHROUGH SAYS WHAT THE PDF SAYS, WORD FOR WORD.
+   *
+   * "Do not change any wording without asking me first."
+   *
+   * Copy typed into a component gets tidied without anybody deciding to: a
+   * plain hyphen becomes an em dash, "Wi-Fi" becomes "wifi", a sentence gets
+   * shortened to fit a button. None of those is a change somebody approved, and
+   * every one of them is invisible in review.
+   *
+   * So the strings live in one file and this holds a sample of them to the
+   * source PDF, character for character — including the hyphens where a
+   * typographer would use a dash, which is the exact thing most likely to be
+   * "fixed" by accident.
+   */
+  test('the walkthrough is worded the way he wrote it', async () => {
+    const c = await import('../shared/onboarding.mjs')
+
+    /* One from every screen, chosen for the bits most likely to drift. */
+    assert.equal(c.D1.head, 'Let\u2019s get your whole rig connected.')
+    assert.equal(c.D1.sub, 'Three clear steps. About a minute.')
+    assert.equal(c.D1.skip, 'Skip walkthrough')
+    assert.equal(c.D2.head, 'Plug your unit into this computer.')
+    assert.equal(c.D2.helpBody, 'Quit FM3-Edit or Axe-Edit. One app can hold USB at a time.')
+    assert.equal(c.D2B.head, 'Something else has the USB port.')
+    assert.equal(c.D2B.without, 'Continue without it')
+    assert.equal(c.D3.head, 'Use your phone as the remote?')
+    assert.equal(c.D4.waiting, 'Waiting for your phone\u2026')
+    assert.equal(c.D5.head, 'You\u2019re set.')
+    assert.equal(c.P1.head, 'YOUR RIG, FROM ACROSS THE STAGE.')
+    assert.equal(c.P3.demo.go, 'Start free demo')
+    assert.equal(c.P3.real.go, 'Set up  \u00b7  $9.99 once')
+    assert.equal(c.P8.go, 'Unlock real-rig control  \u00b7  $9.99')
+    assert.equal(c.P9.head, 'You\u2019re connected.')
+    assert.equal(c.REPLAY, 'Show the walkthrough')
+
+    /*
+     * THE HYPHENS, which are the whole reason this test is this pedantic. Four
+     * lines use a plain hyphen where an em dash would be the typographic
+     * choice. That was his choice and it is not ours to improve.
+     */
+    for (const line of [
+      c.CHAIN[2].phoneBody,
+      c.D3.why[2].body,
+      c.D3.note,
+      c.P1.sub,
+      c.P5.body,
+      c.P5.foot,
+      c.P6.yes
+    ]) {
+      assert.ok(!/[\u2014\u2013]/.test(line), `an em or en dash crept into: ${line}`)
+    }
+    assert.equal(c.CHAIN[2].phoneBody, 'Your remote - nearby or away')
+    assert.equal(c.P6.yes, 'Yes - show me the scanner')
+    assert.equal(c.P5.body, 'Tap toggles the block. Press and hold to choose channels A-D.')
+
+    /* Wi-Fi keeps its capital and its hyphen. */
+    assert.match(c.D3.why[2].body, /home Wi-Fi$/, 'Wi-Fi was rewritten')
+
+    /*
+     * AND THE LINES THAT CLAIM SOMETHING ARE FUNCTIONS, not strings. Each of
+     * these names a fact — which unit answered, how many presets, whether a
+     * phone arrived — and the one moment this screen exists for is somebody
+     * deciding whether the app works. A typed-out "FM3 found" has answered that
+     * question before asking the hardware.
+     */
+    for (const [name, fn] of [
+      ['D2.found', c.D2.found],
+      ['D2.detail', c.D2.detail],
+      ['D5.status', c.D5.status],
+      ['P4.go', c.P4.go],
+      ['P8.verified', c.P8.verified],
+      ['P9.tag', c.P9.tag],
+      ['P9.status', c.P9.status]
+    ]) {
+      assert.equal(typeof fn, 'function', `${name} is a fixed string, so it can claim something untrue`)
+    }
+    assert.equal(c.D2.found('FM9'), 'FM9 found')
+    assert.equal(c.D2.detail({ firmware: '8.02', presets: 512 }), 'USB  \u00b7  firmware 8.02  \u00b7  512 presets')
+    /* And they say less rather than inventing, when a fact is missing. */
+    assert.equal(c.D2.detail({}), 'USB')
+    assert.equal(c.D5.status({ unit: 'FM3', phone: false }), 'FM3 on USB')
+    assert.equal(c.D5.status({ unit: null, phone: true }), 'iPhone connected')
+  })
+
 }
