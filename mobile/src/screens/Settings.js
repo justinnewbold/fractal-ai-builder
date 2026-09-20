@@ -855,7 +855,7 @@ function UnitBits() {
         </Note>
       ) : null}
       <SaveNotes s={saveTo} />
-      <SaveButton s={saveTo} height={TAP} grow />
+      <SaveButton s={saveTo} height={TAP} grow waiting={pending} />
       <Note>
         A new name is on the unit straight away and is lost on the next preset change unless it is
         saved. Save asks the computer to write this slot, and that keeps everything changed from this

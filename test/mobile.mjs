@@ -4772,8 +4772,36 @@ export function run(test) {
 
     /* And the button: Save, then Tap again with the warning, then the ask. */
     const saver = read('mobile/src/components/SaveToSlot.js').replace(/\s+/g, ' ')
-    assert.match(saver, /label=\{s\.saving \? 'Saving…' : s\.armed \? 'Tap again' : 'Save'\}/, 'there is no Save button, or it does not ask twice')
-    assert.match(saver, /replacing what was saved there\. Tap Save again to do it\./, 'the warning does not say what a save overwrites')
+    assert.match(
+      saver,
+      /label=\{s\.saving \? 'Saving…' : s\.armed \? 'Tap again to confirm' : 'Save'\}/,
+      'there is no Save button, or it does not ask twice'
+    )
+
+    /*
+     * AND IT IS FILLED WHILE THERE IS SOMETHING TO LOSE.
+     *
+     * "If a user has changed the preset name, make the save button yellow and
+     * obvious that that's how they save it."
+     *
+     * An outline among outlines is the wrong weight for the one control that
+     * stands between a typed name and losing it at the next preset change —
+     * the name IS on the unit already, which is exactly what makes walking
+     * away from this screen feel finished when it is not.
+     */
+    assert.match(saver, /on=\{s\.armed \|\| waiting\}/, 'the Save button does not light up when there is unsaved work')
+
+    /* Both screens that can leave work unsaved hand it the same flag, off the
+       same store value — a moved knob is lost exactly as a typed name is. */
+    for (const [file, where] of [
+      ['mobile/src/screens/Settings.js', 'the rename screen'],
+      ['mobile/src/screens/Edit.js', 'the Edit screen']
+    ]) {
+      const text = read(file)
+      assert.match(text, /const pending = !!unsaved && unsaved\.number === preset\?\.number/, `${where} cannot tell whether there is unsaved work`)
+      assert.match(text, /<SaveButton[^/]*waiting=\{pending\}/, `${where} never lights its Save button`)
+    }
+    assert.match(saver, /replacing what was saved there\. Tap Save again to confirm\./, 'the warning does not say what a save overwrites')
     assert.match(saver, /const res = await askComputerToSave\(\{ park: \(req\) => parkSave\(slug, req\), readResult: \(\) => readSaveResult\(slug\), slot: preset\?\.number, name: preset\?\.name \|\| ''/, 'the button does not ask the computer, or sends no name')
     /* On both screens where something gets changed. */
     for (const screen of ['mobile/src/screens/Edit.js', 'mobile/src/screens/Settings.js']) {
