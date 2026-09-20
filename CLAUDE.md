@@ -26,6 +26,31 @@ be *collected*: "I don't want a bunch of developer jargon, it's hard for me
 to read and understand, so I just need crystal clear questions when you ask
 them, that's all."
 
+**When he is firing things off, hold every question to the end.**
+
+> "I'm gonna fire them off, so if you ask questions in between, I'm not gonna
+> see them. I'll let you know when I'm completely done, and then you can put
+> all questions that you have to clarify into one section at the bottom of the
+> chat, cause in the past you'll just keep asking questions and I'm not
+> reading those because all I'm doing is sending screenshots and telling you
+> what I want fixed quickly before you even have a chance to respond."
+
+This is the rule above under load, and it changes what to do rather than only
+how much to ask. In a run like that he is not in a conversation — he is
+emptying his head onto the screen, and a question asked mid-run is not
+answered late, it is never read at all. So a reply that ends in a question has
+spent its last line on nothing.
+
+Which means: do the work on what is unambiguous, make the call yourself where
+a sensible default exists, and keep a list of what genuinely could not be
+settled. He says when he is done. THEN the list goes out, once, at the bottom,
+in plain words — and it should be short, because most of what looked like a
+question at the time will have been answered by the screenshot after it.
+
+The failure this guards against is not asking too much. It is stopping: a
+question mid-run reads as waiting, and he is not there to unblock anything.
+Never hold work for an answer that cannot arrive until the run is over.
+
 **Write it for a guitarist, not a developer.** Justin is not a programmer.
 Say what a change does to the app in front of him, not what it does to the
 code. Name the file only when he needs to find it. "The buttons move up next
