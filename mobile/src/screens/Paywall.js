@@ -6,6 +6,18 @@ import Note from '../components/Note'
 import Press from '../components/Press'
 import Sheet from '../components/Sheet'
 import { buyUnlock, restorePurchase, usePurchase } from '../lib/purchases'
+import { UNITS } from '../lib/demoUnits'
+
+/*
+ * The units named on the offer, read off the list the app actually carries.
+ *
+ * Typed out by hand this is five chances to be wrong about somebody's gear,
+ * and it would go stale the day a sixth is added — on the ONE screen where
+ * being wrong is a person paying for a unit we do not drive.
+ */
+const SUPPORTED = UNITS.map((u) => u.name)
+const supportedWords =
+  SUPPORTED.slice(0, -1).join(', ') + ' and ' + SUPPORTED[SUPPORTED.length - 1]
 
 /**
  * The one screen that asks for money.
@@ -58,13 +70,10 @@ export default function Paywall({ onUnlocked, onDemo, onBack, asked = false }) {
     >
       <View style={{ gap: space.sm }}>
         <Text style={{ color: color.silk, fontSize: font.title, fontWeight: '700' }}>
-          Drive your own rig
+          Phone Remote
         </Text>
         <Text style={{ color: color.silkDim, fontSize: font.body, lineHeight: font.body * 1.45 }}>
-          One payment, once. It unlocks this app for every Fractal you own, on
-          every phone signed in to your{' '}
-          {/* Apple's word on iOS, Google's on Android — said plainly either way. */}
-          store account.
+          {`One-time payment unlocks the full version of this app on any device you use, forever, including all future updates, on all supported Fractal devices: ${supportedWords}.`}
         </Text>
       </View>
 
@@ -76,15 +85,10 @@ export default function Paywall({ onUnlocked, onDemo, onBack, asked = false }) {
           gap: space.md
         }}
       >
-        {[
-          'Scenes, presets and tempo from across the room',
-          'The tuner, on the unit itself',
-          'Your setlists, on the phone you already carry'
-        ].map((line) => (
-          <Text key={line} style={{ color: color.silk, fontSize: font.body }}>
-            {line}
-          </Text>
-        ))}
+        <Text style={{ color: color.silk, fontSize: font.body, lineHeight: font.body * 1.45 }}>
+          You&rsquo;ll be able to control and switch presets, scenes, amp &amp; effects blocks,
+          tuner, tap tempo, setlists, and so much more.
+        </Text>
       </View>
 
       {said ? <Note tone={said.tone}>{said.text}</Note> : null}
@@ -95,7 +99,7 @@ export default function Paywall({ onUnlocked, onDemo, onBack, asked = false }) {
 
       <View style={{ gap: space.md }}>
         <Press
-          label={price ? `Unlock — ${price}` : 'Unlock'}
+          label={price ? `Unlock Full Version — ${price}` : 'Unlock Full Version'}
           tone="signal"
           disabled={busy || !available}
           onPress={buy}

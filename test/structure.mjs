@@ -364,7 +364,7 @@ export function run(test) {
     for (const [title, names] of [
       ['Presets', ['PresetList', 'LocalLibrary', 'Backup', 'Versions', 'DeviceBackup']],
       ['Scenes', ['Scenes', 'SceneMatrix']],
-      ['Setup', ['DeviceDetail', 'PhoneRemote', 'Ports', 'ChangeLog', 'DebugLog', 'Diagnostics', 'LinkDetails']]
+      ['Settings', ['DeviceDetail', 'PhoneRemote', 'Ports', 'ChangeLog', 'DebugLog', 'Diagnostics', 'LinkDetails']]
     ]) {
       for (const name of names) {
         assert.ok(components(sheet(title)).includes(name), `${name} should be in the ${title} sheet`)
@@ -1111,7 +1111,7 @@ export function run(test) {
     assert.match(rule, /font-size: var\(--f-input\)/, 'tapping the search box will zoom the page on iOS')
 
     // And Setup's row opens it rather than unfolding four hundred rows in place.
-    const setup = sheet('Setup')
+    const setup = sheet('Settings')
     assert.match(setup, /key="gear-names"/, 'Setup has no way into the gear sheet')
     assert.match(setup, /onClick=\{\(\) => setSheet\('gear'\)\}/, 'the way in does not open the sheet')
   })
@@ -1372,7 +1372,7 @@ export function run(test) {
     )
 
     /* All of which needs a fold above it to listen to. */
-    const setup = sheet('Setup')
+    const setup = sheet('Settings')
     const at = setup.indexOf('<Ports')
     assert.notEqual(at, -1, 'the Connection panel is gone from Setup')
     const opened = setup.lastIndexOf('<Section', at)
@@ -1429,7 +1429,7 @@ export function run(test) {
      * state moved there and the row took the errand's name. "Help & fixes"
      * became "Troubleshooting" in the same pass.
      */
-    const setup = sheet('Setup')
+    const setup = sheet('Settings')
     assert.match(setup, /<div className="device-meta mono setup-version">\{FULL\}<\/div>/, 'the version line is not at the top')
     const rows = [...setup.matchAll(/<SetupRow key="([^"]+)" title="([^"]+)" status=/g)].map((m) => m[2])
     assert.deepEqual(
@@ -1455,13 +1455,49 @@ export function run(test) {
          */
         'Demo Unit',
         'Rename presets and scenes',
-        'Play screen',
+        /* No 'Play screen'. Stage tiles and Appearance are not doors any more;
+           they are open at the bottom of this list. Asserted below. */
         'Troubleshooting',
         'About'
       ],
-      `Setup opens on ${rows.length} rows: ${rows.join(', ')}`
+      `Settings opens on ${rows.length} rows: ${rows.join(', ')}`
     )
     assert.ok(!setup.includes('<Group'), 'the doors are back')
+
+    /*
+     * AND THE TWO THAT ARE NOT DOORS ARE OPEN, below the ones that are.
+     *
+     * "Move this to the settings screen at the bottom below all the other
+     * drop-down menus — we want it quickly available just by clicking
+     * settings. Don't have it via a drop-down, have it always visible."
+     *
+     * The trap this guards is precise, and it is one I walked into while
+     * making the change: moving a <Section> from the Play screen page onto
+     * this list would look done and would not BE done, because <Section> is a
+     * <details> that starts closed. That is the same drop-down, one page to
+     * the left. So the check is not "are these on the list" but "are these on
+     * the list WITHOUT a fold around them".
+     */
+    const at = setup.indexOf('className="setup-loose"')
+    const loose = setup.slice(at, setup.indexOf('setupPage ===', at))
+    assert.ok(loose.length > 200, 'the open panels moved; this check reads them')
+    /*
+     * Comments stripped first, and that is not a detail. The block carries a
+     * comment SAYING not to use <Section> here, and the first version of this
+     * check read that comment and failed the file for explaining itself. That
+     * is the third time this shape has bitten in this repo; a guard that names
+     * what it forbids has to ignore prose.
+     */
+    const noProse = loose.replace(/\{?\/\*[\s\S]*?\*\/\}?/g, ' ')
+    assert.ok(!/<Section/.test(noProse), 'Stage tiles and Appearance are folded away again')
+    assert.match(loose, />Stage tiles</, 'the tile size control is not on the Settings list')
+    assert.match(loose, /<Theme \/>/, 'the light and dark buttons are not on the Settings list')
+    /* Below the rows, not above them: the rows are what somebody opens
+       Settings for, these are the thing they want in one click once there. */
+    assert.ok(
+      setup.indexOf('className="setup-rows"') < setup.indexOf('className="setup-loose"'),
+      'the always-open settings sit above the list of rows'
+    )
 
     const behind = (key) => {
       const at = setup.indexOf(`setupPage === '${key}' ? (`)
@@ -1479,9 +1515,6 @@ export function run(test) {
          other end sits above the details about the line to it: it is the
          question somebody has when there is nothing on the other end at all. */
       ['link', ['connection', 'phone-remote', 'ways-in', 'link-details']],
-      /* 'playing' was the play-mode switch, whose only job was hiding the
-                 ✦ Ask button. Both went with the AI. */
-      ['play', ['size', 'appearance']],
       /* Fixes first: it is the one somebody is looking for when they open
          this page at all, and the log is what they send if it did not help. */
       ['help', ['fixes', 'preset-check', 'debug-log', 'feedback', 'what-s-changed-this-session']],
@@ -1497,7 +1530,8 @@ export function run(test) {
     ]) {
       assert.deepEqual(behind(page), panels, `the ${page} page holds ${behind(page).join(', ')}`)
     }
-    const linkPage = setup.slice(setup.indexOf("setupPage === 'link'"), setup.indexOf("setupPage === 'play'"))
+    /* Ends at the help page: 'play' used to be the next one and is gone. */
+    const linkPage = setup.slice(setup.indexOf("setupPage === 'link'"), setup.indexOf("setupPage === 'help'"))
     assert.ok(linkPage.includes('<DeviceDetail'), 'the unit header is not on the Phone & computer page')
     const renamePage = setup.slice(setup.indexOf("setupPage === 'rename'"), setup.indexOf("setupPage === 'link'"))
     assert.ok(!renamePage.includes('<DeviceDetail'), 'the unit header is back in front of the rename button')
@@ -3621,10 +3655,12 @@ export function run(test) {
      */
     const preset = g.slice(g.indexOf('className="gig-preset"'), g.indexOf('className="gig-signal"'))
     assert.ok(!/gig-size|onSize/.test(g), 'the size control is back on the Play screen')
-    const setup = sheet('Setup')
-    assert.match(setup, /title="Button size"/, 'Setup has no Button size section')
-    assert.match(setup, /className="size-steps"/, 'the size steps are not in Setup')
-    assert.match(setup, /aria-label="Smaller buttons"[\s\S]*?aria-label="Bigger buttons"/, 'Setup has lost a size step')
+    const setup = sheet('Settings')
+    /* "Stage tiles" now, the same words the phone uses for the same control,
+       and it is not behind a fold — see the Settings list test for why. */
+    assert.match(setup, />Stage tiles</, 'Settings has no Stage tiles section')
+    assert.match(setup, /className="size-steps"/, 'the size steps are not in Settings')
+    assert.match(setup, /aria-label="Smaller buttons"[\s\S]*?aria-label="Bigger buttons"/, 'Settings has lost a size step')
     assert.ok(!/onSize=/.test(bare(app)), 'App still hands Play a size control')
 
     /*
@@ -4001,7 +4037,7 @@ export function run(test) {
      * down the port that is carrying the audio, and it copies the same three
      * ways the log does, because a phone's clipboard can say no.
      */
-    const setup = sheet('Setup')
+    const setup = sheet('Settings')
     assert.match(setup, /<PresetReport device=\{device\} link=\{link\} \/>/, 'Setup cannot read the preset')
     /* Above the debug log, which is the thing it must not be buried under.
        This used to measure against a "Developer" section holding the AI's

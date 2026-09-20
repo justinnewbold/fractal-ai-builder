@@ -22,7 +22,7 @@ import {
 } from '../lib/relay'
 import { notePresetName, noteSceneName, useRig } from '../lib/rig'
 import { dropReadCache, sceneShape, setPresetName, setSceneName } from '../lib/device'
-import { SIZES, loadSize, saveSize } from '../lib/gigSize'
+import { SIZES, loadFit, loadSize, saveFit, saveSize } from '../lib/gigSize'
 import { sync, useStored } from '../lib/store'
 import { isPairAccount } from '../lib/pairing'
 import Lamp from '../components/Lamp'
@@ -30,6 +30,7 @@ import Note from '../components/Note'
 import PasswordBox from '../components/PasswordBox'
 import Press from '../components/Press'
 import { SaveButton, SaveNotes, useSaveToSlot } from '../components/SaveToSlot'
+import EdgeBack from '../components/EdgeBack'
 import Sheet from '../components/Sheet'
 
 const face = Platform.select(mono)
@@ -37,8 +38,6 @@ const face = Platform.select(mono)
 const ofDeviceName = (s) => s.deviceName
 const ofFirmware = (s) => s.firmware
 
-/** What each theme setting is called, for the row that has to say which. */
-const THEME_WORD = { auto: 'Auto', light: 'Light', dark: 'Dark' }
 const ofUnitState = (s) => s.unit
 
 /**
@@ -147,26 +146,49 @@ export default function Settings({
           ? 'Your computer isn’t answering'
           : 'Not connected'
 
-  const head = (title, onDone) => (
-    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
-      {onDone === 'back' ? (
-        <Press label="‹ Setup" height={40} onPress={() => setPage(null)} />
-      ) : (
+  /*
+   * TWO WAYS OUT OF EVERY PAGE, and they go to different places on purpose.
+   *
+   * "Add the done button to all submenus, and if they click done, it takes
+   * them directly back to the play screen, no matter how deep they are in the
+   * submenus. Swiping back should always take them to the previous screen."
+   *
+   * Back is one step — a submenu to the list, the list to Play. Done is the
+   * whole way out from any depth. A submenu had only Back, so leaving from
+   * three levels in meant tapping out one level at a time; the list had only
+   * Done, so there was no step back from it at all. Both now have both.
+   *
+   * The submenu head is two rows rather than three things crammed across one:
+   * Back and Done on the top, the title under them with the width to itself.
+   * "Rename presets and scenes" is four words that will not share a line with
+   * two buttons on a phone.
+   */
+  const head = (title, onDone) =>
+    onDone === 'back' ? (
+      <View style={{ gap: space.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
+          <Press label="‹ Settings" height={40} onPress={() => setPage(null)} />
+          <Press label="Done" height={40} onPress={onBack} />
+        </View>
         <Text accessibilityRole="header" style={{ color: color.silk, fontSize: font.title, fontWeight: '700' }}>
           {title}
         </Text>
-      )}
-      {onDone === 'back' ? (
-        <Text accessibilityRole="header" style={{ color: color.silk, fontSize: font.lead, fontWeight: '700' }}>
+      </View>
+    ) : (
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
+        <Text accessibilityRole="header" style={{ color: color.silk, fontSize: font.title, fontWeight: '700' }}>
           {title}
         </Text>
-      ) : (
         <Press label="Done" height={40} onPress={onBack} />
-      )}
-    </View>
-  )
+      </View>
+    )
+
+  /* One step up, whatever that means from where you are standing. The swipe
+     and the Back button are the same errand, so they ask the same function. */
+  const goBack = () => (page === null ? onBack?.() : setPage(null))
 
   return (
+    <EdgeBack onBack={goBack}>
     <ScrollView
       style={{ flex: 1 }}
       contentContainerStyle={{ padding: space.lg, gap: space.xl, paddingBottom: space.xxl }}
@@ -174,7 +196,7 @@ export default function Settings({
     >
       {page === null ? (
         <>
-          {head('Setup')}
+          {head('Settings')}
           <Text style={{ color: color.silkFaint, fontSize: font.small, fontFamily: face }}>
             {`v${APP_VERSION}`}
           </Text>
@@ -235,13 +257,6 @@ export default function Settings({
                   : 'Connect a computer first'
               }
               onPress={() => setPage('unit')}
-            />
-            <SetupRow
-              title="Play screen"
-              /* Both of the things behind this row, so somebody looking for
-                 the theme can see from the list that it is in here. */
-              status={[SIZES[loadSize(sync)]?.name || 'Small', THEME_WORD[getMode()] || 'Auto'].join(' · ')}
-              onPress={() => setPage('play')}
             />
             {/*
               Three rows became one door.
@@ -344,6 +359,43 @@ export default function Settings({
               }
               onPress={() => (updates.phase === 'ready' ? applyNow() : checkNow())}
             />
+          </View>
+
+          {/*
+            * THE TWO THAT ARE NOT DOORS, and they are here rather than behind one.
+            *
+            * "Move this to the settings screen at the bottom below all the
+            * other drop-down menus — we want it quickly available just by
+            * clicking settings. Don't have it via a drop-down, have it always
+            * visible."
+            *
+            * Every row above opens something and then you come back. These two
+            * are not errands: they are how the screen you play off LOOKS, and
+            * the way anybody uses them is to change one and look at the result.
+            * Behind a row called Play screen that is four taps a go — open
+            * Settings, open the row, change it, come back out to see — and the
+            * thing you are judging is not even on screen while you are judging
+            * it.
+            *
+            * At the bottom because the rows above are what somebody opens
+            * Settings FOR. These want to be reachable in one tap, not first.
+            */}
+          <View style={{ gap: space.md }}>
+            <Section>Stage tiles</Section>
+            <TileSize />
+          </View>
+
+          {/*
+            Light, dark, or whatever the phone is set to.
+
+            "I'm not seeing where the light/dark/auto theme buttons are
+            anymore. Please put that back on Setup." The phone had none of
+            them and was dark whatever the handset was set to, which is the
+            wrong answer in a lit room.
+          */}
+          <View style={{ gap: space.md }}>
+            <Section>Appearance</Section>
+            <Appearance />
           </View>
         </>
       ) : null}
@@ -648,32 +700,6 @@ export default function Settings({
         </>
       ) : null}
 
-      {/* ----------------------------------------------------- play screen */}
-      {page === 'play' ? (
-        <>
-          {head('Play screen', 'back')}
-          <View style={{ gap: space.md }}>
-            <Section>Stage tiles</Section>
-            <TileSize />
-          </View>
-
-          {/*
-            Light, dark, or whatever the phone is set to.
-
-            "I'm not seeing where the light/dark/auto theme buttons are
-            anymore. Please put that back on Setup." The browser has had these
-            three for a long time and keeps them here, under Play screen,
-            because both of these settings are about how the thing you look at
-            on a stand LOOKS. The phone had none of them and was dark whatever
-            the handset was set to, which is the wrong answer in a lit room.
-          */}
-          <View style={{ gap: space.md }}>
-            <Section>Appearance</Section>
-            <Appearance />
-          </View>
-        </>
-      ) : null}
-
       {/* ----------------------------------------------------------- about */}
       {page === 'about' ? (
         <>
@@ -714,6 +740,7 @@ export default function Settings({
         </>
       ) : null}
     </ScrollView>
+    </EdgeBack>
   )
 }
 
@@ -853,7 +880,7 @@ function UnitBits() {
         </Note>
       ) : null}
       <SaveNotes s={saveTo} />
-      <SaveButton s={saveTo} height={TAP} grow />
+      <SaveButton s={saveTo} height={TAP} grow waiting={pending} />
       <Note>
         A new name is on the unit straight away and is lost on the next preset change unless it is
         saved. Save asks the computer to write this slot, and that keeps everything changed from this
@@ -915,25 +942,69 @@ function NameField({ label, value, onDone }) {
  * screen and Largest for somebody playing in the dark. Kept under the same key
  * as the browser's, so a phone and a laptop on one account agree.
  */
+/**
+ * Fit on screen, or a size of your own.
+ *
+ * "Make one that says fit on screen, and if they click that, it'll just make
+ * sure whatever size device they're on, all of those will fit onto the screen
+ * so they don't have to manually push up and down for sizes and then go back
+ * to the play screen to see what it did and then go back, so that way it's
+ * just always set up, good to go. Also make this the default setting from the
+ * beginning."
+ *
+ * FIT SITS FIRST AND IS ON OUT OF THE BOX, because it is the answer for
+ * everybody who has not got an opinion yet — which is everybody, on the first
+ * launch. The five steps underneath are still there and still remembered;
+ * they are now the thing you pick when fit has guessed wrong for you, rather
+ * than the only way to get a screen that fits.
+ *
+ * It is not a sixth step on the ladder, and drawing it as one would be a lie
+ * about what it does. A step is a height. Fit is a rule: the screen is
+ * measured and the tiles take what is left, so the same setting gives
+ * different pixels on a different phone, or on the same phone with a preset
+ * that has more blocks in it. That is the whole point — the round trip to Play
+ * and back to check ends here.
+ */
 function TileSize() {
   useStored()
   const now = loadSize(sync)
+  const fit = loadFit(sync, true)
   return (
     <View style={{ gap: space.sm }}>
+      <Press
+        label="Fit on screen"
+        sub="Sizes everything to your phone, whatever the preset holds"
+        tone="signal"
+        on={fit}
+        height={TAP}
+        onPress={() => saveFit(true, sync)}
+      />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
         {SIZES.map((size, i) => (
           <Press
             key={size.name}
             label={size.name}
             tone="signal"
-            on={i === now}
+            /* Never lit while fit is on: the stored step is still there and
+               comes back when it is picked, but it is not what the screen is
+               being drawn at, and showing it as chosen would say it was. */
+            on={!fit && i === now}
             height={44}
             style={{ paddingHorizontal: space.md }}
-            onPress={() => saveSize(i, sync)}
+            /* Picking a size IS turning fit off. Leaving it on and quietly
+               ignoring the press is how a setting stops being believed. */
+            onPress={() => {
+              saveFit(false, sync)
+              saveSize(i, sync)
+            }}
           />
         ))}
       </View>
-      <Note>Bigger tiles are easier to hit without looking; smaller ones fit more of the rig on screen.</Note>
+      <Note>
+        Fit does the work for you. Pick a size instead if you want bigger targets and do not mind
+        scrolling — bigger tiles are easier to hit without looking, smaller ones fit more of the rig
+        on screen.
+      </Note>
     </View>
   )
 }

@@ -106,7 +106,7 @@ export default function PhoneApp() {
 
       <h4>Once it is installed</h4>
       <p className="hint">
-        Open <strong>Phone &amp; computer</strong> in Setup here. It shows a square the phone&rsquo;s
+        Open <strong>Phone &amp; computer</strong> in Settings here. It shows a square the phone&rsquo;s
         camera can read, and that is the pairing done &mdash; no account, nothing to type.
       </p>
     </>

@@ -40,6 +40,8 @@ const ofScene = (s) => s.sceneIndex
 const ofSceneNames = (s) => s.sceneNames
 const ofCaps = (s) => s.capabilities
 const ofChain = (s) => s.chain
+const ofPreset = (s) => s.preset
+const ofUnsaved = (s) => s.unsaved
 
 /**
  * Why a knob did not take, in words that say whose doing it is.
@@ -121,6 +123,12 @@ export default function Edit({ onBack }) {
   const sceneNames = useRig(ofSceneNames)
   const caps = useRig(ofCaps)
   const chain = useRig(ofChain)
+  /* Unsaved work on THIS slot, for the Save button's fill. Same flag the
+     rename screen uses: a moved knob is lost at the next preset change
+     exactly as a typed name is. */
+  const preset = useRig(ofPreset)
+  const unsaved = useRig(ofUnsaved)
+  const pending = !!unsaved && unsaved.number === preset?.number
 
   const [openEid, setOpenEid] = useState(null)
   const [error, setError] = useState(null)
@@ -187,7 +195,7 @@ export default function Edit({ onBack }) {
           </Text>
         </View>
         <View style={{ flexDirection: 'row', gap: space.sm }}>
-          <SaveButton s={saveTo} />
+          <SaveButton s={saveTo} waiting={pending} />
           <Press label="Done" height={40} onPress={onBack} />
         </View>
       </View>

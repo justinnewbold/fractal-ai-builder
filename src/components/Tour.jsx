@@ -169,7 +169,7 @@ const phoneCard = ({ connected, email }) => ({
       </p>
       <PhoneQr connected={connected} email={email} showAccount={false} />
       <p className="hint">
-        It is in Setup &rarr; Phone &amp; computer whenever you want it again.
+        It is in Settings &rarr; Phone &amp; computer whenever you want it again.
       </p>
     </>
   )

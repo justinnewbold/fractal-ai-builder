@@ -69,13 +69,34 @@ export function useSaveToSlot() {
   }
 }
 
-/** The button: Save, then Tap again. */
-export function SaveButton({ s, height = 40, grow = false }) {
+/**
+ * The button: Save, then Tap again to confirm.
+ *
+ * FILLED THE MOMENT THERE IS SOMETHING TO LOSE. `waiting` is "this phone has
+ * changed something that is not written yet" — a renamed preset, a moved
+ * knob — and while that is true this is the only thing on the screen worth
+ * pressing, so it stops being an outline among outlines.
+ *
+ * "If a user has changed the preset name, make the save button yellow and
+ * obvious that that's how they save it."
+ *
+ * It matters more here than anywhere else in the app, because the thing it
+ * protects is invisible: a new name is on the unit the instant it is typed
+ * and is gone at the next preset change. Somebody who types a name, sees it
+ * take, and walks away has lost it and will not find out until the gig.
+ *
+ * Armed keeps the same fill rather than a louder one. The step between "you
+ * have unsaved work" and "this will overwrite slot 1" is carried by the
+ * words — on the button and in the warning above it — because two ambers
+ * would have to be told apart at a glance on a dark stage, and they would
+ * not be.
+ */
+export function SaveButton({ s, height = 40, grow = false, waiting = false }) {
   return (
     <Press
-      label={s.saving ? 'Saving…' : s.armed ? 'Tap again' : 'Save'}
+      label={s.saving ? 'Saving…' : s.armed ? 'Tap again to confirm' : 'Save'}
       tone="signal"
-      on={s.armed}
+      on={s.armed || waiting}
       height={height}
       grow={grow}
       disabled={!s.can}
@@ -92,7 +113,7 @@ export function SaveNotes({ s }) {
         <Note tone="warn" onDismiss={s.disarm}>
           {`This writes what the unit is playing now over slot ${
             s.slot !== null ? colLabel(s.slot) : '—'
-          }, replacing what was saved there. Tap Save again to do it.`}
+          }, replacing what was saved there. Tap Save again to confirm.`}
         </Note>
       ) : null}
       {s.said ? (

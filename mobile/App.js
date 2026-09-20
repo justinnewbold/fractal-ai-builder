@@ -10,6 +10,7 @@ import Note from './src/components/Note'
 import TopBar from './src/components/TopBar'
 import DemoUnit from './src/components/DemoUnit'
 import Settings from './src/screens/Settings'
+import EdgeBack from './src/components/EdgeBack'
 import SignIn from './src/screens/SignIn'
 import Edit from './src/screens/Edit'
 import Connect from './src/screens/Connect'
@@ -78,6 +79,32 @@ export default function App() {
      from the log they were reading is the wrong room. */
   const [reportFrom, setReportFrom] = useState('settings')
   const [link, setLink] = useState(linkState())
+
+  /*
+   * Where a left-edge swipe goes from the screen you are on.
+   *
+   * The same targets the Done buttons already use, named in one place so the
+   * gesture and the button cannot drift into disagreeing. Two of them are not
+   * constants — the guide and the feedback form are reached from Setup AND
+   * from the log, and returning somebody to Setup from the log they were
+   * reading is the wrong room.
+   *
+   * Nothing for `stage`: it is the bottom of the stack. Nothing for
+   * `settings` either — it wraps itself, because it is the one screen with
+   * pages inside it and only it knows whether back means its own list or the
+   * way out.
+   */
+  const BACK_TO = {
+    presets: 'stage',
+    setlists: 'stage',
+    edit: 'stage',
+    connect: 'settings',
+    gear: 'settings',
+    log: 'settings',
+    report: reportFrom,
+    fixes: fixFrom
+  }
+  const backFrom = BACK_TO[screen] ? () => setScreen(BACK_TO[screen]) : null
   /** The last "picked up 2 setlists from your Mac", until it has been read. */
   const [picked, setPicked] = useState(null)
   /** Whether the five units are up, from the name in the corner. */
@@ -381,6 +408,23 @@ export default function App() {
               The bar stays up while this waits, which is what makes the wait
               safe: whatever happens, Setup is one tap away in the corner.
             */}
+            {/*
+              SWIPE IN FROM THE LEFT TO GO BACK ONE STEP, on every screen that
+              has a way back.
+
+              "Swiping back should always take them to the previous screen."
+
+              One wrapper rather than one per screen, because the thing it
+              needs to know — where back IS from here — already lives here, in
+              the same `onBack` each screen is handed a line below. Settings
+              is the exception and carries its own: it is the only screen with
+              pages INSIDE it, so only it can say whether back means its own
+              list or the stage.
+
+              `null` on the stage screen itself: there is nowhere behind it,
+              and a gesture that does nothing is worse than none at all.
+            */}
+            <EdgeBack onBack={backFrom}>
             {settling && screen === 'stage' ? (
               <Waking link={link} />
             ) : screen === 'presets' ? (
@@ -499,6 +543,7 @@ export default function App() {
                 onUnlock={() => setBuying(true)}
               />
             )}
+            </EdgeBack>
           </>
         )}
       </SafeAreaView>

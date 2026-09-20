@@ -15,7 +15,7 @@ import {
   stepTarget
 } from '../lib/lists'
 import { sync, useStored } from '../lib/store'
-import { SIZES, loadSize } from '../lib/gigSize'
+import { SIZES, fitTiles, loadFit, loadSize } from '../lib/gigSize'
 import {
   clearError,
   loadPreset,
@@ -146,10 +146,58 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
    * below the platform's own 44.
    */
   const tight = size === SIZES[0]
+
+  /*
+   * FIT ON SCREEN: the screen decides the height, not a step on the ladder.
+   *
+   * "Make one that says fit on screen, and if they click that, it'll just make
+   * sure whatever size device they're on, all of those will fit onto the
+   * screen so they don't have to manually push up and down for sizes and then
+   * go back to the play screen to see what it did and then go back."
+   *
+   * That round trip is the whole complaint, and no fixed step can end it: a
+   * step is a number of pixels, and whether a rig fits at that number depends
+   * on the preset in front of you and the phone in your hand. So this measures
+   * instead — the browser has done it this way since "everything static on the
+   * screen without being able to scroll", and this is the same arithmetic
+   * against React Native's measurements rather than the DOM's.
+   *
+   * CHROME IS WHAT IS LEFT OVER. Everything here that is not a tile — the
+   * preset button, the notes, the tempo and tuner at the foot — has a height
+   * that does not depend on the tile size. So it is the content's whole height
+   * less the two grids, and whatever the viewport has left after THAT is what
+   * the grids may share.
+   *
+   * It settles rather than oscillating: the grids are subtracted out of the
+   * measurement, so the chrome figure does not move when the tiles resize.
+   */
+  const scenes = sceneShape(caps)
+  const [viewport, setViewport] = useState(0)
+  const [content, setContent] = useState(0)
+  const [sceneGrid, setSceneGrid] = useState(0)
+  const [blockGrid, setBlockGrid] = useState(0)
+  const fitOn = loadFit(sync, true)
+  const chrome = Math.max(0, content - sceneGrid - blockGrid)
+  /* Only once every piece has been measured. Fitting against a chrome of
+     zero would hand the grids the whole screen for one frame, which is the
+     flash of wrong sizes this screen already learned to avoid. */
+  const fitted =
+    fitOn && viewport > 0 && content > 0 && (sceneGrid > 0 || blockGrid > 0)
+      ? fitTiles({
+          available: viewport - chrome,
+          scenes: scenes.hasScenes ? scenes.count : 0,
+          blocks: blocks.length,
+          sceneCols: size.scenes,
+          fxCols: size.fx,
+          gap: space.sm
+        })
+      : null
+  /** The two numbers the tiles are actually drawn with. */
+  const tileH = fitted ? fitted.tile : size.tile
+  const fxCols = fitted ? fitted.fxCols : size.fx
   /** Which block's channel picker is open, by effect id. */
   const [picking, setPicking] = useState(null)
 
-  const scenes = sceneShape(caps)
   const channels = caps?.channelNames
   const slots = slotCount(caps)
   const conflict = hostConflict(remoteHosts(), remoteChosenHost())
@@ -234,6 +282,10 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
   return (
     <ScrollView
       style={{ flex: 1 }}
+      /* The viewport, and everything in it: fit is the difference between
+         the two, less the grids. */
+      onLayout={(e) => setViewport(e.nativeEvent.layout.height)}
+      onContentSizeChange={(_w, h) => setContent(h)}
       contentContainerStyle={{
         padding: space.lg,
         gap: tight ? space.md : space.lg,
@@ -358,7 +410,10 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
         <View style={{ gap: space.sm }}>
           <Label>Scenes</Label>
           <View
-            onLayout={(e) => setGrid(e.nativeEvent.layout.width)}
+            onLayout={(e) => {
+              setGrid(e.nativeEvent.layout.width)
+              setSceneGrid(e.nativeEvent.layout.height)
+            }}
             style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}
           >
             {Array.from({ length: scenes.count }, (_, i) => {
@@ -371,7 +426,7 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
                   fill={hue.fill}
                   ink={hue.ink}
                   on={i === scene}
-                  height={size.tile}
+                  height={tileH}
                   haptic={thud}
                   onPress={() => writeScene(i)}
                   style={{ width: tileWidth(row, size.scenes) }}
@@ -421,7 +476,10 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
         <View
           /* Both grids measure, because a unit that reports no scenes never
              draws the other one and these tiles would have no width. */
-          onLayout={(e) => setGrid(e.nativeEvent.layout.width)}
+          onLayout={(e) => {
+            setGrid(e.nativeEvent.layout.width)
+            setBlockGrid(e.nativeEvent.layout.height)
+          }}
           style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}
         >
           {blocks.map((block) => {
@@ -439,14 +497,14 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
                 fill={hue.fill}
                 ink={hue.ink}
                 on={engaged}
-                height={Math.max(tight ? 44 : TAP, size.tile - 12)}
+                height={Math.max(tight || fitted ? 44 : TAP, tileH - 12)}
                 onPress={() => writeBypass(idOf(block), !block.bypassed)}
                 onLongPress={
                   channels?.length > 1
                     ? () => setPicking(picking === idOf(block) ? null : idOf(block))
                     : undefined
                 }
-                style={{ width: tileWidth(row, size.fx) }}
+                style={{ width: tileWidth(row, fxCols) }}
               />
             )
           })}

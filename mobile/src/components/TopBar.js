@@ -45,17 +45,6 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
   const [failed, setFailed] = useState(null)
   const purchase = usePurchase()
   /*
-   * Named once, because the word and the pill below must agree about it.
-   *
-   * NOT gated on `purchase.available` any more, and that was the bug. The
-   * store not being ready made the whole offer vanish rather than explain
-   * itself — see shouldOffer in lib/purchases. The paywall is where "we
-   * cannot take your money this second" belongs; the bar's job is to be
-   * findable.
-   */
-  const canBuy = Boolean(onUnlock) && shouldOffer({ demo })
-
-  /*
    * The demo says DEMO, not CONNECTED.
    *
    * It reads as a connected link everywhere else on purpose — the questions do
@@ -65,10 +54,49 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
    * that. "It does sound connected, even in demo."
    */
   const demo = useDemo()
+
+  /*
+   * Named once, because the word and the pill below must agree about it.
+   *
+   * BELOW `demo`, and that is not tidiness. It sat ABOVE it and read `demo`
+   * from the line under itself — a const, so the read lands in the temporal
+   * dead zone. Depending on how the bundler lowers block scoping that is
+   * either a ReferenceError on every render of this bar or, quietly, a
+   * `demo` of undefined: shouldOffer({ demo: undefined }) is always false,
+   * so the unlock NEVER appeared in the demo. Which is the exact fault the
+   * offer was added to fix — "where is the unlock button? I don't see it
+   * anywhere" — reintroduced one line above the fix.
+   *
+   * NOT gated on `purchase.available`, which was the first version of that
+   * same bug. The store not being ready made the whole offer vanish rather
+   * than explain itself — see shouldOffer in lib/purchases. The paywall is
+   * where "we cannot take your money this second" belongs; the bar's job is
+   * to be findable.
+   */
+  const canBuy = Boolean(onUnlock) && shouldOffer({ demo })
   const connected = link?.link === 'connected'
   const tone = toneOfRemote(link?.link)
   const mark = demo ? 'wait' : linkTone(tone)
-  const word = demo ? 'demo' : linkWord(tone, 'remote')
+  /*
+   * In the demo the word IS the way out, so it says so.
+   *
+   * "Change this word demo to Unlock and bring up the unlock page when it's
+   * tapped. This is obviously only on the demo version where it would show
+   * this. Make sure it doesn't change how this button functions on unlocked
+   * versions when connected to an actual unit."
+   *
+   * DEMO described the state and named no way out of it. UNLOCK names the
+   * errand, which is the whole point: it is the word an eye lands on in this
+   * bar, and it was spending itself saying something the rest of the screen
+   * already makes obvious.
+   *
+   * `canBuy` rather than `demo` is what gates it, and that is the carve-out
+   * he asked for plus one he did not have to: outside the demo the word is
+   * CONNECTED or FINDING and is untouched, and INSIDE the demo somebody who
+   * has already paid still reads DEMO — offering an unlock to a person who
+   * owns it sends them to a paywall that bounces them straight back out.
+   */
+  const word = canBuy ? 'unlock' : demo ? 'demo' : linkWord(tone, 'remote')
 
   /*
    * TWO SPOTS, EACH TELLING ITS OWN TRUTH. The word on the right is the
@@ -248,7 +276,7 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
        * it is bought — a button that charges a person twice, or that cannot
        * take money at all, is worse than no button.
        */}
-      {canBuy ? (
+      {canBuy && purchase.price ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Unlock the full version"
@@ -277,8 +305,13 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
           >
             {/* The price belongs on the button. "Unlock" asks somebody to
                 tap to find out what it costs, which is the tap most people
-                will not make. */}
-            {purchase.price ? `Unlock ${purchase.price}` : 'Unlock'}
+                will not make.
+
+                The verb has moved left onto the word itself, so this carries
+                the price and nothing else — UNLOCK $9.99 reading across the
+                two. Saying "Unlock" here as well would be the same word twice
+                in half an inch. */}
+            {purchase.price}
           </Text>
         </Pressable>
       ) : null}

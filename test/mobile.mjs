@@ -1596,13 +1596,20 @@ export function run(test) {
      */
     const stage = read('mobile/src/screens/Stage.js')
     assert.match(stage, /const size = SIZES\[loadSize\(sync\)\]/, 'the stage screen never reads the tile size')
-    assert.match(stage, /height=\{size\.tile\}/, 'the scene tiles ignore the size setting')
+    /* `tileH` is the size setting OR the measured fit — see the fit test
+       below for which wins and when. Either way it is read, not ignored. */
+    assert.match(stage, /const tileH = fitted \? fitted\.tile : size\.tile/, 'the tile height is no longer the chosen size')
+    assert.match(stage, /height=\{tileH\}/, 'the scene tiles ignore the size setting')
     /* The tiles are measured rather than given a percentage now — a percentage
        cannot pay for the gaps, and the last tile of a short row stretched the
        width of the screen. The rule being checked is the same: how many go
        across comes from the setting. */
     assert.match(stage, /width: tileWidth\(row, size\.scenes\)/, 'the scenes are a fixed number across whatever the setting says')
-    assert.match(stage, /width: tileWidth\(row, size\.fx\)/, 'the chain is a fixed number across whatever the setting says')
+    /* Blocks take their column count from `fxCols`, which is the setting's
+       own `fx` until fit is measuring — fit widens the rows rather than let a
+       tile drop under a thumb. Either way it comes from the setting. */
+    assert.match(stage, /const fxCols = fitted \? fitted\.fxCols : size\.fx/, 'the chain column count is no longer the chosen one')
+    assert.match(stage, /width: tileWidth\(row, fxCols\)/, 'the chain is a fixed number across whatever the setting says')
     /*
      * And `row` is not the raw measurement, which is zero on the first frame of
      * every mount. "After going to setlists and going back it shows this screen
@@ -1619,7 +1626,11 @@ export function run(test) {
       /const row = grid \|\| Math\.max\(0, screen - space\.lg \* 2\)/,
       'the tiles are drawn from a width that is zero until the screen has been measured'
     )
-    assert.match(stage, /onLayout=\{\(e\) => setGrid\(e\.nativeEvent\.layout\.width\)\}/, 'nothing measures the row any more, so an unusual screen stays guessed at')
+    assert.match(stage, /setGrid\(e\.nativeEvent\.layout\.width\)/, 'nothing measures the row any more, so an unusual screen stays guessed at')
+    /* The same two onLayouts now take the HEIGHT as well, which is what fit
+       subtracts to find out how much screen is left for tiles. */
+    assert.match(stage, /setSceneGrid\(e\.nativeEvent\.layout\.height\)/, 'the scenes grid is not measured, so fit has nothing to subtract')
+    assert.match(stage, /setBlockGrid\(e\.nativeEvent\.layout\.height\)/, 'the chain grid is not measured, so fit has nothing to subtract')
     assert.ok(
       !/flexGrow: 1[\s\S]{0,40}flexBasis/.test(stage),
       'a tile can grow into the spare room again, so the last one in a short row fills the screen'
@@ -1835,7 +1846,8 @@ export function run(test) {
     for (const row of [
       'Phone & computer',
       'Rename presets and scenes',
-      'Play screen',
+      /* No 'Play screen'. Stage tiles and Appearance are open at the bottom of
+         this list now rather than behind a door. Asserted below. */
       'Troubleshooting',
       'About'
     ]) {
@@ -1855,7 +1867,26 @@ export function run(test) {
     const root = settings.slice(settings.indexOf('{page === null ? ('), settings.indexOf("{page === 'unit' ?"))
     assert.ok(root.length > 200, 'the Setup root moved; this check reads it')
     assert.ok(!/UnitBits/.test(root), 'the scene-name boxes are back on the front page of Setup')
-    assert.ok(!/TileSize/.test(root), 'the tile size buttons are on the front page rather than behind Play screen')
+    /*
+     * AND THE TWO THAT ARE NOT DOORS ARE ON IT, at the bottom.
+     *
+     * "Move this to the settings screen at the bottom below all the other
+     * drop-down menus — we want it quickly available just by clicking
+     * settings. Don't have it via a drop-down, have it always visible."
+     *
+     * This assertion used to say the opposite — that TileSize must NOT be on
+     * the front page — because these were behind a row called Play screen.
+     * Both are things you change and then LOOK at, and a door meant judging
+     * the result with the result off screen.
+     */
+    assert.match(root, /<TileSize \/>/, 'the tile size buttons are not on the front page of Settings')
+    assert.match(root, /<Appearance \/>/, 'the light and dark buttons are not on the front page of Settings')
+    /* Below the rows, not above: the rows are what somebody opens Settings
+       for, these are what they want in one tap once they are there. */
+    assert.ok(
+      root.indexOf('<SetupRow') < root.indexOf('<TileSize />'),
+      'the tile size buttons sit above the list of rows'
+    )
 
     const unit = settings.slice(settings.indexOf("{page === 'unit' ?"), settings.indexOf("{page === 'trouble' ?"))
     assert.match(unit, /<UnitBits \/>/, 'renaming is not on the rename page')
@@ -1877,9 +1908,6 @@ export function run(test) {
     /* Each row says something true about the state it leads to, which is the
        whole point of the list: it answers most questions without a tap. */
     assert.match(settings, /status=\{\s*demo\s*\?\s*'Demo — simulated FM3'[\s\S]{0,500}?`\$\{deviceName \|\| 'Unit'\} · connected`/)
-    /* Both things behind the Play screen row, so somebody hunting for the
-       theme can tell from the list that it is in there. */
-    assert.match(settings, /status=\{\[SIZES\[loadSize\(sync\)\]\?\.name \|\| 'Small', THEME_WORD\[getMode\(\)\] \|\| 'Auto'\]\.join/)
   })
 
   test('the version on the About page is the version that was built', async () => {
@@ -4511,7 +4539,10 @@ export function run(test) {
     assert.match(stage, /const tight = size === SIZES\[0\]/, 'the smallest step is not told apart')
     assert.match(stage, /gap: tight \? space\.md : space\.lg, paddingBottom: tight \? space\.lg : space\.xxl/, 'the gaps and the padding under the foot do not give at the smallest size')
     assert.match(stage, /height=\{tight \? TAP : TAP \+ 12\}/, 'the preset button keeps its extra height at the smallest size')
-    assert.match(stage, /height=\{Math\.max\(tight \? 44 : TAP, size\.tile - 12\)\}/, 'a chain tile is held at 56 beside scene tiles of 48')
+    /* `|| fitted` for the same reason `tight` is there: when the screen is
+       being asked to fit, a chain tile held at 56 beside scene tiles of 48 is
+       the thing that stops it fitting. */
+    assert.match(stage, /height=\{Math\.max\(tight \|\| fitted \? 44 : TAP, tileH - 12\)\}/, 'a chain tile is held at 56 beside scene tiles of 48')
     assert.match(stage, /const foot = tight \? 48 : TAP/, 'the foot does not give at the smallest size')
     /* Six: Previous, Setlists, Next, Tuner, Tap Tempo and Edit — the last of
        which joined the bar when it came down off the preset row, "exactly like
@@ -4755,8 +4786,36 @@ export function run(test) {
 
     /* And the button: Save, then Tap again with the warning, then the ask. */
     const saver = read('mobile/src/components/SaveToSlot.js').replace(/\s+/g, ' ')
-    assert.match(saver, /label=\{s\.saving \? 'Saving…' : s\.armed \? 'Tap again' : 'Save'\}/, 'there is no Save button, or it does not ask twice')
-    assert.match(saver, /replacing what was saved there\. Tap Save again to do it\./, 'the warning does not say what a save overwrites')
+    assert.match(
+      saver,
+      /label=\{s\.saving \? 'Saving…' : s\.armed \? 'Tap again to confirm' : 'Save'\}/,
+      'there is no Save button, or it does not ask twice'
+    )
+
+    /*
+     * AND IT IS FILLED WHILE THERE IS SOMETHING TO LOSE.
+     *
+     * "If a user has changed the preset name, make the save button yellow and
+     * obvious that that's how they save it."
+     *
+     * An outline among outlines is the wrong weight for the one control that
+     * stands between a typed name and losing it at the next preset change —
+     * the name IS on the unit already, which is exactly what makes walking
+     * away from this screen feel finished when it is not.
+     */
+    assert.match(saver, /on=\{s\.armed \|\| waiting\}/, 'the Save button does not light up when there is unsaved work')
+
+    /* Both screens that can leave work unsaved hand it the same flag, off the
+       same store value — a moved knob is lost exactly as a typed name is. */
+    for (const [file, where] of [
+      ['mobile/src/screens/Settings.js', 'the rename screen'],
+      ['mobile/src/screens/Edit.js', 'the Edit screen']
+    ]) {
+      const text = read(file)
+      assert.match(text, /const pending = !!unsaved && unsaved\.number === preset\?\.number/, `${where} cannot tell whether there is unsaved work`)
+      assert.match(text, /<SaveButton[^/]*waiting=\{pending\}/, `${where} never lights its Save button`)
+    }
+    assert.match(saver, /replacing what was saved there\. Tap Save again to confirm\./, 'the warning does not say what a save overwrites')
     assert.match(saver, /const res = await askComputerToSave\(\{ park: \(req\) => parkSave\(slug, req\), readResult: \(\) => readSaveResult\(slug\), slot: preset\?\.number, name: preset\?\.name \|\| ''/, 'the button does not ask the computer, or sends no name')
     /* On both screens where something gets changed. */
     for (const screen of ['mobile/src/screens/Edit.js', 'mobile/src/screens/Settings.js']) {
@@ -5211,7 +5270,14 @@ export function run(test) {
      */
     const bar = read('mobile/src/components/TopBar.js').replace(/\s+/g, ' ')
     assert.match(bar, /const demo = useDemo\(\)/, 'the bar cannot tell whether it is in the demo')
-    assert.match(bar, /const word = demo \? 'demo' : linkWord\(tone, 'remote'\)/, 'the bar still says CONNECTED in the demo')
+    /* `canBuy` is now the first rung — the word says UNLOCK where there is
+       one to sell. What this test is about is the rung after it: the demo
+       must never wear CONNECTED. */
+    assert.match(
+      bar,
+      /const word = canBuy \? 'unlock' : demo \? 'demo' : linkWord\(tone, 'remote'\)/,
+      'the bar still says CONNECTED in the demo'
+    )
     assert.match(bar, /const mark = demo \? 'wait' : linkTone\(tone\)/, 'the demo word is drawn in the colour a real connection gets')
   })
 
@@ -5969,6 +6035,197 @@ export function run(test) {
     assert.match(set, /How this works/, 'there is no way back to the tour')
   })
 
+  /**
+   * SWIPE IN FROM THE LEFT TO GO BACK, AND DONE LEAVES FROM ANY DEPTH.
+   *
+   * "Under the settings menu they could swipe on the left side of the screen
+   * to the right to go back to the play screen, or in one of the submenus on
+   * the settings screen, it would swipe and go back to the previous page they
+   * were on. Then add the done button to all submenus, and if they click
+   * done, it takes them directly back to the play screen, no matter how deep
+   * they are. Swiping back should always take them to the previous screen."
+   *
+   * Two gestures with two different jobs, and the test is mostly about them
+   * not being confused for one another: back is ONE step, Done is the whole
+   * way out.
+   */
+  test('a left-edge swipe goes back one step, and Done goes all the way out', () => {
+    const edge = read('mobile/src/components/EdgeBack.js')
+
+    /*
+     * PanResponder, NOT react-native-gesture-handler — and this is the part
+     * worth holding. The usual library is a native module, so adding it moves
+     * mobile/fingerprint.json, which stops every installed handset receiving
+     * updates until a new build is made. Spending an iOS build slot to add a
+     * swipe is the wrong trade. PanResponder is inside React Native.
+     */
+    assert.match(edge, /from 'react-native'/, 'the swipe is not built on React Native itself')
+    assert.match(edge, /PanResponder\.create/, 'the swipe no longer uses PanResponder')
+    const pkg = JSON.parse(read('mobile/package.json'))
+    assert.ok(
+      !pkg.dependencies['react-native-gesture-handler'],
+      'a native gesture library was added — that moves the fingerprint and costs a build'
+    )
+
+    /* It must not eat taps, and must not eat a knob. */
+    assert.match(edge, /onStartShouldSetPanResponder: \(\) => false/, 'the swipe claims plain taps')
+    assert.ok(
+      !/onMoveShouldSetPanResponderCapture/.test(edge.replace(/\/\*[\s\S]*?\*\//g, ' ')),
+      'the swipe captures gestures from its children — a slider at the left edge would lose its drag'
+    )
+    /* Started at the edge, going sideways, by a margin over vertical. */
+    assert.match(edge, /g\.x0 <= EDGE/, 'a drag from anywhere on screen counts as going back')
+    assert.match(edge, /Math\.abs\(g\.dx\) > Math\.abs\(g\.dy\) \* 2/, 'a vertical scroll can trigger the back swipe')
+
+    /*
+     * WHERE BACK GOES IS THE SAME PLACE DONE ALREADY WENT.
+     *
+     * App.js hands every screen an onBack; the swipe reads a map beside it.
+     * Two lists of the same facts drift, so this holds them to each other:
+     * every screen the map names must hand its own Done the same target.
+     */
+    const app = read('mobile/App.js')
+    const map = app.slice(app.indexOf('const BACK_TO = {'), app.indexOf('const backFrom ='))
+    assert.ok(map.length > 40, 'the back-target map moved; this check reads it')
+    for (const [screen, target] of [
+      ['presets', 'stage'],
+      ['setlists', 'stage'],
+      ['edit', 'stage'],
+      ['connect', 'settings'],
+      ['gear', 'settings'],
+      ['log', 'settings']
+    ]) {
+      assert.match(map, new RegExp(`${screen}: '${target}'`), `a swipe on ${screen} does not go to ${target}`)
+    }
+    /* The two that are not constants, because they are reached from two
+       places and going "back" to the wrong one is the wrong room. */
+    assert.match(map, /report: reportFrom/, 'the feedback form sends a swipe to a fixed screen')
+    assert.match(map, /fixes: fixFrom/, 'the guide sends a swipe to a fixed screen')
+
+    /* The stage is the bottom of the stack: no handler, rather than a
+       gesture that does nothing. */
+    assert.ok(!/\bstage: /.test(map), 'the stage screen has somewhere to swipe back to')
+    assert.match(
+      app,
+      /const backFrom = BACK_TO\[screen\] \? \(\) => setScreen\(BACK_TO\[screen\]\) : null/,
+      'the swipe is wired to something other than the map'
+    )
+
+    /*
+     * SETTINGS CARRIES ITS OWN, because it is the only screen with pages
+     * inside it. One step from a submenu is the list; one step from the list
+     * is the way out. The same function answers the Back button and the
+     * swipe, so they cannot disagree.
+     */
+    const set = read('mobile/src/screens/Settings.js')
+    assert.match(
+      set,
+      /const goBack = \(\) => \(page === null \? onBack\?\.\(\) : setPage\(null\)\)/,
+      'a swipe in Settings does not go back one step'
+    )
+    assert.match(set, /<EdgeBack onBack=\{goBack\}>/, 'Settings cannot be swiped out of')
+
+    /*
+     * AND EVERY SUBMENU HAS BOTH. It had Back and no Done, so leaving from
+     * three levels in was three taps; the list had Done and no Back.
+     */
+    const head = set.slice(set.indexOf('const head = (title, onDone) =>'), set.indexOf('const goBack ='))
+    assert.ok(head.length > 100, 'the page header moved; this check reads it')
+    const back = head.slice(head.indexOf("onDone === 'back' ?"), head.indexOf(') : ('))
+    assert.match(back, /label="‹ Settings"/, 'a submenu has no way back to the list')
+    assert.match(back, /label="Done" height=\{40\} onPress=\{onBack\}/, 'a submenu has no Done, so leaving takes a tap per level')
+  })
+
+  /**
+   * FIT ON SCREEN, AND IT IS WHAT A NEW PHONE GETS.
+   *
+   * "Make one that says fit on screen, and if they click that, it'll just make
+   * sure whatever size device they're on, all of those will fit onto the
+   * screen so they don't have to manually push up and down for sizes and then
+   * go back to the play screen to see what it did and then go back, so that
+   * way it's just always set up, good to go. Also make this the default
+   * setting from the beginning."
+   *
+   * The round trip is the complaint, and no fixed step can end it: a step is a
+   * number of pixels, and whether a rig fits at that number depends on the
+   * preset and the handset. Fit measures instead.
+   */
+  test('Play fits itself to the screen, and that is the setting out of the box', async () => {
+    const { loadFit, saveFit, fitTiles } = await import('../mobile/src/lib/gigSize.js')
+
+    /*
+     * THREE STATES, WHICH IS THE WHOLE TRICK.
+     *
+     * This stored '1' or nothing, so "off" and "never chosen" were the same
+     * value. That is fine while the default is off and impossible once it is
+     * on: turning fit off would be indistinguishable from never having
+     * touched it, and it would come back on at the next launch. So off is
+     * written down.
+     */
+    const store = () => {
+      const held = new Map()
+      return {
+        getItem: (k) => (held.has(k) ? held.get(k) : null),
+        setItem: (k, v) => held.set(k, String(v)),
+        removeItem: (k) => held.delete(k),
+        held
+      }
+    }
+
+    const fresh = store()
+    assert.equal(loadFit(fresh, true), true, 'a phone that has never chosen does not get fit')
+    assert.equal(loadFit(fresh), false, 'the browser default moved — it was not asked to')
+
+    const off = store()
+    saveFit(false, off)
+    assert.equal(loadFit(off, true), false, 'turning fit off does not stick, so it returns at the next launch')
+    const on = store()
+    saveFit(true, on)
+    assert.equal(loadFit(on, true), true, 'turning fit on does not stick')
+    assert.equal(loadFit(on), true, 'an explicit yes is ignored in the browser')
+
+    /* And it is never REMOVED, which would read as "never chosen" and hand
+       the answer back to the default — the bug this shape exists to avoid. */
+    assert.equal(off.held.get('fractal.gigFit'), '0', 'off is stored as absence, which means default')
+
+    /*
+     * THE ARITHMETIC ITSELF: more rig, smaller tiles, and never under a thumb.
+     */
+    const roomy = fitTiles({ available: 600, scenes: 4, blocks: 8 })
+    const packed = fitTiles({ available: 600, scenes: 8, blocks: 24 })
+    assert.ok(packed.tile <= roomy.tile, 'a bigger rig does not get smaller tiles')
+    assert.ok(packed.tile >= 44, `a tile came out at ${packed.tile}px, which is under a thumb`)
+    assert.ok(fitTiles({ available: 50, scenes: 8, blocks: 24 }).tile >= 44, 'a cramped screen draws tiles nobody can hit')
+
+    /*
+     * THE SCREEN ASKS FOR IT, and asks with the phone's default rather than
+     * the browser's.
+     */
+    const stage = read('mobile/src/screens/Stage.js')
+    assert.match(stage, /const fitOn = loadFit\(sync, true\)/, 'the stage screen does not default to fitting')
+    assert.match(stage, /const chrome = Math\.max\(0, content - sceneGrid - blockGrid\)/, 'nothing works out how much screen the tiles may have')
+    assert.match(stage, /available: viewport - chrome/, 'fit is measured against something other than what is left')
+    /* Not until everything has been measured: fitting against a chrome of
+       zero hands the grids the whole screen for a frame, which is the flash
+       of wrong sizes this screen already learned to avoid. */
+    assert.match(stage, /viewport > 0 && content > 0/, 'fit runs before the screen has been measured')
+
+    /* And the control, with fit first because it is the answer for anybody
+       who has not got an opinion yet. */
+    const set = read('mobile/src/screens/Settings.js')
+    assert.match(set, /label="Fit on screen"/, 'there is no way to ask for a screen that fits')
+    assert.match(set, /on=\{fit\}/, 'the Fit button never shows that it is on')
+    assert.ok(
+      set.indexOf('label="Fit on screen"') < set.indexOf('{SIZES.map('),
+      'the sizes come before Fit, which buries the thing most people want'
+    )
+    /* Picking a size IS turning fit off. Leaving it on and ignoring the press
+       is how a setting stops being believed. */
+    const tile = set.slice(set.indexOf('function TileSize()'), set.indexOf('function TileSize()') + 2200)
+    assert.match(tile, /saveFit\(false, sync\)\s*\n\s*saveSize\(i, sync\)/, 'picking a size leaves fit on, so the press does nothing')
+    assert.match(tile, /on=\{!fit && i === now\}/, 'a size shows as chosen while fit is what is actually drawing the screen')
+  })
+
   test('the demo stays in front of the paywall', () => {
     const app = read('mobile/App.js')
     /* Not `[^>]*` — the arrow in `() =>` is a `>` and would end the class. */
@@ -6072,11 +6329,51 @@ export function run(test) {
       /const canBuy = Boolean\(onUnlock\) && shouldOffer\(\{ demo \}\)/,
       'the word and the pill no longer share one condition'
     )
-    assert.match(bar, /\{\.\.\.\(canBuy\s*\?\s*\{/, 'the word DEMO is not a way into the unlock page')
+    assert.match(bar, /\{\.\.\.\(canBuy\s*\?\s*\{/, 'the word is not a way into the unlock page')
+    /* Comments stripped: the block above `word` explains the rule by naming
+       canBuy, and counting prose as a use is how this number goes wrong. */
+    const code = bar.replace(/\/\*[\s\S]*?\*\//g, ' ')
     assert.equal(
-      (bar.match(/canBuy/g) || []).length,
-      3,
-      'the condition is declared and used twice — the word and the pill'
+      (code.match(/canBuy/g) || []).length,
+      4,
+      'the condition is declared and used three times — the word, its press, and the pill'
+    )
+
+    /*
+     * AND IT IS DECLARED AFTER `demo`, WHICH IS NOT A STYLE POINT.
+     *
+     * canBuy sat ABOVE `const demo = useDemo()` and read `demo` off the line
+     * below it. A const read before its declaration is in the temporal dead
+     * zone, so depending on how the bundler lowers block scoping that is a
+     * ReferenceError on every render of this bar, or a silent `undefined` —
+     * and shouldOffer({ demo: undefined }) is false forever, so the unlock
+     * never appears in the demo at all.
+     *
+     * That is the exact fault the offer was written to fix ("where is the
+     * unlock button? I don't see it anywhere"), reintroduced one line above
+     * the fix, and invisible to every check here because the source still
+     * said all the right words in the right order.
+     */
+    assert.ok(
+      bar.indexOf('const demo = useDemo()') < bar.indexOf('const canBuy ='),
+      'canBuy reads `demo` before it is declared — the unlock never shows in the demo'
+    )
+
+    /*
+     * THE WORD ITSELF SAYS UNLOCK, and only where there is one to sell.
+     *
+     * "Change this word demo to Unlock and bring up the unlock page when it's
+     * tapped... Make sure it doesn't change how this button functions on
+     * unlocked versions when connected to an actual unit."
+     *
+     * So the ladder is canBuy, then demo, then the link word — a real unit is
+     * untouched, and somebody who already owns it still reads DEMO rather
+     * than being sold a thing they have.
+     */
+    assert.match(
+      bar,
+      /const word = canBuy \? 'unlock' : demo \? 'demo' : linkWord\(tone, 'remote'\)/,
+      'the word no longer says UNLOCK in the demo, or says it outside one'
     )
 
     /* Settings carries it too — for reading before tapping, and for restoring
@@ -6214,13 +6511,24 @@ export function run(test) {
     /* The price goes ON the buttons. Asking somebody to tap to find out what
        it costs is asking for the tap most people will not make. */
     const offer = read('mobile/src/components/UnlockOffer.js')
-    for (const [where, text] of [['the bar', bar], ['the stage offer', offer]]) {
-      assert.match(
-        text,
-        /purchase\.price \? `Unlock \$\{purchase\.price\}` : 'Unlock'/,
-        `${where} does not show the price on the button`
-      )
-    }
+    assert.match(
+      offer,
+      /purchase\.price \? `Unlock \$\{purchase\.price\}` : 'Unlock'/,
+      'the stage offer does not show the price on the button'
+    )
+    /*
+     * The bar is the exception, and only because the verb moved next to it.
+     * The word itself now reads UNLOCK, so the pill beside it carries the
+     * price alone — "Unlock" in both would be the same word twice in half an
+     * inch. Which also means the pill must not draw at all before a price
+     * arrives, or it is an empty amber blob.
+     */
+    assert.match(bar, /\{purchase\.price\}/, 'the bar does not show the price on the button')
+    assert.match(
+      bar,
+      /\{canBuy && purchase\.price \? \(/,
+      'the bar draws an empty pill while the store has no price yet'
+    )
 
     /* And it can be put away, or it is an advertisement rather than an offer —
        on a screen that is open on a dark stage between songs. */
