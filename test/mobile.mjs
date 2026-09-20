@@ -6226,6 +6226,53 @@ export function run(test) {
     assert.match(tile, /on=\{!fit && i === now\}/, 'a size shows as chosen while fit is what is actually drawing the screen')
   })
 
+  /**
+   * LEAVING THE DEMO LEAVES NOTHING OF IT BEHIND, and a read that works
+   * clears the message from the read that did not.
+   *
+   * "Says I'm not connected but I'm clearly connected based on the green FM3
+   * and connected button. It's also still showing demo presets when I'm no
+   * longer in the demo. I logged out and back in and now it's showing up
+   * correctly."
+   *
+   * Two faults, one screenshot, and signing out cured both — which is the
+   * tell: `reset` is called from exactly one place, the disconnect path, so
+   * anything this store gets wrong stays wrong until a sign-out.
+   */
+  test('a working read clears the old failure, and the demo takes its names with it', () => {
+    const rig = read('mobile/src/lib/rig.js')
+
+    /*
+     * FAULT ONE: the note and the bar read different things, and only one of
+     * them was kept up to date. The bar reads the live link. The red note
+     * reads `state.error`, which nothing but a later failure ever cleared —
+     * so a message from a minute ago sat over a working rig.
+     */
+    const all = rig.slice(rig.indexOf('export async function refreshAll()'), rig.indexOf('export async function refreshAll()') + 2400)
+    assert.ok(all.length > 400, 'refreshAll moved; this check reads it')
+    assert.match(all, /error: null/, 'a successful re-read leaves the last failure on screen')
+
+    /*
+     * FAULT TWO: the demo's FM3 and a real FM3 both answer 'fm3', so the
+     * check that forgets stale names saw no change and kept the
+     * simulation's. They are filled in lazily and never re-read wholesale,
+     * so nothing downstream corrected them.
+     */
+    assert.match(rig, /const simulated = isDemo\(\)/, 'the store cannot tell a simulated unit from a real one')
+    assert.match(
+      all,
+      /if \(slug !== state\.deviceSlug \|\| simulated !== state\.simulated\) forgetNames\(\)/,
+      'the demo keeps its preset names when a real unit of the same model arrives'
+    )
+    assert.match(rig, /simulated: false/, 'the simulated flag has no starting value')
+    assert.match(all, /simulated,/, 'the simulated flag is worked out and then not stored')
+
+    /* It is genuinely a different question from the slug, which is the whole
+       reason this bug existed: same model, different source. */
+    const slugs = read('mobile/src/lib/device-slug.js')
+    assert.ok(!/isDemo|demo/i.test(slugs), 'the slug now knows about the demo — then the flag above is redundant and one of them is wrong')
+  })
+
   test('the demo stays in front of the paywall', () => {
     const app = read('mobile/App.js')
     /* Not `[^>]*` — the arrow in `() =>` is a `>` and would end the class. */

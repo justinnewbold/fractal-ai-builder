@@ -26,6 +26,7 @@ import { adopt as adoptNames, forget as forgetNames, learn as learnName, nameOf 
 import { forget as forgetControls } from './paramIndex'
 import { forgetSceneNames, recallSceneNames, rememberSceneNames } from './sceneNameCache'
 import { subscribeRemoteEvents } from './relay'
+import { isDemo } from './demo'
 import { logDebug } from './debugLog'
 
 const initial = {
@@ -72,7 +73,16 @@ const initial = {
   tuning: null,
   /** 'idle' | 'reading' | 'ok' | 'failed' — a failed read and an empty preset are not the same. */
   chain: 'idle',
-  error: null
+  error: null,
+  /*
+   * Whether what answered is the simulation rather than a rig.
+   *
+   * Held because the SLUG cannot tell them apart: the demo's FM3 and a real
+   * FM3 both answer 'fm3', so leaving the demo with an FM3 plugged in looked
+   * to this store like the same unit it already had — and the 512 preset
+   * names read off the simulation stayed on screen over the real one's slots.
+   */
+  simulated: false
 }
 
 let state = initial
@@ -339,7 +349,19 @@ export async function refreshAll() {
    * and a picker showing one unit's names over the other's slots would send
    * somebody to the wrong song by its right name.
    */
-  if (slug !== state.deviceSlug) forgetNames()
+  /*
+   * A different unit means the names read off the last one are wrong — and so
+   * does the same unit arriving from the other side of the demo switch.
+   *
+   * "It's also still showing demo presets when I'm no longer in the demo."
+   * The demo's FM3 and his FM3 share a slug, so this comparison said nothing
+   * had changed and the simulation's names were served over the real rig's
+   * slots. They are lazily filled and never re-read wholesale, so nothing
+   * later corrected them; signing out was the only thing that cleared them,
+   * which is exactly what he had to do.
+   */
+  const simulated = isDemo()
+  if (slug !== state.deviceSlug || simulated !== state.simulated) forgetNames()
   const unit = caps?.connected === false ? 'missing' : 'present'
   if (unit !== state.unit) logDebug('unit', unit === 'missing' ? 'the computer has no unit' : 'the computer has a unit', caps?.short || caps?.name || undefined)
   set({
@@ -350,7 +372,20 @@ export async function refreshAll() {
        one leaves this null and the screen draws nothing. */
     firmware: firmwareOf(caps),
     deviceSlug: slug,
-    unit
+    simulated,
+    unit,
+    /*
+     * The old failure is over, because this one worked.
+     *
+     * "Says I'm not connected but I'm clearly connected based on the green
+     * FM3 and connected button." Both were true: the bar reads the live link
+     * and was right, and the note reads this field, which no successful read
+     * ever cleared. So a message from a minute ago sat over a working rig
+     * until the app was signed out. A detect that answers IS the evidence
+     * that whatever failed before is no longer failing; anything that fails
+     * after this sets its own.
+     */
+    error: null
   })
   /*
    * The preset names, from disk now and from the computer's list when it
