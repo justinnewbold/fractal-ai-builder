@@ -1475,9 +1475,10 @@ export function run(test) {
          about it is a fault being fixed: it is what the app is and how it
          works, and somebody hunting for it under Troubleshooting has first
          had to decide they have a problem. */
-      /* 'how-this-works' has gone with the tour — the walkthrough that
-         replaces it gets its own row here once its copy is settled. */
-      ['about', ['updates', 'small-print']]
+      /* 'how-this-works' went with the tour. The walkthrough that replaced it
+         sits first, because it is the one thing on this page somebody opens
+         on purpose rather than to check a fact. */
+      ['about', ['walkthrough', 'updates', 'small-print']]
     ]) {
       assert.deepEqual(behind(page), panels, `the ${page} page holds ${behind(page).join(', ')}`)
     }
@@ -4665,6 +4666,59 @@ export function run(test) {
    * typographer would use a dash, which is the exact thing most likely to be
    * "fixed" by accident.
    */
+  /*
+   * THE WALKTHROUGH REPORTS; IT DOES NOT PRETEND.
+   *
+   * Every screen in the PDF that names a fact — which unit answered, its
+   * firmware, how many presets, whether a phone arrived — is wired to the
+   * thing it names. That is the whole difference between this and a mockup,
+   * and it is the one property worth a test: the single moment these screens
+   * exist for is somebody deciding whether this app actually works, and a
+   * walkthrough that prints "FM3 found" with nothing plugged in has answered
+   * that question for them, wrongly.
+   */
+  test('the walkthrough says what the port answered, not what the mockup said', () => {
+    const onb = readFileSync(new URL('../src/components/Onboarding.jsx', import.meta.url), 'utf8')
+
+    /* Not one word typed into the component. */
+    assert.match(onb, /from '\.\.\/\.\.\/shared\/onboarding\.mjs'/, 'the copy is not coming from the one file that holds it')
+    const bare = onb.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ')
+    for (const typed of ['FM3 found', 'firmware 8.02', '512 presets', 'K7QM-4T9R', 'iPhone connected']) {
+      assert.ok(!bare.includes(typed), `"${typed}" is typed into the screen, so it is true whether or not it is`)
+    }
+
+    /* The unit is whatever answered, and the numbers are read off it. */
+    assert.match(onb, /const found = status === 'live' && !!device/, 'the found state is not the real one')
+    assert.match(onb, /D2\.found\(unitName\)/, 'the unit name is not the one that answered')
+    assert.match(onb, /firmware: firmwareOf\(device\)/, 'the firmware is not read off the unit')
+    assert.match(onb, /presets: slotCount\(device\?\.capabilities\)/, 'the preset count is not the unit own')
+
+    /* The square is the real one, shared with Settings rather than a second
+       thing that can disagree about how pairing works. */
+    assert.match(onb, /<PhoneQr connected=\{paired\}/, 'the pairing screen draws its own square')
+
+    /*
+     * AND "THE PORT IS BUSY" IS TOLD APART FROM "NOTHING IS PLUGGED IN".
+     * They are different screens in the PDF because they are different
+     * problems: one is a thing to go and fix, the other is "plug it in".
+     */
+    assert.match(
+      onb,
+      /const stuck = !found && \(faultReason === 'no-answer' \|\| faultReason === 'unreadable'\)/,
+      'the busy-port screen is guessed at rather than read from why the read failed'
+    )
+
+    /* It finishes itself once a phone actually arrives: nobody should press
+       Next after the thing they are holding has already connected. */
+    assert.match(onb, /if \(open && at === 'pair' && paired\) setAt\('done'\)/, 'the pairing step waits for a press it does not need')
+
+    /* Seen once. Marked on open rather than on finish — closing the tab is
+       not an accident to be corrected next launch. */
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    assert.match(app, /useState\(\(\) => !onboarded\(\)\)/, 'the walkthrough does not open itself on a first run')
+    assert.match(app, /if \(walkthrough\) markOnboarded\(\)/, 'the walkthrough is not remembered, so it returns every load')
+  })
+
   test('the walkthrough is worded the way he wrote it', async () => {
     const c = await import('../shared/onboarding.mjs')
 

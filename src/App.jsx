@@ -22,6 +22,8 @@ import LocalLibrary from './components/LocalLibrary'
 import GearNames from './components/GearNames'
 import PhoneApp from './components/PhoneApp'
 import SetupRow from './components/SetupRow'
+import Onboarding, { onboarded, markOnboarded } from './components/Onboarding'
+import { REPLAY } from '../shared/onboarding.mjs'
 import { FULL, BUILT_AT, VERSION } from './lib/version'
 import Theme from './components/Theme'
 import Section from './components/Section'
@@ -392,6 +394,19 @@ export default function App() {
    * quiet was described as a Mac that had answered. See faultCopy.
    */
   const [faultReason, setFaultReason] = useState(null)
+  /*
+   * The walkthrough, and whether it has been through.
+   *
+   * Opened from `onboarded()` rather than a fresh false, so a reload does not
+   * start it again — and marked the moment it opens rather than when it
+   * finishes. Somebody who opens it, reads a screen and closes the tab has
+   * seen it; offering it again treats closing as an accident, and a tutorial
+   * that keeps coming back is the thing everybody remembers hating.
+   */
+  const [walkthrough, setWalkthrough] = useState(() => !onboarded())
+  useEffect(() => {
+    if (walkthrough) markOnboarded()
+  }, [walkthrough])
   const [device, setDevice] = useState(null)
   /*
    * The unit's own state comes from the store, not from here.
@@ -3509,6 +3524,21 @@ export default function App() {
         Create would be a second place for those to diverge.
       */}
       {/* The one sign-in, as a sheet: it pops up, you do the thing, it goes. */}
+      {/*
+        Not a sheet over the app: a page instead of it. There is nothing
+        useful behind this until the unit is plugged in, and showing the app
+        greyed out behind a dialog shows somebody a thing they cannot use yet.
+      */}
+      <Onboarding
+        open={walkthrough}
+        onClose={() => setWalkthrough(false)}
+        device={device}
+        status={status}
+        faultReason={faultReason}
+        link={link}
+        onLookAgain={() => read()}
+      />
+
       <SignInSheet
         open={signIn}
         role={link.role}
@@ -4187,6 +4217,23 @@ export default function App() {
             </button>
             <p className="setup-page-title">{SETUP_PAGES.about}</p>
             <p className="device-meta mono">{FULL} · built {BUILT_AT} UTC</p>
+            {/*
+              The way back in, named the way the last screen of it promises:
+              "Need this again? Settings → Show the walkthrough."
+            */}
+            <Section key="walkthrough" title={REPLAY} note="The three-step setup">
+              <div className="history-actions">
+                <button
+                  className="chip"
+                  onClick={() => {
+                    setSheet(null)
+                    setWalkthrough(true)
+                  }}
+                >
+                  {REPLAY}
+                </button>
+              </div>
+            </Section>
 {inDesktopApp() ? (
             <Section key="updates" title="Updates" note="This app, not your unit">
               <Updates />

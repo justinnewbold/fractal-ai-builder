@@ -1,0 +1,283 @@
+import { useEffect, useState } from 'react'
+
+import { CHAIN, D1, D2, D2B, D3, D4, D5 } from '../../shared/onboarding.mjs'
+import { firmwareOf } from '../../shared/firmware.mjs'
+import { slotCount } from '../lib/slots'
+import PhoneQr from './PhoneQr'
+
+/**
+ * The first minute, on the machine that holds the cable.
+ *
+ * This replaces the old tour outright, and the difference is not the words —
+ * it is what the screen is FOR. The tour explained the app to somebody who
+ * had not touched it: what a scene is, where a change goes, four cards of
+ * concepts before anything was plugged in. This walks through the three
+ * things that have to be TRUE before the app can do anything at all, and then
+ * gets out of the way.
+ *
+ * IT REPORTS, IT DOES NOT PRETEND. Every line that claims something is wired
+ * to the thing it claims. The unit step names what actually answered on the
+ * USB port and counts the slots that unit really has; the pairing step shows
+ * the real code and moves itself on when a phone actually arrives. The one
+ * moment this screen exists for is the moment somebody is deciding whether
+ * this app works, and a walkthrough that says "FM3 found" with nothing
+ * plugged in has answered that question for them.
+ *
+ * NOT ONE WORD OF IT IS TYPED HERE. Every string comes from
+ * shared/onboarding.mjs — "do not change any wording without asking me
+ * first", and copy living in a component is copy that gets tidied by
+ * accident.
+ */
+const KEY = 'fab.onboarded.v1'
+
+export const onboarded = () => {
+  try {
+    return localStorage.getItem(KEY) === 'done'
+  } catch {
+    /* A browser refusing storage would otherwise meet this every load.
+       Assuming it has been seen is the kinder of the two failures. */
+    return true
+  }
+}
+
+export const markOnboarded = () => {
+  try {
+    localStorage.setItem(KEY, 'done')
+  } catch {
+    /* Costs the next load, and nothing else. */
+  }
+}
+
+/** The three steps that have a place in the order. Welcome and the end do not. */
+const STEPS = ['unit', 'phone', 'pair']
+
+export default function Onboarding({
+  open,
+  onClose,
+  /** What the USB port actually answered, or null. */
+  device,
+  /** 'live' when the unit is talking. */
+  status,
+  /** Why a read failed: 'no-unit' | 'no-answer' | 'unreadable' | null. */
+  faultReason,
+  /** The relay's view — role, link, account. */
+  link,
+  /** Ask the computer to look for the unit again. */
+  onLookAgain
+}) {
+  const [at, setAt] = useState('welcome')
+
+  /* Back to the start when it is asked for again from Settings. Reopening on
+     the last screen is a small thing that makes it feel broken. */
+  useEffect(() => {
+    if (open) setAt('welcome')
+  }, [open])
+
+  const paired = link?.link === 'connected'
+
+  /*
+   * The pairing step finishes itself.
+   *
+   * Nobody should have to press Next after the phone has already connected:
+   * they are holding the phone, looking at the phone, and this screen has
+   * already told them it worked.
+   */
+  useEffect(() => {
+    if (open && at === 'pair' && paired) setAt('done')
+  }, [open, at, paired])
+
+  if (!open) return null
+
+  const finish = () => {
+    markOnboarded()
+    onClose()
+  }
+
+  const found = status === 'live' && !!device
+  const unitName = device?.short || device?.name || null
+  /*
+   * "Something else has the USB port" is a different screen from "nothing is
+   * plugged in", and telling them apart is most of the value here. A computer
+   * that can see something but gets no answer out of it is almost always
+   * FM3-Edit holding the port — which is a thing to go and fix, where "plug it
+   * in" is not.
+   */
+  const stuck = !found && (faultReason === 'no-answer' || faultReason === 'unreadable')
+  const stepNo = STEPS.indexOf(at) + 1
+
+  return (
+    <div className="onb" role="dialog" aria-modal="true" aria-label={D1.eyebrow}>
+      <div className="onb-sheet">
+        {at === 'welcome' ? (
+          <>
+            <p className="onb-eyebrow mono">{D1.eyebrow}</p>
+            <h1 className="onb-head">{D1.head}</h1>
+            <p className="onb-sub">{D1.sub}</p>
+            <div className="onb-chain">
+              {CHAIN.map((box) => (
+                <div key={box.key} className="onb-link">
+                  <div className={box.note === 'YOU ARE HERE' ? 'onb-box here' : 'onb-box'}>
+                    <span className="onb-badge" aria-hidden="true">
+                      {box.badge}
+                    </span>
+                    <p className="onb-n mono">
+                      {box.n}
+                      {box.note ? ` · ${box.note}` : ''}
+                    </p>
+                    <p className="onb-box-title">{box.title}</p>
+                    <p className="hint">{box.body}</p>
+                  </div>
+                  {box.wire ? <span className="onb-wire mono">{box.wire}</span> : null}
+                </div>
+              ))}
+            </div>
+            <p className="onb-note">{D1.foot}</p>
+            <div className="onb-acts">
+              <button className="primary" onClick={() => setAt('unit')}>
+                {D1.go}
+              </button>
+              <button className="chip" onClick={finish}>
+                {D1.skip}
+              </button>
+            </div>
+          </>
+        ) : null}
+
+        {at === 'unit' ? (
+          <>
+            <p className="onb-step mono">{stuck ? D2B.step : D2.step}</p>
+            <h1 className="onb-head">{stuck ? D2B.head : D2.head}</h1>
+            <p className="onb-sub">{stuck ? D2B.sub : D2.sub}</p>
+
+            {/*
+              The real answer from the real port, or nothing at all. `device`
+              is what came back from the unit, so this cannot name an FM3 when
+              nothing is connected — the one lie that would matter here.
+            */}
+            {found ? (
+              <div className="onb-found">
+                <p className="onb-found-name">{D2.found(unitName)}</p>
+                <p className="hint mono">
+                  {D2.detail({
+                    firmware: firmwareOf(device),
+                    presets: slotCount(device?.capabilities)
+                  })}
+                </p>
+              </div>
+            ) : null}
+
+            {stuck ? (
+              <div className="onb-help">
+                <p className="onb-box-title">{D2B.title}</p>
+                <ol className="onb-list">
+                  {D2B.steps.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ol>
+              </div>
+            ) : found ? null : (
+              <div className="onb-help">
+                <p className="onb-box-title">{D2.helpTitle}</p>
+                <p className="hint">{D2.helpBody}</p>
+              </div>
+            )}
+
+            <div className="onb-acts">
+              {found ? (
+                <button className="primary" onClick={() => setAt('phone')}>
+                  {D2.next}
+                </button>
+              ) : (
+                <button className="primary" onClick={() => onLookAgain?.()}>
+                  {D2B.again}
+                </button>
+              )}
+              <button className="chip" onClick={() => setAt('phone')}>
+                {stuck ? D2B.without : D2.later}
+              </button>
+            </div>
+          </>
+        ) : null}
+
+        {at === 'phone' ? (
+          <>
+            <p className="onb-step mono">{D3.step}</p>
+            <h1 className="onb-head">{D3.head}</h1>
+            <p className="onb-sub">{D3.sub}</p>
+            <div className="onb-why">
+              {D3.why.map((why) => (
+                <div key={why.key} className="onb-why-item">
+                  <span className="onb-badge" aria-hidden="true">
+                    {why.badge}
+                  </span>
+                  <p className="onb-n mono">{why.label}</p>
+                  <p className="hint">{why.body}</p>
+                </div>
+              ))}
+            </div>
+            <p className="onb-note">{D3.note}</p>
+            <div className="onb-acts">
+              <button className="primary" onClick={() => setAt('pair')}>
+                {D3.pair}
+              </button>
+              <button className="chip" onClick={finish}>
+                {D3.not}
+              </button>
+            </div>
+            <p className="hint onb-foot">{D3.foot}</p>
+          </>
+        ) : null}
+
+        {at === 'pair' ? (
+          <>
+            <p className="onb-step mono">{D4.step}</p>
+            <h1 className="onb-head">{D4.head}</h1>
+            <p className="onb-sub">{D4.sub}</p>
+            {/*
+              The real square and the real code, not a picture of one. The same
+              block Settings shows, so there is one thing that knows how a
+              phone gets paired rather than two that can disagree.
+            */}
+            <PhoneQr connected={paired} email={link?.account?.email} showAccount={false} />
+            <p className="onb-waiting mono">{D4.waiting}</p>
+            <p className="onb-note">{D4.note}</p>
+            <div className="onb-acts">
+              <button className="chip" onClick={finish}>
+                {D4.skip}
+              </button>
+            </div>
+          </>
+        ) : null}
+
+        {at === 'done' ? (
+          <>
+            <h1 className="onb-head">{D5.head}</h1>
+            {/* Only what is actually true: no unit means the line says less
+                rather than claiming one. */}
+            <p className="onb-sub mono">{D5.status({ unit: unitName, phone: paired })}</p>
+            <div className="onb-tips">
+              {D5.tips.map((tip) => (
+                <div key={tip.key} className="onb-tip">
+                  <p className="onb-n mono">{tip.label}</p>
+                  <p className="hint">{tip.body}</p>
+                </div>
+              ))}
+            </div>
+            <div className="onb-acts">
+              <button className="primary" onClick={finish}>
+                {D5.go}
+              </button>
+            </div>
+            <p className="hint onb-foot">{D5.foot}</p>
+          </>
+        ) : null}
+
+        <div className="onb-dots" aria-hidden="true">
+          {STEPS.map((name, i) => (
+            <span key={name} className={i < stepNo ? 'onb-dot on' : 'onb-dot'} />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
