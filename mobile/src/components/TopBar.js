@@ -7,7 +7,7 @@ import { linkTone, linkWord, toneOfRemote, unitWord } from '../lib/link-word'
 import { APP_VERSION } from '../lib/version'
 import { useRig } from '../lib/rig'
 import { useDemo } from '../lib/demo'
-import { usePurchase } from '../lib/purchases'
+import { shouldOffer, usePurchase } from '../lib/purchases'
 import { idOf } from '../lib/device'
 import Lamp from './Lamp'
 import Volume from './Volume'
@@ -44,8 +44,16 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
   const [volume, setVolume] = useState(false)
   const [failed, setFailed] = useState(null)
   const purchase = usePurchase()
-  /* Named once, because the word and the pill below must agree about it. */
-  const canBuy = Boolean(demo && purchase.available && !purchase.unlocked && onUnlock)
+  /*
+   * Named once, because the word and the pill below must agree about it.
+   *
+   * NOT gated on `purchase.available` any more, and that was the bug. The
+   * store not being ready made the whole offer vanish rather than explain
+   * itself — see shouldOffer in lib/purchases. The paywall is where "we
+   * cannot take your money this second" belongs; the bar's job is to be
+   * findable.
+   */
+  const canBuy = Boolean(onUnlock) && shouldOffer({ demo })
 
   /*
    * The demo says DEMO, not CONNECTED.
@@ -249,24 +257,28 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
             onUnlock()
           }}
           hitSlop={8}
+          /* FILLED, not outlined. An outline reads as one more piece of
+             chrome in a bar that is mostly lamps and labels; this is the only
+             thing on the screen anybody is being asked to DO. */
           style={({ pressed }) => ({
-            paddingHorizontal: space.sm,
-            paddingVertical: 3,
+            paddingHorizontal: space.md,
+            paddingVertical: 4,
             borderRadius: radius.pill,
-            borderWidth: 1,
-            borderColor: color.signal,
-            backgroundColor: pressed ? color.signalWash : 'transparent'
+            backgroundColor: pressed ? color.signalWash : color.signal
           })}
         >
           <Text
             style={{
-              color: color.signal,
+              color: color.onSignal,
               fontSize: font.micro,
               fontWeight: '700',
               letterSpacing: 0.6
             }}
           >
-            Unlock
+            {/* The price belongs on the button. "Unlock" asks somebody to
+                tap to find out what it costs, which is the tap most people
+                will not make. */}
+            {purchase.price ? `Unlock ${purchase.price}` : 'Unlock'}
           </Text>
         </Pressable>
       ) : null}

@@ -48,6 +48,20 @@ const PHONE_GLOBALS = new Set([
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
 
+/**
+ * A file's CODE, without the prose around it.
+ *
+ * Every rule worth writing down here is a rule some comment in the app
+ * explains — and explaining a rule means NAMING the thing it forbids. A
+ * file-wide grep for the forbidden thing then matches the sentence that
+ * forbids it, and the file fails for documenting itself.
+ *
+ * The tour is the case in hand: its own header says why a phone must never
+ * be told to press Save, and a check for "press Save" matched that sentence.
+ */
+const withoutComments = (t) =>
+  t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+
 /** Every .js under a directory, so a new screen cannot quietly opt out. */
 /*
  * Forward slashes, on every platform.
@@ -5806,6 +5820,60 @@ export function run(test) {
     )
   })
 
+  /**
+   * THE PHONE HAS A TUTORIAL, which is the end that needed one most.
+   *
+   * "First issue is demo has no tutorial. Very important."
+   *
+   * The browser has had one since long before this app existed. The phone
+   * never did — which left the demo, the one place somebody arrives knowing
+   * nothing at all, as the end with no explanation.
+   *
+   * AND IT IS NOT THE BROWSER'S TOUR WITH THE WORDS CHANGED. The browser can
+   * save a preset into a slot and a phone cannot: the host refuses it from a
+   * distance, by REMOTE_FORBIDDEN in shared/relay-rules. A card saying "press
+   * Save" would send somebody hunting for a button that is deliberately
+   * absent, which is worse than saying nothing at all.
+   */
+  test('the phone tells a first-time player the four things', () => {
+    const tour = read('mobile/src/components/Tour.js')
+
+    /* The gesture with no visible control is the one that must be in here. */
+    assert.match(tour, /Hold a block to change its channel/, 'the long-press gesture is not taught')
+    assert.match(tour, /Scenes are one rig, several sounds/, 'scenes are not explained')
+
+    /* And the thing that is otherwise discovered as a disappointment. */
+    assert.match(tour, /This is a remote, not a workbench/, 'nothing says a phone cannot save')
+    /* `<?strong>?` made only the ANGLE BRACKETS optional, not the word — so
+       this asked for the literal "strongSave" and matched nothing ever. It is
+       the web tour's markup leaking into a file that has none. */
+    /* Code, not prose — see withoutComments. This file's own header explains
+       why a phone must not be told to press Save, and that sentence matched. */
+    assert.ok(
+      !/press\s+save/i.test(withoutComments(tour)),
+      'the tour tells a phone to press Save, which the host refuses from a distance'
+    )
+
+    /* Never twice. A tutorial that comes back after being dismissed is worse
+       than one nobody saw. */
+    assert.match(tour, /fractal\.tour\.v1/, 'seeing it is not remembered')
+    assert.match(tour, /markSeen\(\)/, 'closing it does not mark it seen')
+
+    /* Storage can refuse, and the kinder failure is to assume it was seen. */
+    assert.match(tour, /return true/, 'a phone that refuses storage gets the tour every launch')
+
+    /* It covers the screen rather than sitting in the stage layout. */
+    assert.match(tour, /<Modal visible animationType="slide"/, 'the tour is not a sheet and would push the rig down the page')
+
+    const app = read('mobile/App.js')
+    assert.match(app, /tourSeen\(\)\.then/, 'nothing decides whether to show it')
+    assert.match(app, /if \(auth !== 'in'\) return undefined/, 'the tour can arrive before the app does')
+
+    /* And it can be found again by somebody who skipped it. */
+    const set = read('mobile/src/screens/Settings.js')
+    assert.match(set, /How this works/, 'there is no way back to the tour')
+  })
+
   test('the demo stays in front of the paywall', () => {
     const app = read('mobile/App.js')
     /* Not `[^>]*` — the arrow in `() =>` is a `>` and would end the class. */
@@ -5896,8 +5964,8 @@ export function run(test) {
     assert.match(bar, /usePurchase/, 'the bar cannot know whether there is anything to sell')
     assert.match(
       bar,
-      /demo && purchase\.available && !purchase\.unlocked && onUnlock/,
-      'the Unlock button is gone from the bar, or shows when there is nothing to buy'
+      /const canBuy = Boolean\(onUnlock\) && shouldOffer\(\{ demo \}\)/,
+      'the Unlock button is gone from the bar, or decides for itself when to show'
     )
     assert.match(bar, /Unlock the full version/, 'the Unlock button has no accessible name')
 
@@ -5906,7 +5974,7 @@ export function run(test) {
        into disagreeing about whether there is anything to sell. */
     assert.match(
       bar,
-      /const canBuy = Boolean\(demo && purchase\.available && !purchase\.unlocked && onUnlock\)/,
+      /const canBuy = Boolean\(onUnlock\) && shouldOffer\(\{ demo \}\)/,
       'the word and the pill no longer share one condition'
     )
     assert.match(bar, /\{\.\.\.\(canBuy\s*\?\s*\{/, 'the word DEMO is not a way into the unlock page')
@@ -5926,10 +5994,12 @@ export function run(test) {
     /* And both are wired to a paywall that opens OVER the app rather than
        replacing it: nothing is being withheld, they came looking. */
     const app = read('mobile/App.js')
-    assert.equal(
-      (app.match(/onUnlock=\{\(\) => setBuying\(true\)\}/g) || []).length,
-      2,
-      'the bar and Settings do not both open the paywall'
+    /* The count itself is owned by the four-ways test below; this one only
+       cares that the routes reach the SAME paywall rather than each growing
+       its own. */
+    assert.ok(
+      (app.match(/onUnlock=\{\(\) => setBuying\(true\)\}/g) || []).length >= 2,
+      'the routes no longer open one shared paywall'
     )
     assert.match(app, /\{buying \? \(\s*<Paywall\s+asked/, 'the asked-for paywall is not rendered')
 
@@ -5983,6 +6053,84 @@ export function run(test) {
     assert.match(lib, /await checkOwner\(\)/, 'the owner check never runs at startup')
     const app = read('mobile/App.js')
     assert.match(app, /checkOwner\(\)/, 'signing in does not re-check the account')
+  })
+
+  /**
+   * THE OFFER MUST NEVER HIDE ITSELF, which is the bug that made the whole
+   * purchase invisible on a real handset.
+   *
+   * Every route was gated on `purchase.available`, reasoning that a button
+   * which cannot take money is worse than no button. The consequence is worse
+   * than either: `available` is false whenever the store is not set up yet,
+   * unreachable, or still propagating permissions, and in all of those the
+   * offer VANISHED. An absent button is indistinguishable from a feature that
+   * does not exist.
+   *
+   * "I'm building this app and I don't know where to unlock it."
+   *
+   * He wrote it, knew it was there, and could not find it. So `shouldOffer`
+   * asks one thing — are they in the demo and have they not paid — and what
+   * `available` decides is what the PAYWALL says when they arrive.
+   */
+  test('the way to buy it is never hidden by the store not being ready', async () => {
+    const src = read('mobile/src/lib/purchases.js')
+    assert.match(
+      src,
+      /export const shouldOffer = \(\{ demo \}\) => Boolean\(demo\) && !state\.unlocked/,
+      'shouldOffer changed shape — it must not consult `available`'
+    )
+    const fn = src.slice(src.indexOf('export const shouldOffer'), src.indexOf('export const shouldOffer') + 200)
+    assert.ok(!/available/.test(fn), 'the offer is gated on the store being ready again')
+
+    /* And every route uses it rather than rolling its own condition. */
+    /* Comments explaining the fix necessarily NAME the thing they warn about,
+       so this reads the code with them stripped. A file-wide grep tripped on
+       its own explanation. */
+    const code = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+    for (const f of ['mobile/src/components/TopBar.js', 'mobile/src/components/UnlockOffer.js']) {
+      const text = code(read(f))
+      assert.match(text, /shouldOffer\(\{ demo \}\)/, `${f} decides for itself whether to offer`)
+      assert.ok(
+        !/purchase\.available/.test(text),
+        `${f} consults \`available\` again, which is what made the offer vanish`
+      )
+    }
+  })
+
+  /**
+   * FOUR WAYS IN, ONE DESTINATION.
+   *
+   * "We need lots of ways to unlock the phone from different menus and
+   * different screens, not to the point that it's annoying but to the point
+   * where there is a clear path."
+   */
+  test('there are four ways to the purchase and they all go to one place', () => {
+    const app = read('mobile/App.js')
+    assert.equal(
+      (app.match(/onUnlock=\{\(\) => setBuying\(true\)\}/g) || []).length,
+      3,
+      'the bar, Settings and the stage screen do not all open the same paywall'
+    )
+
+    /* The fourth is the word DEMO itself, inside the bar. */
+    const bar = read('mobile/src/components/TopBar.js')
+    assert.match(bar, /\{\.\.\.\(canBuy\s*\?\s*\{/, 'the word DEMO is no longer a way in')
+
+    /* The price goes ON the buttons. Asking somebody to tap to find out what
+       it costs is asking for the tap most people will not make. */
+    const offer = read('mobile/src/components/UnlockOffer.js')
+    for (const [where, text] of [['the bar', bar], ['the stage offer', offer]]) {
+      assert.match(
+        text,
+        /purchase\.price \? `Unlock \$\{purchase\.price\}` : 'Unlock'/,
+        `${where} does not show the price on the button`
+      )
+    }
+
+    /* And it can be put away, or it is an advertisement rather than an offer —
+       on a screen that is open on a dark stage between songs. */
+    assert.match(offer, /Put this away/, 'the stage offer cannot be dismissed')
+    assert.match(offer, /fractal\.offerDismissed/, 'dismissing it is not remembered')
   })
 
   test('a phone that cannot buy anything is never locked out', () => {

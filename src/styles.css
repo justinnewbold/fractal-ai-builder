@@ -10243,3 +10243,56 @@ button.setup-back {
   font-weight: 600;
   color: var(--silk);
 }
+
+/*
+ * The DEMO word when it is a way in, not just a label.
+ *
+ * It has to keep reading as the status word it has always been — same size,
+ * same letter-spacing, same colour from data-state — while being obviously
+ * pressable. So: no button chrome at all, an underline that says "this goes
+ * somewhere", and the pointer. A chip or a box here would put a second
+ * competing control next to the unit name in a bar that is mostly lamp.
+ */
+.topbar-how.is-button {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+/* Where the two store squares sit. Side by side with room, stacking on a
+   narrow window rather than squeezing two unreadable QR codes together. */
+.phone-stores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4);
+  margin: var(--s-3) 0 var(--s-1);
+}
+.phone-store {
+  flex: 1 1 200px;
+  min-width: 190px;
+  padding: var(--s-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2);
+  text-align: center;
+}
+.phone-store h4 {
+  margin: 0 0 var(--s-3);
+}
+.phone-store-qr {
+  display: block;
+  margin: 0 auto var(--s-3);
+  width: 160px;
+  height: 160px;
+  border-radius: var(--r-1);
+  background: #fff;
+}
+.phone-store-qr.placeholder {
+  background: var(--panel-hi);
+}
