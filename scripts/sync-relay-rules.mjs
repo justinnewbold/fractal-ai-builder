@@ -116,6 +116,13 @@ export const FILES = [
    */
   { source: '../shared/affiliation.mjs', target: '../mobile/src/lib/affiliation.js' },
   /*
+   * Every word of the walkthrough, so the two ends cannot word it differently.
+   *
+   * "Do not change any wording without asking me first." One file to read when
+   * checking that, and one line in a diff when it changes.
+   */
+  { source: '../shared/onboarding.mjs', target: '../mobile/src/lib/onboarding.js' },
+  /*
    * Who owns this copy, and the reason it is here rather than imported.
    *
    * purchases.js does `import { isOwner } from './owner-unlock'`, and Metro

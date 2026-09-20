@@ -1637,7 +1637,8 @@ export function run(test) {
     )
 
     const settings = read('mobile/src/screens/Settings.js')
-    assert.match(settings, /saveSize\(i, sync\)/, 'the size buttons do not save anything')
+    /* A stepper now, not five tabs: one step either side of the answer. */
+    assert.match(settings, /const step = \(by\) => saveSize\(clampSize\(now \+ by\), sync\)/, 'the size buttons do not save anything')
   })
 
   test('the phone can rename a preset and its scenes, and says what that means', () => {
@@ -5981,59 +5982,6 @@ export function run(test) {
     }
   })
 
-  /**
-   * THE PHONE HAS A TUTORIAL, which is the end that needed one most.
-   *
-   * "First issue is demo has no tutorial. Very important."
-   *
-   * The browser has had one since long before this app existed. The phone
-   * never did — which left the demo, the one place somebody arrives knowing
-   * nothing at all, as the end with no explanation.
-   *
-   * AND IT IS NOT THE BROWSER'S TOUR WITH THE WORDS CHANGED. The browser can
-   * save a preset into a slot and a phone cannot: the host refuses it from a
-   * distance, by REMOTE_FORBIDDEN in shared/relay-rules. A card saying "press
-   * Save" would send somebody hunting for a button that is deliberately
-   * absent, which is worse than saying nothing at all.
-   */
-  test('the phone tells a first-time player the four things', () => {
-    const tour = read('mobile/src/components/Tour.js')
-
-    /* The gesture with no visible control is the one that must be in here. */
-    assert.match(tour, /Hold a block to change its channel/, 'the long-press gesture is not taught')
-    assert.match(tour, /Scenes are one rig, several sounds/, 'scenes are not explained')
-
-    /* And the thing that is otherwise discovered as a disappointment. */
-    assert.match(tour, /This is a remote, not a workbench/, 'nothing says a phone cannot save')
-    /* `<?strong>?` made only the ANGLE BRACKETS optional, not the word — so
-       this asked for the literal "strongSave" and matched nothing ever. It is
-       the web tour's markup leaking into a file that has none. */
-    /* Code, not prose — see withoutComments. This file's own header explains
-       why a phone must not be told to press Save, and that sentence matched. */
-    assert.ok(
-      !/press\s+save/i.test(withoutComments(tour)),
-      'the tour tells a phone to press Save, which the host refuses from a distance'
-    )
-
-    /* Never twice. A tutorial that comes back after being dismissed is worse
-       than one nobody saw. */
-    assert.match(tour, /fractal\.tour\.v1/, 'seeing it is not remembered')
-    assert.match(tour, /markSeen\(\)/, 'closing it does not mark it seen')
-
-    /* Storage can refuse, and the kinder failure is to assume it was seen. */
-    assert.match(tour, /return true/, 'a phone that refuses storage gets the tour every launch')
-
-    /* It covers the screen rather than sitting in the stage layout. */
-    assert.match(tour, /<Modal visible animationType="slide"/, 'the tour is not a sheet and would push the rig down the page')
-
-    const app = read('mobile/App.js')
-    assert.match(app, /tourSeen\(\)\.then/, 'nothing decides whether to show it')
-    assert.match(app, /if \(auth !== 'in'\) return undefined/, 'the tour can arrive before the app does')
-
-    /* And it can be found again by somebody who skipped it. */
-    const set = read('mobile/src/screens/Settings.js')
-    assert.match(set, /How this works/, 'there is no way back to the tour')
-  })
 
   /**
    * SWIPE IN FROM THE LEFT TO GO BACK, AND DONE LEAVES FROM ANY DEPTH.
@@ -6204,26 +6152,334 @@ export function run(test) {
     const stage = read('mobile/src/screens/Stage.js')
     assert.match(stage, /const fitOn = loadFit\(sync, true\)/, 'the stage screen does not default to fitting')
     assert.match(stage, /const chrome = Math\.max\(0, content - sceneGrid - blockGrid\)/, 'nothing works out how much screen the tiles may have')
-    assert.match(stage, /available: viewport - chrome/, 'fit is measured against something other than what is left')
+    assert.match(stage, /available: viewport - chrome - trim/, 'fit is measured against something other than what is left')
+
+    /*
+     * AND IT CORRECTS ITSELF AGAINST WHAT ACTUALLY HAPPENED.
+     *
+     * "This is set to the fit to screen setting but the tempo numbers are
+     * cutting off."
+     *
+     * fitTiles works out how tall a tile may be and assumes every row comes
+     * out that tall. Tiles take it as a MINIMUM — a scene tile carrying a
+     * number over a name grows past it — so the grids landed taller than
+     * their budget and the footer went off the bottom. And it was stable
+     * there: chrome and the budget both stay put, so it settled overflowing.
+     *
+     * Rather than teach the prediction about every way a tile can grow, the
+     * overflow is measured and taken off the budget. Monotone within a
+     * layout so it converges rather than oscillating, and thrown away when
+     * the thing being fitted changes.
+     */
+    assert.match(stage, /const over = content - viewport/, 'nothing notices when the fitted screen overflows anyway')
+    assert.match(stage, /setTrim\(\(was\) => was \+ over\)/, 'the overflow is measured and then not used')
+    assert.match(stage, /if \(over > 2\)/, 'a rounding pixel starts another fitting pass')
+    /* Reset when what is being fitted changes, or a preset with fewer blocks
+       inherits the trim from a bigger one and draws tiny tiles. */
+    assert.match(
+      stage,
+      /const fitKey = `\$\{viewport\}:\$\{scenes\.hasScenes \? scenes\.count : 0\}:\$\{blocks\.length\}:\$\{fitOn\}`/,
+      'the trim is not thrown away when the rig or the screen changes'
+    )
+    assert.match(stage, /if \(trim !== 0\) setTrim\(0\)/, 'the trim survives a change of preset, so a smaller rig gets a smaller tile')
     /* Not until everything has been measured: fitting against a chrome of
        zero hands the grids the whole screen for a frame, which is the flash
        of wrong sizes this screen already learned to avoid. */
     assert.match(stage, /viewport > 0 && content > 0/, 'fit runs before the screen has been measured')
 
-    /* And the control, with fit first because it is the answer for anybody
-       who has not got an opinion yet. */
+    /*
+     * AND THE CONTROL IS THE BROWSER'S: a stepper, with fit as a tick box
+     * under it rather than a sixth step on the ladder.
+     *
+     * "Update the mobile app's tile size screen to look like this with the
+     * +/- buttons instead of the tab buttons."
+     */
     const set = read('mobile/src/screens/Settings.js')
-    assert.match(set, /label="Fit on screen"/, 'there is no way to ask for a screen that fits')
-    assert.match(set, /on=\{fit\}/, 'the Fit button never shows that it is on')
-    assert.ok(
-      set.indexOf('label="Fit on screen"') < set.indexOf('{SIZES.map('),
-      'the sizes come before Fit, which buries the thing most people want'
+    const tile = set.slice(set.indexOf('function TileSize()'), set.indexOf('function Choice('))
+    assert.ok(tile.length > 400, 'the tile size control moved; this check reads it')
+
+    assert.match(tile, /label="−"/, 'there is no way to step the tiles down')
+    assert.match(tile, /label="\+"/, 'there is no way to step the tiles up')
+    assert.ok(!/SIZES\.map\(/.test(tile), 'the five tab buttons are back')
+    /* The stepper says what it is set to, and says fit when fit is deciding. */
+    assert.match(tile, /fit \? 'Fit to screen' : SIZES\[now\]\?\.name/, 'the stepper does not say what it is set to')
+
+    /*
+     * GREYED WHILE FIT IS ON, not hidden. The value is being overridden, and
+     * "not now" is a different thing to say than "never" — hiding them would
+     * say the second.
+     */
+    assert.match(tile, /disabled=\{fit \|\| now <= 0\}/, 'the smaller button works while fit is deciding the size')
+    assert.match(tile, /disabled=\{fit \|\| now >= SIZES\.length - 1\}/, 'the bigger button works while fit is deciding the size')
+
+    /* Fit is the tick box, and it is a real checkbox to a screen reader. */
+    assert.match(tile, /label="Fit everything on one screen"/, 'there is no way to ask for a screen that fits')
+    assert.match(tile, /on=\{fit\}/, 'the tick box never shows that it is on')
+    assert.match(tile, /onPress=\{\(\) => saveFit\(!fit, sync\)\}/, 'the tick box does not toggle')
+    assert.match(set, /accessibilityRole="checkbox"/, 'the tick box announces itself as a button rather than a checkbox')
+
+    /* And the stepper's own buttons say something other than their shapes. */
+    assert.match(tile, /accessibilityLabel="Smaller tiles"/, 'the minus button reads out as a shape')
+    assert.match(tile, /accessibilityLabel="Bigger tiles"/, 'the plus button reads out as a shape')
+    const press = read('mobile/src/components/Press.js')
+    assert.match(
+      press,
+      /accessibilityLabel=\{accessibilityLabel \|\|/,
+      'Press ignores an explicit accessible name again, so the stepper is two shapes'
     )
-    /* Picking a size IS turning fit off. Leaving it on and ignoring the press
-       is how a setting stops being believed. */
-    const tile = set.slice(set.indexOf('function TileSize()'), set.indexOf('function TileSize()') + 2200)
-    assert.match(tile, /saveFit\(false, sync\)\s*\n\s*saveSize\(i, sync\)/, 'picking a size leaves fit on, so the press does nothing')
-    assert.match(tile, /on=\{!fit && i === now\}/, 'a size shows as chosen while fit is what is actually drawing the screen')
+  })
+
+  /**
+   * LEAVING THE DEMO LEAVES NOTHING OF IT BEHIND, and a read that works
+   * clears the message from the read that did not.
+   *
+   * "Says I'm not connected but I'm clearly connected based on the green FM3
+   * and connected button. It's also still showing demo presets when I'm no
+   * longer in the demo. I logged out and back in and now it's showing up
+   * correctly."
+   *
+   * Two faults, one screenshot, and signing out cured both — which is the
+   * tell: `reset` is called from exactly one place, the disconnect path, so
+   * anything this store gets wrong stays wrong until a sign-out.
+   */
+  test('a working read clears the old failure, and the demo takes its names with it', () => {
+    const rig = read('mobile/src/lib/rig.js')
+
+    /*
+     * FAULT ONE: the note and the bar read different things, and only one of
+     * them was kept up to date. The bar reads the live link. The red note
+     * reads `state.error`, which nothing but a later failure ever cleared —
+     * so a message from a minute ago sat over a working rig.
+     */
+    const all = rig.slice(rig.indexOf('export async function refreshAll()'), rig.indexOf('export async function refreshAll()') + 2400)
+    assert.ok(all.length > 400, 'refreshAll moved; this check reads it')
+    assert.match(all, /error: null/, 'a successful re-read leaves the last failure on screen')
+
+    /*
+     * FAULT TWO: the demo's FM3 and a real FM3 both answer 'fm3', so the
+     * check that forgets stale names saw no change and kept the
+     * simulation's. They are filled in lazily and never re-read wholesale,
+     * so nothing downstream corrected them.
+     */
+    assert.match(rig, /const simulated = isDemo\(\)/, 'the store cannot tell a simulated unit from a real one')
+    assert.match(
+      all,
+      /if \(slug !== state\.deviceSlug \|\| simulated !== state\.simulated\) forgetNames\(\)/,
+      'the demo keeps its preset names when a real unit of the same model arrives'
+    )
+    assert.match(rig, /simulated: false/, 'the simulated flag has no starting value')
+    assert.match(all, /simulated,/, 'the simulated flag is worked out and then not stored')
+
+    /* It is genuinely a different question from the slug, which is the whole
+       reason this bug existed: same model, different source. */
+    const slugs = read('mobile/src/lib/device-slug.js')
+    assert.ok(!/isDemo|demo/i.test(slugs), 'the slug now knows about the demo — then the flag above is redundant and one of them is wrong')
+  })
+
+  /**
+   * A SONG IS SWIPED AWAY, AND THE ✕ ONLY APPEARS IF YOU HESITATE.
+   *
+   * "Make the setlist songs swipe to delete instead of the x. Make a full
+   * swipe delete it and a partial swipe show the x that can be tapped.
+   * Otherwise hide the X."
+   *
+   * Two gestures out of one movement: a short pull parks the row open and
+   * hands you a button to think about, a long pull means you were never in
+   * any doubt.
+   */
+  test('a setlist song is swiped away, and the cross is only there once it is', () => {
+    const swipe = read('mobile/src/components/SwipeAway.js')
+
+    /* Built on React Native itself, for the same reason the back swipe is:
+       a native gesture library moves the fingerprint and costs a build. */
+    assert.match(swipe, /PanResponder\.create/, 'the swipe no longer uses PanResponder')
+    const pkg = JSON.parse(read('mobile/package.json'))
+    assert.ok(
+      !pkg.dependencies['react-native-gesture-handler'],
+      'a native gesture library was added — that moves the fingerprint and costs a build'
+    )
+
+    /* Two thresholds, and the long one is the one that acts without asking. */
+    assert.match(swipe, /if \(total <= -FULL\)/, 'a full swipe does not remove the song')
+    assert.match(swipe, /if \(total <= -OPEN \/ 2\)/, 'a part swipe does not park the row open')
+    const full = Number(swipe.match(/const FULL = (\d+)/)?.[1])
+    const open = Number(swipe.match(/export const OPEN = (\d+)/)?.[1])
+    assert.ok(full > open * 1.5, `a full swipe is ${full}px and the open stop is ${open}px — too close to tell apart`)
+
+    /* Leftward only, and only when it is clearly sideways. */
+    assert.match(swipe, /Math\.abs\(g\.dx\) > Math\.abs\(g\.dy\) \* 2/, 'a vertical scroll can swipe a song away')
+    assert.match(swipe, /Math\.min\(0, rest\.current \+ g\.dx\)/, 'the row can be dragged to the right, where there is nothing')
+    assert.match(swipe, /onStartShouldSetPanResponder: \(\) => false/, 'the swipe claims plain taps')
+    /* Not capture: the drag grip beside it must keep its own gesture, or a
+       reorder turns into a row sliding open. */
+    assert.ok(
+      !/onMoveShouldSetPanResponderCapture/.test(swipe.replace(/\/\*[\s\S]*?\*\//g, ' ')),
+      'the swipe captures from its children, so the reorder grip loses its drag'
+    )
+
+    /*
+     * AND THE ROW NO LONGER CARRIES A STANDING OFFER TO DELETE IT.
+     */
+    const list = read('mobile/src/screens/Setlists.js')
+    assert.match(list, /<SwipeAway onRemove=\{onRemove\} label=\{`Remove \$\{name\}`\}>/, 'a song cannot be swiped away')
+    assert.ok(!/<Nudge/.test(list), 'the ✕ is back on every row')
+    assert.ok(!/function Nudge/.test(list), 'the button the ✕ used to be is still here with nothing using it')
+
+    /* The button behind stays in the tree rather than being drawn only once
+       the row has moved: a screen reader cannot swipe, and this is the only
+       other way to remove a song. */
+    assert.match(swipe, /accessibilityLabel=\{label\}/, 'the remove button behind the row has no accessible name')
+  })
+
+  /**
+   * VIBRANT, AND STILL THE SAME COLOURS.
+   *
+   * "I want this to look more like the liquid glass type stuff that Apple
+   * does, and the color is a little bit more vibrant like it is in this
+   * mock-up."
+   *
+   * The trap this guards is the obvious way to do it: open blockColors and
+   * type sixty livelier hex values. Those are not a style choice — several are
+   * marked VERIFIED against FM3-Edit, because the promise that palette makes
+   * is that a drive is the red the unit itself shows. Sixty new values is
+   * sixty chances to break that quietly, and nobody would notice until they
+   * looked at the hardware.
+   */
+  test('the vibrancy is a lift, not a repaint — every hue stays put', async () => {
+    const { vivid, at, readHex } = await import('../mobile/src/lib/vivid.js')
+
+    /* Hue is identity and must not move. Saturation and lightness are what
+       vibrancy IS, so those are the only two that do. */
+    const hueOf = ({ r, g, b }) => {
+      const R = r / 255, G = g / 255, B = b / 255
+      const max = Math.max(R, G, B), min = Math.min(R, G, B), d = max - min
+      if (!d) return null
+      if (max === R) return (((G - B) / d + (G < B ? 6 : 0)) / 6) * 360
+      if (max === G) return (((B - R) / d + 2) / 6) * 360
+      return (((R - G) / d + 4) / 6) * 360
+    }
+    for (const hex of ['#b5502f', '#2f5f9c', '#94357a', '#c0392b', '#2a7f9c', '#4a8f7a']) {
+      const before = hueOf(readHex(hex))
+      const after = hueOf(readHex(vivid(hex)))
+      assert.ok(Math.abs(before - after) < 2, `${hex} moved hue from ${before} to ${after} — that is a different colour, not a brighter one`)
+      assert.notEqual(vivid(hex), hex, `${hex} came back unchanged, so nothing got more vibrant`)
+    }
+
+    /* Grey stays grey, out of the maths rather than a list of exceptions: a
+       slate scene and the utility blocks must not turn into pastels. */
+    const grey = '#5d626b'
+    const moved = Math.abs(readHex(vivid(grey)).r - readHex(grey).r)
+    assert.ok(moved < 16, `a grey shifted by ${moved} — the neutrals are being tinted`)
+
+    /* Anything it cannot read comes back untouched. The browser's palette
+       carries var(--panel-hi) for an unknown block, and turning that into
+       garbage would paint a tile black rather than leave it neutral. */
+    assert.equal(vivid('var(--panel-hi)'), 'var(--panel-hi)')
+    assert.equal(vivid(undefined), undefined)
+    assert.match(at('#b5502f', 0.14), /^#[0-9a-f]{8}$/, 'the alpha helper does not produce a colour RN can read')
+
+    /* The palettes themselves are untouched, which is the whole point — they
+       are shared with the browser through sync:rules. */
+    const scenes = read('mobile/src/lib/sceneColors.js')
+    assert.match(scenes, /#b5502f/, 'the scene palette was repainted rather than lifted')
+    const tile = read('mobile/src/components/Tile.js')
+    assert.match(tile, /const hue = vivid\(fill\)/, 'the tiles are not lifted')
+
+    /*
+     * AND THE GLASS COST NOTHING. expo-blur is already a dependency, which is
+     * the only reason this look was available without a build at all.
+     */
+    const pkg = JSON.parse(read('mobile/package.json'))
+    assert.ok(pkg.dependencies['expo-blur'], 'the blur package is gone, so the glass is gone with it')
+    assert.ok(
+      !pkg.dependencies['expo-linear-gradient'] && !pkg.dependencies['react-native-svg'],
+      'a native drawing package was added — that moves the fingerprint and costs a build'
+    )
+    const bar = read('mobile/src/components/TopBar.js')
+    assert.match(bar, /<BlurView/, 'the top bar is a flat panel again')
+    assert.match(bar, /experimentalBlurMethod="dimezisBlurView"/, 'the blur does nothing on Android without this')
+
+    /* The sheen is a stand-in for a gradient and must not affect layout: the
+       fit-to-screen arithmetic is budgeting this tile's height. */
+    assert.match(tile, /pointerEvents="none"/, 'the sheen swallows presses')
+    assert.match(tile, /position: 'absolute'/, 'the sheen is in the layout, so it changes the tile height')
+  })
+
+  /**
+   * THE PHONE'S WALKTHROUGH IS THE WAY IN, AND IT USES THE REAL THING AT
+   * EVERY STEP.
+   *
+   * Nine screens, and the order of them is a decision: this phone can never
+   * reach a Fractal unit on its own. It talks to a computer, and the computer
+   * holds the cable. So the demo comes first and costs nothing — somebody who
+   * has just installed this may have no computer running, no code, and no
+   * idea a computer was part of the arrangement — and the purchase comes last,
+   * after the computer has been proved to work.
+   */
+  test('the phone walkthrough pairs, buys and starts the demo for real', () => {
+    const onb = read('mobile/src/screens/Onboarding.js')
+
+    /* Not one word typed in: it all comes from the generated copy. */
+    assert.match(onb, /from '\.\.\/lib\/onboarding'/, 'the copy is not coming from the one file that holds it')
+    const bare = onb.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ')
+    for (const typed of ['Try the demo', 'Start free demo', 'Connection verified', '$9.99']) {
+      assert.ok(!bare.includes(typed), `"${typed}" is typed into the screen rather than read from the copy`)
+    }
+
+    /* The demo is really started — the mock is built and the unit is the one
+       they picked, not whatever the default was. */
+    assert.match(onb, /setDemoUnit\(unit\)\s*\n\s*setDemo\(true\)/, 'the demo is not actually started')
+    assert.match(onb, /P4\.go\(unitName\)/, 'the button does not say which unit it starts')
+
+    /* The code becomes a session through the same call the sign-in screen
+       makes. One way a phone gets paired, not two that drift. */
+    assert.match(onb, /await signIn\(pairCredentials\(code\)\)/, 'pairing is reimplemented rather than reused')
+    /* And the scanner is the same one, opened rather than embedded: it is a
+       modal, so without `open` it is a camera that never appears. */
+    assert.match(onb, /<ScanCode\s*\n?\s*open=\{scanning\}/, 'the scanner is never opened, so the button does nothing')
+
+    /* The purchase is the real one. */
+    assert.match(onb, /await buyUnlock\(\)/, 'the unlock screen does not buy anything')
+    assert.match(onb, /await restorePurchase\(\)/, 'there is no way to restore a purchase already made')
+    /* The store's price where it knows one. */
+    assert.match(onb, /P8\.go\(purchase\.price\)/, 'the price is not the store own')
+    assert.match(onb, /P3\.real\.go\(purchase\.price\)/, 'the price is not the store own')
+
+    /*
+     * VERIFIED MEANS VERIFIED. P8 says "Connection verified" and it is only
+     * reached from a pairing that succeeded — asking for money before knowing
+     * the thing being bought can work at all is how refunds happen.
+     */
+    const connect = onb.slice(onb.indexOf('const connect = async'), onb.indexOf('const buy = async'))
+    assert.match(connect, /setAt\('unlock'\)/, 'the unlock is reached without pairing first')
+    assert.ok(!/setAt\('unlock'\)/.test(onb.slice(0, onb.indexOf('const connect = async'))), 'the unlock is reachable before the connection is proved')
+
+    /* Seen once, and reachable again from Settings under the name its own
+       last screen promises. */
+    const app = read('mobile/App.js')
+    assert.match(app, /walkthroughSeen\(\)\.then\(setSeenWalk\)/, 'nothing decides whether the walkthrough has been through')
+    assert.match(app, /auth === 'out' && !seenWalk/, 'the walkthrough is not the way in')
+    assert.match(app, /onReplay=\{/, 'there is no way back into the walkthrough')
+    const set = read('mobile/src/screens/Settings.js')
+    assert.match(set, /title=\{REPLAY\}/, 'Settings does not offer the walkthrough again')
+
+    /*
+     * AND THE EMAIL NEVER THROWS. It is one optional convenience inside a
+     * first-run flow; a rejected promise halfway through somebody's first
+     * minute is a worse outcome than the mail not arriving.
+     */
+    const mail = read('mobile/src/lib/downloadLink.js')
+    assert.ok(!/throw /.test(mail.replace(/\/\*[\s\S]*?\*\//g, ' ')), 'the download-link helper throws')
+    assert.match(mail, /ok: false/, 'failures are not reported as an answer')
+    /* The address is on screen either way, so the button failing is never a
+       dead end. */
+    assert.match(onb, /DOWNLOADS_URL/, 'the download address is not shown, so a failed email is a dead end')
+    /* The controller is made before the timeout that aborts it — written the
+       other way round once, which is a ReferenceError on every call. */
+    assert.ok(
+      mail.indexOf('const controller = new AbortController()') < mail.indexOf('setTimeout(() => controller.abort()'),
+      'the abort timeout closes over a const that does not exist yet'
+    )
   })
 
   test('the demo stays in front of the paywall', () => {

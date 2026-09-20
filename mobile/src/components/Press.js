@@ -28,7 +28,16 @@ export default function Press({
   grow = false,
   height = TAP,
   haptic = tick,
-  style
+  style,
+  /*
+   * What a screen reader says instead of the visible words.
+   *
+   * Almost every button here reads fine off its own label. A stepper does
+   * not: "−" and "+" are shapes, and a person who cannot see which control
+   * they sit either side of is told nothing at all. Passing this was silently
+   * ignored before, which is worse than not offering it.
+   */
+  accessibilityLabel
 }) {
   const accent = tone === 'signal' ? color.signal : tone === 'live' ? color.live : color.silk
   const background = on ? accent : color.panel
@@ -38,7 +47,7 @@ export default function Press({
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: on, disabled }}
-      accessibilityLabel={[caption, label, sub].filter(Boolean).join(', ')}
+      accessibilityLabel={accessibilityLabel || [caption, label, sub].filter(Boolean).join(', ')}
       disabled={disabled}
       onPress={() => {
         haptic?.()

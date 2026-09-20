@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Platform, Pressable, Text, View } from 'react-native'
+import { BlurView } from 'expo-blur'
 
-import { color, font, mono, radius, space } from '../lib/theme'
+import { color, font, mono, radius, space, isDark } from '../lib/theme'
+import { at } from '../lib/vivid'
 import { tick } from '../lib/feedback'
 import { linkTone, linkWord, toneOfRemote, unitWord } from '../lib/link-word'
 import { APP_VERSION } from '../lib/version'
@@ -144,8 +146,24 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
   const hasOutput = connected && Number.isInteger(idOf((blocks || []).find((b) => b?.slug === 'output')))
 
   return (
-    <View
+    /*
+     * GLASS, AND IT COSTS NOTHING TO ADD.
+     *
+     * "I want this to look more like the liquid glass type stuff that Apple
+     * does." expo-blur is already a dependency — the sheets, the tuner and the
+     * password box have used it for a long time — so this bar can sit on real
+     * translucency rather than a flat panel without moving the native
+     * fingerprint. A blur is the one part of that look that cannot be faked
+     * with a colour, and it was already paid for.
+     *
+     * `experimentalBlurMethod` is what makes it work on Android at all: the
+     * same incantation the sheets use.
+     */
+    <BlurView
       accessibilityLiveRegion="polite"
+      intensity={40}
+      tint={isDark() ? 'dark' : 'light'}
+      experimentalBlurMethod="dimezisBlurView"
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -154,7 +172,9 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
         paddingVertical: space.sm,
         borderBottomWidth: 1,
         borderBottomColor: color.rule,
-        backgroundColor: color.panel
+        /* Translucent, or the blur has nothing to do: a solid panel in front
+           of it hides the very thing it is blurring. */
+        backgroundColor: at(color.panel, 0.55)
       }}
     >
       <Lamp state={unitLamp} />
@@ -353,7 +373,7 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
       */}
       <Volume blocks={blocks} open={volume} onClose={() => setVolume(false)} onError={setFailed} />
       {failed ? <Reported said={failed} onClear={() => setFailed(null)} /> : null}
-    </View>
+    </BlurView>
   )
 }
 

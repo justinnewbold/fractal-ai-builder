@@ -725,57 +725,6 @@ export function run(test) {
     assert.match(lifted.slice(0, lifted.indexOf('}')), /background:/, 'the row being dragged is see-through')
   })
 
-  test('the introduction teaches the hold, and Play says it once as well', () => {
-    /*
-     * "We need to add to the tutorial about holding down the amp in effect
-     * buttons to switch channels by tapping and holding. After that,
-     * additionally on the play screen the first time it's opened, have another
-     * pop up that also tells them to hold down those buttons... I actually
-     * believe we had this previously set up, but I'm not seeing it working."
-     *
-     * It was not set up. Nothing on Play had ever said it, and that is exactly
-     * why it reads as something that used to work: the gesture is real and has
-     * been since the channel sheet was built, so a gesture with nothing on
-     * screen pointing at it is indistinguishable from a broken one.
-     *
-     * The card before it in the tour explains what a channel IS and never says
-     * how to reach one, which left the most useful thing on the Play screen
-     * behind a gesture nobody was told about.
-     */
-    const tour = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
-    assert.match(tour, /title: 'Hold a block to change its channel'/, 'the introduction never mentions the hold')
-    const card = tour.slice(tour.indexOf("title: 'Hold a block to change its channel'"))
-    assert.match(card.slice(0, 1200), /Hold\s*\n?\s*it down/, 'the card does not say to hold it down')
-
-    /*
-     * AND PLAY SAYS IT ONCE, on its own key rather than the tour's. Somebody
-     * who skipped the introduction, or met this app before that card existed,
-     * still gets told — and once put away it stays away.
-     */
-    assert.match(src, /const HOLD_NOTE_KEY = 'fab\.play\.hold'/, 'the Play hint has nowhere to remember it was seen')
-    assert.match(src, /className="play-hint"/, 'Play never mentions the hold')
-    assert.match(src, /onClick=\{dismissHoldNote\}/, 'the Play hint cannot be put away')
-    assert.ok(
-      src.indexOf("const HOLD_NOTE_KEY") < src.indexOf("const DEMO_NOTE_KEY"),
-      'the two one-time notes have drifted apart'
-    )
-
-    /*
-     * Inside the Play view, not above it. The strip between the bar and the
-     * first screen is held to the bar, the states that mean the app cannot
-     * work yet, and the assistant — the chrome check in this file is what
-     * keeps 290px from creeping back. A hint belongs with the thing it hints
-     * at anyway.
-     */
-    const playAt = src.indexOf("view === 'play' ? (")
-    const hintAt = src.indexOf('className="play-hint"')
-    assert.ok(playAt !== -1 && hintAt > playAt, 'the Play hint sits in the chrome above every screen')
-
-    /* And it is styled, sharing the demo note's shape because it is the same
-       thing: one sentence the app says once, with the button that clears it. */
-    const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
-    assert.match(css, /\.play-hint,\n\.demo-banner \{/, 'the Play hint has no styling at all')
-  })
 
   test('the block editor arrives over the screen, not below it', () => {
     /*
@@ -1526,7 +1475,10 @@ export function run(test) {
          about it is a fault being fixed: it is what the app is and how it
          works, and somebody hunting for it under Troubleshooting has first
          had to decide they have a problem. */
-      ['about', ['how-this-works', 'updates', 'small-print']]
+      /* 'how-this-works' went with the tour. The walkthrough that replaced it
+         sits first, because it is the one thing on this page somebody opens
+         on purpose rather than to check a fact. */
+      ['about', ['walkthrough', 'updates', 'small-print']]
     ]) {
       assert.deepEqual(behind(page), panels, `the ${page} page holds ${behind(page).join(', ')}`)
     }
@@ -2386,44 +2338,6 @@ export function run(test) {
     assert.match(mods, /doesn.{1,8}t let an app attach a modifier/, 'nothing says why the panel is empty')
   })
 
-  test('the introduction is offered once, and only when there is something to see', () => {
-    /*
-     * Two mistakes a tutorial can make, both of which turn it from help into
-     * the thing people remember hating. It can arrive over a broken
-     * connection, burying the one message that mattered and touring screens
-     * that cannot be reached. And it can come back after being dismissed.
-     */
-    assert.match(
-      src,
-      /if \(status !== 'live' \|\| tourSeen\(\)\) return\s*\n\s*markTourSeen\(\)/,
-      'the introduction no longer waits for a working connection, or no longer remembers being shown'
-    )
-
-    const tour = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
-    /*
-     * Marked seen wherever it closes, not only where it finishes. The X, the
-     * back gesture and a swipe down all arrive at Sheet's onClose, and all of
-     * them mean "not now" — so onClose has to be the thing that records it,
-     * rather than a Done handler the other three routes never touch.
-     */
-    assert.match(
-      tour,
-      /onClose=\{finish\}/,
-      'closing the introduction any way but Done no longer counts as having seen it, so it comes back'
-    )
-    assert.match(tour, /const finish = \(\) => \{\s*\n\s*markTourSeen\(\)/, 'finish no longer records the visit')
-
-    // The way forward keeps the same corner on every card. It was Done on the
-    // left and Back on the right, so the fourth tap where the last three were
-    // went backwards.
-    assert.match(
-      tour,
-      /onClick=\{last \? finish : \(\) => setCard\(card \+ 1\)\}/,
-      'the right-hand button is no longer the way forward on every card'
-    )
-
-    assert.match(src, /Show the introduction/, 'there is no way back to the introduction once it is dismissed')
-  })
 
   test('a sheet that opens as another closes is not closed by its pop', () => {
     /*
@@ -3805,19 +3719,6 @@ export function run(test) {
   })
 
   
-  test('the tour teaches what a scene actually is', () => {
-    const tour = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
-    const card = tour.slice(tour.indexOf('Scenes are one rig'), tour.indexOf('Scenes are one rig') + 1200)
-    assert.match(card, /channel/i, 'the scenes card never mentions channels, which is what a scene remembers')
-    assert.ok(
-      !/every scene shares/i.test(card),
-      'the scenes card still teaches that every scene shares one set of values'
-    )
-    assert.ok(
-      !/rather than a\s*\n?\s*hotter amp|not a hotter amp/i.test(card),
-      'the scenes card still says a lead scene cannot have a hotter amp'
-    )
-  })
 
   test('nobody has to sign in to connect a phone', () => {
     /*
@@ -4701,75 +4602,6 @@ export function run(test) {
     assert.match(settings, /onPress=\{\(\) => setDemoUnit\(u\.key\)\}/, 'the phone offers no unit picker')
   })
 
-  test('the computer with the cable is shown the square on its first launch', () => {
-    /*
-     * "Mac app first-launch tutorial pulling up QR/pairing codes
-     * automatically."
-     *
-     * The Mac app's whole job is to hold the cable so a phone can drive the
-     * unit from the other side of a stage — and the tour never mentioned the
-     * phone. It taught the three screens to somebody sitting AT the computer,
-     * which is the one place they are least likely to be using this.
-     *
-     * The squares existed the whole time, three taps into Setup → Phone &
-     * computer, which is exactly where somebody in their first minute of
-     * owning the app has not been yet.
-     */
-    /* Read as text: node cannot import JSX, which is why every check in this
-       file reads a component's source rather than running it. */
-    const tourSrc = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
-
-    /* The extra card exists, and only the machine with the cable gets it. */
-    assert.match(tourSrc, /title: 'Get your phone on this'/, 'there is no card about the phone')
-    assert.match(
-      tourSrc,
-      /role === 'mac' \? \[phoneCard\(\{ connected, email \}\), \.\.\.CARDS\] : CARDS/,
-      'every device is shown the same cards, or the computer is shown them in the wrong order'
-    )
-
-    /* FIRST, because it is the thing to do while you are still at the desk;
-       everything after it is about using the app once the phone is on. */
-    assert.ok(
-      tourSrc.indexOf('phoneCard({ connected, email })') < tourSrc.indexOf('...CARDS'),
-      'the phone card is not the first thing the computer sees'
-    )
-
-    /* And the paging reads that list rather than the static one, or the extra
-       card is built and never drawn. */
-    for (const line of ['const last = card === cards.length - 1', '{cards[card].body}', 'title={cards[card].title}']) {
-      assert.ok(tourSrc.includes(line), `the tour still pages through the static list: ${line}`)
-    }
-
-    /*
-     * THE SAME COMPONENTS SETUP USES, not a second copy. Two renderings of a
-     * pairing code drift, and the way that drift shows up is a phone scanning
-     * a square that pairs it with nothing.
-     */
-    const qr = readFileSync(new URL('../src/components/PhoneQr.jsx', import.meta.url), 'utf8')
-    assert.match(qr, /from '\.\/PhoneRemote'/, 'the tour draws its own pairing code')
-    assert.match(qr, /PairCard|AccountCard/, 'the shared block renders no square')
-    const tour = readFileSync(new URL('../src/components/Tour.jsx', import.meta.url), 'utf8')
-    assert.match(tour, /<PhoneQr connected=\{connected\} email=\{email\}/, 'the card has no square in it')
-
-    /*
-     * AND IT DOES NOT PRINT THE ADDRESS. "The first shot that pops up in the
-     * tutorial literally shows my personal email address on it."
-     *
-     * The Setup page prints it and should: it is answering "which account is
-     * this", on his own screen, asked for. The tour is the first thing the app
-     * ever shows — the screen that gets photographed, screen-shared and handed
-     * across a desk — and the sentence above the square already says what to do
-     * without naming anybody.
-     */
-    assert.match(tour, /showAccount=\{false\}/, 'the tour prints the signed-in address on its first card again')
-    const remote = readFileSync(new URL('../src/components/PhoneRemote.jsx', import.meta.url), 'utf8')
-    assert.match(remote, /showAccount = true/, 'the address can no longer be withheld, so the tour cannot hide it')
-    assert.match(remote, /\{showAccount \? \(/, 'the address is drawn whatever the caller asked for')
-
-    /* And the app tells it which end this is, or the check above is decorative. */
-    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
-    assert.match(app, /<Tour[\s\S]{0,200}role=\{link\.role\}/, 'the tour is never told which machine it is on')
-  })
 
   test('there is one square, and the wifi one is gone', () => {
     /*
@@ -4816,6 +4648,163 @@ export function run(test) {
        one it was. */
     const scan = readFileSync(new URL('../mobile/src/components/ScanCode.js', import.meta.url), 'utf8')
     assert.match(scan, /looksLikeTheWifiSquare/, 'the scanner no longer recognises the wrong square')
+  })
+
+
+  /*
+   * THE WALKTHROUGH SAYS WHAT THE PDF SAYS, WORD FOR WORD.
+   *
+   * "Do not change any wording without asking me first."
+   *
+   * Copy typed into a component gets tidied without anybody deciding to: a
+   * plain hyphen becomes an em dash, "Wi-Fi" becomes "wifi", a sentence gets
+   * shortened to fit a button. None of those is a change somebody approved, and
+   * every one of them is invisible in review.
+   *
+   * So the strings live in one file and this holds a sample of them to the
+   * source PDF, character for character — including the hyphens where a
+   * typographer would use a dash, which is the exact thing most likely to be
+   * "fixed" by accident.
+   */
+  /*
+   * THE WALKTHROUGH REPORTS; IT DOES NOT PRETEND.
+   *
+   * Every screen in the PDF that names a fact — which unit answered, its
+   * firmware, how many presets, whether a phone arrived — is wired to the
+   * thing it names. That is the whole difference between this and a mockup,
+   * and it is the one property worth a test: the single moment these screens
+   * exist for is somebody deciding whether this app actually works, and a
+   * walkthrough that prints "FM3 found" with nothing plugged in has answered
+   * that question for them, wrongly.
+   */
+  test('the walkthrough says what the port answered, not what the mockup said', () => {
+    const onb = readFileSync(new URL('../src/components/Onboarding.jsx', import.meta.url), 'utf8')
+
+    /* Not one word typed into the component. */
+    assert.match(onb, /from '\.\.\/\.\.\/shared\/onboarding\.mjs'/, 'the copy is not coming from the one file that holds it')
+    const bare = onb.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ')
+    for (const typed of ['FM3 found', 'firmware 8.02', '512 presets', 'K7QM-4T9R', 'iPhone connected']) {
+      assert.ok(!bare.includes(typed), `"${typed}" is typed into the screen, so it is true whether or not it is`)
+    }
+
+    /* The unit is whatever answered, and the numbers are read off it. */
+    assert.match(onb, /const found = status === 'live' && !!device/, 'the found state is not the real one')
+    assert.match(onb, /D2\.found\(unitName\)/, 'the unit name is not the one that answered')
+    assert.match(onb, /firmware: firmwareOf\(device\)/, 'the firmware is not read off the unit')
+    assert.match(onb, /presets: slotCount\(device\?\.capabilities\)/, 'the preset count is not the unit own')
+
+    /* The square is the real one, shared with Settings rather than a second
+       thing that can disagree about how pairing works. */
+    assert.match(onb, /<PhoneQr connected=\{paired\}/, 'the pairing screen draws its own square')
+
+    /*
+     * AND "THE PORT IS BUSY" IS TOLD APART FROM "NOTHING IS PLUGGED IN".
+     * They are different screens in the PDF because they are different
+     * problems: one is a thing to go and fix, the other is "plug it in".
+     */
+    assert.match(
+      onb,
+      /const stuck = !found && \(faultReason === 'no-answer' \|\| faultReason === 'unreadable'\)/,
+      'the busy-port screen is guessed at rather than read from why the read failed'
+    )
+
+    /* It finishes itself once a phone actually arrives: nobody should press
+       Next after the thing they are holding has already connected. */
+    assert.match(onb, /if \(open && at === 'pair' && paired\) setAt\('done'\)/, 'the pairing step waits for a press it does not need')
+
+    /* Seen once. Marked on open rather than on finish — closing the tab is
+       not an accident to be corrected next launch. */
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    assert.match(app, /useState\(\(\) => !onboarded\(\)\)/, 'the walkthrough does not open itself on a first run')
+    assert.match(app, /if \(walkthrough\) markOnboarded\(\)/, 'the walkthrough is not remembered, so it returns every load')
+  })
+
+  test('the walkthrough is worded the way he wrote it', async () => {
+    const c = await import('../shared/onboarding.mjs')
+
+    /* One from every screen, chosen for the bits most likely to drift. */
+    assert.equal(c.D1.head, 'Let\u2019s get your whole rig connected.')
+    assert.equal(c.D1.sub, 'Three clear steps. About a minute.')
+    assert.equal(c.D1.skip, 'Skip walkthrough')
+    assert.equal(c.D2.head, 'Plug your unit into this computer.')
+    assert.equal(c.D2.helpBody, 'Quit FM3-Edit or Axe-Edit. One app can hold USB at a time.')
+    assert.equal(c.D2B.head, 'Something else has the USB port.')
+    assert.equal(c.D2B.without, 'Continue without it')
+    assert.equal(c.D3.head, 'Use your phone as the remote?')
+    assert.equal(c.D4.waiting, 'Waiting for your phone\u2026')
+    assert.equal(c.D5.head, 'You\u2019re set.')
+    assert.equal(c.P1.head, 'YOUR RIG, FROM ACROSS THE STAGE.')
+    assert.equal(c.P3.demo.go, 'Start free demo')
+    /*
+     * THE PRICE IS THE STORE'S, AND HIS WORDS ARE THE FALLBACK.
+     *
+     * "Change that one so it does know the correct price per app, and then
+     * default back if it doesn't know the price."
+     *
+     * The store is the only thing that knows what this costs the person
+     * holding the phone — App Store and Play price by country — so printing
+     * $9.99 everywhere quotes a price most buyers cannot pay.
+     */
+    assert.equal(c.P3.real.go('$9.99'), 'Set up  \u00b7  $9.99 once')
+    assert.equal(c.P3.real.go('A$14.99'), 'Set up  \u00b7  A$14.99 once')
+    assert.equal(c.P3.real.go(null), 'Set up  \u00b7  $9.99 once', 'the fallback is no longer his wording')
+    assert.equal(c.P8.head(null), '$9.99 one-time')
+    assert.equal(c.P8.head('\u20ac10,99'), '\u20ac10,99 one-time')
+    assert.equal(c.P8.go(null), 'Unlock real-rig control  \u00b7  $9.99')
+    assert.equal(c.P8.go('\u00a37.99'), 'Unlock real-rig control  \u00b7  \u00a37.99')
+
+    /* One tip, and it does not advertise a second that was never written. */
+    assert.equal(c.P5.count, 'QUICK TIP')
+    assert.equal(c.P9.head, 'You\u2019re connected.')
+    assert.equal(c.REPLAY, 'Show the walkthrough')
+
+    /*
+     * THE HYPHENS, which are the whole reason this test is this pedantic. Four
+     * lines use a plain hyphen where an em dash would be the typographic
+     * choice. That was his choice and it is not ours to improve.
+     */
+    for (const line of [
+      c.CHAIN[2].phoneBody,
+      c.D3.why[2].body,
+      c.D3.note,
+      c.P1.sub,
+      c.P5.body,
+      c.P5.foot,
+      c.P6.yes
+    ]) {
+      assert.ok(!/[\u2014\u2013]/.test(line), `an em or en dash crept into: ${line}`)
+    }
+    assert.equal(c.CHAIN[2].phoneBody, 'Your remote - nearby or away')
+    assert.equal(c.P6.yes, 'Yes - show me the scanner')
+    assert.equal(c.P5.body, 'Tap toggles the block. Press and hold to choose channels A-D.')
+
+    /* Wi-Fi keeps its capital and its hyphen. */
+    assert.match(c.D3.why[2].body, /home Wi-Fi$/, 'Wi-Fi was rewritten')
+
+    /*
+     * AND THE LINES THAT CLAIM SOMETHING ARE FUNCTIONS, not strings. Each of
+     * these names a fact — which unit answered, how many presets, whether a
+     * phone arrived — and the one moment this screen exists for is somebody
+     * deciding whether the app works. A typed-out "FM3 found" has answered that
+     * question before asking the hardware.
+     */
+    for (const [name, fn] of [
+      ['D2.found', c.D2.found],
+      ['D2.detail', c.D2.detail],
+      ['D5.status', c.D5.status],
+      ['P4.go', c.P4.go],
+      ['P8.verified', c.P8.verified],
+      ['P9.tag', c.P9.tag],
+      ['P9.status', c.P9.status]
+    ]) {
+      assert.equal(typeof fn, 'function', `${name} is a fixed string, so it can claim something untrue`)
+    }
+    assert.equal(c.D2.found('FM9'), 'FM9 found')
+    assert.equal(c.D2.detail({ firmware: '8.02', presets: 512 }), 'USB  \u00b7  firmware 8.02  \u00b7  512 presets')
+    /* And they say less rather than inventing, when a fact is missing. */
+    assert.equal(c.D2.detail({}), 'USB')
+    assert.equal(c.D5.status({ unit: 'FM3', phone: false }), 'FM3 on USB')
+    assert.equal(c.D5.status({ unit: null, phone: true }), 'iPhone connected')
   })
 
 }

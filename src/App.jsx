@@ -22,6 +22,8 @@ import LocalLibrary from './components/LocalLibrary'
 import GearNames from './components/GearNames'
 import PhoneApp from './components/PhoneApp'
 import SetupRow from './components/SetupRow'
+import Onboarding, { onboarded, markOnboarded } from './components/Onboarding'
+import { REPLAY } from '../shared/onboarding.mjs'
 import { FULL, BUILT_AT, VERSION } from './lib/version'
 import Theme from './components/Theme'
 import Section from './components/Section'
@@ -120,7 +122,6 @@ import {
   getHost,
   servedLocally
 } from './lib/forgefx'
-import Tour, { tourSeen, markTourSeen } from './components/Tour'
 import ConnectScreen from './components/ConnectScreen'
 import PhoneRemote from './components/PhoneRemote'
 import LinkDetails from './components/LinkDetails'
@@ -393,6 +394,19 @@ export default function App() {
    * quiet was described as a Mac that had answered. See faultCopy.
    */
   const [faultReason, setFaultReason] = useState(null)
+  /*
+   * The walkthrough, and whether it has been through.
+   *
+   * Opened from `onboarded()` rather than a fresh false, so a reload does not
+   * start it again — and marked the moment it opens rather than when it
+   * finishes. Somebody who opens it, reads a screen and closes the tab has
+   * seen it; offering it again treats closing as an accident, and a tutorial
+   * that keeps coming back is the thing everybody remembers hating.
+   */
+  const [walkthrough, setWalkthrough] = useState(() => !onboarded())
+  useEffect(() => {
+    if (walkthrough) markOnboarded()
+  }, [walkthrough])
   const [device, setDevice] = useState(null)
   /*
    * The unit's own state comes from the store, not from here.
@@ -677,7 +691,6 @@ export default function App() {
    * background for a request, not a value the request depends on, and a round
    * trip to Supabase in front of every "make it brighter" would be felt.
    */
-      const [tour, setTour] = useState(false)
 
   /*
    * What this player tends to like, read off what they have kept.
@@ -2224,25 +2237,6 @@ export default function App() {
   }, [status])
 
 
-  /*
-   * The introduction, once, and only when there is something to introduce.
-   *
-   * Held until the app is live rather than shown on load. Before that the
-   * screen is either scanning or explaining a connection that isn't working,
-   * and a tour arriving over a real problem buries the one message that
-   * mattered — and tours the player through screens they cannot reach.
-   *
-   * Marked seen on open rather than on finish. Someone who opens it, reads a
-   * card and closes the tab has seen it; re-offering it next time treats
-   * closing as an accident, and a tutorial that keeps coming back is the
-   * thing everyone remembers hating.
-   */
-  useEffect(() => {
-    if (status !== 'live' || tourSeen()) return
-    markTourSeen()
-    setTour(true)
-  }, [status])
-
   
   /**
    * Nothing here is named yet, so nothing here can be overwritten.
@@ -3529,23 +3523,22 @@ export default function App() {
         running generation, and a second copy of it existing quietly behind
         Create would be a second place for those to diverge.
       */}
+      {/* The one sign-in, as a sheet: it pops up, you do the thing, it goes. */}
       {/*
-        The introduction. Rendered beside the sheets rather than among them
-        because it is not one of the app's places: it opens itself, once, and
-        the only way back to it is the button in Settings.
+        Not a sheet over the app: a page instead of it. There is nothing
+        useful behind this until the unit is plugged in, and showing the app
+        greyed out behind a dialog shows somebody a thing they cannot use yet.
       */}
-      {/* The tour gets told which end this is, because the machine with the
-          cable gets a card the others do not: the square a phone scans. See
-          Tour.cardsFor. */}
-      <Tour
-        open={tour}
-        onClose={() => setTour(false)}
-        role={link.role}
-        connected={link.link === 'connected'}
-        email={link.account?.email}
+      <Onboarding
+        open={walkthrough}
+        onClose={() => setWalkthrough(false)}
+        device={device}
+        status={status}
+        faultReason={faultReason}
+        link={link}
+        onLookAgain={() => read()}
       />
 
-      {/* The one sign-in, as a sheet: it pops up, you do the thing, it goes. */}
       <SignInSheet
         open={signIn}
         role={link.role}
@@ -4225,28 +4218,19 @@ export default function App() {
             <p className="setup-page-title">{SETUP_PAGES.about}</p>
             <p className="device-meta mono">{FULL} · built {BUILT_AT} UTC</p>
             {/*
-              THE INTRODUCTION LIVES HERE NOW, not under Troubleshooting.
-              "Move the tutorial to replay it later into the about section
-              instead of under troubleshooting."
-              It is right: nothing about it is a fault being fixed. It is what
-              the app is and how it works, which is what About is for, and
-              somebody looking for it under Troubleshooting has first had to
-              decide they have a problem.
+              The way back in, named the way the last screen of it promises:
+              "Need this again? Settings → Show the walkthrough."
             */}
-            <Section key="how-this-works" title="How this works" note="A short introduction">
-              <p className="hint">
-                What the screens are for, where a change actually goes, what a scene is, and how to
-                reach a block&rsquo;s channels. It appears once, the first time you connect.
-              </p>
+            <Section key="walkthrough" title={REPLAY} note="The three-step setup">
               <div className="history-actions">
                 <button
                   className="chip"
                   onClick={() => {
                     setSheet(null)
-                    setTour(true)
+                    setWalkthrough(true)
                   }}
                 >
-                  Show the introduction
+                  {REPLAY}
                 </button>
               </div>
             </Section>

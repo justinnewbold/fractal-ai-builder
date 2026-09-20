@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { RefreshControl, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native'
 import { useKeepAwake } from 'expo-keep-awake'
 
@@ -178,13 +178,46 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
   const [blockGrid, setBlockGrid] = useState(0)
   const fitOn = loadFit(sync, true)
   const chrome = Math.max(0, content - sceneGrid - blockGrid)
+  /*
+   * WHAT THE PREDICTION MISSED, MEASURED RATHER THAN GUESSED AT AGAIN.
+   *
+   * "This is set to the fit to screen setting but the tempo numbers are
+   * cutting off."
+   *
+   * fitTiles works out how tall a tile may be and assumes every row comes out
+   * that tall. Tiles take it as a MINIMUM — a scene tile carrying a number
+   * over a name grows past it — so the grids landed taller than the budget
+   * they were given, and the footer went off the bottom of the screen. Worse,
+   * it was STABLE there: chrome and the budget both stay put, so it settled
+   * overflowing and stayed overflowing.
+   *
+   * Rather than teach the prediction about every way a tile can grow — the
+   * two-line name, the block rows being 12 shorter, whatever is added next —
+   * this measures what actually happened and takes it off the budget. It only
+   * ever grows within a layout, so it converges in a frame or two instead of
+   * oscillating, and it is thrown away whenever the thing being fitted
+   * changes.
+   */
+  const [trim, setTrim] = useState(0)
+  const fitKey = `${viewport}:${scenes.hasScenes ? scenes.count : 0}:${blocks.length}:${fitOn}`
+  const lastKey = useRef(fitKey)
+  if (lastKey.current !== fitKey) {
+    lastKey.current = fitKey
+    if (trim !== 0) setTrim(0)
+  }
+  useEffect(() => {
+    if (!fitOn || !viewport || !content) return
+    const over = content - viewport
+    /* A pixel or two is rounding, not an overflow worth another pass. */
+    if (over > 2) setTrim((was) => was + over)
+  }, [fitOn, content, viewport])
   /* Only once every piece has been measured. Fitting against a chrome of
      zero would hand the grids the whole screen for one frame, which is the
      flash of wrong sizes this screen already learned to avoid. */
   const fitted =
     fitOn && viewport > 0 && content > 0 && (sceneGrid > 0 || blockGrid > 0)
       ? fitTiles({
-          available: viewport - chrome,
+          available: viewport - chrome - trim,
           scenes: scenes.hasScenes ? scenes.count : 0,
           blocks: blocks.length,
           sceneCols: size.scenes,

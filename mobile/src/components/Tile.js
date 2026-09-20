@@ -1,6 +1,7 @@
-import { Pressable, Text, View } from 'react-native'
+import { Platform, Pressable, Text, View } from 'react-native'
 
 import { color, font, radius, space, TAP } from '../lib/theme'
+import { at, vivid } from '../lib/vivid'
 import { tick } from '../lib/feedback'
 import { fire, said } from '../lib/tapped'
 
@@ -43,13 +44,39 @@ export default function Tile({
   style
 }) {
   /*
-   * Off is the hue at a twelfth, over the chassis, rather than a flat panel.
-   * Eight-digit hex is RN's own alpha and needs no colour maths: the tile stays
-   * recognisably its own colour while being obviously unlit, which is the
-   * distinction the whole grid rests on.
+   * THE HUE IS THE PALETTE'S; THE VIBRANCY IS THIS SCREEN'S.
+   *
+   * `vivid` lifts saturation and leaves hue exactly where it was, so a drive
+   * is still the red the unit shows and a delay is still the same blue — see
+   * lib/vivid for why that distinction is worth a function. It is applied here
+   * rather than in the palettes because those are shared with the browser, and
+   * repainting the computer app was not what was asked for.
+   *
+   * Off is the same hue at a seventh, over the chassis, rather than a flat
+   * panel: the tile stays recognisably its own colour while being obviously
+   * unlit, which is the distinction the whole grid rests on.
    */
-  const background = on ? fill : `${fill}1f`
+  const hue = vivid(fill)
+  const background = on ? hue : at(hue, 0.14)
   const foreground = on ? ink : color.silk
+  /*
+   * The glow, and it is iOS only by nature rather than by choice: Android has
+   * no coloured shadow, only `elevation`, which is grey. Rather than fake a
+   * halo with an extra View behind every tile in a grid that can hold twenty
+   * of them, Android gets the lift and iOS gets the light. Both read as raised;
+   * only one of them glows.
+   */
+  const glow = on
+    ? Platform.select({
+        ios: {
+          shadowColor: hue,
+          shadowOpacity: 0.55,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 0 }
+        },
+        default: { elevation: 3 }
+      })
+    : null
 
   return (
     <Pressable
@@ -80,13 +107,40 @@ export default function Tile({
           /* Two pixels, because the edge is doing real work when the tile is
              off — it is the only thing still naming the block. */
           borderWidth: 2,
-          borderColor: on ? fill : `${fill}88`,
+          borderColor: on ? at(hue, 0.85) : at(hue, 0.55),
           backgroundColor: background,
-          opacity: pressed ? 0.7 : 1
+          opacity: pressed ? 0.7 : 1,
+          ...glow
         },
         style
       ]}
     >
+      {/*
+        A sheen across the top, which is a gradient's job done without one.
+        A real one needs expo-linear-gradient — native code, so it would move
+        the fingerprint and cost a build to add a highlight. A single
+        translucent white panel over the top half reads as the same thing at
+        arm's length on a dark stage.
+
+        pointerEvents none, and absolute so it takes no part in layout: this
+        tile's height is what the fit-to-screen arithmetic is budgeting, and a
+        decoration must not move it.
+      */}
+      {on ? (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 0,
+            height: '50%',
+            borderTopLeftRadius: radius.md - 2,
+            borderTopRightRadius: radius.md - 2,
+            backgroundColor: 'rgba(255,255,255,0.10)'
+          }}
+        />
+      ) : null}
       <View style={{ alignItems: 'center' }}>
         {caption ? (
           <Text

@@ -22,7 +22,8 @@ import {
 } from '../lib/relay'
 import { notePresetName, noteSceneName, useRig } from '../lib/rig'
 import { dropReadCache, sceneShape, setPresetName, setSceneName } from '../lib/device'
-import { SIZES, loadFit, loadSize, saveFit, saveSize } from '../lib/gigSize'
+import { SIZES, clampSize, loadFit, loadSize, saveFit, saveSize } from '../lib/gigSize'
+import { REPLAY } from '../lib/onboarding'
 import { sync, useStored } from '../lib/store'
 import { isPairAccount } from '../lib/pairing'
 import Lamp from '../components/Lamp'
@@ -51,7 +52,6 @@ const ofUnitState = (s) => s.unit
    under "Unit" in its own Setup: renaming is bench work, not something a thumb
    crosses between songs, which is exactly why neither app puts it on Play. */
 export default function Settings({
-  onOpenTour,
   onUnlock,
   onOpenConnect,
   link,
@@ -61,6 +61,7 @@ export default function Settings({
   onReconnect,
   onSignOut,
   onOpenGear,
+  onReplay,
   onOpenLog,
   onOpenFixes,
   onOpenReport
@@ -308,12 +309,11 @@ export default function Settings({
             {/* Openable again, because a tour worth showing once is worth
                 finding later — and somebody who skipped it on the first
                 launch has no other way back to it. */}
-            {onOpenTour ? (
-              <SetupRow
-                title="How this works"
-                status="The four things worth knowing"
-                onPress={onOpenTour}
-              />
+            {/* The way back into the walkthrough, named the way its own last
+                screen promises: "Replay this anytime in Settings → Show the
+                walkthrough." */}
+            {onReplay ? (
+              <SetupRow title={REPLAY} status="The setup, from the start" onPress={onReplay} />
             ) : null}
             <SetupRow title="About" status={`v${APP_VERSION}`} onPress={() => setPage('about')} />
             {/*
@@ -943,69 +943,117 @@ function NameField({ label, value, onDone }) {
  * as the browser's, so a phone and a laptop on one account agree.
  */
 /**
- * Fit on screen, or a size of your own.
+ * Stage tiles: a stepper and a tick box, the same two controls as the browser.
  *
- * "Make one that says fit on screen, and if they click that, it'll just make
- * sure whatever size device they're on, all of those will fit onto the screen
- * so they don't have to manually push up and down for sizes and then go back
- * to the play screen to see what it did and then go back, so that way it's
- * just always set up, good to go. Also make this the default setting from the
- * beginning."
+ * "Update the mobile app's tile size screen to look like this with the +/-
+ * buttons instead of the tab buttons."
  *
- * FIT SITS FIRST AND IS ON OUT OF THE BOX, because it is the answer for
- * everybody who has not got an opinion yet — which is everybody, on the first
- * launch. The five steps underneath are still there and still remembered;
- * they are now the thing you pick when fit has guessed wrong for you, rather
- * than the only way to get a screen that fits.
+ * Five buttons in a wrapping row said five things at once and took two lines
+ * to do it. A stepper says the one thing that matters — what it is set to
+ * now — and the two ways to change it sit either side of the answer.
  *
- * It is not a sixth step on the ladder, and drawing it as one would be a lie
- * about what it does. A step is a height. Fit is a rule: the screen is
- * measured and the tiles take what is left, so the same setting gives
- * different pixels on a different phone, or on the same phone with a preset
- * that has more blocks in it. That is the whole point — the round trip to Play
- * and back to check ends here.
+ * FIT IS A TICK BOX UNDER IT, NOT A SIXTH STEP, because it is not a size: it
+ * is the screen deciding instead of you. While it is on the stepper reads
+ * "Fit to screen" and its buttons go quiet, which is the honest way to show a
+ * control whose value is being overridden — greying them says "not now"
+ * where hiding them would say "never".
+ *
+ * On out of the box. It is the right answer for everybody who has not got an
+ * opinion yet, which is everybody on the first launch.
  */
 function TileSize() {
   useStored()
   const now = loadSize(sync)
   const fit = loadFit(sync, true)
+  const step = (by) => saveSize(clampSize(now + by), sync)
   return (
-    <View style={{ gap: space.sm }}>
-      <Press
-        label="Fit on screen"
-        sub="Sizes everything to your phone, whatever the preset holds"
-        tone="signal"
-        on={fit}
-        height={TAP}
-        onPress={() => saveFit(true, sync)}
-      />
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-        {SIZES.map((size, i) => (
-          <Press
-            key={size.name}
-            label={size.name}
-            tone="signal"
-            /* Never lit while fit is on: the stored step is still there and
-               comes back when it is picked, but it is not what the screen is
-               being drawn at, and showing it as chosen would say it was. */
-            on={!fit && i === now}
-            height={44}
-            style={{ paddingHorizontal: space.md }}
-            /* Picking a size IS turning fit off. Leaving it on and quietly
-               ignoring the press is how a setting stops being believed. */
-            onPress={() => {
-              saveFit(false, sync)
-              saveSize(i, sync)
-            }}
-          />
-        ))}
+    <View style={{ gap: space.md }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+        <Press
+          label="−"
+          accessibilityLabel="Smaller tiles"
+          height={TAP}
+          disabled={fit || now <= 0}
+          style={{ paddingHorizontal: space.lg }}
+          onPress={() => step(-1)}
+        />
+        <Text
+          style={{
+            flex: 1,
+            textAlign: 'center',
+            color: color.silk,
+            fontSize: font.lead,
+            fontWeight: '700'
+          }}
+        >
+          {fit ? 'Fit to screen' : SIZES[now]?.name || SIZES[0].name}
+        </Text>
+        <Press
+          label="+"
+          accessibilityLabel="Bigger tiles"
+          height={TAP}
+          disabled={fit || now >= SIZES.length - 1}
+          style={{ paddingHorizontal: space.lg }}
+          onPress={() => step(1)}
+        />
       </View>
       <Note>
-        Fit does the work for you. Pick a size instead if you want bigger targets and do not mind
-        scrolling — bigger tiles are easier to hit without looking, smaller ones fit more of the rig
-        on screen.
+        Bigger tiles are easier to hit without looking; smaller ones fit more of the rig on screen.
+        This device remembers it.
       </Note>
+      <Choice
+        on={fit}
+        label="Fit everything on one screen"
+        sub="Sizes the scenes and effects so the whole rig is on screen at once, with no scrolling. Bigger presets get smaller buttons, never under a thumb’s width. Overrides the size above while it is on."
+        onPress={() => saveFit(!fit, sync)}
+      />
     </View>
+  )
+}
+
+/**
+ * A tick box with a sentence under it.
+ *
+ * The browser has a real checkbox and this end has none, so it is drawn:
+ * a square that fills when it is on, the way the one on the computer does.
+ * `accessibilityRole` is checkbox rather than button, because that is what it
+ * is — a screen reader should say "checked", not "selected".
+ */
+function Choice({ on, label, sub, onPress }) {
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: !!on }}
+      accessibilityLabel={label}
+      onPress={() => {
+        tick()
+        onPress?.()
+      }}
+      style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.md }}
+    >
+      <View
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: radius.sm,
+          borderWidth: on ? 0 : 1,
+          borderColor: color.rule,
+          backgroundColor: on ? color.signal : color.panel,
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        {on ? (
+          <Text style={{ color: color.onSignal, fontSize: font.body, fontWeight: '700' }}>✓</Text>
+        ) : null}
+      </View>
+      <View style={{ flex: 1, gap: space.xs }}>
+        <Text style={{ color: color.silk, fontSize: font.body }}>{label}</Text>
+        <Text style={{ color: color.silkDim, fontSize: font.small, lineHeight: font.small * 1.5 }}>
+          {sub}
+        </Text>
+      </View>
+    </Pressable>
   )
 }
 

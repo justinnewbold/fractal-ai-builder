@@ -25,6 +25,7 @@ import { loadPreset, useRig } from '../lib/rig'
 import { tick } from '../lib/feedback'
 import Note from '../components/Note'
 import Grip from '../components/Grip'
+import SwipeAway from '../components/SwipeAway'
 import Press from '../components/Press'
 import { landingIndex } from '../lib/laneOrder'
 
@@ -552,10 +553,17 @@ function SourceRow({ on, onPress, name, note, editing = null }) {
  * set lists drag to rearrange as well, like it is on the chain editor,
  * instead of the up-down arrows." The grip claims the touch and the page
  * stops scrolling while it is held, so a thumb between songs moves the song
- * and nothing else. Remove stays a button of its own.
+ * and nothing else.
+ *
+ * REMOVED BY SWIPING IT AWAY, and the ✕ is gone from the row: "Make the
+ * setlist songs swipe to delete instead of the x. Make a full swipe delete it
+ * and a partial swipe show the x that can be tapped." Two gestures out of one
+ * movement — see SwipeAway — and a row that is mostly read now carries a name
+ * and a grip rather than a name, a grip and a standing offer to delete it.
  */
 function Song({ position, slot, name, playing, alone, lifted, onPlay, onDragStart, onDragMove, onDragEnd, onRemove }) {
   return (
+    <SwipeAway onRemove={onRemove} label={`Remove ${name}`}>
     <View
       style={{
         flexDirection: 'row',
@@ -608,45 +616,8 @@ function Song({ position, slot, name, playing, alone, lifted, onPlay, onDragStar
           onEnd={onDragEnd}
         />
       )}
-      <Nudge label={`Remove ${name}`} glyph="✕" onPress={onRemove} />
     </View>
-  )
-}
-
-/*
- * 44 rather than the app's 56.
- *
- * The 56 in `Press` is a stage rule — a target you hit without looking, in the
- * dark, mid-song. Nothing on this screen is pressed mid-song: the running order
- * is fixed at soundcheck or between songs, with the phone in your hand and your
- * eyes on it. 44 is the platform's own minimum, and three of them fit on the
- * row beside a song's name, which 56 does not.
- */
-function Nudge({ label, glyph, disabled = false, onPress }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-      accessibilityLabel={label}
-      disabled={disabled}
-      onPress={() => {
-        tick()
-        onPress()
-      }}
-      style={({ pressed }) => ({
-        width: 44,
-        minHeight: 44,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: radius.sm,
-        borderWidth: 1,
-        borderColor: color.rule,
-        backgroundColor: color.panelHi,
-        opacity: disabled ? 0.35 : pressed ? 0.7 : 1
-      })}
-    >
-      <Text style={{ color: color.silk, fontSize: font.small }}>{glyph}</Text>
-    </Pressable>
+    </SwipeAway>
   )
 }
 
