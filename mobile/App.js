@@ -170,6 +170,34 @@ export default function App() {
    * back to it, because nothing is being withheld: they came looking.
    */
   const [buying, setBuying] = useState(false)
+
+  /*
+   * THE WAY BACK TO AN ACCOUNT, FROM ANYWHERE INSIDE THE APP.
+   *
+   * "I am logged in and it shows this screen and says I still need to unlock.
+   * There is no way to login with user name and password after you are in the
+   * app on the demo."
+   *
+   * Both halves of that were true. The demo is a session-less state, so the
+   * unlock it is offered is the right one for somebody with no account — and
+   * there was no way from there to say "I have one". Setup offered Sign out
+   * and nothing else, which is no use to somebody with nothing to sign out of.
+   *
+   * IT DOES NOT SIGN ANYTHING OUT ON THE WAY. A phone paired by code has a
+   * real session, and throwing it away to show a form somebody might back out
+   * of would cost them their pairing for nothing. Signing in replaces the
+   * session; backing out leaves it exactly as it was, and the demo button on
+   * that screen is the way back in.
+   *
+   * The demo ends here, though: somebody heading for an account is heading for
+   * a real rig, and the simulated unit would otherwise still be answering.
+   */
+  const toSignIn = () => {
+    setBuying(false)
+    setScreen('stage')
+    setDemo(false)
+    setAuth('out')
+  }
   /*
    * THE TOUR, WHICH THIS END NEVER HAD. "First issue is demo has no
    * tutorial. Very important."
@@ -400,6 +428,7 @@ export default function App() {
           />
         ) : auth === 'paywall' ? (
           <Paywall
+            onSignIn={toSignIn}
             onUnlocked={() => setAuth('in')}
             onDemo={() => {
               /* Out of the paid path entirely: the demo needs no account and
@@ -436,6 +465,7 @@ export default function App() {
             {buying ? (
               <Paywall
                 asked
+                onSignIn={toSignIn}
                 onUnlocked={() => setBuying(false)}
                 onDemo={() => setBuying(false)}
                 onBack={() => setBuying(false)}
@@ -506,6 +536,7 @@ export default function App() {
             ) : screen === 'settings' ? (
               <Settings
                 onUnlock={() => setBuying(true)}
+                onSignIn={toSignIn}
                 link={link.link}
                 macName={link.macName}
                 hostVersion={link.hostVersion}

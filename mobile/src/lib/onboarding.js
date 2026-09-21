@@ -177,7 +177,12 @@ export const D5 = {
 
 /** P1 — the phone's welcome. */
 export const P1 = {
-  head: 'YOUR RIG, FROM ACROSS THE STAGE.',
+  /* His, replacing "YOUR RIG, FROM ACROSS THE STAGE." — "Let's change that
+     then. I don't like it." It is the line the store banner carries, so the
+     first thing somebody reads in the app is the thing that brought them to
+     it. Capitals and the full stop are this screen's house style, not a
+     change to his words. */
+  head: 'CONTROL YOUR FRACTAL FROM YOUR PHONE.',
   sub: 'Presets, scenes, blocks, tuner and tap tempo - on the phone in your pocket.',
   go: 'Get started',
   haveCode: 'I already have a pairing code'
