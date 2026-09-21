@@ -153,7 +153,22 @@ export const D4 = {
   waiting: 'Waiting for your phone…',
   note: 'No account required. Pairing creates a private connection between this phone and computer.',
   noApp: 'I don’t have the app',
-  skip: 'Skip for now'
+  skip: 'Skip for now',
+  /*
+   * NEW WORDING, MINE, from what he said this screen should say: "it's fine
+   * if the Mac says, if you've purchased this, go ahead and scan the QR code."
+   *
+   * The computer cannot check — the purchase lives on the phone's App Store
+   * account and nothing here can see it. So this states the condition and the
+   * PHONE is what actually answers it, which is the other half of the same
+   * sentence: "the phone needs to be able to tell, hey, you did not unlock
+   * this, or yes, you did unlock it." It does, on the far side of the scan.
+   *
+   * Which is why this is worded as what to expect rather than as a warning.
+   * Nothing here is being withheld, and somebody who has not bought it yet is
+   * not doing anything wrong by scanning.
+   */
+  owned: 'If you’ve bought the phone app, scan this and it will connect. The phone checks — it will say so if it isn’t unlocked yet.'
 }
 
 /** The three things worth knowing, said once at the end of each walkthrough. */

@@ -4650,6 +4650,30 @@ export function run(test) {
     assert.match(scan, /looksLikeTheWifiSquare/, 'the scanner no longer recognises the wrong square')
   })
 
+  test('the computer states the condition, and the phone is what answers it', () => {
+    /*
+     * "It's fine if the Mac says, if you've purchased this, go ahead and scan
+     * the QR code, and if they scan it, the phone needs to be able to tell,
+     * hey, you did not unlock this, or yes, you did unlock it."
+     *
+     * Two halves, in the only two places that can carry them. The COMPUTER
+     * cannot check anything: the purchase lives on the phone's App Store
+     * account and there is nothing here that can see it, so its job is to say
+     * what to expect. The PHONE is what actually answers, and it does that on
+     * the far side of the scan — see the walkthrough's connect, which now
+     * sends somebody who already paid past the unlock step instead of asking
+     * them to buy the app a second time.
+     */
+    const tour = readFileSync(new URL('../src/components/Onboarding.jsx', import.meta.url), 'utf8')
+    assert.match(tour, /<p className="onb-note">\{D4\.owned\}<\/p>/, 'the pairing step does not say who this is for')
+    /* Above the square, not under it: a condition read after the thing it
+       conditions has already been scanned is a condition nobody read. */
+    assert.ok(
+      tour.indexOf('{D4.owned}') < tour.indexOf('<PhoneQr'),
+      'the condition is printed below the square it applies to'
+    )
+  })
+
   test('the scanner starts below the notch, and is the colour the rest of the app is', async () => {
     /*
      * "If you look at the screenshot, the close button at the top right is

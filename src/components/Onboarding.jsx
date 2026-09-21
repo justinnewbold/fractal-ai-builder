@@ -238,6 +238,21 @@ export default function Onboarding({
               block Settings shows, so there is one thing that knows how a
               phone gets paired rather than two that can disagree.
             */}
+            {/*
+              THE CONDITION, SAID BEFORE THE SQUARE RATHER THAN AFTER IT.
+
+              "It's fine if the Mac says, if you've purchased this, go ahead
+              and scan the QR code, and if they scan it, the phone needs to be
+              able to tell, hey, you did not unlock this, or yes, you did
+              unlock it."
+
+              This computer cannot check: the purchase lives on the phone's
+              App Store account and nothing here can see it. So it says what
+              to expect and the PHONE answers — which it now does, on the far
+              side of the scan, instead of pairing and asking for money a step
+              later regardless of who is holding it.
+            */}
+            <p className="onb-note">{D4.owned}</p>
             <PhoneQr connected={paired} email={link?.account?.email} showAccount={false} />
             <p className="onb-waiting mono">{D4.waiting}</p>
             <p className="onb-note">{D4.note}</p>
