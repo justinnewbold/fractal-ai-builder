@@ -5,6 +5,7 @@ import { BlurView } from 'expo-blur'
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
 import Note from './Note'
 import { blockParams, idOf, setParam, setParamConfirmed } from '../lib/device'
+import { noteEdited } from '../lib/rig'
 import {
   latestWriter,
   NUDGE_SETTLE_MS,
@@ -207,6 +208,9 @@ export default function Volume({ blocks, open, onClose, onError }) {
       const failed = await writer.current.settled()
       if (failed) onError?.(failed.message)
       const res = await setParamConfirmed(eid, p.id, v, p)
+      /* The level is a parameter like any other, so the Save button should
+         know about it — see rig.noteEdited. */
+      noteEdited()
       /* A newer value arrived while this one was being checked: its own
          check follows, and a miss against a value nobody wants any more is
          not a miss. */
