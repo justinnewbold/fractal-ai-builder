@@ -4808,6 +4808,44 @@ export function run(test) {
   })
 
   /*
+   * REPLAYING THE WALKTHROUGH IS NOT A FIRST RUN.
+   *
+   * "I'm signed in and went to settings to restart the tutorial to get the
+   * screenshots. Now my only option is to start the demo again, which made me
+   * re sign in again to unlock."
+   *
+   * Two faults, one screen. Asking to see it again set the app to signed-out
+   * on the way — which left the walkthrough's own exits as the only way back
+   * in. And every one of those exits is a SETUP step: pick a demo unit, scan
+   * a code, buy the unlock. The one that looked like a way forward started
+   * the demo, which takes somebody off the rig they were driving.
+   */
+  test('replaying the walkthrough changes nothing about who is signed in', () => {
+    const app = readFileSync(new URL('../mobile/App.js', import.meta.url), 'utf8')
+    const onb = readFileSync(new URL('../mobile/src/screens/Onboarding.js', import.meta.url), 'utf8')
+
+    const replay = app.match(/onReplay=\{\(\) => \{[^}]*\}/)
+    assert.ok(replay, 'Settings can no longer ask for the walkthrough again')
+    assert.ok(
+      !/setAuth\(/.test(replay[0]),
+      'asking to see the walkthrough again still changes who is signed in'
+    )
+    assert.match(replay[0], /setReplaying\(true\)/, 'a replay is no longer told apart from a first run')
+
+    /* And a replay carries a door that does nothing but close. */
+    assert.match(app, /replay=\{replaying\}/, 'the walkthrough is not told it is a replay')
+    assert.match(onb, /replay \?[^]{0,120}label=\{CLOSE\}/, 'the replay lost its way out')
+    const close = app.match(/onClose=\{\(\) => \{[^}]*\}/)
+    assert.ok(close, 'the walkthrough cannot be closed')
+    for (const damage of ['setAuth(', 'setDemo(', 'signOut(']) {
+      assert.ok(
+        !close[0].includes(damage),
+        `closing the walkthrough calls ${damage}, so looking at it costs something`
+      )
+    }
+  })
+
+  /*
    * A WAY BACK TO AN ACCOUNT FROM INSIDE THE APP.
    *
    * "I am logged in and it shows this screen and says I still need to unlock.

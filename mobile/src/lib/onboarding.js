@@ -311,3 +311,15 @@ export const P9 = {
 
 /** What Settings calls the way back in, on both ends. */
 export const REPLAY = 'Show the walkthrough'
+
+/*
+ * The way out of a walkthrough somebody is only LOOKING at.
+ *
+ * "I'm signed in and went to settings to restart the tutorial to get the
+ * screenshots. Now my only option is to start the demo again."
+ *
+ * Replaying it is not a first run. Every button on these screens is there to
+ * get somebody set up, and somebody already set up needs none of them — they
+ * need the door. New wording, mine, and he can change it.
+ */
+export const CLOSE = 'Close the walkthrough'
