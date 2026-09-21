@@ -4733,7 +4733,7 @@ export function run(test) {
     assert.equal(c.D3.head, 'Use your phone as the remote?')
     assert.equal(c.D4.waiting, 'Waiting for your phone\u2026')
     assert.equal(c.D5.head, 'You\u2019re set.')
-    assert.equal(c.P1.head, 'YOUR RIG, FROM ACROSS THE STAGE.')
+    assert.equal(c.P1.head, 'CONTROL YOUR FRACTAL FROM YOUR PHONE.')
     assert.equal(c.P3.demo.go, 'Start free demo')
     /*
      * THE PRICE IS THE STORE'S, AND HIS WORDS ARE THE FALLBACK.
