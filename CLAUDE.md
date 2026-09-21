@@ -118,6 +118,24 @@ another one. The workflow has a Submit only box for exactly that: it sends
 the build sitting on Expo's servers rather than making a byte-identical
 replacement. Reach for it before reaching for Build.
 
+**And ask him before every merge.**
+
+> "For this project, Remember to ask me before each merge."
+
+This reverses the standing "merge it the moment you open it" that holds
+everywhere else, and it is his call rather than a technical one, so it needs
+no justifying — but the shape of it matters. It does NOT mean stop working
+and wait. Do the whole job: write it, test it, bundle both platforms, push
+the branch, open the pull request, get CI green. Then say it is ready and
+give him the link.
+
+The merge is the one step that waits. Everything up to it is the work, and
+the work does not pause for an answer.
+
+Which also means it is now the merge, not the push, that ends a task — so a
+reply that says "shipped" about something still sitting in an open pull
+request is wrong twice over: he has not seen it, and nothing has gone out.
+
 ## Things that cost real time to learn here
 
 **Every change needs a new version number.** The `version` job in
