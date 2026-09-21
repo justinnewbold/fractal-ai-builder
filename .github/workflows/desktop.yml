@@ -634,3 +634,82 @@ jobs:
             desktop/release/*.AppImage
             desktop/release/*.deb
           if-no-files-found: error
+
+  # ------------------------------------------------------------- complete
+  #
+  # A RELEASE IS NOT DONE BECAUSE FOUR JOBS WENT GREEN. It is done when the
+  # files are on it, and twice in one evening those were different things.
+  #
+  # 1.14.0 lost the whole of Intel Linux to a race for the release itself.
+  # 1.17.0 lost Windows to a network drop 120MB into downloading Electron.
+  # Different causes, same shape: every other platform published normally, so
+  # the release page looked finished, and the only way to find out was to go
+  # looking. Nothing said a word.
+  #
+  # This says the word. It runs after the four builds, reads back what is
+  # actually on the release, and fails with the missing names listed when
+  # anything a person or an updater needs is not there.
+  #
+  # WHAT IT CHECKS, and what it deliberately does not. Installers and update
+  # manifests, because those are what somebody downloads and what an installed
+  # app reads to find the next version — a missing latest-linux.yml is silent
+  # and permanent. Not blockmaps: they only make an update smaller, and a
+  # release is still usable without one.
+  complete:
+    needs: [mac, windows, linux]
+    # `always()` because this matters MOST when a build has failed: the run is
+    # red either way, and this turns "something went wrong somewhere" into a
+    # list of exactly which files are missing.
+    if: ${{ always() && (startsWith(github.ref, 'refs/tags/desktop-v') || ((inputs.publish || github.event_name == 'push') && github.ref == 'refs/heads/main')) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Every platform is really on the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          v="$(node -p "require('./desktop/package.json').version")"
+          tag="v$v"
+
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets \
+            --jq '.assets[].name' | sort > have.txt
+
+          # One line per thing somebody downloads or an updater reads.
+          cat > want.txt <<WANT
+          Fractal-Remote-$v.dmg
+          Fractal-Remote-$v-arm64.dmg
+          latest-mac.yml
+          Fractal-Remote-Setup-$v.exe
+          latest.yml
+          Fractal-Remote-$v.AppImage
+          fractal-remote-desktop_${v}_amd64.deb
+          latest-linux.yml
+          Fractal-Remote-$v-arm64.AppImage
+          fractal-remote-desktop_${v}_arm64.deb
+          latest-linux-arm64.yml
+          WANT
+          sed -i 's/^[[:space:]]*//' want.txt
+
+          missing=$(comm -23 <(sort want.txt) have.txt || true)
+          echo "On $tag:"
+          sed 's/^/  /' have.txt
+
+          if [ -n "$missing" ]; then
+            echo "::error::$tag is incomplete. A platform built but did not publish."
+            echo "### $tag is missing files" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "$missing" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "Re-run the failed job. If every job was green, the upload was" >> "$GITHUB_STEP_SUMMARY"
+            echo "lost rather than the build." >> "$GITHUB_STEP_SUMMARY"
+            echo "missing:"
+            echo "$missing" | sed 's/^/  /'
+            exit 1
+          fi
+
+          echo "All four platforms are on $tag."
+          echo "### $tag is complete — all four platforms" >> "$GITHUB_STEP_SUMMARY"
