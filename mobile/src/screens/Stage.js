@@ -651,6 +651,20 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
             />
           ) : null}
           {/*
+            The way to the bench, in the middle. "Let's move the edit button to
+            the center and the tap tempo button to the right."
+
+            It sat on the right because it is the only one of the three that
+            leaves this screen, and last felt like the place for that. What
+            that reasoning missed is which hand is holding the phone: the
+            right edge is where a thumb rests, and the button under the thumb
+            should be the one pressed mid-song, not the one pressed between
+            them.
+          */}
+          {onOpenEdit ? <Press grow label="Edit" height={foot} onPress={onOpenEdit} /> : null}
+          {/*
+            Tap Tempo on the right, where the thumb is.
+
             The one thing in this app that must never be sent twice. A parameter
             arriving twice leaves the unit where it was; a beat arriving twice is
             a beat that never happened, so the relay excludes this route from its
@@ -669,13 +683,6 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
             onPress={tapTempo}
             onLongPress={() => setTyping(true)}
           />
-          {/*
-            And the way to the bench, third on the same bar the browser puts
-            it on. Last of the three because it is the only one that leaves
-            this screen: a button that takes you somewhere else does not belong
-            between two that do not.
-          */}
-          {onOpenEdit ? <Press grow label="Edit" height={foot} onPress={onOpenEdit} /> : null}
         </View>
 
 

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
+import { font } from '../lib/theme'
 import { logDebug } from '../lib/debugLog'
-import { colLabel } from '../lib/grid-plan'
 import { parkSave, readSaveResult } from '../lib/device'
 import { askComputerToSave } from '../lib/saveViaComputer'
 import { savedToSlot, useRig } from '../lib/rig'
@@ -70,7 +70,7 @@ export function useSaveToSlot() {
 }
 
 /**
- * The button: Save, then Tap again to confirm.
+ * The button: Save, then Confirm changes.
  *
  * FILLED THE MOMENT THERE IS SOMETHING TO LOSE. `waiting` is "this phone has
  * changed something that is not written yet" — a renamed preset, a moved
@@ -86,15 +86,14 @@ export function useSaveToSlot() {
  * take, and walks away has lost it and will not find out until the gig.
  *
  * Armed keeps the same fill rather than a louder one. The step between "you
- * have unsaved work" and "this will overwrite slot 1" is carried by the
- * words — on the button and in the warning above it — because two ambers
- * would have to be told apart at a glance on a dark stage, and they would
- * not be.
+ * have unsaved work" and an overwrite is carried by the words — on the button
+ * and in the warning above it — because two ambers would have to be told
+ * apart at a glance on a dark stage, and they would not be.
  */
 export function SaveButton({ s, height = 40, grow = false, waiting = false }) {
   return (
     <Press
-      label={s.saving ? 'Saving…' : s.armed ? 'Tap again to confirm' : 'Save'}
+      label={s.saving ? 'Saving…' : s.armed ? 'Confirm changes' : 'Save'}
       tone="signal"
       on={s.armed || waiting}
       height={height}
@@ -110,10 +109,19 @@ export function SaveNotes({ s }) {
   return (
     <>
       {s.armed ? (
-        <Note tone="warn" onDismiss={s.disarm}>
-          {`This writes what the unit is playing now over slot ${
-            s.slot !== null ? colLabel(s.slot) : '—'
-          }, replacing what was saved there. Tap Save again to confirm.`}
+        /*
+          HIS WORDS, AND ONLY HIS WORDS. It used to name the slot and then
+          explain the gesture: "This writes what the unit is playing now over
+          slot 3, replacing what was saved there. Tap Save again to confirm."
+          Three sentences to read while standing over the one button that can
+          lose a preset — and the second half only repeated what the button
+          under it already said.
+
+          Larger, because this is the one note in the app that has to be read
+          rather than skimmed.
+        */
+        <Note tone="warn" size={font.lead} onDismiss={s.disarm}>
+          This will overwrite the current preset
         </Note>
       ) : null}
       {s.said ? (
