@@ -37,7 +37,7 @@ const supportedWords =
  * anyway: the person tapping it has already paid, and hiding their way back in
  * behind the thing that charges them again would be a poor way to treat them.
  */
-export default function Paywall({ onUnlocked, onDemo, onBack, asked = false }) {
+export default function Paywall({ onUnlocked, onDemo, onBack, onSignIn, asked = false }) {
   const { price, unlocked, available, why } = usePurchase()
   const [busy, setBusy] = useState(false)
   const [said, setSaid] = useState(null)
@@ -105,6 +105,20 @@ export default function Paywall({ onUnlocked, onDemo, onBack, asked = false }) {
           onPress={buy}
         />
         <Press label="Restore a purchase" disabled={busy} onPress={restore} />
+        {/*
+          Restore asks the STORE whether this Apple or Google account has
+          bought it. That is a different question from "am I signed in as
+          somebody who already has this", and only one of them had an answer
+          here — which left somebody looking at a locked app, holding an
+          account that unlocks it, with nothing on screen to say so.
+        */}
+        {onSignIn ? (
+          <Press
+            label="Sign in with an email and password"
+            disabled={busy}
+            onPress={onSignIn}
+          />
+        ) : null}
       </View>
 
       <View style={{ gap: space.md }}>

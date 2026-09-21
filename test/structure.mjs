@@ -4808,6 +4808,63 @@ export function run(test) {
   })
 
   /*
+   * A WAY BACK TO AN ACCOUNT FROM INSIDE THE APP.
+   *
+   * "I am logged in and it shows this screen and says I still need to unlock.
+   * There is no way to login with user name and password after you are in the
+   * app on the demo."
+   *
+   * The demo has no session at all, so the unlock it is shown is the right
+   * one — and there was no way from there to say "I already have an account".
+   * Setup offered Sign out, which is no use to somebody with nothing to sign
+   * out of, and the Unlock sheet offered Restore, which asks the STORE a
+   * different question entirely.
+   */
+  test('an account can be signed into from inside the app, not only on the way in', () => {
+    const app = readFileSync(new URL('../mobile/App.js', import.meta.url), 'utf8')
+    const settings = readFileSync(new URL('../mobile/src/screens/Settings.js', import.meta.url), 'utf8')
+    const paywall = readFileSync(new URL('../mobile/src/screens/Paywall.js', import.meta.url), 'utf8')
+
+    /* All three doors, from the one handler. */
+    assert.equal(
+      (app.match(/onSignIn=\{toSignIn\}/g) || []).length,
+      3,
+      'the sign-in route is no longer wired to Setup and both unlock screens'
+    )
+    assert.match(app, /const toSignIn = \(\) => \{/, 'the sign-in route is gone')
+    assert.match(app, /const toSignIn = \(\) => \{[^}]*setAuth\('out'\)/, 'it no longer lands on the sign-in screen')
+    /* It leaves the demo, because somebody heading for an account is heading
+       for a real rig. */
+    assert.match(app, /const toSignIn = \(\) => \{[^}]*setDemo\(false\)/, 'the demo keeps answering after leaving for an account')
+    /* And it destroys nothing on the way: a phone paired by code keeps its
+       session if the person backs out of the form. */
+    assert.ok(
+      !/const toSignIn = \(\) => \{[^}]*signOut\(/.test(app),
+      'the sign-in route signs out first, so backing out of it costs a pairing'
+    )
+
+    for (const [name, file] of [['Settings', settings], ['Paywall', paywall]]) {
+      assert.match(file, /onSignIn/, `${name} no longer offers a way to sign in`)
+      assert.match(
+        file,
+        /label="Sign in with an email and password"/,
+        `${name} lost the sign-in button`
+      )
+    }
+
+    /*
+     * And Setup stops claiming a session that is not there. `account` is null
+     * both before the question is asked and when nobody is signed in; the old
+     * line read "Signed in." for both, which is what the demo showed.
+     */
+    assert.ok(
+      !settings.includes("'Signed in.'"),
+      'Setup still says "Signed in." when there may be no account at all'
+    )
+    assert.match(settings, /setAsked\(true\)/, 'Setup answers before the account service has')
+  })
+
+  /*
    * A WAY IN THAT DOES NOT NEED A RUNNING COMPUTER.
    *
    * "Add login by email and password. I can't login to get my iPad

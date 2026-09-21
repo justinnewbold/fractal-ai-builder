@@ -64,12 +64,23 @@ export default function Settings({
   onReplay,
   onOpenLog,
   onOpenFixes,
-  onOpenReport
+  onOpenReport,
+  onSignIn
 }) {
   const deviceName = useRig(ofDeviceName)
   const firmware = useRig(ofFirmware)
   const unitState = useRig(ofUnitState)
   const [account, setAccount] = useState(null)
+  /*
+   * Whether the account service has answered yet.
+   *
+   * `account` is null both before the question is asked and when nobody is
+   * signed in, and those are opposite answers. Without this the line below
+   * has to guess during the first frame, and the old code guessed "Signed
+   * in." — which is how a demo with no session at all came to say it was
+   * signed in.
+   */
+  const [asked, setAsked] = useState(false)
   const [hosts, setHosts] = useState(remoteHosts())
   const [chosen, setChosen] = useState(remoteChosenHost())
   /*
@@ -86,7 +97,10 @@ export default function Settings({
 
   useEffect(() => {
     let alive = true
-    currentAccount().then((a) => alive && setAccount(a))
+    currentAccount()
+      .then((a) => alive && setAccount(a))
+      .catch(() => {})
+      .finally(() => alive && setAsked(true))
     return () => {
       alive = false
     }
@@ -627,11 +641,35 @@ export default function Settings({
           <View style={{ gap: space.md }}>
             <Section>Account</Section>
             {isPairAccount(account?.email) || !account?.email ? (
-              <Text style={{ color: color.silkDim, fontSize: font.small }}>
-                {isPairAccount(account?.email)
-                  ? 'Paired with your computer, no account. What you save stays on this phone.'
-                  : 'Signed in.'}
-              </Text>
+              <>
+                {/*
+                  What is actually true, which is three different states and
+                  used to be two. Paired by code is not the same as signed in
+                  with an account, and NEITHER is the same as the demo, where
+                  there is no session at all — and the demo is the one that
+                  used to read "Signed in."
+                */}
+                <Text style={{ color: color.silkDim, fontSize: font.small }}>
+                  {!asked
+                    ? 'Checking…'
+                    : isPairAccount(account?.email)
+                      ? 'Paired with your computer, no account. What you save stays on this phone.'
+                      : 'Not signed in on this device.'}
+                </Text>
+                {/*
+                  AND THE WAY BACK IN.
+
+                  "There is no way to login with user name and password after
+                  you are in the app on the demo." There was not: this block
+                  offered Sign out and nothing else, so somebody in the demo —
+                  who has nothing to sign out OF — had no route to an account
+                  they already own. Paired by code gets it too: that is how a
+                  phone moves from its computer's code to a real account.
+                */}
+                {asked && onSignIn ? (
+                  <Press label="Sign in with an email and password" onPress={onSignIn} />
+                ) : null}
+              </>
             ) : (
               /* The way in to the password: the account line itself, with a
                  gear, rather than a box sitting open on the page. */
