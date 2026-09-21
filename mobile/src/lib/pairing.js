@@ -70,6 +70,34 @@ export const PAIR_DOMAIN = 'pair.fractal.newbold.cloud'
 /** The one place the QR points, wherever the Mac is serving from. */
 export const HOSTED_ORIGIN = 'https://fractal.newbold.cloud'
 
+/**
+ * The square a computer signed into a REAL account shows.
+ *
+ * "So scanning a code doesn't even work."
+ *
+ * It did work — it read the square perfectly and then said the wrong thing
+ * about it. A computer with an account has NO pairing code (see the note on
+ * AccountCard: the account is the code), so its square carries the hosted
+ * app's address and nothing else. The phone found no pairing code in it and
+ * fell through to the general complaint, which ends "use the square with
+ * letters and numbers under it" — and on that computer there is no such
+ * square and never will be. Somebody following that sentence is hunting for
+ * something that does not exist.
+ *
+ * Recognised here rather than in the phone, beside the other square's rule,
+ * because the thing being recognised is a decision the BROWSER made about
+ * which card to draw. Two files deciding what a square means is how the two
+ * come to disagree.
+ */
+export function looksLikeTheAccountSquare(text) {
+  const s = String(text || '').trim()
+  if (!/^https?:\/\//i.test(s)) return false
+  /* A pairing link is the other route, even though it lives at this address. */
+  if (/pair=/i.test(s)) return false
+  const host = HOSTED_ORIGIN.replace(/^https?:\/\//i, '').replace(/\./g, '\\.')
+  return new RegExp(`^https?://${host}(?:[/?#]|$)`, 'i').test(s)
+}
+
 const pairPattern = new RegExp(`^[${PAIR_ALPHABET}]{${PAIR_LENGTHS.join('}$|^[' + PAIR_ALPHABET + ']{')}}$`)
 
 /**

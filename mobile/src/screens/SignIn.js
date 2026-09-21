@@ -127,7 +127,17 @@ export default function SignIn({ onSignedIn, onDemo }) {
         the wrong square is still something you can see and correct, rather
         than a sign-in that happens to you.
       */}
-      <ScanCode open={scanning} onClose={() => setScanning(false)} onCode={(c) => setCode(formatPairCode(c))} />
+      <ScanCode
+        open={scanning}
+        onClose={() => setScanning(false)}
+        onCode={(c) => setCode(formatPairCode(c))}
+        /* Somebody who aimed at a computer with an account lands on the form
+           that joins it, rather than being told to go and find one. */
+        onAccount={() => {
+          setScanning(false)
+          switchTo('in')
+        }}
+      />
       <ScrollView
         contentContainerStyle={{ padding: space.lg, gap: space.lg, flexGrow: 1, justifyContent: 'center' }}
         keyboardShouldPersistTaps="handled"

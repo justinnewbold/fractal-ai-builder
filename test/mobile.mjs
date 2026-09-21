@@ -3739,6 +3739,63 @@ export function run(test) {
     }
   })
 
+  test('the square a computer with an account shows is a door, not a mistake', async () => {
+    /*
+     * "So scanning a code doesn't even work."
+     *
+     * It worked. It read the square perfectly and then said the wrong thing
+     * about it: "use the square with letters and numbers under it" — and a
+     * computer signed into a real account HAS NO SUCH SQUARE. The account is
+     * what joins the two, so that computer draws AccountCard, whose square
+     * carries the hosted app's address and no pairing code at all. The phone
+     * found no code, fell through to the general complaint, and sent him
+     * hunting for a thing the app had itself decided not to draw.
+     *
+     * Nothing was aimed at wrongly. That square is the right one for that
+     * computer and this is the wrong door for it — so it gets a way through
+     * rather than a correction.
+     */
+    const { looksLikeTheAccountSquare, HOSTED_ORIGIN } = await import('../shared/pairing.mjs')
+
+    /* Exactly what AccountCard encodes, and the shapes a future one might. */
+    for (const yes of [HOSTED_ORIGIN, `${HOSTED_ORIGIN}/`, `${HOSTED_ORIGIN}/#anything`, `${HOSTED_ORIGIN}?from=mac`]) {
+      assert.equal(looksLikeTheAccountSquare(yes), true, `${yes} is the account square and is not being recognised`)
+    }
+    /* A pairing link lives at the same address and is the OTHER route, so it
+       must never be mistaken for this one — that would turn a square that
+       pairs perfectly well into a lecture about accounts. */
+    for (const no of [
+      `${HOSTED_ORIGIN}/#pair=ABCD2345`,
+      'http://192.168.1.47:5056',
+      'ABCD2345',
+      '',
+      'https://example.com',
+      'https://fractal.newbold.cloud.example.com'
+    ]) {
+      assert.equal(looksLikeTheAccountSquare(no), false, `${no} is being called the account square`)
+    }
+
+    /* The phone's copy of the rule is generated, never hand-written. */
+    assert.match(read('mobile/src/lib/pairing.js'), /export function looksLikeTheAccountSquare\(text\)/, 'the phone has not been given the rule')
+
+    /* And the scanner answers it first, and differently. */
+    const src = read('mobile/src/components/ScanCode.js').replace(/\s+/g, ' ')
+    assert.match(src, /if \(looksLikeTheAccountSquare\(data\)\) \{ setTrouble\(\{ text: ACCOUNT_SQUARE, account: true \}\) return \}/, 'the account square still gets the general complaint')
+    assert.match(src, /\{trouble\?\.account && onAccount \? \(/, 'there is no way through from the account square')
+    assert.match(src, /onPress=\{\(\) => \{ close\(\) onAccount\(\) \}\}/, 'the way through does not close the camera behind it')
+
+    /* Both screens that open the scanner offer that door, because both have
+       one already — this only reaches it from the square. */
+    for (const [file, where] of [
+      ['mobile/src/screens/SignIn.js', 'the sign-in screen'],
+      ['mobile/src/screens/Onboarding.js', 'the walkthrough']
+    ]) {
+      /* Flattened, so `.` reaches across what were lines: the props in
+         between contain `>` of their own, from the arrow functions. */
+      assert.match(read(file).replace(/\s+/g, ' '), /<ScanCode.{0,400}?onAccount=\{\(\) => \{/, `${where} opens the scanner with no way on to an account`)
+    }
+  })
+
   test('the gear descriptions say what a model is like, and never guess', async () => {
     /*
      * "Then work on the amp and cab descriptions and effects pedals."

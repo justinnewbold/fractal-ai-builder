@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { color, font, radius, space } from '../lib/theme'
 import Note from './Note'
 import Press from './Press'
-import { normalizePairCode, pairCodeFromUrl, PAIR_LENGTH } from '../lib/pairing'
+import { looksLikeTheAccountSquare, normalizePairCode, pairCodeFromUrl, PAIR_LENGTH } from '../lib/pairing'
 import { logDebug } from '../lib/debugLog'
 
 /**
@@ -47,7 +47,17 @@ import { logDebug } from '../lib/debugLog'
  * square has earned an answer. So an unreadable square now says so, and the
  * one square people actually aim at by mistake is named specifically.
  */
-export default function ScanCode({ open, onClose, onCode }) {
+/*
+ * MY WORDING, NOT HIS — both of these lines are new and nobody has approved
+ * them. They are here beside the other two the scanner says rather than in
+ * the copy file, because they are answers to a square rather than steps in
+ * the walkthrough. Easy to change.
+ */
+const ACCOUNT_SQUARE =
+  'That square is for signing in, not for pairing. This computer uses an account, so there is no code to scan — sign in with the same email it is signed in with.'
+const ACCOUNT_GO = 'Sign in with an account instead'
+
+export default function ScanCode({ open, onClose, onCode, onAccount }) {
   /*
    * A MODAL IS OUTSIDE THE APP'S SAFE AREA, which is the whole of "the close
    * button at the top right is overlaying with the iPhone screen".
@@ -90,11 +100,29 @@ export default function ScanCode({ open, onClose, onCode }) {
     const code = pairCodeFromUrl({ hash: String(data || ''), search: '' }) || normalizePairCode(data)
     if (!code) {
       logDebug('pair', 'scanned something that is not a pairing code')
-      setTrouble(
-        looksLikeTheWifiSquare(data)
+      /*
+       * THE ACCOUNT SQUARE IS NOT A MISTAKE, which is why it is answered
+       * first and answered differently.
+       *
+       * "So scanning a code doesn't even work." It read the square fine. What
+       * it then said was "use the square with letters and numbers under it" —
+       * and a computer signed into an account HAS NO SUCH SQUARE, because the
+       * account is what joins the two. So the app sent him looking for a
+       * thing it had itself decided not to draw.
+       *
+       * Nothing was aimed at wrongly here: that square is the right one for
+       * that computer, and this is the wrong door for it. So this one gets a
+       * way through rather than a correction.
+       */
+      if (looksLikeTheAccountSquare(data)) {
+        setTrouble({ text: ACCOUNT_SQUARE, account: true })
+        return
+      }
+      setTrouble({
+        text: looksLikeTheWifiSquare(data)
           ? 'That is the “same wifi” square, which is for a web browser. This app needs the pairing code — on the computer it is the square with letters and numbers written under it.'
           : 'That square does not hold a pairing code. On the computer, choose Set up phone remote and use the square with letters and numbers under it.'
-      )
+      })
       return
     }
     setTaken(true)
@@ -184,8 +212,24 @@ export default function ScanCode({ open, onClose, onCode }) {
             >
               {trouble ? (
                 <Note tone="warn" onDismiss={() => setTrouble(null)}>
-                  {trouble}
+                  {trouble.text}
                 </Note>
+              ) : null}
+              {/*
+                A door, not just an explanation. The computer told this person
+                to scan, they scanned, and the answer is that their computer
+                uses the other route — so the other route is one press away
+                rather than something to go and find.
+              */}
+              {trouble?.account && onAccount ? (
+                <Press
+                  label={ACCOUNT_GO}
+                  tone="signal"
+                  onPress={() => {
+                    close()
+                    onAccount()
+                  }}
+                />
               ) : null}
               <Note>
                 On the computer, open Fractal Remote and choose Set up phone remote. Point this at the

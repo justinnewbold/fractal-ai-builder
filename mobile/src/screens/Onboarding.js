@@ -319,6 +319,12 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
               setCode(formatPairCode(found))
               setScanning(false)
             }}
+            /* The same door the button below this offers, reached from the
+               square that sent them here. */
+            onAccount={() => {
+              setScanning(false)
+              onAccount?.()
+            }}
           />
           <Eyebrow>{P7.codeLabel}</Eyebrow>
           <Field
