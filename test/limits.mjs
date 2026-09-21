@@ -1334,6 +1334,31 @@ export function run(test) {
       paths.indexOf('/downloads') < paths.indexOf('/(.*)'),
       '/downloads sits after the catch-all, so it never reaches the page'
     )
+
+    /*
+     * AND THE THREE PAGES A STORE ASKS FOR BY ADDRESS.
+     *
+     * Vercel checks the filesystem before these rewrites, so /support.html
+     * has always worked and /support never has — it fell to the catch-all and
+     * served the app. That is fine for a page nobody types, and not fine for
+     * the Support URL on an App Store listing, which is exactly the kind of
+     * address a reviewer pastes in.
+     */
+    for (const page of ['/support', '/privacy', '/notices']) {
+      assert.ok(paths.includes(page), `${page} is not routed, so it serves the app instead`)
+      assert.ok(
+        paths.indexOf(page) < paths.indexOf('/(.*)'),
+        `${page} sits after the catch-all, so it never reaches the page`
+      )
+    }
+    /* Each one has to point at a file that is actually there. */
+    for (const { source, destination } of vercel.rewrites) {
+      if (source === '/(.*)') continue
+      assert.ok(
+        existsSync(new URL(`../public${destination}`, import.meta.url)),
+        `${source} is routed to ${destination}, which does not exist in public/`
+      )
+    }
   })
 
   test('the Android link is a bookmark rather than a thing to ask for', () => {
@@ -1420,7 +1445,13 @@ export function run(test) {
     const support = read('public/support.html')
     assert.match(support, /justinnewbold@gmail\.com/, 'the support page offers no way to reach anybody')
     assert.match(support, /Feedback/, 'the support page never points at the in-app report')
-    assert.match(support, /privacy\.html/, 'the support page does not link the privacy policy')
+    /* Either address serves the same page now that /privacy is routed, so the
+       check is that the link is THERE rather than which spelling it uses. */
+    assert.match(
+      support,
+      /href="\/privacy(\.html)?"/,
+      'the support page does not link the privacy policy'
+    )
 
     /* Linked both ways, so somebody landing on either finds the other. */
     assert.match(read('public/privacy.html'), /notices\.txt/, 'the privacy page does not link the licences')
