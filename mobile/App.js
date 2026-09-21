@@ -71,9 +71,25 @@ export default function App() {
 
   /** 'checking' | 'out' | 'in' */
   const [auth, setAuth] = useState('checking')
-  /* Whether the walkthrough has been through on this phone. Read once, so a
-     re-render cannot put somebody back at the start of it. */
-  const [seenWalk, setSeenWalk] = useState(true)
+  /*
+   * Whether the walkthrough has been through on this phone. Read once, so a
+   * re-render cannot put somebody back at the start of it.
+   *
+   * NULL UNTIL STORAGE ANSWERS, rather than a guess either way.
+   *
+   * It used to start `true` — "assume seen" — because the alternative puts a
+   * returning player at the start of a first-run flow for a frame. But that
+   * is a guess, and the guess is wrong for everybody on their first launch:
+   * the two reads that decide the opening screen race each other, and if the
+   * session check lands first, a brand-new install draws the SIGN-IN screen
+   * for a moment before the walkthrough replaces it.
+   *
+   * There is a third answer — not knowing — and the spinner below already
+   * exists for exactly that. Both reads are a fraction of a second, and one
+   * spinner is honest where either guess is a screen somebody saw and did
+   * not ask for.
+   */
+  const [seenWalk, setSeenWalk] = useState(null)
   /*
    * Whether the walkthrough is up because somebody ASKED to see it again.
    *
@@ -405,11 +421,14 @@ export default function App() {
           is behind them: light ink on the dark palette, dark on the light one. */}
       <StatusBar style={isDark() ? 'light' : 'dark'} />
       <SafeAreaView style={{ flex: 1, backgroundColor: color.chassis }} edges={['top', 'bottom']}>
-        {auth === 'checking' ? (
+        {/* Not until BOTH answers are in: which screen opens depends on the
+            two of them together, and acting on the first to arrive is what
+            flashed a sign-in form at somebody's first launch. */}
+        {auth === 'checking' || seenWalk === null ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator color={color.silkDim} />
           </View>
-        ) : !seenWalk ? (
+        ) : seenWalk === false ? (
           /*
            * NOT `auth === 'out' && !seenWalk`, WHICH IS THE BUG THIS LINE HAD.
            *

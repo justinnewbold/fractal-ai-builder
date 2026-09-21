@@ -8,6 +8,7 @@ import { UNITS } from '../lib/demoUnits'
 import { setDemo, setDemoUnit } from '../lib/demo'
 import { formatPairCode, isPairCode, pairCredentials } from '../lib/pairing'
 import { signIn } from '../lib/relay'
+import { useRig } from '../lib/rig'
 import { buyUnlock, restorePurchase, usePurchase } from '../lib/purchases'
 import { shouldAskToPay } from '../lib/unlock-rule'
 import { sendDownloadLink, DOWNLOADS_URL } from '../lib/downloadLink'
@@ -53,6 +54,39 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
 
   const unitName = UNITS.find((u) => u.key === unit)?.name || UNITS[0].name
 
+  /*
+   * THE UNIT THAT ACTUALLY ANSWERED, once one has.
+   *
+   * `unitName` above is the DEMO picker's choice and defaults to FM3. It was
+   * also what the last two screens printed after a real pairing — so somebody
+   * who had just connected an FM9 was told "Connection verified · FM3" and
+   * then "FM3 · ONLINE", about hardware they do not own. The store learns the
+   * real name from the computer a moment after the pairing lands; until then
+   * this is the same guess it always was, and it corrects itself in place.
+   */
+  const detected = useRig((st) => st.deviceName)
+  const provenUnit = detected || unitName
+
+  /*
+   * ONE WAY BETWEEN STEPS, AND IT CLEARS THE LAST SCREEN'S NOTES.
+   *
+   * `said` and `error` are one pair for the whole walkthrough, and every step
+   * that has a note draws them. So a failed restore on this screen — "No
+   * previous purchase was found on this account." — followed you onto the
+   * next one and sat there under a heading it had nothing to do with. Same
+   * for a mistyped pairing code: back out of the code screen and the
+   * complaint about it came too.
+   *
+   * Moving between screens is the moment both stop being about anything, so
+   * it is the moment they go. Handlers that want to SAY something set it
+   * after the move, or do not move at all.
+   */
+  const go = (next) => {
+    setSaid(null)
+    setError(null)
+    setAt(next)
+  }
+
   /* The demo, started for real: the mock is built and the app opens on it. */
   const intoDemo = () => {
     setDemoUnit(unit)
@@ -90,7 +124,7 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
        * An unanswered question is not a "no", and the person most likely to
        * be on bad wifi is the one standing on a stage. See lib/unlock-rule.
        */
-      setAt(shouldAskToPay({ inApp: true, demo: false, ...purchase }) ? 'unlock' : 'connected')
+      go(shouldAskToPay({ inApp: true, demo: false, ...purchase }) ? 'unlock' : 'connected')
     } catch (err) {
       setError(
         /didn’t match|invalid login/i.test(err.message || '')
@@ -107,16 +141,27 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
     setError(null)
     const out = await buyUnlock()
     setBusy(false)
-    if (out.ok) return setAt('connected')
+    if (out.ok) return go('connected')
     if (!out.cancelled) setError(out.message)
   }
 
-  const restore = async () => {
+  /*
+   * RESTORING DOES NOT CONNECT ANYTHING, which is what the old destination
+   * claimed.
+   *
+   * This runs from two screens. From the unlock step a pairing has already
+   * succeeded, so "You're connected" is true. From the "where do you want to
+   * start" step NOTHING has been paired — and it landed on that same screen,
+   * which announced a unit online that nobody had plugged in. A restored
+   * purchase means they own it; it says nothing about whether their computer
+   * is running. So the caller says where a success goes.
+   */
+  const restore = async (then) => {
     setBusy(true)
     setError(null)
     const out = await restorePurchase()
     setBusy(false)
-    if (out.ok) return setAt('connected')
+    if (out.ok) return go(then)
     setSaid(out.message)
   }
 
@@ -158,8 +203,8 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
         <>
           <Head>{P1.head}</Head>
           <Sub>{P1.sub}</Sub>
-          <Press label={P1.go} tone="signal" on height={TAP} onPress={() => setAt('how')} />
-          <Press label={P1.haveCode} height={TAP} onPress={() => setAt('scan')} />
+          <Press label={P1.go} tone="signal" on height={TAP} onPress={() => go('how')} />
+          <Press label={P1.haveCode} height={TAP} onPress={() => go('scan')} />
         </>
       ) : null}
 
@@ -194,7 +239,7 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
             </View>
           ))}
           <Note>{P2.foot}</Note>
-          <Press label={P2.go} tone="signal" on height={TAP} onPress={() => setAt('mode')} />
+          <Press label={P2.go} tone="signal" on height={TAP} onPress={() => go('mode')} />
         </>
       ) : null}
 
@@ -219,7 +264,7 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
               tone="signal"
               on
               height={TAP}
-              onPress={() => setAt('pick')}
+              onPress={() => go('pick')}
             />
           </Card>
 
@@ -233,10 +278,31 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
             <Text style={{ color: color.silkDim, fontSize: font.small }}>{P3.real.body}</Text>
             {/* The store's price where it knows one, his wording where it
                 does not — see FALLBACK_PRICE in shared/onboarding.mjs. */}
-            <Press label={P3.real.go(purchase.price)} height={TAP} onPress={() => setAt('app')} />
+            <Press label={P3.real.go(purchase.price)} height={TAP} onPress={() => go('app')} />
           </Card>
 
-          <Press label={P3.restore} disabled={busy} height={TAP} onPress={restore} />
+          <Press label={P3.restore} disabled={busy} height={TAP} onPress={() => restore('app')} />
+          {/*
+            THE OTHER WAY BACK IN, FOR SOMEBODY WHO ALREADY HAS ALL OF THIS.
+
+            "Can we please add username and password login for this screen…
+            if they've already purchased it they can either restore purchase
+            from the App Store or they can login with their username and
+            password."
+
+            The two are not the same door and it is worth knowing which is
+            which. RESTORE asks the App Store whether this Apple ID bought the
+            unlock; it is the one that gets a paid app back on a new phone.
+            SIGNING IN reaches a computer that was set up with an account
+            rather than a pairing code — no code to scan, nothing on screen
+            to type, and until now nothing on this screen for them at all.
+
+            Somebody reinstalling usually needs both, so both are here rather
+            than one buried behind the other. It is the same wording the
+            pairing step uses for the same action, because one phrase for one
+            thing is how the two stay from drifting apart.
+          */}
+          <Press label={P7.account} height={TAP} onPress={() => onAccount?.()} />
           {said ? <Note>{said}</Note> : null}
           <Note>{P3.foot}</Note>
         </>
@@ -264,6 +330,16 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
           {/* Named by whichever is lit, so the button says what pressing it
               gets you rather than "continue". */}
           <Press label={P4.go(unitName)} tone="signal" on height={TAP} onPress={intoDemo} />
+          {/*
+            A WAY BACK, because this screen was a one-way door.
+
+            Every other button here picks a unit, and the only one that went
+            anywhere started the demo. Somebody who got this far and then
+            decided they would rather connect their real rig had to enter the
+            demo and leave it again through Setup. In a walkthrough that is a
+            trap, and it is two steps from the screen that offers both.
+          */}
+          <Press label={P4.back} height={TAP} onPress={() => go('mode')} />
         </>
       ) : null}
 
@@ -286,7 +362,7 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
             on
             height={TAP}
             onPress={() => {
-              setAt('scan')
+              go('scan')
               setScanning(true)
             }}
           />
@@ -317,7 +393,7 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
           <Note>{P6.foot}</Note>
           {said ? <Note>{said}</Note> : null}
           {error ? <Note tone="fault">{error}</Note> : null}
-          <Press label={P6.back} height={TAP} onPress={() => setAt('mode')} />
+          <Press label={P6.back} height={TAP} onPress={() => go('mode')} />
         </>
       ) : null}
 
@@ -364,7 +440,7 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
             height={TAP}
             onPress={connect}
           />
-          <Press label={P7.noCode} height={TAP} onPress={() => setAt('app')} />
+          <Press label={P7.noCode} height={TAP} onPress={() => go('app')} />
           {/*
             THE WAY IN FOR SOMEBODY WHO ALREADY HAS AN ACCOUNT.
 
@@ -387,7 +463,7 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
           <Eyebrow>{P8.tag}</Eyebrow>
           {/* It has been verified, because the pairing above just succeeded. */}
           <Text style={{ color: color.ok, fontSize: font.small, fontFamily: face }}>
-            {P8.verified(unitName)}
+            {P8.verified(provenUnit)}
           </Text>
           <Eyebrow>{P8.eyebrow}</Eyebrow>
           <Head>{P8.head(purchase.price)}</Head>
@@ -410,17 +486,17 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
             height={TAP}
             onPress={buy}
           />
-          <Press label={P8.restore} disabled={busy} height={TAP} onPress={restore} />
-          <Press label={P8.keep} height={TAP} onPress={() => setAt('pick')} />
+          <Press label={P8.restore} disabled={busy} height={TAP} onPress={() => restore('connected')} />
+          <Press label={P8.keep} height={TAP} onPress={() => go('pick')} />
           <Note>{P8.foot}</Note>
         </>
       ) : null}
 
       {at === 'connected' ? (
         <>
-          <Eyebrow>{P9.tag(unitName)}</Eyebrow>
+          <Eyebrow>{P9.tag(provenUnit)}</Eyebrow>
           <Head>{P9.head}</Head>
-          <Sub>{P9.status({ unit: unitName, scenes: null })}</Sub>
+          <Sub>{P9.status({ unit: provenUnit, scenes: null })}</Sub>
           {P9.tips.map((tip) => (
             <Card key={tip.key}>
               <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.2 }}>

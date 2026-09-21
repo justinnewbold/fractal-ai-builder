@@ -4933,10 +4933,24 @@ export function run(test) {
      * So: the walkthrough being up is that flag's business alone. Checking
      * that setAuth is gone is worth nothing without this beside it.
      */
+    /*
+     * Now `=== false` rather than `!seenWalk`, because the flag has a third
+     * value. It starts NULL — storage has not answered — and the spinner
+     * covers that, so a brand-new install no longer flashes the sign-in
+     * screen while the two reads that decide the opening race each other.
+     * `!null` would have drawn the walkthrough on that guess instead, which
+     * is the same fault pointing the other way.
+     */
     assert.match(
       app,
-      /\) : !seenWalk \? \(/,
-      'the walkthrough is gated on being signed out, so a replay flips the flag and nothing happens'
+      /\) : seenWalk === false \? \(/,
+      'the walkthrough is gated on something other than the flag alone, so a replay flips it and nothing happens'
+    )
+    assert.match(app, /const \[seenWalk, setSeenWalk\] = useState\(null\)/, 'the walkthrough flag guesses again instead of waiting')
+    assert.match(
+      app,
+      /\{auth === 'checking' \|\| seenWalk === null \? \(/,
+      'the opening screen is chosen before both answers are in'
     )
     assert.match(onb, /replay \?[^]{0,120}label=\{CLOSE\}/, 'the replay lost its way out')
     const close = app.match(/onClose=\{\(\) => \{[^}]*\}/)
