@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Modal, Text, View } from 'react-native'
 import { CameraView, useCameraPermissions } from 'expo-camera'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { color, font, radius, space } from '../lib/theme'
 import Note from './Note'
@@ -47,6 +48,20 @@ import { logDebug } from '../lib/debugLog'
  * one square people actually aim at by mistake is named specifically.
  */
 export default function ScanCode({ open, onClose, onCode }) {
+  /*
+   * A MODAL IS OUTSIDE THE APP'S SAFE AREA, which is the whole of "the close
+   * button at the top right is overlaying with the iPhone screen".
+   *
+   * App.js wraps the app in a SafeAreaView, so every ordinary screen already
+   * starts below the notch. A Modal is its own window and hangs off the root
+   * rather than off that view, so this sheet alone began at pixel zero — with
+   * Close under the battery icon and "Scan a code" behind the camera cutout.
+   *
+   * The insets are read here rather than wrapping this in another SafeAreaView
+   * so the camera can still fill the screen edge to edge: only the chrome
+   * moves, and the preview stays as big as the glass.
+   */
+  const inset = useSafeAreaInsets()
   const [permission, ask] = useCameraPermissions()
   /* The reader fires many times a second on the same square. Without this the
      screen would take one code and then go on taking it while it closed. */
@@ -91,14 +106,27 @@ export default function ScanCode({ open, onClose, onCode }) {
 
   return (
     <Modal visible={open} animationType="slide" onRequestClose={close} statusBarTranslucent>
-      <View style={{ flex: 1, backgroundColor: color.ink }}>
+      {/*
+        THE CHASSIS COLOUR, NOT `color.ink` — there is no such colour in the
+        palette and there never was, so this read `undefined` and the sheet
+        fell back to the system's own background. White, behind cream
+        lettering, which is why the heading on this screen could barely be
+        read at all while every other screen was black.
+      */}
+      <View style={{ flex: 1, backgroundColor: color.chassis }}>
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: space.lg,
-            gap: space.md
+            paddingTop: inset.top + space.lg,
+            gap: space.md,
+            /* Opaque and ruled off: the camera preview is a native view and
+               will happily draw under anything that is not. */
+            backgroundColor: color.chassis,
+            borderBottomWidth: 1,
+            borderBottomColor: color.rule
           }}
         >
           <Text style={{ color: color.silk, fontSize: font.title, fontWeight: '600' }}>Scan a code</Text>
@@ -145,7 +173,15 @@ export default function ScanCode({ open, onClose, onCode }) {
             ) : (
               <View style={{ flex: 1 }} />
             )}
-            <View style={{ padding: space.lg, gap: space.sm }}>
+            <View
+              style={{
+                padding: space.lg,
+                /* Clear of the home indicator, which sat across this line. */
+                paddingBottom: inset.bottom + space.lg,
+                gap: space.sm,
+                backgroundColor: color.chassis
+              }}
+            >
               {trouble ? (
                 <Note tone="warn" onDismiss={() => setTrouble(null)}>
                   {trouble}

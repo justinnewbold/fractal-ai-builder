@@ -4650,6 +4650,66 @@ export function run(test) {
     assert.match(scan, /looksLikeTheWifiSquare/, 'the scanner no longer recognises the wrong square')
   })
 
+  test('the scanner starts below the notch, and is the colour the rest of the app is', async () => {
+    /*
+     * "If you look at the screenshot, the close button at the top right is
+     * overlaying with the iPhone screen."
+     *
+     * TWO FAULTS IN ONE SCREEN, and the second one had been there the whole
+     * time without anybody naming it.
+     *
+     * A MODAL IS NOT INSIDE THE APP'S SAFE AREA. App.js wraps everything in a
+     * SafeAreaView, so every ordinary screen starts below the notch for free.
+     * A Modal hangs off the root instead, so this sheet alone began at pixel
+     * zero — Close under the battery icon, the heading behind the camera
+     * cutout. Nothing else in the app is a Modal with its own chrome at the
+     * top, which is why this is the only screen it happened on.
+     *
+     * AND THE SHEET WAS WHITE. It asked for `color.ink`, which is not a colour
+     * in this palette and never has been, so the background came out undefined
+     * and fell through to the system's own — white, behind cream lettering, on
+     * the one screen somebody meets before they have ever used the app.
+     */
+    const scan = readFileSync(new URL('../mobile/src/components/ScanCode.js', import.meta.url), 'utf8')
+    assert.match(scan, /import \{ useSafeAreaInsets \} from 'react-native-safe-area-context'/, 'the scanner cannot know where the notch is')
+    assert.match(scan, /paddingTop: inset\.top \+ space\.lg/, 'the scanner header still starts at the top of the glass')
+    assert.match(scan, /paddingBottom: inset\.bottom \+ space\.lg/, 'the line under the camera still sits under the home indicator')
+
+    /*
+     * AND NO SCREEN ASKS FOR A COLOUR THAT DOES NOT EXIST. This is the general
+     * form of the white sheet: a missing key is not an error in JavaScript, it
+     * is `undefined`, and `undefined` in a style is silently "whatever the
+     * platform does". It cost this screen its background for as long as the
+     * screen has existed and nothing anywhere said so.
+     *
+     * Comments are stripped first: the fix's own comment names the colour it
+     * replaced, and a check that cannot tell a quotation from a use would make
+     * that comment unwritable. Fourth time that trap has been sprung.
+     */
+    const { color } = await import('../mobile/src/lib/theme.js')
+    const known = new Set(Object.keys(color))
+    const strip = (t) => t.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1')
+    const sources = { 'App.js': readFileSync(new URL('../mobile/App.js', import.meta.url), 'utf8') }
+    const walk = (at, prefix = '') => {
+      for (const entry of readdirSync(at, { withFileTypes: true })) {
+        const next = new URL(entry.name + (entry.isDirectory() ? '/' : ''), at)
+        if (entry.isDirectory()) walk(next, prefix + entry.name + '/')
+        else if (/\.jsx?$/.test(entry.name)) sources[prefix + entry.name] = readFileSync(next, 'utf8')
+      }
+    }
+    walk(new URL('../mobile/src/', import.meta.url))
+
+    const invented = []
+    for (const [name, body] of Object.entries(sources)) {
+      /* The palette's own file, which is where these names are defined. */
+      if (name === 'lib/theme.js') continue
+      for (const hit of strip(body).matchAll(/\bcolor\.([A-Za-z][A-Za-z0-9]*)/g)) {
+        if (!known.has(hit[1])) invented.push(`${name} asks for color.${hit[1]}`)
+      }
+    }
+    assert.deepEqual(invented, [], `a colour that is not in the palette renders as nothing:\n${invented.join('\n')}`)
+  })
+
 
   /*
    * THE WALKTHROUGH SAYS WHAT THE PDF SAYS, WORD FOR WORD.
