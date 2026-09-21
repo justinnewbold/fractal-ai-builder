@@ -65,6 +65,58 @@ on:
       - '.github/workflows/desktop.yml'
 
 jobs:
+  # ------------------------------------------------------------------ release
+  #
+  # ONE RELEASE, MADE ONCE, BEFORE ANYTHING TRIES TO UPLOAD INTO IT.
+  #
+  # electron-builder's GitHub publisher looks for a release with this version's
+  # tag and creates one when it finds none. Four jobs reach that check within
+  # the same second — mac, windows and the two Linux architectures — so all
+  # four find nothing and all four try to create it. One wins. The others are
+  # told 422 already_exists and give up, taking their own uploads down with
+  # them.
+  #
+  # That is not theoretical. It is what happened to 1.14.0: the x64 Linux build
+  # succeeded, failed on its last step, and that platform got no download and
+  # no latest-linux.yml — so nothing on Intel Linux could install or update to
+  # it, while every other platform looked fine.
+  #
+  # Making the release first closes the window. The four builds then find an
+  # existing release and upload into it, which is the path electron-builder
+  # takes every time after the first anyway.
+  #
+  # IT ONLY RUNS WHEN SOMETHING IS ACTUALLY BEING PUBLISHED. A pull request
+  # builds without publishing, so there is no release to make and this is
+  # skipped — which is why every job below says `always()` as well as naming
+  # this one. A skipped dependency otherwise skips everything that needs it,
+  # and that would turn off the desktop build on every pull request.
+  release:
+    if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') || ((inputs.publish || github.event_name == 'push') && github.ref == 'refs/heads/main') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: The release exists before anything uploads to it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="v$(node -p "require('./desktop/package.json').version")"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "$tag is already there; nothing to make."
+          else
+            # Same shape electron-builder would have made: published, not a
+            # draft, on the commit being built. Notes are left empty because
+            # the release body is not what anybody reads — the assets are.
+            gh release create "$tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "${tag#v}" \
+              --notes ""
+            echo "made $tag"
+          fi
+
   mac:
     # Pinned, and this is a stopgap rather than a fix.
     #
@@ -81,6 +133,12 @@ jobs:
     # while electron-builder is brought up to a version that handles the new
     # image; the real fix is that upgrade, and this line goes when it lands.
     runs-on: macos-15
+    needs: release
+    # `always()` because `release` is skipped on a pull request, and a skipped
+    # dependency skips its dependents unless they say otherwise. The second
+    # half keeps the old behaviour where it matters: if making the release
+    # fails, nothing tries to publish into a release that is not there.
+    if: ${{ always() && needs.release.result != 'failure' && needs.release.result != 'cancelled' }}
     # Creating a release needs contents: write, and a workflow that says
     # nothing gets whatever the repository defaults to — which here is read
     # only. GitHub named the missing permission itself when it refused:
@@ -300,6 +358,12 @@ jobs:
   # WIN_CERT_PASSWORD are read the moment they exist, and nothing else changes.
   windows:
     runs-on: windows-latest
+    needs: release
+    # `always()` because `release` is skipped on a pull request, and a skipped
+    # dependency skips its dependents unless they say otherwise. The second
+    # half keeps the old behaviour where it matters: if making the release
+    # fails, nothing tries to publish into a release that is not there.
+    if: ${{ always() && needs.release.result != 'failure' && needs.release.result != 'cancelled' }}
     permissions:
       contents: write
     env:
@@ -450,6 +514,12 @@ jobs:
           - runner: ubuntu-24.04-arm
             arch: arm64
     runs-on: ${{ matrix.runner }}
+    needs: release
+    # `always()` because `release` is skipped on a pull request, and a skipped
+    # dependency skips its dependents unless they say otherwise. The second
+    # half keeps the old behaviour where it matters: if making the release
+    # fails, nothing tries to publish into a release that is not there.
+    if: ${{ always() && needs.release.result != 'failure' && needs.release.result != 'cancelled' }}
     permissions:
       contents: write
     steps:
