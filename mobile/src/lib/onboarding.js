@@ -240,7 +240,15 @@ export const P4 = {
   head: 'Which unit should we simulate?',
   sub: 'Real models and parameter ranges. Change this any time.',
   /** Play with FM3 — named by whichever is chosen. */
-  go: (unit) => `Play with ${unit}`
+  go: (unit) => `Play with ${unit}`,
+  /*
+   * NEW WORDING, MINE. This screen was a one-way door: every button on it
+   * chose a unit and the only way forward started the demo, so somebody who
+   * got here and then decided they would rather connect their real rig had
+   * to go INTO the demo and back out through Setup to do it. In a
+   * walkthrough that is a trap. Justin can change this line.
+   */
+  back: 'Back'
 }
 
 /** P5 — the coach mark, shown on Play where the gesture lives. */

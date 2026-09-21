@@ -10343,15 +10343,47 @@ button.setup-back {
   padding: var(--s-5);
   background: var(--chassis);
   overflow: auto;
+
+  /*
+   * A LOCAL SCALE, BECAUSE THIS SCREEN IS NOT PART OF THE APP'S FURNITURE.
+   *
+   * "We need to increase the size of the desktop tutorial. It's pretty small
+   * for a big screen. It should fill up the screen so that it's nice and
+   * big."
+   *
+   * The app's type scale tops out at 28px, which is right for a window full
+   * of controls that has to stay dense. This is the opposite: one sentence at
+   * a time on an otherwise empty screen, read at whatever distance somebody
+   * sits from a desktop monitor — and on a 27-inch display the old 820px
+   * block sat in the middle like a dialog somebody forgot to close.
+   *
+   * So the tour carries its own sizes, tied to the viewport rather than to
+   * the scale. Each one is a clamp between the scale step that was right on a
+   * laptop and a ceiling that stops a 4K monitor turning this into a billboard
+   * — the vw in the middle is what does the work at the sizes in between.
+   */
+  --onb-step: clamp(var(--f-2), 0.9vw, 17px);
+  --onb-head: clamp(28px, 4.6vw, 96px);
+  --onb-sub: clamp(var(--f-4), 1.7vw, 30px);
+  --onb-body: clamp(var(--f-3), 1.2vw, 21px);
+  --onb-label: clamp(var(--f-1), 0.8vw, 15px);
+  --onb-title: clamp(var(--f-4), 1.4vw, 25px);
+  /* The gaps go with it: type this size inside a laptop's spacing reads as
+     crowded, and the whole point is that it breathes. */
+  --onb-gap: clamp(var(--s-4), 1.9vw, 44px);
+  --onb-pad: clamp(var(--s-4), 1.4vw, 30px);
 }
 
 .onb-sheet {
   width: 100%;
-  max-width: 820px;
+  /* Was a flat 820px. It is the width that decides whether this reads as a
+     page or as a dialog, so it grows with the window and stops short of the
+     line length nobody can track back from. */
+  max-width: min(1720px, 90vw);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--s-4);
+  gap: var(--onb-gap);
   text-align: center;
 }
 
@@ -10359,13 +10391,13 @@ button.setup-back {
 .onb-step {
   margin: 0;
   letter-spacing: 0.14em;
-  font-size: var(--f-2);
+  font-size: var(--onb-step);
   color: var(--signal);
 }
 
 .onb-head {
   margin: 0;
-  font-size: clamp(28px, 4vw, 44px);
+  font-size: var(--onb-head);
   line-height: 1.1;
   letter-spacing: -0.02em;
 }
@@ -10373,6 +10405,19 @@ button.setup-back {
 .onb-sub {
   margin: 0;
   color: var(--silk-dim);
+  font-size: var(--onb-sub);
+  /* The headline is allowed the full width; a sentence is not. Past about
+     this many characters an eye loses the start of the next line. */
+  max-width: 46ch;
+}
+
+/*
+ * The buttons too. They are the only thing to press on the screen, and a
+ * 32px chip under a 70px headline reads as a footnote rather than the way on.
+ */
+.onb-acts button {
+  font-size: var(--onb-body);
+  padding: var(--onb-pad) clamp(var(--s-5), 2.2vw, 44px);
 }
 
 /* The three boxes, side by side on a desktop and stacked on anything narrow. */
@@ -10394,11 +10439,16 @@ button.setup-back {
 
 .onb-box {
   position: relative;
-  flex: 1 1 200px;
+  /* Equal heights across the three, which only showed once they got big: the
+     row centres its children so the dash between two boxes stays on the
+     line, and that left a short box floating against a tall one. The dash is
+     a sibling, so only the box is stretched. */
+  align-self: stretch;
+  flex: 1 1 clamp(200px, 17vw, 320px);
   min-width: 200px;
-  max-width: 260px;
+  max-width: clamp(260px, 22vw, 380px);
   text-align: left;
-  padding: var(--s-4);
+  padding: var(--onb-pad);
   border: 1px solid var(--rule);
   border-radius: var(--r-2);
   background: var(--panel);
@@ -10412,19 +10462,19 @@ button.setup-back {
 .onb-badge {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: clamp(30px, 2.4vw, 44px);
+  height: clamp(30px, 2.4vw, 44px);
   margin-bottom: var(--s-2);
   border-radius: 50%;
   border: 1px solid var(--rule);
-  font-size: var(--f-3);
+  font-size: var(--onb-body);
   font-weight: 700;
   color: var(--signal);
 }
 
 .onb-n {
   margin: 0 0 var(--s-1);
-  font-size: var(--f-1);
+  font-size: var(--onb-label);
   letter-spacing: 0.12em;
   color: var(--silk-faint);
 }
@@ -10432,12 +10482,13 @@ button.setup-back {
 .onb-box-title {
   margin: 0 0 var(--s-1);
   font-weight: 700;
+  font-size: var(--onb-title);
 }
 
 /* The line between two boxes. Hidden when they stack, where it would point
    sideways at nothing. */
 .onb-wire {
-  font-size: var(--f-1);
+  font-size: var(--onb-label);
   letter-spacing: 0.12em;
   color: var(--silk-faint);
   white-space: nowrap;
@@ -10456,30 +10507,33 @@ button.setup-back {
   margin: 0;
   max-width: 60ch;
   color: var(--silk-dim);
-  font-size: var(--f-3);
+  font-size: var(--onb-body);
 }
 
 /* What the port actually answered. */
 .onb-found {
   width: 100%;
-  max-width: 420px;
-  padding: var(--s-4);
+  max-width: min(820px, 56vw);
+  padding: var(--onb-pad);
   border: 1px solid var(--ok);
   border-radius: var(--r-2);
   background: var(--panel);
+  font-size: var(--onb-body);
 }
 
 .onb-found-name {
   margin: 0 0 var(--s-1);
   font-weight: 700;
   color: var(--ok);
+  font-size: var(--onb-title);
 }
 
 .onb-help {
   width: 100%;
-  max-width: 520px;
+  max-width: min(760px, 62vw);
   text-align: left;
-  padding: var(--s-4);
+  padding: var(--onb-pad);
+  font-size: var(--onb-body);
   border: 1px solid var(--rule);
   border-radius: var(--r-2);
   background: var(--panel);
@@ -10489,7 +10543,7 @@ button.setup-back {
   margin: var(--s-2) 0 0;
   padding-left: var(--s-5);
   color: var(--silk-dim);
-  font-size: var(--f-3);
+  font-size: var(--onb-body);
   line-height: 1.6;
 }
 
@@ -10503,19 +10557,20 @@ button.setup-back {
 }
 
 .onb-why-item {
-  flex: 1 1 200px;
+  flex: 1 1 clamp(200px, 17vw, 320px);
   min-width: 190px;
-  max-width: 240px;
+  max-width: clamp(240px, 21vw, 360px);
   text-align: left;
-  padding: var(--s-4);
+  padding: var(--onb-pad);
   border: 1px solid var(--rule);
   border-radius: var(--r-2);
   background: var(--panel);
+  font-size: var(--onb-body);
 }
 
 .onb-waiting {
   margin: 0;
-  font-size: var(--f-3);
+  font-size: var(--onb-sub);
   color: var(--signal);
 }
 
@@ -10524,13 +10579,14 @@ button.setup-back {
   flex-direction: column;
   gap: var(--s-3);
   width: 100%;
-  max-width: 560px;
+  max-width: min(820px, 66vw);
   margin-top: var(--s-3);
 }
 
 .onb-tip {
   text-align: left;
-  padding: var(--s-4);
+  padding: var(--onb-pad);
+  font-size: var(--onb-body);
   border: 1px solid var(--rule);
   border-radius: var(--r-2);
   background: var(--panel);
@@ -10555,7 +10611,7 @@ button.setup-back {
 }
 
 .onb-dot {
-  width: 26px;
+  width: clamp(26px, 2.2vw, 44px);
   height: 3px;
   border-radius: var(--r-1);
   background: var(--rule);

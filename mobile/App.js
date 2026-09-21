@@ -25,7 +25,7 @@ import Setlists from './src/screens/Setlists'
 import Stage from './src/screens/Stage'
 import { hydrate, sync } from './src/lib/store'
 import { keepSetlistsInStep } from './src/lib/cloudSetlists'
-import { useRig } from './src/lib/rig'
+import { clearLinkFault, useRig } from './src/lib/rig'
 import { keepLog } from './src/lib/logKeep'
 import { installCrashCapture } from './src/lib/debugLog'
 import { restoreDemo, setDemo, useDemo } from './src/lib/demo'
@@ -71,9 +71,25 @@ export default function App() {
 
   /** 'checking' | 'out' | 'in' */
   const [auth, setAuth] = useState('checking')
-  /* Whether the walkthrough has been through on this phone. Read once, so a
-     re-render cannot put somebody back at the start of it. */
-  const [seenWalk, setSeenWalk] = useState(true)
+  /*
+   * Whether the walkthrough has been through on this phone. Read once, so a
+   * re-render cannot put somebody back at the start of it.
+   *
+   * NULL UNTIL STORAGE ANSWERS, rather than a guess either way.
+   *
+   * It used to start `true` — "assume seen" — because the alternative puts a
+   * returning player at the start of a first-run flow for a frame. But that
+   * is a guess, and the guess is wrong for everybody on their first launch:
+   * the two reads that decide the opening screen race each other, and if the
+   * session check lands first, a brand-new install draws the SIGN-IN screen
+   * for a moment before the walkthrough replaces it.
+   *
+   * There is a third answer — not knowing — and the spinner below already
+   * exists for exactly that. Both reads are a fraction of a second, and one
+   * spinner is honest where either guess is a screen somebody saw and did
+   * not ask for.
+   */
+  const [seenWalk, setSeenWalk] = useState(null)
   /*
    * Whether the walkthrough is up because somebody ASKED to see it again.
    *
@@ -225,7 +241,35 @@ export default function App() {
     !demo &&
     (link.link === 'joining' || (link.link === 'connected' && !caps && !readFailed))
 
-  useEffect(() => subscribeLink(setLink), [])
+  /*
+   * THE BAR AND THE RED NOTE, TOLD THE SAME NEWS.
+   *
+   * "Says I'm not connected to the computer, but it also says I'm connected."
+   *
+   * Both were drawn from the truth at the time, and only one of them was kept
+   * up to date. At launch the relay has not joined, the first read throws
+   * "Not connected to your computer.", and the note says so — correctly. A
+   * second later the channel joins, the bar turns green, the chain arrives,
+   * and the note is still underneath it saying the opposite, with a "what to
+   * try" button under THAT.
+   *
+   * refreshAll already cleared the note when a detect SUCCEEDED, which is why
+   * this looked fixed. It is not the same moment: the note he photographed
+   * was set by a read that failed just after one had worked, while the relay
+   * was still coming up. The link arriving is the other half of that
+   * evidence, and this is the only place that hears it.
+   *
+   * Only a complaint ABOUT the link goes; see rig.clearLinkFault. A unit that
+   * refused a write is still worth reading after a reconnect.
+   */
+  useEffect(
+    () =>
+      subscribeLink((next) => {
+        setLink(next)
+        clearLinkFault(next.link)
+      }),
+    []
+  )
 
   /*
    * Setlists and stars, off disk and into memory, once.
@@ -377,11 +421,14 @@ export default function App() {
           is behind them: light ink on the dark palette, dark on the light one. */}
       <StatusBar style={isDark() ? 'light' : 'dark'} />
       <SafeAreaView style={{ flex: 1, backgroundColor: color.chassis }} edges={['top', 'bottom']}>
-        {auth === 'checking' ? (
+        {/* Not until BOTH answers are in: which screen opens depends on the
+            two of them together, and acting on the first to arrive is what
+            flashed a sign-in form at somebody's first launch. */}
+        {auth === 'checking' || seenWalk === null ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator color={color.silkDim} />
           </View>
-        ) : !seenWalk ? (
+        ) : seenWalk === false ? (
           /*
            * NOT `auth === 'out' && !seenWalk`, WHICH IS THE BUG THIS LINE HAD.
            *

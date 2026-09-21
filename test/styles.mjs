@@ -670,6 +670,58 @@ export function run(test) {
     }
   })
 
+  test('the desktop walkthrough is sized for the screen it is on, not for a dialog', () => {
+    /*
+     * "We need to increase the size of the desktop tutorial. It's pretty small
+     * for a big screen. It should fill up the screen so that it's nice and
+     * big."
+     *
+     * It was an 820px block with laptop type in the middle of whatever monitor
+     * somebody had, which on a 27-inch display reads as a dialog nobody
+     * closed. This is the one screen in the app that is NOT a window full of
+     * controls — it is one sentence at a time with nothing behind it — so it
+     * carries its own sizes rather than the app's, and they follow the
+     * viewport.
+     *
+     * The app's scale stays where it is. What this holds is that the tour's
+     * sizes are all tied to the window: a flat px here is the thing that put
+     * the old block in the middle of a big screen in the first place.
+     */
+    const rule = (sel) => code.slice(code.indexOf(sel + ' {'), code.indexOf('}', code.indexOf(sel + ' {')))
+
+    const onb = rule('.onb')
+    for (const name of ['--onb-step', '--onb-head', '--onb-sub', '--onb-body', '--onb-label', '--onb-title', '--onb-gap', '--onb-pad']) {
+      assert.match(onb, new RegExp(`${name}: clamp\\(`), `${name} is not a clamp, so it does not grow with the window`)
+    }
+
+    /* The width is what decides page or dialog. */
+    assert.match(rule('.onb-sheet'), /max-width: min\(\d+px, \d+vw\)/, 'the walkthrough is a fixed-width block again')
+    assert.match(rule('.onb-sheet'), /gap: var\(--onb-gap\)/, 'the walkthrough spaces itself at laptop sizes')
+
+    /* And the parts read off the local scale rather than the app's. */
+    for (const [sel, token] of [
+      ['.onb-head', '--onb-head'],
+      ['.onb-sub', '--onb-sub'],
+      ['.onb-note', '--onb-body'],
+      ['.onb-box-title', '--onb-title'],
+      ['.onb-n', '--onb-label'],
+      ['.onb-waiting', '--onb-sub'],
+      ['.onb-acts button', '--onb-body']
+    ]) {
+      assert.match(rule(sel), new RegExp(`font-size: var\\(${token}\\)`), `${sel} is still sized for a laptop`)
+    }
+
+    /*
+     * Equal-height cards, which only showed once they got big: the row centres
+     * its children so the dash between two boxes stays on the line, and that
+     * left a short box floating against a tall one.
+     */
+    assert.match(rule('.onb-box'), /align-self: stretch/, 'the three boxes are different heights again')
+
+    /* A headline may run the full width; a sentence may not. */
+    assert.match(rule('.onb-sub'), /max-width: \d+ch/, 'a line of prose can now run the whole width of a monitor')
+  })
+
   test('the preset sits in the middle of the bar, and the chip’s word is not the smallest type in it', () => {
     const rule = (sel) => code.slice(code.indexOf(sel + ' {'), code.indexOf('}', code.indexOf(sel + ' {')))
     assert.match(rule('button.topbar-preset'), /align-items: center/, 'the preset button packs its line to the top of a 44px box again')

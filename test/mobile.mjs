@@ -2370,7 +2370,7 @@ export function run(test) {
     /* And put back if the unit refuses — captured before the change rather
        than rebuilt from a state that has already moved. */
     assert.match(load, /const was = state\.preset/, 'nothing remembers the preset to go back to')
-    assert.match(load, /set\(\{ error: err\.message, chain: 'ok', preset: was \}\)/, 'a refused select leaves the wrong preset on screen')
+    assert.match(load, /set\(\{ \.\.\.faultFrom\(err\), chain: 'ok', preset: was \}\)/, 'a refused select leaves the wrong preset on screen')
 
     /* Neither screen waits on it. */
     for (const file of ['mobile/src/screens/Presets.js', 'mobile/src/screens/Stage.js']) {
@@ -2760,7 +2760,7 @@ export function run(test) {
     )
 
     const rig = read('mobile/src/lib/rig.js')
-    assert.match(rig, /export const clearError = \(\) => set\(\{ error: null \}\)/, 'the store cannot be told to forget an error')
+    assert.match(rig, /export const clearError = \(\) => set\(\{ error: null, errorLink: false \}\)/, 'the store cannot be told to forget an error')
 
     const stage = rig && read('mobile/src/screens/Stage.js')
     assert.match(
@@ -6414,6 +6414,72 @@ export function run(test) {
    * tell: `reset` is called from exactly one place, the disconnect path, so
    * anything this store gets wrong stays wrong until a sign-out.
    */
+  test('the red note and the green bar cannot disagree about the link', async () => {
+    /*
+     * "Says I'm not connected to the computer, but it also says I'm
+     * connected." Second time, and the first fix was real but aimed one
+     * moment too early.
+     *
+     * That fix made a SUCCESSFUL detect clear the note. The note in this
+     * screenshot was set by a read that failed just after one had worked —
+     * at launch, while the relay was still joining — so there was no later
+     * success to clear it, and it sat over a working rig with a green bar
+     * above it and a "what to try" button below.
+     *
+     * The link arriving is the other half of that evidence, and nothing was
+     * listening for it.
+     */
+    const { faultFrom, withdrawsFault } = await import('../mobile/src/lib/fault-rule.js')
+
+    /* A fault the relay raised because the link had gone. */
+    const gone = new Error('Not connected to your computer.')
+    gone.aboutLink = true
+    const linkFault = faultFrom(gone)
+    assert.deepEqual(linkFault, { error: 'Not connected to your computer.', errorLink: true })
+    assert.equal(withdrawsFault(linkFault, 'connected'), true, 'the link came back and the note about it having gone is still up')
+
+    /* Not on the way there, only on arrival. */
+    for (const half of ['joining', 'no-answer', 'off']) {
+      assert.equal(withdrawsFault(linkFault, half), false, `a link that is only ${half} already took the note down`)
+    }
+
+    /*
+     * AND ONLY THAT KIND. The unit refusing a write is still worth reading
+     * after a reconnect — clearing every message on every reconnect would
+     * lose exactly the ones somebody needs on a bad night.
+     */
+    const realFault = faultFrom(new Error('The unit refused that write.'))
+    assert.deepEqual(realFault, { error: 'The unit refused that write.', errorLink: false })
+    assert.equal(withdrawsFault(realFault, 'connected'), false, 'a reconnect swallows a fault that had nothing to do with the link')
+
+    /* Nothing on screen, nothing to withdraw. */
+    assert.equal(withdrawsFault({ error: null, errorLink: true }, 'connected'), false)
+    assert.equal(withdrawsFault(undefined, 'connected'), false)
+
+    /* And the store routes every fault through it, rather than some of them. */
+    const rigSrc = read('mobile/src/lib/rig.js')
+    assert.ok(!/error: err\.message/.test(rigSrc), 'a fault is still being set without recording what caused it')
+    assert.match(rigSrc.replace(/\s+/g, ' '), /export function clearLinkFault\(link = 'connected'\) \{ if \(!withdrawsFault\(state, link\)\) return/, 'the store decides this for itself instead of using the rule')
+
+    /* The flag comes off the error the relay threw, not off its wording. */
+    const relay = read('mobile/src/lib/relay.js')
+    assert.match(relay, /err\.linkDown = true/, 'a link failure is no longer marked for retry')
+    assert.match(relay.replace(/\s+/g, ' '), /err\.aboutLink = true return err/, 'a link failure is not marked as being about the link')
+    assert.match(relay.replace(/\s+/g, ' '), /quiet\.aboutLink = true reject\(quiet\)/, 'a computer that never answered is not counted as a link fault')
+    /*
+     * Two flags on purpose. `linkDown` decides whether `request` tries again,
+     * and the tap tempo route is excluded from retries because a beat sent
+     * twice is a beat that never happened. Marking the silent timeout as
+     * linkDown to save a property would have put it back in.
+     */
+    const timeout = relay.slice(relay.indexOf('const reply = new Promise'), relay.indexOf('waiting.set(id,'))
+    assert.ok(!/linkDown = true/.test(timeout), 'the silent timeout is retryable now, which resends beats')
+
+    /* And App is what hears the link and says so. */
+    const app = read('mobile/App.js').replace(/\s+/g, ' ')
+    assert.match(app, /subscribeLink\(\(next\) => \{ setLink\(next\) clearLinkFault\(next\.link\) \}\)/, 'nothing withdraws the note when the link comes back')
+  })
+
   test('a working read clears the old failure, and the demo takes its names with it', () => {
     const rig = read('mobile/src/lib/rig.js')
 
@@ -6423,8 +6489,12 @@ export function run(test) {
      * reads `state.error`, which nothing but a later failure ever cleared —
      * so a message from a minute ago sat over a working rig.
      */
-    const all = rig.slice(rig.indexOf('export async function refreshAll()'), rig.indexOf('export async function refreshAll()') + 2400)
-    assert.ok(all.length > 400, 'refreshAll moved; this check reads it')
+    /* To the next export rather than a character count: the comment in here
+       has grown twice, and a fixed window silently stopped covering the line
+       this is about. */
+    const allFrom = rig.indexOf('export async function refreshAll()')
+    const all = rig.slice(allFrom, rig.indexOf('export function notePresetName'))
+    assert.ok(all.length > 400 && allFrom > 0, 'refreshAll moved; this check reads it')
     assert.match(all, /error: null/, 'a successful re-read leaves the last failure on screen')
 
     /*
@@ -6588,6 +6658,135 @@ export function run(test) {
    * idea a computer was part of the arrangement — and the purchase comes last,
    * after the computer has been proved to work.
    */
+  test('every screen in the walkthrough is reachable, and none of them is a trap', () => {
+    /*
+     * "The whole onboarding process and tutorials have been an absolute
+     * nightmare. Can we please go through everything again, double check it
+     * all and make sure everything works."
+     *
+     * So this reads the screen as a GRAPH rather than checking one button at
+     * a time, because every fault it found was a fault in the joins: a step
+     * you could enter and not leave, a step nothing led to, a message from
+     * the screen before following you onto the next one.
+     *
+     * It is deliberately derived from the source rather than listed by hand.
+     * A list would have to be kept in step with the screen, and the whole
+     * point is to notice a step somebody added and wired up halfway.
+     */
+    const src = read('mobile/src/screens/Onboarding.js')
+    const steps = [...src.matchAll(/at === '(\w+)'/g)].map((m) => m[1])
+    assert.ok(steps.length >= 8, `only ${steps.length} steps found; this check reads them out of the source`)
+
+    /* Each step's own block, to the start of the next one. */
+    const at = steps.map((name) => ({ name, from: src.indexOf(`at === '${name}'`) })).sort((a, b) => a.from - b.from)
+    const block = {}
+    at.forEach((s0, i) => {
+      block[s0.name] = src.slice(s0.from, i + 1 < at.length ? at[i + 1].from : src.length)
+    })
+
+    /* Where each one can go: a move between steps, or a handler that lands on
+       a named step, or a way out of the walkthrough altogether. */
+    const edges = {}
+    const leaves = {}
+    for (const name of steps) {
+      edges[name] = [...new Set([
+        ...[...block[name].matchAll(/go\('(\w+)'\)/g)].map((m) => m[1]),
+        ...[...block[name].matchAll(/restore\('(\w+)'\)/g)].map((m) => m[1])
+      ])]
+      leaves[name] = /onDone|onEnterDemo|intoDemo|onAccount|connect\b/.test(block[name])
+    }
+    /* The one handler whose destination is a condition rather than a literal. */
+    if (/go\(shouldAskToPay\(/.test(src)) edges.scan = [...new Set([...edges.scan, 'unlock', 'connected'])]
+    if (/if \(out\.ok\) return go\('connected'\)/.test(src)) edges.unlock = [...new Set([...edges.unlock, 'connected'])]
+
+    /* NOTHING IS A DEAD END. Every step either leads somewhere or finishes
+       the walkthrough — the demo picker used to do neither, so choosing a
+       unit and changing your mind meant going into the demo and back out
+       through Setup to reach the screen two steps behind you. */
+    for (const name of steps) {
+      assert.ok(edges[name].length || leaves[name], `the "${name}" step is a trap: nothing leads out of it`)
+    }
+
+    /*
+     * AND A STEP WHOSE ONLY EXIT COMMITS YOU STILL OFFERS A WAY BACK.
+     *
+     * The check above passes for the demo picker, because starting the demo
+     * IS leaving the walkthrough — which is exactly what made it a trap
+     * rather than a dead end. Every button on it picked a unit and the only
+     * one that went anywhere started the demo, so somebody who got there and
+     * then decided they would rather connect their real rig had to enter the
+     * demo and come back out through Setup. Named here rather than inferred,
+     * because "leaving" and "leaving on purpose" cannot be told apart from
+     * the source.
+     */
+    assert.ok(edges.pick.includes('mode'), 'the demo picker commits you to the demo with no way back to the screen that offers both')
+
+    /* AND NOTHING IS STRANDED. */
+    const seen = new Set()
+    const walk = (n) => {
+      if (seen.has(n)) return
+      seen.add(n)
+      for (const next of edges[n] || []) walk(next)
+    }
+    walk('welcome')
+    assert.deepEqual(
+      steps.filter((n) => !seen.has(n)),
+      [],
+      'a step was added that nothing in the walkthrough leads to'
+    )
+
+    /*
+     * A RESTORED PURCHASE IS NOT A CONNECTED RIG, which is what the old
+     * destination claimed. Restore runs from two screens: from the unlock
+     * step a pairing has already succeeded, so "You're connected" is true;
+     * from "where do you want to start" nothing has been paired, and it
+     * announced a unit online that nobody had plugged in.
+     */
+    assert.match(block.mode, /restore\('app'\)/, 'restoring from the first screen claims a connection that does not exist')
+    assert.match(block.unlock, /restore\('connected'\)/, 'restoring after a verified pairing no longer finishes')
+
+    /*
+     * MOVING CLEARS THE LAST SCREEN'S NOTES. `said` and `error` are one pair
+     * for the whole walkthrough and most steps draw them, so a failed restore
+     * followed you onto the next screen and sat under a heading it had
+     * nothing to do with.
+     */
+    assert.match(
+      src.replace(/\s+/g, ' '),
+      /const go = \(next\) => \{ setSaid\(null\) setError\(null\) setAt\(next\) \}/,
+      'there is no single way between steps, so the last screen’s notes follow you'
+    )
+    assert.ok(
+      !/setAt\('/.test(src.replace(/const go = \(next\)[\s\S]*?\}/, '')),
+      'a step change goes around `go`, so it carries the previous screen’s notes with it'
+    )
+
+    /*
+     * THE TWO DOORS FOR SOMEBODY WHO ALREADY OWNS IT, on the screen that asks
+     * where to start. "If they've already purchased it they can either
+     * restore purchase from the App Store or they can login with their
+     * username and password." They are different doors — restore asks the
+     * App Store about this Apple ID; signing in reaches a computer set up
+     * with an account rather than a pairing code — so both are here.
+     */
+    assert.match(block.mode, /label=\{P3\.restore\}/, 'there is no way to restore a purchase from the first screen')
+    assert.match(block.mode, /label=\{P7\.account\} height=\{TAP\} onPress=\{\(\) => onAccount\?\.\(\)\}/, 'there is no way to sign in from the first screen')
+
+    /*
+     * AND THE LAST TWO SCREENS NAME THE UNIT THAT ANSWERED. `unitName` is the
+     * DEMO picker's choice and defaults to FM3, so somebody who had just
+     * paired an FM9 was told "Connection verified · FM3".
+     */
+    assert.match(src, /const detected = useRig\(\(st\) => st\.deviceName\)/, 'the walkthrough cannot see which unit actually answered')
+    assert.match(src, /const provenUnit = detected \|\| unitName/, 'a real pairing has no name to fall back from')
+    assert.match(block.unlock, /P8\.verified\(provenUnit\)/, 'the verified line names the demo picker’s unit')
+    assert.match(block.connected, /P9\.tag\(provenUnit\)/, 'the connected line names the demo picker’s unit')
+    assert.match(block.connected, /P9\.status\(\{ unit: provenUnit/, 'the status line names the demo picker’s unit')
+    /* The picker itself still names what is lit, which is the one place the
+       demo choice IS the answer. */
+    assert.match(block.pick, /P4\.go\(unitName\)/, 'the demo picker stopped naming the unit you picked')
+  })
+
   test('the phone walkthrough pairs, buys and starts the demo for real', async () => {
     const onb = read('mobile/src/screens/Onboarding.js')
 
@@ -6637,7 +6836,7 @@ export function run(test) {
     const connect = onb.slice(onb.indexOf('const connect = async'), onb.indexOf('const buy = async'))
     assert.match(
       connect.replace(/\s+/g, ' '),
-      /setAt\(shouldAskToPay\(\{ inApp: true, demo: false, \.\.\.purchase \}\) \? 'unlock' : 'connected'\)/,
+      /go\(shouldAskToPay\(\{ inApp: true, demo: false, \.\.\.purchase \}\) \? 'unlock' : 'connected'\)/,
       'a pair either never reaches the unlock, or reaches it for somebody who already paid'
     )
     assert.match(onb, /import \{ shouldAskToPay \} from '\.\.\/lib\/unlock-rule'/, 'the walkthrough decides who pays with a rule of its own')
