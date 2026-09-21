@@ -4834,6 +4834,26 @@ export function run(test) {
 
     /* And a replay carries a door that does nothing but close. */
     assert.match(app, /replay=\{replaying\}/, 'the walkthrough is not told it is a replay')
+
+    /*
+     * AND IT HAS TO ACTUALLY APPEAR, which the first version of this test
+     * forgot to check and therefore shipped broken.
+     *
+     * "When you click it you feel the haptic feedback, but then it doesn't go
+     * to the screen." The branch read `auth === 'out' && !seenWalk`, which was
+     * only ever true for a replay because asking for one ALSO set the app to
+     * signed-out — the very thing that cost somebody their unlock and was
+     * taken out here. Remove that and a signed-in person flips the flag into a
+     * condition that stays false.
+     *
+     * So: the walkthrough being up is that flag's business alone. Checking
+     * that setAuth is gone is worth nothing without this beside it.
+     */
+    assert.match(
+      app,
+      /\) : !seenWalk \? \(/,
+      'the walkthrough is gated on being signed out, so a replay flips the flag and nothing happens'
+    )
     assert.match(onb, /replay \?[^]{0,120}label=\{CLOSE\}/, 'the replay lost its way out')
     const close = app.match(/onClose=\{\(\) => \{[^}]*\}/)
     assert.ok(close, 'the walkthrough cannot be closed')
