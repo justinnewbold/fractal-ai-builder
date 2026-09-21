@@ -1361,6 +1361,42 @@ export function run(test) {
     }
   })
 
+  /*
+   * A RELEASE IS NOT DONE BECAUSE FOUR JOBS WENT GREEN.
+   *
+   * Twice in one evening a release shipped with a whole platform missing and
+   * nothing said so. 1.14.0 lost Intel Linux to a race for the release
+   * itself; 1.17.0 lost Windows to a network drop partway through downloading
+   * Electron. Different causes, same shape: every other platform published,
+   * so the page looked finished.
+   */
+  test('a release is checked for all four platforms before it is called done', () => {
+    const wf = read('.github/workflows/desktop.yml')
+    const job = wf.slice(wf.indexOf('\n  complete:'))
+    assert.ok(job, 'nothing checks that a release carries every platform')
+
+    /* After all three builders, or it reads a release still being written. */
+    assert.match(job, /needs: \[mac, windows, linux\]/, 'the check no longer waits for every build')
+
+    /*
+     * And it runs when one of them FAILED, which is exactly when it earns its
+     * place: the run is red either way, and this turns "something went wrong"
+     * into the list of files that are not there.
+     */
+    assert.match(job, /if: \$\{\{ always\(\)/, 'the check is skipped when a build fails, which is when it matters most')
+
+    /* The files a person downloads and the ones an updater reads. A missing
+       latest-linux.yml is silent and permanent. */
+    for (const needed of ['latest-mac.yml', 'latest.yml', 'latest-linux.yml', 'latest-linux-arm64.yml']) {
+      assert.ok(job.includes(needed), `the check does not look for ${needed}`)
+    }
+    for (const kind of ['.dmg', 'Setup-$v.exe', '.AppImage', '_amd64.deb', '_arm64.deb']) {
+      assert.ok(job.includes(kind), `the check does not look for ${kind}`)
+    }
+    /* It has to actually fail, rather than printing and carrying on. */
+    assert.match(job, /exit 1/, 'the check reports a gap without failing, so nobody sees it')
+  })
+
   test('the Android link is a bookmark rather than a thing to ask for', () => {
     /*
      * "Is there a link that I can just save to my bookmarks that will take me
