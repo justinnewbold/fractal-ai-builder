@@ -2101,10 +2101,18 @@ export function run(test) {
      */
     const stageSrc = read('mobile/src/screens/Stage.js')
     assert.match(stageSrc, /\{onOpenEdit \? <Press grow label="Edit" height=\{foot\} onPress=\{onOpenEdit\} \/> : null\}/, 'the Edit button is drawn whether or not there is anywhere to go')
-    /* On the foot, which is after the tempo, not in the preset row above it. */
+    /*
+     * On the foot row, in the middle: Tuner, Edit, Tap Tempo.
+     *
+     * "Let's move the edit button to the center and the tap tempo button to
+     * the right. so just swap those two." Edit used to be last, on the
+     * reasoning that it is the only one of the three that leaves the screen.
+     * The right edge is where the thumb sits, though, and Tap Tempo is the
+     * one pressed mid-song, so it gets the easy reach.
+     */
     assert.ok(
-      stageSrc.indexOf('label="Tap Tempo"') < stageSrc.indexOf('label="Edit"'),
-      'Edit is back above the stage, where a thumb looking for a scene finds it first'
+      stageSrc.indexOf('label="Edit"') < stageSrc.indexOf('label="Tap Tempo"'),
+      'Tap Tempo is no longer on the right, where the thumb is'
     )
   })
 
