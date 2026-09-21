@@ -25,7 +25,7 @@ import Setlists from './src/screens/Setlists'
 import Stage from './src/screens/Stage'
 import { hydrate, sync } from './src/lib/store'
 import { keepSetlistsInStep } from './src/lib/cloudSetlists'
-import { useRig } from './src/lib/rig'
+import { clearLinkFault, useRig } from './src/lib/rig'
 import { keepLog } from './src/lib/logKeep'
 import { installCrashCapture } from './src/lib/debugLog'
 import { restoreDemo, setDemo, useDemo } from './src/lib/demo'
@@ -225,7 +225,35 @@ export default function App() {
     !demo &&
     (link.link === 'joining' || (link.link === 'connected' && !caps && !readFailed))
 
-  useEffect(() => subscribeLink(setLink), [])
+  /*
+   * THE BAR AND THE RED NOTE, TOLD THE SAME NEWS.
+   *
+   * "Says I'm not connected to the computer, but it also says I'm connected."
+   *
+   * Both were drawn from the truth at the time, and only one of them was kept
+   * up to date. At launch the relay has not joined, the first read throws
+   * "Not connected to your computer.", and the note says so — correctly. A
+   * second later the channel joins, the bar turns green, the chain arrives,
+   * and the note is still underneath it saying the opposite, with a "what to
+   * try" button under THAT.
+   *
+   * refreshAll already cleared the note when a detect SUCCEEDED, which is why
+   * this looked fixed. It is not the same moment: the note he photographed
+   * was set by a read that failed just after one had worked, while the relay
+   * was still coming up. The link arriving is the other half of that
+   * evidence, and this is the only place that hears it.
+   *
+   * Only a complaint ABOUT the link goes; see rig.clearLinkFault. A unit that
+   * refused a write is still worth reading after a reconnect.
+   */
+  useEffect(
+    () =>
+      subscribeLink((next) => {
+        setLink(next)
+        clearLinkFault(next.link)
+      }),
+    []
+  )
 
   /*
    * Setlists and stars, off disk and into memory, once.

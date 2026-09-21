@@ -16,6 +16,7 @@
  */
 import { useSyncExternalStore } from 'react'
 import { firmwareOf } from './firmware'
+import { faultFrom, withdrawsFault } from './fault-rule'
 
 import * as device from './device'
 import { idOf, sameBlock } from './unit.mjs'
@@ -74,6 +75,9 @@ const initial = {
   /** 'idle' | 'reading' | 'ok' | 'failed' — a failed read and an empty preset are not the same. */
   chain: 'idle',
   error: null,
+  /* Whether `error` is a complaint about the link, and so is withdrawn
+     when the link comes back. See faultFrom. */
+  errorLink: false,
   /*
    * Whether what answered is the simulation rather than a rig.
    *
@@ -117,7 +121,27 @@ export const reset = () => set(initial)
  * song — so the red bar stays above the preset being played, about a read that
  * has since been answered. The ✕ on it comes here.
  */
-export const clearError = () => set({ error: null })
+export const clearError = () => set({ error: null, errorLink: false })
+
+/*
+ * "Says I'm not connected to the computer, but it also says I'm connected."
+ *
+ * Both were drawn from the truth at the time and only one of them had been
+ * kept up to date. At launch the relay is not joined yet, the first read
+ * throws "Not connected to your computer.", and that sentence goes on the
+ * screen — correctly. A second later the channel joins, the bar turns green,
+ * the chain arrives, and the note is still sitting under it saying the
+ * opposite, with a "what to try" button under THAT, because nothing ever told
+ * it the thing it describes had stopped being true.
+ *
+ * The rule itself is in lib/fault-rule, where node can call it.
+ */
+
+/** The link is back, so a complaint about it having gone is over. */
+export function clearLinkFault(link = 'connected') {
+  if (!withdrawsFault(state, link)) return
+  set({ error: null, errorLink: false })
+}
 
 function subscribe(fn) {
   subscribers.add(fn)
@@ -387,8 +411,15 @@ export async function refreshAll() {
      * until the app was signed out. A detect that answers IS the evidence
      * that whatever failed before is no longer failing; anything that fails
      * after this sets its own.
+     *
+     * NOT ENOUGH ON ITS OWN, as it turned out: this clears the note when a
+     * detect SUCCEEDS, and the note he photographed was set by a read that
+     * failed a moment after one did — while the relay was still joining. The
+     * link coming back is the other half of the same evidence; see
+     * clearLinkFault.
      */
-    error: null
+    error: null,
+    errorLink: false
   })
   /*
    * The preset names, from disk now and from the computer's list when it
@@ -537,7 +568,7 @@ export async function refreshPreset() {
     if (answered && state.unit === 'silent') logDebug('unit', 'the unit is answering again')
     set({ preset: fresh, ...(fresh?.number === -1 ? { unit: 'silent' } : answered && state.unit !== 'missing' ? { unit: 'present' } : {}) })
   } catch (err) {
-    set({ error: err.message })
+    set(faultFrom(err))
   }
 }
 
@@ -717,7 +748,7 @@ async function readBlocks(quiet) {
     /* Said in the log as well as on screen: "Chain — out of date" and the
        note under it used to be the only record that this read failed. */
     logDebug('chain', 'the chain could not be read — buttons kept from the last read', err.message)
-    set({ chain: 'failed', error: err.message })
+    set({ chain: 'failed', ...faultFrom(err) })
     return false
   }
 }
@@ -734,12 +765,12 @@ async function readBlocks(quiet) {
  * which is how a refused bypass once restored a chain that never existed.
  */
 async function optimistic(patch, revert, send) {
-  set({ ...patch, error: null })
+  set({ ...patch, error: null, errorLink: false })
   try {
     await send()
     return true
   } catch (err) {
-    set({ ...revert, error: err.message })
+    set({ ...revert, ...faultFrom(err) })
     return false
   }
 }
@@ -868,7 +899,7 @@ let taps = []
  */
 const sendTempo = tempoSender(
   (bpm) => device.setTempo(bpm),
-  (err) => set({ error: err.message })
+  (err) => set(faultFrom(err))
 )
 
 export async function tapTempo() {
@@ -955,7 +986,7 @@ function startDemoTuner() {
  * start must not leave a screen waiting for readings that are never coming.
  */
 export async function writeTuner(on) {
-  set({ tunerOn: on, tuning: on ? state.tuning : null, error: null })
+  set({ tunerOn: on, tuning: on ? state.tuning : null, error: null, errorLink: false })
   if (!on) stopDemoTuner()
   try {
     await device.setTuner(on)
@@ -965,7 +996,7 @@ export async function writeTuner(on) {
     return true
   } catch (err) {
     stopDemoTuner()
-    set({ tunerOn: false, tuning: null, error: err.message })
+    set({ tunerOn: false, tuning: null, ...faultFrom(err) })
     return false
   }
 }
@@ -1017,6 +1048,7 @@ export async function loadPreset(number) {
    */
   set({
     error: null,
+    errorLink: false,
     chain: 'reading',
     sceneNames: [],
     preset: {
@@ -1029,7 +1061,7 @@ export async function loadPreset(number) {
   try {
     await device.selectPreset(number)
   } catch (err) {
-    set({ error: err.message, chain: 'ok', preset: was })
+    set({ ...faultFrom(err), chain: 'ok', preset: was })
     return false
   }
   /*

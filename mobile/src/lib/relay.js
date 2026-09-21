@@ -595,6 +595,16 @@ const rememberHost = async (name) => {
 function linkDown(message) {
   const err = new Error(message)
   err.linkDown = true
+  /*
+   * A SECOND FLAG, DELIBERATELY NOT THE SAME ONE.
+   *
+   * `linkDown` decides whether `request` tries again, and adding anything to
+   * that set changes what gets RESENT — which for the tap tempo route means a
+   * beat sent twice, and a beat sent twice is a beat that never happened. So
+   * "the link is why this failed" is said separately from "ask again", and
+   * only the screens read it. See rig.clearLinkFault.
+   */
+  err.aboutLink = true
   return err
 }
 
@@ -754,7 +764,10 @@ async function relaySend(method, path, options) {
       // Nothing came back: whatever we last believed about the Mac being there,
       // this is better evidence.
       seen(false)
-      reject(new Error('Your computer didn’t answer.'))
+      const quiet = new Error('Your computer didn’t answer.')
+      /* About the link, but NOT retryable — see linkDown above. */
+      quiet.aboutLink = true
+      reject(quiet)
     }, options.timeoutMs || timeoutFor(method, path))
     waiting.set(id, {
       resolve: (v) => {

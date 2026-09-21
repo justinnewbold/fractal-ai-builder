@@ -7,4 +7,4 @@
  * type, which is worse than no version at all — a wrong one sends people
  * hunting for a bug in a build they are not running.
  */
-export const APP_VERSION = '1.22.0'
+export const APP_VERSION = '1.23.0'
