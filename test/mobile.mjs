@@ -4785,12 +4785,33 @@ export function run(test) {
     assert.equal(none.ok, false)
     assert.equal(SAVE_WAIT_MS, 3 * 60 * 1000)
 
-    /* And the button: Save, then Tap again with the warning, then the ask. */
+    /* And the button: Save, then Confirm changes with the warning, then the ask. */
     const saver = read('mobile/src/components/SaveToSlot.js').replace(/\s+/g, ' ')
     assert.match(
       saver,
-      /label=\{s\.saving \? 'Saving…' : s\.armed \? 'Tap again to confirm' : 'Save'\}/,
+      /label=\{s\.saving \? 'Saving…' : s\.armed \? 'Confirm changes' : 'Save'\}/,
       'there is no Save button, or it does not ask twice'
+    )
+
+    /*
+     * THE WARNING IS ONE LINE, AND LARGER THAN EVERYTHING ELSE.
+     *
+     * "Change the warning message to say 'This will overwrite the current
+     * preset', only that text, and make the text larger."
+     *
+     * It used to name the slot and then explain the gesture — three sentences
+     * to read while standing over the one button in the app that can lose a
+     * preset, and the second half only repeated what the button under it
+     * already said.
+     */
+    /* The whole element, not the words anywhere in the file: the comment
+       above it quotes the sentence it replaced, and a check that cannot tell
+       a quotation from the thing itself makes the history unwritable. Third
+       time that trap has been sprung in one evening. */
+    assert.match(
+      saver,
+      /<Note tone="warn" size=\{font\.lead\} onDismiss=\{s\.disarm\}> This will overwrite the current preset <\/Note>/,
+      'the overwrite warning is not his one line, at font.lead, still dismissible'
     )
 
     /*

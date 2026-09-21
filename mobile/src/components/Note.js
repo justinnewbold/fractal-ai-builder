@@ -18,7 +18,13 @@ import { color, font, radius, space } from '../lib/theme'
  * notes that describe a live condition (two Macs listening, a chain nobody has
  * read) do not, because there is nothing to put away.
  */
-export default function Note({ tone = 'hint', onDismiss, children }) {
+/*
+ * `size` is here for one note in the app: the one that says a save is about
+ * to overwrite a preset. "Make the text larger." Everything else on the
+ * screen can be skimmed; that one has to be read, and it is the last thing
+ * between somebody and losing a preset they built.
+ */
+export default function Note({ tone = 'hint', onDismiss, size, children }) {
   const accent = tone === 'fault' ? color.fault : tone === 'warn' ? color.signal : color.rule
   return (
     <View
@@ -39,8 +45,10 @@ export default function Note({ tone = 'hint', onDismiss, children }) {
         style={{
           flex: 1,
           color: tone === 'hint' ? color.silkDim : color.silk,
-          fontSize: font.small,
-          lineHeight: 20
+          fontSize: size || font.small,
+          /* The default stays the exact 20 every other note has had, rather
+             than a ratio that would nudge all of them. */
+          lineHeight: size ? Math.round(size * 1.45) : 20
         }}
       >
         {children}
