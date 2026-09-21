@@ -11,6 +11,18 @@
       "destination": "/downloads.html"
     },
     {
+      "source": "/support",
+      "destination": "/support.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/privacy.html"
+    },
+    {
+      "source": "/notices",
+      "destination": "/notices.txt"
+    },
+    {
       "source": "/(.*)",
       "destination": "/"
     }
