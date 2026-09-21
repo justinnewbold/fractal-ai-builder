@@ -3739,6 +3739,63 @@ export function run(test) {
     }
   })
 
+  test('the square a computer with an account shows is a door, not a mistake', async () => {
+    /*
+     * "So scanning a code doesn't even work."
+     *
+     * It worked. It read the square perfectly and then said the wrong thing
+     * about it: "use the square with letters and numbers under it" — and a
+     * computer signed into a real account HAS NO SUCH SQUARE. The account is
+     * what joins the two, so that computer draws AccountCard, whose square
+     * carries the hosted app's address and no pairing code at all. The phone
+     * found no code, fell through to the general complaint, and sent him
+     * hunting for a thing the app had itself decided not to draw.
+     *
+     * Nothing was aimed at wrongly. That square is the right one for that
+     * computer and this is the wrong door for it — so it gets a way through
+     * rather than a correction.
+     */
+    const { looksLikeTheAccountSquare, HOSTED_ORIGIN } = await import('../shared/pairing.mjs')
+
+    /* Exactly what AccountCard encodes, and the shapes a future one might. */
+    for (const yes of [HOSTED_ORIGIN, `${HOSTED_ORIGIN}/`, `${HOSTED_ORIGIN}/#anything`, `${HOSTED_ORIGIN}?from=mac`]) {
+      assert.equal(looksLikeTheAccountSquare(yes), true, `${yes} is the account square and is not being recognised`)
+    }
+    /* A pairing link lives at the same address and is the OTHER route, so it
+       must never be mistaken for this one — that would turn a square that
+       pairs perfectly well into a lecture about accounts. */
+    for (const no of [
+      `${HOSTED_ORIGIN}/#pair=ABCD2345`,
+      'http://192.168.1.47:5056',
+      'ABCD2345',
+      '',
+      'https://example.com',
+      'https://fractal.newbold.cloud.example.com'
+    ]) {
+      assert.equal(looksLikeTheAccountSquare(no), false, `${no} is being called the account square`)
+    }
+
+    /* The phone's copy of the rule is generated, never hand-written. */
+    assert.match(read('mobile/src/lib/pairing.js'), /export function looksLikeTheAccountSquare\(text\)/, 'the phone has not been given the rule')
+
+    /* And the scanner answers it first, and differently. */
+    const src = read('mobile/src/components/ScanCode.js').replace(/\s+/g, ' ')
+    assert.match(src, /if \(looksLikeTheAccountSquare\(data\)\) \{ setTrouble\(\{ text: ACCOUNT_SQUARE, account: true \}\) return \}/, 'the account square still gets the general complaint')
+    assert.match(src, /\{trouble\?\.account && onAccount \? \(/, 'there is no way through from the account square')
+    assert.match(src, /onPress=\{\(\) => \{ close\(\) onAccount\(\) \}\}/, 'the way through does not close the camera behind it')
+
+    /* Both screens that open the scanner offer that door, because both have
+       one already — this only reaches it from the square. */
+    for (const [file, where] of [
+      ['mobile/src/screens/SignIn.js', 'the sign-in screen'],
+      ['mobile/src/screens/Onboarding.js', 'the walkthrough']
+    ]) {
+      /* Flattened, so `.` reaches across what were lines: the props in
+         between contain `>` of their own, from the arrow functions. */
+      assert.match(read(file).replace(/\s+/g, ' '), /<ScanCode.{0,400}?onAccount=\{\(\) => \{/, `${where} opens the scanner with no way on to an account`)
+    }
+  })
+
   test('the gear descriptions say what a model is like, and never guess', async () => {
     /*
      * "Then work on the amp and cab descriptions and effects pedals."
@@ -6531,7 +6588,7 @@ export function run(test) {
    * idea a computer was part of the arrangement — and the purchase comes last,
    * after the computer has been proved to work.
    */
-  test('the phone walkthrough pairs, buys and starts the demo for real', () => {
+  test('the phone walkthrough pairs, buys and starts the demo for real', async () => {
     const onb = read('mobile/src/screens/Onboarding.js')
 
     /* Not one word typed in: it all comes from the generated copy. */
@@ -6564,9 +6621,34 @@ export function run(test) {
      * VERIFIED MEANS VERIFIED. P8 says "Connection verified" and it is only
      * reached from a pairing that succeeded — asking for money before knowing
      * the thing being bought can work at all is how refunds happen.
+     *
+     * AND ONLY WHEN THERE IS SOMETHING TO SELL.
+     *
+     * "The phone needs to be able to tell, hey, you did not unlock this, or
+     * yes, you did unlock it."
+     *
+     * It only ever said one of those. Every successful pair went to the
+     * unlock step and asked for money, including somebody who had already
+     * paid, reinstalled, and was watching their own app ask them to buy it
+     * again. The rule is the paywall's own, reused rather than restated:
+     * three of its four falses are reasons not to be SURE, and an unanswered
+     * store is not a "no".
      */
     const connect = onb.slice(onb.indexOf('const connect = async'), onb.indexOf('const buy = async'))
-    assert.match(connect, /setAt\('unlock'\)/, 'the unlock is reached without pairing first')
+    assert.match(
+      connect.replace(/\s+/g, ' '),
+      /setAt\(shouldAskToPay\(\{ inApp: true, demo: false, \.\.\.purchase \}\) \? 'unlock' : 'connected'\)/,
+      'a pair either never reaches the unlock, or reaches it for somebody who already paid'
+    )
+    assert.match(onb, /import \{ shouldAskToPay \} from '\.\.\/lib\/unlock-rule'/, 'the walkthrough decides who pays with a rule of its own')
+
+    /* The rule itself, at the four combinations that matter here. */
+    const { shouldAskToPay } = await import('../mobile/src/lib/unlock-rule.js')
+    const pairing = (purchase) => shouldAskToPay({ inApp: true, demo: false, ...purchase })
+    assert.equal(pairing({ checking: false, available: true, unlocked: false }), true, 'somebody who has not paid is waved straight through')
+    assert.equal(pairing({ checking: false, available: true, unlocked: true }), false, 'somebody who already paid is asked to buy it again')
+    assert.equal(pairing({ checking: true, available: true, unlocked: false }), false, 'a store that has not answered yet counts as a no')
+    assert.equal(pairing({ checking: false, available: false, unlocked: false }), false, 'a phone that cannot buy anything is asked to buy something')
     assert.ok(!/setAt\('unlock'\)/.test(onb.slice(0, onb.indexOf('const connect = async'))), 'the unlock is reachable before the connection is proved')
 
     /* Seen once, and reachable again from Settings under the name its own

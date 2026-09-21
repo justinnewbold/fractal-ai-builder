@@ -9,6 +9,7 @@ import { setDemo, setDemoUnit } from '../lib/demo'
 import { formatPairCode, isPairCode, pairCredentials } from '../lib/pairing'
 import { signIn } from '../lib/relay'
 import { buyUnlock, restorePurchase, usePurchase } from '../lib/purchases'
+import { shouldAskToPay } from '../lib/unlock-rule'
 import { sendDownloadLink, DOWNLOADS_URL } from '../lib/downloadLink'
 import ScanCode from '../components/ScanCode'
 import Note from '../components/Note'
@@ -68,9 +69,28 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
     setError(null)
     try {
       await signIn(pairCredentials(code))
-      /* Straight to the unlock, which can now say the connection is verified
-         because it has just been. */
-      setAt('unlock')
+      /*
+       * AND THE PHONE ANSWERS FOR ITSELF, which is the half of this that was
+       * missing.
+       *
+       * "If they wanna connect a phone to the Mac, the phone needs to be able
+       * to accept or deny that they've unlocked it… the phone needs to be
+       * able to tell, hey, you did not unlock this, or yes, you did unlock
+       * it."
+       *
+       * It only ever said one of those. Every successful pair went to the
+       * unlock step and asked for money — including somebody who had already
+       * paid, reinstalled, and was watching their own app ask them to buy it
+       * a second time. That is the worst version of this screen and it was
+       * the ordinary case for anybody on a new phone.
+       *
+       * THE SAME RULE THE PAYWALL USES, not a second one. Every false in it
+       * is a reason not to charge and three of them are reasons not to be
+       * SURE: still asking the store, no store to ask, or already unlocked.
+       * An unanswered question is not a "no", and the person most likely to
+       * be on bad wifi is the one standing on a stage. See lib/unlock-rule.
+       */
+      setAt(shouldAskToPay({ inApp: true, demo: false, ...purchase }) ? 'unlock' : 'connected')
     } catch (err) {
       setError(
         /didn’t match|invalid login/i.test(err.message || '')
@@ -318,6 +338,12 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
             onCode={(found) => {
               setCode(formatPairCode(found))
               setScanning(false)
+            }}
+            /* The same door the button below this offers, reached from the
+               square that sent them here. */
+            onAccount={() => {
+              setScanning(false)
+              onAccount?.()
             }}
           />
           <Eyebrow>{P7.codeLabel}</Eyebrow>
