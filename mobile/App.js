@@ -381,8 +381,25 @@ export default function App() {
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator color={color.silkDim} />
           </View>
-        ) : auth === 'out' && !seenWalk ? (
+        ) : !seenWalk ? (
           /*
+           * NOT `auth === 'out' && !seenWalk`, WHICH IS THE BUG THIS LINE HAD.
+           *
+           * "The show me the walkthrough isn't working anymore from the
+           * settings menu. When you click it you feel the haptic feedback, but
+           * then it doesn't go to the screen."
+           *
+           * It used to be true for a replay only because asking to see the
+           * walkthrough again ALSO set the app to signed-out — the very thing
+           * that made a replay cost somebody their unlock, and which 1.15.0
+           * took out. Take that away and a signed-in person setting seenWalk
+           * false meets a condition that is still false: the flag flips, the
+           * screen does not, and the tap is a haptic and nothing else.
+           *
+           * The walkthrough being up is `seenWalk`'s business alone. Who is
+           * signed in decides what comes AFTER it, which is what the branches
+           * below are for.
+           *
            * THE WALKTHROUGH IS THE WAY IN, not a thing laid over it.
            *
            * Everything the sign-in screen offers is inside it — the demo, a
