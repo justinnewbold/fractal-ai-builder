@@ -20,7 +20,7 @@ import { colLabel, doubtfulWrite, gridShape, isSplitChain, laneItems, lanesShown
 import { blockPositions, landingIndex, reorderPlan, settledItems } from '../lib/laneOrder'
 import { isSilencingParam } from '../lib/guardrails'
 import { buildParamIndex, findControls, indexFor } from '../lib/paramIndex'
-import { beginChainWrite, endChainWrite, getState, refreshBlocks, useRig, writeBypass, writeChannel } from '../lib/rig'
+import { beginChainWrite, endChainWrite, getState, noteEdited, refreshBlocks, useRig, writeBypass, writeChannel } from '../lib/rig'
 import { useKeepAwake } from 'expo-keep-awake'
 import { logDebug } from '../lib/debugLog'
 import { blockColor } from '../lib/blockColors'
@@ -144,6 +144,16 @@ export default function Edit({ onBack }) {
    */
   const [focus, setFocus] = useState(null)
 
+  /*
+   * The warning cannot outlive the button that raised it. Arming, then
+   * changing preset from the bar above, would take the Save button away and
+   * leave "This will overwrite the current preset" sitting over a screen with
+   * nothing to confirm.
+   */
+  useEffect(() => {
+    if (!pending && saveTo.armed) saveTo.disarm()
+  }, [pending, saveTo])
+
   const block = blocks.find((b) => sameBlock(b, openEid)) || null
 
   /*
@@ -223,7 +233,28 @@ export default function Edit({ onBack }) {
           )}
         </View>
         <View style={{ flexDirection: 'row', gap: space.sm }}>
-          <SaveButton s={saveTo} waiting={pending} />
+          {/*
+            ONLY WHEN THERE IS SOMETHING TO SAVE.
+
+            "The save button is visible and able to be clicked even though
+            there's nothing that I change and nothing to save. Can we set that
+            to only show up after a parameter has been changed?"
+
+            It was always there, and pressing it on an untouched preset wrote
+            the preset back over itself — harmless, and indistinguishable from
+            the press that matters. A button that is sometimes a no-op teaches
+            you to ignore it, which is the last thing this one can afford:
+            everything this screen does is in the unit's edit buffer and gone
+            at the next preset change.
+
+            So it appears at the first change and leaves when the change is
+            saved, which makes its presence the answer to "is there anything
+            here I would lose". See rig.noteEdited for what counts as one.
+
+            Not disabled-but-visible: a greyed button still has to be read and
+            ruled out. Absent is read at a glance.
+          */}
+          {pending ? <SaveButton s={saveTo} waiting /> : null}
           <Press label="Done" height={40} onPress={onBack} />
         </View>
       </View>
@@ -440,6 +471,9 @@ function BlockPanel({ block, channels, focus, onError, onScrollLock }) {
     if (next === undefined || next === p.value) return
     try {
       const res = await setParamConfirmed(eid, p.id, next, p)
+      /* Before the read-back, not after: the write is out and the unit is
+         holding a value the slot does not, whatever the read says next. */
+      noteEdited()
       const fresh = await blockParams(eid)
       setParams(fresh?.named || [])
       if (!res.ok) onError(didNotTake(p, res.actual, fresh?.named || []))
@@ -472,6 +506,7 @@ function BlockPanel({ block, channels, focus, onError, onScrollLock }) {
   const applyModel = async (value, { undoable = true } = {}) => {
     const was = type
     await setType(eid, Number(value))
+    noteEdited()
     const fresh = await blockParams(eid)
     /* The answer is what the unit shows afterwards, not what it said. */
     logDebug(
@@ -1338,6 +1373,7 @@ function Modifiers({ blocks, onError }) {
   const attach = async () => {
     try {
       await bindModifier(Number(slot), Number(eid), Number(paramId), Number(source))
+      noteEdited()
       const b = blocks.find((x) => sameBlock(x, Number(eid)))
       const p = params.find((x) => x.id === Number(paramId))
       const src = model.sources?.find((x) => x.ordinal === Number(source))

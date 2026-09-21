@@ -794,6 +794,70 @@ export function run(test) {
     assert.match(settings, /Renamed, not saved\. Tap Save to keep the new names\. Changing preset drops them, on the unit and here\./, 'nothing says a rename is not saved yet')
   })
 
+  test('a moved knob counts as unsaved work, the same as a typed name', () => {
+    /*
+     * "So when I go to edit, the save button is visible and able to be
+     * clicked even though there's nothing that I change and nothing to save."
+     *
+     * The store's unsaved flag only ever knew about NAMES, because a name is
+     * the one thing the phone has to remember in order to put it back. A knob
+     * needs no remembering — the unit holds it and drops it at the next
+     * preset change on its own — so nothing marked the preset as touched when
+     * the thing that touched it was a knob, and the Save button had no way to
+     * tell an edited preset from an untouched one.
+     *
+     * One record for both, because a save writes the unit's whole edit buffer:
+     * knobs and names are not two kinds of unsaved work, they are one
+     * question with one answer.
+     */
+    const rig = read('mobile/src/lib/rig.js').replace(/\s+/g, ' ')
+    assert.match(
+      rig,
+      /export function noteEdited\(\) \{ const number = state\.preset\?\.number if \(!Number\.isInteger\(number\)\) return const unsaved = pendingFor\(number\)/,
+      'there is no way to mark this preset as edited'
+    )
+    /* The same object back means it is already marked. Setting it again would
+       re-render every screen watching it on every knob of a drag. */
+    assert.match(rig, /if \(unsaved === state\.unsaved\) return set\(\{ unsaved \}\)/, 'marking an already-marked preset re-renders the screens watching it')
+
+    /*
+     * EVERYTHING THAT LANDS IN THE EDIT BUFFER, and nothing that only moves
+     * you around the rig. A save that dropped a change somebody just made
+     * would be a save that lied, and a Save button that appeared for changing
+     * scene would be back to meaning nothing.
+     */
+    for (const [call, what] of [
+      ['export function writeBypass\\(id, bypassed\\) \\{ const was = asWas\\(\\) noteEdited\\(\\)', 'a bypass'],
+      ['export function writeChannel\\(id, channel\\) \\{ const was = asWas\\(\\) noteEdited\\(\\)', 'a channel'],
+      ['export function beginChainWrite\\(\\) \\{ [^}]*noteEdited\\(\\)', 'a chain move'],
+      ['export function writeTempo\\(bpm\\) \\{ const was = state\\.bpm noteEdited\\(\\)', 'a typed tempo']
+    ]) {
+      assert.match(rig, new RegExp(call), `${what} does not count as unsaved work`)
+    }
+    /* A tap only counts once it has become a number worth sending. */
+    assert.match(rig, /const guess = tappedBpm\(taps\) if \(guess != null\) \{ [^}]*noteEdited\(\)/, 'a tapped tempo does not count as unsaved work')
+
+    /* Moving around the rig is not editing it. */
+    const moves = rig.slice(rig.indexOf('export function writeScene(index)'), rig.indexOf('export async function refreshSceneState()'))
+    assert.ok(!/noteEdited\(\)/.test(moves), 'changing scene counts as an edit, so Save appears for standing somewhere else')
+    const tuner = rig.slice(rig.indexOf('export async function writeTuner(on)'), rig.indexOf('export async function loadPreset(number)'))
+    assert.ok(!/noteEdited\(\)/.test(tuner), 'turning the tuner on counts as an edit')
+
+    /* And the screens that write the rest of it. */
+    const edit = read('mobile/src/screens/Edit.js').replace(/\s+/g, ' ')
+    assert.match(edit, /const res = await setParamConfirmed\(eid, p\.id, next, p\) [^}]*noteEdited\(\)/, 'a knob that landed does not count as unsaved work')
+    assert.match(edit, /await setType\(eid, Number\(value\)\) noteEdited\(\)/, 'swapping the model does not count as unsaved work')
+    assert.match(edit, /await bindModifier\(Number\(slot\), Number\(eid\), Number\(paramId\), Number\(source\)\) noteEdited\(\)/, 'attaching a modifier does not count as unsaved work')
+    assert.match(read('mobile/src/components/Volume.js').replace(/\s+/g, ' '), /const res = await setParamConfirmed\(eid, p\.id, v, p\) [^}]*noteEdited\(\)/, 'the volume does not count as unsaved work')
+
+    /*
+     * AND IT ALL GOES AT THE NEXT PRESET CHANGE, which is the honest half of
+     * this: the Save button appearing is the only warning that a knob is
+     * living in the unit's edit buffer and nowhere else.
+     */
+    assert.match(rig, /if \(patch\.preset && state\.unsaved && patch\.preset\.number !== state\.unsaved\.number\) \{ patch = \{ \.\.\.patch, unsaved: null \}/, 'an edit survives a preset change, so Save would offer to keep something that is gone')
+  })
+
   test('a chain write is re-read off the unit, and a move the unit did not keep is named', () => {
     /*
      * "When I rearranged the presets with the slider and moved it up, it
@@ -4835,17 +4899,39 @@ export function run(test) {
      */
     assert.match(saver, /on=\{s\.armed \|\| waiting\}/, 'the Save button does not light up when there is unsaved work')
 
-    /* Both screens that can leave work unsaved hand it the same flag, off the
-       same store value — a moved knob is lost exactly as a typed name is. */
+    /* Both screens that can leave work unsaved read the same store value — a
+       moved knob is lost exactly as a typed name is. */
     for (const [file, where] of [
       ['mobile/src/screens/Settings.js', 'the rename screen'],
       ['mobile/src/screens/Edit.js', 'the Edit screen']
     ]) {
       const text = read(file)
       assert.match(text, /const pending = !!unsaved && unsaved\.number === preset\?\.number/, `${where} cannot tell whether there is unsaved work`)
-      assert.match(text, /<SaveButton[^/]*waiting=\{pending\}/, `${where} never lights its Save button`)
     }
-    assert.match(saver, /replacing what was saved there\. Tap Save again to confirm\./, 'the warning does not say what a save overwrites')
+
+    /*
+     * AND ON THE EDIT SCREEN IT IS NOT THERE AT ALL UNTIL THEN.
+     *
+     * "The save button is visible and able to be clicked even though there's
+     * nothing that I change and nothing to save. Can we set that to only show
+     * up after a parameter has been changed?"
+     *
+     * The two screens differ on purpose. In Setup the button is the end of a
+     * rename flow and the paragraph under it explains what saving does, so it
+     * stays put and lights up. On Edit it sits in the header beside Done,
+     * where an always-present button is an invitation to press it — and
+     * pressing it on an untouched preset wrote the preset over itself.
+     */
+    assert.match(
+      read('mobile/src/screens/Edit.js').replace(/\s+/g, ' '),
+      /\{pending \? <SaveButton s=\{saveTo\} waiting \/> : null\}/,
+      'the Edit screen draws Save whether or not there is anything to save'
+    )
+    assert.match(
+      read('mobile/src/screens/Settings.js'),
+      /<SaveButton[^/]*waiting=\{pending\}/,
+      'the rename screen never lights its Save button'
+    )
     assert.match(saver, /const res = await askComputerToSave\(\{ park: \(req\) => parkSave\(slug, req\), readResult: \(\) => readSaveResult\(slug\), slot: preset\?\.number, name: preset\?\.name \|\| ''/, 'the button does not ask the computer, or sends no name')
     /* On both screens where something gets changed. */
     for (const screen of ['mobile/src/screens/Edit.js', 'mobile/src/screens/Settings.js']) {

@@ -221,6 +221,9 @@ export function handleEvent(event) {
 let chainWrites = 0
 let chainAsked = false
 export function beginChainWrite() {
+  /* Every add, move and remove comes through here, which is why the mark
+     goes here rather than on each of them. */
+  noteEdited()
   chainWrites += 1
 }
 export function endChainWrite({ refresh = true } = {}) {
@@ -449,6 +452,41 @@ export function noteSceneName(index, name) {
   const slug = state.deviceSlug
   if (!Number.isInteger(number) || !slug) return
   rememberSceneNames(device.nameOwner(slug), number, names)
+}
+
+/**
+ * Something changed on this preset that a save would keep.
+ *
+ * "The save button is visible and able to be clicked even though there's
+ * nothing that I change and nothing to save. Can we set that to only show up
+ * after a parameter has been changed?"
+ *
+ * There was already a flag for this and it only knew about NAMES — a renamed
+ * preset or scene, because those are the two the phone has to remember for
+ * itself in order to put them back. A moved knob needs no remembering: the
+ * unit is holding it and drops it at the next preset change, all by itself.
+ * So nothing marked the preset as touched when the thing that touched it was
+ * a knob, and the Save button had no way to know whether there was anything
+ * to save.
+ *
+ * This is that mark, and it deliberately shares the one record. A save writes
+ * the unit's whole edit buffer, so knobs and names are not two kinds of
+ * unsaved work with two kinds of button — they are one question, "is there
+ * anything here that dies at the next preset change", and one answer.
+ *
+ * WHAT COUNTS is anything that ends up in the edit buffer: a parameter, a
+ * bypass, a channel, a model, a chain move, a modifier, a tempo, a name.
+ * What does NOT count is changing scene or preset, or turning the tuner on —
+ * those move you around the rig rather than altering it.
+ */
+export function noteEdited() {
+  const number = state.preset?.number
+  if (!Number.isInteger(number)) return
+  const unsaved = pendingFor(number)
+  /* Already marked: the record is the same object, and setting it again
+     would re-render every screen watching it on every knob of a drag. */
+  if (unsaved === state.unsaved) return
+  set({ unsaved })
 }
 
 /** The pending record for this preset, started from what the names are now. */
@@ -756,11 +794,13 @@ const asWas = () => ({ blocks: state.blocks, allBlocks: state.allBlocks })
 
 export function writeBypass(id, bypassed) {
   const was = asWas()
+  noteEdited()
   return optimistic(patchBlock(id, { bypassed }), was, () => device.setBypass(id, bypassed))
 }
 
 export function writeChannel(id, channel) {
   const was = asWas()
+  noteEdited()
   return optimistic(patchBlock(id, { channel }), was, () => device.setChannel(id, channel))
 }
 
@@ -847,6 +887,9 @@ export async function tapTempo() {
   taps = keepTaps(taps, Date.now())
   const guess = tappedBpm(taps)
   if (guess != null) {
+    /* The tempo lives in the preset, so a tap is a change to it — and a save
+       that dropped the tempo somebody just set would be a save that lied. */
+    noteEdited()
     set({ bpm: guess })
     tempoSetAt = Date.now()
     expect('bpm', guess)
@@ -866,6 +909,7 @@ export async function tapTempo() {
 
 export function writeTempo(bpm) {
   const was = state.bpm
+  noteEdited()
   expect('bpm', bpm)
   tempoSetAt = Date.now()
   return optimistic({ bpm }, { bpm: was }, () => device.setTempo(bpm))
