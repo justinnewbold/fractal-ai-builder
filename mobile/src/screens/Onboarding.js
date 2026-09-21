@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Linking, ScrollView, Text, TextInput, View } from 'react-native'
 
-import { CHAIN, P1, P2, P3, P4, P6, P7, P8, P9 } from '../lib/onboarding'
+import { CHAIN, P1, P2, P3, P4, P6, P7, P8, P9, CLOSE } from '../lib/onboarding'
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
 import { Platform } from 'react-native'
 import { UNITS } from '../lib/demoUnits'
@@ -39,7 +39,7 @@ import Press from '../components/Press'
  */
 const face = Platform.select(mono)
 
-export default function Onboarding({ onDone, onEnterDemo, onAccount }) {
+export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onClose }) {
   const [at, setAt] = useState('welcome')
   const [unit, setUnit] = useState(UNITS[0].key)
   const [code, setCode] = useState('')
@@ -116,6 +116,24 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount }) {
       contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxl }}
       keyboardShouldPersistTaps="handled"
     >
+      {/*
+        THE DOOR, WHEN SOMEBODY IS ONLY LOOKING.
+
+        "I'm signed in and went to settings to restart the tutorial to get the
+        screenshots. Now my only option is to start the demo again."
+
+        Every button on these screens exists to get somebody SET UP — pick a
+        demo unit, scan a code, buy the unlock. Somebody replaying it is
+        already set up, so all of them are wrong, and the only one that looked
+        like a way forward put them in the demo and off their own rig.
+
+        First, because a way out at the bottom of a screen somebody is done
+        with is a way out they have to go looking for.
+      */}
+      {replay ? (
+        <Press label={CLOSE} height={TAP} onPress={() => onClose?.()} />
+      ) : null}
+
       {at === 'welcome' ? (
         <>
           <Head>{P1.head}</Head>

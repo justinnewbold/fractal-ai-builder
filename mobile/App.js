@@ -74,6 +74,15 @@ export default function App() {
   /* Whether the walkthrough has been through on this phone. Read once, so a
      re-render cannot put somebody back at the start of it. */
   const [seenWalk, setSeenWalk] = useState(true)
+  /*
+   * Whether the walkthrough is up because somebody ASKED to see it again.
+   *
+   * A first run and a replay draw the same screens and mean opposite things.
+   * On a first run every button is the next step; on a replay the person is
+   * already set up and every one of them is wrong, so the replay gets a way
+   * out that changes nothing.
+   */
+  const [replaying, setReplaying] = useState(false)
   useEffect(() => {
     walkthroughSeen().then(setSeenWalk)
   }, [])
@@ -384,15 +393,27 @@ export default function App() {
            * once this has been through.
            */
           <Onboarding
+            replay={replaying}
+            /*
+             * Out, and nothing else. No account touched, no demo started, no
+             * walkthrough state rewound — they came to look at it.
+             */
+            onClose={() => {
+              markWalkthrough()
+              setSeenWalk(true)
+              setReplaying(false)
+            }}
             onDone={() => {
               markWalkthrough()
               setSeenWalk(true)
+              setReplaying(false)
               checkOwner()
               setAuth('in')
             }}
             onEnterDemo={() => {
               markWalkthrough()
               setSeenWalk(true)
+              setReplaying(false)
               setAuth('in')
             }}
             /*
@@ -412,6 +433,7 @@ export default function App() {
             onAccount={() => {
               markWalkthrough()
               setSeenWalk(true)
+              setReplaying(false)
               setAuth('out')
             }}
           />
@@ -546,10 +568,23 @@ export default function App() {
                 onOpenGear={() => setScreen('gear')}
                 /* Back to the start of the walkthrough. It replaces the
                    whole app while it is up, the same as on a first run. */
+                /*
+                 * Back to the start of the walkthrough — and NOTHING ELSE.
+                 *
+                 * This used to set the app to signed-out on the way. It did
+                 * not drop the session, but it meant the walkthrough's exits
+                 * were the only way back in, and the one that looked like a
+                 * way forward started the demo — which takes somebody off the
+                 * rig they were driving. "Now my only option is to start the
+                 * demo again, which made me re sign in again to unlock."
+                 *
+                 * It replaces the whole app while it is up, the same as on a
+                 * first run; who is signed in is none of its business.
+                 */
                 onReplay={() => {
                   setScreen('stage')
+                  setReplaying(true)
                   setSeenWalk(false)
-                  setAuth('out')
                 }}
                 /* The screen somebody needs most when nothing is connected,
                    which is exactly when the rest of Setup can do nothing. */
