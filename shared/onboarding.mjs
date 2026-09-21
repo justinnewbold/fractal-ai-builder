@@ -257,7 +257,11 @@ export const P7 = {
   codeLabel: 'OR ENTER THE CODE UNDER IT',
   foot: 'The code appears in Set up phone remote on your computer.',
   go: 'Connect',
-  noCode: 'I don’t have a code yet'
+  noCode: 'I don’t have a code yet',
+  /* NEW WORDING, not from the PDF. Somebody who has signed in on another
+     device has no code to scan and nothing on this screen for them — the
+     walkthrough sent them round in a circle. Justin can change this line. */
+  account: 'Sign in with an email and password'
 }
 
 /** P8 — the one-time unlock, offered only once the computer is there. */

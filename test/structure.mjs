@@ -4808,6 +4808,53 @@ export function run(test) {
   })
 
   /*
+   * A WAY IN THAT DOES NOT NEED A RUNNING COMPUTER.
+   *
+   * "Add login by email and password. I can't login to get my iPad
+   * screenshots."
+   *
+   * The walkthrough's only door was a pairing code, and a pairing code comes
+   * off a computer app that is running right now. Somebody already signed in
+   * on another handset has no code and no way to say so — the walkthrough
+   * offered them the demo and nothing else, which is being locked out of an
+   * account they already have.
+   *
+   * It hands over to the sign-in screen rather than growing its own email and
+   * password form: that screen already signs in, creates an account and
+   * resets a password, and a second copy of all three would drift from it.
+   */
+  test('the walkthrough lets somebody with an account in without a pairing code', () => {
+    const onb = readFileSync(new URL('../mobile/src/screens/Onboarding.js', import.meta.url), 'utf8')
+    const app = readFileSync(new URL('../mobile/App.js', import.meta.url), 'utf8')
+
+    assert.match(onb, /onAccount/, 'the walkthrough no longer offers an account')
+    assert.match(
+      onb,
+      /label=\{P7\.account\}[^]{0,120}onPress=\{\(\) => onAccount/,
+      'the account button is gone from the pairing screen, or wired to something else'
+    )
+    assert.match(
+      app,
+      /onAccount=\{\(\) => \{[^]{0,200}setAuth\('out'\)/,
+      'the account route no longer lands on the sign-in screen'
+    )
+    /* Marked seen on the way past, like every other exit. Sending somebody
+       back to the start of a flow they just walked out of reads as the app
+       forgetting what they did. */
+    assert.match(
+      app,
+      /onAccount=\{\(\) => \{\s*markWalkthrough\(\)/,
+      'walking out to the account screen does not mark the walkthrough seen'
+    )
+
+    /* And the screen it lands on really does take an email and a password. */
+    const signIn = readFileSync(new URL('../mobile/src/screens/SignIn.js', import.meta.url), 'utf8')
+    for (const needed of ['placeholder="Email"', 'placeholder="Password"', 'secureTextEntry']) {
+      assert.ok(signIn.includes(needed), `the sign-in screen lost ${needed}`)
+    }
+  })
+
+  /*
    * THE COACH MARK, AND THE PROMISE IN ITS OWN LAST LINE.
    *
    * "This tip appears here - exactly when the gesture becomes useful."

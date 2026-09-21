@@ -367,6 +367,25 @@ export default function App() {
               setSeenWalk(true)
               setAuth('in')
             }}
+            /*
+             * Out of the walkthrough and onto the sign-in screen.
+             *
+             * The walkthrough's way in is a code off a running computer, and
+             * somebody already signed in elsewhere has no such code. This is
+             * their door: `out` is the state that draws SignIn, which signs
+             * in, makes an account and resets a password — all of it already
+             * written and tested, rather than a second form here.
+             *
+             * The walkthrough is marked seen on the way past, the same as
+             * every other exit from it. Sending somebody back to the start of
+             * a first-run flow they have just walked out of would read as the
+             * app forgetting what they did.
+             */
+            onAccount={() => {
+              markWalkthrough()
+              setSeenWalk(true)
+              setAuth('out')
+            }}
           />
         ) : auth === 'out' ? (
           <SignIn

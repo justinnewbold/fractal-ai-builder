@@ -39,7 +39,7 @@ import Press from '../components/Press'
  */
 const face = Platform.select(mono)
 
-export default function Onboarding({ onDone, onEnterDemo }) {
+export default function Onboarding({ onDone, onEnterDemo, onAccount }) {
   const [at, setAt] = useState('welcome')
   const [unit, setUnit] = useState(UNITS[0].key)
   const [code, setCode] = useState('')
@@ -321,6 +321,20 @@ export default function Onboarding({ onDone, onEnterDemo }) {
             onPress={connect}
           />
           <Press label={P7.noCode} height={TAP} onPress={() => setAt('app')} />
+          {/*
+            THE WAY IN FOR SOMEBODY WHO ALREADY HAS AN ACCOUNT.
+
+            This screen offers a square to scan and a code to type, and both
+            of those come off a computer that is running right now. Anybody
+            signed in on another device has neither, and had nothing here at
+            all — the walkthrough sent them round to the demo and no further,
+            which is how Justin ended up locked out of his own iPad.
+
+            It hands over to the sign-in screen rather than growing a second
+            email and password form: that one already signs in, makes an
+            account and resets a password, and two of those would drift.
+          */}
+          <Press label={P7.account} height={TAP} onPress={() => onAccount?.()} />
         </>
       ) : null}
 
