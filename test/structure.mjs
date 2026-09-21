@@ -4918,6 +4918,50 @@ export function run(test) {
    * password form: that screen already signs in, creates an account and
    * resets a password, and a second copy of all three would drift from it.
    */
+  /*
+   * THE EDIT SCREEN SAYS WHERE YOU ARE.
+   *
+   * "Can we show what preset name and scene they're on... maybe we don't even
+   * say the word changes land on, just show the preset name and scene name
+   * that they're currently on."
+   *
+   * It read "Changes land in scene 8 — Lead Mid…": three words explaining the
+   * screen, then out of room for the part that identifies anything, and the
+   * preset never named at all. Somebody deciding whether to save could not
+   * tell from this screen what they were about to save over.
+   */
+  test('the Edit screen names the preset and the scene it is editing', () => {
+    const edit = readFileSync(new URL('../mobile/src/screens/Edit.js', import.meta.url), 'utf8')
+
+    /* The STRINGS, not the word anywhere in the file — the comment above the
+       header quotes the old line, and a test that cannot tell a quotation
+       from the thing itself makes the history unwritable. Same trap the
+       coach mark's "Try it" comment fell into. */
+    for (const gone of ["'Changes land in the preset'", 'Changes land in scene ${']) {
+      assert.ok(
+        !edit.includes(gone),
+        'the Edit header still explains itself instead of saying where you are'
+      )
+    }
+    assert.match(edit, /presetLabel\(preset\)/, 'the Edit header does not name the preset')
+    assert.match(edit, /Scene \$\{scene \+ 1\}/, 'the Edit header does not name the scene')
+
+    /* A unit with no scenes is not given a scene line to be wrong about. */
+    assert.match(
+      edit,
+      /caps\?\.hasScenes === false \? null :/,
+      'a unit without scenes is shown a scene line anyway'
+    )
+
+    /* And a preset still being read says nothing rather than "Untitled",
+       the same dodge the Play screen uses. */
+    assert.match(
+      edit,
+      /preset\?\.pending && !preset\?\.name \? '…'/,
+      'a preset mid-read is named "Untitled" for a moment, which is a lie'
+    )
+  })
+
   test('the walkthrough lets somebody with an account in without a pairing code', () => {
     const onb = readFileSync(new URL('../mobile/src/screens/Onboarding.js', import.meta.url), 'utf8')
     const app = readFileSync(new URL('../mobile/App.js', import.meta.url), 'utf8')

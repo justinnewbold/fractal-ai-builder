@@ -24,6 +24,7 @@ import { beginChainWrite, endChainWrite, getState, refreshBlocks, useRig, writeB
 import { useKeepAwake } from 'expo-keep-awake'
 import { logDebug } from '../lib/debugLog'
 import { blockColor } from '../lib/blockColors'
+import { presetLabel } from '../lib/presetName'
 import { shortBlock } from '../lib/shortName'
 import { thud } from '../lib/feedback'
 import Knob, { fmt } from '../components/Knob'
@@ -188,11 +189,38 @@ export default function Edit({ onBack }) {
           <Text accessibilityRole="header" style={{ color: color.silk, fontSize: font.title, fontWeight: '700' }}>
             Edit
           </Text>
-          <Text numberOfLines={1} style={{ color: color.silkDim, fontSize: font.small }}>
-            {caps?.hasScenes === false
-              ? 'Changes land in the preset'
-              : `Changes land in scene ${scene + 1}${sceneNames[scene] ? ` — ${sceneNames[scene]}` : ''}`}
+          {/*
+            WHERE YOU ARE, not a sentence about it.
+
+            "Can we show what preset name and scene they're on... maybe we
+            don't even say the word changes land on, just show the preset name
+            and scene name that they're currently on."
+
+            It read "Changes land in scene 8 — Lead Mid…", which spent its
+            first three words explaining the screen and then ran out of room
+            for the only part that identifies anything — and never said which
+            PRESET at all. Somebody deep in a drive block, deciding whether to
+            save, could not tell from this screen what they were about to save
+            over.
+
+            Two lines rather than a longer one: the preset and the scene are
+            two different answers, and one line could only ever truncate the
+            second. The buttons beside this are centred on the row, so the
+            extra line costs nothing but height.
+          */}
+          <Text
+            numberOfLines={1}
+            style={{ color: color.silk, fontSize: font.small, fontWeight: '600' }}
+          >
+            {/* The same dodge the Play screen uses: a preset still being read
+                has no name yet, and "Untitled" for half a second is a lie. */}
+            {preset?.pending && !preset?.name ? '…' : presetLabel(preset)}
           </Text>
+          {caps?.hasScenes === false ? null : (
+            <Text numberOfLines={1} style={{ color: color.silkDim, fontSize: font.small }}>
+              {`Scene ${scene + 1}${sceneNames[scene] ? ` — ${sceneNames[scene]}` : ''}`}
+            </Text>
+          )}
         </View>
         <View style={{ flexDirection: 'row', gap: space.sm }}>
           <SaveButton s={saveTo} waiting={pending} />
