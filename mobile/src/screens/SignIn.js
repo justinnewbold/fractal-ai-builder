@@ -265,18 +265,23 @@ export default function SignIn({ onSignedIn, onDemo }) {
           </Note>
         )}
 
-        <Press label="How do I connect a computer?" disabled={busy} onPress={() => setHelping(true)} />
+        <Press label="Connect my computer" disabled={busy} onPress={() => setHelping(true)} />
 
         {/*
           The demo, offered here because here is where somebody with no
-          computer is standing. It is a simulated FM3 — every screen works,
+          computer is standing. It is a simulated unit — every screen works,
           nothing reaches hardware — and it is also the only way to tell this
           app being slow from the line to the computer being slow, because
           there is no line in it.
+
+          THREE WORDS AND NO SUBTITLE. "Change just looking to just Try the
+          Demo - no text underneath." It read "Just looking? Try the demo"
+          over "A simulated FM3 — no computer needed", which asked a question
+          nobody needed answering and then named one unit out of the five the
+          demo can be.
         */}
         <Press
-          label="Just looking? Try the demo"
-          sub="A simulated FM3 — no computer needed"
+          label="Try the Demo"
           disabled={busy}
           onPress={() => {
             setDemo(true)

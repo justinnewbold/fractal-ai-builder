@@ -199,13 +199,19 @@ sees "no computer", and has no way to know there is anything behind it. The
 demo is three taps in, but only if somebody tells them it is there.
 
 **AND WHY IT IS WRITTEN OUT TAP BY TAP.** The paragraph that used to be here
-said *"On the first screen, tap 'Just looking? Try the demo'"* — a button that
-had not existed for months, on a screen that is not the first one. A reviewer
-following it would have looked for a label that was not there, on a screen
-where it never was, and concluded the app does nothing. It also claimed the
-app worked "on a local network" without an account and that signing in was
-only for reaching a computer from outside your home wifi, both of which
-stopped being true when pairing became account-only.
+said *"On the first screen, tap 'Just looking? Try the demo'"* — and the trap
+is that this was a REAL button. It sat on the sign-in screen, which is not the
+first screen: a fresh install opens the walkthrough, and the sign-in screen is
+only reached after it. So a reviewer looked for a button that exists, on a
+screen that does not have it, and had nothing to go on. Right button, wrong
+screen, same rejection.
 
-Store copy goes stale silently, because nothing in the build reads it. When a
-button on the way into the demo is renamed, this is the other place to change.
+It also claimed the app worked "on a local network" without an account, and
+that signing in was only for reaching a computer from outside your home wifi.
+Both stopped being true when pairing became account-only.
+
+Store copy goes stale silently, because nothing in the build reads it. Two
+tests read it instead — one holds every label here against the walkthrough's
+own strings, the other against the sign-in screen's — and both read only the
+fenced block above, because this paragraph quotes the wording it replaced and
+a search of the whole file finds the explanation rather than the instruction.

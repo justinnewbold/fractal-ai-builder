@@ -3344,7 +3344,7 @@ export function run(test) {
     assert.match(read('mobile/src/screens/Settings.js'), /onPress=\{onOpenConnect\}/, 'Setup has no door to it')
     const signIn = read('mobile/src/screens/SignIn.js')
     assert.match(signIn, /if \(helping\) return <Connect onBack=/, 'the sign-in screen cannot reach it')
-    assert.match(signIn, /How do I connect a computer\?/, 'the sign-in screen does not offer it')
+    assert.match(signIn, /Connect my computer/, 'the sign-in screen does not offer it')
   })
 
   test('the App Store review notes name buttons that exist', () => {
@@ -3353,10 +3353,18 @@ export function run(test) {
      * stale without anything noticing.
      *
      * It told the reviewer: "On the first screen, tap 'Just looking? Try the
-     * demo'". That button had not existed for months, and the screen it named
-     * is not the first one. A reviewer following it looks for a label that is
-     * not there, on a screen where it never was, and concludes the app does
-     * nothing — which is the exact rejection the notes exist to prevent.
+     * demo'".
+     *
+     * I FIRST WROTE THAT THE BUTTON DID NOT EXIST. It did — on the sign-in
+     * screen, which is not the first screen. A fresh install opens the
+     * walkthrough (App.js, `seenWalk === false`), and the sign-in screen is
+     * only reached after it. So a reviewer followed that instruction, looked
+     * for the button on a screen that does not have it, and concluded the app
+     * does nothing — the exact rejection these notes exist to prevent. Right
+     * button, wrong screen, same outcome.
+     *
+     * It is renamed in any case now: "Change just looking to just Try the
+     * Demo - no text underneath".
      *
      * Nothing in the build reads store copy, so renaming a button cannot
      * break it. This is what breaks instead.
@@ -5517,7 +5525,19 @@ export function run(test) {
      * code no computer of theirs has ever shown.
      */
     const signIn = read('mobile/src/screens/SignIn.js').replace(/\s+/g, ' ')
-    assert.match(signIn, /Just looking\? Try the demo/, 'nothing offers the demo where somebody needs it')
+    assert.match(signIn, /label="Try the Demo"/, 'nothing offers the demo where somebody needs it')
+    /*
+     * AND NOTHING UNDER IT. "No text underneath."
+     *
+     * The PROP rather than the words: the comment above the button quotes the
+     * subtitle it replaced, so searching the file for that sentence finds the
+     * explanation and fails on it. Sixth time.
+     */
+    const demoBtn = signIn.slice(signIn.indexOf('label="Try the Demo"'))
+    assert.ok(
+      !/sub=/.test(demoBtn.slice(0, demoBtn.indexOf('/>'))),
+      'the demo button has a subtitle again'
+    )
     assert.match(signIn, /setDemo\(true\)/, 'the button does not turn the demo on')
 
     /* And escapable, or it is a trap rather than a demo. */
