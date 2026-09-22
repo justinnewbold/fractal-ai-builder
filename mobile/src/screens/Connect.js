@@ -32,6 +32,24 @@ import { DOWNLOADS_URL, sendDownloadLink } from '../lib/downloadLink'
  *
  * THE ROUTES LIST STAYS IN shared/ways-in.mjs for the browser, which IS
  * running on the computer in question and can sort them by what it is.
+ *
+ * AND THEN THE PROSE WENT TOO, for the same reason the routes did.
+ *
+ * "On the connect a computer page remove all text except what's in the
+ * screen shot and make the stuff that's visible in the screenshot larger on
+ * the screen. The [same thing] is on the download page that they go to, so we
+ * don't need it here."
+ *
+ * Three paragraphs were still here: what a USB cable is for, what to do once
+ * the app is installed, and the warning that only one program can hold the
+ * port. Every one of them is on the page this screen is sending somebody to,
+ * and every one of them is about the machine they are not holding — which is
+ * the same fault as the routes, in sentences instead of buttons. Read on a
+ * phone they pushed the two things you CAN act on down the screen.
+ *
+ * What is left is the address and the email box, at sizes you can read at
+ * arm's length. The subtitle went with them: it promised "what it is", and
+ * what it is has moved to the page that explains it.
  */
 const face = Platform.select(mono)
 
@@ -72,25 +90,16 @@ export default function Connect({ onBack }) {
           >
             Connecting a computer
           </Text>
-          <Text style={{ color: color.silkDim, fontSize: font.small }}>
-            What it is, and how to get the app onto it
-          </Text>
         </View>
         <Press label="Done" height={40} onPress={onBack} />
       </View>
-
-      <Note>
-        Your unit plugs into a computer with a USB cable. That computer talks to the unit, and this
-        phone tells the computer what to do — over wifi at the venue, or over the internet from
-        anywhere. The phone never talks to the unit directly.
-      </Note>
 
       {/*
         PRINTED, NOT PRESSED — the same rule as the walkthrough's version of
         this. A button on a phone opens the thing on the phone, and what is at
         the far end of this one is a Mac installer.
       */}
-      <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.2 }}>
+      <Text style={{ color: color.silkFaint, fontSize: font.small, letterSpacing: 1.2 }}>
         TYPE THIS ON YOUR COMPUTER · NOT ON THIS PHONE
       </Text>
       <View
@@ -102,16 +111,16 @@ export default function Connect({ onBack }) {
           backgroundColor: color.panel
         }}
       >
-        <Text selectable style={{ color: color.silk, fontSize: font.lead, fontFamily: face }}>
+        <Text selectable style={{ color: color.silk, fontSize: font.title, fontFamily: face }}>
           {DOWNLOADS_URL}
         </Text>
       </View>
-      <Note>
+      <Note size={font.body}>
         That page has the Mac, Windows and Linux downloads, and the steps for each. The computer app
         is free.
       </Note>
 
-      <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.2 }}>
+      <Text style={{ color: color.silkFaint, fontSize: font.small, letterSpacing: 1.2 }}>
         OR HAVE THE LINK SENT TO YOU
       </Text>
       <TextInput
@@ -133,7 +142,7 @@ export default function Connect({ onBack }) {
           borderRadius: radius.md,
           paddingHorizontal: space.md,
           color: color.silk,
-          fontSize: font.lead
+          fontSize: font.title
         }}
       />
       <Press
@@ -144,16 +153,6 @@ export default function Connect({ onBack }) {
       />
       {said ? <Note>{said}</Note> : null}
       {error ? <Note tone="fault">{error}</Note> : null}
-
-      <Note>
-        Once it is installed: on the computer choose Set up phone remote and sign in, then sign in on
-        this phone with that same account.
-      </Note>
-
-      <Note tone="warn">
-        Only one program at a time can hold the unit’s USB port. If the computer says it cannot find
-        your unit, something else has it — the Fractal editor, or a second copy of this app.
-      </Note>
     </ScrollView>
   )
 }

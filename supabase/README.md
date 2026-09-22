@@ -28,7 +28,7 @@ other, and the dashboard still lists it under the old one)
 |---|---|---|
 | `RESEND_API_KEY` | the key from step 1 | yes |
 | `FEEDBACK_TO` | where reports should land | only to change the default |
-| `FEEDBACK_FROM` | who they come from | only to change the default |
+| `FEEDBACK_FROM` | who they come from | only to change the default (`noreply@newbold.cloud`) |
 
 That is the whole of it. The next report sends an email.
 
@@ -39,16 +39,39 @@ injects into every function on its own. An earlier version asked for a string to
 be invented and typed into two places, which is the step that breaks — and it
 breaks silently, as a 401 nobody is looking at.
 
-### Sending from your own domain
+### Sending from your own domain, and the catch that cost an evening
 
-`onboarding@resend.dev` is Resend's shared sender. It works on the day you sign
-up, which is the point of starting there, but mail from it is more likely to be
-filtered and it is obviously not yours.
+Both functions now send from `noreply@newbold.cloud` with nothing set, because
+`newbold.cloud` is verified with Resend. Set `FEEDBACK_FROM` or `DOWNLOAD_FROM`
+only to change that.
 
-To send as `feedback@newbold.cloud`: Resend → **Domains** → **Add Domain** →
-`newbold.cloud`, add the DNS records it gives you, wait for it to verify, then
-change `FEEDBACK_FROM` to `Fractal Remote <feedback@newbold.cloud>`. Nothing
-else changes.
+It used to be `onboarding@resend.dev`, Resend's shared sender, which works on
+the day you sign up — and that is why it was written that way. **What nobody
+wrote down is the limit: that address may only send to the ONE address that
+owns the Resend account.** Every other recipient comes back 403, with this:
+
+> You can only send testing emails to your own email address
+> (justinnewbold@gmail.com). To send emails to other recipients, please verify
+> a domain at resend.com/domains.
+
+Which is invisible for a long time, because it is not obviously a limit. The
+feedback email kept working for nine months — it only ever sends to that same
+gmail. The DOWNLOAD LINK broke the moment it was tried, because a download link
+goes to whoever typed their address into the phone.
+
+`newbold.cloud` had been sitting in Resend at **failed** since December with
+none of its three DNS records ever added. They are in the Vercel zone now:
+
+| type | name | value |
+|---|---|---|
+| TXT | `resend._domainkey` | the DKIM key Resend issued |
+| TXT | `send` | `v=spf1 include:amazonses.com ~all` |
+| MX | `send` | `feedback-smtp.us-east-1.amazonses.com` (priority 10) |
+
+**If mail ever stops again, check that domain first.** Resend → Domains. A
+domain can fall back to `failed` if a record is edited or removed, and the
+symptom at the phone is the same four words either way: *the mail service
+refused it*.
 
 ## How it is put together, and why
 

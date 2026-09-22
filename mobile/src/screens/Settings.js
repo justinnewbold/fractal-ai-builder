@@ -26,6 +26,7 @@ import { SIZES, clampSize, loadFit, loadSize, saveFit, saveSize } from '../lib/g
 import { REPLAY } from '../lib/onboarding'
 import { sync, useStored } from '../lib/store'
 import { isPairAccount } from '../lib/pairing'
+import { mayDrive } from '../lib/unlock-rule'
 import Lamp from '../components/Lamp'
 import Note from '../components/Note'
 import PasswordBox from '../components/PasswordBox'
@@ -274,22 +275,6 @@ export default function Settings({
               onPress={() => setPage('unit')}
             />
             {/*
-              Three rows became one door.
-
-              Fixes, Log and Feedback were three rows in a column, and they
-              are three stages of the same evening: read what to try, read
-              what actually happened, tell somebody when neither helped. As
-              separate rows each looked like a different errand, and the one
-              in the middle looked like a developer's.
-            */}
-            {onOpenFixes || onOpenLog || onOpenReport ? (
-              <SetupRow
-                title="Troubleshooting"
-                status="What to try, the log, and telling us"
-                onPress={() => setPage('trouble')}
-              />
-            ) : null}
-            {/*
               * THE FULL VERSION, AND THE WAY BACK TO ONE ALREADY PAID FOR.
               *
               * The top bar carries an Unlock button while the demo is on,
@@ -320,16 +305,24 @@ export default function Settings({
               }
               onPress={onUnlock}
             />
-            {/* Openable again, because a tour worth showing once is worth
-                finding later — and somebody who skipped it on the first
-                launch has no other way back to it. */}
-            {/* The way back into the walkthrough, named the way its own last
-                screen promises: "Replay this anytime in Settings → Show the
-                walkthrough." */}
-            {onReplay ? (
-              <SetupRow title={REPLAY} status="The setup, from the start" onPress={onReplay} />
-            ) : null}
             <SetupRow title="About" status={`v${APP_VERSION}`} onPress={() => setPage('about')} />
+            {/*
+              WHAT IS BELOW ABOUT, AND WHY IT IS BELOW ABOUT.
+
+              "Move updates, troubleshooting, and the show the tutorial again
+              underneath the about section."
+
+              The three of them had drifted into the middle of the list, so
+              Troubleshooting sat between renaming presets and buying the app,
+              and the walkthrough sat between buying it and the version
+              number. Nothing about that order was decided; each row was added
+              beside whatever it was written next to.
+
+              The rows above are the ones somebody opens Settings FOR. These
+              three are the ones you go looking for on an evening when
+              something is wrong, or once, ever - which is the same reason
+              About is where it is, so they sit under it.
+            */}
             {/*
               * WHAT IS RUNNING, AND HOW TO GET THE NEWEST.
               *
@@ -373,6 +366,31 @@ export default function Settings({
               }
               onPress={() => (updates.phase === 'ready' ? applyNow() : checkNow())}
             />
+            {/*
+              Three rows became one door.
+
+              Fixes, Log and Feedback were three rows in a column, and they
+              are three stages of the same evening: read what to try, read
+              what actually happened, tell somebody when neither helped. As
+              separate rows each looked like a different errand, and the one
+              in the middle looked like a developer's.
+            */}
+            {onOpenFixes || onOpenLog || onOpenReport ? (
+              <SetupRow
+                title="Troubleshooting"
+                status="What to try, the log, and telling us"
+                onPress={() => setPage('trouble')}
+              />
+            ) : null}
+            {/* Openable again, because a tour worth showing once is worth
+                finding later — and somebody who skipped it on the first
+                launch has no other way back to it. */}
+            {/* The way back into the walkthrough, named the way its own last
+                screen promises: "Replay this anytime in Settings → Show the
+                walkthrough." */}
+            {onReplay ? (
+              <SetupRow title={REPLAY} status="The setup, from the start" onPress={onReplay} />
+            ) : null}
           </View>
 
           {/*
@@ -607,6 +625,52 @@ export default function Settings({
             */}
             {onOpenConnect ? (
               <Press label="How do I connect a computer?" onPress={onOpenConnect} />
+            ) : null}
+
+            {/*
+              PLAYING WITH NO INTERNET, told to the people who paid for the app.
+              
+              "Let's make that some kind of option in the app or to tell people
+              how to do it to connect without internet and give instructions to
+              people that have already unlocked it."
+
+              The route is real and it is the only one that works in a room with
+              no signal, but it was advertised in the wrong place: the website's
+              signed-out screen, headed "no account, no code", where it read as
+              a way around paying. It is off that screen now. This is where it
+              belongs instead — behind the unlock, told to somebody who has
+              already bought the thing.
+
+              AND IT IS NOT THIS APP THAT DOES IT, which is the part that has to
+              be said plainly rather than implied. Everything here goes through
+              the relay, which is on the internet; there is no code in this app
+              that speaks to a computer over wifi, and pretending otherwise
+              would have somebody trying it on a stage. What works is the phone's
+              WEB BROWSER on the computer's own page, so that is what the
+              instructions say to open.
+
+              `mayDrive` rather than `purchase.unlocked` on purpose: it also says
+              yes when the store could not be reached, and a person whose signal
+              is bad is exactly the person who needs to read this.
+            */}
+            {mayDrive(purchase) ? (
+              <View style={{ gap: space.sm }}>
+                <Section>Playing with no internet</Section>
+                <Text style={{ color: color.silkDim, fontSize: font.small }}>
+                  This app reaches your computer over the internet, so it needs a signal. For a room
+                  that has none, there is another way round and it does not use this app.
+                </Text>
+                <Text style={{ color: color.silkDim, fontSize: font.small }}>
+                  Put the phone on the same wifi as the computer, then open the computer&rsquo;s
+                  address in the phone&rsquo;s web browser. The computer shows that address in its
+                  menu bar, next to the Fractal icon. You get the same screens, and no part of it
+                  goes near the internet.
+                </Text>
+                <Note>
+                  What you change there is kept by that browser rather than in your account, so it
+                  does not follow you to this app or to another phone.
+                </Note>
+              </View>
             ) : null}
 
             {/*

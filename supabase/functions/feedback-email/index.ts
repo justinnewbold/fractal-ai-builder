@@ -19,8 +19,8 @@
  *
  *   RESEND_API_KEY   from resend.com. The only one that is required.
  *   FEEDBACK_TO      where reports land (default: the address below)
- *   FEEDBACK_FROM    who they come from; must be a domain verified with Resend,
- *                    or their onboarding@resend.dev while testing
+ *   FEEDBACK_FROM    who they come from. Optional now: with nothing set this
+ *                    sends from noreply@newbold.cloud, which is verified.
  *
  * There is deliberately no secret to keep in step by hand. An earlier version
  * had one — FEEDBACK_HOOK_SECRET here, the same string in Vault — and that is
@@ -40,12 +40,22 @@ const RESEND = 'https://api.resend.com/emails'
 /** Where reports go when nothing says otherwise. */
 const DEFAULT_TO = 'justinnewbold@gmail.com'
 
-/**
- * Resend will only send from a domain you have proved you own. `resend.dev` is
- * theirs and works immediately, which is what makes the first email arrive on
- * the day this is set up rather than after a DNS change has propagated.
+/*
+ * THE DOMAIN IS VERIFIED NOW, so this is the real one.
+ *
+ * It used to be `onboarding@resend.dev` — Resend's own address, which works
+ * the day you sign up and is why it was written that way. What the comment
+ * did not say is the catch: that address may only send to the ONE address
+ * that owns the Resend account. Every other recipient is refused outright.
+ *
+ * Which is exactly what happened. "Send link" to an address that was not his
+ * gmail came back "The mail service refused it", and the reason was not the
+ * app or the key — it was this line, plus a newbold.cloud that had been
+ * sitting unverified since December with none of its three DNS records ever
+ * added. The records are in now and the domain is proved, so the fallback is
+ * the domain rather than the practice address.
  */
-const DEFAULT_FROM = 'Fractal Remote <onboarding@resend.dev>'
+const DEFAULT_FROM = 'Fractal Remote <noreply@newbold.cloud>'
 
 /**
  * The secret the trigger sends, read from where the database keeps it.

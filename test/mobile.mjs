@@ -3225,9 +3225,41 @@ export function run(test) {
     assert.match(screen, /TYPE THIS ON YOUR COMPUTER/, 'nothing says which machine the address is for')
     assert.match(screen, /\{DOWNLOADS_URL\}/, 'the address to type is not shown')
     assert.match(screen, /sendDownloadLink\(email\)/, 'there is no way to send the link to a computer')
-    /* And it still says what the arrangement IS, which is the question the
-       screen exists to answer. */
-    assert.match(screen, /The phone never talks to the unit directly/, 'the phone no longer explains why a computer is needed at all')
+    /*
+     * AND NOTHING ELSE. The prose went the same way the routes did.
+     *
+     * "Remove all text except what's in the screen shot and make the stuff
+     * that's visible in the screenshot larger. The [same thing] is on the
+     * download page that they go to, so we don't need it here."
+     *
+     * Three paragraphs outlasted the routes: what the USB cable is for, what
+     * to do once it is installed, and the one-program-one-port warning. All
+     * three are on the page this screen sends somebody to, all three are
+     * about the machine they are not holding, and on a phone they pushed the
+     * two things you CAN act on down the screen.
+     */
+    for (const [pattern, what] of [
+      [/never talks to the unit directly/, 'the USB explanation is back on the phone'],
+      [/Once it is installed/, 'the after-install steps are back on the phone'],
+      [/Only one program at a time/, 'the USB port warning is back on the phone'],
+      [/What it is, and how to get the app onto it/, 'the subtitle promises an explanation this screen no longer gives']
+    ]) {
+      assert.ok(!pattern.test(screen), what)
+    }
+
+    /* And what is left is big enough to read at arm's length: the address and
+       the email box at title size, the two labels a step up from micro. */
+    assert.match(
+      screen,
+      /\{DOWNLOADS_URL\}[\s\S]{0,40}<\/Text>/,
+      'the address is no longer the thing the screen is built around'
+    )
+    assert.ok(!/fontSize: font\.micro/.test(screen), 'a label on this screen is back at the smallest size in the app')
+    assert.equal(
+      (screen.match(/fontSize: font\.title/g) || []).length,
+      3,
+      'the heading, the address and the email box are not all at title size'
+    )
 
     assert.match(src, /The Mac app/, 'the route that actually works is not offered')
     /*
@@ -3290,8 +3322,15 @@ export function run(test) {
       assert.ok(!src.includes(gone), `the connect screen still points at ${gone}, which no longer exists`)
     }
 
-    /* The thing nobody knows and everything else depends on. */
-    assert.match(screen, /Your unit plugs into a computer with a USB cable/, 'the page never says why a computer is involved')
+    /*
+     * THE THING NOBODY KNOWS IS ON THE DOWNLOADS PAGE, not on the phone.
+     *
+     * Both of these used to be asserted against the phone screen as well.
+     * They are still required — of shared/ways-in.mjs, which is what the
+     * downloads page draws, and which is read on the computer the sentences
+     * are actually about.
+     */
+    assert.match(src, /plugs into a computer|USB cable/, 'the downloads page never says why a computer is involved')
     /* And the trap that eats an evening: two programs, one port. */
     assert.match(src, /Only one program can hold the USB port/, 'nothing warns about the editor already holding the port')
 
@@ -3306,6 +3345,89 @@ export function run(test) {
     const signIn = read('mobile/src/screens/SignIn.js')
     assert.match(signIn, /if \(helping\) return <Connect onBack=/, 'the sign-in screen cannot reach it')
     assert.match(signIn, /How do I connect a computer\?/, 'the sign-in screen does not offer it')
+  })
+
+  test('the Setup list is in the order he put it in', () => {
+    /*
+     * "Move the amp and pedals button to the top of the list." Then: "Move
+     * updates, troubleshooting, and the show the tutorial again underneath
+     * the about section."
+     *
+     * Two instructions, a few months apart, and between them the list drifted
+     * — Troubleshooting ended up between renaming presets and buying the app,
+     * and the walkthrough between buying it and the version number. Nothing
+     * decided that. Each row was added beside whatever it happened to be
+     * written next to, which is how a list nobody holds ends up ordered by
+     * the history of the file rather than by what anyone opens it for.
+     *
+     * So the order is held here. The split is his: everything somebody opens
+     * Settings FOR, then About, then the three you only go looking for when
+     * something is wrong or once, ever.
+     */
+    const settings = read('mobile/src/screens/Settings.js')
+    /* Only the rows on the front page, not the ones inside the pages it opens. */
+    const front = settings.slice(
+      settings.indexOf("{page === null ? ("),
+      settings.indexOf('THE TWO THAT ARE NOT DOORS')
+    )
+    const order = [...front.matchAll(/title=(?:"([^"]+)"|\{(?:purchase\.unlocked \? 'Full version' : '([^']+)'|(REPLAY))\})/g)]
+      .map((m) => m[1] || m[2] || m[3])
+
+    assert.deepEqual(order, [
+      'Amp & pedal names',
+      'Phone & computer',
+      'Rename presets and scenes',
+      'Unlock the full version',
+      'About',
+      'Updates',
+      'Troubleshooting',
+      'REPLAY'
+    ], 'the Setup rows are not in the order he asked for')
+  })
+
+  test('playing with no internet is explained, and only to somebody who paid', () => {
+    /*
+     * "Let's make that some kind of option in the app or to tell people how to
+     * do it to connect without internet and give instructions to people that
+     * have already unlocked it."
+     *
+     * The route is real and it is the only one that works in a room with no
+     * signal. It was advertised in the wrong place — the website's signed-out
+     * screen, headed "no account, no code", where it read as the way around
+     * paying. Off that screen now, and told here instead, behind the unlock.
+     */
+    const settings = read('mobile/src/screens/Settings.js')
+    const shown = settings.replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ')
+
+    assert.match(shown, /Playing with no internet/, 'nothing tells a paid-up person how to play without a signal')
+
+    /*
+     * BEHIND THE UNLOCK, and behind `mayDrive` rather than `unlocked` alone.
+     * That one also says yes when the store could not be answered, and the
+     * person whose signal is bad is exactly the person reading this.
+     */
+    assert.match(shown, /\{mayDrive\(purchase\) \?/, 'the instructions are shown to somebody who has not paid')
+    assert.match(settings, /import \{ mayDrive \} from '\.\.\/lib\/unlock-rule'/, 'the gate is not the tested rule')
+
+    /*
+     * AND IT SENDS THEM TO THE BROWSER, because this app cannot do it.
+     *
+     * Everything here goes through the relay, which is on the internet. There
+     * is no code in mobile/ that speaks to a computer over wifi, so any wording
+     * implying this app connects without a signal would have somebody trying it
+     * on a stage. The instruction names the browser and the menu bar.
+     */
+    assert.match(shown, /web browser/, 'the instructions do not say to use the browser')
+    assert.match(shown, /menu bar/, 'nothing says where to find the address')
+    assert.match(shown, /kept by that browser rather than in your account/, 'nothing says where those settings live')
+
+    /* The claim the phone app can do it itself stays false, so it stays unmade. */
+    for (const src of ['mobile/src/lib/relay.js', 'mobile/src/lib/rig.js', 'mobile/src/lib/device.js']) {
+      assert.ok(
+        !/http:\/\/\d+\.\d+\.\d+\.\d+|\.local:|localhost:/.test(read(src)),
+        `${src} talks to a computer over the wifi, so the instructions above are out of date`
+      )
+    }
   })
 
   test('a report carries the log only when it is a bug, and only the useful end of it', async () => {
