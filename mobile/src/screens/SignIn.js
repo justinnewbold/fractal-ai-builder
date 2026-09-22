@@ -156,9 +156,20 @@ export default function SignIn({ onSignedIn, onDemo }) {
             {/*
               ONE SENTENCE NOW, because there is one way in. It used to
               switch on whether the code box or the email box was showing.
+
+              AND IT NO LONGER PROMISES TWO THINGS THAT ARE NOT TRUE.
+
+              "Read the text. We don't have AI features in this app anymore."
+
+              It said "your presets and what the AI has learned about your
+              taste follow you to any device". The AI half is gone from the
+              app. The other half was wrong on its own terms: presets live on
+              the unit, not in an account. What an account actually carries
+              between devices is the setlists you built and the presets you
+              starred, so that is what it says. MY WORDING.
             */}
-            Sign in with the same account as the computer your unit is plugged into. Your presets and
-            what the AI has learned about your taste follow you to any device.
+            Sign in with the same account as the computer your unit is plugged into. Your setlists
+            and starred presets follow you to any device.
           </Text>
         </View>
 

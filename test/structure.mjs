@@ -3036,7 +3036,14 @@ export function run(test) {
     assert.match(connect, /className="connect-local"/, 'the hosted screen offers only the account route')
     assert.match(connect, /no account/i, 'the local route does not say the thing that makes it a choice')
     assert.match(connect, /stays\s+on this phone/i, 'nothing says where the settings live on the local route')
-    assert.match(connect, /follow you\s+to any device/i, 'nothing says what signing in buys')
+    /*
+     * What signing in buys, which is now stated accurately: the setlists and
+     * the stars. It used to say "your presets and what the AI has learned
+     * about your taste" — "we don't have AI features in this app anymore",
+     * and presets were never in the account either. They live on the unit.
+     */
+    assert.match(connect, /setlists and the presets you starred follow you to\s+any device/i, 'nothing says what signing in buys')
+    assert.ok(!/\bAI\b/.test(connect.replace(/\/\*[\s\S]*?\*\//g, ' ')), 'the browser advertises an AI the app does not have')
     // And it goes somewhere: an address typed in lands on the Mac's own page.
     assert.match(connect, /window\.location\.href = `http:\/\//, 'the address typed in goes nowhere')
     assert.match(connect, /:5056/, 'a bare hostname is not given the port the computer serves on')

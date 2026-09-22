@@ -193,9 +193,9 @@ export default function DebugLog({ device, link }) {
       </div>
 
       <p className="hint">
-        Everything that happened this session, in order — what the AI did, what was written to the
-        unit and what it said back, every error. When something goes wrong, share it as a file and
-        attach that to the chat — or copy it and paste, if you would rather.
+        Everything that happened this session, in order — what was written to the unit and what it
+        said back, every error. When something goes wrong, share it as a file and attach that to the
+        chat — or copy it and paste, if you would rather.
       </p>
 
       {fallback ? (

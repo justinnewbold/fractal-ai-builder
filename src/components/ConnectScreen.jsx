@@ -159,9 +159,9 @@ export default function ConnectScreen({ link, onConnect, onRetry, onSwitchAccoun
             <div className="connect-account">
               <p className="silk-label">Or sign in — to save and sync</p>
               <p className="hint">
-                Signing in instead means your presets and what the AI has learned about your taste
-                follow you to any device, anywhere &mdash; not just at home. Set the computer up with the
-                same account and no code is needed.
+                Signing in instead means your setlists and the presets you starred follow you to
+                any device, anywhere &mdash; not just at home. Set the computer up with the same
+                account and the two find each other.
               </p>
               <div className="connect-local-row">
                 <button className="chip" onClick={onConnect} disabled={busy}>

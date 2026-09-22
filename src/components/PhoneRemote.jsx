@@ -92,9 +92,11 @@ function MacSide({ link, email, onAction, busy, error }) {
           </button>
         </div>
         {error ? <p className="hint tone-bad">{String(error)}</p> : null}
+        {/* No AI in this app any more, and presets were never in the
+            account: what follows you between devices is the setlists and the
+            stars. */}
         <p className="hint">
-          An account also means your presets and what the AI has learned about your taste follow you
-          to any device.
+          An account also means your setlists and starred presets follow you to any device.
         </p>
       </>
     )
