@@ -345,7 +345,22 @@ export const P9 = {
   tips: [
     { key: 'play', label: 'PLAY', body: 'Fast controls for performing.' },
     { key: 'edit', label: 'EDIT', body: 'Your full signal chain.' },
-    { key: 'save', label: 'SAVE', body: 'Changes are live now. Save permanently on the computer.' }
+    /*
+     * CHANGED FROM THE PDF, because what it said stopped being true.
+     *
+     * It read "Changes are live now. Save permanently on the computer." —
+     * and it was right when it was written: the computer refused a slot
+     * write from a handset, on purpose.
+     *
+     * "All changes made on the phone can be saved, and should be able to be
+     * saved to the unit."
+     *
+     * They can, and they are. The phone asks the computer to write the slot,
+     * the computer writes it, and the phone is told the moment it lands. So
+     * the tip named a limit the app has not had for a while, on the screen a
+     * new person reads first. MY WORDING for the replacement.
+     */
+    { key: 'save', label: 'SAVE', body: 'Changes are live. Save writes them into the slot on your unit.' }
   ],
   go: 'Open Play',
   foot: 'Replay this anytime in Settings → Show the walkthrough.',

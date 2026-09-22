@@ -249,10 +249,23 @@ export default function SignIn({ onSignedIn, onDemo }) {
           }}
         />
 
-        <Text style={{ color: color.silkFaint, fontSize: font.micro, lineHeight: 18 }}>
-          Saving to a slot, backups and firmware stay at the computer. Your computer refuses them from a
-          distance, and it is right to.
-        </Text>
+        {/*
+          THE LINE THAT USED TO CLOSE THIS SCREEN IS GONE, AND IT WAS WRONG.
+
+          "All changes made on the phone can be saved, and should be able to
+          be saved to the unit. Remove this text."
+
+          It read: "Saving to a slot, backups and firmware stay at the
+          computer. Your computer refuses them from a distance, and it is
+          right to." True when it was written — the computer did refuse a slot
+          write from a handset, deliberately.
+
+          It has not been true since the save flow was built. A phone asks
+          the computer to write the slot, the computer does the writing, and
+          the phone is told the moment it lands (see lib/saveViaComputer and
+          components/SaveToSlot). So the sentence described a limit the app no
+          longer has, on the first screen somebody reads.
+        */}
       </ScrollView>
     </KeyboardAvoidingView>
   )

@@ -54,9 +54,15 @@ export default function SaveBar({
    * and useless after ten minutes of work on a tone with the amp across the room.
    *
    * The request now travels the host's document store — the one road the relay
-   * leaves open — and the page at the Mac carries it out. So the button saves;
-   * it just says who does the writing, and waits for word back rather than
-   * claiming a slot was written the moment it was asked for.
+   * leaves open — and the page at the Mac carries it out. So the button saves,
+   * and waits for word back rather than claiming a slot was written the moment
+   * it was asked for.
+   *
+   * It used to SAY who does the writing, in its label: "Save at the computer".
+   * "All changes made on the phone can be saved, and should be able to be
+   * saved to the unit." They can, and that label read as a job to go and do
+   * somewhere else. Which machine performs the write is a true thing and not
+   * the presser's problem, so it is a tooltip now and the button says Save.
    */
   const remote = remoteActive()
 
@@ -145,17 +151,15 @@ export default function SaveBar({
           {hint === 'dot' && dirty && !working ? (
             <span className="save-hint-dot" role="status" aria-label="Unsaved — Save to keep" />
           ) : null}
-          {working
-            ? compact
-              ? 'Saving…'
-              : remote
-                ? 'Saving at the computer…'
-                : 'Saving…'
-            : !dirty && justSaved
-              ? '✓ Saved'
-              : remote && !compact
-                ? 'Save at the computer'
-                : 'Save'}
+          {/*
+            JUST "SAVE", EITHER END.
+
+            It used to read "Save at the computer" from a phone, which was
+            meant as where the write happens and lands as a job to go and do
+            there. The button saves. That the computer performs the write is
+            true and is not the presser's problem.
+          */}
+          {working ? 'Saving…' : !dirty && justSaved ? '✓ Saved' : 'Save'}
         </button>
       </div>
     </div>
