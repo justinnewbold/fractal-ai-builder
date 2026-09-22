@@ -357,13 +357,44 @@ export default function App() {
     }
   }, [])
 
+  /*
+   * THE LINK, AND IT HAS TO WATCH THE DEMO TOO.
+   *
+   * "This says I'm connected to an AM4 which I have not connected to in
+   * weeks. I exited the demo and that's what it shows."
+   *
+   * It did. Leaving the demo left the whole screen dressed as a live rig: the
+   * AM4's name in the bar, its 104 slots, its four scenes, its chain, and
+   * CONNECTED in green beside them.
+   *
+   * WHY. startLink() short-circuits in the demo — there is no far end to poll,
+   * so it sets `link: 'connected', macName: 'the demo'` and returns. Correct
+   * while the demo is on; the bar says DEMO rather than CONNECTED because
+   * TopBar asks the demo store, not the link.
+   *
+   * But this effect depended on `auth` alone. Turning the demo off does not
+   * touch `auth` — Settings' "Leave the demo" calls setDemo(false) and nothing
+   * else — so the effect never re-ran, stopLink() never happened, and that
+   * made-up 'connected' stayed. The word in the bar changed from DEMO to
+   * CONNECTED the moment `demo` went false, and every number under it was
+   * still the simulation's.
+   *
+   * Depending on `demo` as well is the whole fix: the cleanup runs stopLink(),
+   * which resets the rig store and the link state, and startLink() then does
+   * the real work with the demo off. It is right in the other direction too —
+   * entering the demo now clears a real rig's presets instead of leaving them
+   * under a simulated unit's name.
+   *
+   * remoteDisconnect() drops the channel, not the account, so the session is
+   * still there to rejoin with.
+   */
   useEffect(() => {
     if (auth !== 'in') return undefined
     startLink()
     return () => {
       stopLink()
     }
-  }, [auth])
+  }, [auth, demo])
 
   /*
    * Setlists and stars, kept in step with the Mac.

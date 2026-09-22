@@ -3412,6 +3412,59 @@ export function run(test) {
     )
   })
 
+  test('leaving the demo takes the simulated rig with it', () => {
+    /*
+     * "This says I'm connected to an AM4 which I have not connected to in
+     * weeks. I exited the demo and that's what it shows."
+     *
+     * It did. Leaving the demo left the screen dressed as a live rig: the
+     * AM4's name in the bar, its 104 slots, its four scenes, its chain, and
+     * CONNECTED in green beside them.
+     *
+     * startLink() short-circuits in the demo — there is no far end to poll, so
+     * it sets link 'connected' with macName 'the demo' and returns. That is
+     * right while the demo is on, because TopBar asks the DEMO store for the
+     * word and says DEMO.
+     *
+     * The effect that runs it depended on `auth` alone. Turning the demo off
+     * does not touch `auth` — Settings' "Leave the demo" calls setDemo(false)
+     * and nothing else — so it never re-ran, stopLink() never happened, and
+     * the invented 'connected' stayed while the word in the bar changed to
+     * CONNECTED underneath it.
+     */
+    const app = read('mobile/App.js')
+
+    /* The demo's short-circuit is still there, because it is not the bug. */
+    const link = read('mobile/src/lib/link.js')
+    assert.match(link, /if \(isDemo\(\)\) \{/, 'the demo polls a far end that does not exist')
+    assert.match(link, /link: 'connected', macName: 'the demo'/, 'the demo stopped answering its own screens')
+
+    /* And stopLink is what clears the rig, so it has to be the thing that runs. */
+    assert.match(link, /resetRig\(\)/, 'stopping the link leaves the last unit on screen')
+
+    /*
+     * THE FIX, held exactly: the effect watches the demo as well as auth.
+     * Whitespace-flattened, because a dependency array is the kind of line a
+     * formatter moves.
+     */
+    const flat = app.replace(/\s+/g, ' ')
+    assert.match(
+      flat,
+      /if \(auth !== 'in'\) return undefined startLink\(\) return \(\) => \{ stopLink\(\) \} \}, \[auth, demo\]\)/,
+      'leaving the demo no longer tears the link down, so a simulated rig stays on screen as a real one'
+    )
+
+    /*
+     * AND THE ROUTE THAT REPORTED IT. Settings' way out is setDemo(false) on
+     * its own — which is fine now, and was the whole fault before.
+     */
+    assert.match(
+      read('mobile/src/screens/Settings.js'),
+      /label="Leave the demo"[\s\S]{0,120}setDemo\(false\)/,
+      'the way out of the demo moved; this test names it'
+    )
+  })
+
   test('the Setup list is in the order he put it in', () => {
     /*
      * "Move the amp and pedals button to the top of the list." Then: "Move
