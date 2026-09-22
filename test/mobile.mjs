@@ -3412,6 +3412,38 @@ export function run(test) {
     )
   })
 
+  test('the unlock row is gone once there is nothing left to unlock', () => {
+    /*
+     * "This is the setup page when the phone has already been unlocked. The
+     * unlock full version needs to disappear if it has been unlocked."
+     *
+     * It used to stay and reword itself to "Full version · Unlocked — thank
+     * you": a row that can be pressed to be told a thing it has already said.
+     * Nobody opens Setup to be thanked.
+     */
+    const settings = read('mobile/src/screens/Settings.js')
+    const shown = settings.replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ')
+
+    assert.match(shown, /\{purchase\.unlocked \? null : \(/, 'the unlock row still draws for somebody who has paid')
+    assert.ok(!/Unlocked — thank you/.test(shown), 'the row still rewords itself instead of going')
+
+    /*
+     * AND THE APPLE RULE IS UNTOUCHED, which is the only reason to be careful
+     * here: a purchase has to be restorable and apps are rejected for hiding
+     * it. That rule is about somebody who CANNOT reach what they bought, and
+     * `unlocked` false is exactly that person — a new handset reads false
+     * until a restore says otherwise. They still get the row, and it still
+     * says restoring is on it.
+     */
+    assert.match(
+      shown,
+      /title="Unlock the full version"[\s\S]{0,400}Drive a real rig, or restore a purchase/,
+      'somebody who paid and changed phones has no way back to what they own'
+    )
+    /* The paywall behind it keeps its own Restore button, checked elsewhere. */
+    assert.match(shown, /onPress=\{onUnlock\}/, 'the row no longer opens the paywall')
+  })
+
   test('leaving the demo takes the simulated rig with it', () => {
     /*
      * "This says I'm connected to an AM4 which I have not connected to in

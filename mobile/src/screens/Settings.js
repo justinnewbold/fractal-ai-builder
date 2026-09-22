@@ -304,22 +304,35 @@ export default function Settings({
               * you could reach by exactly one route: signing in with a pairing
               * code you had not paid for. A person who paid, changed phones
               * and opened the demo had no way back to what they owned.
+              *
+              * AND IT GOES ENTIRELY ONCE THEY HAVE PAID. "The unlock full
+              * version needs to disappear if it has been unlocked."
+              *
+              * It used to stay, reading "Full version · Unlocked — thank you",
+              * which is a row that can be pressed to be told a thing it has
+              * already said. Nobody opens Setup to be thanked.
+              *
+              * The Apple rule is untouched by this, because it is about
+              * somebody who CANNOT reach what they bought. `unlocked` false is
+              * exactly that person — a new handset reads false until a restore
+              * says otherwise — and they still get the row, still worded so
+              * restoring is on it.
               */}
-            <SetupRow
-              title={purchase.unlocked ? 'Full version' : 'Unlock the full version'}
-              status={
-                purchase.unlocked
-                  ? 'Unlocked — thank you'
-                  : purchase.price
+            {purchase.unlocked ? null : (
+              <SetupRow
+                title="Unlock the full version"
+                status={
+                  purchase.price
                     ? `Drive a real rig · ${purchase.price}`
                     : /* Never "Restore a purchase" as the only wording when the
                          store is simply not ready — that reads as though buying
                          is not on offer at all, which is how the whole thing
                          came to be invisible. */
                       'Drive a real rig, or restore a purchase'
-              }
-              onPress={onUnlock}
-            />
+                }
+                onPress={onUnlock}
+              />
+            )}
             <SetupRow title="About" status={`v${APP_VERSION}`} onPress={() => setPage('about')} />
           </View>
 
