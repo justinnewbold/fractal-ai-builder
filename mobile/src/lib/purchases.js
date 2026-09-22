@@ -83,7 +83,23 @@ let state = {
   /** What it costs, as the store says it locally — "$9.99", "£8.99". */
   price: null,
   /** Why purchasing is off, when it is. */
-  why: null
+  why: null,
+  /*
+   * And the store's own account of it, for the one case where "why" is too
+   * vague to act on.
+   *
+   * "Still not showing ae to purchase. And yes, I downloaded this directly
+   * from the play console tester site." The paywall said the shelves were
+   * empty, which was true and useless: empty because Play has no such
+   * product, because RevenueCat has no offering, or because the fetch failed
+   * are three different afternoons of work, and the app knew which and threw
+   * it away into a log nobody was reading.
+   *
+   * Facts only, and the store's words where there are any. Null whenever
+   * there is something to sell, which is every customer who ever sees this
+   * screen.
+   */
+  detail: null
 }
 
 const watchers = new Set()
@@ -398,20 +414,37 @@ const loadPrice = async () => {
       null
     if (found) {
       pkg = found
-      set({ price: found.product?.priceString || null })
+      set({ price: found.product?.priceString || null, detail: null })
       return true
     }
     const products = await api.getProducts([PRODUCT_ID])
     if (products?.[0]) {
-      set({ price: products[0].priceString || null })
+      set({ price: products[0].priceString || null, detail: null })
       return true
     }
-    logDebug('purchases: the store returned no offering and no product')
+    /*
+     * WHICH SIDE IS EMPTY, because the two are fixed in different places.
+     *
+     * A count of nought means RevenueCat has no offering configured — that is
+     * its dashboard. A count above nought with nothing sellable in it means
+     * the offering exists but its packages point at products the store will
+     * not sell, which is App Store Connect or the Play Console. Either way
+     * getProducts has just asked the store for the item by name and been told
+     * no, so the number and the id together say where to go.
+     */
+    const count = Object.keys(offerings?.all || {}).length
+    const detail = `RevenueCat returned ${count} offering${count === 1 ? '' : 's'}; the store has no ${PRODUCT_ID}.`
+    set({ detail })
+    logDebug(`purchases: ${detail}`)
     return false
   } catch (err) {
     /* Could not find out. Treat it as nothing to sell, which unlocks rather
-       than locks — the same direction every other unknown goes here. */
-    logDebug(`purchases: no price (${err?.message || err})`)
+       than locks — the same direction every other unknown goes here. The
+       store's own sentence is kept as it came: it names the billing fault,
+       and any rewording of it here would be a guess laid over a fact. */
+    const detail = String(err?.message || err)
+    set({ detail })
+    logDebug(`purchases: no price (${detail})`)
     return false
   }
 }
