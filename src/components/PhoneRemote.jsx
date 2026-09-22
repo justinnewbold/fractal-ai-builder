@@ -92,9 +92,11 @@ function MacSide({ link, email, onAction, busy, error }) {
           </button>
         </div>
         {error ? <p className="hint tone-bad">{String(error)}</p> : null}
+        {/* No AI in this app any more, and presets were never in the
+            account: what follows you between devices is the setlists and the
+            stars. */}
         <p className="hint">
-          An account also means your presets and what the AI has learned about your taste follow you
-          to any device.
+          An account also means your setlists and starred presets follow you to any device.
         </p>
       </>
     )
@@ -132,9 +134,12 @@ function PhoneSide({ link, email, onAction, busy }) {
   if (link.link === 'connected') {
     return (
       <>
+        {/* Was "Saving to a slot happens at the computer", which read as a
+            job to go and do there. The computer performs the write, but the
+            phone asks for it and hears back — see lib/saveViaComputer. */}
         <p className="hint">
-          Everything you change here happens on the unit at the computer. Saving to a slot happens at
-          the computer.
+          Everything you change here happens on the unit at the computer, and Save writes it into
+          the slot. The computer does that part for you.
         </p>
         <div className="history-actions">
           <button className="chip" onClick={() => onAction('disconnect')} disabled={busy}>

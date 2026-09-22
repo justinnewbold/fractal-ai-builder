@@ -7,7 +7,7 @@ import { Platform } from 'react-native'
 import { UNITS } from '../lib/demoUnits'
 import { setDemo, setDemoUnit } from '../lib/demo'
 import { useRig } from '../lib/rig'
-import { restorePurchase, usePurchase } from '../lib/purchases'
+import { restorePurchase } from '../lib/purchases'
 import { sendDownloadLink, DOWNLOADS_URL } from '../lib/downloadLink'
 import Note from '../components/Note'
 import Press from '../components/Press'
@@ -46,7 +46,6 @@ export default function Onboarding({ onEnterDemo, onAccount, replay, onClose }) 
   const [busy, setBusy] = useState(false)
   const [said, setSaid] = useState(null)
   const [error, setError] = useState(null)
-  const purchase = usePurchase()
 
   const unitName = UNITS.find((u) => u.key === unit)?.name || UNITS[0].name
 
@@ -211,13 +210,14 @@ export default function Onboarding({ onEnterDemo, onAccount, replay, onClose }) 
 
       {at === 'mode' ? (
         <>
+          {/* No heading: the two cards under this say what they are, and
+              "WHERE DO YOU WANT TO START?" asked the question the screen
+              already is. */}
           <Count>{P3.count}</Count>
-          <Head>{P3.head}</Head>
 
           <Card>
-            <Text style={{ color: color.signal, fontSize: font.micro, letterSpacing: 1.2 }}>
-              {P3.demo.tag}
-            </Text>
+            {/* The FREE tag is gone too — the button on this card says "Start
+                free demo" and the eyebrow says EXPLORE THE APP. */}
             <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.2 }}>
               {P3.demo.eyebrow}
             </Text>
@@ -241,10 +241,10 @@ export default function Onboarding({ onEnterDemo, onAccount, replay, onClose }) 
             <Text style={{ color: color.silk, fontSize: font.lead, fontWeight: '700' }}>
               {P3.real.title}
             </Text>
-            <Text style={{ color: color.silkDim, fontSize: font.small }}>{P3.real.body}</Text>
-            {/* The store's price where it knows one, his wording where it
-                does not — see FALLBACK_PRICE in shared/onboarding.mjs. */}
-            <Press label={P3.real.go(purchase.price)} height={TAP} onPress={() => go('app')} />
+            {/* No price on this button: it takes no money. It opens the
+                computer-app step, and the store's own sheet quotes the price
+                at the paywall. "Have the button just say 'Unlock'." */}
+            <Press label={P3.real.go} height={TAP} onPress={() => go('app')} />
           </Card>
 
           <Press label={P3.restore} disabled={busy} height={TAP} onPress={() => restore('app')} />
@@ -270,7 +270,6 @@ export default function Onboarding({ onEnterDemo, onAccount, replay, onClose }) 
           */}
           <Press label={P7.account} height={TAP} onPress={() => onAccount?.()} />
           {said ? <Note>{said}</Note> : null}
-          <Note>{P3.foot}</Note>
         </>
       ) : null}
 
@@ -315,12 +314,10 @@ export default function Onboarding({ onEnterDemo, onAccount, replay, onClose }) 
           <Eyebrow>{P6.eyebrow}</Eyebrow>
           <Head>{P6.head}</Head>
           {/*
-            Both, from the one button the copy gives us. "Yes - show me the
-            scanner" promises a scanner, so it opens one rather than landing
-            on a screen with a camera you have to ask for again. Arriving here
-            from "I already have a pairing code" does NOT open it: that route
-            says they have the code, and a camera nobody asked for is a
-            permission prompt nobody asked for.
+            The one way on from here. An account is the only thing that joins
+            a phone to a computer, so the button goes to sign-in — and the
+            label says so, where it used to promise a scanner that no longer
+            exists.
           */}
           <Press
             label={P6.yes}

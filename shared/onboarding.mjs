@@ -217,11 +217,38 @@ export const P2 = {
 }
 
 /** P3 — demo or real rig. */
+/*
+ * P3 — the two ways in, and nothing else.
+ *
+ * "How do we verify their computer connects before purchasing? Didn't know
+ * we built that. If we don't actually do that then remove it. Also remove
+ * the text to the bottom that says free forever. And the text at top that
+ * says free. And remove the text that says where do you want to start."
+ *
+ * FOUR LINES GONE, and one of them was my fault.
+ *
+ *   'We verify the computer connection before purchase.' — we DID. The
+ *   walkthrough paired with a code, said "Connection verified", and offered
+ *   the unlock on the strength of it. When the codes went out, pairing left
+ *   the walkthrough and that step became unreachable, so it was removed. This
+ *   line was left behind describing a thing the app no longer does.
+ *
+ *   'WHERE DO YOU WANT TO START?' — the two cards under it say what they
+ *   are. A heading that asks the question the screen already is, is a line
+ *   spent on nothing.
+ *
+ *   'FREE' — the card says "Start free demo" and the eyebrow says EXPLORE
+ *   THE APP. Three labels on one card, two of them saying the same thing.
+ *
+ *   'The demo stays free forever.' — said again at the bottom of a screen
+ *   whose first card already says free twice.
+ *
+ * What is left is the two choices, the way back for somebody who has paid,
+ * and the way in for somebody with an account.
+ */
 export const P3 = {
   count: '2 OF 2',
-  head: 'WHERE DO YOU WANT TO START?',
   demo: {
-    tag: 'FREE',
     eyebrow: 'EXPLORE THE APP',
     title: 'Try the demo',
     body: 'Use a simulated Fractal unit. Every screen works. No computer needed.',
@@ -230,11 +257,21 @@ export const P3 = {
   real: {
     eyebrow: 'CONTROL YOUR HARDWARE',
     title: 'Connect my real rig',
-    body: 'We verify the computer connection before purchase.',
-    go: (price) => `Set up  ·  ${price || FALLBACK_PRICE} once`
+    /*
+     * "Have the button just say 'Unlock'."
+     *
+     * It read "Set up  ·  $9.99 once", which put a price on a button that
+     * takes no money: pressing it opens the computer-app step, and the
+     * charge happens later at the paywall where the store's own sheet
+     * quotes the price. A price here reads as a till, two screens early.
+     *
+     * So this is the only card label in the walkthrough that is a plain
+     * string rather than a function of the store's price. The price still
+     * belongs on P8, which IS the paywall.
+     */
+    go: 'Unlock'
   },
-  restore: 'Already bought it? Restore purchase',
-  foot: 'The demo stays free forever.'
+  restore: 'Already bought it? Restore purchase'
 }
 
 /** P4 — which unit the demo pretends to be. */
@@ -274,7 +311,17 @@ export const P6 = {
   tag: 'CONNECT',
   eyebrow: 'CONNECT YOUR COMPUTER',
   head: 'Is Fractal Remote installed there?',
-  yes: 'Yes - show me the scanner',
+  /*
+   * WAS "Yes - show me the scanner", and there is no scanner.
+   *
+   * "I want the QR code gone and the scanner gone."
+   *
+   * The camera went with the QR code, and this button was left promising
+   * one. It has opened the sign-in screen ever since, because an account is
+   * the only way to join a phone to a computer now, so the label says that.
+   * MY WORDING. The plain hyphen matches the rest of his lines.
+   */
+  yes: 'Yes - sign in to connect',
   notYet: 'NOT YET  ·  THE COMPUTER APP IS FREE',
   platforms: [
     { key: 'mac', badge: 'M', label: 'MAC', go: 'Send link' },
@@ -345,7 +392,22 @@ export const P9 = {
   tips: [
     { key: 'play', label: 'PLAY', body: 'Fast controls for performing.' },
     { key: 'edit', label: 'EDIT', body: 'Your full signal chain.' },
-    { key: 'save', label: 'SAVE', body: 'Changes are live now. Save permanently on the computer.' }
+    /*
+     * CHANGED FROM THE PDF, because what it said stopped being true.
+     *
+     * It read "Changes are live now. Save permanently on the computer." —
+     * and it was right when it was written: the computer refused a slot
+     * write from a handset, on purpose.
+     *
+     * "All changes made on the phone can be saved, and should be able to be
+     * saved to the unit."
+     *
+     * They can, and they are. The phone asks the computer to write the slot,
+     * the computer writes it, and the phone is told the moment it lands. So
+     * the tip named a limit the app has not had for a while, on the screen a
+     * new person reads first. MY WORDING for the replacement.
+     */
+    { key: 'save', label: 'SAVE', body: 'Changes are live. Save writes them into the slot on your unit.' }
   ],
   go: 'Open Play',
   foot: 'Replay this anytime in Settings → Show the walkthrough.',

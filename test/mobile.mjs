@@ -2180,6 +2180,50 @@ export function run(test) {
     )
   })
 
+  test('no scrolling screen centres content it is too small to hold', () => {
+    /*
+     * "What is the button on the bottom that can't be seen and can't be
+     * scrolled to??"
+     *
+     * The sign-in screen's scroll view carried `flexGrow: 1` with
+     * `justifyContent: 'center'`. Together those centre the content inside a
+     * box the height of the screen, which is exactly right while the content
+     * is SHORTER than the screen — and this screen was short once.
+     *
+     * It grew: a title, a paragraph, two fields, four buttons, a note. Once
+     * the content is taller than that box, centring pushes the overflow out
+     * through BOTH ends, and a scroll view can only scroll within its content
+     * size. So the last thing on the screen was drawn below the bottom edge
+     * and no amount of dragging would reach it.
+     *
+     * The pair is the fault, not either half: flexGrow alone is what makes a
+     * short screen fill the space, and centring alone is harmless on a view
+     * that does not scroll. So the pair is what is checked, across every
+     * screen rather than the one it was found on.
+     */
+    const bad = []
+    for (const file of [
+      ...walk(new URL('../mobile/src/screens/', import.meta.url)),
+      ...walk(new URL('../mobile/src/components/', import.meta.url))
+    ]) {
+      const text = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' ')
+      /* Every contentContainerStyle in the file, brace-balanced enough for a
+         style object one level deep. */
+      for (const m of text.matchAll(/contentContainerStyle=\{\{([^{}]*)\}\}/g)) {
+        const style = m[1].replace(/\s+/g, ' ')
+        if (/flexGrow: 1/.test(style) && /justifyContent: 'center'/.test(style)) {
+          bad.push(`${String(file).split('/mobile/')[1]}: ${style.trim()}`)
+        }
+      }
+    }
+    assert.deepEqual(bad, [], `a scroll view centres content that can outgrow it:\n${bad.join('\n')}`)
+
+    /* And the screen it was found on starts at the top, with room under the
+       last thing on it for the home indicator. */
+    const signIn = read('mobile/src/screens/SignIn.js')
+    assert.match(signIn, /paddingBottom: space\.xxl/, 'the last thing on the sign-in screen sits under the home indicator')
+  })
+
   test('a knob keeps the finger the scroll view would otherwise take', () => {
     /*
      * "The knobs just scroll the screen up and down when trying to change them."
@@ -3158,12 +3202,32 @@ export function run(test) {
      * What they now carry is the honest difference between a signed app, an
      * unsigned one Windows argues about, and a route that builds from source.
      */
-    /* The routes themselves are the list both ends share; what is in
-       Connect.js is the phone's way of drawing them. Both are read, because
-       either one going missing takes the page down. */
+    /*
+     * THE ROUTES ARE THE BROWSER'S NOW, not the phone's.
+     *
+     * "This screen should not show up on the phone. A phone can't download
+     * desktop software, it also isn't suppose to go to GitHub directly."
+     *
+     * The phone drew all three routes with their install steps and a button
+     * under each that opened the GitHub releases page — every line of it
+     * about a machine the reader is not holding, ending in a download the
+     * handset cannot use. The list still exists and the browser still draws
+     * it, because the browser IS running on the computer in question.
+     *
+     * What the phone offers instead is the two things it can do about it: the
+     * address to type on the computer, and the link sent somewhere the
+     * computer can open it.
+     */
     const src = read('shared/ways-in.mjs')
     const screen = read('mobile/src/screens/Connect.js')
-    assert.match(screen, /WAYS\.map/, 'the phone no longer draws the routes')
+    assert.ok(!/WAYS/.test(screen), 'the phone lists the desktop download routes again')
+    assert.ok(!/Linking\.openURL/.test(screen), 'the phone can be sent to a download page again')
+    assert.match(screen, /TYPE THIS ON YOUR COMPUTER/, 'nothing says which machine the address is for')
+    assert.match(screen, /\{DOWNLOADS_URL\}/, 'the address to type is not shown')
+    assert.match(screen, /sendDownloadLink\(email\)/, 'there is no way to send the link to a computer')
+    /* And it still says what the arrangement IS, which is the question the
+       screen exists to answer. */
+    assert.match(screen, /The phone never talks to the unit directly/, 'the phone no longer explains why a computer is needed at all')
 
     assert.match(src, /The Mac app/, 'the route that actually works is not offered')
     /*
@@ -3174,7 +3238,6 @@ export function run(test) {
      */
     const { RELEASES, REPO } = await import('../shared/ways-in.mjs')
     assert.equal(RELEASES, `https://github.com/${REPO}/releases`, 'there is nowhere to get the Mac app from')
-    assert.ok(read('mobile/src/lib/ways-in.js').includes('RELEASES'), 'the phone carries no download link at all')
     /*
      * The list, not `/releases/latest`.
      *
@@ -3553,15 +3616,17 @@ export function run(test) {
     const web = read('src/App.jsx')
     assert.match(web, /waysFor\(thisComputer\)/, 'the browser does not sort the routes for this computer')
     assert.match(web, /osGuess\(typeof navigator === 'undefined' \? '' : navigator\.userAgent\)/, 'the browser never reads its own user agent')
+    /*
+     * The BROWSER draws it, and only the browser. The phone used to draw the
+     * same list unsorted — a phone cannot know which computer is on the desk
+     * — and now does not draw it at all: "a phone can't download desktop
+     * software, it also isn't suppose to go to GitHub directly." So the
+     * question of whether the phone sorts it cannot arise.
+     */
     const phone = read('mobile/src/screens/Connect.js')
-    assert.match(phone, /WAYS\.map/, 'the phone does not draw the routes')
-    /* Comments stripped first. The screen's own note EXPLAINS why it does not
-       sort, and naming the function it is not calling is the clearest way to
-       say that — reading it as a call is the mistake CLAUDE.md warns about,
-       one file along. */
     assert.ok(
-      !/waysFor|osGuess/.test(phone.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ')),
-      'the phone sorts the routes, which means it guessed which computer somebody owns'
+      !/WAYS|waysFor|osGuess/.test(phone.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ')),
+      'the phone is back in the business of listing desktop downloads'
     )
   })
 
@@ -6553,6 +6618,52 @@ export function run(test) {
    * idea a computer was part of the arrangement — and the purchase comes last,
    * after the computer has been proved to work.
    */
+  test('the start screen claims nothing the app does not do', () => {
+    /*
+     * "How do we verify their computer connects before purchasing? Didn't
+     * know we built that. If we don't actually do that then remove it. Also
+     * remove the text to the bottom that says free forever. And the text at
+     * top that says free. And remove the text that says where do you want to
+     * start."
+     *
+     * The first of those was a real promise the app used to keep, and the
+     * reason it stopped is in this repository: the walkthrough paired with a
+     * code, said "Connection verified", and offered the unlock on the
+     * strength of it. When the codes went out, pairing left the walkthrough
+     * and that step became unreachable, so it was removed — and the sentence
+     * advertising it was left behind on the screen before.
+     *
+     * A claim outliving the thing it describes is the shape of fault worth a
+     * test, so this holds the four lines out rather than trusting that
+     * nobody puts them back.
+     */
+    const copy = read('mobile/src/lib/onboarding.js')
+    const screen = read('mobile/src/screens/Onboarding.js')
+    const p3 = copy.slice(copy.indexOf('export const P3'), copy.indexOf('export const P4'))
+
+    for (const [gone, why] of [
+      ['verify the computer connection', 'the app promises to verify a connection before purchase, which it no longer does'],
+      ['WHERE DO YOU WANT TO START', 'the heading that asks the question the screen already is, is back'],
+      ["tag: 'FREE'", 'the demo card carries a third label saying what its button already says'],
+      ['stays free forever', 'the demo is told to be free a third time, at the bottom of the screen']
+    ]) {
+      assert.ok(!p3.includes(gone), why)
+    }
+    /* And nothing on the screen reaches for them. */
+    assert.ok(!/P3\.head|P3\.foot|P3\.demo\.tag|P3\.real\.body/.test(screen), 'the screen draws a P3 line that no longer exists')
+
+    /* What is left is the two ways in, the way back for somebody who paid,
+       and the way in for somebody with an account. */
+    for (const [needed, why] of [
+      ['P3.demo.go', 'the demo has no button'],
+      ['P3.real.go', 'the real-rig card has no button'],
+      ['P3.restore', 'there is no way to restore a purchase from the first screen'],
+      ['P7.account', 'there is no way to sign in from the first screen']
+    ]) {
+      assert.ok(screen.includes(needed), why)
+    }
+  })
+
   test('every screen in the walkthrough is reachable, and none of them is a trap', () => {
     /*
      * "The whole onboarding process and tutorials have been an absolute
@@ -6795,7 +6906,15 @@ export function run(test) {
     assert.ok(!/pairCredentials|<ScanCode|await buyUnlock/.test(onb), 'the walkthrough pairs or sells again')
     /* Restore stays: somebody who already paid needs it before anything. */
     assert.match(onb, /await restorePurchase\(\)/, 'there is no way to restore a purchase already made')
-    assert.match(onb, /P3\.real\.go\(purchase\.price\)/, 'the price is not the store own')
+    /*
+     * AND NO PRICE ON THE BUTTON THAT TAKES NO MONEY.
+     *
+     * "Have the button just say 'Unlock'." It read "Set up  ·  $9.99 once",
+     * which puts a till on a button that opens the computer-app step. The
+     * price belongs on the paywall, where the store quotes it itself.
+     */
+    assert.match(onb, /label=\{P3\.real\.go\}/, 'the real-rig button is not the plain Unlock label')
+    assert.ok(!/P3\.real\.go\(/.test(onb), 'the real-rig button is quoting a price again')
 
     /*
      * THE UNLOCK IS NOT ASKED ABOUT HERE ANY MORE.

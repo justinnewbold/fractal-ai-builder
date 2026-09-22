@@ -145,7 +145,31 @@ export default function SignIn({ onSignedIn, onDemo }) {
       style={{ flex: 1 }}
     >
       <ScrollView
-        contentContainerStyle={{ padding: space.lg, gap: space.lg, flexGrow: 1, justifyContent: 'center' }}
+        /*
+         * NOT CENTRED ANY MORE, and that is the whole of the bug.
+         *
+         * "What is the button on the bottom that can't be seen and can't be
+         * scrolled to??"
+         *
+         * `flexGrow: 1` with `justifyContent: 'center'` centres the content
+         * inside a box the height of the screen. While the content is SHORTER
+         * than the screen that is exactly what it is for, and this screen was
+         * short once. It has grown: a title, a paragraph, two fields, four
+         * buttons, a note. Once the content is TALLER than that box, centring
+         * pushes the overflow out through BOTH ends — and a scroll view can
+         * only scroll within its content size, so what hangs out the bottom
+         * is not reachable by scrolling. It is drawn, and it cannot be got to.
+         *
+         * Starting at the top costs the short-screen case a little symmetry
+         * and gives every screen back its last element. paddingBottom clears
+         * the home indicator, which was the other thing in the way.
+         */
+        contentContainerStyle={{
+          padding: space.lg,
+          paddingBottom: space.xxl,
+          gap: space.lg,
+          flexGrow: 1
+        }}
         keyboardShouldPersistTaps="handled"
       >
         <View style={{ gap: space.xs }}>
@@ -156,9 +180,20 @@ export default function SignIn({ onSignedIn, onDemo }) {
             {/*
               ONE SENTENCE NOW, because there is one way in. It used to
               switch on whether the code box or the email box was showing.
+
+              AND IT NO LONGER PROMISES TWO THINGS THAT ARE NOT TRUE.
+
+              "Read the text. We don't have AI features in this app anymore."
+
+              It said "your presets and what the AI has learned about your
+              taste follow you to any device". The AI half is gone from the
+              app. The other half was wrong on its own terms: presets live on
+              the unit, not in an account. What an account actually carries
+              between devices is the setlists you built and the presets you
+              starred, so that is what it says. MY WORDING.
             */}
-            Sign in with the same account as the computer your unit is plugged into. Your presets and
-            what the AI has learned about your taste follow you to any device.
+            Sign in with the same account as the computer your unit is plugged into. Your setlists
+            and starred presets follow you to any device.
           </Text>
         </View>
 
@@ -249,10 +284,23 @@ export default function SignIn({ onSignedIn, onDemo }) {
           }}
         />
 
-        <Text style={{ color: color.silkFaint, fontSize: font.micro, lineHeight: 18 }}>
-          Saving to a slot, backups and firmware stay at the computer. Your computer refuses them from a
-          distance, and it is right to.
-        </Text>
+        {/*
+          THE LINE THAT USED TO CLOSE THIS SCREEN IS GONE, AND IT WAS WRONG.
+
+          "All changes made on the phone can be saved, and should be able to
+          be saved to the unit. Remove this text."
+
+          It read: "Saving to a slot, backups and firmware stay at the
+          computer. Your computer refuses them from a distance, and it is
+          right to." True when it was written — the computer did refuse a slot
+          write from a handset, deliberately.
+
+          It has not been true since the save flow was built. A phone asks
+          the computer to write the slot, the computer does the writing, and
+          the phone is told the moment it lands (see lib/saveViaComputer and
+          components/SaveToSlot). So the sentence described a limit the app no
+          longer has, on the first screen somebody reads.
+        */}
       </ScrollView>
     </KeyboardAvoidingView>
   )

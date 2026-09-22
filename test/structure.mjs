@@ -3036,7 +3036,14 @@ export function run(test) {
     assert.match(connect, /className="connect-local"/, 'the hosted screen offers only the account route')
     assert.match(connect, /no account/i, 'the local route does not say the thing that makes it a choice')
     assert.match(connect, /stays\s+on this phone/i, 'nothing says where the settings live on the local route')
-    assert.match(connect, /follow you\s+to any device/i, 'nothing says what signing in buys')
+    /*
+     * What signing in buys, which is now stated accurately: the setlists and
+     * the stars. It used to say "your presets and what the AI has learned
+     * about your taste" — "we don't have AI features in this app anymore",
+     * and presets were never in the account either. They live on the unit.
+     */
+    assert.match(connect, /setlists and the presets you starred follow you to\s+any device/i, 'nothing says what signing in buys')
+    assert.ok(!/\bAI\b/.test(connect.replace(/\/\*[\s\S]*?\*\//g, ' ')), 'the browser advertises an AI the app does not have')
     // And it goes somewhere: an address typed in lands on the Mac's own page.
     assert.match(connect, /window\.location\.href = `http:\/\//, 'the address typed in goes nowhere')
     assert.match(connect, /:5056/, 'a bare hostname is not given the port the computer serves on')
@@ -4459,7 +4466,13 @@ export function run(test) {
     const ways = readFileSync(new URL('../shared/ways-in.mjs', import.meta.url), 'utf8')
     const ids = [...ways.matchAll(/^\s{4}id: '([^']+)'/gm)].map((m) => m[1])
     assert.deepEqual(ids, ['mac-app', 'windows-app', 'linux-app'], `the ways in are now ${ids.join(', ')}`)
-    for (const file of ['../src/App.jsx', '../mobile/src/screens/Connect.js']) {
+    /*
+     * The browser only. The phone's version of this screen no longer lists
+     * the routes at all — "a phone can't download desktop software, it also
+     * isn't suppose to go to GitHub directly" — so there is no count on it to
+     * get wrong. See mobile/src/screens/Connect.js.
+     */
+    for (const file of ['../src/App.jsx']) {
       const text = bare(readFileSync(new URL(file, import.meta.url), 'utf8'))
       assert.match(text, /waysWord\(\)/, `${file} types the number of ways rather than counting them`)
       assert.ok(!/Four ways/.test(text), `${file} still says there are four ways in`)
@@ -4852,9 +4865,12 @@ export function run(test) {
      * holding the phone — App Store and Play price by country — so printing
      * $9.99 everywhere quotes a price most buyers cannot pay.
      */
-    assert.equal(c.P3.real.go('$9.99'), 'Set up  \u00b7  $9.99 once')
-    assert.equal(c.P3.real.go('A$14.99'), 'Set up  \u00b7  A$14.99 once')
-    assert.equal(c.P3.real.go(null), 'Set up  \u00b7  $9.99 once', 'the fallback is no longer his wording')
+    /*
+     * EXCEPT THE ONE THAT TAKES NO MONEY. "Have the button just say
+     * 'Unlock'." The real-rig card opens the computer-app step; the charge
+     * is two screens later on P8, which is where the store's price belongs.
+     */
+    assert.equal(c.P3.real.go, 'Unlock')
     assert.equal(c.P8.head(null), '$9.99 one-time')
     assert.equal(c.P8.head('\u20ac10,99'), '\u20ac10,99 one-time')
     assert.equal(c.P8.go(null), 'Unlock real-rig control  \u00b7  $9.99')
@@ -4882,7 +4898,7 @@ export function run(test) {
       assert.ok(!/[\u2014\u2013]/.test(line), `an em or en dash crept into: ${line}`)
     }
     assert.equal(c.CHAIN[2].phoneBody, 'Your remote - nearby or away')
-    assert.equal(c.P6.yes, 'Yes - show me the scanner')
+    assert.equal(c.P6.yes, 'Yes - sign in to connect', 'the button promises a scanner that does not exist')
     assert.equal(c.P5.body, 'Tap toggles the block. Press and hold to choose channels A-D.')
 
     /* Wi-Fi keeps its capital and its hyphen. */
