@@ -1839,7 +1839,9 @@ export function run(test) {
      */
     const stage = read('mobile/src/screens/Stage.js')
 
-    const nav = stage.indexOf('‹ Previous')
+    /* The chevron is a picture now rather than a character in the label —
+       Justin's mockup draws it beside the word — so this looks for the word. */
+    const nav = stage.indexOf('label="Previous"')
     const scenes = stage.indexOf('<Label>Scenes</Label>')
     const chain = stage.indexOf("chain === 'reading' ?")
     assert.ok(nav > 0 && scenes > 0 && chain > 0, 'the stage screen moved; this check reads it')
@@ -2164,7 +2166,7 @@ export function run(test) {
      * and the tempo, on the strip for what you do BETWEEN songs.
      */
     const stageSrc = read('mobile/src/screens/Stage.js')
-    assert.match(stageSrc, /\{onOpenEdit \? <Press grow label="Edit" height=\{foot\} onPress=\{onOpenEdit\} \/> : null\}/, 'the Edit button is drawn whether or not there is anywhere to go')
+    assert.match(stageSrc, /\{onOpenEdit \? \(\s*<Press grow label="Edit" icon=\{editIcon\} height=\{foot\} onPress=\{onOpenEdit\} \/>\s*\) : null\}/, 'the Edit button is drawn whether or not there is anywhere to go')
     /*
      * On the foot row, in the middle: Tuner, Edit, Tap Tempo.
      *
@@ -2850,15 +2852,19 @@ export function run(test) {
       last = at
     }
 
-    /* And the gear can be seen. "The settings icon is too dark to even see" —
-       on Android, where ⚙ is a text character drawn in the text colour, and
-       the text colour was never set, so it was black on black. The iPhone
-       swaps that character for a picture and hid the bug. */
+    /* And the gear can be seen, on both phones, and is the same gear on both.
+       "The settings icon is too dark to even see" — on Android, where ⚙ was a
+       text character drawn in the text colour, and the text colour was never
+       set, so it was black on black. The iPhone swapped that character for a
+       picture of its own and hid the bug. It is Justin's own picture now,
+       tinted, which settles the colour and the two-different-gears at once —
+       so the character must not come back. */
     assert.match(
       flat,
-      /<Text style=\{\{ color: color\.silk, fontSize: font\.lead \}\}>⚙<\/Text>/,
-      'the gear has no colour of its own, so Android draws it black on a black bar'
+      /<Image source=\{setupIcon\}[^>]*tintColor: color\.silk/,
+      'the gear is not his picture, tinted — Android will draw it black on a black bar again'
     )
+    assert.ok(!/>⚙</.test(bar), 'the gear character is back, and the two phones draw two different gears')
 
     /* The unit's own short name, not the Mac's. */
     assert.match(bar, /const ofDeviceName = \(s\) => s\.deviceName/, 'the header does not say what the unit is')
@@ -3494,6 +3500,92 @@ export function run(test) {
       [],
       `a screen asks for a colour the theme does not have:\n${[...asked].join('\n')}`
     )
+  })
+
+  test('every picture in the app is one he actually sent', () => {
+    /*
+     * "the images I sent you are the images I had so use those images. If you
+     * have to crop them out whatever you have to do use the images that I
+     * already sent you. I don't have more images."
+     *
+     * So every file in mobile/assets/icons was cut out of his own mockup of
+     * the play screen, and nothing is there that nobody draws. This checks the
+     * second half of that — a file that no screen imports is either a picture
+     * that quietly stopped being used or one that was never his.
+     *
+     * It also holds the other direction: an import of a file that isn't there
+     * is a red screen on a phone and nothing at all in a bundle test, because
+     * Metro resolves assets at build time and a missing one fails the build
+     * rather than this suite.
+     */
+    const dir = new URL('../mobile/assets/icons/', import.meta.url)
+    const files = readdirSync(fileURLToPath(dir)).filter((f) => f.endsWith('.png'))
+    assert.ok(files.length > 0, 'the icons are gone')
+
+    /* Every .js under mobile/src, plus the app's root. */
+    const sources = []
+    const walk = (at) => {
+      for (const entry of readdirSync(fileURLToPath(new URL(at, import.meta.url)))) {
+        const next = new URL(`${at}${entry}`, import.meta.url)
+        if (statSync(fileURLToPath(next)).isDirectory()) walk(`${at}${entry}/`)
+        else if (entry.endsWith('.js')) sources.push(readFileSync(next, 'utf8'))
+      }
+    }
+    walk('../mobile/src/')
+    sources.push(read('mobile/App.js'))
+    const all = sources.join('\n')
+
+    const unused = files.filter((f) => !all.includes(`assets/icons/${f}`))
+    assert.deepEqual(unused, [], `a picture nothing draws: ${unused.join(', ')}`)
+
+    const missing = []
+    for (const m of all.matchAll(/assets\/icons\/([\w.-]+)/g)) {
+      if (!files.includes(m[1])) missing.push(m[1])
+    }
+    assert.deepEqual(missing, [], `a screen imports a picture that is not there: ${missing.join(', ')}`)
+  })
+
+  test('the blocks he drew wear his drawings, and the rest wear none', () => {
+    /*
+     * Nine families are in the mockup and nine are mapped. The point of the
+     * check is the SECOND half: a family he did not draw gets nothing rather
+     * than the nearest-looking picture of a different effect, because a delay
+     * wearing the flanger's swirl is worse than a delay wearing nothing.
+     *
+     * Read rather than imported, and that is not laziness: the module's whole
+     * job is to import PNGs, which node refuses and Metro resolves. Every
+     * other check in this file that touches a screen does the same.
+     */
+    const src = read('mobile/src/lib/blockIcons.js')
+
+    /* What the map actually holds, taken from the object literal rather than
+       from the file as a whole, so a name in a comment proves nothing. */
+    const table = src.slice(src.indexOf('const ICONS = {'), src.indexOf('}', src.indexOf('const ICONS = {')))
+    const keys = [...table.matchAll(/^ {2}(\w+)\s*(?::|,|$)/gm)].map((m) => m[1])
+
+    for (const slug of ['amp', 'cab', 'comp', 'delay', 'drive', 'flanger', 'phaser', 'reverb', 'wah']) {
+      assert.ok(keys.includes(slug), `${slug} is in the mockup and has no picture`)
+      assert.ok(src.includes(`assets/icons/${slug}.png`), `${slug}'s picture is not the file of that name`)
+    }
+
+    /* Nothing else. The nine he drew and the one alias for the long spelling
+       of the first of them — anything beyond that is a picture of some other
+       effect being lent to a family, which is the failure this exists for. */
+    assert.deepEqual(
+      keys.filter((k) => !['amp', 'cab', 'comp', 'delay', 'drive', 'flanger', 'phaser', 'reverb', 'wah'].includes(k)),
+      ['compressor'],
+      'a family he did not draw was given somebody else’s picture'
+    )
+
+    /* A suffix and a display name reach the same picture the colours do —
+       blockColors normalises the same three ways, and the two maps have to
+       agree or a tile comes out red with the delay's dots on it. */
+    assert.match(src, /key\.replace\(\/\\d\+\$\/, ''\)/, 'a second drive loses its picture')
+    assert.match(src, /replace\(\/\[\^a-z\]\/g, ''\)/, 'a spelled-out name loses its picture')
+    assert.match(src, /if \(!slug\) return null/, 'a block with no slug is not handled')
+
+    /* And the stage actually asks for them. */
+    assert.match(read('mobile/src/screens/Stage.js'), /icon=\{blockIcon\(block\.slug\)\}/, 'the chain tiles are drawn without their pictures')
   })
 
   test('a purchase follows the person, not the handset', () => {
