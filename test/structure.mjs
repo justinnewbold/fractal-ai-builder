@@ -4459,7 +4459,13 @@ export function run(test) {
     const ways = readFileSync(new URL('../shared/ways-in.mjs', import.meta.url), 'utf8')
     const ids = [...ways.matchAll(/^\s{4}id: '([^']+)'/gm)].map((m) => m[1])
     assert.deepEqual(ids, ['mac-app', 'windows-app', 'linux-app'], `the ways in are now ${ids.join(', ')}`)
-    for (const file of ['../src/App.jsx', '../mobile/src/screens/Connect.js']) {
+    /*
+     * The browser only. The phone's version of this screen no longer lists
+     * the routes at all — "a phone can't download desktop software, it also
+     * isn't suppose to go to GitHub directly" — so there is no count on it to
+     * get wrong. See mobile/src/screens/Connect.js.
+     */
+    for (const file of ['../src/App.jsx']) {
       const text = bare(readFileSync(new URL(file, import.meta.url), 'utf8'))
       assert.match(text, /waysWord\(\)/, `${file} types the number of ways rather than counting them`)
       assert.ok(!/Four ways/.test(text), `${file} still says there are four ways in`)

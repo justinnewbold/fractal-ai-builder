@@ -3158,12 +3158,32 @@ export function run(test) {
      * What they now carry is the honest difference between a signed app, an
      * unsigned one Windows argues about, and a route that builds from source.
      */
-    /* The routes themselves are the list both ends share; what is in
-       Connect.js is the phone's way of drawing them. Both are read, because
-       either one going missing takes the page down. */
+    /*
+     * THE ROUTES ARE THE BROWSER'S NOW, not the phone's.
+     *
+     * "This screen should not show up on the phone. A phone can't download
+     * desktop software, it also isn't suppose to go to GitHub directly."
+     *
+     * The phone drew all three routes with their install steps and a button
+     * under each that opened the GitHub releases page — every line of it
+     * about a machine the reader is not holding, ending in a download the
+     * handset cannot use. The list still exists and the browser still draws
+     * it, because the browser IS running on the computer in question.
+     *
+     * What the phone offers instead is the two things it can do about it: the
+     * address to type on the computer, and the link sent somewhere the
+     * computer can open it.
+     */
     const src = read('shared/ways-in.mjs')
     const screen = read('mobile/src/screens/Connect.js')
-    assert.match(screen, /WAYS\.map/, 'the phone no longer draws the routes')
+    assert.ok(!/WAYS/.test(screen), 'the phone lists the desktop download routes again')
+    assert.ok(!/Linking\.openURL/.test(screen), 'the phone can be sent to a download page again')
+    assert.match(screen, /TYPE THIS ON YOUR COMPUTER/, 'nothing says which machine the address is for')
+    assert.match(screen, /\{DOWNLOADS_URL\}/, 'the address to type is not shown')
+    assert.match(screen, /sendDownloadLink\(email\)/, 'there is no way to send the link to a computer')
+    /* And it still says what the arrangement IS, which is the question the
+       screen exists to answer. */
+    assert.match(screen, /The phone never talks to the unit directly/, 'the phone no longer explains why a computer is needed at all')
 
     assert.match(src, /The Mac app/, 'the route that actually works is not offered')
     /*
@@ -3174,7 +3194,6 @@ export function run(test) {
      */
     const { RELEASES, REPO } = await import('../shared/ways-in.mjs')
     assert.equal(RELEASES, `https://github.com/${REPO}/releases`, 'there is nowhere to get the Mac app from')
-    assert.ok(read('mobile/src/lib/ways-in.js').includes('RELEASES'), 'the phone carries no download link at all')
     /*
      * The list, not `/releases/latest`.
      *
@@ -3553,15 +3572,17 @@ export function run(test) {
     const web = read('src/App.jsx')
     assert.match(web, /waysFor\(thisComputer\)/, 'the browser does not sort the routes for this computer')
     assert.match(web, /osGuess\(typeof navigator === 'undefined' \? '' : navigator\.userAgent\)/, 'the browser never reads its own user agent')
+    /*
+     * The BROWSER draws it, and only the browser. The phone used to draw the
+     * same list unsorted — a phone cannot know which computer is on the desk
+     * — and now does not draw it at all: "a phone can't download desktop
+     * software, it also isn't suppose to go to GitHub directly." So the
+     * question of whether the phone sorts it cannot arise.
+     */
     const phone = read('mobile/src/screens/Connect.js')
-    assert.match(phone, /WAYS\.map/, 'the phone does not draw the routes')
-    /* Comments stripped first. The screen's own note EXPLAINS why it does not
-       sort, and naming the function it is not calling is the clearest way to
-       say that — reading it as a call is the mistake CLAUDE.md warns about,
-       one file along. */
     assert.ok(
-      !/waysFor|osGuess/.test(phone.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ')),
-      'the phone sorts the routes, which means it guessed which computer somebody owns'
+      !/WAYS|waysFor|osGuess/.test(phone.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ')),
+      'the phone is back in the business of listing desktop downloads'
     )
   })
 

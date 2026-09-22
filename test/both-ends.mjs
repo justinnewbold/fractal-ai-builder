@@ -446,6 +446,19 @@ export const AREAS = [
       },
       { does: 'sign in to an account you have', web: 'Sign in', phone: 'Sign in' },
       {
+        does: 'email yourself the computer download link',
+        web: null,
+        phone: 'Send link',
+        /*
+         * "A phone can't download desktop software, it also isn't suppose to
+         * go to GitHub directly." So the phone's answer to "how do I connect
+         * a computer" is the address to type there, or this — the link sent
+         * somewhere the computer can open it. A browser running ON the
+         * computer needs neither: it links straight to the downloads page.
+         */
+        why: 'the browser is already on a computer that can open the link'
+      },
+      {
         does: 'connect with the account this device already remembers',
         web: 'Connect',
         phone: null,
