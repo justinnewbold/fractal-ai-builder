@@ -30,9 +30,10 @@
  *
  * WHAT HAS TO BE SET, in Supabase → Edge Functions → Secrets:
  *
- *   RESEND_API_KEY   from resend.com. Same key feedback-email uses.
- *   DOWNLOAD_FROM    who it comes from; a domain verified with Resend, or
- *                    their onboarding@resend.dev while testing.
+ *   RESEND_API_KEY   from resend.com. Same key feedback-email uses, and the
+ *                    only one that has to be set.
+ *   DOWNLOAD_FROM    who it comes from. Optional: with nothing set this sends
+ *                    from noreply@newbold.cloud, which is verified.
  *
  * With no RESEND_API_KEY this answers "not configured" rather than throwing,
  * the same as its neighbour: the button exists before the key does.
@@ -43,7 +44,22 @@ const RESEND = 'https://api.resend.com/emails'
 /** The page that decides which build somebody needs. Not a caller's URL. */
 const LINK = 'https://fractal.newbold.cloud/downloads'
 
-const DEFAULT_FROM = 'Fractal Remote <onboarding@resend.dev>'
+/*
+ * THE DOMAIN IS VERIFIED NOW, so this is the real one.
+ *
+ * It used to be `onboarding@resend.dev` — Resend's own address, which works
+ * the day you sign up and is why it was written that way. What the comment
+ * did not say is the catch: that address may only send to the ONE address
+ * that owns the Resend account. Every other recipient is refused outright.
+ *
+ * Which is exactly what happened. "Send link" to an address that was not his
+ * gmail came back "The mail service refused it", and the reason was not the
+ * app or the key — it was this line, plus a newbold.cloud that had been
+ * sitting unverified since December with none of its three DNS records ever
+ * added. The records are in now and the domain is proved, so the fallback is
+ * the domain rather than the practice address.
+ */
+const DEFAULT_FROM = 'Fractal Remote <noreply@newbold.cloud>'
 
 /** How long an address waits before it can be sent this again. */
 const EVERY_MINUTES = 10
