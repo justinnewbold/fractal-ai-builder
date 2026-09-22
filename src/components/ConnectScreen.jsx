@@ -10,30 +10,29 @@
  *
  * Three states, each one sentence and one button:
  *
- *   signed-out  — the pairing code from the Mac, and Connect
+ *   signed-out  — sign in with the same account as the computer
  *   joining     — nothing to press; it is happening
  *   no-answer   — Try now, and the reassurance that it keeps trying anyway
  *
- * Nobody is asked to sign in. The first way in is the code the Mac shows —
- * scanned, or typed into the box here — and it needs no account. Signing in
- * is the third thing on the page, offered for what it actually buys: presets
- * and taste that follow you between devices. "User shouldn't be required to
- * sign in unless they want to save and sync across the cloud."
+ * AND SIGNING IN IS THE WAY IN NOW, which it was not.
+ *
+ * "I want the QR code gone and the scanner gone. It has never worked once…
+ * to use this app and connect it to your computer, you have to sign up."
+ *
+ * The first thing this page offered used to be the pairing code from the Mac,
+ * typed into a box here, needing no account at all. The code is gone and so
+ * is the box. What still needs no account is the demo, and the same-wifi
+ * route at the bottom of this page, where nothing is signed into and what you
+ * save stays on the phone.
  */
 import { useState } from 'react'
-import { formatPairCode, isPairAccount, isPairCode } from '../lib/link'
+import { isPairAccount } from '../lib/link'
 
-export default function ConnectScreen({ link, onPair, onConnect, onRetry, onSwitchAccount, onUnpair, onDemo, busy }) {
-  const { link: state, account, pairError } = link
+export default function ConnectScreen({ link, onConnect, onRetry, onSwitchAccount, onUnpair, onDemo, busy }) {
+  const { link: state, account } = link
   const remembered = account?.email || null
   const paired = isPairAccount(remembered)
-  const [code, setCode] = useState('')
   const [where, setWhere] = useState('')
-
-  const pair = () => {
-    if (!isPairCode(code)) return
-    onPair(code)
-  }
 
   /*
    * Go to the Mac directly.
@@ -82,7 +81,7 @@ export default function ConnectScreen({ link, onPair, onConnect, onRetry, onSwit
             <>
               <p>
                 {paired
-                  ? 'This phone is paired with your computer. No account needed.'
+                  ? 'This phone is paired with your computer.'
                   : 'Your Fractal is plugged into your computer. Connect and this phone becomes its remote.'}
               </p>
               <div className="connect-actions">
@@ -98,40 +97,19 @@ export default function ConnectScreen({ link, onPair, onConnect, onRetry, onSwit
           ) : (
             <>
               <p>
-                Your Fractal is plugged into your computer. Point this phone&rsquo;s camera at the code
-                the computer shows, or type the code here. No account needed.
+                Sign in with the same account as the computer your unit is plugged into, and this
+                phone becomes its remote.
               </p>
               <div className="connect-actions">
-                <div className="connect-code-row">
-                  <input
-                    type="text"
-                    inputMode="text"
-                    autoCapitalize="characters"
-                    autoCorrect="off"
-                    autoComplete="one-time-code"
-                    spellCheck={false}
-                    value={code}
-                    onChange={(e) => setCode(formatPairCode(e.target.value))}
-                    onKeyDown={(e) => e.key === 'Enter' && pair()}
-                    placeholder="XXXX-XXXX-XXXX-XXXX"
-                    aria-label="The pairing code your computer shows"
-                    maxLength={19}
-                  />
-                </div>
-                <button className="primary" onClick={pair} disabled={busy || !isPairCode(code)}>
-                  Connect
+                <button className="primary" onClick={onSwitchAccount} disabled={busy}>
+                  Sign in
                 </button>
               </div>
-              {pairError ? (
-                <p className="problem" role="alert">
-                  {pairError}
-                </p>
-              ) : null}
             </>
           )}
           <p className="hint">
-            Haven&rsquo;t set up the computer yet? Open this app on the computer and tap{' '}
-            <strong>Set up phone remote</strong>.
+            Haven&rsquo;t set up the computer yet? Open this app on the computer, tap{' '}
+            <strong>Set up phone remote</strong>, and sign in with this same account.
           </p>
 
           {/*

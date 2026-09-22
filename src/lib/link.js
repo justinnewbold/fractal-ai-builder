@@ -52,8 +52,16 @@ import {
   signOut,
   remoteSignUp
 } from './remote.js'
-import { isPairAccount, makePairCode, normalizePairCode, NOT_A_PAIR_CODE, pairCredentials, pairCodeFromUrl } from '../../shared/pairing.mjs'
-export { isPairAccount, formatPairCode, pairLink, normalizePairCode, isPairCode, HOSTED_ORIGIN } from '../../shared/pairing.mjs'
+/*
+ * Only `isPairAccount` survives the codes.
+ *
+ * Computers and phones paired the old way still hold perfectly good sessions
+ * on those hidden accounts, and a screen that called them signed-out would be
+ * wrong about somebody who is working. Everything else here made or consumed
+ * a code, and nothing makes one any more.
+ */
+import { isPairAccount } from '../../shared/pairing.mjs'
+export { isPairAccount, HOSTED_ORIGIN } from '../../shared/pairing.mjs'
 
 /**
  * Which end this is.
@@ -789,23 +797,16 @@ export async function bootLink() {
      * the connect screen could ask for anything — and the code comes out of
      * the address at once, so a reload or a shared link does not pair twice.
      */
-    const scanned =
-      typeof window !== 'undefined'
-        ? pairCodeFromUrl({ hash: window.location.hash, search: window.location.search })
-        : null
-    if (scanned) {
-      try {
-        window.history.replaceState(null, '', window.location.pathname)
-      } catch {
-        // The address stays; pairing still happens.
-      }
-      try {
-        await pairPhone(scanned)
-      } catch (err) {
-        set({ pairError: err.message })
-        refresh()
-      }
-    } else if (account && wantsAutoConnect() !== false) {
+    /*
+     * NOTHING MAKES A `#pair=` LINK ANY MORE, so nothing reads one.
+     *
+     * It was how a phone's browser landed already paired: the QR code on the
+     * computer carried this app's address with the code in the fragment, the
+     * page consumed it and cleared it from the address bar. The codes are
+     * gone, so this is too.
+     */
+    if (account && wantsAutoConnect() !== false) {
+
       // join() announces itself as joining first, so the screen goes from
       // "connecting" to "connecting" — never through "isn't answering".
       await join()
@@ -904,89 +905,26 @@ export async function setUpMac({ email, password }) {
   return state
 }
 
-/**
- * Set the Mac up with nobody making an account.
+/*
+ * `pairMac` WAS HERE, and it is gone.
  *
- * Makes a pairing code, makes the hidden account the code stands for, signs
- * both the browser and the device server in as it, and turns the host on —
- * the same three steps as setUpMac, with the code where the form was. The
- * code is kept here so the Mac can show it again: to a second phone, or to
- * the same phone after it forgot.
+ * "I want the QR code gone and the scanner gone. It has never worked once…
+ * to use this app and connect it to your computer, you have to sign up."
  *
- * The one thing that can stop it is the account service insisting on a
- * confirmation email, which nothing will ever read. That is a project
- * setting, not a person's mistake, and the message says so in words.
+ * It made an eight-character code, created the hidden account the code stood
+ * for, signed this computer into it and turned the host on — so two devices
+ * could share an account without anybody making one. The phone read the code
+ * off a QR code or had it typed in.
+ *
+ * Every part of that is gone: the code, the QR code, the camera, and the box
+ * to type it into. Both ends sign into a real account now, which is the one
+ * route that always worked.
+ *
+ * `isPairAccount` below stays: phones and computers paired the old way still
+ * hold perfectly good sessions on those hidden accounts, and a screen that
+ * called them signed-out would be wrong about somebody who is working.
  */
-export async function pairMac() {
-  const config = loadRemoteConfig() || {}
-  const code = makePairCode()
-  const { email, password } = pairCredentials(code)
-  /*
-   * AND THE ONE REFUSAL THAT READS AS A DEAD BUTTON.
-   *
-   * "Setup phone button does nothing on mac." It did something: it asked the
-   * account service to make the hidden account behind a pairing code, and got
-   * back "email rate limit exceeded" — Supabase caps how many accounts can be
-   * made in an hour. The sentence went up in the error bar at the top left of
-   * the window, which is about as far from this button as the window allows,
-   * and in the service's own words, which name a limit nobody set and offer
-   * nothing to do about it.
-   *
-   * So it is said here, where the meaning is known: what ran out, that it
-   * comes back on its own, and that the other button on this panel needs none
-   * of it. MY WORDING — nobody has approved this line.
-   */
-  let made
-  try {
-    made = await remoteSignUp({ url: config.url, anonKey: config.anonKey, email, password })
-  } catch (err) {
-    if (/rate limit/i.test(err?.message || '')) {
-      throw new Error(
-        'Too many pairings from this computer in the last hour — the account service limits them and it has reached that limit. It clears by itself within the hour. In the meantime, “Sign in with an account instead” needs no pairing code at all.'
-      )
-    }
-    throw err
-  }
-  const { needsConfirmation } = made
-  if (needsConfirmation) {
-    throw new Error(
-      'This computer couldn’t pair without an account, because the account service is set to confirm every new account by email. Sign in with an account instead, or turn off “Confirm email” for the project.'
-    )
-  }
-  await remoteSignIn({ url: config.url, anonKey: config.anonKey, email, password })
-  saveRemoteConfig({ ...config, email, pairCode: code })
-  set({ account: await currentAccount() })
-  await turnOnMac({ email, password })
-  return state
-}
 
-/** The code this Mac was paired with, if it was paired from this browser. */
-export const savedPairCode = () => {
-  const config = loadRemoteConfig()
-  const code = config?.pairCode ? normalizePairCode(config.pairCode) : null
-  return code && isPairAccount(config?.email) ? code : null
-}
-
-/**
- * Connect this phone with the code the Mac shows. No account is asked for;
- * the code stands for one, and the phone stays paired from here on.
- */
-export async function pairPhone(code) {
-  const clean = normalizePairCode(code)
-  if (!clean) throw new Error(NOT_A_PAIR_CODE)
-  set({ pairError: null })
-  try {
-    await connectPhone(pairCredentials(clean))
-  } catch (err) {
-    // The sign-in failed because there is no such account — a mistyped code,
-    // or a Mac that was paired again since. Say that, not "invalid login".
-    if (/didn’t match|invalid login/i.test(err.message || '')) {
-      throw new Error('No computer is paired with that code. Check it against the code your computer shows.')
-    }
-    throw err
-  }
-  return state
-}
 
 /** Sign the device server in with the same details, and turn the host on. */
 async function turnOnMac({ email, password }) {

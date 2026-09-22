@@ -3689,112 +3689,7 @@ export function run(test) {
     assert.equal(scripts.fingerprint, 'node scripts/fingerprint.mjs', 'npm run fingerprint no longer runs the check')
   })
 
-  test('a square the scanner cannot use says so, instead of doing nothing', async () => {
-    /*
-     * "Android phone scanner doesn't work. It pulls up the camera and
-     * everything fine, but nothing scans the QR code when it's in the
-     * viewfinder. It does nothing."
-     *
-     * THE COMPUTER SHOWS TWO SQUARES AND ONLY ONE IS FOR THIS APP. The page
-     * served from the computer shows a "same wifi" square carrying its own
-     * address — http://192.168.x.x:5056 — captioned "point your phone's
-     * camera at this". That one is for the phone's BROWSER, which loads the
-     * app from the computer directly. This app cannot use it: every call it
-     * makes goes through the relay and there is no direct-to-host path
-     * anywhere in mobile/. So it read the square perfectly, found no pairing
-     * code, and said nothing — which looks exactly like a camera that is not
-     * scanning.
-     *
-     * The silence was deliberate and was wrong: a reader restricted to QR
-     * codes is not going to be swamped by a room, and somebody deliberately
-     * aiming at a square has earned an answer.
-     */
-    const src = read('mobile/src/components/ScanCode.js')
 
-    /* The props are the ones this Expo version actually reads. onBarCodeScanned
-       with a capital C is the old name and fails silently, which is the other
-       way this screen could look broken. */
-    assert.match(src, /onBarcodeScanned=/, 'the scanner has no barcode handler')
-    assert.ok(!/onBarCodeScanned/.test(src), 'the pre-SDK-51 prop name is back, and it never fires')
-    assert.match(src, /barcodeTypes: \['qr'\]/, 'the reader is no longer restricted to QR codes')
-
-    /* A square that cannot be used is now said out loud. */
-    assert.match(src, /setTrouble\(/, 'an unusable square is silently ignored again')
-    assert.match(src, /tone="warn"/, 'the complaint is not shown on screen')
-
-    /* And the camera is mounted only while the sheet is up — a Modal on
-       Android is its own window, and a camera left behind a hidden one comes
-       back showing a preview that never delivers a scan. */
-    assert.match(src, /\{open \? \(\s*<CameraView/, 'the camera is mounted behind a closed modal again')
-
-    const { looksLikeTheWifiSquare } = await import('../mobile/src/components/ScanCode.js')
-      .catch(() => ({ looksLikeTheWifiSquare: null }))
-    if (looksLikeTheWifiSquare) {
-      for (const yes of ['http://192.168.1.47:5056', 'http://fractal-macbook.local:5056', 'http://10.0.0.5:5056']) {
-        assert.equal(looksLikeTheWifiSquare(yes), true, `${yes} is the wifi square and is not being recognised`)
-      }
-      for (const no of ['https://fractal.newbold.cloud/#pair=ABCD2345', 'ABCD2345', 'https://example.com', '']) {
-        assert.equal(looksLikeTheWifiSquare(no), false, `${no} is being called the wifi square`)
-      }
-    }
-  })
-
-  test('the square a computer with an account shows is a door, not a mistake', async () => {
-    /*
-     * "So scanning a code doesn't even work."
-     *
-     * It worked. It read the square perfectly and then said the wrong thing
-     * about it: "use the square with letters and numbers under it" — and a
-     * computer signed into a real account HAS NO SUCH SQUARE. The account is
-     * what joins the two, so that computer draws AccountCard, whose square
-     * carries the hosted app's address and no pairing code at all. The phone
-     * found no code, fell through to the general complaint, and sent him
-     * hunting for a thing the app had itself decided not to draw.
-     *
-     * Nothing was aimed at wrongly. That square is the right one for that
-     * computer and this is the wrong door for it — so it gets a way through
-     * rather than a correction.
-     */
-    const { looksLikeTheAccountSquare, HOSTED_ORIGIN } = await import('../shared/pairing.mjs')
-
-    /* Exactly what AccountCard encodes, and the shapes a future one might. */
-    for (const yes of [HOSTED_ORIGIN, `${HOSTED_ORIGIN}/`, `${HOSTED_ORIGIN}/#anything`, `${HOSTED_ORIGIN}?from=mac`]) {
-      assert.equal(looksLikeTheAccountSquare(yes), true, `${yes} is the account square and is not being recognised`)
-    }
-    /* A pairing link lives at the same address and is the OTHER route, so it
-       must never be mistaken for this one — that would turn a square that
-       pairs perfectly well into a lecture about accounts. */
-    for (const no of [
-      `${HOSTED_ORIGIN}/#pair=ABCD2345`,
-      'http://192.168.1.47:5056',
-      'ABCD2345',
-      '',
-      'https://example.com',
-      'https://fractal.newbold.cloud.example.com'
-    ]) {
-      assert.equal(looksLikeTheAccountSquare(no), false, `${no} is being called the account square`)
-    }
-
-    /* The phone's copy of the rule is generated, never hand-written. */
-    assert.match(read('mobile/src/lib/pairing.js'), /export function looksLikeTheAccountSquare\(text\)/, 'the phone has not been given the rule')
-
-    /* And the scanner answers it first, and differently. */
-    const src = read('mobile/src/components/ScanCode.js').replace(/\s+/g, ' ')
-    assert.match(src, /if \(looksLikeTheAccountSquare\(data\)\) \{ setTrouble\(\{ text: ACCOUNT_SQUARE, account: true \}\) return \}/, 'the account square still gets the general complaint')
-    assert.match(src, /\{trouble\?\.account && onAccount \? \(/, 'there is no way through from the account square')
-    assert.match(src, /onPress=\{\(\) => \{ close\(\) onAccount\(\) \}\}/, 'the way through does not close the camera behind it')
-
-    /* Both screens that open the scanner offer that door, because both have
-       one already — this only reaches it from the square. */
-    for (const [file, where] of [
-      ['mobile/src/screens/SignIn.js', 'the sign-in screen'],
-      ['mobile/src/screens/Onboarding.js', 'the walkthrough']
-    ]) {
-      /* Flattened, so `.` reaches across what were lines: the props in
-         between contain `>` of their own, from the arrow functions. */
-      assert.match(read(file).replace(/\s+/g, ' '), /<ScanCode.{0,400}?onAccount=\{\(\) => \{/, `${where} opens the scanner with no way on to an account`)
-    }
-  })
 
   test('the gear descriptions say what a model is like, and never guess', async () => {
     /*
@@ -6675,7 +6570,18 @@ export function run(test) {
      */
     const src = read('mobile/src/screens/Onboarding.js')
     const steps = [...src.matchAll(/at === '(\w+)'/g)].map((m) => m[1])
-    assert.ok(steps.length >= 8, `only ${steps.length} steps found; this check reads them out of the source`)
+    /*
+     * Six, not eight. Two steps went with the pairing codes:
+     *
+     *   `scan`   — the camera, the QR code and the box for eight characters
+     *   `unlock` — "Connection verified", which could only be said because
+     *              the step before it had just paired something
+     *
+     * Nothing pairs inside the walkthrough now, so neither could be reached.
+     * The Paywall asks about the purchase instead, which is where it was
+     * always asked for everybody who did not arrive through here.
+     */
+    assert.ok(steps.length >= 6, `only ${steps.length} steps found; this check reads them out of the source`)
 
     /* Each step's own block, to the start of the next one. */
     const at = steps.map((name) => ({ name, from: src.indexOf(`at === '${name}'`) })).sort((a, b) => a.from - b.from)
@@ -6696,7 +6602,13 @@ export function run(test) {
       leaves[name] = /onDone|onEnterDemo|intoDemo|onAccount|connect\b/.test(block[name])
     }
     /* The one handler whose destination is a condition rather than a literal. */
-    if (/go\(shouldAskToPay\(/.test(src)) edges.scan = [...new Set([...edges.scan, 'unlock', 'connected'])]
+    /* The demo's last screen is reached from `intoDemo`, which is declared
+       above the steps rather than inside one, so the edge is read from there
+       — the same reason the conditional edge into the old unlock step had to
+       be named by hand. */
+    if (/const intoDemo = [\s\S]{0,200}?go\('connected'\)/.test(src)) {
+      edges.pick = [...new Set([...edges.pick, 'connected'])]
+    }
     if (/if \(out\.ok\) return go\('connected'\)/.test(src)) edges.unlock = [...new Set([...edges.unlock, 'connected'])]
 
     /* NOTHING IS A DEAD END. Every step either leads somewhere or finishes
@@ -6743,7 +6655,9 @@ export function run(test) {
      * announced a unit online that nobody had plugged in.
      */
     assert.match(block.mode, /restore\('app'\)/, 'restoring from the first screen claims a connection that does not exist')
-    assert.match(block.unlock, /restore\('connected'\)/, 'restoring after a verified pairing no longer finishes')
+    /* The second caller was the unlock step, which is gone: restore runs from
+       one screen now, and its one destination is the computer-app step. */
+    assert.ok(!('unlock' in block), 'the unlock step is back inside the walkthrough')
 
     /*
      * MOVING CLEARS THE LAST SCREEN'S NOTES. `said` and `error` are one pair
@@ -6779,9 +6693,8 @@ export function run(test) {
      */
     assert.match(src, /const detected = useRig\(\(st\) => st\.deviceName\)/, 'the walkthrough cannot see which unit actually answered')
     assert.match(src, /const provenUnit = detected \|\| unitName/, 'a real pairing has no name to fall back from')
-    assert.match(block.unlock, /P8\.verified\(provenUnit\)/, 'the verified line names the demo picker’s unit')
     assert.match(block.connected, /P9\.tag\(provenUnit\)/, 'the connected line names the demo picker’s unit')
-    assert.match(block.connected, /P9\.status\(\{ unit: provenUnit/, 'the status line names the demo picker’s unit')
+    assert.match(block.connected, /P9\.demo\.status\(provenUnit\)/, 'the status line names the demo picker’s unit')
     /* The picker itself still names what is lit, which is the one place the
        demo choice IS the answer. */
     assert.match(block.pick, /P4\.go\(unitName\)/, 'the demo picker stopped naming the unit you picked')
@@ -6800,17 +6713,18 @@ export function run(test) {
      * person who has never seen this app was the one person who never got it.
      */
     const flat = src.replace(/\s+/g, ' ')
-    assert.match(flat, /const intoDemo = \(\) => \{ setDemoUnit\(unit\) setDemo\(true\) setDemoReady\(true\) go\('connected'\) \}/, 'choosing the demo still drops somebody straight onto the Play screen')
+    assert.match(flat, /const intoDemo = \(\) => \{ setDemoUnit\(unit\) setDemo\(true\) go\('connected'\) \}/, 'choosing the demo still drops somebody straight onto the Play screen')
 
     /* The three tips are the same either way; only the two lines that name a
        computer change, because there is no computer in the demo. */
-    assert.match(block.connected, /\{demoReady \? P9\.demo\.head : P9\.head\}/, 'the demo is told it is connected to a computer')
-    assert.match(block.connected, /\{demoReady \? P9\.demo\.status\(provenUnit\) : P9\.status/, 'the demo is told it is running through a computer')
+    /* The demo's words unconditionally: it is the only way to this screen
+       now, and "You're connected" named a computer that is not there. */
+    assert.match(block.connected, /<Head>\{P9\.demo\.head\}<\/Head>/, 'the demo is told it is connected to a computer')
     assert.match(block.connected, /P9\.tips\.map/, 'the three tips are no longer on the last screen')
 
     /* And the right handler finishes it. onDone marks an owner unlocked,
        which is wrong for somebody who has just chosen a simulation. */
-    assert.match(block.connected, /onPress=\{demoReady \? onEnterDemo : onDone\}/, 'a demo run finishes as though a rig had been paired')
+    assert.match(block.connected, /onPress=\{onEnterDemo\}/, 'a demo run finishes as though a rig had been paired')
 
     /*
      * THE DOWNLOAD ADDRESS IS PRINTED, NOT PRESSED.
@@ -6841,7 +6755,6 @@ export function run(test) {
      */
     for (const [file, what] of [
       ['mobile/src/lib/onboarding.js', 'the walkthrough'],
-      ['mobile/src/components/ScanCode.js', 'the scanner'],
       ['mobile/src/screens/SignIn.js', 'the sign-in screen']
     ]) {
       const text = read(file)
@@ -6872,53 +6785,34 @@ export function run(test) {
     assert.match(onb, /setDemoUnit\(unit\)\s*\n\s*setDemo\(true\)/, 'the demo is not actually started')
     assert.match(onb, /P4\.go\(unitName\)/, 'the button does not say which unit it starts')
 
-    /* The code becomes a session through the same call the sign-in screen
-       makes. One way a phone gets paired, not two that drift. */
-    assert.match(onb, /await signIn\(pairCredentials\(code\)\)/, 'pairing is reimplemented rather than reused')
-    /* And the scanner is the same one, opened rather than embedded: it is a
-       modal, so without `open` it is a camera that never appears. */
-    assert.match(onb, /<ScanCode\s*\n?\s*open=\{scanning\}/, 'the scanner is never opened, so the button does nothing')
-
-    /* The purchase is the real one. */
-    assert.match(onb, /await buyUnlock\(\)/, 'the unlock screen does not buy anything')
+    /*
+     * NEITHER PAIRING NOR BUYING HAPPENS HERE ANY MORE.
+     *
+     * The walkthrough used to turn a pairing code into a session and then
+     * offer the unlock on the strength of it. Codes are gone, so signing in
+     * is a screen of its own, and the Paywall asks about the purchase.
+     */
+    assert.ok(!/pairCredentials|<ScanCode|await buyUnlock/.test(onb), 'the walkthrough pairs or sells again')
+    /* Restore stays: somebody who already paid needs it before anything. */
     assert.match(onb, /await restorePurchase\(\)/, 'there is no way to restore a purchase already made')
-    /* The store's price where it knows one. */
-    assert.match(onb, /P8\.go\(purchase\.price\)/, 'the price is not the store own')
     assert.match(onb, /P3\.real\.go\(purchase\.price\)/, 'the price is not the store own')
 
     /*
-     * VERIFIED MEANS VERIFIED. P8 says "Connection verified" and it is only
-     * reached from a pairing that succeeded — asking for money before knowing
-     * the thing being bought can work at all is how refunds happen.
+     * THE UNLOCK IS NOT ASKED ABOUT HERE ANY MORE.
      *
-     * AND ONLY WHEN THERE IS SOMETHING TO SELL.
+     * This used to hold the walkthrough's own copy of the paywall's rule: a
+     * pairing that succeeded went to the unlock step unless the store said
+     * this person had already paid. Both halves have gone — the pairing,
+     * because there are no codes, and the step, because it could only say
+     * "Connection verified" off the back of one.
      *
-     * "The phone needs to be able to tell, hey, you did not unlock this, or
-     * yes, you did unlock it."
-     *
-     * It only ever said one of those. Every successful pair went to the
-     * unlock step and asked for money, including somebody who had already
-     * paid, reinstalled, and was watching their own app ask them to buy it
-     * again. The rule is the paywall's own, reused rather than restated:
-     * three of its four falses are reasons not to be SURE, and an unanswered
-     * store is not a "no".
+     * The rule itself is unchanged and still tested where it lives; the only
+     * thing that reads it now is App.js, which raises the Paywall. That is
+     * where the question was always asked for everybody who did not come
+     * through this screen.
      */
-    const connect = onb.slice(onb.indexOf('const connect = async'), onb.indexOf('const buy = async'))
-    assert.match(
-      connect.replace(/\s+/g, ' '),
-      /go\(shouldAskToPay\(\{ inApp: true, demo: false, \.\.\.purchase \}\) \? 'unlock' : 'connected'\)/,
-      'a pair either never reaches the unlock, or reaches it for somebody who already paid'
-    )
-    assert.match(onb, /import \{ shouldAskToPay \} from '\.\.\/lib\/unlock-rule'/, 'the walkthrough decides who pays with a rule of its own')
-
-    /* The rule itself, at the four combinations that matter here. */
-    const { shouldAskToPay } = await import('../mobile/src/lib/unlock-rule.js')
-    const pairing = (purchase) => shouldAskToPay({ inApp: true, demo: false, ...purchase })
-    assert.equal(pairing({ checking: false, available: true, unlocked: false }), true, 'somebody who has not paid is waved straight through')
-    assert.equal(pairing({ checking: false, available: true, unlocked: true }), false, 'somebody who already paid is asked to buy it again')
-    assert.equal(pairing({ checking: true, available: true, unlocked: false }), false, 'a store that has not answered yet counts as a no')
-    assert.equal(pairing({ checking: false, available: false, unlocked: false }), false, 'a phone that cannot buy anything is asked to buy something')
-    assert.ok(!/setAt\('unlock'\)/.test(onb.slice(0, onb.indexOf('const connect = async'))), 'the unlock is reachable before the connection is proved')
+    assert.ok(!/shouldAskToPay/.test(onb), 'the walkthrough keeps its own copy of the paywall rule again')
+    assert.ok(!/'unlock'/.test(onb), 'the unlock step is back in the walkthrough')
 
     /* Seen once, and reachable again from Settings under the name its own
        last screen promises. */

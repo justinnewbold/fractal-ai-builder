@@ -3720,50 +3720,131 @@ export function run(test) {
 
   
 
-  test('nobody has to sign in to connect a phone', () => {
+  test('an account is the only way to join a phone to a computer', () => {
     /*
-     * "User shouldn't be required to sign in unless they want to save and
-     * sync across the cloud. It's requiring a login to connect."
+     * "I want the QR code gone and the scanner gone. It has never worked
+     * once. Every time I've ever tried it, you tell me something different…
+     * to use this app and connect it to your computer, you have to sign up.
+     * That's the way we're doing it."
      *
-     * The phone's Connect button opened the sign-in sheet, and the Mac's
-     * "Set up phone remote" opened it too. Now the first thing either end
-     * offers is a code — made at the Mac, scanned or typed at the phone — and
-     * signing in is offered third, for what it buys.
+     * This test used to hold the opposite. There were two routes: a pairing
+     * code — made at the computer, shown as a QR code, scanned or typed at
+     * the phone, needing no account — and signing in, offered third for what
+     * it bought. The code route is gone entirely: the code, the QR code, the
+     * camera, and every box for typing one.
+     *
+     * WHAT STILL NEEDS NO ACCOUNT, because it would be easy to over-correct:
+     * the demo, and a phone on the same wifi reaching the computer directly.
+     * Only joining a phone to a computer from anywhere needs one.
      */
+    const gone = [
+      ['../src/components/PhoneQr.jsx', 'the computer’s QR code component'],
+      ['../mobile/src/components/ScanCode.js', 'the phone’s camera scanner']
+    ]
+    for (const [rel, what] of gone) {
+      assert.ok(!existsSync(new URL(rel, import.meta.url)), `${what} is back`)
+    }
+
+    /* No code anywhere: not made, not read, not typed. */
+    const link = readFileSync(new URL('../src/lib/link.js', import.meta.url), 'utf8')
+    for (const [pattern, what] of [
+      [/export async function pairMac\(/, 'the computer can make a pairing code again'],
+      [/export async function pairPhone\(/, 'the phone can be paired with a code again'],
+      [/pairCodeFromUrl\(/, 'a #pair= link is read out of the address again'],
+      [/makePairCode/, 'a pairing code can be minted again']
+    ]) {
+      assert.ok(!pattern.test(link), what)
+    }
+    /* Except the one that tells an ALREADY paired account apart, because
+       those sessions are still perfectly good and still signed in. */
+    assert.match(link, /import \{ isPairAccount \}/, 'a computer paired the old way now reads as signed out')
+
     const connect = readFileSync(new URL('../src/components/ConnectScreen.jsx', import.meta.url), 'utf8')
-    const codeAt = connect.indexOf('connect-code-row')
-    const wifiAt = connect.indexOf('connect-local"')
-    const accountAt = connect.indexOf('connect-account')
-    assert.ok(codeAt > 0, 'the phone has nowhere to type the code from the computer')
-    assert.ok(accountAt > 0, 'signing in is not offered at all')
-    assert.ok(codeAt < wifiAt && wifiAt < accountAt, 'signing in comes before the routes that need no account')
-    assert.match(connect, /No account needed/, 'the code route does not say the thing that makes it the first choice')
-    assert.match(connect, /onPair\(code\)/, 'a typed code goes nowhere')
-    assert.match(connect, /autoComplete="one-time-code"/, 'the code field is not offered as a code to the keyboard')
-    assert.match(connect, /pairError/, 'a scanned code that fails is failed silently')
-    assert.ok(!/Sign in and this phone becomes/.test(connect), 'the phone still leads with signing in')
-    // A paired phone is never shown its hidden address as though it were an email.
-    assert.match(connect, /paired \? 'Connect' : `Connect as \$\{remembered\}`/, 'a paired phone is offered "Connect as pair-…@…"')
+    assert.ok(!/connect-code-row/.test(connect), 'the phone has a code box again')
+    assert.ok(!/one-time-code/.test(connect), 'the phone still offers a code to the keyboard')
+    assert.match(connect, /onClick=\{onSwitchAccount\}[\s\S]{0,120}Sign in/, 'the phone’s way in is not signing in')
+    /* The same-wifi route keeps its no-account promise, because it is true. */
+    assert.match(connect, /no account, no code/, 'the same-wifi route lost the thing that makes it worth offering')
 
     const panel = readFileSync(new URL('../src/components/PhoneRemote.jsx', import.meta.url), 'utf8')
-    const macIdle = panel.slice(panel.indexOf("if (link.link === 'signed-out')"), panel.indexOf('const paired = isPairAccount(email)'))
-    assert.match(macIdle, /onAction\('mac-pair'\)[\s\S]*?Set up phone remote/, 'the computer’s Set up phone remote still opens the sign-in sheet')
-    assert.match(macIdle, /Sign in with an account instead/, 'the computer no longer offers an account at all')
-    assert.match(panel, /function PairCard/, 'a paired computer has no code to show')
-    assert.match(panel, /pairLink\(code\)/, 'the computer’s QR does not carry the code')
-    assert.match(panel, /formatPairCode\(code\)/, 'the code is shown only as a QR, so a camera that will not focus is stuck')
-    assert.match(panel, /Unpair this computer/, 'a paired computer has no way out of pairing')
+    assert.ok(!/PairCard|AccountCard|PhoneQr/.test(panel), 'the computer draws a QR code again')
+    assert.match(panel, /onAction\('mac-setup'\)[\s\S]{0,140}Sign in to set up the phone remote/, 'the computer’s one button is not signing in')
+    assert.ok(!/onAction\('mac-pair'\)/.test(panel), 'the computer can pair without an account again')
 
-    assert.match(src, /kind === 'mac-pair'[\s\S]*?await pairMac\(\)/, 'the computer’s pair button does nothing')
-    assert.match(src, /onPair=\{pairFromCode\}/, 'the connect screen’s code is not wired to anything')
-    assert.match(src, /await pairPhone\(code\)/, 'a typed code never signs the phone in')
+    assert.ok(!/kind === 'mac-pair'/.test(src), 'the computer’s pair action is back')
+    assert.ok(!/pairFromCode|await pairPhone\(/.test(src), 'a typed code is wired up again')
 
-    // The phone apps take the same code, derived the same way, from the same source.
-    const sync = readFileSync(new URL('../scripts/sync-relay-rules.mjs', import.meta.url), 'utf8')
-    assert.match(sync, /shared\/pairing\.mjs.*mobile\/src\/lib\/pairing\.js/, 'the phone app has its own idea of what a code means')
+    /*
+     * AND AN ACCOUNT IS MADE ON THE PHONE, AFTER THE UNLOCK, NOWHERE ELSE.
+     *
+     * "On the desktop app make it so you can only sign in with account that
+     * was already created on a phone. So do not allow an account to be
+     * created on any of the desktop or the web app version, only sign-ins.
+     * On the phones, only show the create account window after the phone has
+     * been unlocked."
+     */
+    const webForm = readFileSync(new URL('../src/components/SignIn.jsx', import.meta.url), 'utf8')
+    assert.ok(!/remoteSignUp/.test(webForm), 'the browser can make an account again')
+    assert.ok(!/Create Account/.test(webForm), 'the browser offers to make an account again')
+    assert.match(webForm, /Forgot password\?/, 'the browser lost the reset it still needs')
+
     const native = readFileSync(new URL('../mobile/src/screens/SignIn.js', import.meta.url), 'utf8')
-    assert.match(native, /useState\('code'\)/, 'the phone app still leads with the account form')
-    assert.match(native, /pairCredentials\(code\)/, 'the phone app’s code does not sign in')
+    assert.ok(!/useState\('code'\)/.test(native), 'the phone leads with a code box again')
+    assert.ok(!/pairCredentials/.test(native), 'the phone signs in with a code again')
+    assert.match(native, /const canMakeAccount = mayDrive\(purchase\)/, 'the phone does not check the unlock before offering an account')
+    assert.match(native, /\{canMakeAccount \? \(\s*\n?\s*<Press/, 'Create Account is offered before the app is unlocked')
+    /* mayDrive rather than purchase.unlocked: somebody the store cannot be
+       asked about is treated as unlocked, so a bad minute on a hotel network
+       does not hide the form from somebody who paid. */
+    assert.match(native, /import \{ mayDrive \} from '\.\.\/lib\/unlock-rule'/, 'the phone invents its own unlock rule for this')
+  })
+
+  test('nothing promises that joining a phone needs no account', () => {
+    /*
+     * "Go through all code, change anything that says no account needed. You
+     * can use the demo for free without an account. You can use the computer
+     * app for free without an account, but to connect your phone, you must
+     * create an account, even if the app is unlocked."
+     *
+     * So the claim is not banned outright — it is still true of two things,
+     * and saying so is the reason anybody tries them. What it may no longer
+     * be attached to is PAIRING.
+     */
+    const shown = (text) =>
+      text
+        /* Comments quote the sentences they replaced — the fifth time that
+           trap has come up — so only the strings and the JSX text are read. */
+        .replace(/\/\*[\s\S]*?\*\//g, ' ')
+        .replace(/^\s*\/\/.*$/gm, ' ')
+
+    const files = [
+      'src/components/ConnectScreen.jsx',
+      'src/components/PhoneRemote.jsx',
+      'src/components/PhoneApp.jsx',
+      'src/components/SignIn.jsx',
+      'src/components/SignInSheet.jsx',
+      'shared/onboarding.mjs',
+      'shared/ways-in.mjs',
+      'mobile/src/screens/SignIn.js',
+      'mobile/src/screens/Onboarding.js'
+    ]
+
+    /* The two places the promise is still true, and still made. */
+    const wifi = shown(readFileSync(new URL('../src/components/ConnectScreen.jsx', import.meta.url), 'utf8'))
+    assert.match(wifi, /no account, no code/, 'the same-wifi route stopped saying the thing that makes it worth offering')
+
+    /* And nowhere is it made about pairing. Every sentence carrying the claim
+       has to be about the demo or about the same-wifi route. */
+    const allowed = /demo|same wifi|on this phone|stays on this phone|no account details/i
+    const offenders = []
+    for (const rel of files) {
+      const text = shown(readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8'))
+      for (const m of text.matchAll(/[^.!?\n]*\b(no account|No account|without an account|needs no account)\b[^.!?\n]*/g)) {
+        const sentence = m[0].replace(/\s+/g, ' ').trim()
+        if (!allowed.test(sentence)) offenders.push(`${rel}: ${sentence}`)
+      }
+    }
+    assert.deepEqual(offenders, [], `pairing is still advertised as needing no account:\n${offenders.join('\n')}`)
   })
 
   test('the save button is under your thumb, not above five hundred rows', () => {
@@ -4603,52 +4684,6 @@ export function run(test) {
   })
 
 
-  test('there is one square, and the wifi one is gone', () => {
-    /*
-     * "Are both QR codes needed on the Mac app? It's confusing and they are
-     * literally right by each other so a phone will pick up both codes."
-     * Then, plainly: "Just delete the QR code. Because we will not be using
-     * it."
-     *
-     * The one that went was the SAME WIFI square — it opened the computer's
-     * own address in a web browser on the phone, with nothing to sign into,
-     * and only while both were on the same network. A real route, and not one
-     * this app asks anybody to use: the phone app is the phone app.
-     *
-     * What is left is the square for the APP: a pairing code, or the way in
-     * to signing into the same account. It works from anywhere, and it is the
-     * one the phone's scanner reads.
-     */
-    const qr = readFileSync(new URL('../src/components/PhoneQr.jsx', import.meta.url), 'utf8')
-    const bare = qr.replace(/\{?\/\*[\s\S]*?\*\/\}?/g, '')
-
-    /* Gone, not folded away and not merely unreferenced. A fold left behind
-       is a square a camera can still find. */
-    assert.ok(!/wifi-fold/.test(bare), 'the wifi square is still folded into the page')
-    assert.ok(!/WifiCard/.test(bare), 'the wifi square is still drawn')
-    assert.ok(!/servedLocally/.test(bare), 'the block still asks whether it is being served locally')
-
-    /* And what remains is the app's square, both ways in to it. */
-    assert.match(bare, /<PairCard /, 'the pairing square is gone too')
-    assert.match(bare, /<AccountCard /, 'the account square is gone too')
-
-    const remote = readFileSync(new URL('../src/components/PhoneRemote.jsx', import.meta.url), 'utf8')
-    assert.ok(!/function WifiCard/.test(remote), 'the wifi square is still built, waiting to be drawn again')
-
-    /*
-     * ONE RENDERING, shared by Setup and the first-launch tour. Two copies of
-     * a pairing code drift, and that drift is a phone scanning a square that
-     * pairs it with nothing.
-     */
-    const macSide = remote.slice(remote.indexOf('function MacSide'), remote.indexOf('export function PairCard'))
-    assert.match(macSide, /<PhoneQr connected=\{link\.link === 'connected'\} email=\{email\}/, 'Setup draws its own square again')
-
-    /* The scanner's message stays: a desktop build older than this one still
-       shows that square, and somebody who scans it deserves to be told which
-       one it was. */
-    const scan = readFileSync(new URL('../mobile/src/components/ScanCode.js', import.meta.url), 'utf8')
-    assert.match(scan, /looksLikeTheWifiSquare/, 'the scanner no longer recognises the wrong square')
-  })
 
   test('a failed pairing says so where the button is, and the way back in is on the Settings list', () => {
     /*
@@ -4679,20 +4714,15 @@ export function run(test) {
     /* Under the two buttons, not above them: it is about the press that just
        happened, and a message above a button is read before the press. */
     assert.ok(
-      panel.indexOf("onAction('mac-pair')") < panel.indexOf('tone-bad'),
+      panel.indexOf("onAction('mac-setup')") < panel.indexOf('tone-bad'),
       'the fault is printed above the button it is about'
     )
 
     /*
-     * AND THE REFUSAL IS SAID IN WORDS THAT NAME A WAY OUT. The service's own
-     * sentence names a limit nobody set and offers nothing to do about it.
+     * The rate-limited-pairing message that used to be checked here is gone
+     * with `pairMac`: nothing makes a pairing account any more, so nothing
+     * can be refused for making too many.
      */
-    const link = readFileSync(new URL('../src/lib/link.js', import.meta.url), 'utf8')
-    const pair = link.slice(link.indexOf('export async function pairMac()'), link.indexOf('export const savedPairCode'))
-    assert.match(pair, /if \(\/rate limit\/i\.test\(err\?\.message \|\| ''\)\)/, 'a rate-limited pairing is passed through in the service’s own words')
-    assert.match(pair, /Sign in with an account instead/, 'the refusal does not name the button that needs no code')
-    assert.match(pair, /clears by itself within the hour/, 'the refusal does not say that it passes on its own')
-
     /*
      * THE WALKTHROUGH, on the list rather than two doors in. Checked by
      * position: the About page is where it used to live, and a row that
@@ -4719,73 +4749,12 @@ export function run(test) {
      */
     const tour = readFileSync(new URL('../src/components/Onboarding.jsx', import.meta.url), 'utf8')
     assert.match(tour, /<p className="onb-note">\{D4\.owned\}<\/p>/, 'the pairing step does not say who this is for')
-    /* Above the square, not under it: a condition read after the thing it
-       conditions has already been scanned is a condition nobody read. */
-    assert.ok(
-      tour.indexOf('{D4.owned}') < tour.indexOf('<PhoneQr'),
-      'the condition is printed below the square it applies to'
-    )
+    /* It is the whole of that step now — the QR code it used to sit above is
+       gone, and signing in on both ends is the pairing. */
+    assert.ok(!/PhoneQr/.test(tour), 'the tour draws a QR code again')
+    assert.match(tour, /\{D4\.waiting\}/, 'the tour no longer says it is waiting for the phone')
   })
 
-  test('the scanner starts below the notch, and is the colour the rest of the app is', async () => {
-    /*
-     * "If you look at the screenshot, the close button at the top right is
-     * overlaying with the iPhone screen."
-     *
-     * TWO FAULTS IN ONE SCREEN, and the second one had been there the whole
-     * time without anybody naming it.
-     *
-     * A MODAL IS NOT INSIDE THE APP'S SAFE AREA. App.js wraps everything in a
-     * SafeAreaView, so every ordinary screen starts below the notch for free.
-     * A Modal hangs off the root instead, so this sheet alone began at pixel
-     * zero — Close under the battery icon, the heading behind the camera
-     * cutout. Nothing else in the app is a Modal with its own chrome at the
-     * top, which is why this is the only screen it happened on.
-     *
-     * AND THE SHEET WAS WHITE. It asked for `color.ink`, which is not a colour
-     * in this palette and never has been, so the background came out undefined
-     * and fell through to the system's own — white, behind cream lettering, on
-     * the one screen somebody meets before they have ever used the app.
-     */
-    const scan = readFileSync(new URL('../mobile/src/components/ScanCode.js', import.meta.url), 'utf8')
-    assert.match(scan, /import \{ useSafeAreaInsets \} from 'react-native-safe-area-context'/, 'the scanner cannot know where the notch is')
-    assert.match(scan, /paddingTop: inset\.top \+ space\.lg/, 'the scanner header still starts at the top of the glass')
-    assert.match(scan, /paddingBottom: inset\.bottom \+ space\.lg/, 'the line under the camera still sits under the home indicator')
-
-    /*
-     * AND NO SCREEN ASKS FOR A COLOUR THAT DOES NOT EXIST. This is the general
-     * form of the white sheet: a missing key is not an error in JavaScript, it
-     * is `undefined`, and `undefined` in a style is silently "whatever the
-     * platform does". It cost this screen its background for as long as the
-     * screen has existed and nothing anywhere said so.
-     *
-     * Comments are stripped first: the fix's own comment names the colour it
-     * replaced, and a check that cannot tell a quotation from a use would make
-     * that comment unwritable. Fourth time that trap has been sprung.
-     */
-    const { color } = await import('../mobile/src/lib/theme.js')
-    const known = new Set(Object.keys(color))
-    const strip = (t) => t.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1')
-    const sources = { 'App.js': readFileSync(new URL('../mobile/App.js', import.meta.url), 'utf8') }
-    const walk = (at, prefix = '') => {
-      for (const entry of readdirSync(at, { withFileTypes: true })) {
-        const next = new URL(entry.name + (entry.isDirectory() ? '/' : ''), at)
-        if (entry.isDirectory()) walk(next, prefix + entry.name + '/')
-        else if (/\.jsx?$/.test(entry.name)) sources[prefix + entry.name] = readFileSync(next, 'utf8')
-      }
-    }
-    walk(new URL('../mobile/src/', import.meta.url))
-
-    const invented = []
-    for (const [name, body] of Object.entries(sources)) {
-      /* The palette's own file, which is where these names are defined. */
-      if (name === 'lib/theme.js') continue
-      for (const hit of strip(body).matchAll(/\bcolor\.([A-Za-z][A-Za-z0-9]*)/g)) {
-        if (!known.has(hit[1])) invented.push(`${name} asks for color.${hit[1]}`)
-      }
-    }
-    assert.deepEqual(invented, [], `a colour that is not in the palette renders as nothing:\n${invented.join('\n')}`)
-  })
 
 
   /*
@@ -4830,9 +4799,10 @@ export function run(test) {
     assert.match(onb, /firmware: firmwareOf\(device\)/, 'the firmware is not read off the unit')
     assert.match(onb, /presets: slotCount\(device\?\.capabilities\)/, 'the preset count is not the unit own')
 
-    /* The square is the real one, shared with Settings rather than a second
-       thing that can disagree about how pairing works. */
-    assert.match(onb, /<PhoneQr connected=\{paired\}/, 'the pairing screen draws its own square')
+    /* There is no QR code on that step any more — signing in on both ends
+       is the pairing. What it still reads off the link is whether the phone
+       has arrived, which is what the waiting line is about. */
+    assert.match(onb, /\{D4\.waiting\}/, 'the pairing step no longer waits for the phone')
 
     /*
      * AND "THE PORT IS BUSY" IS TOLD APART FROM "NOTHING IS PLUGGED IN".

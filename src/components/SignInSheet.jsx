@@ -18,10 +18,15 @@ export default function SignInSheet({ open, role, email, busy, onClose, onSubmit
       note={phone ? 'Sign in once — this phone stays signed in' : 'Once, on this computer'}
     >
       <div className="signin-sheet">
+        {/*
+          WHERE THE ACCOUNT COMES FROM, said here because it cannot be made
+          here. "Only sign-ins" on the computer — an account is created in
+          the phone app, after the unlock, and this end signs into it.
+        */}
         <p className="hint">
           {phone
             ? 'Use the same account you set up on the computer.'
-            : 'Your phone will sign in with these same details to reach this computer.'}
+            : 'Sign in with the account you made in the phone app. Your phone signs in with these same details to reach this computer.'}
         </p>
         <SignIn
           email={email}

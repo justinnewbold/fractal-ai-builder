@@ -3,194 +3,53 @@
  * fails on any difference between the two. */
 
 /**
- * Pairing a phone with a Mac, with nobody making an account.
+ * What is left of pairing: telling a pairing account apart from a person's.
  *
- * The relay only ever carries one thing: a private channel named after a
- * signed-in user, which both ends must be signed in as. That is a good
- * security model and a bad first minute — the phone's "Connect" button opened
- * a sign-in form, and a person who only wanted to turn a knob from across the
- * room was asked for an email and a password before anything happened.
+ * THE CODES ARE GONE, AND THIS FILE IS THE HOLE THEY LEFT.
  *
- *   "User shouldn't be required to sign in unless they want to save and sync
- *   across the cloud. It's requiring a login to connect."
+ * "I want the QR code gone and the scanner gone. It has never worked once.
+ * Every time I've ever tried it, you tell me something different. OK, I'm
+ * sorry. I don't wanna do it anymore. OK, to use this app and connect it to
+ * your computer, you have to sign up. That's the way we're doing it."
  *
- * The Mac's end is a separate program that can only sign in with an email and
- * a password, and the channel policy cannot be changed from here. So the
- * account stays — but the person never sees it. When the Mac is set up it
- * makes a pairing code, and the code IS the account: an address and a password
- * are derived from it the same way at both ends, so a phone that has the code
- * can sign in as the same user the Mac did without anyone typing anything but
- * the code. The Mac shows it as a QR that opens the hosted app with the code
- * in the address, and as text for a camera that will not focus.
+ * There used to be a whole arrangement here. A computer minted an
+ * eight-character code from an alphabet with no 0, 1, I or O in it; the code
+ * was the password to a hidden account at pair.fractal.newbold.cloud that
+ * nobody ever saw, so two devices could share an account without anybody
+ * making one. The computer showed it as a QR code carrying a link to the
+ * hosted app with the code in the fragment, and the phone read it with its
+ * camera or had it typed in.
  *
- * A signed-in account is still there for anyone who wants their presets to
- * follow them between devices; it is simply no longer the price of a remote.
+ * It was a good idea and it did not work in his hands, across every attempt.
+ * Joining a phone to a computer is a sign-in now, on both ends, and that is
+ * the only way. The demo still needs no account and neither does the computer
+ * app on its own.
  *
- * Everything here is pure and shared with the phone apps, because the two ends
- * deriving different credentials from the same code is a fault that would
- * look, to the person holding the phone, exactly like a Mac that is off.
+ * WHY THESE TWO SURVIVE:
+ *
+ *   isPairAccount — every phone and computer paired the old way still holds a
+ *     perfectly good session on one of those hidden accounts. A screen that
+ *     read them as signed-out would be wrong about somebody who is working,
+ *     and a screen that printed the address as an email would be showing them
+ *     something meaningless. So the shape is still recognised, even though
+ *     nothing makes another one.
+ *
+ *   HOSTED_ORIGIN — where the app lives. It was here because the QR pointed
+ *     at it; it stays because other things need the address.
  */
 
-/** Letters and digits that cannot be misread for each other: no 0/O, no 1/I. */
-export const PAIR_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-/**
- * How long a new code is.
- *
- * "16 digits is a lot for something like this that isn't extremely secure,
- * where they just need a number that will make sure they're connecting to the
- * computer." Half of that is fair — the camera does the typing now, and this
- * is the fallback for a lens that will not focus.
- *
- * But it is not a label, and shortening it is not a cosmetic change. THE CODE
- * IS THE PASSWORD: pairCredentials below turns it into the account both ends
- * sign in as, and the relay carries a channel named after that account. So the
- * number that matters is how many codes there are, and it has to stay past the
- * point where anyone would try them all.
- *
- * 8 symbols from a 32-symbol alphabet is 40 bits — about 1.1 trillion codes.
- * A thousand guesses a second is eleven hundred years. Four digits, which is
- * what was asked for, is ten thousand: minutes, by a script, against a sign-in
- * service that answers from anywhere. Getting to four needs a different design
- * — a short code that expires and is traded for this one — and not a smaller
- * number here.
- */
-export const PAIR_LENGTH = 8
-/**
- * The lengths that still open a door. New codes are PAIR_LENGTH; the 16 that
- * came before it keep working, because a Mac and a phone that are paired today
- * should not be unpaired by an app update. A longer code is a stronger one, so
- * there is nothing to take away.
- */
-export const PAIR_LENGTHS = [PAIR_LENGTH, 16]
-
-/** Said in one place, because the browser and the phone both say it. */
-export const NOT_A_PAIR_CODE = `That isn’t a pairing code. It’s ${PAIR_LENGTH} letters and numbers, shown on your computer.`
-/** Where the hidden account's address lives. Nothing is ever mailed to it. */
+/** Where the hidden account's address lives. Nothing was ever mailed to it. */
 export const PAIR_DOMAIN = 'pair.fractal.newbold.cloud'
-/** The one place the QR points, wherever the Mac is serving from. */
+
+/** Where the app is served from. */
 export const HOSTED_ORIGIN = 'https://fractal.newbold.cloud'
 
 /**
- * The square a computer signed into a REAL account shows.
+ * Is this one of the hidden accounts a pairing code stood for?
  *
- * "So scanning a code doesn't even work."
- *
- * It did work — it read the square perfectly and then said the wrong thing
- * about it. A computer with an account has NO pairing code (see the note on
- * AccountCard: the account is the code), so its square carries the hosted
- * app's address and nothing else. The phone found no pairing code in it and
- * fell through to the general complaint, which ends "use the square with
- * letters and numbers under it" — and on that computer there is no such
- * square and never will be. Somebody following that sentence is hunting for
- * something that does not exist.
- *
- * Recognised here rather than in the phone, beside the other square's rule,
- * because the thing being recognised is a decision the BROWSER made about
- * which card to draw. Two files deciding what a square means is how the two
- * come to disagree.
+ * Asked so that no screen shows somebody `X7K2MQ4B@pair.fractal.newbold.cloud`
+ * as though it were their email address, and so a device paired before the
+ * codes went away still reads as signed in.
  */
-export function looksLikeTheAccountSquare(text) {
-  const s = String(text || '').trim()
-  if (!/^https?:\/\//i.test(s)) return false
-  /* A pairing link is the other route, even though it lives at this address. */
-  if (/pair=/i.test(s)) return false
-  const host = HOSTED_ORIGIN.replace(/^https?:\/\//i, '').replace(/\./g, '\\.')
-  return new RegExp(`^https?://${host}(?:[/?#]|$)`, 'i').test(s)
-}
-
-const pairPattern = new RegExp(`^[${PAIR_ALPHABET}]{${PAIR_LENGTHS.join('}$|^[' + PAIR_ALPHABET + ']{')}}$`)
-
-/**
- * A fresh code. `random` fills a byte array, the way `crypto.getRandomValues`
- * does; it is a parameter so a test can hand in known bytes.
- */
-export function makePairCode(random) {
-  const fill =
-    random ||
-    ((bytes) => {
-      const c = globalThis.crypto
-      if (!c?.getRandomValues) throw new Error('No source of randomness here.')
-      return c.getRandomValues(bytes)
-    })
-  const bytes = fill(new Uint8Array(PAIR_LENGTH))
-  let code = ''
-  for (let i = 0; i < PAIR_LENGTH; i++) code += PAIR_ALPHABET[bytes[i] % PAIR_ALPHABET.length]
-  return code
-}
-
-/**
- * A code as typed — lower case, spaces, dashes — as the code it means.
- * Returns null for anything that is not a code at all, so a caller can say
- * "that isn't a code" rather than trying to sign in with it. The alphabet has
- * no 0, 1, I or O, so a code never contains the characters people misread.
- */
-export function normalizePairCode(text) {
-  const raw = String(text || '')
-    .toUpperCase()
-    .replace(/[^A-Z2-9]/g, '')
-  return pairPattern.test(raw) ? raw : null
-}
-
-/** The code the way it is shown and read out: four groups of four. */
-export function formatPairCode(code) {
-  const clean = String(code || '').replace(/[^A-Z2-9]/gi, '').toUpperCase()
-  return clean.replace(/(.{4})(?=.)/g, '$1-')
-}
-
-/** Whether something is already a code — for enabling a Connect button. */
-export const isPairCode = (text) => normalizePairCode(text) !== null
-
-/**
- * The account a code stands for. Same code, same account, at both ends.
- *
- * The address carries only HALF the code, so a screen that shows who is signed
- * in never shows enough to sign in with. The password carries all of it. Half
- * of whatever length it is: at 16 that was the first eight, and hard-coding
- * eight would have handed the whole of an 8-symbol code to anyone who read the
- * address off a settings screen.
- *
- * WHAT HALF AN ADDRESS COSTS, since it is worth knowing rather than
- * discovering. Four symbols is about a million addresses, so two codes can
- * share one. They do not share an account: the passwords differ, so the second
- * Mac's sign-in is refused and its phone says no computer is paired with that
- * code. Irritating, and safe — it fails shut. Two rigs never land on one
- * channel, which is the failure worth designing against.
- */
-export function pairCredentials(code) {
-  const clean = normalizePairCode(code)
-  if (!clean) throw new Error(NOT_A_PAIR_CODE)
-  return {
-    email: `pair-${clean.slice(0, clean.length / 2).toLowerCase()}@${PAIR_DOMAIN}`,
-    password: `pair-${clean}`
-  }
-}
-
-/** Whether an account is one of these, rather than one a person made. */
-export function isPairAccount(email) {
-  const halves = PAIR_LENGTHS.map((n) => n / 2).join(',')
-  return new RegExp(`^pair-[a-z2-9]{${halves}}@${PAIR_DOMAIN.replace(/\./g, '\\.')}$`).test(String(email || ''))
-}
-
-/**
- * What the QR carries: the hosted app, with the code in the fragment.
- *
- * The fragment rather than the query, because a fragment never leaves the
- * phone — it is not sent to the server, so the code is in no access log.
- */
-export function pairLink(code, origin = HOSTED_ORIGIN) {
-  const clean = normalizePairCode(code)
-  if (!clean) return null
-  return `${origin.replace(/\/+$/, '')}/#pair=${clean}`
-}
-
-/** The code in a URL the phone opened, or null. Accepts the query too, for a link typed by hand. */
-export function pairCodeFromUrl({ hash = '', search = '' } = {}) {
-  for (const part of [hash, search]) {
-    const m = /(?:^|[#?&])pair=([^&]*)/i.exec(String(part || ''))
-    if (m) {
-      const code = normalizePairCode(decodeURIComponent(m[1]))
-      if (code) return code
-    }
-  }
-  return null
-}
+export const isPairAccount = (email) =>
+  typeof email === 'string' && email.toLowerCase().endsWith(`@${PAIR_DOMAIN}`)

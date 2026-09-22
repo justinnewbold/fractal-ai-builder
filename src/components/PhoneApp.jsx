@@ -106,8 +106,8 @@ export default function PhoneApp() {
 
       <h4>Once it is installed</h4>
       <p className="hint">
-        Open <strong>Phone &amp; computer</strong> in Settings here. It shows a QR code the phone&rsquo;s
-        camera can read, and that is the pairing done &mdash; no account, nothing to type.
+        Open <strong>Phone &amp; computer</strong> in Settings here and sign in. Sign in on the
+        phone with the same account, and that is the pairing done.
       </p>
     </>
   )
