@@ -2180,6 +2180,50 @@ export function run(test) {
     )
   })
 
+  test('no scrolling screen centres content it is too small to hold', () => {
+    /*
+     * "What is the button on the bottom that can't be seen and can't be
+     * scrolled to??"
+     *
+     * The sign-in screen's scroll view carried `flexGrow: 1` with
+     * `justifyContent: 'center'`. Together those centre the content inside a
+     * box the height of the screen, which is exactly right while the content
+     * is SHORTER than the screen — and this screen was short once.
+     *
+     * It grew: a title, a paragraph, two fields, four buttons, a note. Once
+     * the content is taller than that box, centring pushes the overflow out
+     * through BOTH ends, and a scroll view can only scroll within its content
+     * size. So the last thing on the screen was drawn below the bottom edge
+     * and no amount of dragging would reach it.
+     *
+     * The pair is the fault, not either half: flexGrow alone is what makes a
+     * short screen fill the space, and centring alone is harmless on a view
+     * that does not scroll. So the pair is what is checked, across every
+     * screen rather than the one it was found on.
+     */
+    const bad = []
+    for (const file of [
+      ...walk(new URL('../mobile/src/screens/', import.meta.url)),
+      ...walk(new URL('../mobile/src/components/', import.meta.url))
+    ]) {
+      const text = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' ')
+      /* Every contentContainerStyle in the file, brace-balanced enough for a
+         style object one level deep. */
+      for (const m of text.matchAll(/contentContainerStyle=\{\{([^{}]*)\}\}/g)) {
+        const style = m[1].replace(/\s+/g, ' ')
+        if (/flexGrow: 1/.test(style) && /justifyContent: 'center'/.test(style)) {
+          bad.push(`${String(file).split('/mobile/')[1]}: ${style.trim()}`)
+        }
+      }
+    }
+    assert.deepEqual(bad, [], `a scroll view centres content that can outgrow it:\n${bad.join('\n')}`)
+
+    /* And the screen it was found on starts at the top, with room under the
+       last thing on it for the home indicator. */
+    const signIn = read('mobile/src/screens/SignIn.js')
+    assert.match(signIn, /paddingBottom: space\.xxl/, 'the last thing on the sign-in screen sits under the home indicator')
+  })
+
   test('a knob keeps the finger the scroll view would otherwise take', () => {
     /*
      * "The knobs just scroll the screen up and down when trying to change them."

@@ -145,7 +145,31 @@ export default function SignIn({ onSignedIn, onDemo }) {
       style={{ flex: 1 }}
     >
       <ScrollView
-        contentContainerStyle={{ padding: space.lg, gap: space.lg, flexGrow: 1, justifyContent: 'center' }}
+        /*
+         * NOT CENTRED ANY MORE, and that is the whole of the bug.
+         *
+         * "What is the button on the bottom that can't be seen and can't be
+         * scrolled to??"
+         *
+         * `flexGrow: 1` with `justifyContent: 'center'` centres the content
+         * inside a box the height of the screen. While the content is SHORTER
+         * than the screen that is exactly what it is for, and this screen was
+         * short once. It has grown: a title, a paragraph, two fields, four
+         * buttons, a note. Once the content is TALLER than that box, centring
+         * pushes the overflow out through BOTH ends — and a scroll view can
+         * only scroll within its content size, so what hangs out the bottom
+         * is not reachable by scrolling. It is drawn, and it cannot be got to.
+         *
+         * Starting at the top costs the short-screen case a little symmetry
+         * and gives every screen back its last element. paddingBottom clears
+         * the home indicator, which was the other thing in the way.
+         */
+        contentContainerStyle={{
+          padding: space.lg,
+          paddingBottom: space.xxl,
+          gap: space.lg,
+          flexGrow: 1
+        }}
         keyboardShouldPersistTaps="handled"
       >
         <View style={{ gap: space.xs }}>
