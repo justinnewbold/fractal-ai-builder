@@ -98,7 +98,8 @@ export default function ConnectScreen({ link, onConnect, onRetry, onSwitchAccoun
             <>
               <p>
                 Sign in with the same account as the computer your unit is plugged into, and this
-                phone becomes its remote.
+                phone becomes its remote. Your setlists and the presets you starred follow you to
+                any device, anywhere &mdash; not just at home.
               </p>
               <div className="connect-actions">
                 <button className="primary" onClick={onSwitchAccount} disabled={busy}>
@@ -113,22 +114,30 @@ export default function ConnectScreen({ link, onConnect, onRetry, onSwitchAccoun
           </p>
 
           {/*
-            The other way in, which has worked all along and was invisible.
+            THE SHORTCUT TO THE COMPUTER'S OWN COPY, and it is not a second
+            way in.
 
-            A phone on the same wifi needs no account at all — the Mac serves
-            this same app, and everything is kept on the phone. But every word
-            about it lived behind servedLocally(), which is to say it was only
-            ever shown to someone who had already found it. "There should be two
-            options, one just to sign in and control the device and use local
-            browser storage… and then there should be a cloud login where they
-            can save all their stuff between devices."
+            It used to be headed "on the same wifi — no account, no code",
+            which is the one thing it must not say: "to use this app and
+            connect it to your computer, you have to sign up. That's the way
+            we're doing it." Advertising an account-free route on the screen
+            whose whole job is to ask for an account is the screen arguing
+            with itself.
+
+            What the box actually does is narrower than the old heading
+            claimed. It does not pair anything. The computer serves this same
+            app on the LAN, and this sends the browser there — so it is a
+            shortcut to a page, not a way to join a phone to a computer from
+            anywhere. Where it goes, the settings are the browser's, which is
+            worth saying once and not selling.
           */}
           <div className="connect-local">
-            <p className="silk-label">Or, on the same wifi — no account, no code</p>
+            <p className="silk-label">Or go straight to your computer</p>
             <p className="hint">
-              Your computer shows its address in the menu bar, next to the Fractal icon. Type it here and
-              this phone talks to the computer directly. Nothing is signed into, and what you save stays
-              on this phone.
+              On the same wifi, your computer serves this app itself. Its address is in the menu
+              bar, next to the Fractal icon &mdash; type it here and this phone opens the
+              computer&rsquo;s own copy. What you change there stays on this phone rather than in
+              your account.
             </p>
             <div className="connect-local-row">
               <input
@@ -150,26 +159,21 @@ export default function ConnectScreen({ link, onConnect, onRetry, onSwitchAccoun
           </div>
 
           {/*
-            Signing in is optional, and it is offered for what it buys rather
-            than as the way in. A paired phone can sign in too, later, from
-            Settings; here it is the one line for someone who already has an
-            account on the Mac.
+            THERE WAS A SECOND SIGN-IN BLOCK HERE, and it drew at the same
+            time as the first.
+
+            Both branches turned on the same thing — the top one renders its
+            Sign in button when `remembered` is null, and this rendered on
+            `!remembered` — so a signed-out phone got the screen he sent back:
+            "Sign in" at the top, a wifi box, and "Or sign in — to save and
+            sync" with a second Sign in under it. Two buttons with one label,
+            and not even the same call behind them: the top one switches
+            account, this one connected.
+
+            What it said that the top did not was what signing in buys, so
+            that sentence moved up into the paragraph beside the button it
+            belongs to.
           */}
-          {!remembered ? (
-            <div className="connect-account">
-              <p className="silk-label">Or sign in — to save and sync</p>
-              <p className="hint">
-                Signing in instead means your setlists and the presets you starred follow you to
-                any device, anywhere &mdash; not just at home. Set the computer up with the same
-                account and the two find each other.
-              </p>
-              <div className="connect-local-row">
-                <button className="chip" onClick={onConnect} disabled={busy}>
-                  Sign in
-                </button>
-              </div>
-            </div>
-          ) : null}
         </>
       )}
 

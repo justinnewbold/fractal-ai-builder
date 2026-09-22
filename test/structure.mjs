@@ -3034,7 +3034,25 @@ export function run(test) {
      */
     const connect = readFileSync(new URL('../src/components/ConnectScreen.jsx', import.meta.url), 'utf8')
     assert.match(connect, /className="connect-local"/, 'the hosted screen offers only the account route')
-    assert.match(connect, /no account/i, 'the local route does not say the thing that makes it a choice')
+    /*
+     * IT SAYS WHERE THE SETTINGS LIVE, AND NO LONGER SAYS "no account".
+     *
+     * "This is still on the website where it says no account no code need to
+     * remove that terminology." It was headed "on the same wifi — no account,
+     * no code", which is the one promise this screen must not make: an
+     * account is the only way to join a phone to a computer now. The fact
+     * underneath is still true and still stated — the browser keeps what you
+     * change — it is just no longer the selling point.
+     */
+    /*
+     * COMMENTS QUOTE THE SENTENCE THEY REPLACED, which is the trap this file
+     * falls into about once a quarter: the note above the new heading says
+     * what the old one was, so a raw search for the old wording finds it and
+     * the test fails on its own explanation. Only what the screen draws is
+     * read.
+     */
+    const drawn = (text) => text.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ')
+    assert.ok(!/no account, no code/.test(drawn(connect)), 'the same-wifi route advertises needing no account again')
     assert.match(connect, /stays\s+on this phone/i, 'nothing says where the settings live on the local route')
     /*
      * What signing in buys, which is now stated accurately: the setlists and
@@ -3770,8 +3788,22 @@ export function run(test) {
     assert.ok(!/connect-code-row/.test(connect), 'the phone has a code box again')
     assert.ok(!/one-time-code/.test(connect), 'the phone still offers a code to the keyboard')
     assert.match(connect, /onClick=\{onSwitchAccount\}[\s\S]{0,120}Sign in/, 'the phone’s way in is not signing in')
-    /* The same-wifi route keeps its no-account promise, because it is true. */
-    assert.match(connect, /no account, no code/, 'the same-wifi route lost the thing that makes it worth offering')
+    /*
+     * AND THE SAME-WIFI ROUTE NO LONGER ADVERTISES ITSELF AS NEEDING NO
+     * ACCOUNT. It used to, and this test used to require it. He sent the
+     * screen back: "it says no account no code need to remove that
+     * terminology". It is a shortcut to the page the computer already serves,
+     * not a second way to pair, and the heading says that now.
+     */
+    /*
+     * COMMENTS QUOTE THE SENTENCE THEY REPLACED, which is the trap this file
+     * falls into about once a quarter: the note above the new heading says
+     * what the old one was, so a raw search for the old wording finds it and
+     * the test fails on its own explanation. Only what the screen draws is
+     * read.
+     */
+    const drawn = (text) => text.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ')
+    assert.ok(!/no account, no code/.test(drawn(connect)), 'the same-wifi route advertises needing no account again')
 
     const panel = readFileSync(new URL('../src/components/PhoneRemote.jsx', import.meta.url), 'utf8')
     assert.ok(!/PairCard|AccountCard|PhoneQr/.test(panel), 'the computer draws a QR code again')
@@ -3836,9 +3868,11 @@ export function run(test) {
       'mobile/src/screens/Onboarding.js'
     ]
 
-    /* The two places the promise is still true, and still made. */
+    /* And the screen that used to make the promise does not make it anywhere,
+       in any wording: not in the heading, not in the paragraph under it. */
     const wifi = shown(readFileSync(new URL('../src/components/ConnectScreen.jsx', import.meta.url), 'utf8'))
-    assert.match(wifi, /no account, no code/, 'the same-wifi route stopped saying the thing that makes it worth offering')
+    assert.ok(!/no account|without an account|needs no account/i.test(wifi),
+      'the connect screen advertises a way in that needs no account again')
 
     /* And nowhere is it made about pairing. Every sentence carrying the claim
        has to be about the demo or about the same-wifi route. */
