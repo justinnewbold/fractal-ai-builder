@@ -289,7 +289,7 @@ export const P3 = {
      * string rather than a function of the store's price. The price still
      * belongs on P8, which IS the paywall.
      */
-    go: 'Unlock hardware control'
+    go: 'Unlock'
   },
   /*
    * THE TWO WAYS BACK IN, UNDER ONE QUESTION.

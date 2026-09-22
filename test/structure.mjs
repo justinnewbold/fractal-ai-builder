@@ -4921,7 +4921,7 @@ export function run(test) {
      * 'Unlock'." The real-rig card opens the computer-app step; the charge
      * is two screens later on P8, which is where the store's price belongs.
      */
-    assert.equal(c.P3.real.go, 'Unlock hardware control')
+    assert.equal(c.P3.real.go, 'Unlock')
     assert.equal(c.P8.head(null), '$9.99 one-time')
     assert.equal(c.P8.head('\u20ac10,99'), '\u20ac10,99 one-time')
     assert.equal(c.P8.go(null), 'Unlock real-rig control  \u00b7  $9.99')
