@@ -175,17 +175,20 @@ This app is a remote control for Fractal Audio guitar hardware. Normally it
 connects to a computer that has the guitar unit plugged into it over USB.
 
 You will not have that hardware, so the app includes a full demo mode that
-needs nothing but the phone:
+needs nothing but the phone, and no account:
 
-  On the first screen, tap "Just looking? Try the demo".
+  1. Tap "Get started"
+  2. Tap "Got it"
+  3. Tap "Start free demo"
+  4. Choose any unit, then tap "Play with ..."
 
-That loads a simulated FM3 with twelve presets and named scenes. Every screen
-works — presets, scenes, the signal chain, the tuner, setlists, settings.
-Nothing in the demo reaches real hardware.
+That loads a simulated unit with twelve presets and named scenes. Every
+screen works — presets, scenes, the signal chain, the tuner, tap tempo,
+setlists, settings. Nothing in the demo reaches real hardware.
 
-No account is required to use the demo, or to use the app on a local network.
-Signing in is only needed to reach your own computer from outside your home
-wifi, and that is the only thing an account does.
+The demo is free and needs no account. An account is used for one thing
+only: joining this phone to a computer that has the guitar unit plugged
+into it.
 
 If you would prefer to review a signed-in account instead, please ask and we
 will provide credentials.
@@ -193,5 +196,16 @@ will provide credentials.
 
 **Why this matters more than anything else here.** A reviewer opens the app,
 sees "no computer", and has no way to know there is anything behind it. The
-demo is one tap away on the very first screen, but only if somebody tells them
-it is there.
+demo is three taps in, but only if somebody tells them it is there.
+
+**AND WHY IT IS WRITTEN OUT TAP BY TAP.** The paragraph that used to be here
+said *"On the first screen, tap 'Just looking? Try the demo'"* — a button that
+had not existed for months, on a screen that is not the first one. A reviewer
+following it would have looked for a label that was not there, on a screen
+where it never was, and concluded the app does nothing. It also claimed the
+app worked "on a local network" without an account and that signing in was
+only for reaching a computer from outside your home wifi, both of which
+stopped being true when pairing became account-only.
+
+Store copy goes stale silently, because nothing in the build reads it. When a
+button on the way into the demo is renamed, this is the other place to change.

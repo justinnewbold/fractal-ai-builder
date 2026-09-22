@@ -3347,6 +3347,63 @@ export function run(test) {
     assert.match(signIn, /How do I connect a computer\?/, 'the sign-in screen does not offer it')
   })
 
+  test('the App Store review notes name buttons that exist', () => {
+    /*
+     * THE PARAGRAPH THAT DECIDES WHETHER THE APP IS REJECTED, and it had gone
+     * stale without anything noticing.
+     *
+     * It told the reviewer: "On the first screen, tap 'Just looking? Try the
+     * demo'". That button had not existed for months, and the screen it named
+     * is not the first one. A reviewer following it looks for a label that is
+     * not there, on a screen where it never was, and concludes the app does
+     * nothing — which is the exact rejection the notes exist to prevent.
+     *
+     * Nothing in the build reads store copy, so renaming a button cannot
+     * break it. This is what breaks instead.
+     */
+    const notes = read('docs/app-store.md')
+    const copy = read('shared/onboarding.mjs')
+
+    /* Every button the notes tell a reviewer to tap is a label the app draws. */
+    for (const [label, where] of [
+      ['Get started', 'P1.go'],
+      ['Got it', 'P2.go'],
+      ['Start free demo', 'P3.demo.go'],
+      ['Play with ', 'P4.go']
+    ]) {
+      assert.ok(copy.includes(label), `the notes send a reviewer to "${label}", which ${where} no longer says`)
+      assert.ok(notes.includes(label), `the review notes stopped naming ${where}`)
+    }
+
+    /*
+     * ONLY THE FENCED BLOCK, which is the text that actually gets pasted into
+     * App Store Connect. The prose under it QUOTES the old wording to explain
+     * what went wrong, and reading that as live copy fails the test on its own
+     * explanation — the same trap CLAUDE.md warns about for App.jsx, hit for
+     * the fifth time.
+     */
+    const after = notes.slice(notes.indexOf('## Review notes'))
+    const pasted = after.slice(after.indexOf('```') + 3, after.indexOf('```', after.indexOf('```') + 3))
+
+    /* The label that is gone stays gone. */
+    assert.ok(
+      !/Just looking\? Try the demo/.test(pasted),
+      'the review notes name a button that was removed months ago'
+    )
+    /*
+     * AND THEY DO NOT PROMISE WHAT THE APP STOPPED DOING. They said it worked
+     * "on a local network" with no account, and that signing in was only for
+     * reaching a computer from outside your home wifi. Both stopped being true
+     * when pairing became account-only — and a reviewer told the app does
+     * something it does not is the same rejection as a button that is not
+     * there.
+     */
+    assert.ok(
+      !/local network|outside your home\s+wifi/i.test(pasted),
+      'the review notes describe the two-tier app that no longer exists'
+    )
+  })
+
   test('the Setup list is in the order he put it in', () => {
     /*
      * "Move the amp and pedals button to the top of the list." Then: "Move
