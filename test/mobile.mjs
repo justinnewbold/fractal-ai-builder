@@ -3308,6 +3308,51 @@ export function run(test) {
     assert.match(signIn, /How do I connect a computer\?/, 'the sign-in screen does not offer it')
   })
 
+  test('playing with no internet is explained, and only to somebody who paid', () => {
+    /*
+     * "Let's make that some kind of option in the app or to tell people how to
+     * do it to connect without internet and give instructions to people that
+     * have already unlocked it."
+     *
+     * The route is real and it is the only one that works in a room with no
+     * signal. It was advertised in the wrong place — the website's signed-out
+     * screen, headed "no account, no code", where it read as the way around
+     * paying. Off that screen now, and told here instead, behind the unlock.
+     */
+    const settings = read('mobile/src/screens/Settings.js')
+    const shown = settings.replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ')
+
+    assert.match(shown, /Playing with no internet/, 'nothing tells a paid-up person how to play without a signal')
+
+    /*
+     * BEHIND THE UNLOCK, and behind `mayDrive` rather than `unlocked` alone.
+     * That one also says yes when the store could not be answered, and the
+     * person whose signal is bad is exactly the person reading this.
+     */
+    assert.match(shown, /\{mayDrive\(purchase\) \?/, 'the instructions are shown to somebody who has not paid')
+    assert.match(settings, /import \{ mayDrive \} from '\.\.\/lib\/unlock-rule'/, 'the gate is not the tested rule')
+
+    /*
+     * AND IT SENDS THEM TO THE BROWSER, because this app cannot do it.
+     *
+     * Everything here goes through the relay, which is on the internet. There
+     * is no code in mobile/ that speaks to a computer over wifi, so any wording
+     * implying this app connects without a signal would have somebody trying it
+     * on a stage. The instruction names the browser and the menu bar.
+     */
+    assert.match(shown, /web browser/, 'the instructions do not say to use the browser')
+    assert.match(shown, /menu bar/, 'nothing says where to find the address')
+    assert.match(shown, /kept by that browser rather than in your account/, 'nothing says where those settings live')
+
+    /* The claim the phone app can do it itself stays false, so it stays unmade. */
+    for (const src of ['mobile/src/lib/relay.js', 'mobile/src/lib/rig.js', 'mobile/src/lib/device.js']) {
+      assert.ok(
+        !/http:\/\/\d+\.\d+\.\d+\.\d+|\.local:|localhost:/.test(read(src)),
+        `${src} talks to a computer over the wifi, so the instructions above are out of date`
+      )
+    }
+  })
+
   test('a report carries the log only when it is a bug, and only the useful end of it', async () => {
     /*
      * "Keep the last 200 lines plus the last 10 errors, only when they press
