@@ -449,12 +449,17 @@ export default function App() {
            *
            * THE WALKTHROUGH IS THE WAY IN, not a thing laid over it.
            *
-           * Everything the sign-in screen offers is inside it — the demo, a
-           * pairing code, the scanner, the purchase — reached in the order
-           * somebody actually needs them rather than as four choices on one
-           * screen. Sign-in is still there behind "I already have a pairing
-           * code" for anybody who has done this before, and is what they get
-           * once this has been through.
+           * It explains the arrangement, starts the demo, and hands over to
+           * the sign-in screen for anybody joining a phone to a computer —
+           * reached in the order somebody actually needs them rather than as
+           * four choices on one screen.
+           *
+           * AND IT NO LONGER HAS AN `onDone`. That finished a walkthrough
+           * which had just paired a phone with a code: marked the walkthrough
+           * seen, asked whether this account is an owner, and put the app in.
+           * No route through it ends that way now — signing in leaves the
+           * walkthrough, and the sign-in screen's own onSignedIn does those
+           * same two things. The demo has onEnterDemo.
            */
           <Onboarding
             replay={replaying}
@@ -466,13 +471,6 @@ export default function App() {
               markWalkthrough()
               setSeenWalk(true)
               setReplaying(false)
-            }}
-            onDone={() => {
-              markWalkthrough()
-              setSeenWalk(true)
-              setReplaying(false)
-              checkOwner()
-              setAuth('in')
             }}
             onEnterDemo={() => {
               markWalkthrough()

@@ -430,9 +430,38 @@ export const AREAS = [
     web: ['src/components/ConnectScreen.jsx', 'src/components/SignIn.jsx', 'src/components/SignInSheet.jsx'],
     phone: ['mobile/src/screens/Connect.js', 'mobile/src/screens/SignIn.js'],
     buttons: [
-      { does: 'make a new account', web: 'Create Account', phone: 'Create Account' },
+      {
+        does: 'make a new account',
+        web: null,
+        phone: 'Create Account',
+        /*
+         * "Do not allow an account to be created on any of the desktop or the
+         * web app version, only sign-ins. On the phones, only show the create
+         * account window after the phone has been unlocked."
+         *
+         * An account exists to join a phone to a computer, and the phone is
+         * the end that is paid for. The browser signs into one made there.
+         */
+        why: 'an account is made in the phone app, after the unlock, and nowhere else'
+      },
       { does: 'sign in to an account you have', web: 'Sign in', phone: 'Sign in' },
-      { does: 'join the computer with a pairing code', web: 'Connect', phone: 'Connect' },
+      {
+        does: 'connect with the account this device already remembers',
+        web: 'Connect',
+        phone: null,
+        /* The browser's connect screen remembers a signed-in account and
+           offers to rejoin with it. The phone does that without asking: a
+           session it already holds goes straight to the rig. */
+        why: 'a phone with a session rejoins on its own rather than offering a button'
+      },
+      {
+        does: 'join the computer with a pairing code',
+        web: null,
+        phone: null,
+        /* "I want the QR code gone and the scanner gone. It has never worked
+           once." Signing in on both ends is the pairing now. */
+        why: 'there are no pairing codes at either end any more'
+      },
       {
         does: 'send yourself a password reset',
         web: 'Forgot password?',
@@ -459,8 +488,12 @@ export const AREAS = [
       {
         does: 'read the pairing code off the computer’s screen with the camera',
         web: null,
-        phone: 'Scan a code',
-        why: 'the browser is the thing the QR POINTS AT — it carries the hosted app’s address with the code in the fragment, so opening the square’s link IS the browser pairing, and a camera there would be a laptop photographing its own screen'
+        phone: null,
+        /* "I want the QR code gone and the scanner gone. It has never worked
+           once. Every time I've ever tried it, you tell me something
+           different." The camera, the QR code and the code box all went
+           together; signing in on both ends is the pairing now. */
+        why: 'there is no camera and no code to read at either end any more'
       },
       {
         does: 'close the sign-in sheet',

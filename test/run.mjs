@@ -6714,69 +6714,8 @@ console.log('\npairing')
  */
 import * as pairing from '../shared/pairing.mjs'
 
-test('a code is 8 symbols nobody misreads, shown in fours, and 16 still opens the door', () => {
-  const bytes = (arr) => arr.map((_, i) => i * 7)
-  const code = pairing.makePairCode(bytes)
-  assert.equal(code.length, 8, 'a new code is not the length the app tells people to expect')
-  assert.match(code, /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/, 'the alphabet has a 0, 1, I or O in it')
-  assert.equal(pairing.formatPairCode(code), `${code.slice(0, 4)}-${code.slice(4)}`)
-  // Two calls with real randomness never agree.
-  assert.notEqual(pairing.makePairCode(), pairing.makePairCode())
 
-  /*
-   * IT IS STILL A PASSWORD, which is the reason this is 8 and not the 4 that
-   * was asked for. 32 symbols to the 8th is about 1.1 trillion; a thousand
-   * guesses a second is eleven hundred years. Four digits is ten thousand —
-   * minutes, by a script, against a sign-in service that answers to anyone.
-   */
-  assert.ok(Math.pow(32, pairing.PAIR_LENGTH) > 1e12, 'a code is now short enough to be worth guessing')
 
-  /* And a Mac paired before this is not unpaired by it. A longer code is a
-     stronger one, so the old length keeps working rather than being retired. */
-  assert.deepEqual(pairing.PAIR_LENGTHS, [8, 16])
-  assert.equal(pairing.normalizePairCode('ABCD-EFGH-JKLM-NPQR'), 'ABCDEFGHJKLMNPQR', 'a phone paired at 16 is locked out by the change')
-  assert.equal(pairing.normalizePairCode('ABCD-2345'), 'ABCD2345')
-  for (const wrong of ['ABCD', 'ABCD-EFGH-JKLM', 'ABCD-EFGH-JKLM-NPQR-STUV']) {
-    assert.equal(pairing.normalizePairCode(wrong), null, `${wrong} passed as a code`)
-  }
-})
-
-test('a code typed carelessly is still the code', () => {
-  const code = 'ABCDEFGHJKLMNPQR'
-  for (const typed of ['abcd-efgh-jklm-npqr', 'ABCD EFGH JKLM NPQR', ' abcdefghjklmnpqr ', 'ABCD-EFGH-JKLM-NPQR']) {
-    assert.equal(pairing.normalizePairCode(typed), code, typed)
-    assert.ok(pairing.isPairCode(typed), typed)
-  }
-  assert.equal(pairing.normalizePairCode('ABCD-EFGH-JKLM-NPQ'), null, 'fifteen symbols passed as a code')
-  assert.equal(pairing.normalizePairCode('ABCD-EFG'), null, 'seven symbols passed as a code')
-  assert.equal(pairing.normalizePairCode('ABCD-EFGH-JKLM-NPQ0'), null, 'a zero passed, and no code has one')
-  assert.equal(pairing.normalizePairCode(''), null)
-  assert.equal(pairing.normalizePairCode(null), null)
-})
-
-test('the same code is the same account at both ends, and the address gives half of it away at most', () => {
-  const a = pairing.pairCredentials('abcd-efgh-jklm-npqr')
-  const b = pairing.pairCredentials('ABCDEFGHJKLMNPQR')
-  assert.deepEqual(a, b, 'a typed code and a scanned one sign in as different people')
-  assert.equal(a.email, 'pair-abcdefgh@pair.fractal.newbold.cloud')
-  assert.equal(a.password, 'pair-ABCDEFGHJKLMNPQR')
-  assert.ok(a.password.length >= 6, 'the account service refuses passwords under six')
-  assert.ok(!a.email.toUpperCase().includes('JKLMNPQR'), 'the address, which screens show, carries the whole code')
-  assert.throws(() => pairing.pairCredentials('nope'), /isn’t a pairing code/)
-
-  /*
-   * HALF OF WHATEVER LENGTH IT IS. Hard-coded at eight, an 8-symbol code would
-   * have put the whole thing in the address — and the address is what a screen
-   * shows when it says who is signed in. Shortening the code would have handed
-   * the code to anybody reading over a shoulder.
-   */
-  const short = pairing.pairCredentials('ABCD-2345')
-  assert.equal(short.email, 'pair-abcd@pair.fractal.newbold.cloud')
-  assert.equal(short.password, 'pair-ABCD2345')
-  assert.ok(!short.email.toUpperCase().includes('2345'), 'the short code is given away whole by its own address')
-  assert.ok(short.password.length >= 6, 'the account service refuses passwords under six')
-  assert.ok(pairing.isPairAccount(short.email), 'a short code’s account is not recognised as a paired one')
-})
 
 test('a paired account is told apart from a person’s, so no screen shows it as an email', () => {
   assert.ok(pairing.isPairAccount('pair-abcdefgh@pair.fractal.newbold.cloud'))
@@ -6792,32 +6731,7 @@ test('a paired account is told apart from a person’s, so no screen shows it as
   assert.match(link.describeLink({ role: 'mac', link: 'connected', account: { email: 'j@x.com' } }).sentence, /for j@x.com/)
 })
 
-test('the QR opens the hosted app with the code in the fragment, and the phone reads it back', () => {
-  const url = pairing.pairLink('abcd-efgh-jklm-npqr')
-  assert.equal(url, 'https://fractal.newbold.cloud/#pair=ABCDEFGHJKLMNPQR')
-  assert.equal(pairing.pairLink('bad'), null)
-  assert.equal(pairing.pairCodeFromUrl({ hash: '#pair=ABCDEFGHJKLMNPQR' }), 'ABCDEFGHJKLMNPQR')
-  assert.equal(pairing.pairCodeFromUrl({ hash: '#pair=abcd-efgh-jklm-npqr' }), 'ABCDEFGHJKLMNPQR', 'a code typed into a link is not read')
-  assert.equal(pairing.pairCodeFromUrl({ search: '?x=1&pair=ABCDEFGHJKLMNPQR' }), 'ABCDEFGHJKLMNPQR')
-  assert.equal(pairing.pairCodeFromUrl({ hash: '#other', search: '' }), null)
-  assert.equal(pairing.pairCodeFromUrl({}), null)
-  // The hosted origin the QR points at is the one the app already knows itself by.
-  const platform = readSrc(new URL('../src/lib/platform.js', import.meta.url), 'utf8')
-  assert.match(platform, new RegExp(`HOSTED = '${new URL(pairing.HOSTED_ORIGIN).hostname}'`), 'the QR points somewhere other than the hosted app')
-})
 
-test('a scanned code pairs before the connect screen can ask for anything', () => {
-  const src = readSrc(new URL('../src/lib/link.js', import.meta.url), 'utf8')
-  const boot = src.slice(src.indexOf('export async function bootLink'))
-  assert.match(boot, /pairCodeFromUrl\(\{ hash: window\.location\.hash/, 'bootLink never looks for a code in the address')
-  assert.match(boot, /replaceState\(null, '', window\.location\.pathname\)/, 'the code stays in the address, so a reload pairs again')
-  assert.match(boot, /await pairPhone\(scanned\)/, 'a scanned code is found and not acted on')
-  assert.match(src, /set\(\{ pairError: err\.message \}\)/, 'a bad scanned code fails silently')
-  // The Mac's pairing and a person's sign-in are the same three steps after the account.
-  assert.match(src, /export async function pairMac\(\)[\s\S]*?await turnOnMac\(/, 'pairing the computer does not turn the host on')
-  assert.match(src, /export async function setUpMac\([\s\S]*?await turnOnMac\(/, 'signing the computer in no longer turns the host on')
-  assert.match(src, /needsConfirmation[\s\S]*?Confirm email/, 'a project that confirms every account fails pairing with no words about why')
-})
 
 
 console.log('\ntyping a tempo')

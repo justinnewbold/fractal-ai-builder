@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { loadRemoteConfig, remoteSignUp, sendPasswordReset } from '../lib/remote'
+import { loadRemoteConfig, sendPasswordReset } from '../lib/remote'
 
 /**
  * The one sign-in form.
@@ -9,12 +9,23 @@ import { loadRemoteConfig, remoteSignUp, sendPasswordReset } from '../lib/remote
  * sign anyone in at all. Same account, same two fields, three places to type
  * them. This is the form; what happens on submit is the caller's.
  *
- * Create and forgot live inside it as modes rather than as separate screens,
- * because they are the two things a person at a sign-in form is about to
- * need, and sending them somewhere else to do them is a door too many.
+ * CREATE IS NOT HERE, AND THAT IS DELIBERATE.
+ *
+ * "On the desktop app make it so you can only sign in with account that was
+ * already created on a phone. So do not allow an account to be created on
+ * any of the desktop or the web app version, only sign-ins."
+ *
+ * An account exists to join a phone to a computer, and the phone is the end
+ * that is paid for. Making one here would let somebody set up the free half
+ * of the arrangement and find out later that the half they wanted costs
+ * money — and it would put the app's only sign-up form on the one device
+ * that can never buy the unlock.
+ *
+ * Forgot stays: somebody signing in here with an account made on their phone
+ * is exactly the person who will have forgotten the password.
  */
 export default function SignIn({ email: initial = '', submitLabel = 'Sign in', onSubmit, busy, autoFocus }) {
-  const [mode, setMode] = useState('in')
+  const [mode, setMode] = useState('in') // 'in' | 'forgot'
   const [email, setEmail] = useState(initial)
   const [password, setPassword] = useState('')
   const [working, setWorking] = useState(false)
@@ -38,14 +49,6 @@ export default function SignIn({ email: initial = '', submitLabel = 'Sign in', o
     try {
       if (mode === 'in') {
         await onSubmit({ email: address, password })
-      } else if (mode === 'create') {
-        const { needsConfirmation } = await remoteSignUp({ ...project(), email: address, password })
-        setNote(
-          needsConfirmation
-            ? 'Check your email to confirm the account, then sign in.'
-            : 'Account made. Sign in to continue.'
-        )
-        setMode('in')
       } else {
         await sendPasswordReset({ ...project(), email: address, redirectTo: window.location.origin })
         setNote('If that address has an account, a reset link is on its way.')
@@ -78,7 +81,7 @@ export default function SignIn({ email: initial = '', submitLabel = 'Sign in', o
           <span>Password</span>
           <input
             type="password"
-            autoComplete={mode === 'create' ? 'new-password' : 'current-password'}
+            autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={off}
@@ -88,23 +91,12 @@ export default function SignIn({ email: initial = '', submitLabel = 'Sign in', o
 
       <div className="signin-actions">
         <button className="primary" type="submit" disabled={off}>
-          {working
-            ? 'One moment…'
-            : mode === 'create'
-              ? 'Create Account'
-              : mode === 'forgot'
-                ? 'Email me a reset link'
-                : submitLabel}
+          {working ? 'One moment…' : mode === 'forgot' ? 'Email me a reset link' : submitLabel}
         </button>
         {mode === 'in' ? (
-          <>
-            <button type="button" className="signin-link" onClick={() => setMode('create')} disabled={off}>
-              Create Account
-            </button>
-            <button type="button" className="signin-link" onClick={() => setMode('forgot')} disabled={off}>
-              Forgot password?
-            </button>
-          </>
+          <button type="button" className="signin-link" onClick={() => setMode('forgot')} disabled={off}>
+            Forgot password?
+          </button>
         ) : (
           <button type="button" className="signin-link" onClick={() => setMode('in')} disabled={off}>
             Back to sign in

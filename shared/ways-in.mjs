@@ -82,8 +82,8 @@ export const WAYS = [
       'Drag it to Applications and open it.',
       'Plug your unit into the Mac with its USB cable.',
       'Quit FM3-Edit or Axe-Edit if either is open. Only one program can hold the USB port, and whichever got there first keeps it.',
-      'In the app, choose Set up phone remote. It shows a short code and a QR you can scan.',
-      'On your phone, scan that QR with Scan a code — or type the code in. That is the whole of it — no account needed.'
+      'In the app, choose Set up phone remote and sign in. Make an account there if you have not got one.',
+      'On your phone, sign in with that same account. That is the whole of it.'
     ],
     links: [{ label: 'Download Fractal Remote for Mac', url: RELEASES }]
   },
@@ -99,7 +99,7 @@ export const WAYS = [
       'Plug your unit into the PC with its USB cable.',
       'Quit any Fractal editor if one is open. Only one program can hold the USB port, and whichever got there first keeps it.',
       'The first time it starts its server, Windows asks whether to allow it through the firewall. Say yes, or your phone cannot reach this computer over wifi.',
-      'In the app, choose Set up phone remote, and type the code it shows into your phone. Same as the Mac — no account needed.'
+      'In the app, choose Set up phone remote and sign in, then sign in on the phone with that same account. Same as the Mac.'
     ],
     links: [{ label: 'Download Fractal Remote for Windows', url: RELEASES }]
   },
@@ -115,7 +115,7 @@ export const WAYS = [
       'For the .deb: sudo apt install ./the-file.deb',
       'Plug your unit into the machine with its USB cable.',
       'You may need permission to use the USB port. If the app says it cannot find your unit, run: sudo usermod -aG dialout $USER — then log out and back in. Most distributions keep serial ports behind that group, and it catches nearly everybody once.',
-      'In the app, choose Set up phone remote, and type the code it shows into your phone. No account needed.',
+      'In the app, choose Set up phone remote and sign in, then sign in on the phone with that same account.',
       'There are builds for both ordinary PCs and ARM machines, so a Raspberry Pi works — which makes a cheap box that sits in the rack and stays on a genuinely good answer.'
     ],
     links: [{ label: 'Download Fractal Remote for Linux', url: RELEASES }]

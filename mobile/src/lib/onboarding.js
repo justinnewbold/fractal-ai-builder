@@ -127,7 +127,10 @@ export const D2B = {
 export const D3 = {
   step: 'STEP 2 OF 3',
   head: 'Use your phone as the remote?',
-  sub: 'No account required. Scan one code and you’re connected.',
+  /* Was "No account required. Scan one code and you're connected." Both
+     halves stopped being true on the same day: there is no code to scan, and
+     an account is now what joins the two ends. MY WORDING. */
+  sub: 'Sign in on this computer and on the phone, and they find each other.',
   why: [
     { key: 'stage', badge: '↗', label: 'STAGE', body: 'Change scenes from across the room' },
     { key: 'rack', badge: 'T', label: 'RACK', body: 'Tune without walking back' },
@@ -144,14 +147,16 @@ export const D3 = {
   foot: 'You can add a phone later in Settings → Phone & computer.'
 }
 
-/** D4 — the square, the code, and the wait. */
+/** D4 — the QR code, the pairing code, and the wait. */
 export const D4 = {
   step: 'STEP 3 OF 3',
-  head: 'Scan this code with your phone.',
-  sub: 'The phone connects to this computer, which stays connected to your Fractal unit.',
-  codeLabel: 'OR ENTER THIS CODE',
+  /* Was "Scan this code with your phone." and a note reading "No account
+     required." The QR code and the pairing code are both gone, and an
+     account is the only way the two ends find each other. MY WORDING. */
+  head: 'Sign in on this computer.',
+  sub: 'Then sign in on the phone with the same account, and it becomes the remote for the unit here.',
   waiting: 'Waiting for your phone…',
-  note: 'No account required. Pairing creates a private connection between this phone and computer.',
+  note: 'An account is what joins the two. The demo and this computer app are both free without one.',
   noApp: 'I don’t have the app',
   skip: 'Skip for now',
   /*
@@ -168,7 +173,7 @@ export const D4 = {
    * Nothing here is being withheld, and somebody who has not bought it yet is
    * not doing anything wrong by scanning.
    */
-  owned: 'If you’ve bought the phone app, scan this and it will connect. The phone checks — it will say so if it isn’t unlocked yet.'
+  owned: 'If you’ve bought the phone app, sign in on it with this same account and it will connect. The phone checks — it will say so if it isn’t unlocked yet.'
 }
 
 /** The three things worth knowing, said once at the end of each walkthrough. */
@@ -200,7 +205,10 @@ export const P1 = {
   head: 'CONTROL YOUR FRACTAL FROM YOUR PHONE.',
   sub: 'Presets, scenes, blocks, tuner and tap tempo - on the phone in your pocket.',
   go: 'Get started',
-  haveCode: 'I already have a pairing code'
+  /* Was "I already have a pairing code". Codes are gone — "I want the QR
+     code gone and the scanner gone" — so the person this is for is the one
+     who has been here before and has an account. MY WORDING. */
+  haveCode: 'I already have an account'
 }
 
 /** P2 — the same three boxes, down a phone. */
@@ -278,21 +286,36 @@ export const P6 = {
     { key: 'linux', badge: 'L', label: 'LINUX', go: 'Send link' }
   ],
   foot: 'We’ll email or text the download link so you can open it on the computer.',
-  back: 'Back to the free demo'
+  back: 'Back to the free demo',
+  /*
+   * NEW WORDING, MINE.
+   *
+   * "This needs to be crystal clear that to download this, you have to be
+   * from your computer. It does ask for an email, but it's not very clear. It
+   * just says download when you click on it. And it tries downloading it on
+   * the phone."
+   *
+   * The address was a BUTTON on the phone, so tapping it opened the downloads
+   * page on the handset and started fetching a Mac installer onto a phone
+   * that can do nothing with it. It is an address to type somewhere else, so
+   * it is printed rather than pressed now, and this line says where.
+   */
+  address: 'TYPE THIS ON YOUR COMPUTER · NOT ON THIS PHONE',
+  emailLabel: 'OR HAVE THE LINK SENT TO YOU'
 }
 
-/** P7 — scanning the computer's square. */
+/**
+ * P7 — what is left of the pairing step.
+ *
+ * "I want the QR code gone and the scanner gone. It has never worked once.
+ * Every time I've ever tried it, you tell me something different."
+ *
+ * The screen this named is gone: the camera, the QR code, the eight-character
+ * box and the Connect button under it. Only the one line survives, because
+ * three other screens point at the same action with it and one phrase for one
+ * thing is how they stay from drifting apart.
+ */
 export const P7 = {
-  tag: 'CONNECT',
-  eyebrow: 'PAIR WITH YOUR COMPUTER',
-  head: 'Scan the square on your computer.',
-  codeLabel: 'OR ENTER THE CODE UNDER IT',
-  foot: 'The code appears in Set up phone remote on your computer.',
-  go: 'Connect',
-  noCode: 'I don’t have a code yet',
-  /* NEW WORDING, not from the PDF. Somebody who has signed in on another
-     device has no code to scan and nothing on this screen for them — the
-     walkthrough sent them round in a circle. Justin can change this line. */
   account: 'Sign in with an email and password'
 }
 
@@ -329,7 +352,28 @@ export const P9 = {
     { key: 'save', label: 'SAVE', body: 'Changes are live now. Save permanently on the computer.' }
   ],
   go: 'Open Play',
-  foot: 'Replay this anytime in Settings → Show the walkthrough.'
+  foot: 'Replay this anytime in Settings → Show the walkthrough.',
+  /*
+   * THE SAME LAST SCREEN, FOR SOMEBODY WHO CHOSE THE DEMO.
+   *
+   * "When I did a fresh app install, not logged in, there's no tutorial,
+   * nothing. So it just brings up the screen. This is a new user trying it
+   * out. Not a very good experience."
+   *
+   * Right, and the screen that would have fixed it was already written — this
+   * one. PLAY, EDIT and SAVE in three lines. It was only ever reached after a
+   * real pairing, so the person most likely to need it, somebody who has
+   * never seen the app at all, was the one person who never got it.
+   *
+   * The tips are his and are reused word for word. These two lines are mine,
+   * because the ones above them say "You're connected" and name a computer,
+   * and in the demo there is no computer and nothing is connected.
+   */
+  demo: {
+    head: 'Here’s the app.',
+    /** FM3 · simulated */
+    status: (unit) => `${unit}  ·  simulated`
+  }
 }
 
 /** What Settings calls the way back in, on both ends. */

@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
-import QRCode from 'qrcode'
 import { changePassword } from '../lib/remote'
-import { describeLink, formatPairCode, isPairAccount, pairLink, savedPairCode, HOSTED_ORIGIN } from '../lib/link'
-import PhoneQr from './PhoneQr'
+import { describeLink, isPairAccount } from '../lib/link'
 
 /**
  * Phone remote, in Setup: what this end is, whether the other end is there,
@@ -20,7 +18,7 @@ import PhoneQr from './PhoneQr'
  * relay, channel, helper, or the name of the account service; the
  * diagnostics that need those words live under Technical details.
  */
-export default function PhoneRemote({ link, onAction, onError, busy }) {
+export default function PhoneRemote({ link, onAction, onError, error, busy }) {
   const said = describeLink(link)
   const email = link.account?.email || link.cloud?.user?.email || ''
 
@@ -32,7 +30,7 @@ export default function PhoneRemote({ link, onAction, onError, busy }) {
       </p>
 
       {link.role === 'mac' ? (
-        <MacSide link={link} email={email} onAction={onAction} busy={busy} />
+        <MacSide link={link} email={email} onAction={onAction} busy={busy} error={error} />
       ) : link.role === 'wifi' ? (
         <p className="hint">
           Nothing to set up &mdash; this phone is talking to the computer directly over wifi.
@@ -50,7 +48,7 @@ export default function PhoneRemote({ link, onAction, onError, busy }) {
 
 /* ------------------------------------------------------------------ */
 
-function MacSide({ link, email, onAction, busy }) {
+function MacSide({ link, email, onAction, busy, error }) {
   const cloud = link.cloud
 
   if (cloud?.demo) {
@@ -67,49 +65,52 @@ function MacSide({ link, email, onAction, busy }) {
 
   if (link.link === 'signed-out') {
     /*
-     * Two ways to set the Mac up, and the one that asks for nothing comes
-     * first. Pairing makes a code the phone scans; nobody types an email
-     * anywhere. Signing in is for a person who wants presets to follow them
-     * between devices, and it says so.
+     * ONE WAY IN NOW, and the other one is why.
+     *
+     * "I want the QR code gone and the scanner gone. It has never worked
+     * once… to use this app and connect it to your computer, you have to
+     * sign up. That's the way we're doing it."
+     *
+     * The button that used to come first made a pairing code: a hidden
+     * account nobody had to create, shown as a QR code for the phone's camera
+     * and eight characters under it to type. It is gone, along with the
+     * camera at the other end.
+     *
+     * The demo is still free and needs no account. This computer app is still
+     * free and needs no account. Joining a phone to it is the one thing that
+     * does, and both ends sign into the same one.
      */
     return (
       <>
         <p className="hint">
-          Set this up once and your phone can play through this computer from anywhere. No account
-          needed &mdash; the computer shows a code, the phone scans it.
+          Sign in here, then sign in on the phone with the same account, and the phone becomes the
+          remote for the unit on this computer. The demo and this app are both free without one.
         </p>
         <div className="history-actions">
-          <button className="primary" onClick={() => onAction('mac-pair')} disabled={busy}>
-            Set up phone remote
-          </button>
-          <button className="chip" onClick={() => onAction('mac-setup')} disabled={busy}>
-            Sign in with an account instead
+          <button className="primary" onClick={() => onAction('mac-setup')} disabled={busy}>
+            Sign in to set up the phone remote
           </button>
         </div>
+        {error ? <p className="hint tone-bad">{String(error)}</p> : null}
         <p className="hint">
-          An account means your presets and what the AI has learned about your taste follow you to
-          any device.
+          An account also means your presets and what the AI has learned about your taste follow you
+          to any device.
         </p>
       </>
     )
   }
 
+  /*
+   * NO QR CODE HERE ANY MORE. It carried the pairing code, and before that
+   * the hosted app's address for a phone that did not have the app yet.
+   * Both were read by a camera this app no longer has.
+   */
   return (
     <>
-      {/*
-        ONE SQUARE, and the wifi one folded under it.
-
-        "Are both QR codes needed on the Mac app? It's confusing and they are
-        literally right by each other so a phone will pick up both codes."
-        Both are needed and they are for different things — the app, and a web
-        browser — which PhoneQr says in words. Two squares an inch apart is a
-        camera choosing for you.
-
-        Shared with the first-launch tour rather than drawn twice: two
-        renderings of a pairing code drift, and that drift is a phone scanning
-        a square that pairs it with nothing.
-      */}
-      <PhoneQr connected={link.link === 'connected'} email={email} onAction={onAction} busy={busy} />
+      <p className="hint">
+        Signed in as <strong>{email}</strong>. Sign in on the phone with the same account and it
+        becomes the remote for the unit here.
+      </p>
       <div className="history-actions">
         {link.link === 'connected' ? (
           <button className="chip" onClick={() => onAction('mac-off')} disabled={busy}>
@@ -122,134 +123,6 @@ function MacSide({ link, email, onAction, busy }) {
         )}
       </div>
     </>
-  )
-}
-
-/**
- * The code a paired Mac shows, as a QR and as text.
- *
- * The QR opens the hosted app with the code in the address, so a phone that
- * scans it is connected without typing anything. The text is for a camera
- * that will not focus, and for a second phone across the room.
- *
- * The code is kept by the browser that did the pairing. A different browser
- * at the same Mac knows the Mac is paired but not with what, and the only
- * honest offer is to pair again.
- */
-export function PairCard({ on, onAction, busy }) {
-  const code = savedPairCode()
-  const url = code ? pairLink(code) : null
-  const [qr, setQr] = useState(null)
-
-  useEffect(() => {
-    if (!url) return undefined
-    let alive = true
-    QRCode.toDataURL(url, { margin: 1, width: 320, color: { dark: '#0d0f12', light: '#ffffff' } })
-      .then((d) => alive && setQr(d))
-      .catch(() => alive && setQr(null))
-    return () => {
-      alive = false
-    }
-  }, [url])
-
-  if (!code) {
-    return (
-      <>
-        <p className="hint">
-          Paired without an account, but the code was made from another browser on this computer, so it
-          can&rsquo;t be shown here. Pairing again makes a new code; phones with the old one will
-          need the new one.
-        </p>
-        <div className="history-actions">
-          <button className="chip" onClick={() => onAction('mac-pair')} disabled={busy}>
-            Pair again
-          </button>
-        </div>
-      </>
-    )
-  }
-
-  return (
-    <div className="phone-setup pair-card">
-      <p className="hint">
-        {on
-          ? 'Paired, no account. On your phone, point the camera at this — or type the code.'
-          : 'Paired, no account. Turn it on and your phone can connect with this code.'}
-      </p>
-      {qr ? <img className="phone-qr" src={qr} alt="Code to pair your phone with this computer" width={160} height={160} /> : null}
-      <p className="pair-code mono" aria-label="Pairing code">
-        {formatPairCode(code)}
-      </p>
-    </div>
-  )
-}
-
-/**
- * The way in for a computer signed into an account.
- *
- * "I looked all over the Mac app. There is no other QR code besides the one
- * that gives the web address. There is also nowhere that shows the connect
- * code to connect."
- *
- * Both true, and the second one has an answer that had never been written
- * down anywhere he could read it: WITH AN ACCOUNT THERE IS NO CODE. A code
- * exists so that two devices can share a hidden account without anybody
- * making one — see PairCard. Once there is a real account, the account is
- * the code, and the phone joins by signing into it.
- *
- * What was wrong is that the app knew that and never said it. This computer
- * showed one line, "Signed in as you@example.com", beside a wifi QR for a
- * completely different route, and left somebody hunting the menus for a
- * number that does not exist.
- *
- * So: the same square, pointing at the app on the hosted site, and the
- * account to sign into written under it. Scanning gets the phone to the
- * right place; the line under it says what to do when it arrives.
- */
-/**
- * @param showAccount  Whether to print the address. The Setup page does: it is
- *   answering "which account is this", and it is his own screen. THE TOUR DOES
- *   NOT — "the first shot that pops up in the tutorial literally shows my
- *   personal email address on it". That card is the first thing the app ever
- *   shows, it is what gets photographed and screen-shared, and the sentence
- *   above the square already says what to do without naming anybody.
- */
-export function AccountCard({ on, email, showAccount = true }) {
-  const url = HOSTED_ORIGIN
-  const [qr, setQr] = useState(null)
-
-  useEffect(() => {
-    let alive = true
-    QRCode.toDataURL(url, { margin: 1, width: 320, color: { dark: '#0d0f12', light: '#ffffff' } })
-      .then((d) => alive && setQr(d))
-      .catch(() => alive && setQr(null))
-    return () => {
-      alive = false
-    }
-  }, [url])
-
-  return (
-    <div className="phone-setup">
-      <p className="hint">
-        {on
-          ? 'From anywhere. Point your phone’s camera at this to open the app, then sign in with the same account.'
-          : 'From anywhere, once this is turned on. Point your phone’s camera at this to open the app, then sign in with the same account.'}
-      </p>
-      {qr ? (
-        <img className="phone-qr" src={qr} alt={`Code for ${url}`} width={160} height={160} />
-      ) : null}
-      {showAccount ? (
-        <p className="pair-code mono" aria-label="The account to sign in as">
-          {email}
-        </p>
-      ) : null}
-      {/* The sentence that was missing. Somebody who has read about pairing
-          codes will otherwise keep looking for one. */}
-      <p className="footnote">
-        There is no pairing code to type: that is for computers set up without an account. This one
-        has one, so signing in on the phone is what joins it.
-      </p>
-    </div>
   )
 }
 
@@ -329,7 +202,10 @@ function AccountFold({ email, paired, role, onAction, onError, busy }) {
     return (
       <div className="account-fold">
         <button className="signin-link" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-          {open ? 'Hide' : 'Paired without an account'}
+          {/* Was "Paired without an account", which is how this device got
+              here and is no longer something the app offers to do. It is a
+              statement about the past now, so it reads as one. */}
+          {open ? 'Hide' : 'Paired with a code, before accounts'}
         </button>
         {open ? (
           <div className="account">

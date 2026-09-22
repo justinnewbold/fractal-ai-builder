@@ -136,8 +136,6 @@ import {
   reconnectPhone,
   disconnectPhone,
   setUpMac,
-  pairMac,
-  pairPhone,
   isPairAccount,
   setMacRemote,
   signOutHere,
@@ -1699,14 +1697,6 @@ export default function App() {
         if (kind === 'connect') {
           if (linkState().account) await reconnectPhone()
           else setSignIn(true)
-        } else if (kind === 'mac-pair') {
-          /*
-           * The Mac set up with nobody making an account: a code is made, the
-           * hidden account behind it is made, and the host is turned on. The
-           * code shows in Setup for the phone to scan.
-           */
-          await pairMac()
-          record('remote', 'Phone remote set up — paired, no account')
         } else if (kind === 'retry') {
           /*
            * The connect screen's Try again, and the same new socket the fault
@@ -1756,20 +1746,6 @@ export default function App() {
       }
     },
     [read, record]
-  )
-
-  /** The phone's Connect with a code typed in: paired, and connected, in one go. */
-  const pairFromCode = useCallback(
-    async (code) => {
-      setError(null)
-      try {
-        await pairPhone(code)
-        record('remote', 'Paired with the computer')
-      } catch (err) {
-        setError(err.message)
-      }
-    },
-    [record]
   )
 
   /** The sign-in sheet's submit: the same form does a different job per role. */
@@ -2988,7 +2964,6 @@ export default function App() {
           key={tick}
           link={link}
           busy={busy}
-          onPair={pairFromCode}
           onConnect={() => linkAction('connect')}
           onRetry={() => linkAction('retry')}
           onSwitchAccount={() => linkAction('switch')}
@@ -3836,6 +3811,29 @@ export default function App() {
                 status="The remote, for a stage"
                 onClick={() => setSetupPage('phone')}
               />
+              {/*
+                WHERE THE APP SAYS IT IS.
+
+                "No way to replay tutorial set up??" There was, and it was two
+                doors in — a Section on the About page, under the version
+                number and the build date. The last screen of the walkthrough
+                promises "Settings → Show the walkthrough", which reads as a
+                row on this list, and this list is where somebody goes looking
+                after reading that sentence.
+
+                A row rather than a button, because everything else at this
+                level is a row, and the one thing that is not is the one thing
+                nobody finds.
+              */}
+              <SetupRow
+                key="walkthrough"
+                title={REPLAY}
+                status="The three-step setup, again"
+                onClick={() => {
+                  setSheet(null)
+                  setWalkthrough(true)
+                }}
+              />
               <SetupRow key="rename" title="Rename presets and scenes" status={status === 'live' ? 'Give them names you will know on a dark stage' : 'Connect a unit first'} onClick={() => setSetupPage('rename')} />
               <SetupRow key="help" title="Troubleshooting" status={`${getDebugLog().length} line${getDebugLog().length === 1 ? '' : 's'} in the log`} onClick={() => setSetupPage('help')} />
               <SetupRow key="about" title="About" status={FULL} onClick={() => setSetupPage('about')} />
@@ -4027,7 +4025,7 @@ export default function App() {
               The four panels it replaces — each written for the person who built
               the app — are gone, and the words they used with them.
             */}
-            <PhoneRemote link={link} onAction={linkAction} onError={setError} busy={busy} />
+            <PhoneRemote link={link} onAction={linkAction} onError={setError} error={error} busy={busy} />
           </Section>
           {/*
             How to get a computer on the other end at all, which is the

@@ -1,18 +1,14 @@
 import { useState } from 'react'
-import { Linking, ScrollView, Text, TextInput, View } from 'react-native'
+import { ScrollView, Text, TextInput, View } from 'react-native'
 
-import { CHAIN, P1, P2, P3, P4, P6, P7, P8, P9, CLOSE } from '../lib/onboarding'
+import { CHAIN, P1, P2, P3, P4, P6, P7, P9, CLOSE } from '../lib/onboarding'
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
 import { Platform } from 'react-native'
 import { UNITS } from '../lib/demoUnits'
 import { setDemo, setDemoUnit } from '../lib/demo'
-import { formatPairCode, isPairCode, pairCredentials } from '../lib/pairing'
-import { signIn } from '../lib/relay'
 import { useRig } from '../lib/rig'
-import { buyUnlock, restorePurchase, usePurchase } from '../lib/purchases'
-import { shouldAskToPay } from '../lib/unlock-rule'
+import { restorePurchase, usePurchase } from '../lib/purchases'
 import { sendDownloadLink, DOWNLOADS_URL } from '../lib/downloadLink'
-import ScanCode from '../components/ScanCode'
 import Note from '../components/Note'
 import Press from '../components/Press'
 
@@ -30,10 +26,12 @@ import Press from '../components/Press'
  * would be sending them to a dead end. The demo is a whole app against a
  * simulated unit, so the answer to "can I look around" is yes, immediately.
  *
- * AND THE PURCHASE IS OFFERED LAST, AFTER THE COMPUTER IS PROVEN. P8 says
- * "Connection verified" because by the time it is drawn, it has been — the
- * pairing on P7 succeeded. Asking for money before knowing the thing they are
- * buying can work at all is how refunds happen.
+ * AND THE PURCHASE IS NOT OFFERED HERE AT ALL ANY MORE. It used to be, on a
+ * screen that could say "Connection verified" because a pairing had just
+ * succeeded one step earlier. Pairing left this screen with the codes: it is
+ * a sign-in now, and signing in leaves the walkthrough. The Paywall asks the
+ * question instead, which is where it was always asked for everybody who did
+ * not arrive through here.
  *
  * Not one word is typed here: every string is from lib/onboarding, generated
  * from shared/onboarding.mjs. "Do not change any wording without asking me
@@ -41,13 +39,11 @@ import Press from '../components/Press'
  */
 const face = Platform.select(mono)
 
-export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onClose }) {
+export default function Onboarding({ onEnterDemo, onAccount, replay, onClose }) {
   const [at, setAt] = useState('welcome')
   const [unit, setUnit] = useState(UNITS[0].key)
-  const [code, setCode] = useState('')
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
-  const [scanning, setScanning] = useState(false)
   const [said, setSaid] = useState(null)
   const [error, setError] = useState(null)
   const purchase = usePurchase()
@@ -87,74 +83,41 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
     setAt(next)
   }
 
-  /* The demo, started for real: the mock is built and the app opens on it. */
+  /*
+   * THE DEMO GETS THE LAST SCREEN TOO, which it never did.
+   *
+   * "When I did a fresh app install, not logged in, there's no tutorial,
+   * nothing. So it just brings up the screen. This is a new user trying it
+   * out. Not a very good experience."
+   *
+   * Picking a unit used to be the end: the mock was built and the app opened
+   * on the Play screen, mid-stride, with nothing having said what any of it
+   * is. And the screen that would have said so was already written — the one
+   * at the end of the pairing path, PLAY and EDIT and SAVE in three lines. It
+   * was reached only after a real pairing, so the one person who has never
+   * seen this app before was the one person who never got it.
+   *
+   * The demo is switched on here rather than at the end, so the last screen
+   * can name the unit the mock actually is. `onEnterDemo` is what finishes
+   * the walkthrough, and it is the button on that screen that calls it.
+   */
   const intoDemo = () => {
     setDemoUnit(unit)
     setDemo(true)
-    onEnterDemo()
+    go('connected')
   }
 
   /*
-   * The code becomes a session, through the same call the sign-in screen
-   * makes. One way a phone gets paired, not two that can drift.
-   */
-  const connect = async () => {
-    setBusy(true)
-    setError(null)
-    try {
-      await signIn(pairCredentials(code))
-      /*
-       * AND THE PHONE ANSWERS FOR ITSELF, which is the half of this that was
-       * missing.
-       *
-       * "If they wanna connect a phone to the Mac, the phone needs to be able
-       * to accept or deny that they've unlocked it… the phone needs to be
-       * able to tell, hey, you did not unlock this, or yes, you did unlock
-       * it."
-       *
-       * It only ever said one of those. Every successful pair went to the
-       * unlock step and asked for money — including somebody who had already
-       * paid, reinstalled, and was watching their own app ask them to buy it
-       * a second time. That is the worst version of this screen and it was
-       * the ordinary case for anybody on a new phone.
-       *
-       * THE SAME RULE THE PAYWALL USES, not a second one. Every false in it
-       * is a reason not to charge and three of them are reasons not to be
-       * SURE: still asking the store, no store to ask, or already unlocked.
-       * An unanswered question is not a "no", and the person most likely to
-       * be on bad wifi is the one standing on a stage. See lib/unlock-rule.
-       */
-      go(shouldAskToPay({ inApp: true, demo: false, ...purchase }) ? 'unlock' : 'connected')
-    } catch (err) {
-      setError(
-        /didn’t match|invalid login/i.test(err.message || '')
-          ? 'No computer is paired with that code. Check it against the code your computer shows.'
-          : err.message
-      )
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const buy = async () => {
-    setBusy(true)
-    setError(null)
-    const out = await buyUnlock()
-    setBusy(false)
-    if (out.ok) return go('connected')
-    if (!out.cancelled) setError(out.message)
-  }
-
-  /*
-   * RESTORING DOES NOT CONNECT ANYTHING, which is what the old destination
-   * claimed.
+   * NO `connect` ANY MORE, and this is where it was.
    *
-   * This runs from two screens. From the unlock step a pairing has already
-   * succeeded, so "You're connected" is true. From the "where do you want to
-   * start" step NOTHING has been paired — and it landed on that same screen,
-   * which announced a unit online that nobody had plugged in. A restored
-   * purchase means they own it; it says nothing about whether their computer
-   * is running. So the caller says where a success goes.
+   * "I want the QR code gone and the scanner gone. It has never worked once…
+   * to use this app and connect it to your computer, you have to sign up."
+   *
+   * It turned an eight-character code into a session by signing into the
+   * hidden account the code stood for. Both halves of that are gone: the
+   * screen that collected the code, and the code itself. Joining a phone to
+   * a computer is `onAccount` now — the sign-in screen, which already signs
+   * in, makes an account and resets a password, and is the only door.
    */
   const restore = async (then) => {
     setBusy(true)
@@ -204,7 +167,10 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
           <Head>{P1.head}</Head>
           <Sub>{P1.sub}</Sub>
           <Press label={P1.go} tone="signal" on height={TAP} onPress={() => go('how')} />
-          <Press label={P1.haveCode} height={TAP} onPress={() => go('scan')} />
+          {/* Was "I already have a pairing code", which opened the scanner.
+              Somebody who has been here before has an ACCOUNT now, and that
+              is the one door. */}
+          <Press label={P1.haveCode} height={TAP} onPress={() => onAccount?.()} />
         </>
       ) : null}
 
@@ -361,23 +327,35 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
             tone="signal"
             on
             height={TAP}
-            onPress={() => {
-              go('scan')
-              setScanning(true)
-            }}
+            onPress={() => onAccount?.()}
           />
 
           <Eyebrow>{P6.notYet}</Eyebrow>
           {/*
-            The address, on screen, for anybody happy to type it. The button
-            under it is for everybody else — this phone is not the computer
-            that needs the download, which is the whole difficulty.
+            PRINTED, NOT PRESSED.
+            
+            "It just says download when you click on it. And it tries
+            downloading it on the phone."
+
+            It did. The address was a button, and tapping a button on a phone
+            opens the thing on the phone — so it went to the downloads page on
+            the handset and started fetching a Mac installer onto a device
+            that can do nothing whatever with it.
+
+            This phone is never the computer that needs this download. That is
+            the whole difficulty of the step, and a button is a promise that
+            pressing it does something useful. So the address is text to read
+            and type somewhere else, with the eyebrow above it saying where,
+            and the only thing to press is the one that sends the link to a
+            machine that can use it.
           */}
-          <Press
-            label={DOWNLOADS_URL}
-            height={TAP}
-            onPress={() => Linking.openURL(`https://${DOWNLOADS_URL}`)}
-          />
+          <Eyebrow>{P6.address}</Eyebrow>
+          <Card>
+            <Text selectable style={{ color: color.silk, fontSize: font.lead, fontFamily: face }}>
+              {DOWNLOADS_URL}
+            </Text>
+          </Card>
+          <Eyebrow>{P6.emailLabel}</Eyebrow>
           <Field
             value={email}
             onChangeText={setEmail}
@@ -397,106 +375,29 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
         </>
       ) : null}
 
-      {at === 'scan' ? (
-        <>
-          <Eyebrow>{P7.tag}</Eyebrow>
-          <Eyebrow>{P7.eyebrow}</Eyebrow>
-          <Head>{P7.head}</Head>
-          {/*
-            The same scanner the sign-in screen uses, opened the same way. It
-            is a modal over the screen rather than a camera embedded in it —
-            passing it no `open` would have left a camera that never appears
-            and a button that does nothing.
-          */}
-          <ScanCode
-            open={scanning}
-            onClose={() => setScanning(false)}
-            onCode={(found) => {
-              setCode(formatPairCode(found))
-              setScanning(false)
-            }}
-            /* The same door the button below this offers, reached from the
-               square that sent them here. */
-            onAccount={() => {
-              setScanning(false)
-              onAccount?.()
-            }}
-          />
-          <Eyebrow>{P7.codeLabel}</Eyebrow>
-          <Field
-            value={code}
-            onChangeText={(t) => setCode(formatPairCode(t))}
-            placeholder="XXXX-XXXX"
-            autoCapitalize="characters"
-            mono
-          />
-          <Note>{P7.foot}</Note>
-          {error ? <Note tone="fault">{error}</Note> : null}
-          <Press
-            label={P7.go}
-            tone="signal"
-            on
-            disabled={busy || !isPairCode(code)}
-            height={TAP}
-            onPress={connect}
-          />
-          <Press label={P7.noCode} height={TAP} onPress={() => go('app')} />
-          {/*
-            THE WAY IN FOR SOMEBODY WHO ALREADY HAS AN ACCOUNT.
-
-            This screen offers a square to scan and a code to type, and both
-            of those come off a computer that is running right now. Anybody
-            signed in on another device has neither, and had nothing here at
-            all — the walkthrough sent them round to the demo and no further,
-            which is how Justin ended up locked out of his own iPad.
-
-            It hands over to the sign-in screen rather than growing a second
-            email and password form: that one already signs in, makes an
-            account and resets a password, and two of those would drift.
-          */}
-          <Press label={P7.account} height={TAP} onPress={() => onAccount?.()} />
-        </>
-      ) : null}
-
-      {at === 'unlock' ? (
-        <>
-          <Eyebrow>{P8.tag}</Eyebrow>
-          {/* It has been verified, because the pairing above just succeeded. */}
-          <Text style={{ color: color.ok, fontSize: font.small, fontFamily: face }}>
-            {P8.verified(provenUnit)}
-          </Text>
-          <Eyebrow>{P8.eyebrow}</Eyebrow>
-          <Head>{P8.head(purchase.price)}</Head>
-          <Sub>{P8.sub}</Sub>
-          {P8.gets.map((g) => (
-            <Card key={g.key}>
-              <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.2 }}>
-                {g.label}
-              </Text>
-              <Text style={{ color: color.silk, fontSize: font.body }}>{g.body}</Text>
-            </Card>
-          ))}
-          {error ? <Note tone="fault">{error}</Note> : null}
-          {said ? <Note>{said}</Note> : null}
-          <Press
-            label={P8.go(purchase.price)}
-            tone="signal"
-            on
-            disabled={busy}
-            height={TAP}
-            onPress={buy}
-          />
-          <Press label={P8.restore} disabled={busy} height={TAP} onPress={() => restore('connected')} />
-          <Press label={P8.keep} height={TAP} onPress={() => go('pick')} />
-          <Note>{P8.foot}</Note>
-        </>
-      ) : null}
-
+      {/*
+        `unlock` WAS HERE, and it cannot be reached any more.
+        
+        It said "Connection verified" and offered the purchase, and the only
+        way in was a pairing that succeeded on the screen before it. Pairing
+        does not happen inside the walkthrough now — signing in leaves it — so
+        the premise of the screen is gone with the pairing code.
+        
+        Nothing is lost: the Paywall raises itself the moment somebody is in
+        the app with a real rig and no unlock, which is the one place that
+        question is asked (see App.js and lib/unlock-rule). The walkthrough
+        stopped being one of them.
+      */}
       {at === 'connected' ? (
         <>
           <Eyebrow>{P9.tag(provenUnit)}</Eyebrow>
-          <Head>{P9.head}</Head>
-          <Sub>{P9.status({ unit: provenUnit, scenes: null })}</Sub>
+          {/* The same three tips either way. Only the two lines above them
+              change, because "You're connected" and "through your computer"
+              are both false in the demo. */}
+          {/* The demo's words, because the demo is the only way here now.
+              The paired version of this screen went with the unlock step. */}
+          <Head>{P9.demo.head}</Head>
+          <Sub>{P9.demo.status(provenUnit)}</Sub>
           {P9.tips.map((tip) => (
             <Card key={tip.key}>
               <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.2 }}>
@@ -505,7 +406,7 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
               <Text style={{ color: color.silkDim, fontSize: font.small }}>{tip.body}</Text>
             </Card>
           ))}
-          <Press label={P9.go} tone="signal" on height={TAP} onPress={onDone} />
+          <Press label={P9.go} tone="signal" on height={TAP} onPress={onEnterDemo} />
           <Note>{P9.foot}</Note>
         </>
       ) : null}
