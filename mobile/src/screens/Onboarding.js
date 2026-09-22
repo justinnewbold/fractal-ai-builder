@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 
 import { CHAIN, P1, P2, P3, P4, P6, P7, P9, CLOSE } from '../lib/onboarding'
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
@@ -8,6 +8,9 @@ import { UNITS } from '../lib/demoUnits'
 import { setDemo, setDemoUnit } from '../lib/demo'
 import { useRig } from '../lib/rig'
 import { tick } from '../lib/feedback'
+/* An ES import rather than require(): Metro resolves both, but require is not
+   a name this app has anywhere, and a test is right to refuse it. */
+import unitFm3 from '../../assets/unit-fm3.png'
 import { restorePurchase } from '../lib/purchases'
 import { sendDownloadLink, DOWNLOADS_URL } from '../lib/downloadLink'
 import Note from '../components/Note'
@@ -224,7 +227,7 @@ export default function Onboarding({ onEnterDemo, onAccount, replay, onClose }) 
             eyebrow={P3.demo.eyebrow}
             title={P3.demo.title}
             body={P3.demo.body}
-            art={<Art kind="unit" />}
+            art={<UnitShot />}
           >
             <Press label={P3.demo.go} tone="signal" on height={TAP} onPress={() => go('pick')} />
           </Choice>
@@ -464,6 +467,29 @@ const Progress = ({ count, at, of, title }) => (
       ))}
     </View>
   </View>
+)
+
+/**
+ * The FM3 from his mockup, as an asset.
+ *
+ * "I sent the photo with the FM3 in it. Use that exact mockup." So this is
+ * literally that picture: cropped out of the screenshot he sent, with its
+ * edges faded to transparent so it melts into the card rather than sitting in
+ * a visible dark rectangle over the amber wash.
+ *
+ * Measured, because it decides whether this costs him anything: an image in
+ * mobile/assets does NOT move the Expo fingerprint. Artwork ships over the
+ * air. What would cost a build is an icon FONT — expo-font moves both
+ * fingerprints, which is why the chain-block icons in his other mockup are
+ * waiting for a native build and this is not.
+ */
+const UnitShot = () => (
+  <Image
+    source={unitFm3}
+    style={{ width: 132, height: 105 }}
+    resizeMode="contain"
+    accessible={false}
+  />
 )
 
 /**
