@@ -4921,7 +4921,7 @@ export function run(test) {
      * 'Unlock'." The real-rig card opens the computer-app step; the charge
      * is two screens later on P8, which is where the store's price belongs.
      */
-    assert.equal(c.P3.real.go, 'Unlock')
+    assert.equal(c.P3.real.go, 'Unlock hardware control')
     assert.equal(c.P8.head(null), '$9.99 one-time')
     assert.equal(c.P8.head('\u20ac10,99'), '\u20ac10,99 one-time')
     assert.equal(c.P8.go(null), 'Unlock real-rig control  \u00b7  $9.99')
@@ -5175,9 +5175,11 @@ export function run(test) {
     const app = readFileSync(new URL('../mobile/App.js', import.meta.url), 'utf8')
 
     assert.match(onb, /onAccount/, 'the walkthrough no longer offers an account')
+    /* On the choice screen it is a footnote link now, not a full-width
+       button — his mockup — so the shape to look for is the link's. */
     assert.match(
       onb,
-      /label=\{P7\.account\}[^]{0,120}onPress=\{\(\) => onAccount/,
+      /label: P3\.signIn[^]{0,80}onAccount\?\.\(\)/,
       'the account button is gone from the pairing screen, or wired to something else'
     )
     assert.match(

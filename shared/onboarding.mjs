@@ -251,15 +251,32 @@ export const P2 = {
  */
 export const P3 = {
   count: '2 OF 2',
+  /* The flow's own name, in the header his mockups put it in. */
+  title: 'Get started',
+  /*
+   * HIS HEADING IS BACK, IN HIS OWN WORDS.
+   *
+   * "Remove the text that says where do you want to start" took out
+   * "WHERE DO YOU WANT TO START?" — a heading that asked the question the
+   * screen already was. The mockup he sent later puts one back, and it is
+   * doing a different job: it names the DECISION rather than repeating the
+   * cards, and the line under it says what the two choices are before you
+   * read either card. His design, later, and it wins.
+   */
+  head: 'Choose how you want to start',
+  sub: 'Explore instantly, or connect your Fractal rig.',
   demo: {
     eyebrow: 'EXPLORE THE APP',
     title: 'Try the demo',
-    body: 'Use a simulated Fractal unit. Every screen works. No computer needed.',
+    body: 'Use a simulated Fractal unit. Every screen works—no computer needed.',
     go: 'Start free demo'
   },
   real: {
     eyebrow: 'CONTROL YOUR HARDWARE',
     title: 'Connect my real rig',
+    /* From the mockup. The card used to be a title and a button with nothing
+       between them, which made the button carry the whole explanation. */
+    body: 'Unlock live control for your Fractal hardware.',
     /*
      * "Have the button just say 'Unlock'."
      *
@@ -272,9 +289,22 @@ export const P3 = {
      * string rather than a function of the store's price. The price still
      * belongs on P8, which IS the paywall.
      */
-    go: 'Unlock'
+    go: 'Unlock hardware control'
   },
-  restore: 'Already bought it? Restore purchase'
+  /*
+   * THE TWO WAYS BACK IN, UNDER ONE QUESTION.
+   *
+   * It was one long button — "Already bought it? Restore purchase" — with the
+   * sign-in one under it saying "Sign in with an email and password". Two
+   * full-width buttons for the two smallest things on the screen, both of
+   * them shouting over the choice the screen is actually asking you to make.
+   *
+   * His mockup makes them a footnote: one question, two short links, a rule
+   * either side. The words for each are the shortest true ones.
+   */
+  already: 'Already purchased?',
+  restore: 'Restore purchase',
+  signIn: 'Sign in'
 }
 
 /** P4 — which unit the demo pretends to be. */

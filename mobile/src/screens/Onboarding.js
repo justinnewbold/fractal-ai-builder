@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ScrollView, Text, TextInput, View } from 'react-native'
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 
 import { CHAIN, P1, P2, P3, P4, P6, P7, P9, CLOSE } from '../lib/onboarding'
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
@@ -7,6 +7,7 @@ import { Platform } from 'react-native'
 import { UNITS } from '../lib/demoUnits'
 import { setDemo, setDemoUnit } from '../lib/demo'
 import { useRig } from '../lib/rig'
+import { tick } from '../lib/feedback'
 import { restorePurchase } from '../lib/purchases'
 import { sendDownloadLink, DOWNLOADS_URL } from '../lib/downloadLink'
 import Note from '../components/Note'
@@ -204,65 +205,66 @@ export default function Onboarding({ onEnterDemo, onAccount, replay, onClose }) 
 
       {at === 'mode' ? (
         <>
-          {/* No heading: the two cards under this say what they are, and
-              "WHERE DO YOU WANT TO START?" asked the question the screen
-              already is. */}
-          <Count>{P3.count}</Count>
+          <Progress count={P3.count} at={1} of={2} title={P3.title} />
+          <Head>{P3.head}</Head>
+          <Sub>{P3.sub}</Sub>
 
-          <Card>
-            {/* The FREE tag is gone too — the button on this card says "Start
-                free demo" and the eyebrow says EXPLORE THE APP. */}
-            <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.2 }}>
-              {P3.demo.eyebrow}
-            </Text>
-            <Text style={{ color: color.silk, fontSize: font.lead, fontWeight: '700' }}>
-              {P3.demo.title}
-            </Text>
-            <Text style={{ color: color.silkDim, fontSize: font.small }}>{P3.demo.body}</Text>
-            <Press
-              label={P3.demo.go}
-              tone="signal"
-              on
-              height={TAP}
-              onPress={() => go('pick')}
-            />
-          </Card>
+          {/*
+            HIS MOCKUP. Two cards, and only one of them is lit.
 
-          <Card>
-            <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.2 }}>
-              {P3.real.eyebrow}
-            </Text>
-            <Text style={{ color: color.silk, fontSize: font.lead, fontWeight: '700' }}>
-              {P3.real.title}
-            </Text>
+            They used to be the same card twice, which made the screen a pair
+            of equal choices — and they are not equal. The demo costs nothing
+            and works this second; the real rig wants a computer and a
+            purchase. So the demo card carries the amber edge and the solid
+            button, the hardware card is outlined and quiet, and the shape of
+            the screen says which one to press if you do not know.
+          */}
+          <Choice
+            lit
+            eyebrow={P3.demo.eyebrow}
+            title={P3.demo.title}
+            body={P3.demo.body}
+            art={<Art kind="unit" />}
+          >
+            <Press label={P3.demo.go} tone="signal" on height={TAP} onPress={() => go('pick')} />
+          </Choice>
+
+          <Choice
+            eyebrow={P3.real.eyebrow}
+            title={P3.real.title}
+            body={P3.real.body}
+            art={<Lock size={58} faint />}
+          >
             {/* No price on this button: it takes no money. It opens the
                 computer-app step, and the store's own sheet quotes the price
-                at the paywall. "Have the button just say 'Unlock'." */}
+                at the paywall.
+
+                His mockup puts a small lock in the button too. Press has no
+                icon slot and widening a component used on every screen for
+                one glyph is the wrong trade — the card's own lock, above
+                right, already says it. */}
             <Press label={P3.real.go} height={TAP} onPress={() => go('app')} />
-          </Card>
+          </Choice>
 
-          <Press label={P3.restore} disabled={busy} height={TAP} onPress={() => restore('app')} />
           {/*
-            THE OTHER WAY BACK IN, FOR SOMEBODY WHO ALREADY HAS ALL OF THIS.
+            THE TWO WAYS BACK IN, FOR SOMEBODY WHO ALREADY HAS ALL OF THIS.
 
-            "Can we please add username and password login for this screen…
-            if they've already purchased it they can either restore purchase
-            from the App Store or they can login with their username and
-            password."
+            RESTORE asks the store whether this account bought the unlock; it
+            is the one that gets a paid app back on a new phone. SIGNING IN
+            reaches a computer that was set up with an account. Somebody
+            reinstalling usually needs both, so both are here.
 
-            The two are not the same door and it is worth knowing which is
-            which. RESTORE asks the App Store whether this Apple ID bought the
-            unlock; it is the one that gets a paid app back on a new phone.
-            SIGNING IN reaches a computer that was set up with an account
-            rather than a pairing code — no code to scan, nothing on screen
-            to type, and until now nothing on this screen for them at all.
-
-            Somebody reinstalling usually needs both, so both are here rather
-            than one buried behind the other. It is the same wording the
-            pairing step uses for the same action, because one phrase for one
-            thing is how the two stay from drifting apart.
+            As a footnote rather than two full-width buttons: they are the
+            smallest things on the screen and were shouting over the choice it
+            exists to ask.
           */}
-          <Press label={P7.account} height={TAP} onPress={() => onAccount?.()} />
+          <Footnote
+            question={P3.already}
+            links={[
+              { label: P3.restore, onPress: () => restore('app'), disabled: busy },
+              { label: P3.signIn, onPress: () => onAccount?.() }
+            ]}
+          />
           {said ? <Note>{said}</Note> : null}
         </>
       ) : null}
@@ -434,20 +436,148 @@ const Count = ({ children }) => (
  * current one lit. The number is what you read; the dots are what you see
  * without reading, which is the point of having both.
  */
-const Progress = ({ count, at, of }) => (
-  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-    <Count>{count}</Count>
-    <View style={{ flexDirection: 'row', gap: space.xs }}>
+const Progress = ({ count, at, of, title }) => (
+  <View style={{ gap: space.md }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+      <View style={{ flex: 1 }} />
+      {title ? (
+        <Text style={{ color: color.silk, fontSize: font.body, fontWeight: '700' }}>{title}</Text>
+      ) : null}
+      <View style={{ flex: 1, alignItems: 'flex-end' }}>
+        <Count>{count}</Count>
+      </View>
+    </View>
+    {/* Bars rather than dots, from the later mockup. A bar reads as ground
+        covered; a dot only reads as a position. Filled means reached, so at
+        the last step both are lit — which is what his 2 of 2 shows. */}
+    <View style={{ flexDirection: 'row', gap: space.xs, justifyContent: 'center' }}>
       {Array.from({ length: of }, (_, i) => (
         <View
           key={i}
           style={{
-            width: 8,
-            height: 8,
-            borderRadius: 4,
-            backgroundColor: i === at ? color.signal : color.rule
+            width: 64,
+            height: 4,
+            borderRadius: 2,
+            backgroundColor: i <= at ? color.signal : color.rule
           }}
         />
+      ))}
+    </View>
+  </View>
+)
+
+/**
+ * A padlock, drawn.
+ *
+ * There is no icon set in this app and adding one is a dependency for a
+ * shape that is four rectangles. The shackle is a rounded box with its
+ * bottom edge dropped behind the body, which is the whole trick.
+ */
+const Lock = ({ size = 18, faint }) => {
+  const tint = faint ? color.rule : color.silk
+  const w = size * 0.72
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'flex-end' }}>
+      <View
+        style={{
+          width: w * 0.62,
+          height: size * 0.42,
+          borderTopLeftRadius: size,
+          borderTopRightRadius: size,
+          borderWidth: Math.max(1.5, size * 0.08),
+          borderBottomWidth: 0,
+          borderColor: tint,
+          marginBottom: -1
+        }}
+      />
+      <View
+        style={{
+          width: w,
+          height: size * 0.5,
+          borderRadius: Math.max(2, size * 0.12),
+          borderWidth: Math.max(1.5, size * 0.08),
+          borderColor: tint
+        }}
+      />
+    </View>
+  )
+}
+
+/**
+ * One of the two ways in, and whether this is the one to press.
+ *
+ * `lit` is the whole difference: an amber edge, a warm wash behind it and a
+ * solid button. The other card is outlined and quiet. Two identical cards
+ * made the screen a coin toss, and these two choices are not a coin toss.
+ */
+const Choice = ({ lit, eyebrow, title, body, art, children }) => (
+  <View
+    style={{
+      gap: space.sm,
+      padding: space.lg,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: lit ? color.signal : color.rule,
+      backgroundColor: lit ? color.signalWash : color.panel
+    }}
+  >
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.md }}>
+      <View style={{ flex: 1, gap: space.xs }}>
+        <Text
+          style={{
+            color: lit ? color.signal : color.silkFaint,
+            fontSize: font.micro,
+            letterSpacing: 1.5
+          }}
+        >
+          {eyebrow}
+        </Text>
+        <Text style={{ color: color.silk, fontSize: font.lead, fontWeight: '700' }}>{title}</Text>
+        <Text style={{ color: color.silkDim, fontSize: font.small, lineHeight: font.small * 1.45 }}>
+          {body}
+        </Text>
+      </View>
+      {art ? <View style={{ paddingTop: space.xs }}>{art}</View> : null}
+    </View>
+    {children}
+  </View>
+)
+
+/**
+ * The small print at the bottom: one question, and the short answers.
+ *
+ * Restore and Sign in were two full-width buttons — the smallest things on
+ * the screen, shouting over the choice it exists to ask. A rule either side
+ * of the question puts them where they belong without hiding them.
+ */
+const Footnote = ({ question, links }) => (
+  <View style={{ gap: space.md, marginTop: space.sm }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+      <View style={{ flex: 1, height: 1, backgroundColor: color.rule }} />
+      <Text style={{ color: color.silkDim, fontSize: font.small }}>{question}</Text>
+      <View style={{ flex: 1, height: 1, backgroundColor: color.rule }} />
+    </View>
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.md }}>
+      {links.map((l, i) => (
+        <View key={l.label} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+          {i > 0 ? (
+            <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: color.silkFaint }} />
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            disabled={l.disabled}
+            onPress={() => {
+              tick()
+              l.onPress?.()
+            }}
+            hitSlop={12}
+            style={{ minHeight: TAP, justifyContent: 'center', paddingHorizontal: space.xs }}
+          >
+            <Text style={{ color: l.disabled ? color.silkFaint : color.signal, fontSize: font.body }}>
+              {l.label}
+            </Text>
+          </Pressable>
+        </View>
       ))}
     </View>
   </View>

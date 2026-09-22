@@ -7051,10 +7051,25 @@ export function run(test) {
      */
     const copy = read('mobile/src/lib/onboarding.js')
     const screen = read('mobile/src/screens/Onboarding.js')
-    const p3 = copy.slice(copy.indexOf('export const P3'), copy.indexOf('export const P4'))
+    /* Comments stripped first. The note above the new heading QUOTES the one
+       it replaced, so a raw search finds the explanation and fails on it —
+       the seventh time this repository has tripped over its own reasons. */
+    const p3 = copy
+      .slice(copy.indexOf('export const P3'), copy.indexOf('export const P4'))
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
 
     for (const [gone, why] of [
       ['verify the computer connection', 'the app promises to verify a connection before purchase, which it no longer does'],
+      /*
+       * THE OLD HEADING STAYS GONE, but a heading does not.
+       *
+       * "Remove the text that says where do you want to start" took out
+       * "WHERE DO YOU WANT TO START?", which asked the question the screen
+       * already was. The mockup he sent later puts one back doing a different
+       * job: it names the DECISION, and the line under it says what the two
+       * choices are before you read either card. His design, later, and it
+       * wins — so what is held here is the old wording, not the idea.
+       */
       ['WHERE DO YOU WANT TO START', 'the heading that asks the question the screen already is, is back'],
       ["tag: 'FREE'", 'the demo card carries a third label saying what its button already says'],
       ['stays free forever', 'the demo is told to be free a third time, at the bottom of the screen']
@@ -7062,7 +7077,10 @@ export function run(test) {
       assert.ok(!p3.includes(gone), why)
     }
     /* And nothing on the screen reaches for them. */
-    assert.ok(!/P3\.head|P3\.foot|P3\.demo\.tag|P3\.real\.body/.test(screen), 'the screen draws a P3 line that no longer exists')
+    assert.ok(!/P3\.foot|P3\.demo\.tag/.test(screen), 'the screen draws a P3 line that no longer exists')
+    /* P3.head and P3.real.body came BACK with his mockup, and are drawn. */
+    assert.match(screen, /<Head>\{P3\.head\}<\/Head>/, 'the screen lost the heading his mockup asks for')
+    assert.match(screen, /body=\{P3\.real\.body\}/, 'the hardware card is a title and a button again')
 
     /* What is left is the two ways in, the way back for somebody who paid,
        and the way in for somebody with an account. */
@@ -7070,7 +7088,7 @@ export function run(test) {
       ['P3.demo.go', 'the demo has no button'],
       ['P3.real.go', 'the real-rig card has no button'],
       ['P3.restore', 'there is no way to restore a purchase from the first screen'],
-      ['P7.account', 'there is no way to sign in from the first screen']
+      ['P3.signIn', 'there is no way to sign in from the first screen']
     ]) {
       assert.ok(screen.includes(needed), why)
     }
@@ -7206,8 +7224,13 @@ export function run(test) {
      * App Store about this Apple ID; signing in reaches a computer set up
      * with an account rather than a pairing code — so both are here.
      */
-    assert.match(block.mode, /label=\{P3\.restore\}/, 'there is no way to restore a purchase from the first screen')
-    assert.match(block.mode, /label=\{P7\.account\} height=\{TAP\} onPress=\{\(\) => onAccount\?\.\(\)\}/, 'there is no way to sign in from the first screen')
+    /*
+     * BOTH, AS A FOOTNOTE RATHER THAN TWO FULL-WIDTH BUTTONS. They are the
+     * smallest things on the screen and were shouting over the choice it
+     * exists to ask — his mockup makes them one question and two short links.
+     */
+    assert.match(block.mode, /label: P3\.restore[^]{0,80}restore\('app'\)/, 'there is no way to restore a purchase from the first screen')
+    assert.match(block.mode, /label: P3\.signIn[^]{0,80}onAccount\?\.\(\)/, 'there is no way to sign in from the first screen')
 
     /*
      * AND THE LAST TWO SCREENS NAME THE UNIT THAT ANSWERED. `unitName` is the
