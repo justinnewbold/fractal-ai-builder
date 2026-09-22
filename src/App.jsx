@@ -372,8 +372,29 @@ const SETUP_PAGES = {
   demo: 'Demo Unit',
   rename: 'Rename presets and scenes',
   help: 'Troubleshooting',
+  updates: 'Updates',
   about: 'About'
 }
+
+/**
+ * WHICH PAGE A PAGE CAME FROM, for the two that are no longer on the front list.
+ *
+ * "It looks like some of the menus aren't matching up, some of the changes we
+ * made recently, like nesting some of the menus."
+ *
+ * Troubleshooting moved inside About and the demo picker inside Phone &
+ * computer, matching the phone — and the moment a page sits one level down, a
+ * Back button that always says "‹ Settings" and always goes to the front list
+ * walks straight past the page you were standing on. The phone hit this same
+ * wall when About swallowed three rows and grew the same map; this is the
+ * browser's copy of it.
+ *
+ * A map rather than an `if`, so the next nested page is a line rather than a
+ * branch.
+ */
+const SETUP_PARENT = { help: 'about', updates: 'about', demo: 'link' }
+const upFrom = (page) => SETUP_PARENT[page] || null
+const upLabel = (page) => `\u2039 ${SETUP_PAGES[upFrom(page)] || 'Settings'}`
 /** What the chat says when a request needed the model and the model is off. */
 
 export default function App() {
@@ -3789,53 +3810,40 @@ export default function App() {
                   happening". */}
               <SetupRow key="link" title="Phone & computer" status={[describeLink(link).note || 'Phone remote off', status === 'live' ? `${device?.short || device?.name || 'Unit'} · connected` : 'No unit'].join(' · ')} onClick={() => setSetupPage('link')} />
               {/*
-                Which Fractal the demo is, at the top of Setup rather than two
-                doors inside "Phone & computer", where it had been living.
-                "Only shows FM3 is the only model available" — and from where
-                he was sitting that was true: every way into the demo starts it
-                as an FM3, and the one picker was behind a row named after
-                pairing a phone, which is not where anybody looks for it. The
-                phone has had it at this level since the demo learned the five
-                units; this is the browser catching up.
+                WHICH FRACTAL THE DEMO IS has gone back inside Phone & computer,
+                which is where the phone keeps it — a "Which unit" section on
+                that page, not a row on this list.
+
+                It was lifted to this level on the strength of "Only shows FM3
+                is the only model available", and the note written at the time
+                claimed the phone had it here too. It never did. So the row was
+                not the browser catching up with the phone, it was the browser
+                walking away from it, and this list is the one Justin has since
+                dictated: the things Setup is opened FOR, and one door.
+
+                The complaint it answered is answered anyway — the picker is a
+                row on the page named for the unit, and the DEMO badge still
+                opens it in one press.
               */}
-              {isDemo() ? (
-                <SetupRow key="demo-unit" title="Demo Unit" status={`${unitByKey(demoUnit()).name} · five to choose from`} onClick={() => setSetupPage('demo')} />
-              ) : null}
-              {/* Not only behind the DEMO badge. Somebody who has a rig
-                  connected and wants the remote in their pocket is the likeliest
-                  buyer there is, and the badge they would have clicked is not
-                  on screen for them. */}
+              <SetupRow key="rename" title="Rename presets and scenes" status={status === 'live' ? 'Give them names you will know on a dark stage' : 'Connect a unit first'} onClick={() => setSetupPage('rename')} />
+              {/*
+                THE ONE ROW HERE THE PHONE HAS NOT GOT, and it stays on the
+                front page rather than moving into About with the other
+                once-ever errands.
+
+                "Not only behind the DEMO badge. Somebody who has a rig
+                connected and wants the remote in their pocket is the likeliest
+                buyer there is, and the badge they would have clicked is not on
+                screen for them." Burying it one door down would undo exactly
+                that. A phone has no use for it at all, which is why matching
+                the two lists row for row was never going to be the test.
+              */}
               <SetupRow
                 key="phone-app"
                 title="Get it on your phone"
                 status="The remote, for a stage"
                 onClick={() => setSetupPage('phone')}
               />
-              {/*
-                WHERE THE APP SAYS IT IS.
-
-                "No way to replay tutorial set up??" There was, and it was two
-                doors in — a Section on the About page, under the version
-                number and the build date. The last screen of the walkthrough
-                promises "Settings → Show the walkthrough", which reads as a
-                row on this list, and this list is where somebody goes looking
-                after reading that sentence.
-
-                A row rather than a button, because everything else at this
-                level is a row, and the one thing that is not is the one thing
-                nobody finds.
-              */}
-              <SetupRow
-                key="walkthrough"
-                title={REPLAY}
-                status="The three-step setup, again"
-                onClick={() => {
-                  setSheet(null)
-                  setWalkthrough(true)
-                }}
-              />
-              <SetupRow key="rename" title="Rename presets and scenes" status={status === 'live' ? 'Give them names you will know on a dark stage' : 'Connect a unit first'} onClick={() => setSetupPage('rename')} />
-              <SetupRow key="help" title="Troubleshooting" status={`${getDebugLog().length} line${getDebugLog().length === 1 ? '' : 's'} in the log`} onClick={() => setSetupPage('help')} />
               <SetupRow key="about" title="About" status={FULL} onClick={() => setSetupPage('about')} />
             </div>
             {/*
@@ -3927,8 +3935,8 @@ export default function App() {
 
         {setupPage === 'demo' ? (
           <div className="setup-page">
-            <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
-              &lsaquo; Settings
+            <button type="button" className="setup-back" onClick={() => setSetupPage(upFrom('demo'))}>
+              {upLabel('demo')}
             </button>
             <p className="setup-page-title">{SETUP_PAGES.demo}</p>
             {/*
@@ -4008,6 +4016,22 @@ export default function App() {
               it used to be behind a row called "Unit", one door along.
             */}
             <DeviceDetail status={status} device={device} onRetry={reconnect} busy={busy} />
+            {/*
+              WHICH UNIT THE DEMO IS, on the page about the unit — where the
+              phone keeps it, as a "Which unit" section on its own link page.
+              Only while the demo is on: there is nothing to choose when a real
+              rig is answering.
+            */}
+            {isDemo() ? (
+              <div className="setup-rows">
+                <SetupRow
+                  key="demo-unit"
+                  title="Demo Unit"
+                  status={`${unitByKey(demoUnit()).name} · five to choose from`}
+                  onClick={() => setSetupPage('demo')}
+                />
+              </div>
+            ) : null}
 <Section key="connection" title="Connection" note="Which unit this app is talking to">
             <Ports
               busy={busy}
@@ -4106,10 +4130,28 @@ export default function App() {
           </div>
         ) : null}
 
+        {/*
+          WHAT IS RUNNING, AND HOW TO GET THE NEWEST — a page of its own now,
+          because it is a row inside About rather than a panel on it. The phone
+          reached the same shape from the same instruction.
+
+          Desktop only: a browser tab updates by being reloaded, and there is
+          nothing here for it to offer.
+        */}
+        {setupPage === 'updates' ? (
+          <div className="setup-page">
+            <button type="button" className="setup-back" onClick={() => setSetupPage(upFrom('updates'))}>
+              {upLabel('updates')}
+            </button>
+            <p className="setup-page-title">{SETUP_PAGES.updates}</p>
+            <Updates />
+          </div>
+        ) : null}
+
         {setupPage === 'help' ? (
           <div className="setup-page">
-            <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
-              ‹ Settings
+            <button type="button" className="setup-back" onClick={() => setSetupPage(upFrom('help'))}>
+              {upLabel('help')}
             </button>
             <p className="setup-page-title">{SETUP_PAGES.help}</p>
 <Section
@@ -4216,27 +4258,41 @@ export default function App() {
             <p className="setup-page-title">{SETUP_PAGES.about}</p>
             <p className="device-meta mono">{FULL} · built {BUILT_AT} UTC</p>
             {/*
-              The way back in, named the way the last screen of it promises:
-              "Need this again? Settings → Show the walkthrough."
+              UPDATES, TROUBLESHOOTING AND THE WALKTHROUGH, in that order,
+              because that is the order the phone has them in.
+
+              "Move walkthrough, updates and troubleshooting INSIDE of the
+              'About' menu." That instruction was carried out on the phone and
+              not here, and Troubleshooting and the walkthrough went on sitting
+              on the browser's front list for it — which is the drift he spotted.
+              They are three rows now rather than two Sections and a chip, for
+              the same reason the phone's are: everything else at this level is
+              a row, and the one thing that is not is the one thing nobody finds.
             */}
-            <Section key="walkthrough" title={REPLAY} note="The three-step setup">
-              <div className="history-actions">
-                <button
-                  className="chip"
-                  onClick={() => {
-                    setSheet(null)
-                    setWalkthrough(true)
-                  }}
-                >
-                  {REPLAY}
-                </button>
-              </div>
-            </Section>
-{inDesktopApp() ? (
-            <Section key="updates" title="Updates" note="This app, not your unit">
-              <Updates />
-            </Section>
-          ) : null}
+            <div className="setup-rows">
+              {inDesktopApp() ? (
+                <SetupRow key="updates" title="Updates" status="This app, not your unit" onClick={() => setSetupPage('updates')} />
+              ) : null}
+              <SetupRow
+                key="help"
+                title="Troubleshooting"
+                status={`${getDebugLog().length} line${getDebugLog().length === 1 ? '' : 's'} in the log`}
+                onClick={() => setSetupPage('help')}
+              />
+              {/*
+                The way back in, named the way the last screen of it promises:
+                "Need this again? Settings → Show the walkthrough."
+              */}
+              <SetupRow
+                key="walkthrough"
+                title={REPLAY}
+                status="The three-step setup, again"
+                onClick={() => {
+                  setSheet(null)
+                  setWalkthrough(true)
+                }}
+              />
+            </div>
             {/* Reachable from inside the app, which is the point of writing
                 them. Same two links as the phone's About page. */}
             <Section key="small-print" title="The small print" note="Worth knowing, once">
