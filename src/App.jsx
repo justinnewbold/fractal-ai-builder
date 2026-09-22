@@ -3836,6 +3836,29 @@ export default function App() {
                 status="The remote, for a stage"
                 onClick={() => setSetupPage('phone')}
               />
+              {/*
+                WHERE THE APP SAYS IT IS.
+
+                "No way to replay tutorial set up??" There was, and it was two
+                doors in — a Section on the About page, under the version
+                number and the build date. The last screen of the walkthrough
+                promises "Settings → Show the walkthrough", which reads as a
+                row on this list, and this list is where somebody goes looking
+                after reading that sentence.
+
+                A row rather than a button, because everything else at this
+                level is a row, and the one thing that is not is the one thing
+                nobody finds.
+              */}
+              <SetupRow
+                key="walkthrough"
+                title={REPLAY}
+                status="The three-step setup, again"
+                onClick={() => {
+                  setSheet(null)
+                  setWalkthrough(true)
+                }}
+              />
               <SetupRow key="rename" title="Rename presets and scenes" status={status === 'live' ? 'Give them names you will know on a dark stage' : 'Connect a unit first'} onClick={() => setSetupPage('rename')} />
               <SetupRow key="help" title="Troubleshooting" status={`${getDebugLog().length} line${getDebugLog().length === 1 ? '' : 's'} in the log`} onClick={() => setSetupPage('help')} />
               <SetupRow key="about" title="About" status={FULL} onClick={() => setSetupPage('about')} />
@@ -4027,7 +4050,7 @@ export default function App() {
               The four panels it replaces — each written for the person who built
               the app — are gone, and the words they used with them.
             */}
-            <PhoneRemote link={link} onAction={linkAction} onError={setError} busy={busy} />
+            <PhoneRemote link={link} onAction={linkAction} onError={setError} error={error} busy={busy} />
           </Section>
           {/*
             How to get a computer on the other end at all, which is the

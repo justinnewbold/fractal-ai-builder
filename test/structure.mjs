@@ -4650,6 +4650,59 @@ export function run(test) {
     assert.match(scan, /looksLikeTheWifiSquare/, 'the scanner no longer recognises the wrong square')
   })
 
+  test('a failed pairing says so where the button is, and the way back in is on the Settings list', () => {
+    /*
+     * "Setup phone button does nothing on mac. Also no way to replay tutorial
+     * set up??"
+     *
+     * Neither was true, and both were as good as true.
+     *
+     * THE BUTTON worked. It asked the account service for the hidden account
+     * behind a pairing code, got back "email rate limit exceeded", and put
+     * that in the error bar in the far top-left of the window — while the
+     * button that failed is in a panel down the right-hand side. On a wide
+     * screen they are a foot apart, and the words were the service's own:
+     * a limit nobody set, with nothing to do about it.
+     *
+     * THE WALKTHROUGH was there too, as a Section on the About page, under
+     * the version number and the build date. The last screen of it promises
+     * "Settings → Show the walkthrough", which reads as a row on that list,
+     * and that list is where somebody goes after reading the sentence.
+     */
+    const panel = readFileSync(new URL('../src/components/PhoneRemote.jsx', import.meta.url), 'utf8')
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+
+    /* The same sentence a second time, where the press happened. */
+    assert.match(app, /<PhoneRemote link=\{link\} onAction=\{linkAction\} onError=\{setError\} error=\{error\} busy=\{busy\} \/>/, 'the panel is not told what went wrong, so only the far corner of the window says it')
+    assert.match(panel, /function MacSide\(\{ link, email, onAction, busy, error \}\)/, 'the computer half of the panel cannot show a fault')
+    assert.match(panel, /\{error \? <p className="hint tone-bad">\{String\(error\)\}<\/p> : null\}/, 'a failed pairing still only speaks from the top-left corner')
+    /* Under the two buttons, not above them: it is about the press that just
+       happened, and a message above a button is read before the press. */
+    assert.ok(
+      panel.indexOf("onAction('mac-pair')") < panel.indexOf('tone-bad'),
+      'the fault is printed above the button it is about'
+    )
+
+    /*
+     * AND THE REFUSAL IS SAID IN WORDS THAT NAME A WAY OUT. The service's own
+     * sentence names a limit nobody set and offers nothing to do about it.
+     */
+    const link = readFileSync(new URL('../src/lib/link.js', import.meta.url), 'utf8')
+    const pair = link.slice(link.indexOf('export async function pairMac()'), link.indexOf('export const savedPairCode'))
+    assert.match(pair, /if \(\/rate limit\/i\.test\(err\?\.message \|\| ''\)\)/, 'a rate-limited pairing is passed through in the service’s own words')
+    assert.match(pair, /Sign in with an account instead/, 'the refusal does not name the button that needs no code')
+    assert.match(pair, /clears by itself within the hour/, 'the refusal does not say that it passes on its own')
+
+    /*
+     * THE WALKTHROUGH, on the list rather than two doors in. Checked by
+     * position: the About page is where it used to live, and a row that
+     * follows the About row is a row nobody reaches from the promise.
+     */
+    const rows = app.slice(app.indexOf('<SetupRow key="link"'), app.indexOf('<SetupRow key="about"'))
+    assert.match(rows, /<SetupRow\s*\n?\s*key="walkthrough"\s*\n?\s*title=\{REPLAY\}/, 'the walkthrough is not on the Settings list')
+    assert.match(rows, /setWalkthrough\(true\)/, 'the row on the list does not open the walkthrough')
+  })
+
   test('the computer states the condition, and the phone is what answers it', () => {
     /*
      * "It's fine if the Mac says, if you've purchased this, go ahead and scan

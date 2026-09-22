@@ -921,7 +921,33 @@ export async function pairMac() {
   const config = loadRemoteConfig() || {}
   const code = makePairCode()
   const { email, password } = pairCredentials(code)
-  const { needsConfirmation } = await remoteSignUp({ url: config.url, anonKey: config.anonKey, email, password })
+  /*
+   * AND THE ONE REFUSAL THAT READS AS A DEAD BUTTON.
+   *
+   * "Setup phone button does nothing on mac." It did something: it asked the
+   * account service to make the hidden account behind a pairing code, and got
+   * back "email rate limit exceeded" — Supabase caps how many accounts can be
+   * made in an hour. The sentence went up in the error bar at the top left of
+   * the window, which is about as far from this button as the window allows,
+   * and in the service's own words, which name a limit nobody set and offer
+   * nothing to do about it.
+   *
+   * So it is said here, where the meaning is known: what ran out, that it
+   * comes back on its own, and that the other button on this panel needs none
+   * of it. MY WORDING — nobody has approved this line.
+   */
+  let made
+  try {
+    made = await remoteSignUp({ url: config.url, anonKey: config.anonKey, email, password })
+  } catch (err) {
+    if (/rate limit/i.test(err?.message || '')) {
+      throw new Error(
+        'Too many pairings from this computer in the last hour — the account service limits them and it has reached that limit. It clears by itself within the hour. In the meantime, “Sign in with an account instead” needs no pairing code at all.'
+      )
+    }
+    throw err
+  }
+  const { needsConfirmation } = made
   if (needsConfirmation) {
     throw new Error(
       'This computer couldn’t pair without an account, because the account service is set to confirm every new account by email. Sign in with an account instead, or turn off “Confirm email” for the project.'

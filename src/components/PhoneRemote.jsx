@@ -20,7 +20,7 @@ import PhoneQr from './PhoneQr'
  * relay, channel, helper, or the name of the account service; the
  * diagnostics that need those words live under Technical details.
  */
-export default function PhoneRemote({ link, onAction, onError, busy }) {
+export default function PhoneRemote({ link, onAction, onError, error, busy }) {
   const said = describeLink(link)
   const email = link.account?.email || link.cloud?.user?.email || ''
 
@@ -32,7 +32,7 @@ export default function PhoneRemote({ link, onAction, onError, busy }) {
       </p>
 
       {link.role === 'mac' ? (
-        <MacSide link={link} email={email} onAction={onAction} busy={busy} />
+        <MacSide link={link} email={email} onAction={onAction} busy={busy} error={error} />
       ) : link.role === 'wifi' ? (
         <p className="hint">
           Nothing to set up &mdash; this phone is talking to the computer directly over wifi.
@@ -50,7 +50,7 @@ export default function PhoneRemote({ link, onAction, onError, busy }) {
 
 /* ------------------------------------------------------------------ */
 
-function MacSide({ link, email, onAction, busy }) {
+function MacSide({ link, email, onAction, busy, error }) {
   const cloud = link.cloud
 
   if (cloud?.demo) {
@@ -86,6 +86,19 @@ function MacSide({ link, email, onAction, busy }) {
             Sign in with an account instead
           </button>
         </div>
+        {/*
+          BESIDE THE BUTTON, NOT ONLY AT THE TOP OF THE WINDOW.
+
+          "Setup phone button does nothing on mac." It did not do nothing — it
+          failed, and said so, in the error bar in the far top-left corner
+          while the button that failed is in a panel down the right-hand side.
+          On a wide screen those are a foot apart, and a message a foot away
+          from the thing it is about is a message nobody connects to it.
+
+          The bar stays: it is the one place every fault in the app goes. This
+          is the same sentence a second time, where the press happened.
+        */}
+        {error ? <p className="hint tone-bad">{String(error)}</p> : null}
         <p className="hint">
           An account means your presets and what the AI has learned about your taste follow you to
           any device.
