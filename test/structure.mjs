@@ -4865,9 +4865,12 @@ export function run(test) {
      * holding the phone — App Store and Play price by country — so printing
      * $9.99 everywhere quotes a price most buyers cannot pay.
      */
-    assert.equal(c.P3.real.go('$9.99'), 'Set up  \u00b7  $9.99 once')
-    assert.equal(c.P3.real.go('A$14.99'), 'Set up  \u00b7  A$14.99 once')
-    assert.equal(c.P3.real.go(null), 'Set up  \u00b7  $9.99 once', 'the fallback is no longer his wording')
+    /*
+     * EXCEPT THE ONE THAT TAKES NO MONEY. "Have the button just say
+     * 'Unlock'." The real-rig card opens the computer-app step; the charge
+     * is two screens later on P8, which is where the store's price belongs.
+     */
+    assert.equal(c.P3.real.go, 'Unlock')
     assert.equal(c.P8.head(null), '$9.99 one-time')
     assert.equal(c.P8.head('\u20ac10,99'), '\u20ac10,99 one-time')
     assert.equal(c.P8.go(null), 'Unlock real-rig control  \u00b7  $9.99')
@@ -4895,7 +4898,7 @@ export function run(test) {
       assert.ok(!/[\u2014\u2013]/.test(line), `an em or en dash crept into: ${line}`)
     }
     assert.equal(c.CHAIN[2].phoneBody, 'Your remote - nearby or away')
-    assert.equal(c.P6.yes, 'Yes - show me the scanner')
+    assert.equal(c.P6.yes, 'Yes - sign in to connect', 'the button promises a scanner that does not exist')
     assert.equal(c.P5.body, 'Tap toggles the block. Press and hold to choose channels A-D.')
 
     /* Wi-Fi keeps its capital and its hyphen. */

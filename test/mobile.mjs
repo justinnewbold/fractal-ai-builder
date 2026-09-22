@@ -6656,7 +6656,7 @@ export function run(test) {
        and the way in for somebody with an account. */
     for (const [needed, why] of [
       ['P3.demo.go', 'the demo has no button'],
-      ['P3.real.go(purchase.price)', 'the real-rig card lost its price'],
+      ['P3.real.go', 'the real-rig card has no button'],
       ['P3.restore', 'there is no way to restore a purchase from the first screen'],
       ['P7.account', 'there is no way to sign in from the first screen']
     ]) {
@@ -6906,7 +6906,15 @@ export function run(test) {
     assert.ok(!/pairCredentials|<ScanCode|await buyUnlock/.test(onb), 'the walkthrough pairs or sells again')
     /* Restore stays: somebody who already paid needs it before anything. */
     assert.match(onb, /await restorePurchase\(\)/, 'there is no way to restore a purchase already made')
-    assert.match(onb, /P3\.real\.go\(purchase\.price\)/, 'the price is not the store own')
+    /*
+     * AND NO PRICE ON THE BUTTON THAT TAKES NO MONEY.
+     *
+     * "Have the button just say 'Unlock'." It read "Set up  ·  $9.99 once",
+     * which puts a till on a button that opens the computer-app step. The
+     * price belongs on the paywall, where the store quotes it itself.
+     */
+    assert.match(onb, /label=\{P3\.real\.go\}/, 'the real-rig button is not the plain Unlock label')
+    assert.ok(!/P3\.real\.go\(/.test(onb), 'the real-rig button is quoting a price again')
 
     /*
      * THE UNLOCK IS NOT ASKED ABOUT HERE ANY MORE.

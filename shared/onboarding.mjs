@@ -257,7 +257,19 @@ export const P3 = {
   real: {
     eyebrow: 'CONTROL YOUR HARDWARE',
     title: 'Connect my real rig',
-    go: (price) => `Set up  ·  ${price || FALLBACK_PRICE} once`
+    /*
+     * "Have the button just say 'Unlock'."
+     *
+     * It read "Set up  ·  $9.99 once", which put a price on a button that
+     * takes no money: pressing it opens the computer-app step, and the
+     * charge happens later at the paywall where the store's own sheet
+     * quotes the price. A price here reads as a till, two screens early.
+     *
+     * So this is the only card label in the walkthrough that is a plain
+     * string rather than a function of the store's price. The price still
+     * belongs on P8, which IS the paywall.
+     */
+    go: 'Unlock'
   },
   restore: 'Already bought it? Restore purchase'
 }
@@ -299,7 +311,17 @@ export const P6 = {
   tag: 'CONNECT',
   eyebrow: 'CONNECT YOUR COMPUTER',
   head: 'Is Fractal Remote installed there?',
-  yes: 'Yes - show me the scanner',
+  /*
+   * WAS "Yes - show me the scanner", and there is no scanner.
+   *
+   * "I want the QR code gone and the scanner gone."
+   *
+   * The camera went with the QR code, and this button was left promising
+   * one. It has opened the sign-in screen ever since, because an account is
+   * the only way to join a phone to a computer now, so the label says that.
+   * MY WORDING. The plain hyphen matches the rest of his lines.
+   */
+  yes: 'Yes - sign in to connect',
   notYet: 'NOT YET  ·  THE COMPUTER APP IS FREE',
   platforms: [
     { key: 'mac', badge: 'M', label: 'MAC', go: 'Send link' },
