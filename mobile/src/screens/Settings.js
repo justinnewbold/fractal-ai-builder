@@ -179,11 +179,26 @@ export default function Settings({
    * "Rename presets and scenes" is four words that will not share a line with
    * two buttons on a phone.
    */
+  /*
+   * WHICH PAGE A BACK GOES TO, which was not a question until now.
+   *
+   * Every page came off the front list, so back was always the front list and
+   * the button could say "‹ Settings" without thinking. Troubleshooting is
+   * inside About now, and a back that walked past the page you came from
+   * would be the app forgetting where you were standing.
+   *
+   * One entry, because there is one nested page. It is a map rather than an
+   * `if` so the next one is a line rather than a branch.
+   */
+  const PARENT = { trouble: 'about' }
+  const upFrom = (p) => PARENT[p] || null
+  const upLabel = (p) => (PARENT[p] === 'about' ? '‹ About' : '‹ Settings')
+
   const head = (title, onDone) =>
     onDone === 'back' ? (
       <View style={{ gap: space.sm }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
-          <Press label="‹ Settings" height={40} onPress={() => setPage(null)} />
+          <Press label={upLabel(page)} height={40} onPress={() => setPage(upFrom(page))} />
           <Press label="Done" height={40} onPress={onBack} />
         </View>
         <Text accessibilityRole="header" style={{ color: color.silk, fontSize: font.title, fontWeight: '700' }}>
@@ -201,7 +216,7 @@ export default function Settings({
 
   /* One step up, whatever that means from where you are standing. The swipe
      and the Back button are the same errand, so they ask the same function. */
-  const goBack = () => (page === null ? onBack?.() : setPage(null))
+  const goBack = () => (page === null ? onBack?.() : setPage(upFrom(page)))
 
   return (
     <EdgeBack onBack={goBack}>
@@ -306,91 +321,6 @@ export default function Settings({
               onPress={onUnlock}
             />
             <SetupRow title="About" status={`v${APP_VERSION}`} onPress={() => setPage('about')} />
-            {/*
-              WHAT IS BELOW ABOUT, AND WHY IT IS BELOW ABOUT.
-
-              "Move updates, troubleshooting, and the show the tutorial again
-              underneath the about section."
-
-              The three of them had drifted into the middle of the list, so
-              Troubleshooting sat between renaming presets and buying the app,
-              and the walkthrough sat between buying it and the version
-              number. Nothing about that order was decided; each row was added
-              beside whatever it was written next to.
-
-              The rows above are the ones somebody opens Settings FOR. These
-              three are the ones you go looking for on an evening when
-              something is wrong, or once, ever - which is the same reason
-              About is where it is, so they sit under it.
-            */}
-            {/*
-              * WHAT IS RUNNING, AND HOW TO GET THE NEWEST.
-              *
-              * "I have not yet successfully had a single over-the-air update
-              * work correctly. They never come through, so I keep refreshing
-              * the android app, closing it, force closing it, reopening it
-              * over and over again."
-              *
-              * They were arriving. What was missing was any way to SEE it,
-              * plus one detail that makes a working app look stuck: this app
-              * never waits for a download at launch — app.json sets
-              * fallbackToCacheTimeout to 0, so it starts on the bundle it
-              * already has, fetches the new one in the BACKGROUND, and runs it
-              * the NEXT time it opens.
-              *
-              * First launch downloads. Second launch shows it. Somebody
-              * force-closing once, seeing the same number and concluding
-              * nothing happened was one restart short, with nothing on screen
-              * to say so.
-              *
-              * That default is right for a stage and is not what changes here.
-              * This says what is going on, and offers the restart instead of
-              * waiting for it to happen by accident.
-              */}
-            <SetupRow
-              title="Updates"
-              status={
-                updates.phase === 'ready'
-                  ? 'Ready — tap to restart into it'
-                  : updates.phase === 'downloading'
-                    ? 'Downloading…'
-                    : updates.phase === 'checking'
-                      ? 'Checking…'
-                      : updates.phase === 'current'
-                        ? 'Up to date'
-                        : updates.phase === 'off'
-                          ? 'Not available in this build'
-                          : updates.error
-                            ? 'Could not check — tap to try again'
-                            : `Running ${updates.source === 'update' ? 'an update' : 'the installed build'} · tap to check`
-              }
-              onPress={() => (updates.phase === 'ready' ? applyNow() : checkNow())}
-            />
-            {/*
-              Three rows became one door.
-
-              Fixes, Log and Feedback were three rows in a column, and they
-              are three stages of the same evening: read what to try, read
-              what actually happened, tell somebody when neither helped. As
-              separate rows each looked like a different errand, and the one
-              in the middle looked like a developer's.
-            */}
-            {onOpenFixes || onOpenLog || onOpenReport ? (
-              <SetupRow
-                title="Troubleshooting"
-                status="What to try, the log, and telling us"
-                onPress={() => setPage('trouble')}
-              />
-            ) : null}
-            {/* Openable again, because a tour worth showing once is worth
-                finding later — and somebody who skipped it on the first
-                launch has no other way back to it. */}
-            {/* The way back into the walkthrough, named the way its own last
-                screen promises: "Replay this anytime in Settings → Show the
-                walkthrough." */}
-            {onReplay ? (
-              <SetupRow title={REPLAY} status="The setup, from the start" onPress={onReplay} />
-            ) : null}
           </View>
 
           {/*
@@ -809,6 +739,93 @@ export default function Settings({
           <Text style={{ color: color.silk, fontSize: font.body, fontFamily: face }}>
             {`Fractal Remote v${APP_VERSION}`}
           </Text>
+
+          {/*
+            INSIDE ABOUT, not beside it.
+
+            "Move walkthrough, updates and troubleshooting INSIDE of the
+            'About' menu."
+
+            They were moved under About an hour ago, which was the smaller
+            version of the same instruction: they are the rows you go looking
+            for on an evening when something is wrong, or once, ever. Under it
+            they still cost five lines of a list somebody opens to do
+            something else. In it they cost one.
+
+            What is left on the front page is the four things Setup is opened
+            FOR, and one door to everything else.
+          */}
+          <View style={{ gap: 0 }}>
+          {/*
+            * WHAT IS RUNNING, AND HOW TO GET THE NEWEST.
+            *
+            * "I have not yet successfully had a single over-the-air update
+            * work correctly. They never come through, so I keep refreshing
+            * the android app, closing it, force closing it, reopening it
+            * over and over again."
+            *
+            * They were arriving. What was missing was any way to SEE it,
+            * plus one detail that makes a working app look stuck: this app
+            * never waits for a download at launch — app.json sets
+            * fallbackToCacheTimeout to 0, so it starts on the bundle it
+            * already has, fetches the new one in the BACKGROUND, and runs it
+            * the NEXT time it opens.
+            *
+            * First launch downloads. Second launch shows it. Somebody
+            * force-closing once, seeing the same number and concluding
+            * nothing happened was one restart short, with nothing on screen
+            * to say so.
+            *
+            * That default is right for a stage and is not what changes here.
+            * This says what is going on, and offers the restart instead of
+            * waiting for it to happen by accident.
+            */}
+          <SetupRow
+            title="Updates"
+            status={
+              updates.phase === 'ready'
+                ? 'Ready — tap to restart into it'
+                : updates.phase === 'downloading'
+                  ? 'Downloading…'
+                  : updates.phase === 'checking'
+                    ? 'Checking…'
+                    : updates.phase === 'current'
+                      ? 'Up to date'
+                      : updates.phase === 'off'
+                        ? 'Not available in this build'
+                        : updates.error
+                          ? 'Could not check — tap to try again'
+                          : `Running ${updates.source === 'update' ? 'an update' : 'the installed build'} · tap to check`
+            }
+            onPress={() => (updates.phase === 'ready' ? applyNow() : checkNow())}
+          />
+          {/*
+            Three rows became one door.
+
+            Fixes, Log and Feedback were three rows in a column, and they
+            are three stages of the same evening: read what to try, read
+            what actually happened, tell somebody when neither helped. As
+            separate rows each looked like a different errand, and the one
+            in the middle looked like a developer's.
+          */}
+          {onOpenFixes || onOpenLog || onOpenReport ? (
+            <SetupRow
+              title="Troubleshooting"
+              status="What to try, the log, and telling us"
+              onPress={() => setPage('trouble')}
+            />
+          ) : null}
+          {/* Openable again, because a tour worth showing once is worth
+              finding later — and somebody who skipped it on the first
+              launch has no other way back to it. */}
+          {/* The way back into the walkthrough, named the way its own last
+              screen promises: "Replay this anytime in Settings → Show the
+              walkthrough." */}
+          {onReplay ? (
+            <SetupRow title={REPLAY} status="The setup, from the start" onPress={onReplay} />
+          ) : null}
+          </View>
+
           <View style={{ gap: space.md }}>
             <Section>What stays at the computer</Section>
             <Note>

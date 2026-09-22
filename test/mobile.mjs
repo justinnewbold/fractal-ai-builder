@@ -3435,11 +3435,25 @@ export function run(test) {
       'Phone & computer',
       'Rename presets and scenes',
       'Unlock the full version',
-      'About',
-      'Updates',
-      'Troubleshooting',
-      'REPLAY'
+      'About'
     ], 'the Setup rows are not in the order he asked for')
+
+    /*
+     * AND THE OTHER THREE ARE INSIDE ABOUT, not under it.
+     *
+     * "Move walkthrough, updates and troubleshooting INSIDE of the 'About'
+     * menu." Moving them below About was the smaller version of the same
+     * instruction an hour earlier: under it they still cost five lines of a
+     * list somebody opens to do something else. In it they cost one.
+     */
+    const about = settings.slice(settings.indexOf("{page === 'about' ?"))
+    for (const [pattern, what] of [
+      [/title="Updates"/, 'Updates'],
+      [/title="Troubleshooting"/, 'Troubleshooting'],
+      [/title=\{REPLAY\}/, 'the walkthrough']
+    ]) {
+      assert.ok(pattern.test(about), `${what} is not inside About`)
+    }
   })
 
   test('playing with no internet is explained, and only to somebody who paid', () => {
@@ -6372,16 +6386,30 @@ export function run(test) {
 
     /*
      * SETTINGS CARRIES ITS OWN, because it is the only screen with pages
-     * inside it. One step from a submenu is the list; one step from the list
-     * is the way out. The same function answers the Back button and the
-     * swipe, so they cannot disagree.
+     * inside it. One step from a submenu is the page it hangs off; one step
+     * from the list is the way out. The same function answers the Back button
+     * and the swipe, so they cannot disagree.
+     *
+     * IT USED TO BE `setPage(null)` FLAT, and that was right while every page
+     * came off the front list. Troubleshooting lives inside About now — "Move
+     * walkthrough, updates and troubleshooting INSIDE of the 'About' menu" —
+     * so a flat back walks past the page you came from.
      */
     const set = read('mobile/src/screens/Settings.js')
     assert.match(
       set,
-      /const goBack = \(\) => \(page === null \? onBack\?\.\(\) : setPage\(null\)\)/,
+      /const goBack = \(\) => \(page === null \? onBack\?\.\(\) : setPage\(upFrom\(page\)\)\)/,
       'a swipe in Settings does not go back one step'
     )
+    /* And the Back button asks the same thing, rather than its own copy. */
+    assert.match(
+      set,
+      /onPress=\{\(\) => setPage\(upFrom\(page\)\)\}/,
+      'the Back button and the swipe can disagree about where one step up is'
+    )
+    assert.match(set, /const PARENT = \{ trouble: 'about' \}/, 'Troubleshooting is not inside About')
+    /* And it says where it is going, because "Settings" would be a lie. */
+    assert.match(set, /label=\{upLabel\(page\)\}/, 'the Back button names a screen it does not go to')
     assert.match(set, /<EdgeBack onBack=\{goBack\}>/, 'Settings cannot be swiped out of')
 
     /*
@@ -6391,7 +6419,9 @@ export function run(test) {
     const head = set.slice(set.indexOf('const head = (title, onDone) =>'), set.indexOf('const goBack ='))
     assert.ok(head.length > 100, 'the page header moved; this check reads it')
     const back = head.slice(head.indexOf("onDone === 'back' ?"), head.indexOf(') : ('))
-    assert.match(back, /label="‹ Settings"/, 'a submenu has no way back to the list')
+    /* The label is computed now rather than fixed: a page inside About says
+       "‹ About", because "‹ Settings" would name a screen it does not go to. */
+    assert.match(back, /label=\{upLabel\(page\)\}/, 'a submenu has no way back to the list')
     assert.match(back, /label="Done" height=\{40\} onPress=\{onBack\}/, 'a submenu has no Done, so leaving takes a tap per level')
   })
 
