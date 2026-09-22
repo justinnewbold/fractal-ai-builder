@@ -305,6 +305,22 @@ export const AREAS = [
       },
       { does: 'ask the app for a tone', web: 'Ask', phone: '✦ Tone', unreadable: ['phone'] },
       {
+        does: 'step to the preset before this one',
+        /* The word is the same at both ends; only the arrow differs. The
+           browser draws its chevron as a character in the label — "‹ Previous"
+           — and the phone draws it as a picture beside the label, cut from
+           Justin's own mockup of this screen. So the browser's copy never
+           matches this scanner's idea of a button name and the phone's now
+           does, which is the whole of the difference recorded here. */
+        web: '‹ Previous',
+        phone: 'Previous'
+      },
+      {
+        does: 'step to the preset after this one',
+        web: 'Next ›',
+        phone: 'Next'
+      },
+      {
         does: 'choose what Previous and Next step through',
         /* Both ends name the button after the list it is stepping through, and
            both say "All" when that is every preset on the unit. */

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Platform, Pressable, Text, View } from 'react-native'
+import { Image, Platform, Pressable, Text, View } from 'react-native'
 import { BlurView } from 'expo-blur'
 
 import { color, font, mono, radius, space, isDark } from '../lib/theme'
@@ -10,6 +10,7 @@ import { APP_VERSION } from '../lib/version'
 import { useRig } from '../lib/rig'
 import { useDemo } from '../lib/demo'
 import { shouldOffer, usePurchase } from '../lib/purchases'
+import setupIcon from '../../assets/icons/setup.png'
 import { idOf } from '../lib/device'
 import Lamp from './Lamp'
 import Volume from './Volume'
@@ -348,14 +349,21 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
       ) : null}
 
       {/*
-        The gear is a letter, not a picture, and a letter needs a colour.
+        The gear is a picture now, and it is his own.
 
-        "The settings icon is too dark to even see, but if I click where it's
-        supposed to be" — on Android. ⚙ is drawn from the phone's text font in
-        the text colour, which nobody set, so it took the default: black, on
-        a bar that is nearly black. The iPhone got away with it because Apple
-        swaps that character for its own picture of a gear. The speaker beside
-        it is a true emoji and paints itself on both.
+        It was the character ⚙, and that cost a bug: "The settings icon is too
+        dark to even see, but if I click where it's supposed to be" — on
+        Android. The character is drawn from the phone's text font in the text
+        colour, which nobody had set, so it took the default: black, on a bar
+        that is nearly black. Giving it a colour fixed the invisibility and
+        left the real problem, which is that the two platforms were drawing
+        two different gears: Apple swaps that character for its own picture,
+        Android draws the outline from its font.
+
+        The one in the file is cut out of Justin's mockup of the play screen,
+        so both phones now show the gear he drew. Tinted rather than coloured
+        in, for the same reason every other picture here is — see
+        mobile/assets/icons. The speaker beside it is still a true emoji.
       */}
       <Pressable
         accessibilityRole="button"
@@ -363,7 +371,12 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
         hitSlop={10}
         onPress={onOpenSettings}
       >
-        <Text style={{ color: color.silk, fontSize: font.lead }}>⚙</Text>
+        <Image
+          source={setupIcon}
+          accessible={false}
+          resizeMode="contain"
+          style={{ width: 22, height: 22, tintColor: color.silk }}
+        />
       </Pressable>
 
       {/*

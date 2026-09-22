@@ -31,7 +31,7 @@ import { installCrashCapture } from './src/lib/debugLog'
 import { restoreDemo, setDemo, useDemo } from './src/lib/demo'
 import { BENCH } from './src/lib/features'
 import Paywall from './src/screens/Paywall'
-import { checkOwner, startPurchases, usePurchase } from './src/lib/purchases'
+import { checkOwner, linkAccount, startPurchases, unlinkAccount, usePurchase } from './src/lib/purchases'
 import { shouldAskToPay } from './src/lib/unlock-rule'
 
 /**
@@ -537,6 +537,10 @@ export default function App() {
                  the next launch — the check at startup ran before there was
                  an account to read. */
               checkOwner()
+              /* And so is somebody who bought this on another phone. The
+                 purchase follows the account, so signing in is what tells
+                 RevenueCat which account to answer for. */
+              linkAccount()
               setAuth('in')
             }}
             onDemo={() => setAuth('in')}
@@ -708,6 +712,11 @@ export default function App() {
                    */
                   await stopLink()
                   await signOut()
+                  /* Stop answering as that person. It never takes an unlock
+                     away — see unlinkAccount — so somebody who bought on this
+                     phone and signed out of an account keeps what they paid
+                     for. */
+                  unlinkAccount().catch(() => {})
                   setScreen('stage')
                   setAuth('out')
                 }}

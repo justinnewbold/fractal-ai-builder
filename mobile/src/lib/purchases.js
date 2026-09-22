@@ -83,7 +83,23 @@ let state = {
   /** What it costs, as the store says it locally — "$9.99", "£8.99". */
   price: null,
   /** Why purchasing is off, when it is. */
-  why: null
+  why: null,
+  /*
+   * And the store's own account of it, for the one case where "why" is too
+   * vague to act on.
+   *
+   * "Still not showing ae to purchase. And yes, I downloaded this directly
+   * from the play console tester site." The paywall said the shelves were
+   * empty, which was true and useless: empty because Play has no such
+   * product, because RevenueCat has no offering, or because the fetch failed
+   * are three different afternoons of work, and the app knew which and threw
+   * it away into a log nobody was reading.
+   *
+   * Facts only, and the store's words where there are any. Null whenever
+   * there is something to sell, which is every customer who ever sees this
+   * screen.
+   */
+  detail: null
 }
 
 const watchers = new Set()
@@ -183,6 +199,88 @@ export const checkOwner = async () => {
   return false
 }
 
+/**
+ * Tell RevenueCat WHO this is, so a purchase follows the person and not the
+ * handset.
+ *
+ * "I don't want to charge people to use other devices if they already
+ * purchased."
+ *
+ * Without this the SDK is started anonymously: it knows "this install on this
+ * phone" and nothing else, so an iPhone purchase left an Android tablet
+ * locked even with the same email signed in on both. The paywall meanwhile
+ * promised "the full version of this app on any device you use, forever",
+ * which somebody would have discovered by paying twice.
+ *
+ * The id is the ACCOUNT's, not the email. An address can be changed; the
+ * Supabase user id cannot, and a purchase tied to an address somebody edits
+ * is a purchase they lose.
+ *
+ * logIn also carries an anonymous purchase over: somebody who bought before
+ * making an account gets it aliased onto the account, which is the ordinary
+ * order of events here — the paywall comes before the sign-in screen.
+ */
+const linkTo = async (api, id) => {
+  if (!api?.logIn || !id) return null
+  try {
+    const out = await api.logIn(id)
+    logDebug('purchases: linked to the account')
+    return out?.customerInfo || null
+  } catch (err) {
+    /* Not fatal, and not evidence of anything. The remembered answer stands
+       and the store is still asked; this only means the entitlement will not
+       cross platforms until the next launch that manages it. */
+    logDebug(`purchases: could not link to the account (${err?.message || err})`)
+    return null
+  }
+}
+
+/**
+ * The account signed in after startup, so link and re-read now.
+ *
+ * Only ever unlocks. A logIn that comes back with nothing is not proof the
+ * person has not paid — it is one answer from one network call — and the rule
+ * at the top of this file is that only certainty locks anybody out.
+ */
+export const linkAccount = async () => {
+  const api = await load()
+  if (!api) return
+  try {
+    const account = await currentAccount()
+    if (!account?.id) return
+    const info = await linkTo(api, account.id)
+    if (info && entitled(info)) {
+      await remember(true)
+      set({ unlocked: true })
+      logDebug('purchases: unlocked by a purchase on this account')
+    }
+    loadPrice()
+  } catch (err) {
+    logDebug(`purchases: link failed (${err?.message || err})`)
+  }
+}
+
+/**
+ * Signed out, so stop answering as that person.
+ *
+ * AND IT NEVER TAKES THE UNLOCK AWAY. RevenueCat's logOut returns to a fresh
+ * anonymous id, which by definition owns nothing — so re-reading the
+ * entitlement here would lock out somebody who bought on this very phone and
+ * then signed out of an account they did not need to buy it. The remembered
+ * answer stands, and Restore is there for the case where it really is gone.
+ */
+export const unlinkAccount = async () => {
+  const api = await load()
+  if (!api?.logOut) return
+  try {
+    await api.logOut()
+    logDebug('purchases: unlinked from the account')
+  } catch (err) {
+    /* Logging out of an already-anonymous user throws, and is a no-op. */
+    logDebug(`purchases: nothing to unlink (${err?.message || err})`)
+  }
+}
+
 export const startPurchases = async () => {
   const known = await remembered()
   if (known) set({ unlocked: true })
@@ -206,7 +304,13 @@ export const startPurchases = async () => {
 
   try {
     await api.configure({ apiKey: key })
-    const info = await api.getCustomerInfo()
+    /* WHO before WHAT. Linking first means the very first read is already the
+       account's, so a phone that has never bought anything but is signed in to
+       an account that has comes up unlocked rather than flashing the paywall
+       and correcting itself. */
+    const account = await currentAccount().catch(() => null)
+    const linked = account?.id ? await linkTo(api, account.id) : null
+    const info = linked || (await api.getCustomerInfo())
     const yes = entitled(info)
     await remember(yes)
 
@@ -310,20 +414,37 @@ const loadPrice = async () => {
       null
     if (found) {
       pkg = found
-      set({ price: found.product?.priceString || null })
+      set({ price: found.product?.priceString || null, detail: null })
       return true
     }
     const products = await api.getProducts([PRODUCT_ID])
     if (products?.[0]) {
-      set({ price: products[0].priceString || null })
+      set({ price: products[0].priceString || null, detail: null })
       return true
     }
-    logDebug('purchases: the store returned no offering and no product')
+    /*
+     * WHICH SIDE IS EMPTY, because the two are fixed in different places.
+     *
+     * A count of nought means RevenueCat has no offering configured — that is
+     * its dashboard. A count above nought with nothing sellable in it means
+     * the offering exists but its packages point at products the store will
+     * not sell, which is App Store Connect or the Play Console. Either way
+     * getProducts has just asked the store for the item by name and been told
+     * no, so the number and the id together say where to go.
+     */
+    const count = Object.keys(offerings?.all || {}).length
+    const detail = `RevenueCat returned ${count} offering${count === 1 ? '' : 's'}; the store has no ${PRODUCT_ID}.`
+    set({ detail })
+    logDebug(`purchases: ${detail}`)
     return false
   } catch (err) {
     /* Could not find out. Treat it as nothing to sell, which unlocks rather
-       than locks — the same direction every other unknown goes here. */
-    logDebug(`purchases: no price (${err?.message || err})`)
+       than locks — the same direction every other unknown goes here. The
+       store's own sentence is kept as it came: it names the billing fault,
+       and any rewording of it here would be a guess laid over a fact. */
+    const detail = String(err?.message || err)
+    set({ detail })
+    logDebug(`purchases: no price (${detail})`)
     return false
   }
 }

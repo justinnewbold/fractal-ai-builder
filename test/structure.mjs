@@ -5175,9 +5175,11 @@ export function run(test) {
     const app = readFileSync(new URL('../mobile/App.js', import.meta.url), 'utf8')
 
     assert.match(onb, /onAccount/, 'the walkthrough no longer offers an account')
+    /* On the choice screen it is a footnote link now, not a full-width
+       button — his mockup — so the shape to look for is the link's. */
     assert.match(
       onb,
-      /label=\{P7\.account\}[^]{0,120}onPress=\{\(\) => onAccount/,
+      /label: P3\.signIn[^]{0,80}onAccount\?\.\(\)/,
       'the account button is gone from the pairing screen, or wired to something else'
     )
     assert.match(

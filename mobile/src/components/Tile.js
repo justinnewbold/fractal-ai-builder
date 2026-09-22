@@ -1,4 +1,4 @@
-import { Platform, Pressable, Text, View } from 'react-native'
+import { Image, Platform, Pressable, Text, View } from 'react-native'
 
 import { color, font, radius, space, TAP } from '../lib/theme'
 import { at, vivid } from '../lib/vivid'
@@ -34,6 +34,13 @@ export default function Tile({
   label,
   sub,
   caption,
+  /*
+   * The picture above the letters, cut from Justin's mockup of this screen.
+   * White in the file and tinted here, so one copy serves every hue — see
+   * lib/blockIcons. Optional by design: a family he did not draw shows the
+   * letters alone, exactly as the grid looked before any of this.
+   */
+  icon,
   fill,
   ink,
   on = false,
@@ -66,6 +73,18 @@ export default function Tile({
    * of them, Android gets the lift and iOS gets the light. Both read as raised;
    * only one of them glows.
    */
+  /*
+   * How big the picture can be, and whether there is room for one at all.
+   *
+   * Fit-to-screen squeezes these tiles down to 44pt on a small phone with a
+   * long chain, and at that height the icon and the three letters are fighting
+   * over the same space — the letters win, because they are the part you read.
+   * Above that it takes a quarter of the tile, which is where the mockup has
+   * it, and stops growing at 28 so a short chain's roomy tiles don't turn into
+   * a row of billboards.
+   */
+  const picture = icon && height >= 66 ? Math.min(28, Math.round(height * 0.26)) : 0
+
   const glow = on
     ? Platform.select({
         ios: {
@@ -142,6 +161,17 @@ export default function Tile({
         />
       ) : null}
       <View style={{ alignItems: 'center' }}>
+        {picture ? (
+          <Image
+            source={icon}
+            /* Silent: the Pressable above already says the block's name and
+               state, and a second announcement for the picture of it would
+               make every tile read itself out twice. */
+            accessible={false}
+            style={{ width: picture, height: picture, marginBottom: 3, tintColor: foreground }}
+            resizeMode="contain"
+          />
+        ) : null}
         {caption ? (
           <Text
             numberOfLines={1}

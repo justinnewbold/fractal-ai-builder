@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { RefreshControl, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native'
+import { Image, RefreshControl, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native'
 import { useKeepAwake } from 'expo-keep-awake'
 
 import { color, font, space, TAP } from '../lib/theme'
@@ -32,6 +32,19 @@ import { useDemoUnit } from '../lib/demo'
 import { coachSeen, markCoach } from '../lib/coach'
 import { nope, thud } from '../lib/feedback'
 import { blockColor } from '../lib/blockColors'
+import { blockIcon } from '../lib/blockIcons'
+/*
+ * The pictures, cut out of Justin's own mockup of this screen. Assets rather
+ * than an icon font on purpose: a font is native code, and native code costs a
+ * build — see mobile/assets/icons. These are white in the file and tinted
+ * wherever they land.
+ */
+import chevronIcon from '../../assets/icons/chevron.png'
+import chainIcon from '../../assets/icons/chain.png'
+import editIcon from '../../assets/icons/edit.png'
+import presetsIcon from '../../assets/icons/presets.png'
+import tempoIcon from '../../assets/icons/tempo.png'
+import tunerIcon from '../../assets/icons/tuner.png'
 import { sceneColor } from '../lib/sceneColors'
 import { shortBlock } from '../lib/shortName'
 import UnlockOffer from '../components/UnlockOffer'
@@ -462,6 +475,8 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
         <Press
           label={preset?.pending && !preset?.name ? '…' : presetLabel(preset)}
           sub={onOpenPresets ? 'Tap for all presets' : undefined}
+          icon={onOpenPresets ? presetsIcon : undefined}
+          after={onOpenPresets ? chevronIcon : undefined}
           height={tight ? TAP : TAP + 12}
           disabled={!onOpenPresets}
           onPress={onOpenPresets}
@@ -517,7 +532,7 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
 
       {/* ---------------------------------------------------------- blocks */}
       <View style={{ gap: space.sm }}>
-        <Label>
+        <Label icon={chainIcon}>
           {chain === 'reading' ? 'Reading the chain…' : chain === 'failed' ? 'Chain — out of date' : 'Chain'}
         </Label>
 
@@ -582,6 +597,7 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
               <Tile
                 key={idOf(block)}
                 label={shortBlock(block)}
+                icon={blockIcon(block.slug)}
                 sub={block.channel ? `${state}  ${block.channel}` : state}
                 fill={hue.fill}
                 ink={hue.ink}
@@ -615,7 +631,15 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
       */}
       <View style={{ gap: space.sm }}>
         <View style={{ flexDirection: 'row', gap: space.sm }}>
-          <Press grow label="‹ Previous" height={foot} disabled={landing(-1) === null} onPress={() => step(-1)} />
+          <Press
+            grow
+            label="Previous"
+            icon={chevronIcon}
+            flip
+            height={foot}
+            disabled={landing(-1) === null}
+            onPress={() => step(-1)}
+          />
           <Press
             grow
             caption="Setlists"
@@ -627,7 +651,14 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
             disabled={!onOpenSetlists}
             onPress={onOpenSetlists}
           />
-          <Press grow label="Next ›" height={foot} disabled={landing(1) === null} onPress={() => step(1)} />
+          <Press
+            grow
+            label="Next"
+            after={chevronIcon}
+            height={foot}
+            disabled={landing(1) === null}
+            onPress={() => step(1)}
+          />
         </View>
 
         {/*
@@ -644,6 +675,7 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
             <Press
               grow
               label={tunerOn ? 'Stop tuner' : 'Tuner'}
+              icon={tunerIcon}
               tone="live"
               on={tunerOn}
               height={foot}
@@ -661,7 +693,9 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
             should be the one pressed mid-song, not the one pressed between
             them.
           */}
-          {onOpenEdit ? <Press grow label="Edit" height={foot} onPress={onOpenEdit} /> : null}
+          {onOpenEdit ? (
+            <Press grow label="Edit" icon={editIcon} height={foot} onPress={onOpenEdit} />
+          ) : null}
           {/*
             Tap Tempo on the right, where the thumb is.
 
@@ -678,6 +712,7 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
             grow
             label="Tap Tempo"
             sub={Number.isFinite(bpm) ? String(Math.round(bpm)) : undefined}
+            icon={tempoIcon}
             tone="signal"
             height={foot}
             onPress={tapTempo}
@@ -810,8 +845,8 @@ function ChannelSheet({ block, channels, onClose, onPick }) {
   )
 }
 
-function Label({ children }) {
-  return (
+function Label({ children, icon }) {
+  const word = (
     <Text
       accessibilityRole="header"
       style={{
@@ -823,5 +858,22 @@ function Label({ children }) {
     >
       {children}
     </Text>
+  )
+  /*
+   * The link beside CHAIN, which is the only heading in the mockup that has a
+   * picture. Wrapped only when there is one so every other heading stays the
+   * bare Text it has always been.
+   */
+  if (!icon) return word
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <Image
+        source={icon}
+        accessible={false}
+        resizeMode="contain"
+        style={{ width: 13, height: 13, tintColor: color.silkFaint }}
+      />
+      {word}
+    </View>
   )
 }

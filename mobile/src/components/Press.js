@@ -1,4 +1,4 @@
-import { Pressable, Text, View } from 'react-native'
+import { Image, Pressable, Text, View } from 'react-native'
 
 import { color, font, radius, space, TAP } from '../lib/theme'
 import { tick } from '../lib/feedback'
@@ -20,6 +20,26 @@ export default function Press({
   label,
   sub,
   caption,
+  /*
+   * A picture beside the words, cut from Justin's mockup of the play screen.
+   * White in the file and tinted to whatever the label is, so one copy works
+   * on a lit button and an unlit one. Optional: a button he drew without an
+   * icon still gets none.
+   */
+  icon,
+  /*
+   * A second picture, on the right. The preset button wears both — the list
+   * on the left saying what it opens, the chevron on the right saying it
+   * opens somewhere — and Next wears this one alone, because there the
+   * chevron IS the direction rather than a decoration on it.
+   */
+  after,
+  /*
+   * Mirror the left picture. Previous and Next are the same chevron pointing
+   * opposite ways, and one file flipped is better than two files that could
+   * drift apart.
+   */
+  flip = false,
   onPress,
   onLongPress,
   tone = 'plain',
@@ -83,45 +103,67 @@ export default function Press({
         style
       ]}
     >
-      <View style={{ alignItems: 'center' }}>
-        {/*
-          A word ABOVE the label, for the one button whose name does not say
-          what it is. "All" between Previous and Next reads as a caption; the
-          word Source over it says that pressing it changes what those two do.
-        */}
-        {caption ? (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+        {icon ? <Picture source={icon} tint={ink} flip={flip} /> : null}
+        <View style={{ alignItems: 'center' }}>
+          {/*
+            A word ABOVE the label, for the one button whose name does not say
+            what it is. "All" between Previous and Next reads as a caption; the
+            word Source over it says that pressing it changes what those two do.
+          */}
+          {caption ? (
+            <Text
+              numberOfLines={1}
+              style={{
+                color: on ? color.onSignal : color.silkFaint,
+                fontSize: font.micro,
+                letterSpacing: 1.2,
+                textTransform: 'uppercase',
+                marginBottom: 1
+              }}
+            >
+              {caption}
+            </Text>
+          ) : null}
           <Text
             numberOfLines={1}
-            style={{
-              color: on ? color.onSignal : color.silkFaint,
-              fontSize: font.micro,
-              letterSpacing: 1.2,
-              textTransform: 'uppercase',
-              marginBottom: 1
-            }}
+            style={{ color: ink, fontSize: font.body, fontWeight: '600', textAlign: 'center' }}
           >
-            {caption}
+            {label}
           </Text>
-        ) : null}
-        <Text
-          numberOfLines={1}
-          style={{ color: ink, fontSize: font.body, fontWeight: '600', textAlign: 'center' }}
-        >
-          {label}
-        </Text>
-        {sub ? (
-          <Text
-            numberOfLines={1}
-            style={{
-              color: on ? color.onSignal : color.silkDim,
-              fontSize: font.micro,
-              marginTop: 2
-            }}
-          >
-            {sub}
-          </Text>
-        ) : null}
+          {sub ? (
+            <Text
+              numberOfLines={1}
+              style={{
+                color: on ? color.onSignal : color.silkDim,
+                fontSize: font.micro,
+                marginTop: 2
+              }}
+            >
+              {sub}
+            </Text>
+          ) : null}
+        </View>
+        {after ? <Picture source={after} tint={ink} /> : null}
       </View>
     </Pressable>
+  )
+}
+
+/**
+ * The picture on a button.
+ *
+ * Silent to a screen reader on purpose — the Pressable above already carries
+ * the words, and a chevron that announced itself would make Next read out
+ * twice. Sized once here so every button in the row agrees.
+ */
+function Picture({ source, tint, flip = false }) {
+  return (
+    <Image
+      source={source}
+      accessible={false}
+      resizeMode="contain"
+      style={{ width: 20, height: 20, tintColor: tint, transform: flip ? [{ scaleX: -1 }] : undefined }}
+    />
   )
 }

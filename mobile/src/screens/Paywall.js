@@ -38,7 +38,7 @@ const supportedWords =
  * behind the thing that charges them again would be a poor way to treat them.
  */
 export default function Paywall({ onUnlocked, onDemo, onBack, onSignIn, asked = false }) {
-  const { price, unlocked, available, why } = usePurchase()
+  const { price, unlocked, available, why, detail } = usePurchase()
   const [busy, setBusy] = useState(false)
   const [said, setSaid] = useState(null)
 
@@ -73,7 +73,7 @@ export default function Paywall({ onUnlocked, onDemo, onBack, onSignIn, asked = 
           Phone Remote
         </Text>
         <Text style={{ color: color.silkDim, fontSize: font.body, lineHeight: font.body * 1.45 }}>
-          {`One-time payment unlocks the full version of this app on any device you use, forever, including all future updates, on all supported Fractal devices: ${supportedWords}.`}
+          {`One-time payment unlocks the full version of this app, forever, including all future updates, on all supported Fractal devices: ${supportedWords}. Sign in with the same account on another phone or tablet and it is unlocked there too.`}
         </Text>
       </View>
 
@@ -96,6 +96,17 @@ export default function Paywall({ onUnlocked, onDemo, onBack, onSignIn, asked = 
       {/* A dead Unlock button is worse than an explained one. Restore still
           shows, because a purchase made elsewhere is worth trying for. */}
       {!available ? <Note tone="warn">{why || 'Purchases are not available here.'}</Note> : null}
+      {/*
+        And underneath it, the store's own account, when there is one.
+        "The store has nothing to sell yet" is true and unactionable — it does
+        not say whether the gap is in RevenueCat or in the Play Console, and
+        those are fixed in different places. See purchases.detail: facts only,
+        and null for anybody who can actually buy the thing, which is every
+        customer who ever reaches this screen.
+      */}
+      {!available && detail ? (
+        <Text style={{ color: color.silkFaint, fontSize: font.small, lineHeight: 18 }}>{detail}</Text>
+      ) : null}
 
       <View style={{ gap: space.md }}>
         <Press

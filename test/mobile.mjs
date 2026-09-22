@@ -1839,7 +1839,9 @@ export function run(test) {
      */
     const stage = read('mobile/src/screens/Stage.js')
 
-    const nav = stage.indexOf('‹ Previous')
+    /* The chevron is a picture now rather than a character in the label —
+       Justin's mockup draws it beside the word — so this looks for the word. */
+    const nav = stage.indexOf('label="Previous"')
     const scenes = stage.indexOf('<Label>Scenes</Label>')
     const chain = stage.indexOf("chain === 'reading' ?")
     assert.ok(nav > 0 && scenes > 0 && chain > 0, 'the stage screen moved; this check reads it')
@@ -2164,7 +2166,7 @@ export function run(test) {
      * and the tempo, on the strip for what you do BETWEEN songs.
      */
     const stageSrc = read('mobile/src/screens/Stage.js')
-    assert.match(stageSrc, /\{onOpenEdit \? <Press grow label="Edit" height=\{foot\} onPress=\{onOpenEdit\} \/> : null\}/, 'the Edit button is drawn whether or not there is anywhere to go')
+    assert.match(stageSrc, /\{onOpenEdit \? \(\s*<Press grow label="Edit" icon=\{editIcon\} height=\{foot\} onPress=\{onOpenEdit\} \/>\s*\) : null\}/, 'the Edit button is drawn whether or not there is anywhere to go')
     /*
      * On the foot row, in the middle: Tuner, Edit, Tap Tempo.
      *
@@ -2850,15 +2852,19 @@ export function run(test) {
       last = at
     }
 
-    /* And the gear can be seen. "The settings icon is too dark to even see" —
-       on Android, where ⚙ is a text character drawn in the text colour, and
-       the text colour was never set, so it was black on black. The iPhone
-       swaps that character for a picture and hid the bug. */
+    /* And the gear can be seen, on both phones, and is the same gear on both.
+       "The settings icon is too dark to even see" — on Android, where ⚙ was a
+       text character drawn in the text colour, and the text colour was never
+       set, so it was black on black. The iPhone swapped that character for a
+       picture of its own and hid the bug. It is Justin's own picture now,
+       tinted, which settles the colour and the two-different-gears at once —
+       so the character must not come back. */
     assert.match(
       flat,
-      /<Text style=\{\{ color: color\.silk, fontSize: font\.lead \}\}>⚙<\/Text>/,
-      'the gear has no colour of its own, so Android draws it black on a black bar'
+      /<Image source=\{setupIcon\}[^>]*tintColor: color\.silk/,
+      'the gear is not his picture, tinted — Android will draw it black on a black bar again'
     )
+    assert.ok(!/>⚙</.test(bar), 'the gear character is back, and the two phones draw two different gears')
 
     /* The unit's own short name, not the Mac's. */
     assert.match(bar, /const ofDeviceName = \(s\) => s\.deviceName/, 'the header does not say what the unit is')
@@ -3442,6 +3448,190 @@ export function run(test) {
     )
     /* The paywall behind it keeps its own Restore button, checked elsewhere. */
     assert.match(shown, /onPress=\{onUnlock\}/, 'the row no longer opens the paywall')
+  })
+
+  test('every colour a screen asks for is a colour the theme has', () => {
+    /*
+     * A TOKEN THAT DOES NOT EXIST FAILS SILENTLY, which is why this is here.
+     *
+     * Writing `backgroundColor: color.ink` in the walkthrough bundled clean,
+     * exported clean for both platforms and passed every test — because the
+     * theme has no `ink`, the value was undefined, and React Native treats an
+     * undefined background as no background. The pill I had drawn as a solid
+     * chip over a lit cable would have shipped transparent, with the line
+     * running straight through the words, and the first anyone knew would
+     * have been a screenshot.
+     *
+     * The rule is the same one this project applies to gear facts: a name
+     * that looks right and is wrong is worse than a name that is missing.
+     */
+    const theme = read('mobile/src/lib/theme.js')
+    const known = new Set(
+      [...theme.slice(theme.indexOf('const DARK = {'), theme.indexOf('}', theme.indexOf('const DARK = {')))
+        .matchAll(/^\s{2}(\w+):/gm)].map((m) => m[1])
+    )
+    assert.ok(known.size > 10, 'the theme moved; this test reads DARK by shape')
+
+    /* Walked here rather than with a helper, because this file has none. */
+    const under = (rel) => {
+      const out = []
+      const walk = (at) => {
+        for (const entry of readdirSync(fileURLToPath(new URL(at, import.meta.url)))) {
+          const next = `${at}/${entry}`
+          if (statSync(fileURLToPath(new URL(next, import.meta.url))).isDirectory()) walk(next)
+          else if (entry.endsWith('.js')) out.push(next)
+        }
+      }
+      walk(rel)
+      return out
+    }
+
+    const asked = new Set()
+    for (const rel of under('../mobile/src')) {
+      const text = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, ' ')
+        .replace(/^\s*\/\/.*$/gm, ' ')
+      for (const m of text.matchAll(/\bcolor\.(\w+)/g)) {
+        if (!known.has(m[1])) asked.add(`${rel.replace('../', '')}: color.${m[1]}`)
+      }
+    }
+    assert.deepEqual(
+      [...asked],
+      [],
+      `a screen asks for a colour the theme does not have:\n${[...asked].join('\n')}`
+    )
+  })
+
+  test('every picture in the app is one he actually sent', () => {
+    /*
+     * "the images I sent you are the images I had so use those images. If you
+     * have to crop them out whatever you have to do use the images that I
+     * already sent you. I don't have more images."
+     *
+     * So every file in mobile/assets/icons was cut out of his own mockup of
+     * the play screen, and nothing is there that nobody draws. This checks the
+     * second half of that — a file that no screen imports is either a picture
+     * that quietly stopped being used or one that was never his.
+     *
+     * It also holds the other direction: an import of a file that isn't there
+     * is a red screen on a phone and nothing at all in a bundle test, because
+     * Metro resolves assets at build time and a missing one fails the build
+     * rather than this suite.
+     */
+    const dir = new URL('../mobile/assets/icons/', import.meta.url)
+    const files = readdirSync(fileURLToPath(dir)).filter((f) => f.endsWith('.png'))
+    assert.ok(files.length > 0, 'the icons are gone')
+
+    /* Every .js under mobile/src, plus the app's root. */
+    const sources = []
+    const walk = (at) => {
+      for (const entry of readdirSync(fileURLToPath(new URL(at, import.meta.url)))) {
+        const next = new URL(`${at}${entry}`, import.meta.url)
+        if (statSync(fileURLToPath(next)).isDirectory()) walk(`${at}${entry}/`)
+        else if (entry.endsWith('.js')) sources.push(readFileSync(next, 'utf8'))
+      }
+    }
+    walk('../mobile/src/')
+    sources.push(read('mobile/App.js'))
+    const all = sources.join('\n')
+
+    const unused = files.filter((f) => !all.includes(`assets/icons/${f}`))
+    assert.deepEqual(unused, [], `a picture nothing draws: ${unused.join(', ')}`)
+
+    const missing = []
+    for (const m of all.matchAll(/assets\/icons\/([\w.-]+)/g)) {
+      if (!files.includes(m[1])) missing.push(m[1])
+    }
+    assert.deepEqual(missing, [], `a screen imports a picture that is not there: ${missing.join(', ')}`)
+  })
+
+  test('the blocks he drew wear his drawings, and the rest wear none', () => {
+    /*
+     * Nine families are in the mockup and nine are mapped. The point of the
+     * check is the SECOND half: a family he did not draw gets nothing rather
+     * than the nearest-looking picture of a different effect, because a delay
+     * wearing the flanger's swirl is worse than a delay wearing nothing.
+     *
+     * Read rather than imported, and that is not laziness: the module's whole
+     * job is to import PNGs, which node refuses and Metro resolves. Every
+     * other check in this file that touches a screen does the same.
+     */
+    const src = read('mobile/src/lib/blockIcons.js')
+
+    /* What the map actually holds, taken from the object literal rather than
+       from the file as a whole, so a name in a comment proves nothing. */
+    const table = src.slice(src.indexOf('const ICONS = {'), src.indexOf('}', src.indexOf('const ICONS = {')))
+    const keys = [...table.matchAll(/^ {2}(\w+)\s*(?::|,|$)/gm)].map((m) => m[1])
+
+    for (const slug of ['amp', 'cab', 'comp', 'delay', 'drive', 'flanger', 'phaser', 'reverb', 'wah']) {
+      assert.ok(keys.includes(slug), `${slug} is in the mockup and has no picture`)
+      assert.ok(src.includes(`assets/icons/${slug}.png`), `${slug}'s picture is not the file of that name`)
+    }
+
+    /* Nothing else. The nine he drew and the one alias for the long spelling
+       of the first of them — anything beyond that is a picture of some other
+       effect being lent to a family, which is the failure this exists for. */
+    assert.deepEqual(
+      keys.filter((k) => !['amp', 'cab', 'comp', 'delay', 'drive', 'flanger', 'phaser', 'reverb', 'wah'].includes(k)),
+      ['compressor'],
+      'a family he did not draw was given somebody else’s picture'
+    )
+
+    /* A suffix and a display name reach the same picture the colours do —
+       blockColors normalises the same three ways, and the two maps have to
+       agree or a tile comes out red with the delay's dots on it. */
+    assert.match(src, /key\.replace\(\/\\d\+\$\/, ''\)/, 'a second drive loses its picture')
+    assert.match(src, /replace\(\/\[\^a-z\]\/g, ''\)/, 'a spelled-out name loses its picture')
+    assert.match(src, /if \(!slug\) return null/, 'a block with no slug is not handled')
+
+    /* And the stage actually asks for them. */
+    assert.match(read('mobile/src/screens/Stage.js'), /icon=\{blockIcon\(block\.slug\)\}/, 'the chain tiles are drawn without their pictures')
+  })
+
+  test('a purchase follows the person, not the handset', () => {
+    /*
+     * "It does unlock it on android because you can sign in with a user name
+     * and password right?" — it did not. "Yes make it true, I don't want to
+     * charge people to use other devices if they already purchased."
+     *
+     * The SDK was started anonymously: configure() with a key and no identity,
+     * and no logIn anywhere. So RevenueCat knew "this install on this phone",
+     * an iPhone purchase left an Android tablet locked with the same email
+     * signed in on both, and the paywall meanwhile promised "the full version
+     * of this app on any device you use, forever".
+     */
+    const buy = read('mobile/src/lib/purchases.js')
+
+    /* The ACCOUNT id, not the email: an address can be changed, and a purchase
+       tied to one somebody edits is a purchase they lose. */
+    assert.match(buy, /api\.logIn\(id\)/, 'the SDK is still anonymous, so a purchase cannot cross devices')
+    assert.match(buy, /const account = await currentAccount\(\)/, 'nothing asks who is signed in')
+    assert.match(buy, /linkTo\(api, account\.id\)/, 'the link is not made with the account id')
+
+    /* WHO before WHAT: the first read is already the account's, so a phone
+       that never bought anything but is signed in to an account that did comes
+       up unlocked rather than flashing the paywall and correcting itself. */
+    const order = buy.indexOf('const linked = account?.id')
+    assert.ok(order > 0 && order < buy.indexOf('const info = linked ||'), 'the store is asked before it is told who is asking')
+
+    /*
+     * AND SIGNING OUT NEVER TAKES AN UNLOCK AWAY.
+     *
+     * RevenueCat's logOut returns to a fresh anonymous id, which by definition
+     * owns nothing. Re-reading the entitlement after it would lock out
+     * somebody who bought on this very phone and then signed out of an account
+     * they did not need in order to buy. The remembered answer stands.
+     */
+    const out = buy.slice(buy.indexOf('export const unlinkAccount'))
+    const body = out.slice(0, out.indexOf('\n}'))
+    assert.match(body, /api\.logOut\(\)/, 'signing out still answers as the last person')
+    assert.ok(!/set\(\{ unlocked: false/.test(body), 'signing out takes the unlock away')
+    assert.ok(!/remember\(false\)/.test(body), 'signing out forgets a purchase made on this phone')
+
+    /* Both ends wired: signing in links, signing out unlinks. */
+    const app = read('mobile/App.js')
+    assert.match(app, /checkOwner\(\)[\s\S]{0,260}linkAccount\(\)/, 'signing in does not link the account')
+    assert.match(app, /await signOut\(\)[\s\S]{0,320}unlinkAccount\(\)/, 'signing out does not unlink')
   })
 
   test('leaving the demo takes the simulated rig with it', () => {
@@ -6953,10 +7143,25 @@ export function run(test) {
      */
     const copy = read('mobile/src/lib/onboarding.js')
     const screen = read('mobile/src/screens/Onboarding.js')
-    const p3 = copy.slice(copy.indexOf('export const P3'), copy.indexOf('export const P4'))
+    /* Comments stripped first. The note above the new heading QUOTES the one
+       it replaced, so a raw search finds the explanation and fails on it —
+       the seventh time this repository has tripped over its own reasons. */
+    const p3 = copy
+      .slice(copy.indexOf('export const P3'), copy.indexOf('export const P4'))
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
 
     for (const [gone, why] of [
       ['verify the computer connection', 'the app promises to verify a connection before purchase, which it no longer does'],
+      /*
+       * THE OLD HEADING STAYS GONE, but a heading does not.
+       *
+       * "Remove the text that says where do you want to start" took out
+       * "WHERE DO YOU WANT TO START?", which asked the question the screen
+       * already was. The mockup he sent later puts one back doing a different
+       * job: it names the DECISION, and the line under it says what the two
+       * choices are before you read either card. His design, later, and it
+       * wins — so what is held here is the old wording, not the idea.
+       */
       ['WHERE DO YOU WANT TO START', 'the heading that asks the question the screen already is, is back'],
       ["tag: 'FREE'", 'the demo card carries a third label saying what its button already says'],
       ['stays free forever', 'the demo is told to be free a third time, at the bottom of the screen']
@@ -6964,7 +7169,10 @@ export function run(test) {
       assert.ok(!p3.includes(gone), why)
     }
     /* And nothing on the screen reaches for them. */
-    assert.ok(!/P3\.head|P3\.foot|P3\.demo\.tag|P3\.real\.body/.test(screen), 'the screen draws a P3 line that no longer exists')
+    assert.ok(!/P3\.foot|P3\.demo\.tag/.test(screen), 'the screen draws a P3 line that no longer exists')
+    /* P3.head and P3.real.body came BACK with his mockup, and are drawn. */
+    assert.match(screen, /<Head>\{P3\.head\}<\/Head>/, 'the screen lost the heading his mockup asks for')
+    assert.match(screen, /body=\{P3\.real\.body\}/, 'the hardware card is a title and a button again')
 
     /* What is left is the two ways in, the way back for somebody who paid,
        and the way in for somebody with an account. */
@@ -6972,7 +7180,7 @@ export function run(test) {
       ['P3.demo.go', 'the demo has no button'],
       ['P3.real.go', 'the real-rig card has no button'],
       ['P3.restore', 'there is no way to restore a purchase from the first screen'],
-      ['P7.account', 'there is no way to sign in from the first screen']
+      ['P3.signIn', 'there is no way to sign in from the first screen']
     ]) {
       assert.ok(screen.includes(needed), why)
     }
@@ -7108,8 +7316,13 @@ export function run(test) {
      * App Store about this Apple ID; signing in reaches a computer set up
      * with an account rather than a pairing code — so both are here.
      */
-    assert.match(block.mode, /label=\{P3\.restore\}/, 'there is no way to restore a purchase from the first screen')
-    assert.match(block.mode, /label=\{P7\.account\} height=\{TAP\} onPress=\{\(\) => onAccount\?\.\(\)\}/, 'there is no way to sign in from the first screen')
+    /*
+     * BOTH, AS A FOOTNOTE RATHER THAN TWO FULL-WIDTH BUTTONS. They are the
+     * smallest things on the screen and were shouting over the choice it
+     * exists to ask — his mockup makes them one question and two short links.
+     */
+    assert.match(block.mode, /label: P3\.restore[^]{0,80}restore\('app'\)/, 'there is no way to restore a purchase from the first screen')
+    assert.match(block.mode, /label: P3\.signIn[^]{0,80}onAccount\?\.\(\)/, 'there is no way to sign in from the first screen')
 
     /*
      * AND THE LAST TWO SCREENS NAME THE UNIT THAT ANSWERED. `unitName` is the
