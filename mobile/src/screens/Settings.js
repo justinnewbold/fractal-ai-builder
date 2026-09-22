@@ -275,22 +275,6 @@ export default function Settings({
               onPress={() => setPage('unit')}
             />
             {/*
-              Three rows became one door.
-
-              Fixes, Log and Feedback were three rows in a column, and they
-              are three stages of the same evening: read what to try, read
-              what actually happened, tell somebody when neither helped. As
-              separate rows each looked like a different errand, and the one
-              in the middle looked like a developer's.
-            */}
-            {onOpenFixes || onOpenLog || onOpenReport ? (
-              <SetupRow
-                title="Troubleshooting"
-                status="What to try, the log, and telling us"
-                onPress={() => setPage('trouble')}
-              />
-            ) : null}
-            {/*
               * THE FULL VERSION, AND THE WAY BACK TO ONE ALREADY PAID FOR.
               *
               * The top bar carries an Unlock button while the demo is on,
@@ -321,16 +305,24 @@ export default function Settings({
               }
               onPress={onUnlock}
             />
-            {/* Openable again, because a tour worth showing once is worth
-                finding later — and somebody who skipped it on the first
-                launch has no other way back to it. */}
-            {/* The way back into the walkthrough, named the way its own last
-                screen promises: "Replay this anytime in Settings → Show the
-                walkthrough." */}
-            {onReplay ? (
-              <SetupRow title={REPLAY} status="The setup, from the start" onPress={onReplay} />
-            ) : null}
             <SetupRow title="About" status={`v${APP_VERSION}`} onPress={() => setPage('about')} />
+            {/*
+              WHAT IS BELOW ABOUT, AND WHY IT IS BELOW ABOUT.
+
+              "Move updates, troubleshooting, and the show the tutorial again
+              underneath the about section."
+
+              The three of them had drifted into the middle of the list, so
+              Troubleshooting sat between renaming presets and buying the app,
+              and the walkthrough sat between buying it and the version
+              number. Nothing about that order was decided; each row was added
+              beside whatever it was written next to.
+
+              The rows above are the ones somebody opens Settings FOR. These
+              three are the ones you go looking for on an evening when
+              something is wrong, or once, ever - which is the same reason
+              About is where it is, so they sit under it.
+            */}
             {/*
               * WHAT IS RUNNING, AND HOW TO GET THE NEWEST.
               *
@@ -374,6 +366,31 @@ export default function Settings({
               }
               onPress={() => (updates.phase === 'ready' ? applyNow() : checkNow())}
             />
+            {/*
+              Three rows became one door.
+
+              Fixes, Log and Feedback were three rows in a column, and they
+              are three stages of the same evening: read what to try, read
+              what actually happened, tell somebody when neither helped. As
+              separate rows each looked like a different errand, and the one
+              in the middle looked like a developer's.
+            */}
+            {onOpenFixes || onOpenLog || onOpenReport ? (
+              <SetupRow
+                title="Troubleshooting"
+                status="What to try, the log, and telling us"
+                onPress={() => setPage('trouble')}
+              />
+            ) : null}
+            {/* Openable again, because a tour worth showing once is worth
+                finding later — and somebody who skipped it on the first
+                launch has no other way back to it. */}
+            {/* The way back into the walkthrough, named the way its own last
+                screen promises: "Replay this anytime in Settings → Show the
+                walkthrough." */}
+            {onReplay ? (
+              <SetupRow title={REPLAY} status="The setup, from the start" onPress={onReplay} />
+            ) : null}
           </View>
 
           {/*

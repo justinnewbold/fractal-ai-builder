@@ -3308,6 +3308,44 @@ export function run(test) {
     assert.match(signIn, /How do I connect a computer\?/, 'the sign-in screen does not offer it')
   })
 
+  test('the Setup list is in the order he put it in', () => {
+    /*
+     * "Move the amp and pedals button to the top of the list." Then: "Move
+     * updates, troubleshooting, and the show the tutorial again underneath
+     * the about section."
+     *
+     * Two instructions, a few months apart, and between them the list drifted
+     * — Troubleshooting ended up between renaming presets and buying the app,
+     * and the walkthrough between buying it and the version number. Nothing
+     * decided that. Each row was added beside whatever it happened to be
+     * written next to, which is how a list nobody holds ends up ordered by
+     * the history of the file rather than by what anyone opens it for.
+     *
+     * So the order is held here. The split is his: everything somebody opens
+     * Settings FOR, then About, then the three you only go looking for when
+     * something is wrong or once, ever.
+     */
+    const settings = read('mobile/src/screens/Settings.js')
+    /* Only the rows on the front page, not the ones inside the pages it opens. */
+    const front = settings.slice(
+      settings.indexOf("{page === null ? ("),
+      settings.indexOf('THE TWO THAT ARE NOT DOORS')
+    )
+    const order = [...front.matchAll(/title=(?:"([^"]+)"|\{(?:purchase\.unlocked \? 'Full version' : '([^']+)'|(REPLAY))\})/g)]
+      .map((m) => m[1] || m[2] || m[3])
+
+    assert.deepEqual(order, [
+      'Amp & pedal names',
+      'Phone & computer',
+      'Rename presets and scenes',
+      'Unlock the full version',
+      'About',
+      'Updates',
+      'Troubleshooting',
+      'REPLAY'
+    ], 'the Setup rows are not in the order he asked for')
+  })
+
   test('playing with no internet is explained, and only to somebody who paid', () => {
     /*
      * "Let's make that some kind of option in the app or to tell people how to
