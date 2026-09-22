@@ -73,7 +73,7 @@ export default function Paywall({ onUnlocked, onDemo, onBack, onSignIn, asked = 
           Phone Remote
         </Text>
         <Text style={{ color: color.silkDim, fontSize: font.body, lineHeight: font.body * 1.45 }}>
-          {`One-time payment unlocks the full version of this app on any device you use, forever, including all future updates, on all supported Fractal devices: ${supportedWords}.`}
+          {`One-time payment unlocks the full version of this app, forever, including all future updates, on all supported Fractal devices: ${supportedWords}. Sign in with the same account on another phone or tablet and it is unlocked there too.`}
         </Text>
       </View>
 

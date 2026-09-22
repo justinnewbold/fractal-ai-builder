@@ -3444,6 +3444,52 @@ export function run(test) {
     assert.match(shown, /onPress=\{onUnlock\}/, 'the row no longer opens the paywall')
   })
 
+  test('a purchase follows the person, not the handset', () => {
+    /*
+     * "It does unlock it on android because you can sign in with a user name
+     * and password right?" — it did not. "Yes make it true, I don't want to
+     * charge people to use other devices if they already purchased."
+     *
+     * The SDK was started anonymously: configure() with a key and no identity,
+     * and no logIn anywhere. So RevenueCat knew "this install on this phone",
+     * an iPhone purchase left an Android tablet locked with the same email
+     * signed in on both, and the paywall meanwhile promised "the full version
+     * of this app on any device you use, forever".
+     */
+    const buy = read('mobile/src/lib/purchases.js')
+
+    /* The ACCOUNT id, not the email: an address can be changed, and a purchase
+       tied to one somebody edits is a purchase they lose. */
+    assert.match(buy, /api\.logIn\(id\)/, 'the SDK is still anonymous, so a purchase cannot cross devices')
+    assert.match(buy, /const account = await currentAccount\(\)/, 'nothing asks who is signed in')
+    assert.match(buy, /linkTo\(api, account\.id\)/, 'the link is not made with the account id')
+
+    /* WHO before WHAT: the first read is already the account's, so a phone
+       that never bought anything but is signed in to an account that did comes
+       up unlocked rather than flashing the paywall and correcting itself. */
+    const order = buy.indexOf('const linked = account?.id')
+    assert.ok(order > 0 && order < buy.indexOf('const info = linked ||'), 'the store is asked before it is told who is asking')
+
+    /*
+     * AND SIGNING OUT NEVER TAKES AN UNLOCK AWAY.
+     *
+     * RevenueCat's logOut returns to a fresh anonymous id, which by definition
+     * owns nothing. Re-reading the entitlement after it would lock out
+     * somebody who bought on this very phone and then signed out of an account
+     * they did not need in order to buy. The remembered answer stands.
+     */
+    const out = buy.slice(buy.indexOf('export const unlinkAccount'))
+    const body = out.slice(0, out.indexOf('\n}'))
+    assert.match(body, /api\.logOut\(\)/, 'signing out still answers as the last person')
+    assert.ok(!/set\(\{ unlocked: false/.test(body), 'signing out takes the unlock away')
+    assert.ok(!/remember\(false\)/.test(body), 'signing out forgets a purchase made on this phone')
+
+    /* Both ends wired: signing in links, signing out unlinks. */
+    const app = read('mobile/App.js')
+    assert.match(app, /checkOwner\(\)[\s\S]{0,260}linkAccount\(\)/, 'signing in does not link the account')
+    assert.match(app, /await signOut\(\)[\s\S]{0,320}unlinkAccount\(\)/, 'signing out does not unlink')
+  })
+
   test('leaving the demo takes the simulated rig with it', () => {
     /*
      * "This says I'm connected to an AM4 which I have not connected to in
