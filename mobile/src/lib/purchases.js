@@ -396,6 +396,32 @@ export const startPurchases = async () => {
 }
 
 /**
+ * THE PACKAGE THAT SELLS THE UNLOCK, out of however many an offering holds.
+ *
+ * It used to be whichever package came first, and that was a coin toss wearing
+ * a confident face. A RevenueCat project starts life with three sample
+ * packages — $rc_monthly, $rc_annual, $rc_lifetime — and this one's account has
+ * all three sitting in the offering the app reads. They resolve to nothing
+ * today, because the only products on them are Test Store ones, so first-wins
+ * happens to land on the right package. The day a real product is attached to
+ * the monthly sample, first-wins sells a MONTHLY SUBSCRIPTION for an app whose
+ * entire pitch is "One payment, once" — and the button would still say the
+ * right-looking price while doing it.
+ *
+ * So the product id decides, and the id is the same one the entitlement is
+ * wired to. First-wins stays as the fallback, because an offering built by
+ * hand with a differently-named product in it should still sell something
+ * rather than nothing, and because that is what shipped.
+ */
+const theUnlockIn = (offerings) => {
+  const every = [
+    ...(offerings?.current?.availablePackages || []),
+    ...Object.values(offerings?.all || {}).flatMap((o) => o?.availablePackages || [])
+  ]
+  return every.find((p) => p?.product?.identifier === PRODUCT_ID) || every[0] || null
+}
+
+/**
  * Ask the store what it charges here, so the button can say so.
  *
  * ANSWERS WHETHER THERE IS ANYTHING TO SELL, which the caller needs before it
@@ -408,10 +434,7 @@ const loadPrice = async () => {
   if (!api) return false
   try {
     const offerings = await api.getOfferings()
-    const found =
-      offerings?.current?.availablePackages?.[0] ||
-      Object.values(offerings?.all || {})[0]?.availablePackages?.[0] ||
-      null
+    const found = theUnlockIn(offerings)
     if (found) {
       pkg = found
       set({ price: found.product?.priceString || null, detail: null })

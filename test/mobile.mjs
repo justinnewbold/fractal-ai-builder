@@ -3588,6 +3588,63 @@ export function run(test) {
     assert.match(read('mobile/src/screens/Stage.js'), /icon=\{blockIcon\(block\.slug\)\}/, 'the chain tiles are drawn without their pictures')
   })
 
+  test('the paywall sells the unlock, not whichever package came first', async () => {
+    /*
+     * FOUND IN THE LIVE ACCOUNT, not imagined.
+     *
+     * RevenueCat starts a project with three sample packages — $rc_monthly,
+     * $rc_annual and $rc_lifetime — and all three are sitting in the offering
+     * this app reads. They resolve to nothing today, because the only products
+     * on them belong to the Test Store, so taking the first package happened
+     * to land on the right one.
+     *
+     * Attach a real product to the monthly sample and first-wins sells a
+     * MONTHLY SUBSCRIPTION in an app whose paywall says "One payment, once" —
+     * with the button showing a plausible price the whole time. Nothing would
+     * fail; somebody would just be billed every month for a thing they were
+     * told they were buying outright.
+     *
+     * So the product id chooses, and first-wins is only the fallback.
+     */
+    const src = read('mobile/src/lib/purchases.js')
+    const picker = src.slice(src.indexOf('const theUnlockIn'), src.indexOf('const loadPrice'))
+    assert.ok(picker.length > 50, 'the package picker moved; this check reads it')
+    assert.match(picker, /p\?\.product\?\.identifier === PRODUCT_ID/, 'the package is not chosen by which product it sells')
+    assert.ok(
+      picker.indexOf('=== PRODUCT_ID') < picker.indexOf('every[0]'),
+      'first-wins is tried before the product id, so the id changes nothing'
+    )
+
+    /* And nothing reaches for a package by position any more. */
+    const noProse = src.replace(/\/\*[\s\S]*?\*\//g, ' ')
+    assert.ok(
+      !/availablePackages\?\.\[0\]/.test(noProse),
+      'something still takes the first package out of an offering'
+    )
+
+    /* The picker itself, run against the shape RevenueCat actually returns —
+       the three sample packages, with the real unlock on the last of them. */
+    const mod = await import(`data:text/javascript,${encodeURIComponent(
+      picker.replace('const theUnlockIn', 'export const theUnlockIn') +
+        "\nexport const PRODUCT_ID = 'cloud.newbold.fractalremote.full'\n"
+    )}`).catch(() => null)
+    if (mod) {
+      const pack = (id) => ({ product: { identifier: id } })
+      const offerings = {
+        current: {
+          availablePackages: [pack('monthly.sub'), pack('yearly.sub'), pack('cloud.newbold.fractalremote.full')]
+        },
+        all: {}
+      }
+      assert.equal(
+        mod.theUnlockIn(offerings)?.product?.identifier,
+        'cloud.newbold.fractalremote.full',
+        'the picker took the monthly subscription over the unlock'
+      )
+      assert.equal(mod.theUnlockIn({ current: { availablePackages: [] }, all: {} }), null, 'an empty offering does not come back empty')
+    }
+  })
+
   test('a purchase follows the person, not the handset', () => {
     /*
      * "It does unlock it on android because you can sign in with a user name
