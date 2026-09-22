@@ -3225,9 +3225,41 @@ export function run(test) {
     assert.match(screen, /TYPE THIS ON YOUR COMPUTER/, 'nothing says which machine the address is for')
     assert.match(screen, /\{DOWNLOADS_URL\}/, 'the address to type is not shown')
     assert.match(screen, /sendDownloadLink\(email\)/, 'there is no way to send the link to a computer')
-    /* And it still says what the arrangement IS, which is the question the
-       screen exists to answer. */
-    assert.match(screen, /The phone never talks to the unit directly/, 'the phone no longer explains why a computer is needed at all')
+    /*
+     * AND NOTHING ELSE. The prose went the same way the routes did.
+     *
+     * "Remove all text except what's in the screen shot and make the stuff
+     * that's visible in the screenshot larger. The [same thing] is on the
+     * download page that they go to, so we don't need it here."
+     *
+     * Three paragraphs outlasted the routes: what the USB cable is for, what
+     * to do once it is installed, and the one-program-one-port warning. All
+     * three are on the page this screen sends somebody to, all three are
+     * about the machine they are not holding, and on a phone they pushed the
+     * two things you CAN act on down the screen.
+     */
+    for (const [pattern, what] of [
+      [/never talks to the unit directly/, 'the USB explanation is back on the phone'],
+      [/Once it is installed/, 'the after-install steps are back on the phone'],
+      [/Only one program at a time/, 'the USB port warning is back on the phone'],
+      [/What it is, and how to get the app onto it/, 'the subtitle promises an explanation this screen no longer gives']
+    ]) {
+      assert.ok(!pattern.test(screen), what)
+    }
+
+    /* And what is left is big enough to read at arm's length: the address and
+       the email box at title size, the two labels a step up from micro. */
+    assert.match(
+      screen,
+      /\{DOWNLOADS_URL\}[\s\S]{0,40}<\/Text>/,
+      'the address is no longer the thing the screen is built around'
+    )
+    assert.ok(!/fontSize: font\.micro/.test(screen), 'a label on this screen is back at the smallest size in the app')
+    assert.equal(
+      (screen.match(/fontSize: font\.title/g) || []).length,
+      3,
+      'the heading, the address and the email box are not all at title size'
+    )
 
     assert.match(src, /The Mac app/, 'the route that actually works is not offered')
     /*
@@ -3290,8 +3322,15 @@ export function run(test) {
       assert.ok(!src.includes(gone), `the connect screen still points at ${gone}, which no longer exists`)
     }
 
-    /* The thing nobody knows and everything else depends on. */
-    assert.match(screen, /Your unit plugs into a computer with a USB cable/, 'the page never says why a computer is involved')
+    /*
+     * THE THING NOBODY KNOWS IS ON THE DOWNLOADS PAGE, not on the phone.
+     *
+     * Both of these used to be asserted against the phone screen as well.
+     * They are still required — of shared/ways-in.mjs, which is what the
+     * downloads page draws, and which is read on the computer the sentences
+     * are actually about.
+     */
+    assert.match(src, /plugs into a computer|USB cable/, 'the downloads page never says why a computer is involved')
     /* And the trap that eats an evening: two programs, one port. */
     assert.match(src, /Only one program can hold the USB port/, 'nothing warns about the editor already holding the port')
 
