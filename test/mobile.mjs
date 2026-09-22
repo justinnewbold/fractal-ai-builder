@@ -3344,7 +3344,157 @@ export function run(test) {
     assert.match(read('mobile/src/screens/Settings.js'), /onPress=\{onOpenConnect\}/, 'Setup has no door to it')
     const signIn = read('mobile/src/screens/SignIn.js')
     assert.match(signIn, /if \(helping\) return <Connect onBack=/, 'the sign-in screen cannot reach it')
-    assert.match(signIn, /How do I connect a computer\?/, 'the sign-in screen does not offer it')
+    assert.match(signIn, /Connect my computer/, 'the sign-in screen does not offer it')
+  })
+
+  test('the App Store review notes name buttons that exist', () => {
+    /*
+     * THE PARAGRAPH THAT DECIDES WHETHER THE APP IS REJECTED, and it had gone
+     * stale without anything noticing.
+     *
+     * It told the reviewer: "On the first screen, tap 'Just looking? Try the
+     * demo'".
+     *
+     * I FIRST WROTE THAT THE BUTTON DID NOT EXIST. It did — on the sign-in
+     * screen, which is not the first screen. A fresh install opens the
+     * walkthrough (App.js, `seenWalk === false`), and the sign-in screen is
+     * only reached after it. So a reviewer followed that instruction, looked
+     * for the button on a screen that does not have it, and concluded the app
+     * does nothing — the exact rejection these notes exist to prevent. Right
+     * button, wrong screen, same outcome.
+     *
+     * It is renamed in any case now: "Change just looking to just Try the
+     * Demo - no text underneath".
+     *
+     * Nothing in the build reads store copy, so renaming a button cannot
+     * break it. This is what breaks instead.
+     */
+    const notes = read('docs/app-store.md')
+    const copy = read('shared/onboarding.mjs')
+
+    /* Every button the notes tell a reviewer to tap is a label the app draws. */
+    for (const [label, where] of [
+      ['Get started', 'P1.go'],
+      ['Got it', 'P2.go'],
+      ['Start free demo', 'P3.demo.go'],
+      ['Play with ', 'P4.go']
+    ]) {
+      assert.ok(copy.includes(label), `the notes send a reviewer to "${label}", which ${where} no longer says`)
+      assert.ok(notes.includes(label), `the review notes stopped naming ${where}`)
+    }
+
+    /*
+     * ONLY THE FENCED BLOCK, which is the text that actually gets pasted into
+     * App Store Connect. The prose under it QUOTES the old wording to explain
+     * what went wrong, and reading that as live copy fails the test on its own
+     * explanation — the same trap CLAUDE.md warns about for App.jsx, hit for
+     * the fifth time.
+     */
+    const after = notes.slice(notes.indexOf('## Review notes'))
+    const pasted = after.slice(after.indexOf('```') + 3, after.indexOf('```', after.indexOf('```') + 3))
+
+    /* The label that is gone stays gone. */
+    assert.ok(
+      !/Just looking\? Try the demo/.test(pasted),
+      'the review notes name a button that was removed months ago'
+    )
+    /*
+     * AND THEY DO NOT PROMISE WHAT THE APP STOPPED DOING. They said it worked
+     * "on a local network" with no account, and that signing in was only for
+     * reaching a computer from outside your home wifi. Both stopped being true
+     * when pairing became account-only — and a reviewer told the app does
+     * something it does not is the same rejection as a button that is not
+     * there.
+     */
+    assert.ok(
+      !/local network|outside your home\s+wifi/i.test(pasted),
+      'the review notes describe the two-tier app that no longer exists'
+    )
+  })
+
+  test('the unlock row is gone once there is nothing left to unlock', () => {
+    /*
+     * "This is the setup page when the phone has already been unlocked. The
+     * unlock full version needs to disappear if it has been unlocked."
+     *
+     * It used to stay and reword itself to "Full version · Unlocked — thank
+     * you": a row that can be pressed to be told a thing it has already said.
+     * Nobody opens Setup to be thanked.
+     */
+    const settings = read('mobile/src/screens/Settings.js')
+    const shown = settings.replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ')
+
+    assert.match(shown, /\{purchase\.unlocked \? null : \(/, 'the unlock row still draws for somebody who has paid')
+    assert.ok(!/Unlocked — thank you/.test(shown), 'the row still rewords itself instead of going')
+
+    /*
+     * AND THE APPLE RULE IS UNTOUCHED, which is the only reason to be careful
+     * here: a purchase has to be restorable and apps are rejected for hiding
+     * it. That rule is about somebody who CANNOT reach what they bought, and
+     * `unlocked` false is exactly that person — a new handset reads false
+     * until a restore says otherwise. They still get the row, and it still
+     * says restoring is on it.
+     */
+    assert.match(
+      shown,
+      /title="Unlock the full version"[\s\S]{0,400}Drive a real rig, or restore a purchase/,
+      'somebody who paid and changed phones has no way back to what they own'
+    )
+    /* The paywall behind it keeps its own Restore button, checked elsewhere. */
+    assert.match(shown, /onPress=\{onUnlock\}/, 'the row no longer opens the paywall')
+  })
+
+  test('leaving the demo takes the simulated rig with it', () => {
+    /*
+     * "This says I'm connected to an AM4 which I have not connected to in
+     * weeks. I exited the demo and that's what it shows."
+     *
+     * It did. Leaving the demo left the screen dressed as a live rig: the
+     * AM4's name in the bar, its 104 slots, its four scenes, its chain, and
+     * CONNECTED in green beside them.
+     *
+     * startLink() short-circuits in the demo — there is no far end to poll, so
+     * it sets link 'connected' with macName 'the demo' and returns. That is
+     * right while the demo is on, because TopBar asks the DEMO store for the
+     * word and says DEMO.
+     *
+     * The effect that runs it depended on `auth` alone. Turning the demo off
+     * does not touch `auth` — Settings' "Leave the demo" calls setDemo(false)
+     * and nothing else — so it never re-ran, stopLink() never happened, and
+     * the invented 'connected' stayed while the word in the bar changed to
+     * CONNECTED underneath it.
+     */
+    const app = read('mobile/App.js')
+
+    /* The demo's short-circuit is still there, because it is not the bug. */
+    const link = read('mobile/src/lib/link.js')
+    assert.match(link, /if \(isDemo\(\)\) \{/, 'the demo polls a far end that does not exist')
+    assert.match(link, /link: 'connected', macName: 'the demo'/, 'the demo stopped answering its own screens')
+
+    /* And stopLink is what clears the rig, so it has to be the thing that runs. */
+    assert.match(link, /resetRig\(\)/, 'stopping the link leaves the last unit on screen')
+
+    /*
+     * THE FIX, held exactly: the effect watches the demo as well as auth.
+     * Whitespace-flattened, because a dependency array is the kind of line a
+     * formatter moves.
+     */
+    const flat = app.replace(/\s+/g, ' ')
+    assert.match(
+      flat,
+      /if \(auth !== 'in'\) return undefined startLink\(\) return \(\) => \{ stopLink\(\) \} \}, \[auth, demo\]\)/,
+      'leaving the demo no longer tears the link down, so a simulated rig stays on screen as a real one'
+    )
+
+    /*
+     * AND THE ROUTE THAT REPORTED IT. Settings' way out is setDemo(false) on
+     * its own — which is fine now, and was the whole fault before.
+     */
+    assert.match(
+      read('mobile/src/screens/Settings.js'),
+      /label="Leave the demo"[\s\S]{0,120}setDemo\(false\)/,
+      'the way out of the demo moved; this test names it'
+    )
   })
 
   test('the Setup list is in the order he put it in', () => {
@@ -3378,11 +3528,25 @@ export function run(test) {
       'Phone & computer',
       'Rename presets and scenes',
       'Unlock the full version',
-      'About',
-      'Updates',
-      'Troubleshooting',
-      'REPLAY'
+      'About'
     ], 'the Setup rows are not in the order he asked for')
+
+    /*
+     * AND THE OTHER THREE ARE INSIDE ABOUT, not under it.
+     *
+     * "Move walkthrough, updates and troubleshooting INSIDE of the 'About'
+     * menu." Moving them below About was the smaller version of the same
+     * instruction an hour earlier: under it they still cost five lines of a
+     * list somebody opens to do something else. In it they cost one.
+     */
+    const about = settings.slice(settings.indexOf("{page === 'about' ?"))
+    for (const [pattern, what] of [
+      [/title="Updates"/, 'Updates'],
+      [/title="Troubleshooting"/, 'Troubleshooting'],
+      [/title=\{REPLAY\}/, 'the walkthrough']
+    ]) {
+      assert.ok(pattern.test(about), `${what} is not inside About`)
+    }
   })
 
   test('playing with no internet is explained, and only to somebody who paid', () => {
@@ -5446,7 +5610,19 @@ export function run(test) {
      * code no computer of theirs has ever shown.
      */
     const signIn = read('mobile/src/screens/SignIn.js').replace(/\s+/g, ' ')
-    assert.match(signIn, /Just looking\? Try the demo/, 'nothing offers the demo where somebody needs it')
+    assert.match(signIn, /label="Try the Demo"/, 'nothing offers the demo where somebody needs it')
+    /*
+     * AND NOTHING UNDER IT. "No text underneath."
+     *
+     * The PROP rather than the words: the comment above the button quotes the
+     * subtitle it replaced, so searching the file for that sentence finds the
+     * explanation and fails on it. Sixth time.
+     */
+    const demoBtn = signIn.slice(signIn.indexOf('label="Try the Demo"'))
+    assert.ok(
+      !/sub=/.test(demoBtn.slice(0, demoBtn.indexOf('/>'))),
+      'the demo button has a subtitle again'
+    )
     assert.match(signIn, /setDemo\(true\)/, 'the button does not turn the demo on')
 
     /* And escapable, or it is a trap rather than a demo. */
@@ -6315,16 +6491,30 @@ export function run(test) {
 
     /*
      * SETTINGS CARRIES ITS OWN, because it is the only screen with pages
-     * inside it. One step from a submenu is the list; one step from the list
-     * is the way out. The same function answers the Back button and the
-     * swipe, so they cannot disagree.
+     * inside it. One step from a submenu is the page it hangs off; one step
+     * from the list is the way out. The same function answers the Back button
+     * and the swipe, so they cannot disagree.
+     *
+     * IT USED TO BE `setPage(null)` FLAT, and that was right while every page
+     * came off the front list. Troubleshooting lives inside About now — "Move
+     * walkthrough, updates and troubleshooting INSIDE of the 'About' menu" —
+     * so a flat back walks past the page you came from.
      */
     const set = read('mobile/src/screens/Settings.js')
     assert.match(
       set,
-      /const goBack = \(\) => \(page === null \? onBack\?\.\(\) : setPage\(null\)\)/,
+      /const goBack = \(\) => \(page === null \? onBack\?\.\(\) : setPage\(upFrom\(page\)\)\)/,
       'a swipe in Settings does not go back one step'
     )
+    /* And the Back button asks the same thing, rather than its own copy. */
+    assert.match(
+      set,
+      /onPress=\{\(\) => setPage\(upFrom\(page\)\)\}/,
+      'the Back button and the swipe can disagree about where one step up is'
+    )
+    assert.match(set, /const PARENT = \{ trouble: 'about' \}/, 'Troubleshooting is not inside About')
+    /* And it says where it is going, because "Settings" would be a lie. */
+    assert.match(set, /label=\{upLabel\(page\)\}/, 'the Back button names a screen it does not go to')
     assert.match(set, /<EdgeBack onBack=\{goBack\}>/, 'Settings cannot be swiped out of')
 
     /*
@@ -6334,7 +6524,9 @@ export function run(test) {
     const head = set.slice(set.indexOf('const head = (title, onDone) =>'), set.indexOf('const goBack ='))
     assert.ok(head.length > 100, 'the page header moved; this check reads it')
     const back = head.slice(head.indexOf("onDone === 'back' ?"), head.indexOf(') : ('))
-    assert.match(back, /label="‹ Settings"/, 'a submenu has no way back to the list')
+    /* The label is computed now rather than fixed: a page inside About says
+       "‹ About", because "‹ Settings" would name a screen it does not go to. */
+    assert.match(back, /label=\{upLabel\(page\)\}/, 'a submenu has no way back to the list')
     assert.match(back, /label="Done" height=\{40\} onPress=\{onBack\}/, 'a submenu has no Done, so leaving takes a tap per level')
   })
 

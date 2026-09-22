@@ -484,12 +484,17 @@ export const AREAS = [
         unreadable: ['web']
       },
       {
+        does: 'find out how to get a computer on the other end',
+        web: 'Set up phone remote',
+        phone: 'Connect my computer',
+        why: 'the browser says it from the computer being set up, the phone from the end that needs one — "Change how to connect computer to Connect my computer", which is the phone saying what pressing it gets you rather than asking a question on your behalf'
+      },
+      {
         does: 'look around without a rig',
         web: 'Try the demo',
         also: ['Try now', 'Go'],
-        phone: 'Just looking? Try the demo',
-        unreadable: ['phone'],
-        why: 'the same offer at both ends; the browser also says Try now on the not-connected screen and Go beside the code box, neither of which the phone has a place for'
+        phone: 'Try the Demo',
+        why: 'the same offer at both ends, in the same three words now; the browser also says Try now on the not-connected screen and Go beside the code box, neither of which the phone has a place for'
       },
       {
         does: 'choose which of the five Fractals the demo is',

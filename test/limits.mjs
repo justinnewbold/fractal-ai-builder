@@ -1497,17 +1497,35 @@ export function run(test) {
     assert.match(store, /privacy\.html/, 'the store notes give no privacy URL')
 
     /*
-     * THE REVIEW NOTE, checked against the actual button. If somebody renames
-     * that button, the instruction handed to Apple becomes wrong and this
-     * fails rather than the submission.
+     * THE REVIEW NOTE, checked against the actual buttons. If somebody renames
+     * one, the instruction handed to Apple becomes wrong and this fails rather
+     * than the submission.
+     *
+     * TWO THINGS CHANGED HERE, and the second is the one that mattered.
+     *
+     * The note no longer sends a reviewer to the sign-in screen at all. A
+     * fresh install opens the WALKTHROUGH, and that is where the demo is three
+     * taps in; the sign-in screen is only reached after it. The old note named
+     * the sign-in screen's button while telling them to look on the first
+     * screen, which is a real button on a screen they were not on.
+     *
+     * And this read the whole file, so a mention of a label ANYWHERE in it —
+     * including prose explaining what the notes used to say — counted as the
+     * notes naming it. That is a green light for a doc that no longer gives
+     * the instruction. It reads the fenced block now, which is the text that
+     * gets pasted.
      */
-    const signIn = read('mobile/src/screens/SignIn.js')
-    const label = signIn.match(/label="(Just looking\?[^"]*)"/)
-    assert.ok(label, 'the demo button on the sign-in screen has been renamed or removed')
-    assert.ok(
-      store.includes(label[1]),
-      `the review notes tell Apple to tap "…" but the button now says "${label[1]}"`
-    )
+    const copy = read('shared/onboarding.mjs')
+    const pastedAt = store.indexOf('## Review notes')
+    const fence = store.indexOf('```', pastedAt)
+    const pasted = store.slice(fence + 3, store.indexOf('```', fence + 3))
+    for (const label of ['Get started', 'Got it', 'Start free demo']) {
+      assert.ok(pasted.includes(label), `the review notes stopped telling Apple to tap "${label}"`)
+      assert.ok(
+        copy.includes(label),
+        `the review notes tell Apple to tap "${label}", which the walkthrough no longer says`
+      )
+    }
     assert.match(store, /Review notes/, 'there are no review notes at all')
   })
 

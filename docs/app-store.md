@@ -175,17 +175,20 @@ This app is a remote control for Fractal Audio guitar hardware. Normally it
 connects to a computer that has the guitar unit plugged into it over USB.
 
 You will not have that hardware, so the app includes a full demo mode that
-needs nothing but the phone:
+needs nothing but the phone, and no account:
 
-  On the first screen, tap "Just looking? Try the demo".
+  1. Tap "Get started"
+  2. Tap "Got it"
+  3. Tap "Start free demo"
+  4. Choose any unit, then tap "Play with ..."
 
-That loads a simulated FM3 with twelve presets and named scenes. Every screen
-works — presets, scenes, the signal chain, the tuner, setlists, settings.
-Nothing in the demo reaches real hardware.
+That loads a simulated unit with twelve presets and named scenes. Every
+screen works — presets, scenes, the signal chain, the tuner, tap tempo,
+setlists, settings. Nothing in the demo reaches real hardware.
 
-No account is required to use the demo, or to use the app on a local network.
-Signing in is only needed to reach your own computer from outside your home
-wifi, and that is the only thing an account does.
+The demo is free and needs no account. An account is used for one thing
+only: joining this phone to a computer that has the guitar unit plugged
+into it.
 
 If you would prefer to review a signed-in account instead, please ask and we
 will provide credentials.
@@ -193,5 +196,22 @@ will provide credentials.
 
 **Why this matters more than anything else here.** A reviewer opens the app,
 sees "no computer", and has no way to know there is anything behind it. The
-demo is one tap away on the very first screen, but only if somebody tells them
-it is there.
+demo is three taps in, but only if somebody tells them it is there.
+
+**AND WHY IT IS WRITTEN OUT TAP BY TAP.** The paragraph that used to be here
+said *"On the first screen, tap 'Just looking? Try the demo'"* — and the trap
+is that this was a REAL button. It sat on the sign-in screen, which is not the
+first screen: a fresh install opens the walkthrough, and the sign-in screen is
+only reached after it. So a reviewer looked for a button that exists, on a
+screen that does not have it, and had nothing to go on. Right button, wrong
+screen, same rejection.
+
+It also claimed the app worked "on a local network" without an account, and
+that signing in was only for reaching a computer from outside your home wifi.
+Both stopped being true when pairing became account-only.
+
+Store copy goes stale silently, because nothing in the build reads it. Two
+tests read it instead — one holds every label here against the walkthrough's
+own strings, the other against the sign-in screen's — and both read only the
+fenced block above, because this paragraph quotes the wording it replaced and
+a search of the whole file finds the explanation rather than the instruction.
