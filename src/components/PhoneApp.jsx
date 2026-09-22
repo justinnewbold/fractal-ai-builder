@@ -57,7 +57,7 @@ function StoreCard({ store }) {
           ) : (
             <div className="phone-store-qr placeholder" aria-hidden="true" />
           )}
-          <p className="hint">Point your phone&rsquo;s camera at the square.</p>
+          <p className="hint">Point your phone&rsquo;s camera at the QR code.</p>
           <a className="chip" href={store.url} target="_blank" rel="noreferrer">
             Open {store.store}
           </a>
@@ -106,7 +106,7 @@ export default function PhoneApp() {
 
       <h4>Once it is installed</h4>
       <p className="hint">
-        Open <strong>Phone &amp; computer</strong> in Settings here. It shows a square the phone&rsquo;s
+        Open <strong>Phone &amp; computer</strong> in Settings here. It shows a QR code the phone&rsquo;s
         camera can read, and that is the pairing done &mdash; no account, nothing to type.
       </p>
     </>

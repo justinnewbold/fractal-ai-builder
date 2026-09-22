@@ -148,7 +148,7 @@ export default function SignIn({ onSignedIn, onDemo }) {
           </Text>
           <Text style={{ color: color.silkDim, fontSize: font.body, lineHeight: 22 }}>
             {mode === 'code'
-              ? 'Scan the square your computer shows under Set up phone remote — or type the code under it — and this phone becomes its remote, from anywhere, with no account.'
+              ? 'Scan the QR code your computer shows under Set up phone remote — or type the code under it — and this phone becomes its remote, from anywhere, with no account.'
               : 'Sign in with the same account as the computer your unit is plugged into. Your presets and what the AI has learned about your taste follow you to any device.'}
           </Text>
         </View>

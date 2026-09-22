@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Linking, ScrollView, Text, TextInput, View } from 'react-native'
+import { ScrollView, Text, TextInput, View } from 'react-native'
 
 import { CHAIN, P1, P2, P3, P4, P6, P7, P8, P9, CLOSE } from '../lib/onboarding'
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
@@ -388,15 +388,30 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
 
           <Eyebrow>{P6.notYet}</Eyebrow>
           {/*
-            The address, on screen, for anybody happy to type it. The button
-            under it is for everybody else — this phone is not the computer
-            that needs the download, which is the whole difficulty.
+            PRINTED, NOT PRESSED.
+            
+            "It just says download when you click on it. And it tries
+            downloading it on the phone."
+
+            It did. The address was a button, and tapping a button on a phone
+            opens the thing on the phone — so it went to the downloads page on
+            the handset and started fetching a Mac installer onto a device
+            that can do nothing whatever with it.
+
+            This phone is never the computer that needs this download. That is
+            the whole difficulty of the step, and a button is a promise that
+            pressing it does something useful. So the address is text to read
+            and type somewhere else, with the eyebrow above it saying where,
+            and the only thing to press is the one that sends the link to a
+            machine that can use it.
           */}
-          <Press
-            label={DOWNLOADS_URL}
-            height={TAP}
-            onPress={() => Linking.openURL(`https://${DOWNLOADS_URL}`)}
-          />
+          <Eyebrow>{P6.address}</Eyebrow>
+          <Card>
+            <Text selectable style={{ color: color.silk, fontSize: font.lead, fontFamily: face }}>
+              {DOWNLOADS_URL}
+            </Text>
+          </Card>
+          <Eyebrow>{P6.emailLabel}</Eyebrow>
           <Field
             value={email}
             onChangeText={setEmail}

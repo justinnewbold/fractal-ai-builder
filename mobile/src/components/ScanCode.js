@@ -54,7 +54,7 @@ import { logDebug } from '../lib/debugLog'
  * the walkthrough. Easy to change.
  */
 const ACCOUNT_SQUARE =
-  'That square is for signing in, not for pairing. This computer uses an account, so there is no code to scan — sign in with the same email it is signed in with.'
+  'That QR code is for signing in, not for pairing. This computer uses an account, so there is no pairing code to scan — sign in with the same email it is signed in with.'
 const ACCOUNT_GO = 'Sign in with an account instead'
 
 export default function ScanCode({ open, onClose, onCode, onAccount }) {
@@ -120,8 +120,8 @@ export default function ScanCode({ open, onClose, onCode, onAccount }) {
       }
       setTrouble({
         text: looksLikeTheWifiSquare(data)
-          ? 'That is the “same wifi” square, which is for a web browser. This app needs the pairing code — on the computer it is the square with letters and numbers written under it.'
-          : 'That square does not hold a pairing code. On the computer, choose Set up phone remote and use the square with letters and numbers under it.'
+          ? 'That is the “same wifi” QR code, which is for a web browser. This app needs the pairing code — on the computer it is the QR code with letters and numbers written under it.'
+          : 'That QR code does not hold a pairing code. On the computer, choose Set up phone remote and use the QR code with letters and numbers under it.'
       })
       return
     }
@@ -233,7 +233,7 @@ export default function ScanCode({ open, onClose, onCode, onAccount }) {
               ) : null}
               <Note>
                 On the computer, open Fractal Remote and choose Set up phone remote. Point this at the
-                square it shows.
+                QR code it shows.
               </Note>
               <Text style={{ color: color.silkFaint, fontSize: font.small, borderRadius: radius.sm }}>
                 Or close this and type the {PAIR_LENGTH} characters underneath it.

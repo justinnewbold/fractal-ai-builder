@@ -6812,6 +6812,45 @@ export function run(test) {
        which is wrong for somebody who has just chosen a simulation. */
     assert.match(block.connected, /onPress=\{demoReady \? onEnterDemo : onDone\}/, 'a demo run finishes as though a rig had been paired')
 
+    /*
+     * THE DOWNLOAD ADDRESS IS PRINTED, NOT PRESSED.
+     *
+     * "It just says download when you click on it. And it tries downloading
+     * it on the phone."
+     *
+     * It did. The address was a button, and a button on a phone opens the
+     * thing on the phone — so it went to the downloads page on the handset
+     * and started fetching a Mac installer onto a device that can do nothing
+     * with it. This phone is never the computer that needs this download,
+     * which is the whole difficulty of the step.
+     */
+    assert.ok(!/Linking\.openURL/.test(src), 'the phone can still be sent to the desktop downloads page')
+    assert.ok(!/import \{ Linking,/.test(src), 'Linking is imported but no longer used')
+    assert.match(block.app, /<Eyebrow>\{P6\.address\}<\/Eyebrow>/, 'nothing says the address is for the computer')
+    assert.match(block.app, /<Text selectable style=\{\{ color: color\.silk, fontSize: font\.lead, fontFamily: face \}\}>\s*\n?\s*\{DOWNLOADS_URL\}/, 'the address is not printed as text to read and type')
+    assert.match(block.app, /<Eyebrow>\{P6\.emailLabel\}<\/Eyebrow>/, 'the email route is unlabelled')
+    /* Said where he said to say it: above the address, not under it. */
+    assert.ok(
+      block.app.indexOf('{P6.address}') < block.app.indexOf('{DOWNLOADS_URL}'),
+      'the line about which machine this is for comes after the address'
+    )
+    assert.match(read('mobile/src/lib/onboarding.js'), /address: '[^']*NOT ON THIS PHONE'/, 'the address line no longer rules out this phone')
+
+    /*
+     * AND IT IS CALLED A QR CODE. "Call it a QR code not a square."
+     */
+    for (const [file, what] of [
+      ['mobile/src/lib/onboarding.js', 'the walkthrough'],
+      ['mobile/src/components/ScanCode.js', 'the scanner'],
+      ['mobile/src/screens/SignIn.js', 'the sign-in screen']
+    ]) {
+      const text = read(file)
+      /* Comments quote the sentences they replaced, so only the strings are
+         read — the same trap as the save warning, four times over now. */
+      const strings = (text.match(/'[^'\n]{12,}'/g) || []).join(' ')
+      assert.ok(!/\bsquare\b/i.test(strings), `${what} still calls the QR code a square`)
+    }
+
     /* Both lines of the demo wording exist rather than being typed here. */
     const copy = read('mobile/src/lib/onboarding.js')
     assert.match(copy, /demo: \{\s*\n?\s*head: 'Here’s the app\.'/, 'the demo has no heading of its own')

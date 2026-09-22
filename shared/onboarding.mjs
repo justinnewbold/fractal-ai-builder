@@ -140,7 +140,7 @@ export const D3 = {
   foot: 'You can add a phone later in Settings → Phone & computer.'
 }
 
-/** D4 — the square, the code, and the wait. */
+/** D4 — the QR code, the pairing code, and the wait. */
 export const D4 = {
   step: 'STEP 3 OF 3',
   head: 'Scan this code with your phone.',
@@ -274,14 +274,29 @@ export const P6 = {
     { key: 'linux', badge: 'L', label: 'LINUX', go: 'Send link' }
   ],
   foot: 'We’ll email or text the download link so you can open it on the computer.',
-  back: 'Back to the free demo'
+  back: 'Back to the free demo',
+  /*
+   * NEW WORDING, MINE.
+   *
+   * "This needs to be crystal clear that to download this, you have to be
+   * from your computer. It does ask for an email, but it's not very clear. It
+   * just says download when you click on it. And it tries downloading it on
+   * the phone."
+   *
+   * The address was a BUTTON on the phone, so tapping it opened the downloads
+   * page on the handset and started fetching a Mac installer onto a phone
+   * that can do nothing with it. It is an address to type somewhere else, so
+   * it is printed rather than pressed now, and this line says where.
+   */
+  address: 'TYPE THIS ON YOUR COMPUTER · NOT ON THIS PHONE',
+  emailLabel: 'OR HAVE THE LINK SENT TO YOU'
 }
 
-/** P7 — scanning the computer's square. */
+/** P7 — scanning the computer's QR code. */
 export const P7 = {
   tag: 'CONNECT',
   eyebrow: 'PAIR WITH YOUR COMPUTER',
-  head: 'Scan the square on your computer.',
+  head: 'Scan the QR code on your computer.',
   codeLabel: 'OR ENTER THE CODE UNDER IT',
   foot: 'The code appears in Set up phone remote on your computer.',
   go: 'Connect',
