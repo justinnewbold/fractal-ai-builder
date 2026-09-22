@@ -175,36 +175,30 @@ export default function Onboarding({ onEnterDemo, onAccount, replay, onClose }) 
 
       {at === 'how' ? (
         <>
-          <Count>{P2.count}</Count>
+          {/*
+            HIS MOCKUP, BUILT. The words were already right — CHAIN has said
+            YOUR UNIT / YOUR COMPUTER / THIS PHONE and the two wire labels for
+            months. What it did not have was the drawing: three numbered boxes
+            joined by a lit cable, which is the whole idea in one look.
+
+            Everything here is Views and type. No SVG library, no new asset
+            pipeline, nothing native — so a screen that reads like a product
+            shot still ships over the air and costs no build.
+          */}
+          <Progress count={P2.count} at={0} of={2} />
           <Eyebrow>{P2.eyebrow}</Eyebrow>
           <Head>{P2.head}</Head>
-          {CHAIN.map((box) => (
-            <View key={box.key} style={{ gap: space.xs }}>
-              <Card>
-                <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.2 }}>
-                  {box.n}
-                </Text>
-                <Text style={{ color: color.silk, fontSize: font.body, fontWeight: '700' }}>
-                  {box.phoneTitle}
-                </Text>
-                <Text style={{ color: color.silkDim, fontSize: font.small }}>{box.phoneBody}</Text>
-              </Card>
-              {box.phoneWire ? (
-                <Text
-                  style={{
-                    color: color.silkFaint,
-                    fontSize: font.micro,
-                    letterSpacing: 1.2,
-                    textAlign: 'center'
-                  }}
-                >
-                  {box.phoneWire}
-                </Text>
-              ) : null}
-            </View>
-          ))}
+          <Sub>{P2.sub}</Sub>
+          <View style={{ gap: 0 }}>
+            {CHAIN.map((box, i) => (
+              <View key={box.key}>
+                <ChainBox n={i + 1} title={box.phoneTitle} body={box.phoneBody} kind={box.key} />
+                {box.phoneWire ? <Wire label={box.phoneWire} /> : null}
+              </View>
+            ))}
+          </View>
           <Note>{P2.foot}</Note>
-          <Press label={P2.go} tone="signal" on height={TAP} onPress={() => go('mode')} />
+          <Press label={`${P2.go}  ›`} tone="signal" on height={TAP} onPress={() => go('mode')} />
         </>
       ) : null}
 
@@ -431,6 +425,175 @@ const Eyebrow = ({ children }) => (
 
 const Count = ({ children }) => (
   <Text style={{ color: color.signal, fontSize: font.micro, letterSpacing: 1.5 }}>{children}</Text>
+)
+
+/**
+ * Which step this is, as a number and as dots.
+ *
+ * His mockup puts both in the corner: "1 OF 2" beside two dots with the
+ * current one lit. The number is what you read; the dots are what you see
+ * without reading, which is the point of having both.
+ */
+const Progress = ({ count, at, of }) => (
+  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+    <Count>{count}</Count>
+    <View style={{ flexDirection: 'row', gap: space.xs }}>
+      {Array.from({ length: of }, (_, i) => (
+        <View
+          key={i}
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: i === at ? color.signal : color.rule
+          }}
+        />
+      ))}
+    </View>
+  </View>
+)
+
+/**
+ * A device, drawn rather than photographed.
+ *
+ * His mockup has renders of a rack unit, a laptop and a phone. Those are
+ * image files and I do not have them, so these are the same three shapes in
+ * the app's own materials: a wide chassis with a screen and knobs, a lid over
+ * a base, a handset with a bar meter. Recognisable at a glance, which is all
+ * the row needs them to be.
+ *
+ * WHEN THE REAL ART ARRIVES it drops in here and nothing else moves — the row
+ * already gives it a fixed box to sit in.
+ */
+const Art = ({ kind }) => {
+  const box = { width: 92, height: 56, alignItems: 'center', justifyContent: 'center' }
+  const skin = { backgroundColor: color.panelHi, borderWidth: 1, borderColor: color.rule }
+  if (kind === 'computer') {
+    return (
+      <View style={box}>
+        <View style={{ ...skin, width: 74, height: 44, borderRadius: radius.sm }} />
+        <View style={{ ...skin, width: 88, height: 5, borderRadius: 3, marginTop: 2 }} />
+      </View>
+    )
+  }
+  if (kind === 'phone') {
+    return (
+      <View style={box}>
+        <View
+          style={{
+            ...skin,
+            width: 34,
+            height: 56,
+            borderRadius: radius.sm,
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'row',
+            gap: 2
+          }}
+        >
+          {[8, 14, 10, 16, 9].map((h, i) => (
+            <View key={i} style={{ width: 2, height: h, borderRadius: 1, backgroundColor: color.signal }} />
+          ))}
+        </View>
+      </View>
+    )
+  }
+  /* The unit: a chassis, a lit display and a row of knobs. */
+  return (
+    <View style={box}>
+      <View
+        style={{
+          ...skin,
+          width: 92,
+          height: 40,
+          borderRadius: radius.sm,
+          padding: 5,
+          justifyContent: 'space-between'
+        }}
+      >
+        <View
+          style={{
+            height: 16,
+            borderRadius: 2,
+            backgroundColor: color.chassis,
+            borderWidth: 1,
+            borderColor: color.signalWash
+          }}
+        />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 }}>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <View
+              key={i}
+              style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color.rule }}
+            />
+          ))}
+        </View>
+      </View>
+    </View>
+  )
+}
+
+/** One of the three boxes: a number, what it is, and a picture of it. */
+const ChainBox = ({ n, title, body, kind }) => (
+  <View
+    style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space.md,
+      padding: space.lg,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: color.rule,
+      backgroundColor: color.panel
+    }}
+  >
+    <View
+      style={{
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        borderWidth: 1.5,
+        borderColor: color.signal,
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}
+    >
+      <Text style={{ color: color.signal, fontSize: font.body, fontWeight: '700' }}>{n}</Text>
+    </View>
+    <View style={{ flex: 1, gap: 2 }}>
+      <Text style={{ color: color.silk, fontSize: font.body, fontWeight: '700', letterSpacing: 0.6 }}>
+        {title}
+      </Text>
+      <Text style={{ color: color.silkDim, fontSize: font.small }}>{body}</Text>
+    </View>
+    <Art kind={kind} />
+  </View>
+)
+
+/**
+ * The cable between two boxes: a lit line with its name on it.
+ *
+ * The label used to sit on its own between two cards and read as a heading for
+ * the card under it. On the line it reads as what it is — the thing joining
+ * the box above to the box below.
+ */
+const Wire = ({ label }) => (
+  <View style={{ alignItems: 'center' }}>
+    <View style={{ width: 2, height: 14, backgroundColor: color.signal }} />
+    <View
+      style={{
+        paddingHorizontal: space.md,
+        paddingVertical: 4,
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: color.signal,
+        backgroundColor: color.chassis
+      }}
+    >
+      <Text style={{ color: color.signal, fontSize: font.micro, letterSpacing: 1.2 }}>{label}</Text>
+    </View>
+    <View style={{ width: 2, height: 14, backgroundColor: color.signal }} />
+  </View>
 )
 
 const Card = ({ children }) => (

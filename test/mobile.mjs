@@ -3444,6 +3444,58 @@ export function run(test) {
     assert.match(shown, /onPress=\{onUnlock\}/, 'the row no longer opens the paywall')
   })
 
+  test('every colour a screen asks for is a colour the theme has', () => {
+    /*
+     * A TOKEN THAT DOES NOT EXIST FAILS SILENTLY, which is why this is here.
+     *
+     * Writing `backgroundColor: color.ink` in the walkthrough bundled clean,
+     * exported clean for both platforms and passed every test — because the
+     * theme has no `ink`, the value was undefined, and React Native treats an
+     * undefined background as no background. The pill I had drawn as a solid
+     * chip over a lit cable would have shipped transparent, with the line
+     * running straight through the words, and the first anyone knew would
+     * have been a screenshot.
+     *
+     * The rule is the same one this project applies to gear facts: a name
+     * that looks right and is wrong is worse than a name that is missing.
+     */
+    const theme = read('mobile/src/lib/theme.js')
+    const known = new Set(
+      [...theme.slice(theme.indexOf('const DARK = {'), theme.indexOf('}', theme.indexOf('const DARK = {')))
+        .matchAll(/^\s{2}(\w+):/gm)].map((m) => m[1])
+    )
+    assert.ok(known.size > 10, 'the theme moved; this test reads DARK by shape')
+
+    /* Walked here rather than with a helper, because this file has none. */
+    const under = (rel) => {
+      const out = []
+      const walk = (at) => {
+        for (const entry of readdirSync(fileURLToPath(new URL(at, import.meta.url)))) {
+          const next = `${at}/${entry}`
+          if (statSync(fileURLToPath(new URL(next, import.meta.url))).isDirectory()) walk(next)
+          else if (entry.endsWith('.js')) out.push(next)
+        }
+      }
+      walk(rel)
+      return out
+    }
+
+    const asked = new Set()
+    for (const rel of under('../mobile/src')) {
+      const text = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, ' ')
+        .replace(/^\s*\/\/.*$/gm, ' ')
+      for (const m of text.matchAll(/\bcolor\.(\w+)/g)) {
+        if (!known.has(m[1])) asked.add(`${rel.replace('../', '')}: color.${m[1]}`)
+      }
+    }
+    assert.deepEqual(
+      [...asked],
+      [],
+      `a screen asks for a colour the theme does not have:\n${[...asked].join('\n')}`
+    )
+  })
+
   test('a purchase follows the person, not the handset', () => {
     /*
      * "It does unlock it on android because you can sign in with a user name

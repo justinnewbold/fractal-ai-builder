@@ -216,6 +216,9 @@ export const P2 = {
   count: '1 OF 2',
   eyebrow: 'ONE SIMPLE PATH',
   head: 'Your phone talks to your computer.',
+  /* MINE, from his mockup. The three boxes underneath are the answer to "what
+     are the pieces"; this says how many there are before somebody counts. */
+  sub: 'Three pieces. One powerful connection.',
   foot: 'No computer yet? Try a simulated unit free, with no time limit.',
   go: 'Got it'
 }
