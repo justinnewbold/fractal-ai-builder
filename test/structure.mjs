@@ -3019,52 +3019,69 @@ export function run(test) {
    * threw away every write failure and every rejected setting, and rendered
    * its progress on a screen the person was not looking at.
    */
-  test('both ways in are offered, and the local one says what it costs', () => {
+  test('signing in is the only way in the website offers', () => {
     /*
-     * "Currently can a user login if they're just on the same network without
-     * signing in to the online account? If not, there should be two options —
-     * one just to sign in and control the device and use local browser
-     * storage… and then there should be a cloud login where they can save all
-     * their stuff between devices."
+     * "Yes, number three sounds good."
      *
-     * They could, and it worked: a phone on the page the Mac serves needs no
-     * account at all. Every word about it lived behind servedLocally(), which
-     * is to say it was only ever shown to someone already there. The hosted
-     * screen offered exactly one route.
+     * Three choices were on the table for what the website does about the
+     * $9.99, which it cannot charge: gate the site behind a paid unlock, let
+     * it be free and sell the app on convenience, or free for signed-in
+     * accounts with the same-wifi box dropped. He took the third.
+     *
+     * WHAT THAT BOX WAS. The computer's address, typed, sending the browser
+     * to the copy the computer serves on the LAN. Nothing signed into,
+     * nothing paid, and a phone with full control of a rig — offered at the
+     * bottom of the one screen whose entire job is to say that an account is
+     * how you connect a phone. It was asked for once ("there should be two
+     * options, one just to sign in and control the device and use local
+     * browser storage"), and the account-only rule that came later is the one
+     * that wins.
+     *
+     * WHAT IS NOT CLAIMED HERE. The route still exists — the computer serves
+     * the app on the LAN and a typed address still reaches it, which is what
+     * works at a venue with no signal. This holds only that the website stops
+     * offering it as an alternative to signing in.
      */
     const connect = readFileSync(new URL('../src/components/ConnectScreen.jsx', import.meta.url), 'utf8')
-    assert.match(connect, /className="connect-local"/, 'the hosted screen offers only the account route')
-    /*
-     * IT SAYS WHERE THE SETTINGS LIVE, AND NO LONGER SAYS "no account".
-     *
-     * "This is still on the website where it says no account no code need to
-     * remove that terminology." It was headed "on the same wifi — no account,
-     * no code", which is the one promise this screen must not make: an
-     * account is the only way to join a phone to a computer now. The fact
-     * underneath is still true and still stated — the browser keeps what you
-     * change — it is just no longer the selling point.
-     */
-    /*
-     * COMMENTS QUOTE THE SENTENCE THEY REPLACED, which is the trap this file
-     * falls into about once a quarter: the note above the new heading says
-     * what the old one was, so a raw search for the old wording finds it and
-     * the test fails on its own explanation. Only what the screen draws is
-     * read.
-     */
+    /* Comments quote what they replaced, so only what the screen draws counts.
+       Fourth time this file has failed on its own explanation. */
     const drawn = (text) => text.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ')
-    assert.ok(!/no account, no code/.test(drawn(connect)), 'the same-wifi route advertises needing no account again')
-    assert.match(connect, /stays\s+on this phone/i, 'nothing says where the settings live on the local route')
+    const shown = drawn(connect)
+
+    /* The box, its field, and the jump it made are all gone. */
+    for (const [pattern, what] of [
+      [/className="connect-local"/, 'the same-wifi box is back on the hosted screen'],
+      [/placeholder="fractal\.local"/, 'the address field is back'],
+      [/window\.location\.href = `http:\/\//, 'the screen sends the browser to a plain-http address again'],
+      [/:5056/, 'the screen still knows the port the computer serves on'],
+      [/no account, no code/, 'the same-wifi route advertises needing no account again']
+    ]) {
+      assert.ok(!pattern.test(shown), what)
+    }
+    /* And no wording of the promise, in any form. */
+    assert.ok(
+      !/no account|without an account|needs no account/i.test(shown),
+      'the connect screen advertises a way in that needs no account again'
+    )
+
+    /* What is left is one route, and it says what it buys. */
+    assert.match(shown, /Sign in with the same account as the computer/, 'the screen stopped asking for an account')
+    assert.match(
+      connect,
+      /setlists and the presets you starred follow you to\s+any device/i,
+      'nothing says what signing in buys'
+    )
     /*
-     * What signing in buys, which is now stated accurately: the setlists and
-     * the stars. It used to say "your presets and what the AI has learned
-     * about your taste" — "we don't have AI features in this app anymore",
-     * and presets were never in the account either. They live on the unit.
+     * AND ONE SIGN IN BUTTON, not two. The screen drew its own twice — the top
+     * branch on `remembered` being null and a second block on `!remembered`,
+     * which is the same condition — so a signed-out phone got two buttons with
+     * one label running different calls. "What is the button on the bottom".
      */
-    assert.match(connect, /setlists and the presets you starred follow you to\s+any device/i, 'nothing says what signing in buys')
-    assert.ok(!/\bAI\b/.test(connect.replace(/\/\*[\s\S]*?\*\//g, ' ')), 'the browser advertises an AI the app does not have')
-    // And it goes somewhere: an address typed in lands on the Mac's own page.
-    assert.match(connect, /window\.location\.href = `http:\/\//, 'the address typed in goes nowhere')
-    assert.match(connect, /:5056/, 'a bare hostname is not given the port the computer serves on')
+    assert.equal((shown.match(/>\s*Sign in\s*</g) || []).length, 1, 'the screen offers Sign in twice again')
+    assert.ok(!/className="connect-account"/.test(shown), 'the duplicate sign-in block is back')
+
+    /* No AI, which this screen advertised until he read it. */
+    assert.ok(!/\bAI\b/.test(shown), 'the browser advertises an AI the app does not have')
   })
 
   test('watching a pull request does not need asking about', () => {

@@ -25,29 +25,12 @@
  * route at the bottom of this page, where nothing is signed into and what you
  * save stays on the phone.
  */
-import { useState } from 'react'
 import { isPairAccount } from '../lib/link'
 
 export default function ConnectScreen({ link, onConnect, onRetry, onSwitchAccount, onUnpair, onDemo, busy }) {
   const { link: state, account } = link
   const remembered = account?.email || null
   const paired = isPairAccount(remembered)
-  const [where, setWhere] = useState('')
-
-  /*
-   * Go to the Mac directly.
-   *
-   * Typed rather than found: a browser cannot look for a Mac on the network,
-   * and this page is served over https, so it cannot talk to a plain-http
-   * address on the LAN either. What it can do is send you to the page the Mac
-   * is already serving, which is the whole of local mode — so the address goes
-   * in, and the phone lands on the Mac's own copy of this app.
-   */
-  const go = () => {
-    const typed = where.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '')
-    if (!typed) return
-    window.location.href = `http://${/:\d+$/.test(typed) ? typed : `${typed}:5056`}`
-  }
 
   return (
     <section className="connect" data-state={state}>
@@ -88,7 +71,7 @@ export default function ConnectScreen({ link, onConnect, onRetry, onSwitchAccoun
                 <button className="primary" onClick={onConnect} disabled={busy}>
                   {paired ? 'Connect' : `Connect as ${remembered}`}
                 </button>
-                {/* Unpairing forgets the hidden account and comes back to the code box; a person's account gets the sign-in sheet. */}
+                {/* Unpairing forgets the hidden account and comes back to signing in — there is no code box any more; a person's account gets the sign-in sheet. */}
                 <button className="chip" onClick={paired ? onUnpair : onSwitchAccount} disabled={busy}>
                   {paired ? 'Pair with a different computer' : 'Use a different account'}
                 </button>
@@ -114,49 +97,23 @@ export default function ConnectScreen({ link, onConnect, onRetry, onSwitchAccoun
           </p>
 
           {/*
-            THE SHORTCUT TO THE COMPUTER'S OWN COPY, and it is not a second
-            way in.
+            THE SAME-WIFI BOX IS GONE, and it was the last way in that did not
+            want an account.
 
-            It used to be headed "on the same wifi — no account, no code",
-            which is the one thing it must not say: "to use this app and
-            connect it to your computer, you have to sign up. That's the way
-            we're doing it." Advertising an account-free route on the screen
-            whose whole job is to ask for an account is the screen arguing
-            with itself.
+            It offered the computer's address, typed, and sent the browser to
+            the copy the computer serves on the LAN. Nothing was signed into,
+            nothing was paid, and a phone had full control of a rig — which
+            made the one rule this whole screen exists to enforce optional for
+            anybody who read to the bottom of it. "Yes, number three sounds
+            good": free for signed-in accounts, and the box goes.
 
-            What the box actually does is narrower than the old heading
-            claimed. It does not pair anything. The computer serves this same
-            app on the LAN, and this sends the browser there — so it is a
-            shortcut to a page, not a way to join a phone to a computer from
-            anywhere. Where it goes, the settings are the browser's, which is
-            worth saying once and not selling.
+            NOTE WHAT THIS DOES NOT DO. The computer still serves the app on
+            the LAN, and a person who types that address still lands on it.
+            That is deliberate — it is the route that works with no internet
+            at all, and taking it away would strand somebody at a venue with
+            no signal. What is gone is this page advertising it as an
+            alternative to signing in.
           */}
-          <div className="connect-local">
-            <p className="silk-label">Or go straight to your computer</p>
-            <p className="hint">
-              On the same wifi, your computer serves this app itself. Its address is in the menu
-              bar, next to the Fractal icon &mdash; type it here and this phone opens the
-              computer&rsquo;s own copy. What you change there stays on this phone rather than in
-              your account.
-            </p>
-            <div className="connect-local-row">
-              <input
-                type="text"
-                inputMode="url"
-                autoCapitalize="off"
-                autoCorrect="off"
-                spellCheck={false}
-                value={where}
-                onChange={(e) => setWhere(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && go()}
-                placeholder="fractal.local"
-                aria-label="The address your computer shows"
-              />
-              <button onClick={go} disabled={busy || !where.trim()}>
-                Go
-              </button>
-            </div>
-          </div>
 
           {/*
             THERE WAS A SECOND SIGN-IN BLOCK HERE, and it drew at the same

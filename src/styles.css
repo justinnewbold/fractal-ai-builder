@@ -9159,89 +9159,8 @@ button.phone-chip.dim {
   font-size: var(--f-2);
 }
 
-/*
- * The second way in, given the same weight as the first.
- *
- * Ruled off rather than tucked under, because it is not a footnote: a phone on
- * the same wifi needs no account at all, and that route worked for months
- * while being visible only to people who had already found it.
- */
-.connect-local {
-  width: 100%;
-  max-width: 420px;
-  margin-top: var(--s-6);
-  padding-top: var(--s-5);
-  border-top: 1px solid var(--rule);
-  text-align: left;
-}
-
-.connect-local-row {
-  display: flex;
-  gap: var(--s-2);
-  margin: var(--s-3) 0;
-}
-
-.connect-local-row input {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 44px;
-  padding: var(--s-2) var(--s-3);
-  font-family: var(--body);
-  font-size: var(--f-2);
-  color: var(--silk);
-  background: var(--chassis);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-1);
-}
-
-.connect-local-row button {
-  flex: 0 0 auto;
-  min-height: 44px;
-}
-
 .connect-demo {
   margin-top: var(--s-6);
-}
-
-/*
- * The pairing code, typed. Wide letter-spaced mono so a code read off a Mac
- * across the room can be checked group by group; the button sits under it
- * because a 19-character field and a button do not share a phone's width.
- */
-.connect-code-row {
-  width: 100%;
-  max-width: 320px;
-}
-
-.connect-code-row input {
-  width: 100%;
-  min-height: 52px;
-  padding: var(--s-2) var(--s-3);
-  font-family: var(--mono);
-  font-size: var(--f-3);
-  letter-spacing: 0.12em;
-  text-align: center;
-  text-transform: uppercase;
-  color: var(--silk);
-  background: var(--chassis);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-1);
-}
-
-.connect-code-row input::placeholder {
-  letter-spacing: 0.12em;
-  color: var(--silk-dim);
-  opacity: 0.6;
-}
-
-/* Signing in, offered third and for what it buys — same rule and weight as the wifi route. */
-.connect-account {
-  width: 100%;
-  max-width: 420px;
-  margin-top: var(--s-5);
-  padding-top: var(--s-5);
-  border-top: 1px solid var(--rule);
-  text-align: left;
 }
 
 /* What macOS said while it tried to install, folded away for pasting. */
