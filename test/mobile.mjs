@@ -6785,6 +6785,37 @@ export function run(test) {
     /* The picker itself still names what is lit, which is the one place the
        demo choice IS the answer. */
     assert.match(block.pick, /P4\.go\(unitName\)/, 'the demo picker stopped naming the unit you picked')
+
+    /*
+     * AND THE DEMO GETS THE LAST SCREEN TOO.
+     *
+     * "When I did a fresh app install, not logged in, there's no tutorial,
+     * nothing. So it just brings up the screen. This is a new user trying it
+     * out. Not a very good experience."
+     *
+     * Picking a unit was the end of it: the mock was built and the app opened
+     * on the Play screen mid-stride, with nothing having said what any of it
+     * is. The screen that says so was already written — PLAY, EDIT and SAVE
+     * in three lines — and was reached only after a real pairing, so the one
+     * person who has never seen this app was the one person who never got it.
+     */
+    const flat = src.replace(/\s+/g, ' ')
+    assert.match(flat, /const intoDemo = \(\) => \{ setDemoUnit\(unit\) setDemo\(true\) setDemoReady\(true\) go\('connected'\) \}/, 'choosing the demo still drops somebody straight onto the Play screen')
+
+    /* The three tips are the same either way; only the two lines that name a
+       computer change, because there is no computer in the demo. */
+    assert.match(block.connected, /\{demoReady \? P9\.demo\.head : P9\.head\}/, 'the demo is told it is connected to a computer')
+    assert.match(block.connected, /\{demoReady \? P9\.demo\.status\(provenUnit\) : P9\.status/, 'the demo is told it is running through a computer')
+    assert.match(block.connected, /P9\.tips\.map/, 'the three tips are no longer on the last screen')
+
+    /* And the right handler finishes it. onDone marks an owner unlocked,
+       which is wrong for somebody who has just chosen a simulation. */
+    assert.match(block.connected, /onPress=\{demoReady \? onEnterDemo : onDone\}/, 'a demo run finishes as though a rig had been paired')
+
+    /* Both lines of the demo wording exist rather than being typed here. */
+    const copy = read('mobile/src/lib/onboarding.js')
+    assert.match(copy, /demo: \{\s*\n?\s*head: 'Here’s the app\.'/, 'the demo has no heading of its own')
+    assert.match(copy, /status: \(unit\) => `\$\{unit\}  ·  simulated`/, 'the demo has no status line of its own')
   })
 
   test('the phone walkthrough pairs, buys and starts the demo for real', async () => {

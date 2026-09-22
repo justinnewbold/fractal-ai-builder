@@ -87,11 +87,30 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
     setAt(next)
   }
 
-  /* The demo, started for real: the mock is built and the app opens on it. */
+  /*
+   * THE DEMO GETS THE LAST SCREEN TOO, which it never did.
+   *
+   * "When I did a fresh app install, not logged in, there's no tutorial,
+   * nothing. So it just brings up the screen. This is a new user trying it
+   * out. Not a very good experience."
+   *
+   * Picking a unit used to be the end: the mock was built and the app opened
+   * on the Play screen, mid-stride, with nothing having said what any of it
+   * is. And the screen that would have said so was already written — the one
+   * at the end of the pairing path, PLAY and EDIT and SAVE in three lines. It
+   * was reached only after a real pairing, so the one person who has never
+   * seen this app before was the one person who never got it.
+   *
+   * The demo is switched on here rather than at the end, so the last screen
+   * can name the unit the mock actually is. `onEnterDemo` is what finishes
+   * the walkthrough, and it is the button on that screen that calls it.
+   */
+  const [demoReady, setDemoReady] = useState(false)
   const intoDemo = () => {
     setDemoUnit(unit)
     setDemo(true)
-    onEnterDemo()
+    setDemoReady(true)
+    go('connected')
   }
 
   /*
@@ -495,8 +514,11 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
       {at === 'connected' ? (
         <>
           <Eyebrow>{P9.tag(provenUnit)}</Eyebrow>
-          <Head>{P9.head}</Head>
-          <Sub>{P9.status({ unit: provenUnit, scenes: null })}</Sub>
+          {/* The same three tips either way. Only the two lines above them
+              change, because "You're connected" and "through your computer"
+              are both false in the demo. */}
+          <Head>{demoReady ? P9.demo.head : P9.head}</Head>
+          <Sub>{demoReady ? P9.demo.status(provenUnit) : P9.status({ unit: provenUnit, scenes: null })}</Sub>
           {P9.tips.map((tip) => (
             <Card key={tip.key}>
               <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.2 }}>
@@ -505,7 +527,17 @@ export default function Onboarding({ onDone, onEnterDemo, onAccount, replay, onC
               <Text style={{ color: color.silkDim, fontSize: font.small }}>{tip.body}</Text>
             </Card>
           ))}
-          <Press label={P9.go} tone="signal" on height={TAP} onPress={onDone} />
+          {/* onEnterDemo finishes a demo run and onDone finishes a paired
+              one: the second checks who is signed in and marks an owner
+              unlocked, which is wrong for somebody who has just chosen a
+              simulation. */}
+          <Press
+            label={P9.go}
+            tone="signal"
+            on
+            height={TAP}
+            onPress={demoReady ? onEnterDemo : onDone}
+          />
           <Note>{P9.foot}</Note>
         </>
       ) : null}

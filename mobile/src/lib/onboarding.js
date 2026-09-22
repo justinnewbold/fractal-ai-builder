@@ -329,7 +329,28 @@ export const P9 = {
     { key: 'save', label: 'SAVE', body: 'Changes are live now. Save permanently on the computer.' }
   ],
   go: 'Open Play',
-  foot: 'Replay this anytime in Settings → Show the walkthrough.'
+  foot: 'Replay this anytime in Settings → Show the walkthrough.',
+  /*
+   * THE SAME LAST SCREEN, FOR SOMEBODY WHO CHOSE THE DEMO.
+   *
+   * "When I did a fresh app install, not logged in, there's no tutorial,
+   * nothing. So it just brings up the screen. This is a new user trying it
+   * out. Not a very good experience."
+   *
+   * Right, and the screen that would have fixed it was already written — this
+   * one. PLAY, EDIT and SAVE in three lines. It was only ever reached after a
+   * real pairing, so the person most likely to need it, somebody who has
+   * never seen the app at all, was the one person who never got it.
+   *
+   * The tips are his and are reused word for word. These two lines are mine,
+   * because the ones above them say "You're connected" and name a computer,
+   * and in the demo there is no computer and nothing is connected.
+   */
+  demo: {
+    head: 'Here’s the app.',
+    /** FM3 · simulated */
+    status: (unit) => `${unit}  ·  simulated`
+  }
 }
 
 /** What Settings calls the way back in, on both ends. */
