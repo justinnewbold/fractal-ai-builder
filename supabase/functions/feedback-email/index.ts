@@ -40,11 +40,6 @@ const RESEND = 'https://api.resend.com/emails'
 /** Where reports go when nothing says otherwise. */
 const DEFAULT_TO = 'justinnewbold@gmail.com'
 
-/**
- * Resend will only send from a domain you have proved you own. `resend.dev` is
- * theirs and works immediately, which is what makes the first email arrive on
- * the day this is set up rather than after a DNS change has propagated.
- */
 /*
  * THE DOMAIN IS VERIFIED NOW, so this is the real one.
  *
