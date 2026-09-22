@@ -217,11 +217,38 @@ export const P2 = {
 }
 
 /** P3 — demo or real rig. */
+/*
+ * P3 — the two ways in, and nothing else.
+ *
+ * "How do we verify their computer connects before purchasing? Didn't know
+ * we built that. If we don't actually do that then remove it. Also remove
+ * the text to the bottom that says free forever. And the text at top that
+ * says free. And remove the text that says where do you want to start."
+ *
+ * FOUR LINES GONE, and one of them was my fault.
+ *
+ *   'We verify the computer connection before purchase.' — we DID. The
+ *   walkthrough paired with a code, said "Connection verified", and offered
+ *   the unlock on the strength of it. When the codes went out, pairing left
+ *   the walkthrough and that step became unreachable, so it was removed. This
+ *   line was left behind describing a thing the app no longer does.
+ *
+ *   'WHERE DO YOU WANT TO START?' — the two cards under it say what they
+ *   are. A heading that asks the question the screen already is, is a line
+ *   spent on nothing.
+ *
+ *   'FREE' — the card says "Start free demo" and the eyebrow says EXPLORE
+ *   THE APP. Three labels on one card, two of them saying the same thing.
+ *
+ *   'The demo stays free forever.' — said again at the bottom of a screen
+ *   whose first card already says free twice.
+ *
+ * What is left is the two choices, the way back for somebody who has paid,
+ * and the way in for somebody with an account.
+ */
 export const P3 = {
   count: '2 OF 2',
-  head: 'WHERE DO YOU WANT TO START?',
   demo: {
-    tag: 'FREE',
     eyebrow: 'EXPLORE THE APP',
     title: 'Try the demo',
     body: 'Use a simulated Fractal unit. Every screen works. No computer needed.',
@@ -230,11 +257,9 @@ export const P3 = {
   real: {
     eyebrow: 'CONTROL YOUR HARDWARE',
     title: 'Connect my real rig',
-    body: 'We verify the computer connection before purchase.',
     go: (price) => `Set up  ·  ${price || FALLBACK_PRICE} once`
   },
-  restore: 'Already bought it? Restore purchase',
-  foot: 'The demo stays free forever.'
+  restore: 'Already bought it? Restore purchase'
 }
 
 /** P4 — which unit the demo pretends to be. */

@@ -6618,6 +6618,52 @@ export function run(test) {
    * idea a computer was part of the arrangement — and the purchase comes last,
    * after the computer has been proved to work.
    */
+  test('the start screen claims nothing the app does not do', () => {
+    /*
+     * "How do we verify their computer connects before purchasing? Didn't
+     * know we built that. If we don't actually do that then remove it. Also
+     * remove the text to the bottom that says free forever. And the text at
+     * top that says free. And remove the text that says where do you want to
+     * start."
+     *
+     * The first of those was a real promise the app used to keep, and the
+     * reason it stopped is in this repository: the walkthrough paired with a
+     * code, said "Connection verified", and offered the unlock on the
+     * strength of it. When the codes went out, pairing left the walkthrough
+     * and that step became unreachable, so it was removed — and the sentence
+     * advertising it was left behind on the screen before.
+     *
+     * A claim outliving the thing it describes is the shape of fault worth a
+     * test, so this holds the four lines out rather than trusting that
+     * nobody puts them back.
+     */
+    const copy = read('mobile/src/lib/onboarding.js')
+    const screen = read('mobile/src/screens/Onboarding.js')
+    const p3 = copy.slice(copy.indexOf('export const P3'), copy.indexOf('export const P4'))
+
+    for (const [gone, why] of [
+      ['verify the computer connection', 'the app promises to verify a connection before purchase, which it no longer does'],
+      ['WHERE DO YOU WANT TO START', 'the heading that asks the question the screen already is, is back'],
+      ["tag: 'FREE'", 'the demo card carries a third label saying what its button already says'],
+      ['stays free forever', 'the demo is told to be free a third time, at the bottom of the screen']
+    ]) {
+      assert.ok(!p3.includes(gone), why)
+    }
+    /* And nothing on the screen reaches for them. */
+    assert.ok(!/P3\.head|P3\.foot|P3\.demo\.tag|P3\.real\.body/.test(screen), 'the screen draws a P3 line that no longer exists')
+
+    /* What is left is the two ways in, the way back for somebody who paid,
+       and the way in for somebody with an account. */
+    for (const [needed, why] of [
+      ['P3.demo.go', 'the demo has no button'],
+      ['P3.real.go(purchase.price)', 'the real-rig card lost its price'],
+      ['P3.restore', 'there is no way to restore a purchase from the first screen'],
+      ['P7.account', 'there is no way to sign in from the first screen']
+    ]) {
+      assert.ok(screen.includes(needed), why)
+    }
+  })
+
   test('every screen in the walkthrough is reachable, and none of them is a trap', () => {
     /*
      * "The whole onboarding process and tutorials have been an absolute

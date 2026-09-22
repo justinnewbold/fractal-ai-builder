@@ -211,13 +211,14 @@ export default function Onboarding({ onEnterDemo, onAccount, replay, onClose }) 
 
       {at === 'mode' ? (
         <>
+          {/* No heading: the two cards under this say what they are, and
+              "WHERE DO YOU WANT TO START?" asked the question the screen
+              already is. */}
           <Count>{P3.count}</Count>
-          <Head>{P3.head}</Head>
 
           <Card>
-            <Text style={{ color: color.signal, fontSize: font.micro, letterSpacing: 1.2 }}>
-              {P3.demo.tag}
-            </Text>
+            {/* The FREE tag is gone too — the button on this card says "Start
+                free demo" and the eyebrow says EXPLORE THE APP. */}
             <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.2 }}>
               {P3.demo.eyebrow}
             </Text>
@@ -241,7 +242,6 @@ export default function Onboarding({ onEnterDemo, onAccount, replay, onClose }) 
             <Text style={{ color: color.silk, fontSize: font.lead, fontWeight: '700' }}>
               {P3.real.title}
             </Text>
-            <Text style={{ color: color.silkDim, fontSize: font.small }}>{P3.real.body}</Text>
             {/* The store's price where it knows one, his wording where it
                 does not — see FALLBACK_PRICE in shared/onboarding.mjs. */}
             <Press label={P3.real.go(purchase.price)} height={TAP} onPress={() => go('app')} />
@@ -270,7 +270,6 @@ export default function Onboarding({ onEnterDemo, onAccount, replay, onClose }) 
           */}
           <Press label={P7.account} height={TAP} onPress={() => onAccount?.()} />
           {said ? <Note>{said}</Note> : null}
-          <Note>{P3.foot}</Note>
         </>
       ) : null}
 
