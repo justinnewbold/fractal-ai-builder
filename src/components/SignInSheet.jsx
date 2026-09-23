@@ -8,7 +8,7 @@ import SignIn from './SignIn'
  * it is "Connect to your Mac", because that is what the person is doing —
  * the account is the means. At the Mac it is "Set up phone remote", once.
  */
-export default function SignInSheet({ open, role, account = false, email, busy, onClose, onSubmit, onCreate }) {
+export default function SignInSheet({ open, role, account = false, startIn = 'in', email, busy, onClose, onSubmit, onCreate }) {
   const phone = role !== 'mac'
   /*
    * A sign-in with no errand: the account and nothing else, for the demo and
@@ -25,7 +25,7 @@ export default function SignInSheet({ open, role, account = false, email, busy, 
             Sign in with the same account as the computer your unit is plugged into. Your setlists
             and starred presets follow you to any device.
           </p>
-          <SignIn email={email} busy={busy} autoFocus submitLabel="Sign in" onSubmit={onSubmit} onCreate={onCreate} />
+          <SignIn key={startIn} email={email} busy={busy} autoFocus submitLabel="Sign in" onSubmit={onSubmit} onCreate={onCreate} startIn={startIn} />
         </div>
       </Sheet>
     )
@@ -49,11 +49,18 @@ export default function SignInSheet({ open, role, account = false, email, busy, 
             : 'Sign in with the account you made in the phone app. Your phone signs in with these same details to reach this computer.'}
         </p>
         <SignIn
+          /* A new key when the button that opened it changes, so the form
+             starts on the side that button asked for. */
+          key={startIn}
           email={email}
           busy={busy}
           autoFocus
           submitLabel={phone ? 'Connect' : 'Turn on'}
           onSubmit={onSubmit}
+          /* Here too: "Where is the sign-up button?" A new account made here
+             goes on to do this sheet's errand — connect, or turn on. */
+          onCreate={onCreate}
+          startIn={startIn}
         />
       </div>
     </Sheet>

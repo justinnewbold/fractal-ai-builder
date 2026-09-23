@@ -3888,15 +3888,22 @@ export function run(test) {
      * decided to do purchases on the web, so yes, somebody should be able to
      * create an account on the web and desktops, and make purchases as well."
      *
-     * The form offers it only to a caller that hands it `onCreate`, and the
-     * one that does is the plain sign-in the unlock goes through.
+     * The form offers it only to a caller that hands it `onCreate`, and every
+     * sign-in hands it now. It was on the unlock's sign-in only, and the
+     * website's first screen had no way to make one: "Where is the sign-up
+     * button?" So the connect screen has a Create Account of its own, beside
+     * Sign in, and it opens the form already on making one.
      */
     const webForm = readFileSync(new URL('../src/components/SignIn.jsx', import.meta.url), 'utf8')
     assert.ok(!/remoteSignUp/.test(webForm), 'the form makes accounts itself rather than through its caller')
     assert.match(webForm, /mode === 'in' && onCreate \? \(/, 'the browser offers to make an account to a caller with nothing to sell')
     assert.match(webForm, /Forgot password\?/, 'the browser lost the reset it still needs')
     const sheet = readFileSync(new URL('../src/components/SignInSheet.jsx', import.meta.url), 'utf8')
-    assert.equal((sheet.match(/onCreate=\{onCreate\}/g) || []).length, 1, 'Create Account is on a sign-in other than the plain one')
+    assert.equal((sheet.match(/onCreate=\{onCreate\}/g) || []).length, 2, 'one of the sign-ins cannot make an account')
+    const connectScreen = readFileSync(new URL('../src/components/ConnectScreen.jsx', import.meta.url), 'utf8')
+    assert.match(connectScreen, /onClick=\{onCreateAccount\}[^>]*>\s*Create Account\s*</, 'the website’s first screen has no sign-up button')
+    assert.match(src, /onCreateAccount=\{\(\) => \{\s*setSignInStart\('up'\)/, 'Create Account opens the form on signing in instead')
+    assert.match(webForm, /useState\(onCreate && startIn === 'up' \? 'up' : 'in'\)/, 'the form ignores which button opened it')
     assert.match(src, /onCreate=\{async \(details\) => \{\s*const out = await createAccount\(details\)/, 'the browser cannot make an account on the way to the unlock')
 
     const native = readFileSync(new URL('../mobile/src/screens/SignIn.js', import.meta.url), 'utf8')

@@ -29,8 +29,9 @@ import { loadRemoteConfig, sendPasswordReset } from '../lib/remote'
  * Forgot stays: somebody signing in here with an account made on their phone
  * is exactly the person who will have forgotten the password.
  */
-export default function SignIn({ email: initial = '', submitLabel = 'Sign in', onSubmit, onCreate, busy, autoFocus }) {
-  const [mode, setMode] = useState('in') // 'in' | 'up' | 'forgot'
+export default function SignIn({ email: initial = '', submitLabel = 'Sign in', onSubmit, onCreate, startIn = 'in', busy, autoFocus }) {
+  /* Opened by a Create Account button, the form starts on making one. */
+  const [mode, setMode] = useState(onCreate && startIn === 'up' ? 'up' : 'in') // 'in' | 'up' | 'forgot'
   const [email, setEmail] = useState(initial)
   const [password, setPassword] = useState('')
   const [working, setWorking] = useState(false)

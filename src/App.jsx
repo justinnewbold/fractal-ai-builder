@@ -849,6 +849,11 @@ export default function App() {
     /* false, true for the sign-in this end's role calls for, or 'account'
        for a sign-in with no errand attached — see signInAccount. */
     const [signIn, setSignIn] = useState(false)
+    /* Which side the form opens on: 'up' when a Create Account button opened it. */
+    const [signInStart, setSignInStart] = useState('in')
+    useEffect(() => {
+      if (!signIn) setSignInStart('in')
+    }, [signIn])
   /*
    * Whether the phone has ever had the Mac answer this session. A blip after
    * that keeps the screen (the chip goes red; the loop retries); before it,
@@ -3116,6 +3121,10 @@ export default function App() {
           onConnect={() => linkAction('connect')}
           onRetry={() => linkAction('retry')}
           onSwitchAccount={() => linkAction('switch')}
+          onCreateAccount={() => {
+            setSignInStart('up')
+            linkAction('switch')
+          }}
           onUnpair={() => linkAction('signout')}
           onDemo={() => {
             setDemo(true)
@@ -3666,12 +3675,15 @@ export default function App() {
       <SignInSheet
         open={Boolean(signIn)}
         account={signIn === 'account'}
+        startIn={signInStart}
         onCreate={async (details) => {
           const out = await createAccount(details)
-          if (!out.needsConfirmation) {
-            record('remote', `Account made for ${details.email}`)
-            setSignIn(false)
-          }
+          if (out.needsConfirmation) return out
+          record('remote', `Account made for ${details.email}`)
+          /* Then the errand the sheet was opened for — connect this phone, or
+             turn the computer's phone remote on — as the sign-in would have. */
+          if (signIn === 'account') setSignIn(false)
+          else await signInSubmit(details)
           return out
         }}
         role={link.role}

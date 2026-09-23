@@ -27,7 +27,7 @@
  */
 import { isPairAccount } from '../lib/link'
 
-export default function ConnectScreen({ link, onConnect, onRetry, onSwitchAccount, onUnpair, onDemo, busy }) {
+export default function ConnectScreen({ link, onConnect, onRetry, onSwitchAccount, onCreateAccount, onUnpair, onDemo, busy }) {
   const { link: state, account } = link
   const remembered = account?.email || null
   const paired = isPairAccount(remembered)
@@ -88,6 +88,17 @@ export default function ConnectScreen({ link, onConnect, onRetry, onSwitchAccoun
                 <button className="primary" onClick={onSwitchAccount} disabled={busy}>
                   Sign in
                 </button>
+                {/*
+                  "Where is the sign-up button?" Beside the sign-in, where
+                  somebody without an account looks for it — not behind it.
+                  The browser can make an account since it can sell the
+                  unlock; the phone's word for it.
+                */}
+                {onCreateAccount ? (
+                  <button className="chip" onClick={onCreateAccount} disabled={busy}>
+                    Create Account
+                  </button>
+                ) : null}
               </div>
             </>
           )}
