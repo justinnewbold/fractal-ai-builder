@@ -4456,9 +4456,8 @@ export default function App() {
           shows as paid on this page, through the account.
 
           The checkout itself is RevenueCat's, drawn over this page by the
-          library. Stripe marks it TEST MODE for as long as webPurchase.js is
-          on the sandbox key, which is how it ships until somebody has walked
-          through it.
+          library. It takes real cards: webPurchase.js is on the live key since
+          the sandbox checkout was walked through end to end.
         */}
         {setupPage === 'unlock' ? (
           <div className="setup-page">

@@ -14,16 +14,17 @@ import { DEFAULT_PROJECT, supabaseClient } from './remote'
  * same `full` entitlement. So a card taken here unlocks the phone the moment
  * that phone signs in, and the relay's table learns of it from the webhook.
  *
- * WHICH KEY, and why it is the test one for now. Web Billing has two public
- * keys. The sandbox key takes Stripe's test cards and moves no money; the
- * production key takes real ones. A checkout nobody has walked through yet
- * should not be able to charge a real card, so this ships on sandbox, and
- * going live is one line: swap WEB_KEY to PRODUCTION_KEY. Both are public by
- * design, like the phone's appl_ and goog_ keys.
+ * WHICH KEY: the live one. Web Billing has two public keys. The sandbox key
+ * takes Stripe's test cards and moves no money; the production key takes
+ * real ones. It shipped on sandbox until somebody had walked the checkout
+ * end to end — he did, a new account made on the website and paid for:
+ * "Payment on web working. You can go ahead and set it live instead of the
+ * sandbox." Going back is one line: WEB_KEY to SANDBOX_KEY. Both are public
+ * by design, like the phone's appl_ and goog_ keys.
  */
 const SANDBOX_KEY = 'rcb_sb_KdoKqKIDAheHEcOurZYnqRBHO'
 const PRODUCTION_KEY = 'rcb_sRfyHdzVZSYYipRdOgggitGqahKr'
-export const WEB_KEY = SANDBOX_KEY
+export const WEB_KEY = PRODUCTION_KEY
 export const WEB_LIVE = WEB_KEY === PRODUCTION_KEY
 
 /** The product the phones sell too, so the package is picked by name, not by position. */

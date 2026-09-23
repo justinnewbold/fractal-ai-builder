@@ -1061,12 +1061,14 @@ export function run(test) {
     assert.match(src, /export const PRODUCT_ID = 'cloud\.newbold\.fractalremote\.full'/, 'the web sells a different product id from the phones')
 
     /*
-     * THE SANDBOX KEY, UNTIL HE SAYS OTHERWISE. A checkout nobody has walked
-     * through must not be able to charge a real card. Going live is one line
-     * in webPurchase.js — and this line here, on purpose, so it is a decision
-     * somebody makes rather than a default that drifts.
+     * THE LIVE KEY, BECAUSE HE SAID SO. It shipped on sandbox until the
+     * checkout had been walked through: "Payment on web working. You can go
+     * ahead and set it live instead of the sandbox." Which key it is stays
+     * written down here, on purpose, so going back to test cards is a
+     * decision somebody makes rather than a default that drifts.
      */
-    assert.match(src, /export const WEB_KEY = SANDBOX_KEY/, 'the web checkout is taking real money; if that was meant, change this check with it')
+    assert.match(src, /export const WEB_KEY = PRODUCTION_KEY/, 'the web checkout is on test cards; if that was meant, change this check with it')
+    assert.match(src, /const PRODUCTION_KEY = 'rcb_(?!sb_)/, 'the live key is a sandbox key')
     assert.match(src, /const SANDBOX_KEY = 'rcb_sb_/, 'the sandbox key is not a sandbox key')
 
     /* Loaded only when there is a price to show: nobody driving their own rig downloads Stripe. */
