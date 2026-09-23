@@ -27,6 +27,22 @@ Still to do:
   computer app), and whether the latest update has reached phones. Answers
   "why am I still on 1.66?" at a glance.
 
+## Older Fractal units
+
+The Axe-Fx II (Mark I, Mark II, XL and XL+) is in as of 1.86.0: presets,
+scenes, blocks on and off, X/Y, placing blocks, knobs. None of it has been on
+a real one yet — a friend of Justin's is the first tester. After that:
+
+- **Axe-Fx II: tuner, tempo, scene names, the preset name list.** Each needs a
+  recording of what the unit sends, from the tester's rig.
+- **AX8.** Easy once the Axe-Fx II is proven: it is an Axe-Fx II with fewer
+  blocks and a different model byte. Needs an AX8 owner to test.
+- **FX8 and FX8 Mk II.** Medium to hard. Fractal never published how it talks,
+  and it has an 8-slot chain instead of a grid. Needs an owner and recordings
+  of FX8-Edit.
+- **Original Axe-Fx (Standard, Ultra).** Hard. A different language, no USB
+  (a MIDI cable interface), no scenes, no X/Y. Needs an owner.
+
 ## Waiting on something
 
 - **The GitHub description** still says "AI-powered preset builder…". It
