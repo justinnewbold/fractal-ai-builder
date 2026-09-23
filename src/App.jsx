@@ -138,6 +138,7 @@ import {
   disconnectPhone,
   setUpMac,
   signInAccount,
+  createAccount,
   isPairAccount,
   setMacRemote,
   signOutHere,
@@ -1777,6 +1778,20 @@ export default function App() {
    * way rather than a hunt through Settings for it. Somebody who turns out
    * to have paid already, on a phone, is not shown the unlock page at all.
    */
+  /*
+   * The price on Settings' Unlock row for somebody not signed in, fetched
+   * when Settings opens rather than on every page load — the payment library
+   * is a download nobody who never looks at the row should pay for.
+   */
+  useEffect(() => {
+    if (sheet !== 'settings' || accountId || webPriceText) return undefined
+    let live = true
+    webPrice(null).then((price) => live && setWebPriceText(price))
+    return () => {
+      live = false
+    }
+  }, [sheet, accountId, webPriceText])
+
   const [unlockAfterSignIn, setUnlockAfterSignIn] = useState(false)
   const openUnlock = () => {
     if (accountId) {
@@ -3651,6 +3666,14 @@ export default function App() {
       <SignInSheet
         open={Boolean(signIn)}
         account={signIn === 'account'}
+        onCreate={async (details) => {
+          const out = await createAccount(details)
+          if (!out.needsConfirmation) {
+            record('remote', `Account made for ${details.email}`)
+            setSignIn(false)
+          }
+          return out
+        }}
         role={link.role}
         email={[link.account?.email, loadRemoteConfig()?.email].find((e) => e && !isPairAccount(e)) || ''}
         busy={busy}
@@ -3949,22 +3972,24 @@ export default function App() {
                 before About. "Unlock the full version" over the price, the
                 phone's words for the phone's errand.
 
-                Only for somebody signed in who has not paid. Signed out there
-                is no account for a purchase to belong to, and once it is
-                bought there is nothing left to offer — the phone hides this
-                row for the same reason.
+                For anybody who has not paid, signed in or not, as on the
+                phone. Signed out it asks for the sign-in first — where an
+                account can be made now: "somebody should be able to create an
+                account on the web and desktops, and make purchases as well" —
+                and lands on the unlock page after it. Once it is bought there
+                is nothing left to offer, and the row goes.
 
                 The phone's other wording, "Drive a real rig, or restore a
                 purchase", is for a store that has not answered with a price.
                 A browser has no store to restore from, so until the price
                 arrives it says the first half and nothing it cannot back up.
               */}
-              {accountId && paid.checked && !paid.unlocked ? (
+              {paid.checked && !paid.unlocked ? (
                 <SetupRow
                   key="unlock"
                   title="Unlock the full version"
                   status={webPriceText ? `Drive a real rig · ${webPriceText}` : 'Drive a real rig'}
-                  onClick={() => setSetupPage('unlock')}
+                  onClick={openUnlock}
                 />
               ) : null}
               {/*

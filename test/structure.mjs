@@ -3879,18 +3879,25 @@ export function run(test) {
     assert.ok(!/pairFromCode|await pairPhone\(/.test(src), 'a typed code is wired up again')
 
     /*
-     * AND AN ACCOUNT IS MADE ON THE PHONE, AFTER THE UNLOCK, NOWHERE ELSE.
+     * AN ACCOUNT CAN BE MADE WHERE THE UNLOCK CAN BE BOUGHT.
      *
-     * "On the desktop app make it so you can only sign in with account that
-     * was already created on a phone. So do not allow an account to be
-     * created on any of the desktop or the web app version, only sign-ins.
-     * On the phones, only show the create account window after the phone has
-     * been unlocked."
+     * It was the phone only, after the unlock: "do not allow an account to be
+     * created on any of the desktop or the web app version, only sign-ins."
+     * Then the browser and the computer app started selling the unlock, and a
+     * purchase has to belong to an account: "That was old info before we
+     * decided to do purchases on the web, so yes, somebody should be able to
+     * create an account on the web and desktops, and make purchases as well."
+     *
+     * The form offers it only to a caller that hands it `onCreate`, and the
+     * one that does is the plain sign-in the unlock goes through.
      */
     const webForm = readFileSync(new URL('../src/components/SignIn.jsx', import.meta.url), 'utf8')
-    assert.ok(!/remoteSignUp/.test(webForm), 'the browser can make an account again')
-    assert.ok(!/Create Account/.test(webForm), 'the browser offers to make an account again')
+    assert.ok(!/remoteSignUp/.test(webForm), 'the form makes accounts itself rather than through its caller')
+    assert.match(webForm, /mode === 'in' && onCreate \? \(/, 'the browser offers to make an account to a caller with nothing to sell')
     assert.match(webForm, /Forgot password\?/, 'the browser lost the reset it still needs')
+    const sheet = readFileSync(new URL('../src/components/SignInSheet.jsx', import.meta.url), 'utf8')
+    assert.equal((sheet.match(/onCreate=\{onCreate\}/g) || []).length, 1, 'Create Account is on a sign-in other than the plain one')
+    assert.match(src, /onCreate=\{async \(details\) => \{\s*const out = await createAccount\(details\)/, 'the browser cannot make an account on the way to the unlock')
 
     const native = readFileSync(new URL('../mobile/src/screens/SignIn.js', import.meta.url), 'utf8')
     assert.ok(!/useState\('code'\)/.test(native), 'the phone leads with a code box again')
