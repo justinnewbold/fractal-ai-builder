@@ -214,6 +214,9 @@ export const FILES = [
    * not have.
    */
   { source: '../src/lib/slots.js', target: '../mobile/src/lib/slots.js' },
+  /* Where the preset list's quick jumps land — 100s on a 512-slot unit, 20s
+     on an AM4 — so the phone's row of them and the browser's agree. */
+  { source: '../src/lib/presetJumps.js', target: '../mobile/src/lib/presetJumps.js' },
   /*
    * And how two copies of a stage become one.
    *
