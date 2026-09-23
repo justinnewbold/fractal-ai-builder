@@ -95,6 +95,9 @@ export default function Settings({
    * everyone who came to change the tile size.
    */
   const [accountMenu, setAccountMenu] = useState(false)
+  /* The account's email, when there is a real one: a pairing code's account
+     is not somebody's email and is not called one. */
+  const signedInAs = account?.email && !isPairAccount(account.email) ? account.email : null
   const [changing, setChanging] = useState(false)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState(null)
@@ -232,9 +235,50 @@ export default function Settings({
       {page === null ? (
         <>
           {head('Settings')}
-          <Text style={{ color: color.silkFaint, fontSize: font.small, fontFamily: face }}>
-            {`v${APP_VERSION}`}
-          </Text>
+          {/*
+            WHICH ACCOUNT, BESIDE THE VERSION. "Can we also list the user
+            account if they're signed in and if they're not signed in, have it
+            say not signed in. Then clicking on it will take them to where they
+            can sign in or otherwise show them their account info… where they
+            can sign out or change our password."
+
+            Signed in, it opens Phone & computer with the account's own sheet
+            up — password — and Sign out on the page under it. Not signed in,
+            it goes straight to the sign-in.
+          */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
+            <Text style={{ color: color.silkFaint, fontSize: font.small, fontFamily: face }}>
+              {`v${APP_VERSION}`}
+            </Text>
+            {asked ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={signedInAs ? `Signed in as ${signedInAs}. Account` : 'Not signed in. Sign in'}
+                hitSlop={8}
+                style={{ flexShrink: 1 }}
+                onPress={() => {
+                  if (signedInAs) {
+                    setNote(null)
+                    setError(null)
+                    setPage('link')
+                    setAccountMenu(true)
+                  } else if (onSignIn && !isPairAccount(account?.email)) {
+                    onSignIn()
+                  } else {
+                    setPage('link')
+                  }
+                }}
+              >
+                <Text
+                  numberOfLines={1}
+                  ellipsizeMode="middle"
+                  style={{ color: signedInAs ? color.silkDim : color.signal, fontSize: font.small, textAlign: 'right' }}
+                >
+                  {signedInAs || (isPairAccount(account?.email) ? 'Paired, no account' : 'Not signed in')}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
           <View style={{ gap: 0 }}>
             {/*
               First, because it is the only row here anybody opens for the fun

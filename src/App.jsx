@@ -4124,7 +4124,30 @@ export default function App() {
         */}
         {setupPage === null ? (
           <>
-            <div className="device-meta mono setup-version">{FULL}</div>
+            {/*
+              WHICH ACCOUNT, BESIDE THE VERSION. "Can we also list the user
+              account if they're signed in and if they're not signed in, have
+              it say not signed in. Then clicking on it will take them to where
+              they can sign in or otherwise show them their account info."
+              It opens Phone & computer, which holds both: the Account section
+              (Sign out, or Sign in) and, on the computer, the phone remote's
+              own sign-in.
+            */}
+            <div className="setup-version-row">
+              <div className="device-meta mono setup-version">{FULL}</div>
+              <button
+                type="button"
+                className={`setup-account${signedInHere ? '' : ' out'}`}
+                onClick={() => setSetupPage('link')}
+                aria-label={signedInHere ? `Signed in as ${link.account.email}. Account` : 'Not signed in. Sign in'}
+              >
+                {signedInHere
+                  ? link.account.email
+                  : isPairAccount(link.account?.email)
+                    ? 'Paired, no account'
+                    : 'Not signed in'}
+              </button>
+            </div>
             <div className="setup-rows">
               {/*
                 First, because it is the only row here anybody opens for the

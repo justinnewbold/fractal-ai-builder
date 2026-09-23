@@ -3195,6 +3195,28 @@ export function run(test) {
     assert.match(flat, /Finding \$\{link\.macName \|\| 'your computer'\}/, 'the wait does not say what it is waiting for')
   })
 
+  test('Settings says which account is signed in beside the version, and opens it', async () => {
+    /*
+     * "On this screen at the top either next to the version number or next
+     * to where it says the unit name can we also list the user account if
+     * they're signed in and if they're not signed in, have it say not signed
+     * in. Then clicking on it will take them to where they can sign in or
+     * otherwise show them their account info."
+     */
+    const phone = read('mobile/src/screens/Settings.js').replace(/\s+/g, ' ')
+    const top = phone.slice(phone.indexOf("{head('Settings')}"), phone.indexOf('title="Amp & pedal names"'))
+    assert.match(top, /\{`v\$\{APP_VERSION\}`\}/, 'the version left the top of the phone’s Settings')
+    assert.match(top, /signedInAs \|\| \(isPairAccount\(account\?\.email\) \? 'Paired, no account' : 'Not signed in'\)/, 'the phone does not say who is signed in, or that nobody is')
+    assert.match(top, /setPage\('link'\) setAccountMenu\(true\)/, 'the phone’s account line does not open the account')
+    assert.match(top, /onSignIn\(\)/, 'the phone’s Not signed in goes nowhere near a sign-in')
+
+    const web = read('src/App.jsx').replace(/\s+/g, ' ')
+    const head = web.slice(web.indexOf('<div className="setup-version-row">'), web.indexOf('<div className="setup-rows">'))
+    assert.match(head, /\{FULL\}/, 'the version left the top of the browser’s Settings')
+    assert.match(head, /signedInHere \? link\.account\.email : isPairAccount\(link\.account\?\.email\) \? 'Paired, no account' : 'Not signed in'/, 'the browser does not say who is signed in, or that nobody is')
+    assert.match(head, /onClick=\{\(\) => setSetupPage\('link'\)\}/, 'the browser’s account line does not open the page with the account on it')
+  })
+
   test('the phone’s preset list has the browser’s jumps, sized to the unit', async () => {
     /*
      * "Can we add the 100 200 300 400 500 thing to the mobile apps as well?
