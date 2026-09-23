@@ -1266,6 +1266,14 @@ export function run(test) {
     const onb = read('src/components/Onboarding.jsx')
     assert.match(onb, /\{D4\.unlock\}/)
     assert.match(onb, /D4\.notUnlocked\(link\.account\.email\)/)
+    /*
+     * And what step 3 opens is on top of it. "The sign-in button on this mac
+     * app screen doesn't work" — it opened the sign-in under the walkthrough.
+     */
+    const css = read('src/styles.css')
+    const z = (name) => Number((css.match(new RegExp(`--z-${name}: (\\d+);`)) || [])[1])
+    assert.match(css, /\.onb \{[^}]*z-index: var\(--z-onb\);/, 'the walkthrough has a height of its own again')
+    assert.ok(z('bar') < z('onb') && z('onb') < z('scrim'), 'the walkthrough is over a sheet it opens, or under the bar it covers')
     assert.equal(D4.notUnlocked('a@b.c'), 'a@b.c hasn’t unlocked the phone remote yet. This computer app is free to use on its own; the phone remote is the one-time unlock.')
   })
 
