@@ -62,6 +62,7 @@ import {
  */
 import { isPairAccount } from '../../shared/pairing.mjs'
 import { holders } from '../../shared/editors.mjs'
+import { D4 } from '../../shared/onboarding.mjs'
 export { isPairAccount, HOSTED_ORIGIN } from '../../shared/pairing.mjs'
 
 /**
@@ -966,9 +967,35 @@ export async function setUpMac({ email, password }) {
   // A person's own account replaces any pairing this Mac had.
   saveRemoteConfig({ ...config, email: email.trim(), pairCode: null })
   set({ account: await currentAccount() })
+  /*
+   * THE UNLOCK FIRST. The relay lets only an account that has bought the
+   * phone remote onto its channel, and turning the host on for one that has
+   * not ended in "realtime CHANNEL_ERROR" and nothing to do about it. So ask
+   * the server — the same question the phone and the browser ask — and stop
+   * here with the reason if the answer is a plain no. The device server is
+   * still signed in, so buying it later turns the host on without the
+   * password again (App's buyHere). A question that could not be put is not
+   * a no, and goes on as before.
+   */
+  /* Looked up when used: the purchase library is the browser's alone. */
+  const { checkUnlocked } = await import('./webPurchase.js')
+  const { unlocked, unknown } = await checkUnlocked()
+  if (!unlocked && !unknown) {
+    const { cloudLogin } = await device()
+    await cloudLogin(email, password).catch(() => {})
+    const err = new Error(D4.notUnlocked(email.trim()))
+    err.code = 'not-unlocked'
+    throw err
+  }
   await turnOnMac({ email, password })
   return state
 }
+
+/** The relay's refusal, in words: it is what an account without the unlock meets. */
+const plainRelay = (err) =>
+  /CHANNEL_ERROR|channel error/i.test(String(err?.message || err))
+    ? new Error('The phone remote needs the one-time unlock on this account. Open Settings → Unlock the full version.')
+    : err
 
 /*
  * `pairMac` WAS HERE, and it is gone.
@@ -994,8 +1021,12 @@ export async function setUpMac({ email, password }) {
 /** Sign the device server in with the same details, and turn the host on. */
 async function turnOnMac({ email, password }) {
   const { cloudLogin, remoteEnable, writeHostDoc, readHostDoc } = await device()
-  await cloudLogin(email, password)
-  const res = await remoteEnable(true)
+  await cloudLogin(email, password).catch((err) => {
+    throw plainRelay(err)
+  })
+  const res = await remoteEnable(true).catch((err) => {
+    throw plainRelay(err)
+  })
   if (res?.error) throw new Error("Signed in, but couldn't turn the phone remote on. Try again.")
   await writeHostDoc('remote.host', { wanted: true, at: Date.now() })
   if (!(await readHostDoc('host.name'))?.name) {
@@ -1008,7 +1039,9 @@ async function turnOnMac({ email, password }) {
 /** Turn the Mac's phone remote on or off, and remember which. */
 export async function setMacRemote(on) {
   const { remoteEnable, writeHostDoc } = await device()
-  const res = await remoteEnable(!!on)
+  const res = await remoteEnable(!!on).catch((err) => {
+    throw plainRelay(err)
+  })
   if (on && res?.error) throw new Error("Couldn't turn it on. Check this computer is online, then try again.")
   await writeHostDoc('remote.host', { wanted: !!on, at: Date.now() })
   await readMac()

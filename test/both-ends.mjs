@@ -1233,14 +1233,56 @@ export function run(test) {
    * a phone. The phone app's own walkthrough is drawn instead there, from the
    * same words and the same pictures as the phone's.
    */
+  test('the computer app starts with three ways in, and an account without the unlock is offered it', async () => {
+    /*
+     * "It's not showing any unlock options, basically in the beginning… I
+     * didn't see any demo options whatsoever… there needs to be a clear way
+     * to unlock it from the beginning or try a demo or just use the Mac app
+     * without the phone." And: signing in on the computer "gave that error…
+     * realtime CHANNEL_ERROR. Also, no way to unlock it at that point."
+     */
+    const { C3, D4 } = await import('../shared/onboarding.mjs')
+    const web = read('src/components/PhoneWalkthrough.jsx').replace(/\s+/g, ' ')
+    /* Three cards on the computer: here, the demo, the phone remote. */
+    for (const piece of ['{C3.here.title}', "onClick={() => onHere?.()}", '{P3.demo.go}', '{computer ? C3.phone.title : P3.real.title}', '{P3.real.agree}']) {
+      assert.ok(web.includes(piece), `the computer's choice screen lost ${piece}`)
+    }
+    assert.ok(!/no account/i.test(C3.here.body), 'the computer card promises no account, which the pairing rule forbids')
+
+    /* The sign-in asks about the unlock before it turns the phone remote on. */
+    const link = read('src/lib/link.js')
+    const setUp = link.slice(link.indexOf('export async function setUpMac'), link.indexOf('/** The relay'))
+    assert.ok(setUp.indexOf('checkUnlocked()') > 0 && setUp.indexOf('checkUnlocked()') < setUp.indexOf('await turnOnMac('), 'the phone remote is turned on before anybody asks whether it was bought')
+    assert.match(setUp, /err\.code = 'not-unlocked'/)
+    assert.match(link, /CHANNEL_ERROR\|channel error/, 'the relay’s refusal reaches the screen in its own words again')
+
+    /* And the app answers that with the unlock, then turns it on once bought. */
+    const app = read('src/App.jsx').replace(/\s+/g, ' ')
+    assert.match(app, /if \(err\?\.code !== 'not-unlocked'\) throw err/, 'an account without the unlock is shown an error rather than the unlock')
+    assert.match(app, /setUnlockAfterSignIn\(true\) return/, 'the unlock does not open after that sign-in')
+    assert.match(app, /linkState\(\)\.role === 'mac'\) \{ await checkUnlocked\(\) try \{ await setMacRemote\(true\)/, 'buying on the computer does not turn its phone remote on')
+
+    /* The sign-in step says so too, rather than waiting for ever. */
+    const onb = read('src/components/Onboarding.jsx')
+    assert.match(onb, /\{D4\.unlock\}/)
+    assert.match(onb, /D4\.notUnlocked\(link\.account\.email\)/)
+    assert.equal(D4.notUnlocked('a@b.c'), 'a@b.c hasn’t unlocked the phone remote yet. This computer app is free to use on its own; the phone remote is the one-time unlock.')
+  })
+
   test('a phone gets the phone’s walkthrough, in the browser too', () => {
     const app = read('src/App.jsx')
     const web = read('src/components/PhoneWalkthrough.jsx')
     const phone = read('mobile/src/screens/Onboarding.js')
 
     assert.match(app, /const phoneEnd = link\.role === 'remote' \|\| link\.role === 'wifi' \|\| \(isDemo\(\) && link\.canHost === false\)/, 'the browser no longer tells a phone from a computer for its walkthrough')
-    assert.match(app, /<PhoneWalkthrough\s+open=\{walkthrough && phoneEnd\}/, 'a phone’s browser is not shown the phone’s walkthrough')
-    assert.match(app, /<Onboarding\s+open=\{walkthrough && computerEnd\}/, 'the computer’s walkthrough is shown to something that is not the computer')
+    assert.match(app, /<PhoneWalkthrough\s+open=\{walkthrough && \(phoneEnd \|\| \(computerEnd && !computerSetup\)\)\}/, 'a phone’s browser is not shown the phone’s walkthrough')
+    /*
+     * And the computer gets its welcome too, then its own plug-in steps.
+     * "There needs to be a clear way to unlock it from the beginning or try a
+     * demo or just use the Mac app without the phone."
+     */
+    assert.match(app, /computer=\{computerEnd\}/, 'the computer is shown the phone’s choice screen, without its own cards')
+    assert.match(app, /<Onboarding\s+open=\{walkthrough && computerEnd && computerSetup\}\s+start="unit"/, 'the computer’s plug-in steps are shown to something that is not the computer, or before it chose to use it here')
 
     /* The same steps, from the same words file, in the same order. */
     for (const words of ['P1.head', 'P1.go', 'P1.haveCode', 'P2.head', 'P2.go', 'P3.head', 'P3.demo.go', 'P3.real.go', 'P3.signIn', 'P4.head', 'P4.go(unitName)', 'P4.back', 'P9.demo.head', 'P9.go']) {

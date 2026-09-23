@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { CHAIN, CLOSE, P1, P2, P3, P4, P9 } from '../../shared/onboarding.mjs'
+import { C3, CHAIN, CLOSE, P1, P2, P3, P4, P9 } from '../../shared/onboarding.mjs'
 import { WELCOME_NOTICE } from '../../shared/affiliation.mjs'
 import { UNITS } from '../lib/demoUnits'
 import { setDemo, setDemoUnit } from '../lib/forgefx'
@@ -46,7 +46,21 @@ const PIECES = { unit: pieceUnit, computer: pieceComputer, phone: piecePhone }
  *  - The demo starts with a reload, because which end this is was decided
  *    when the page loaded; the phone flips a switch.
  */
-export default function PhoneWalkthrough({ open, replay = false, onClose, onAccount, onUnlock }) {
+/*
+ * AND FOR THE COMPUTER APP TOO, with `computer`.
+ *
+ * "It's not showing any unlock options, basically in the beginning… I didn't
+ * see any demo options whatsoever… there needs to be a clear way to unlock it
+ * from the beginning or try a demo or just use the Mac app without the phone…
+ * make sure that the desktop apps have been updated with all of the new
+ * features and icons and screens that we created for the phones, but it needs
+ * to be desktop related."
+ *
+ * The same welcome and the same three pieces. At the choice the computer has
+ * three cards (C3): use it here — which hands over to the computer's own
+ * plug-in steps, `onHere` — the demo, and the phone remote's unlock.
+ */
+export default function PhoneWalkthrough({ open, replay = false, computer = false, onClose, onAccount, onUnlock, onHere }) {
   const [at, setAt] = useState('welcome')
   const [unit, setUnit] = useState(UNITS[0].key)
   /* The box under Connect my real rig. Unlock stays grey until it is ticked. */
@@ -93,7 +107,7 @@ export default function PhoneWalkthrough({ open, replay = false, onClose, onAcco
               <img src={welcomeShot} alt="A Fractal Audio FM3" />
             </div>
             <h1 className="pw-welcome-head">{P1.head}</h1>
-            <p className="pw-welcome-sub">{P1.sub}</p>
+            <p className="pw-welcome-sub">{computer ? C3.welcomeSub : P1.sub}</p>
             <ul className="pw-features">
               {P1.features.map((label) => (
                 <li key={label}>
@@ -158,21 +172,38 @@ export default function PhoneWalkthrough({ open, replay = false, onClose, onAcco
           <>
             <Progress count={P3.count} at={1} of={2} title={P3.title} />
             <h1 className="pw-head">{P3.head}</h1>
-            <p className="pw-sub">{P3.sub}</p>
+            <p className="pw-sub">{computer ? C3.sub : P3.sub}</p>
+
+            {/* The computer's first card: it works on its own, free. */}
+            {computer ? (
+              <div className="pw-choice lit">
+                <div className="pw-choice-top">
+                  <div className="pw-choice-words">
+                    <p className="pw-choice-eyebrow">{C3.here.eyebrow}</p>
+                    <p className="pw-choice-title">{C3.here.title}</p>
+                    <p className="pw-choice-body">{C3.here.body}</p>
+                  </div>
+                  <img className="pw-unit-shot" src={pieceComputer} alt="" />
+                </div>
+                <button type="button" className="primary pw-go" onClick={() => onHere?.()}>
+                  {C3.here.go}
+                </button>
+              </div>
+            ) : null}
 
             {/* Two cards, and only one lit, as on the phone: the demo costs
                 nothing and works this second; the real rig wants a computer
                 and a purchase. */}
-            <div className="pw-choice lit">
+            <div className={computer ? 'pw-choice' : 'pw-choice lit'}>
               <div className="pw-choice-top">
                 <div className="pw-choice-words">
                   <p className="pw-choice-eyebrow">{P3.demo.eyebrow}</p>
                   <p className="pw-choice-title">{P3.demo.title}</p>
-                  <p className="pw-choice-body">{P3.demo.body}</p>
+                  <p className="pw-choice-body">{computer ? C3.demoBody : P3.demo.body}</p>
                 </div>
                 <img className="pw-unit-shot" src={unitShot} alt="" />
               </div>
-              <button type="button" className="primary pw-go" onClick={() => setAt('pick')}>
+              <button type="button" className={computer ? 'chip pw-go' : 'primary pw-go'} onClick={() => setAt('pick')}>
                 {P3.demo.go}
               </button>
             </div>
@@ -180,9 +211,9 @@ export default function PhoneWalkthrough({ open, replay = false, onClose, onAcco
             <div className="pw-choice">
               <div className="pw-choice-top">
                 <div className="pw-choice-words">
-                  <p className="pw-choice-eyebrow">{P3.real.eyebrow}</p>
-                  <p className="pw-choice-title">{P3.real.title}</p>
-                  <p className="pw-choice-body">{P3.real.body}</p>
+                  <p className="pw-choice-eyebrow">{computer ? C3.phone.eyebrow : P3.real.eyebrow}</p>
+                  <p className="pw-choice-title">{computer ? C3.phone.title : P3.real.title}</p>
+                  <p className="pw-choice-body">{computer ? C3.phone.body : P3.real.body}</p>
                 </div>
                 <span className="pw-lock" aria-hidden="true" />
               </div>
@@ -191,7 +222,7 @@ export default function PhoneWalkthrough({ open, replay = false, onClose, onAcco
                 <span>{P3.real.agree}</span>
               </label>
               <button type="button" className="chip pw-go" disabled={!agreed} onClick={() => agreed && leave(onUnlock)}>
-                {P3.real.go}
+                {computer ? C3.phone.go : P3.real.go}
               </button>
             </div>
 
