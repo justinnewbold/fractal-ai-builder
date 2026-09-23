@@ -64,6 +64,8 @@ import { editButtonShows } from './lib/playMode'
 import { FIXES, FIRMWARE_NOTE, fixById, fixFor, versionsInSync } from '../shared/troubleshooting.mjs'
 import { osGuess, waysFor, waysWord } from '../shared/ways-in.mjs'
 import { AFFILIATION } from '../shared/affiliation.mjs'
+import { isAdmin } from '../shared/admin.mjs'
+import AccessTool from './components/AccessTool'
 import { remember as rememberPreset, CHANGED as MARKS_CHANGED } from './lib/presetMarks'
 import { CHANGED as SETLISTS_CHANGED } from './lib/setlists'
 import { syncSetlists, setlistCloudReady } from './lib/cloudSetlists'
@@ -381,6 +383,8 @@ const SETUP_PAGES = {
   help: 'Troubleshooting',
   updates: 'Updates',
   about: 'About',
+  /* Justin's own tools, on his account only — see shared/admin.mjs. */
+  access: 'Give someone access',
   /* The phone's sheet is titled Unlock; so is this page. */
   unlock: 'Unlock'
 }
@@ -4228,6 +4232,9 @@ export default function App() {
                 onClick={() => setSetupPage('phone')}
               />
               <SetupRow key="about" title="About" status={FULL} onClick={() => setSetupPage('about')} />
+              {isAdmin(link.account?.email) ? (
+                <SetupRow key="access" title="Give someone access" status="Unlock an account by hand" onClick={() => setSetupPage('access')} />
+              ) : null}
             </div>
             {/*
               THE TWO THAT ARE NOT DOORS, and they are here rather than behind one.
@@ -4689,6 +4696,16 @@ export default function App() {
             </button>
             <p className="setup-page-title">{SETUP_PAGES.unlock}</p>
             {unlockBody}
+          </div>
+        ) : null}
+
+        {setupPage === 'access' && isAdmin(link.account?.email) ? (
+          <div className="setup-page">
+            <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
+              ‹ Settings
+            </button>
+            <p className="setup-page-title">{SETUP_PAGES.access}</p>
+            <AccessTool />
           </div>
         ) : null}
 

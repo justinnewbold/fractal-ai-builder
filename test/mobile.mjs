@@ -3312,6 +3312,39 @@ export function run(test) {
     assert.match(web, /\{mismatch \|\|/, 'the browser says the generic line over the real reason')
   })
 
+  test('Give someone access is his alone, on both ends and on the server', async () => {
+    /*
+     * "Do I have an ability to manually activate an account for somebody?"
+     * "Yes, build that in and only when logged into the justinnewbold@icloud.com
+     * account."
+     */
+    const { ADMINS, isAdmin, accessAction } = await import('../shared/admin.mjs')
+    const { fold } = await import('../shared/owner-unlock.mjs')
+    assert.deepEqual(ADMINS, [fold('justinnewbold@icloud.com')], 'the tools are for some other account')
+    assert.ok(isAdmin('justinnewbold@icloud.com') && isAdmin(' JustinNewbold@iCloud.com '), 'his own account does not get the tools')
+    assert.ok(!isAdmin('justinnewbold@mac.com') && !isAdmin('') && !isAdmin(null), 'somebody else gets the tools')
+
+    /* The server holds the same list, and checks it before doing anything. */
+    const server = read('supabase/functions/grant-access/index.ts')
+    const copied = JSON.parse((server.match(/const ADMINS = (\[[^\]]*\])/) || [])[1]?.replace(/'/g, '"') || 'null')
+    assert.deepEqual(copied, ADMINS, 'the server and the apps disagree about whose tools these are')
+    assert.ok(server.indexOf('ADMINS.includes(fold(me.email))') < server.indexOf("rpc('account_for_email'"), 'the server looks somebody up before checking who is asking')
+    assert.match(server, /actions\/grant_entitlement/, 'the server does not grant through RevenueCat')
+    assert.match(server, /actions\/revoke_granted_entitlement/, 'the server cannot take a grant back')
+    const sql = read('supabase/migrations/20260923_account_for_email.sql')
+    assert.match(sql, /revoke all on function public\.account_for_email\(text\) from public, anon, authenticated/, 'a client can look up whether an email has an account')
+
+    /* Both ends draw the page only for him. */
+    assert.match(read('mobile/src/screens/Settings.js'), /\{page === 'access' && isAdmin\(account\?\.email\) \?/)
+    assert.match(read('src/App.jsx'), /\{setupPage === 'access' && isAdmin\(link\.account\?\.email\) \?/)
+
+    /* And the call never throws, whatever the line does. */
+    const down = await accessAction({ url: 'x', anonKey: 'k', token: 't', action: 'check', email: 'a@b.c', fetchImpl: () => Promise.reject(new Error('offline')) })
+    assert.equal(down.ok, false)
+    const signedOut = await accessAction({ url: 'x', anonKey: 'k', token: null, action: 'check', email: 'a@b.c' })
+    assert.equal(signedOut.message, 'Sign in first.')
+  })
+
   test('the advice to close Fractal’s own software names it, per unit where the unit is known', async () => {
     /*
      * "What kind of information do we have to let people know they need to
@@ -4289,7 +4322,9 @@ export function run(test) {
       'Phone & computer',
       'Rename presets and scenes',
       'Unlock the full version',
-      'About'
+      'About',
+      /* Last, and drawn only on his own account — shared/admin.mjs. */
+      'Give someone access'
     ], 'the Setup rows are not in the order he asked for')
 
     /*
