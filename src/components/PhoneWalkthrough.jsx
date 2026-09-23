@@ -9,7 +9,13 @@ import { markOnboarded } from './Onboarding'
 import unitShot from '../../mobile/assets/unit-fm3.png'
 /* His photograph of an FM3, sent for the first screen: "I included the photo
    of the fractal device separately". */
-import welcomeShot from '../assets/welcome-fm3.jpg'
+import welcomeShot from '../../mobile/assets/welcome/fm3.jpg'
+/* And the five tile pictures cut from his mockup, the phone's same files. */
+import featurePresets from '../../mobile/assets/welcome/presets.png'
+import featureScenes from '../../mobile/assets/welcome/scenes.png'
+import featureBlocks from '../../mobile/assets/welcome/blocks.png'
+import featureTuner from '../../mobile/assets/welcome/tuner.png'
+import featureTempo from '../../mobile/assets/welcome/tempo.png'
 import pieceUnit from '../../mobile/assets/piece-unit.png'
 import pieceComputer from '../../mobile/assets/piece-computer.png'
 import piecePhone from '../../mobile/assets/piece-phone.png'
@@ -92,7 +98,11 @@ export default function PhoneWalkthrough({ open, replay = false, onClose, onAcco
               {P1.features.map((label) => (
                 <li key={label}>
                   <span className="pw-feature-tile" aria-hidden="true">
-                    <FeatureIcon name={label} />
+                    {/* White on clear, so a mask takes the theme's colour. */}
+                    <span
+                      className="pw-feature-picture"
+                      style={{ WebkitMaskImage: `url(${FEATURE_PICTURES[label]})`, maskImage: `url(${FEATURE_PICTURES[label]})` }}
+                    />
                   </span>
                   <span className="pw-feature-label">{label}</span>
                 </li>
@@ -266,48 +276,11 @@ function Progress({ count, at, of, title }) {
   )
 }
 
-/*
- * The five tiles' pictures, drawn after his mockup: a list, two scenes
- * overlapping, three blocks, a tuning fork, a metronome. Lines in the
- * current colour, so the tile's CSS decides it.
- */
-function FeatureIcon({ name }) {
-  const common = { width: 30, height: 30, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round', strokeLinejoin: 'round' }
-  if (name === 'PRESETS')
-    return (
-      <svg {...common}>
-        <path d="M8 6h12M8 12h12M8 18h12" />
-        <circle cx="4" cy="6" r="0.6" fill="currentColor" />
-        <circle cx="4" cy="12" r="0.6" fill="currentColor" />
-        <circle cx="4" cy="18" r="0.6" fill="currentColor" />
-      </svg>
-    )
-  if (name === 'SCENES')
-    return (
-      <svg {...common}>
-        <rect x="4" y="4" width="11" height="11" rx="2" />
-        <rect x="9" y="9" width="11" height="11" rx="2" />
-      </svg>
-    )
-  if (name === 'BLOCKS')
-    return (
-      <svg {...common}>
-        <rect x="2" y="12.5" width="5.5" height="5.5" rx="1.2" />
-        <rect x="9.25" y="6" width="5.5" height="5.5" rx="1.2" />
-        <rect x="16.5" y="12.5" width="5.5" height="5.5" rx="1.2" />
-      </svg>
-    )
-  if (name === 'TUNER')
-    return (
-      <svg {...common}>
-        <path d="M8 3v7a4 4 0 0 0 8 0V3M12 14v7" />
-      </svg>
-    )
-  return (
-    <svg {...common}>
-      <path d="M9.5 3h5L19 21H5L9.5 3z" />
-      <path d="M7.5 15h9M12 15l4-9" />
-      <circle cx="12" cy="15" r="1.2" />
-    </svg>
-  )
+/* The five tiles' pictures, by the label under each. */
+const FEATURE_PICTURES = {
+  PRESETS: featurePresets,
+  SCENES: featureScenes,
+  BLOCKS: featureBlocks,
+  TUNER: featureTuner,
+  'TAP TEMPO': featureTempo
 }
