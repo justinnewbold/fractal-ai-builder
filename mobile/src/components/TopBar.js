@@ -218,7 +218,8 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
       <Pressable
         onPress={onOpenUnit || onOpenSettings}
         accessibilityRole="button"
-        accessibilityLabel={demo ? 'Demo Unit' : 'About this unit'}
+        /* Named for where it goes: Setup, not a page about the unit. */
+        accessibilityLabel={demo ? 'Demo Unit' : 'Settings'}
         hitSlop={8}
       >
         <Text

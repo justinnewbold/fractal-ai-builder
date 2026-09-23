@@ -155,7 +155,10 @@ export default function TopBar({
         <button
           className="topbar-unit silk-label"
           onClick={onOpenUnit}
-          aria-label={demo ? 'Demo Unit' : 'About this unit'}
+          /* Named for where it goes. It was labelled as a page about the
+             unit and opened Phone & computer, so a screen reader named one
+             page and landed on another. */
+          aria-label={demo ? 'Demo Unit' : 'Phone & computer'}
         >
           {unit}
         </button>

@@ -8,6 +8,7 @@ import { haveSession, linkState, probeNow, startLink, stopLink, subscribeLink } 
 import { currentAccount, signOut } from './src/lib/relay'
 import { isPairAccount } from './src/lib/pairing'
 import Note from './src/components/Note'
+import Press from './src/components/Press'
 import TopBar from './src/components/TopBar'
 import DemoUnit from './src/components/DemoUnit'
 import Settings from './src/screens/Settings'
@@ -727,7 +728,7 @@ export default function App() {
             */}
             <EdgeBack onBack={backFrom}>
             {settling && screen === 'stage' ? (
-              <Waking link={link} />
+              <Waking link={link} onRetry={probeNow} />
             ) : screen === 'presets' ? (
               <Presets onBack={() => setScreen('stage')} />
             ) : screen === 'setlists' ? (
@@ -910,7 +911,10 @@ const ofError = (s) => s.error
  * over a spinner tells somebody standing in front of a silent rig nothing they
  * can act on — and what they can act on is usually the Mac.
  */
-function Waking({ link }) {
+/* How long "Finding your computer…" stands on its own before it says more. */
+const WAKING_LONG_MS = 15000
+
+function Waking({ link, onRetry }) {
   const said =
     link.link === 'connected'
       ? 'Asking your unit what it is\u2026'
@@ -931,6 +935,24 @@ function Waking({ link }) {
       live = false
     }
   }, [])
+  /*
+   * AND IT STOPS JUST SPINNING. "Been stuck on connecting screen for over a
+   * minute on iOS. How long until it times out and displays troubleshooting
+   * or refresh button. I usually force close." It never did: a join that
+   * fails goes back to joining, so this screen could spin for as long as the
+   * app was open, with nothing to press. After fifteen seconds it says what
+   * to check — the phone's own sentence from Setup — and offers the same
+   * button Setup has. The gear is still up top for a different account.
+   *
+   * That night the phone was signed in as one account and the computer as
+   * another, and the line above names the one this phone is using.
+   */
+  const [long, setLong] = useState(false)
+  useEffect(() => {
+    setLong(false)
+    const t = setTimeout(() => setLong(true), WAKING_LONG_MS)
+    return () => clearTimeout(t)
+  }, [link.link])
   return (
     <View
       accessibilityLiveRegion="polite"
@@ -943,6 +965,15 @@ function Waking({ link }) {
           {'Make sure you’re connected to your computer using '}
           <Text style={{ color: color.silkDim, fontWeight: '700' }}>{email}</Text>.
         </Text>
+      ) : null}
+      {long && link.link !== 'connected' ? (
+        <View style={{ alignSelf: 'stretch', gap: space.md }}>
+          <Note tone="warn">
+            Open the Fractal app on the computer and make sure the computer is awake. This keeps trying on
+            its own.
+          </Note>
+          <Press label="Look for the computer again" onPress={() => onRetry?.()} />
+        </View>
       ) : null}
     </View>
   )

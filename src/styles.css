@@ -4477,9 +4477,15 @@ button.chan-btn.current {
   gap: var(--s-1);
   margin: var(--s-3) 0 0;
   border-bottom: 1px solid var(--rule);
+  /* An amp has ten pages, more than the panel is wide. They wrap onto a
+     second line rather than scrolling sideways, where a mouse would never
+     find the ones past the edge. */
+  flex-wrap: wrap;
 }
 
 .block-tabs button {
+  flex: none;
+  white-space: nowrap;
   background: none;
   border: none;
   border-radius: 0;;

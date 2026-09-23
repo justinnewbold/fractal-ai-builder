@@ -19,6 +19,7 @@ import {
 import { colLabel, doubtfulWrite, gridShape, isSplitChain, laneItems, lanesShown, rowLabel } from '../lib/grid-plan'
 import { blockPositions, landingIndex, reorderPlan, settledItems } from '../lib/laneOrder'
 import { isSilencingParam } from '../lib/guardrails'
+import { editPages, pageFor, pageHolding } from '../lib/editPages'
 import { buildParamIndex, findControls, indexFor } from '../lib/paramIndex'
 import { beginChainWrite, endChainWrite, getState, noteEdited, refreshBlocks, useRig, writeBypass, writeChannel } from '../lib/rig'
 import { useKeepAwake } from 'expo-keep-awake'
@@ -382,6 +383,8 @@ function BlockPanel({ block, channels, focus, onError, onScrollLock }) {
      `block.eid`, and what it cost to find out. */
   const eid = idOf(block)
   const [params, setParams] = useState([])
+  /* The editor's own pages for this block, as the unit sent them. */
+  const [layout, setLayout] = useState(null)
   const [models, setModels] = useState([])
   /* Which model this block is on. It comes back on the params read and nowhere
      else — /preset/blocks has never carried one. */
@@ -410,6 +413,7 @@ function BlockPanel({ block, channels, focus, onError, onScrollLock }) {
         ])
         if (stop) return
         setParams(p?.named || [])
+        setLayout(p?.layout || null)
         setModels(t || [])
         setType_(p?.type ?? null)
       } catch (err) {
@@ -437,11 +441,11 @@ function BlockPanel({ block, channels, focus, onError, onScrollLock }) {
   const editable = params.filter((p) => !isSilencingParam(p.name))
   const level = params.find((p) => /^.*\bLevel$/i.test(p.name) && !/boost|input/i.test(p.name))
 
-  /* The first handful are what anyone reaches for; the rest are behind a tab,
-     the way the hardware editors split them. */
-  const primary = editable.slice(0, 6)
-  const rest = editable.slice(6)
-  const shown = tab === 'main' ? primary : rest
+  /* Split into the pages Fractal's editor uses, where the unit says what
+     they are — see lib/editPages.js. */
+  const pages = editPages(editable, layout)
+  const onPage = pageFor(pages, tab)
+  const shown = onPage?.params || []
 
   /*
    * Search opens the right block, then puts your eyes on the control you named.
@@ -452,11 +456,18 @@ function BlockPanel({ block, channels, focus, onError, onScrollLock }) {
    * marking nothing, which looks exactly like a search result that did nothing.
    */
   const [lit, setLit] = useState(null)
+  /* Which search has already turned the page, so a tab pressed after it stays
+     pressed instead of being turned back to the search's page. */
+  const turned = useRef(null)
   useEffect(() => {
     if (!focus?.nonce || focus.eid !== eid) return undefined
-    const onMore = rest.some((p) => p.id === focus.paramId)
-    setTab(onMore ? 'more' : 'main')
     if (loading) return undefined
+    const holding = pageHolding(pages, focus.paramId)
+    if (holding && turned.current !== focus.nonce) {
+      turned.current = focus.nonce
+      setTab(holding.key)
+      return undefined
+    }
     if (!shown.some((p) => p.id === focus.paramId)) return undefined
     setLit(focus.paramId)
     const clear = setTimeout(() => setLit(null), 2500)
@@ -515,6 +526,8 @@ function BlockPanel({ block, channels, focus, onError, onScrollLock }) {
       fresh?.type?.value === Number(value) ? 'unit shows it' : `unit shows ${fresh?.type?.value ?? 'nothing'}, asked ${Number(value)}`
     )
     setParams(fresh?.named || [])
+    /* A new model can bring different pages with it. */
+    setLayout(fresh?.layout || null)
     setType_(fresh?.type ?? null)
     setLocal({})
     clearTimeout(undoTimer.current)
@@ -687,11 +700,23 @@ function BlockPanel({ block, channels, focus, onError, onScrollLock }) {
       ) : null}
 
       {/* ------------------------------------------------------------ knobs */}
-      {rest.length ? (
-        <View style={{ flexDirection: 'row', gap: space.sm }}>
-          <Press grow label="Main" tone="signal" on={tab === 'main'} height={44} onPress={() => setTab('main')} />
-          <Press grow label="More" tone="signal" on={tab === 'more'} height={44} onPress={() => setTab('more')} />
-        </View>
+      {/*
+        One tab per page. An amp has ten, more than a phone is wide, so the
+        row scrolls sideways rather than squeezing the words.
+      */}
+      {pages.length > 1 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
+          {pages.map((pg) => (
+            <Press
+              key={pg.key}
+              label={pg.name}
+              tone="signal"
+              on={pg.key === onPage?.key}
+              height={44}
+              onPress={() => setTab(pg.key)}
+            />
+          ))}
+        </ScrollView>
       ) : null}
 
       {/*
