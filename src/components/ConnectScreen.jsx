@@ -27,6 +27,7 @@
  */
 import { useEffect, useState } from 'react'
 import { isPairAccount } from '../lib/link'
+import { computerElsewhere } from '../lib/remote'
 import { P6 } from '../../shared/onboarding.mjs'
 import { DOWNLOADS_URL } from '../../mobile/src/lib/downloadLink'
 
@@ -59,6 +60,30 @@ export default function ConnectScreen({
     const t = setTimeout(() => setLong(true), 15000)
     return () => clearTimeout(t)
   }, [state])
+  /*
+   * And when the accounts don't match, it says so: "I was signed into the
+   * wrong account, but it didn't notify me at all." A computer on this wifi
+   * signed into a different account is a yes from the account server — yes
+   * or no, nothing about whose (lib/remote.js). Asked once it has been
+   * waiting a while, and every half minute after.
+   */
+  const [elsewhere, setElsewhere] = useState(false)
+  const asking = (state === 'joining' && long) || state === 'no-answer'
+  useEffect(() => {
+    if (!asking || paired) {
+      setElsewhere(false)
+      return undefined
+    }
+    let live = true
+    const ask = () => computerElsewhere().then((yes) => live && setElsewhere(yes))
+    ask()
+    const t = setInterval(ask, 30000)
+    return () => {
+      live = false
+      clearInterval(t)
+    }
+  }, [asking, paired])
+  const mismatch = elsewhere ? <Mismatch email={remembered} /> : null
 
   return (
     <section className="connect" data-state={state}>
@@ -71,14 +96,21 @@ export default function ConnectScreen({
           {account ? <Using email={remembered} paired={paired} /> : null}
           {long ? (
             <>
-              <p className="hint">
-                Make sure the Fractal app is open on the computer and the computer is awake. This keeps
-                trying on its own.
-              </p>
+              {mismatch || (
+                <p className="hint">
+                  Make sure the Fractal app is open on the computer and the computer is awake. This keeps
+                  trying on its own.
+                </p>
+              )}
               <div className="connect-actions">
                 <button className="primary" onClick={onRetry} disabled={busy}>
                   Try now
                 </button>
+                {elsewhere ? (
+                  <button className="chip" onClick={onSwitchAccount} disabled={busy}>
+                    Sign in as someone else
+                  </button>
+                ) : null}
               </div>
             </>
           ) : null}
@@ -86,10 +118,12 @@ export default function ConnectScreen({
       ) : state === 'no-answer' ? (
         <>
           <h2>Your computer isn&rsquo;t answering</h2>
-          <p>
-            Make sure the Fractal app is open on the computer and the computer is awake. This keeps trying on
-            its own.
-          </p>
+          {mismatch || (
+            <p>
+              Make sure the Fractal app is open on the computer and the computer is awake. This keeps trying on
+              its own.
+            </p>
+          )}
           <Using email={remembered} paired={paired} />
           <div className="connect-actions">
             <button className="primary" onClick={onRetry} disabled={busy}>
@@ -248,5 +282,16 @@ function NoComputerYet() {
         <strong>{DOWNLOADS_URL}</strong>
       </p>
     </>
+  )
+}
+
+/** The computer on this wifi is on another account: said, with which one this is. */
+function Mismatch({ email }) {
+  return (
+    <p className="connect-mismatch" role="alert">
+      {email
+        ? `The computer on this wifi is signed into a different account. This browser is signed in as ${email}. Sign the Fractal app on the computer in with ${email}, or sign this browser into the computer’s account.`
+        : 'The computer on this wifi is signed into a different account than this browser. Sign both into the same account.'}
+    </p>
   )
 }

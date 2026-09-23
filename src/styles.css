@@ -9117,6 +9117,17 @@ button.phone-chip.dim {
   color: var(--silk-dim);
 }
 
+/* The computer on this wifi is on another account. Said in the fault colour
+   along its edge, as the phone's fault note is, because it is the reason. */
+.connect > p.connect-mismatch {
+  color: var(--silk);
+  text-align: left;
+  border-left: 2px solid var(--fault);
+  padding: var(--s-2) var(--s-3);
+  background: var(--fault-halo);
+  border-radius: var(--r-1);
+}
+
 .connect-lamp {
   width: 12px;
   height: 12px;

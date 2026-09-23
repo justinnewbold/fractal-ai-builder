@@ -655,6 +655,22 @@ export async function currentAccount() {
 }
 
 /**
+ * Whether a computer on this wifi is signed into a different account.
+ *
+ * The phone's question, asked from the browser: see mobile/src/lib/relay.js.
+ * Yes or no and nothing more, and any failure is a no.
+ */
+export async function computerElsewhere() {
+  if (!client) return false
+  try {
+    const { data, error } = await client.rpc('computer_elsewhere')
+    return !error && data === true
+  } catch {
+    return false
+  }
+}
+
+/**
  * Sign out here, and everywhere the session was written.
  *
  * Scope 'local' rather than 'global' on purpose: signing out on a phone should
