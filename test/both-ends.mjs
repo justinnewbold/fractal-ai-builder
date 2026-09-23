@@ -1071,11 +1071,70 @@ export function run(test) {
     assert.match(src, /export const WEB_KEY = SANDBOX_KEY/, 'the web checkout is taking real money; if that was meant, change this check with it')
     assert.match(src, /const SANDBOX_KEY = 'rcb_sb_/, 'the sandbox key is not a sandbox key')
 
-    /* Loaded only on the unlock page: nobody who never buys downloads Stripe. */
+    /* Loaded only when there is a price to show: nobody driving their own rig downloads Stripe. */
     assert.match(src, /await import\('@revenuecat\/purchases-js'\)/, 'the payment library is loaded for everybody')
     assert.ok(!/^import .*@revenuecat\/purchases-js/m.test(src), 'the payment library is in the main bundle')
 
     /* And the row is only offered to somebody who can use it. */
     assert.match(app, /\{accountId && paid\.checked && !paid\.unlocked \? \(/, 'the unlock row shows to somebody signed out, or who has paid')
+  })
+
+  /**
+   * THE DEMO'S BAR SAYS UNLOCK AND THE PRICE, IN THE BROWSER AS ON THE PHONE.
+   *
+   * "When someone's on the demo, it should always say unlock, and then the
+   * price at the top? Otherwise, how's a user supposed to know how to go to
+   * settings to sign in?"
+   *
+   * The phone has had it since the demo could be bought from; the browser
+   * said DEMO and sent people to a page about the phone app, because at the
+   * time a browser could not take a card. It can now, so the two bars say the
+   * same thing: UNLOCK and the price for somebody who has not paid, DEMO and
+   * Exit demo for somebody who has.
+   */
+  test('the demo bar says unlock and the price in the browser, as on the phone', () => {
+    const bar = read('src/components/TopBar.jsx')
+    const phone = read('mobile/src/components/TopBar.js')
+
+    /* The same rule at both ends: the word is UNLOCK only while there is
+       something to sell this person. */
+    assert.match(phone, /const word = canBuy \? 'unlock' : demo \? 'demo'/, 'the phone bar stopped saying unlock in the demo')
+    assert.match(bar, /const canBuy = demo && Boolean\(onUnlock\)/, 'the browser bar offers the unlock outside the demo')
+    assert.match(bar, /\? canBuy\s*\? 'unlock'\s*: 'demo'/, 'the browser bar does not say unlock in the demo')
+
+    /* The word and the pill both go to the unlock, and the pill is the price. */
+    assert.match(bar, /onClick=\{onUnlock\}[\s\S]*?aria-label="Unlock the full version"/, 'UNLOCK does not open the unlock')
+    assert.match(bar, /\{canBuy && unlockPrice \? \(/, 'the price pill is not drawn beside UNLOCK')
+    assert.match(bar, /<span className="topbar-pill-face">\{unlockPrice\}<\/span>/, 'the pill says something other than the price')
+
+    /* His words for the way out, and only for somebody who has paid. */
+    assert.match(bar, /<span className="topbar-pill-face">Exit demo<\/span>/, 'Exit demo is missing from the browser bar')
+
+    const app = read('src/App.jsx')
+    assert.match(
+      app,
+      /onUnlock=\{isDemo\(\) && paid\.checked && !paid\.unlocked \? openUnlock : null\}/,
+      'the browser bar offers the unlock to somebody who has paid, or outside the demo'
+    )
+    assert.match(app, /onExitDemo=\{isDemo\(\) && paid\.unlocked \?/, 'Exit demo is offered to somebody who has not paid')
+
+    /*
+     * Signed out, the unlock asks for the sign-in first and then lands on the
+     * unlock page by itself — the whole point of the request is that nobody
+     * has to find Settings. And not for somebody who turns out to have paid.
+     */
+    assert.match(app, /setUnlockAfterSignIn\(true\)\s*setSignIn\(true\)/, 'signed out, UNLOCK does not ask for the sign-in')
+    assert.match(app, /paid\.for !== accountId/, 'the unlock page can open on the signed-out answer, before the new account’s is in')
+    assert.match(app, /if \(paid\.unlocked\) return\s*setSheet\('settings'\)\s*setSetupPage\('unlock'\)/, 'somebody who has paid is sent to the unlock page after signing in')
+
+    /* The price reaches somebody not signed in; the purchase still does not. */
+    const buy = read('src/lib/webPurchase.js')
+    assert.match(buy, /purchasesFor\(accountId \|\| \(await visitorId\(\)\)\)/, 'the demo cannot show the price before a sign-in')
+    assert.match(buy, /generateRevenueCatAnonymousAppUserId\(\)/, 'the visitor id is invented here rather than asked of RevenueCat')
+    const buyer = buy.slice(buy.indexOf('export async function buyOnWeb'))
+    assert.ok(!/visitorId/.test(buyer), 'a purchase can be filed under an anonymous visitor')
+
+    /* And buying in the demo ends it, as on the phone. */
+    assert.match(app, /if \(isDemo\(\)\) \{\s*setDemo\(false\)\s*window\.location\.reload\(\)/, 'buying in the browser leaves the person in the demo')
   })
 }
