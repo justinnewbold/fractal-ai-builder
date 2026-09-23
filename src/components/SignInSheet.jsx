@@ -46,7 +46,9 @@ export default function SignInSheet({ open, role, account = false, startIn = 'in
         <p className="hint">
           {phone
             ? 'Use the same account you set up on the computer.'
-            : 'Sign in with the account you made in the phone app. Your phone signs in with these same details to reach this computer.'}
+            : /* "Sign in with the account you made in the phone app." came
+                 off the front: an account can be made on this form now. */
+              'Your phone signs in with these same details to reach this computer.'}
         </p>
         <SignIn
           /* A new key when the button that opened it changes, so the form

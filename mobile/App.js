@@ -599,7 +599,19 @@ export default function App() {
             {buying ? (
               <Paywall
                 asked
-                onSignIn={toSignIn}
+                /*
+                 * Out of the walkthrough as well as into the sign-in. toSignIn
+                 * alone set auth to 'out' and left the walkthrough standing —
+                 * it is drawn ahead of the sign-in screen — so the sheet closed
+                 * and nothing else happened: "Sign in with an email and
+                 * password" did nothing at all from here.
+                 */
+                onSignIn={() => {
+                  markWalkthrough()
+                  setSeenWalk(true)
+                  setReplaying(false)
+                  toSignIn()
+                }}
                 onUnlocked={() => {
                   setBuying(false)
                   markWalkthrough()

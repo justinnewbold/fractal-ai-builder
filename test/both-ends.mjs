@@ -516,6 +516,17 @@ export const AREAS = [
         why: 'the same offer at both ends, in the same three words; the browser also says Try now on the not-connected screen and Go beside the code box, neither of which the phone has a place for'
       },
       {
+        does: 'go into the demo, for somebody who has paid',
+        /* "If they are already signed in and the app is unlocked, instead of
+           saying try the demo, have it just say Demo." The phone says it on
+           Setup's Phone & computer page; the browser says it here too,
+           because this is the screen a paid phone is left on while its
+           computer is not answering. */
+        web: 'Demo',
+        phone: null,
+        why: 'the phone’s Demo button is on Setup → Phone & computer rather than on its sign-in screen, which somebody who has paid never sees'
+      },
+      {
         does: 'choose which of the five Fractals the demo is',
         web: 'Demo Unit',
         phone: 'Demo Unit',
@@ -1023,7 +1034,11 @@ export function run(test) {
      * This holds them together, so rewording one end without the other fails.
      */
     const web = read('src/App.jsx')
-    const page = web.slice(web.indexOf("setupPage === 'unlock' ? ("), web.indexOf("setupPage === 'about' ? ("))
+    /* Written once and drawn twice — the Unlock page and the screen an unpaid
+       phone sees instead of connecting — so the words are read where they are. */
+    assert.match(web, /setupPage === 'unlock' \? \([\s\S]{0,400}\{unlockBody\}/, 'the Unlock page no longer draws the paywall’s words')
+    assert.match(web, /\{mustPay \? \([\s\S]{0,600}\{unlockBody\}/, 'the unpaid phone’s screen no longer draws the paywall’s words')
+    const page = web.slice(web.indexOf('const unlockBody = ('), web.indexOf('{mustPay ? ('))
     const phone = read('mobile/src/screens/Paywall.js')
     const norm = (t) => t.replace(/&rsquo;/g, '’').replace(/&amp;/g, '&').replace(/\s+/g, ' ')
     for (const line of [
@@ -1157,5 +1172,48 @@ export function run(test) {
 
     /* And buying in the demo ends it, as on the phone. */
     assert.match(app, /if \(isDemo\(\)\) \{\s*setDemo\(false\)\s*window\.location\.reload\(\)/, 'buying in the browser leaves the person in the demo')
+  })
+
+  /**
+   * THE BROWSER ON A PHONE PLAYS BY THE PHONE'S RULES.
+   *
+   * "We need to make sure we're on the same page as far as what the app does
+   * and what the web app does… Everything's chaos." A play-through of both
+   * found the browser acting as a phone breaking three of the phone's rules:
+   * it connected for somebody who had not paid, it offered "Try the Demo" to
+   * somebody who had, and when nothing answered it never said which account
+   * it was on — which was the whole of why it did not connect that night.
+   */
+  test('the browser acting as a phone plays by the phone’s rules', () => {
+    const app = read('src/App.jsx')
+    const phoneRule = read('mobile/src/lib/unlock-rule.js')
+
+    /* Not paid: the unlock first, as the phone's shouldAskToPay does — and
+       only on a definite no, as the phone fails open. */
+    assert.match(phoneRule, /export const shouldAskToPay/, 'the phone’s paywall rule moved; this check follows it')
+    assert.match(
+      app,
+      /const mustPay = Boolean\(link\.role === 'remote' && !isDemo\(\) && answeredFor && !paid\.unlocked && !paid\.unknown\)/,
+      'the browser on a phone drives a rig for somebody who has not paid, or shuts out somebody the server could not answer for'
+    )
+    assert.match(app, /unknown: out\.unknown/, 'a question the server could not answer is read as a no')
+
+    /* Paid: "Demo", never "Try the Demo". */
+    const connect = read('src/components/ConnectScreen.jsx')
+    assert.match(connect, /\{owned \? 'Demo' : 'Try the Demo'\}/, 'the connect screen offers Try the Demo to somebody who has paid')
+    assert.match(app, /\{owned \? 'Demo' : 'Try the demo'\}/, 'the fault notice offers Try the demo to somebody who has paid')
+    assert.match(app, /owned=\{owned\}/, 'the connect screen is never told who has paid')
+
+    /* Nothing answering: which account this is, in the link test's words. */
+    const details = read('src/components/LinkDetails.jsx')
+    assert.ok(details.includes('Signed in here as') && details.includes('Is the Fractal app open there, signed in as this same account?'), 'the link test changed its words; these follow them')
+    assert.match(
+      connect,
+      /Signed in here as <strong>\{remembered\}<\/strong>\. Is the Fractal app open there, signed in as\s+this same account\?/,
+      'the not-answering screen does not say which account it is on'
+    )
+
+    /* And signing in on a phone connects, rather than stopping one tap short. */
+    assert.match(app, /if \(linkState\(\)\.role === 'remote' && !isDemo\(\)\) await reconnectPhone\(\)/, 'a phone signed in from the unlock stops at “Connect as …”')
   })
 }

@@ -1763,7 +1763,11 @@ export default function App() {
       }
     }
     setPaid((p) => ({ ...p, checked: false }))
-    checkUnlocked().then((out) => live && setPaid({ checked: true, unlocked: out.unlocked, for: accountId }))
+    /* `unknown` kept: a question that could not be put is not a no, and the
+       one place that shuts a door on "not paid" — mustPay — leaves it open. */
+    checkUnlocked().then(
+      (out) => live && setPaid({ checked: true, unlocked: out.unlocked, unknown: out.unknown, for: accountId })
+    )
     webPrice(accountId).then((price) => live && setWebPriceText(price))
     return () => {
       live = false
@@ -1796,6 +1800,29 @@ export default function App() {
       live = false
     }
   }, [sheet, accountId, webPriceText])
+
+  /*
+   * THE PHONE'S RULES, NAMED ONCE, so the browser on a phone plays by them.
+   *
+   * "We need to make sure we're on the same page as far as what the app does
+   * and what the web app does." Two of the phone's rules had never reached
+   * this end:
+   *
+   * OWNED — somebody signed in who has paid. The phone offers them "Demo",
+   * never "Try the Demo".
+   *
+   * MUST PAY — a phone signed in, not paid, and not in the demo. The phone
+   * puts the unlock in front of everything before it will drive a rig
+   * (shouldAskToPay, mobile/src/lib/unlock-rule.js); this end connected
+   * anyway. Only the browser acting as a phone: the computer driving its
+   * own unit over USB is free, and always has been. And only on a definite
+   * no — a question the server could not answer lets them through, as the
+   * phone does, so a bad minute on a venue's wifi does not lock out somebody
+   * who paid.
+   */
+  const answeredFor = accountId && paid.checked && paid.for === accountId
+  const owned = Boolean(answeredFor && paid.unlocked)
+  const mustPay = Boolean(link.role === 'remote' && !isDemo() && answeredFor && !paid.unlocked && !paid.unknown)
 
   const [unlockAfterSignIn, setUnlockAfterSignIn] = useState(false)
   const openUnlock = () => {
@@ -1900,6 +1927,9 @@ export default function App() {
       if (signIn === 'account') {
         await signInAccount({ email, password })
         record('remote', `Signed in as ${email}`)
+        /* A phone signed in has one thing to do next, and it did not do it:
+           it stopped on "Connect as …" and waited for another tap. */
+        if (linkState().role === 'remote' && !isDemo()) await reconnectPhone()
       } else if (linkState().role === 'mac') {
         await setUpMac({ email, password })
         record('remote', `Phone remote set up for ${email}`)
@@ -3003,6 +3033,34 @@ export default function App() {
     </>
   )
 
+  /*
+   * THE UNLOCK, IN THE PHONE PAYWALL'S OWN WORDS — drawn in two places, so
+   * written once: the Unlock page in Settings, and the screen a phone that
+   * has not paid sees in place of connecting (mustPay, above).
+   *
+   * Every sentence here is copied from mobile/src/screens/Paywall.js, and
+   * test/both-ends.mjs holds them to it.
+   */
+  const unlockBody = (
+    <>
+      <p className="device-meta">One payment, once</p>
+      <h3 className="unlock-head">Phone Remote</h3>
+      <p className="hint">
+        {`One-time payment unlocks the full version of this app, forever, including all future updates, on all supported Fractal devices: ${
+          DEMO_UNITS.slice(0, -1).map((u) => u.name).join(', ') + ' and ' + DEMO_UNITS[DEMO_UNITS.length - 1].name
+        }. Sign in with the same account on another phone or tablet and it is unlocked there too.`}
+      </p>
+      <p className="unlock-features">
+        You&rsquo;ll be able to control and switch presets, scenes, amp &amp; effects blocks,
+        tuner, tap tempo, setlists, and so much more.
+      </p>
+      {buySaid ? <p className="hint tone-bad">{buySaid}</p> : null}
+      <button type="button" className="primary unlock-buy" disabled={buying || !accountId} onClick={buyHere}>
+        {webPriceText ? `Unlock Full Version — ${webPriceText}` : 'Unlock Full Version'}
+      </button>
+    </>
+  )
+
   return (
     <div className="shell">
       {/*
@@ -3113,7 +3171,35 @@ export default function App() {
         grace, so a phone in a pocket losing a socket for a moment keeps the
         Play screen and gets it back without anyone noticing.
       */}
-      {showConnect ? (
+      {mustPay ? (
+        /*
+         * The phone's imposed paywall, on the phone's terms: the unlock, then
+         * its three ways out in its own words — a different account, the
+         * demo, or back to the start signed out.
+         */
+        <section className="connect connect-unlock">
+          {unlockBody}
+          <div className="connect-actions">
+            <button className="chip" onClick={() => linkAction('switch')} disabled={busy}>
+              Sign in with an email and password
+            </button>
+          </div>
+          <button
+            type="button"
+            className="connect-demo"
+            onClick={() => {
+              setDemo(true)
+              window.location.reload()
+            }}
+            disabled={busy}
+          >
+            Keep using the demo
+          </button>
+          <button type="button" className="signin-link" onClick={() => linkAction('signout')} disabled={busy}>
+            Back
+          </button>
+        </section>
+      ) : showConnect ? (
         <ConnectScreen
           key={tick}
           link={link}
@@ -3125,6 +3211,7 @@ export default function App() {
             setSignInStart('up')
             linkAction('switch')
           }}
+          owned={owned}
           onUnpair={() => linkAction('signout')}
           onDemo={() => {
             setDemo(true)
@@ -3154,7 +3241,8 @@ export default function App() {
                 window.location.reload()
               }}
             >
-              Try the demo
+              {/* "Demo" to somebody who owns it, as on the phone. */}
+              {owned ? 'Demo' : 'Try the demo'}
             </button>
           </p>
           {/*
@@ -3670,6 +3758,7 @@ export default function App() {
         faultReason={faultReason}
         link={link}
         onLookAgain={() => read()}
+        onSignIn={() => linkAction('mac-setup')}
       />
 
       <SignInSheet
@@ -3682,8 +3771,10 @@ export default function App() {
           record('remote', `Account made for ${details.email}`)
           /* Then the errand the sheet was opened for — connect this phone, or
              turn the computer's phone remote on — as the sign-in would have. */
-          if (signIn === 'account') setSignIn(false)
-          else await signInSubmit(details)
+          if (signIn === 'account') {
+            setSignIn(false)
+            if (linkState().role === 'remote' && !isDemo()) await reconnectPhone()
+          } else await signInSubmit(details)
           return out
         }}
         role={link.role}
@@ -4465,21 +4556,7 @@ export default function App() {
               {upLabel('unlock')}
             </button>
             <p className="setup-page-title">{SETUP_PAGES.unlock}</p>
-            <p className="device-meta">One payment, once</p>
-            <h3 className="unlock-head">Phone Remote</h3>
-            <p className="hint">
-              {`One-time payment unlocks the full version of this app, forever, including all future updates, on all supported Fractal devices: ${
-                DEMO_UNITS.slice(0, -1).map((u) => u.name).join(', ') + ' and ' + DEMO_UNITS[DEMO_UNITS.length - 1].name
-              }. Sign in with the same account on another phone or tablet and it is unlocked there too.`}
-            </p>
-            <p className="unlock-features">
-              You&rsquo;ll be able to control and switch presets, scenes, amp &amp; effects blocks,
-              tuner, tap tempo, setlists, and so much more.
-            </p>
-            {buySaid ? <p className="hint tone-bad">{buySaid}</p> : null}
-            <button type="button" className="primary unlock-buy" disabled={buying || !accountId} onClick={buyHere}>
-              {webPriceText ? `Unlock Full Version — ${webPriceText}` : 'Unlock Full Version'}
-            </button>
+            {unlockBody}
           </div>
         ) : null}
 

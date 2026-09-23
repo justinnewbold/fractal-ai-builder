@@ -1959,7 +1959,9 @@ export function run(test) {
 
     // The phone gets a connect screen, not an error; the Mac keeps the notice.
     assert.match(src, /const showConnect =\s*\n\s*link\.role === 'remote' &&/, 'the connect screen is no longer keyed to the phone role')
-    assert.match(src, /\{showConnect \? \(\s*\n\s*<ConnectScreen/, 'the connect screen is no longer the phone’s screen when not connected')
+    assert.match(src, /(\{| : )showConnect \? \(\s*\n\s*<ConnectScreen/, 'the connect screen is no longer the phone’s screen when not connected')
+    /* Ahead of it, only the phone's own rule: signed in, not paid, the unlock first. */
+    assert.match(src, /\{mustPay \? \([\s\S]{0,2000}\) : showConnect \? \(/, 'something other than the unlock stands in front of the connect screen')
     assert.match(
       src,
       /if \(showConnect && status === 'live'\) \{\s*\n[^}]*setStatus\('fault'\)/,
@@ -5151,8 +5153,19 @@ export function run(test) {
        button stopped merely advancing to the next step. */
     assert.equal(
       (app.match(/onSignIn=\{toSignIn\}/g) || []).length,
-      4,
-      'the sign-in route is no longer wired to Setup, the walkthrough and both unlock screens'
+      3,
+      'the sign-in route is no longer wired to Setup and both unlock screens'
+    )
+    /*
+     * The walkthrough's door goes through the same handler, and out of the
+     * walkthrough first. On toSignIn alone it did nothing visible: the
+     * walkthrough is drawn ahead of the sign-in screen, so setting auth to
+     * 'out' behind it changed nothing on screen.
+     */
+    assert.match(
+      app,
+      /onSignIn=\{\(\) => \{\s*markWalkthrough\(\)\s*setSeenWalk\(true\)\s*setReplaying\(false\)\s*toSignIn\(\)/,
+      'the walkthrough’s sign-in leaves the walkthrough standing again'
     )
     assert.match(app, /const toSignIn = \(\) => \{/, 'the sign-in route is gone')
     assert.match(app, /const toSignIn = \(\) => \{[^}]*setAuth\('out'\)/, 'it no longer lands on the sign-in screen')

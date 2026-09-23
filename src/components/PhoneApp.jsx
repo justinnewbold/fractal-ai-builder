@@ -95,9 +95,11 @@ export default function PhoneApp() {
 
       <h4>What it costs</h4>
       <p className="hint">
+        {/* "…made inside the phone app — Apple and Google handle the payment,
+            so it cannot be bought here" came off the end: it can, since the
+            browser and the computer app sell the unlock too. */}
         The app is a free download and the demo is free for as long as you want it. Driving a
-        real rig from the phone is a one-off purchase, made inside the phone app &mdash; Apple
-        and Google handle the payment, so it cannot be bought here.
+        real rig from the phone is a one-off purchase.
       </p>
       <p className="hint">
         This computer app stays free. It is the thing holding the cable, and charging for both

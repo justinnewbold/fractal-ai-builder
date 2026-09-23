@@ -6528,7 +6528,8 @@ test('a phone that has not reached the computer stays quiet about it', () => {
   // is calmly asking you to connect is the loud wrong answer.
   for (const state of ['off', 'joining', 'no-answer']) {
     const said = link.describeUnit({ role: 'remote', link: state, status: 'fault' })
-    assert.equal(said.unit, 'Not connected', state)
+    /* A dash, as the phone draws it — the word beside it already says the link is down. */
+    assert.equal(said.unit, '—', state)
     assert.equal(said.lamp, 'idle', state)
   }
 })

@@ -27,7 +27,20 @@
  */
 import { isPairAccount } from '../lib/link'
 
-export default function ConnectScreen({ link, onConnect, onRetry, onSwitchAccount, onCreateAccount, onUnpair, onDemo, busy }) {
+export default function ConnectScreen({
+  link,
+  onConnect,
+  onRetry,
+  onSwitchAccount,
+  onCreateAccount,
+  onUnpair,
+  onDemo,
+  /* Somebody who has paid. The phone never offers them "Try the Demo" —
+     "if they are already signed in and the app is unlocked, instead of
+     saying try the demo, have it just say Demo." */
+  owned = false,
+  busy
+}) {
   const { link: state, account } = link
   const remembered = account?.email || null
   const paired = isPairAccount(remembered)
@@ -48,6 +61,20 @@ export default function ConnectScreen({ link, onConnect, onRetry, onSwitchAccoun
             Make sure the Fractal app is open on the computer and the computer is awake. This keeps trying on
             its own.
           </p>
+          {/*
+            WHICH ACCOUNT THIS IS, because the likeliest reason nothing answers
+            is a computer signed in as somebody else. "I am connected, both the
+            android app and the Apple app connects just fine, so I'm not sure
+            why this isn't connecting" — the browser was on a second account
+            made that evening, and nothing on this screen said so. Both
+            sentences are the link test's own, from LinkDetails.
+          */}
+          {remembered && !paired ? (
+            <p className="hint">
+              Signed in here as <strong>{remembered}</strong>. Is the Fractal app open there, signed in as
+              this same account?
+            </p>
+          ) : null}
           <div className="connect-actions">
             <button className="primary" onClick={onRetry} disabled={busy}>
               Try now
@@ -158,7 +185,7 @@ export default function ConnectScreen({ link, onConnect, onRetry, onSwitchAccoun
         not a footnote to the other.
       */}
       <button type="button" className="connect-demo" onClick={onDemo} disabled={busy}>
-        Try the Demo
+        {owned ? 'Demo' : 'Try the Demo'}
       </button>
     </section>
   )
