@@ -9952,6 +9952,40 @@ button.phone-chip.compact.bad {
   margin: 0 0 var(--s-3);
 }
 
+/* The version and the account on one line, the account at the right end and
+   cut short in the middle of a long email rather than pushing the row wide. */
+.setup-version-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin: 0 0 var(--s-3);
+}
+
+.setup-version-row .setup-version {
+  margin: 0;
+  flex: none;
+}
+
+.setup-account {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: none;
+  border: none;
+  padding: var(--s-1) 0;
+  color: var(--silk-dim);
+  font-size: var(--f-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.setup-account.out {
+  color: var(--signal);
+}
+
 .setup-rows {
   border: 1px solid var(--rule);
   border-radius: var(--r-1);
