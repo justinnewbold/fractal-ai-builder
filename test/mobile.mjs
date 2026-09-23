@@ -3569,7 +3569,13 @@ export function run(test) {
     assert.ok(!/WAYS/.test(screen), 'the phone lists the desktop download routes again')
     assert.ok(!/Linking\.openURL/.test(screen), 'the phone can be sent to a download page again')
     assert.match(screen, /TYPE THIS ON YOUR COMPUTER/, 'nothing says which machine the address is for')
-    assert.match(screen, /\{DOWNLOADS_URL\}/, 'the address to type is not shown')
+    assert.match(screen, /<CopyAddress size=\{font\.lead\} \/>/, 'the address to type is not shown')
+    /* Tapping it copies the address, and never opens the page on the phone. */
+    const copy = read('mobile/src/components/CopyAddress.js')
+    assert.match(copy, /\{DOWNLOADS_URL\}/, 'the address is not on the card')
+    assert.match(copy, /Clipboard\.setStringAsync\(`https:\/\/\$\{DOWNLOADS_URL\}`\)/, 'a tap does not copy the address')
+    assert.match(copy, /copied \? P6\.copied : P6\.copyHint/, 'nothing says it was copied')
+    assert.ok(!/Linking/.test(copy), 'the address opens the downloads page on the phone again')
     assert.match(screen, /sendDownloadLink\(email\)/, 'there is no way to send the link to a computer')
     /*
      * AND NOTHING ELSE. The prose went the same way the routes did.
@@ -3595,16 +3601,11 @@ export function run(test) {
 
     /* And what is left is big enough to read at arm's length: the address and
        the email box at title size, the two labels a step up from micro. */
-    assert.match(
-      screen,
-      /\{DOWNLOADS_URL\}[\s\S]{0,40}<\/Text>/,
-      'the address is no longer the thing the screen is built around'
-    )
     assert.ok(!/fontSize: font\.micro/.test(screen), 'a label on this screen is back at the smallest size in the app')
     assert.equal(
       (screen.match(/fontSize: font\.title/g) || []).length,
-      3,
-      'the heading, the address and the email box are not all at title size'
+      2,
+      'the heading and the email box are not both at title size'
     )
 
     assert.match(src, /The Mac app/, 'the route that actually works is not offered')
@@ -8042,7 +8043,7 @@ export function run(test) {
     assert.ok(!/Linking\.openURL/.test(src), 'the phone can still be sent to the desktop downloads page')
     assert.ok(!/import \{ Linking,/.test(src), 'Linking is imported but no longer used')
     assert.match(block.app, /<Eyebrow>\{P6\.address\}<\/Eyebrow>/, 'nothing says the address is for the computer')
-    assert.match(block.app, /<Text selectable style=\{\{ color: color\.silk, fontSize: font\.lead, fontFamily: face \}\}>\s*\n?\s*\{DOWNLOADS_URL\}/, 'the address is not printed as text to read and type')
+    assert.match(block.app, /<CopyAddress \/>/, 'the address is not shown to read, type or copy')
     /* "Email me the download link" — "make that text bold". */
     assert.match(block.app, /<Text style=\{\{ color: color\.silk, fontSize: font\.body, fontWeight: '700' \}\}>\{P6\.emailLabel\}<\/Text>/, 'the email route is unlabelled, or not bold')
     /*
@@ -8062,13 +8063,30 @@ export function run(test) {
       assert.match(src, /<Note strong size=\{font\.body\}>\{said\}<\/Note>/, `${file} says it small and grey`)
     }
     assert.match(read('mobile/src/components/Note.js'), /fontWeight: strong \? '700' : undefined/)
+
+    /*
+     * "Make the computer link able to just be copied if they tap it", and on
+     * a computer, "click download now instead of sending it to their email".
+     */
+    assert.equal(P6.copied, 'Copied. Paste it into a browser on your computer, or into an email to yourself.')
+    const { onAPhoneOrTablet } = await import('../src/lib/desktop.js')
+    assert.ok(onAPhoneOrTablet('Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X)', 5))
+    assert.ok(onAPhoneOrTablet('Mozilla/5.0 (Linux; Android 15; Pixel 9)', 5))
+    assert.ok(onAPhoneOrTablet('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 5), 'an iPad passing as a Mac is offered a Mac download')
+    assert.ok(!onAPhoneOrTablet('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 0), 'a Mac is told to type the address on a computer')
+    assert.ok(!onAPhoneOrTablet('Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 0))
+    const web = read('src/components/ConnectScreen.jsx').replace(/\s+/g, ' ')
+    assert.match(web, /if \(inDesktopApp\(\)\) return null/, 'the computer app is told to download the computer app')
+    assert.match(web, /\{onPhone \? \(/, 'the browser does not tell a phone from a computer')
+    assert.match(web, /navigator\.clipboard\.writeText\(url\)/, 'a phone browser cannot copy the address')
+    assert.match(web, /window\.open\(url, '_blank', 'noopener'\)\}> \{P6\.downloadNow\}/, 'a computer is not offered the download')
     assert.ok(!/P6\.(tag|eyebrow)\b/.test(block.app), 'the two tiny CONNECT lines are back')
     assert.ok(block.app.indexOf('{P6.yes}') < block.app.indexOf('{P6.no}'), 'No is not under Yes')
     const opened = block.app.slice(block.app.indexOf('{needsApp ? ('))
-    assert.ok(block.app.indexOf('{needsApp ? (') > block.app.indexOf('{P6.no}') && opened.indexOf('{DOWNLOADS_URL}') > 0 && opened.indexOf('{P6.emailLabel}') > 0, 'the download help shows before No is tapped')
+    assert.ok(block.app.indexOf('{needsApp ? (') > block.app.indexOf('{P6.no}') && opened.indexOf('<CopyAddress />') > 0 && opened.indexOf('{P6.emailLabel}') > 0, 'the download help shows before No is tapped')
     /* Said where he said to say it: above the address, not under it. */
     assert.ok(
-      block.app.indexOf('{P6.address}') < block.app.indexOf('{DOWNLOADS_URL}'),
+      block.app.indexOf('{P6.address}') < block.app.indexOf('<CopyAddress />'),
       'the line about which machine this is for comes after the address'
     )
     assert.match(read('mobile/src/lib/onboarding.js'), /address: '[^']*NOT ON THIS PHONE'/, 'the address line no longer rules out this phone')

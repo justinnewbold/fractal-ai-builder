@@ -25,6 +25,24 @@ export function desktopBridge() {
 export const inDesktopApp = () => desktopBridge() !== null
 
 /**
+ * Whether this browser is on a phone or a tablet rather than a computer.
+ *
+ * "Is there a way to detect if they're on a desktop versus a phone so that…
+ * they can just click download now instead of sending it to their email?"
+ * The user agent says so for iPhones and Android. An iPad does not: iPadOS
+ * Safari introduces itself as a Mac, and only its touch screen gives it away —
+ * no Mac has one.
+ */
+export function onAPhoneOrTablet(
+  ua = typeof navigator !== 'undefined' ? navigator.userAgent : '',
+  touches = typeof navigator !== 'undefined' ? navigator.maxTouchPoints : 0
+) {
+  const s = String(ua || '')
+  if (/iPhone|iPad|iPod|Android/i.test(s)) return true
+  return /Macintosh/i.test(s) && Number(touches) > 1
+}
+
+/**
  * Whether an update is downloaded and waiting for the app to be quit.
  *
  * The one state worth saying out loud in the app, because it is the only one

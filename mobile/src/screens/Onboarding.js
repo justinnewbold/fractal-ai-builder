@@ -27,6 +27,7 @@ import { WELCOME_NOTICE } from '../lib/affiliation'
 import { at as tint } from '../lib/vivid'
 import { restorePurchase } from '../lib/purchases'
 import { sendDownloadLink, DOWNLOADS_URL } from '../lib/downloadLink'
+import CopyAddress from '../components/CopyAddress'
 import Note from '../components/Note'
 import Press from '../components/Press'
 
@@ -473,11 +474,7 @@ export default function Onboarding({ onEnterDemo, onAccount, onUnlock, replay, o
                 machine that can use it.
               */}
               <Eyebrow>{P6.address}</Eyebrow>
-              <Card>
-                <Text selectable style={{ color: color.silk, fontSize: font.lead, fontFamily: face }}>
-                  {DOWNLOADS_URL}
-                </Text>
-              </Card>
+              <CopyAddress />
               <Text style={{ color: color.silk, fontSize: font.body, fontWeight: '700' }}>{P6.emailLabel}</Text>
               <Field
                 value={email}

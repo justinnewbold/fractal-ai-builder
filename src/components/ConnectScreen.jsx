@@ -30,6 +30,7 @@ import { isPairAccount } from '../lib/link'
 import { computerElsewhere } from '../lib/remote'
 import { P6 } from '../../shared/onboarding.mjs'
 import { DOWNLOADS_URL } from '../../mobile/src/lib/downloadLink'
+import { inDesktopApp, onAPhoneOrTablet } from '../lib/desktop'
 
 export default function ConnectScreen({
   link,
@@ -269,18 +270,51 @@ function Using({ email, paired }) {
   )
 }
 
-/** "Haven't set up the computer yet?", with where to get it — the phone's address and its label. */
+/**
+ * "Haven't set up the computer yet?", with where to get it.
+ *
+ * WHICH MACHINE THIS IS decides the rest. In the computer app's own window
+ * there is nothing to get — it IS the computer app — so nothing is said. In a
+ * browser on a computer the download is one click away: "they can just click
+ * download now instead of sending it to their email". On a phone it is the
+ * phone's address and label, and a tap copies it — "a lot of Mac users can
+ * copy and paste between phone and computer, or they could copy it and email
+ * it themselves".
+ */
 function NoComputerYet() {
+  const [copied, setCopied] = useState(false)
+  if (inDesktopApp()) return null
+  const url = `https://${DOWNLOADS_URL}`
+  const onPhone = onAPhoneOrTablet()
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+    } catch {
+      /* No clipboard here (an old browser, or no permission): the address is on screen to read. */
+    }
+  }
   return (
     <>
       <p className="hint">
         Haven&rsquo;t set up the computer yet? Open this app on the computer, tap{' '}
         <strong>Set up phone remote</strong>, and sign in with this same account.
       </p>
-      <p className="hint connect-address">
-        <span className="mono">{P6.address}</span>
-        <strong>{DOWNLOADS_URL}</strong>
-      </p>
+      {onPhone ? (
+        <div className="hint connect-address">
+          <span className="mono">{P6.address}</span>
+          <button type="button" className="connect-copy" onClick={copy}>
+            <strong>{DOWNLOADS_URL}</strong>
+            <span className={copied ? 'connect-copied' : undefined}>{copied ? P6.copied : P6.copyHint}</span>
+          </button>
+        </div>
+      ) : (
+        <div className="connect-actions">
+          <button type="button" className="primary" onClick={() => window.open(url, '_blank', 'noopener')}>
+            {P6.downloadNow}
+          </button>
+        </div>
+      )}
     </>
   )
 }

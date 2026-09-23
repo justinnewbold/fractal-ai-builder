@@ -428,7 +428,24 @@ export const P6 = {
    * app' and have the text bold and a little bit bigger." His words; the
    * phone's Connect screen says the same after its own Send link.
    */
-  sent: (email) => `Email link has been sent to ${email}, open on your desktop computer to install app.`
+  sent: (email) => `Email link has been sent to ${email}, open on your desktop computer to install app.`,
+  /*
+   * TAP THE ADDRESS TO COPY IT. "Is it possible to make the computer link
+   * able to just be copied if they tap it? And then a confirmation that it was
+   * copied… A lot of Mac users can copy and paste between phone and computer,
+   * or they could copy it and email it themselves." MY WORDING, both lines.
+   * Copying is not opening, so the old rule — never open the downloads page
+   * on the phone — still holds.
+   */
+  copyHint: 'Tap to copy',
+  copied: 'Copied. Paste it into a browser on your computer, or into an email to yourself.',
+  /*
+   * ON A COMPUTER, A BUTTON. "Is there a way to detect if they're on a desktop
+   * versus a phone so that… they can just click download now instead of
+   * sending it to their email?" The website can tell; on a computer there is
+   * nothing to type anywhere else. MY WORDING.
+   */
+  downloadNow: 'Download the computer app'
 }
 
 /**
