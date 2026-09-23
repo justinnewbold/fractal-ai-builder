@@ -31,6 +31,7 @@ import ampTypes from '../data/amp-types.json' with { type: 'json' }
 import driveTypes from '../data/drive-types.json' with { type: 'json' }
 import cabTypes from '../data/cab-types.json' with { type: 'json' }
 import ampParams from '../data/amp-params.json' with { type: 'json' }
+import blockParams from '../data/block-params.json' with { type: 'json' }
 import demoPresets from '../data/demo-presets.json' with { type: 'json' }
 import { nameFor, scenesFor, presetsFor } from './factoryPresets.js'
 import { unitByKey, DEFAULT_UNIT } from './demoUnits.js'
@@ -55,6 +56,27 @@ const LAYOUT = [
 ]
 
 const ROSTERS = { amp: ampTypes, drive: driveTypes, cab: cabTypes }
+
+/*
+ * WHICH BLOCKS EACH UNIT'S DEMO CHAIN HOLDS.
+ *
+ * Every unit was built on the FM3's chain, which is where "the VP4 simulation
+ * displayed Amp and Cab blocks" came from: the VP4 has no amp and no cab, and
+ * the AM4 is not a grid at all but four slots in a row. The grid units — FM3,
+ * FM9, Axe-Fx III — share a family and a layout, so they keep LAYOUT. The two
+ * that are not get their own four slots, from the same blocks (the same
+ * effect ids, so the scene seeds that name them still find them):
+ *
+ *   AM4 — drive, amp, delay, reverb. Its amp carries the cab; there is no
+ *         separate Cab block.
+ *   VP4 — compressor, drive, delay, reverb. Effects only.
+ */
+const LINEAR = {
+  am4: ['drive', 'amp', 'delay', 'reverb'],
+  vp4: ['comp', 'drive', 'delay', 'reverb']
+}
+const layoutFor = (unitKey) =>
+  LINEAR[unitKey] ? LINEAR[unitKey].map((slug, col) => ({ ...LAYOUT.find((l) => l.slug === slug), col })) : LAYOUT
 
 /*
  * What each scene switches off, by effect id. The first three are named —
@@ -144,19 +166,19 @@ const IR_BANKS = {
   Scratchpad: []
 }
 
-/** Generic controls for blocks whose real parameter list wasn't captured. */
+/*
+ * Only what every Fractal block has, for a block whose real list was never
+ * read. It used to be an amp's tone stack — Drive, Tone, Bass, Mid, Treble —
+ * on every block, so the demo's Delay and Reverb showed an amp's knobs:
+ * "Users could believe they are editing real device parameters when the app
+ * is displaying unrelated controls." The blocks in the demo's chains all have
+ * their real lists now (data/block-params.json); this is for anything placed
+ * from the palette that has not been read yet.
+ */
 const GENERIC = [
   { id: 1, name: 'Level', value: 0, min: -80, max: 20, unit: 'dB' },
   { id: 2, name: 'Balance', value: 0, min: -100, max: 100, unit: '%' },
-  { id: 3, name: 'Mix', value: 100, min: 0, max: 100, unit: '%' },
-  { id: 7, name: 'Drive 1', value: 5, min: 0, max: 10 },
-  { id: 8, name: 'Tone', value: 5, min: 0, max: 10 },
-  { id: 9, name: 'Bass', value: 5, min: 0, max: 10 },
-  { id: 10, name: 'Mid', value: 5, min: 0, max: 10 },
-  { id: 11, name: 'Treble', value: 5, min: 0, max: 10 },
-  { id: 12, name: 'Low Cut', value: 20, min: 20, max: 2000, log: true, unit: 'Hz' },
-  { id: 13, name: 'High Cut', value: 20000, min: 200, max: 20000, log: true, unit: 'Hz' },
-  { id: 20, name: 'Time', value: 0.5, min: 0.1, max: 10, unit: 's' }
+  { id: 3, name: 'Mix', value: 100, min: 0, max: 100, unit: '%' }
 ]
 
 function clone(x) {
@@ -304,7 +326,7 @@ export function createMockDevice(unitKey = DEFAULT_UNIT) {
     const seed = rigSeeds.get(number)
     const blocks = seed
       ? chainOf(seed)
-      : LAYOUT.map((b, i) => ({
+      : layoutFor(UNIT).map((b, i) => ({
           slug: b.slug,
           name: b.name,
           effectId: b.effectId,
@@ -433,6 +455,9 @@ export function createMockDevice(unitKey = DEFAULT_UNIT) {
     if (slug === 'amp') {
       return clone(ampParams.named).map((p) => ({ ...p, log: !!p.log }))
     }
+    /* The block's own controls, as a real FM3 reported them. */
+    const real = blockParams.blocks[slug]
+    if (real) return clone(real.named).map((p) => ({ ...p, log: !!p.log }))
     return clone(GENERIC)
   }
 
@@ -727,8 +752,15 @@ export function createMockDevice(unitKey = DEFAULT_UNIT) {
      */
     ports: () => clone(midiCarried() ? MIDI_PORTS : SERIAL_PORTS),
 
+    /* Only what this unit could place: no amp on a VP4, and no separate cab
+       on a unit whose amp carries its own — the AM4 and the VP4. */
     blockCatalog: () =>
-      LAYOUT.filter((l) => !['input', 'output'].includes(l.slug)).map((l) => ({
+      LAYOUT.filter(
+        (l) =>
+          !['input', 'output'].includes(l.slug) &&
+          !(l.slug === 'amp' && !unit.amps) &&
+          !(l.slug === 'cab' && !unit.grid)
+      ).map((l) => ({
         slug: l.slug,
         family: l.slug,
         instance: 1,

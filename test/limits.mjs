@@ -1823,4 +1823,53 @@ export function run(test) {
     )
   })
 
+
+  /*
+   * THE DEMO SHOWS EACH BLOCK'S OWN CONTROLS, AND EACH UNIT ITS OWN CHAIN.
+   *
+   * A ChatGPT play-through: "Input, Compressor, Wah, Cab, Delay, Reverb, and
+   * Output all displayed the same generic controls: Mix, Drive 1, Tone, Bass,
+   * Mid, Treble", and "the VP4 simulation displayed Amp and Cab blocks". The
+   * lists are now the ones a real FM3 reported, and the VP4 and the AM4 get
+   * their own four slots.
+   */
+  test('the demo shows each block its own controls, and each unit its own chain', async () => {
+    const { createMockDevice } = await import('../src/lib/mockDevice.js')
+    const fm3 = createMockDevice('fm3')
+    const names = (eid) => fm3.blockParams(eid).named.map((p) => p.name)
+    const blocks = fm3.presetBlocks()
+    const list = Array.isArray(blocks) ? blocks : blocks.blocks
+    const bySlug = Object.fromEntries(list.map((b) => [b.slug, b.page ?? b.effectId]))
+    for (const slug of ['delay', 'reverb', 'cab', 'wah', 'comp', 'input', 'output']) {
+      assert.ok(bySlug[slug], `the demo FM3 has no ${slug} block to check`)
+      const said = names(bySlug[slug])
+      assert.ok(said.length > 3, `the demo ${slug} has almost no controls`)
+      assert.ok(!['Tone', 'Bass', 'Treble'].every((n) => said.includes(n)), `the demo ${slug} shows an amp's tone stack again`)
+    }
+    assert.ok(names(bySlug.delay).some((n) => /Time/.test(n)) && names(bySlug.delay).some((n) => /Feedback/.test(n)), 'the demo delay has no time or feedback')
+
+    const chain = (unit) => {
+      const got = createMockDevice(unit).presetBlocks()
+      return (Array.isArray(got) ? got : got.blocks).map((b) => b.slug)
+    }
+    assert.deepEqual(chain('vp4'), ['comp', 'drive', 'delay', 'reverb'], 'the VP4 demo is not an effects-only four slots')
+    assert.ok(!chain('vp4').includes('amp') && !chain('vp4').includes('cab'), 'the VP4 demo has an amp or a cab again')
+    assert.deepEqual(chain('am4'), ['drive', 'amp', 'delay', 'reverb'], 'the AM4 demo is not its own four slots')
+    const palette = (unit) => createMockDevice(unit).blockCatalog().map((b) => b.slug)
+    assert.ok(!palette('vp4').includes('amp'), 'the VP4 demo can place an amp')
+    assert.ok(!palette('am4').includes('cab') && !palette('vp4').includes('cab'), 'a unit whose amp carries its cab can place a separate one')
+  })
+
+  test('the slot box refuses what is not a slot, rather than turning it into one', async () => {
+    /* "Slot -1 became slot 1… Slot 512 was accepted… Text such as abc became slot 0." */
+    const { slotProblem } = await import('../src/lib/slots.js')
+    assert.equal(slotProblem('', 512), null, 'an empty box no longer means the loaded slot')
+    assert.equal(slotProblem('0', 512), null)
+    assert.equal(slotProblem('511', 512), null)
+    for (const bad of ['-1', 'abc', '1.5', '12a']) assert.ok(slotProblem(bad, 512), `"${bad}" is taken as a slot`)
+    assert.match(slotProblem('512', 512), /0 to 511/, 'a slot past the end is not refused with the range')
+    const sheet = read('src/components/SaveSheet.jsx')
+    assert.ok(!/replace\(\/\[\^0-9\]\/g/.test(sheet), 'the slot box strips what was typed again')
+    assert.match(sheet, /disabled=\{busy \|\| !!queued \|\| !!problem\}/, 'Save can be pressed with a bad slot in the box')
+  })
 }

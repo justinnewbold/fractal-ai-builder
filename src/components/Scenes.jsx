@@ -58,10 +58,19 @@ export default function Scenes({
     }
   }
 
+  /*
+   * Only a name worth writing: not blank, not the name it already has, and no
+   * longer than the unit's 31. "A blank scene name left the confirmation
+   * button enabled. Renaming a scene to its existing name was allowed." The
+   * box stops a typist at 31; a paste or a script does not have to stop.
+   */
+  const drafted = draft.trim().slice(0, 31)
+  const worthWriting = (index) => drafted !== '' && drafted !== (names[index] || '').trim()
+
   const rename = async (index) => {
-    const name = draft.trim()
+    const name = drafted
+    if (!worthWriting(index)) return
     setRenaming(null)
-    if (!name) return
     try {
       await setSceneName(index, name)
       /*
@@ -156,7 +165,9 @@ export default function Scenes({
             }}
             aria-label={`Name for scene ${renaming + 1}`}
           />
-          <button onClick={() => rename(renaming)}>Name scene {renaming + 1}</button>
+          <button onClick={() => rename(renaming)} disabled={!worthWriting(renaming)}>
+            Name scene {renaming + 1}
+          </button>
           <button onClick={() => setRenaming(null)}>Cancel</button>
         </div>
       ) : null}

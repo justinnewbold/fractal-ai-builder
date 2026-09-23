@@ -285,6 +285,9 @@ export const FILES = [
   { source: '../src/lib/tunerStream.js', target: '../mobile/src/lib/tunerStream.js' },
   { source: '../src/data/cab-types.json', target: '../mobile/src/data/cab-types.json', raw: true },
   { source: '../src/data/amp-params.json', target: '../mobile/src/data/amp-params.json', raw: true },
+  /* Every other demo block's controls, read off a real FM3 — the phone's
+     demo shows a delay's knobs on its Delay for the same reason. */
+  { source: '../src/data/block-params.json', target: '../mobile/src/data/block-params.json', raw: true },
   /* The demo's twelve presets. The mock imports it on both ends, so a phone
      without this file is a phone whose demo mode will not bundle. */
   { source: '../src/data/demo-presets.json', target: '../mobile/src/data/demo-presets.json', raw: true },

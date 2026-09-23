@@ -3984,7 +3984,8 @@ test('a save writes down what the slot is called, on every route to one', () => 
    * phone will ever have.
    */
   const park = app.slice(app.indexOf('setQueuedSave({'), app.indexOf('record(\'save\', `Asked the computer to save'))
-  assert.match(park, /name: saveName\.trim\(\) \|\| preset\?\.name \|\| ''/)
+  /* Capped at the unit's 31 on the way, however the text got into the box. */
+  assert.match(park, /name: saveName\.trim\(\)\.slice\(0, 31\) \|\| preset\?\.name \|\| ''/)
   assert.match(park, /scenes: Array\.isArray\(sceneNames\) \? \[\.\.\.sceneNames\] : \[\]/)
 
   // The list on screen is rebuilt from the cache, so the new name shows now

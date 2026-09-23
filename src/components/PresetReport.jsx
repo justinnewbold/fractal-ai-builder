@@ -156,8 +156,10 @@ export default function PresetReport({ device, link }) {
             </ul>
           ) : (
             <p className="hint">
-              Nothing this read can see would keep it quiet — every block is connected, on, and
-              above its floor. Copy the report into the chat and it can be taken further.
+              {/* Trimmed to what is true. "Every block is connected, on…" was
+                  said over presets with bypassed blocks in them, and "copy the
+                  report into the chat" pointed at a chat that went with the AI. */}
+              Nothing this read can see would keep it quiet.
             </p>
           )}
 
