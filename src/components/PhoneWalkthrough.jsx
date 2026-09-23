@@ -39,6 +39,8 @@ const PIECES = { unit: pieceUnit, computer: pieceComputer, phone: piecePhone }
 export default function PhoneWalkthrough({ open, replay = false, onClose, onAccount, onUnlock }) {
   const [at, setAt] = useState('welcome')
   const [unit, setUnit] = useState(UNITS[0].key)
+  /* The box under Connect my real rig. Unlock stays grey until it is ticked. */
+  const [agreed, setAgreed] = useState(false)
 
   /* Back to the start when it is asked for again from Settings. */
   useEffect(() => {
@@ -148,7 +150,11 @@ export default function PhoneWalkthrough({ open, replay = false, onClose, onAcco
                 </div>
                 <span className="pw-lock" aria-hidden="true" />
               </div>
-              <button type="button" className="chip pw-go" onClick={() => leave(onUnlock)}>
+              <label className="pw-agree">
+                <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+                <span>{P3.real.agree}</span>
+              </label>
+              <button type="button" className="chip pw-go" disabled={!agreed} onClick={() => agreed && leave(onUnlock)}>
                 {P3.real.go}
               </button>
             </div>
