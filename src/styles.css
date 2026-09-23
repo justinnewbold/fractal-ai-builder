@@ -10765,6 +10765,136 @@ button.setup-back {
 .pw-hero {
   margin-top: var(--s-6);
 }
+
+/*
+ * THE FIRST SCREEN, FROM HIS MOCKUP: the unit in a card, the heading, the line
+ * under it, five tiles, the two ways in, all down the middle.
+ */
+.pw-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--s-3);
+  text-align: center;
+}
+/*
+ * The faint contour lines down both edges of his mockup: rings centred off
+ * each side of the screen, faded out towards the middle so they never sit
+ * behind the words.
+ */
+.pw.pw-at-welcome::before,
+.pw.pw-at-welcome::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  pointer-events: none;
+}
+/* One set of rings per side, each faded out before the middle, so the two
+   never cross into a mesh on a wide screen. */
+.pw.pw-at-welcome::before {
+  left: 0;
+  background-image: repeating-radial-gradient(circle at -40% 45%, transparent 0 22px, color-mix(in srgb, var(--silk) 7%, transparent) 22px 23px);
+  -webkit-mask-image: linear-gradient(to right, #000, transparent 60%);
+  mask-image: linear-gradient(to right, #000, transparent 60%);
+}
+.pw.pw-at-welcome::after {
+  right: 0;
+  background-image: repeating-radial-gradient(circle at 140% 35%, transparent 0 22px, color-mix(in srgb, var(--silk) 7%, transparent) 22px 23px);
+  -webkit-mask-image: linear-gradient(to left, #000, transparent 60%);
+  mask-image: linear-gradient(to left, #000, transparent 60%);
+}
+.pw.pw-at-welcome .pw-sheet {
+  position: relative;
+}
+/* His photograph is on an off-white, so the card is that off-white whatever
+   the theme — the photo's edges disappear into it instead of showing as a
+   box. Held to a share of the screen so the buttons stay on it. */
+.pw-welcome-shot {
+  display: grid;
+  place-items: center;
+  padding: var(--s-2);
+  border-radius: var(--r-3);
+  background: #f7f6f3;
+  border: 1px solid var(--rule);
+}
+.pw-welcome-shot img {
+  display: block;
+  width: 100%;
+  max-height: 25dvh;
+  object-fit: contain;
+  /* The photo's own background fades into the card at its edges. */
+  -webkit-mask-image: radial-gradient(ellipse 72% 72% at center, #000 62%, transparent 100%);
+  mask-image: radial-gradient(ellipse 72% 72% at center, #000 62%, transparent 100%);
+}
+.pw-welcome-head {
+  margin: var(--s-2) 0 0;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: calc(var(--f-6) * 1.15);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+}
+.pw-welcome-sub {
+  margin: 0;
+  color: var(--silk-dim);
+  font-size: var(--f-4);
+  line-height: 1.4;
+}
+.pw-features {
+  list-style: none;
+  margin: var(--s-1) 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--s-2);
+}
+.pw-features li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.pw-feature-tile {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+  max-width: 64px;
+  border-radius: var(--r-2);
+  background: color-mix(in srgb, var(--signal) 8%, var(--panel));
+  color: var(--signal);
+}
+.pw-feature-label {
+  color: var(--silk-dim);
+  font-size: var(--f-1);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+/* Get started with its arrow at the far end, as drawn. */
+.pw-welcome-go {
+  position: relative;
+  border-radius: var(--r-3);
+}
+.pw-welcome-arrow {
+  position: absolute;
+  right: var(--s-4);
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: var(--f-5);
+}
+.pw-welcome .chip.pw-go {
+  border-radius: var(--r-3);
+}
+/* The disclaimer at the foot, small and quiet. */
+.pw-welcome-notice {
+  margin: var(--s-2) 0 0;
+  color: var(--silk-faint);
+  font-size: var(--f-1);
+  line-height: 1.4;
+}
 .pw-sub {
   margin: 0;
   color: var(--silk-dim);

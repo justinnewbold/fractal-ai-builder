@@ -203,7 +203,11 @@ export const P1 = {
      it. Capitals and the full stop are this screen's house style, not a
      change to his words. */
   head: 'CONTROL YOUR FRACTAL FROM YOUR PHONE.',
-  sub: 'Presets, scenes, blocks, tuner and tap tempo - on the phone in your pocket.',
+  /* "all" is from his mockup of the website's first screen. The hyphen stays
+     his, as it always was (see test/structure.mjs). */
+  sub: 'Presets, scenes, blocks, tuner and tap tempo - all on the phone in your pocket.',
+  /* The five tiles under it, from the same mockup, in its order and its words. */
+  features: ['PRESETS', 'SCENES', 'BLOCKS', 'TUNER', 'TAP TEMPO'],
   go: 'Get started',
   /* Was "I already have a pairing code". Codes are gone — "I want the QR
      code gone and the scanner gone" — so the person this is for is the one

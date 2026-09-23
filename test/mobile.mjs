@@ -3195,6 +3195,30 @@ export function run(test) {
     assert.match(flat, /Finding \$\{link\.macName \|\| 'your computer'\}/, 'the wait does not say what it is waiting for')
   })
 
+  test('the website’s first screen is his mockup, without the official line', async () => {
+    /*
+     * "Redo the initial landing page at fractal.Newbold.com use the mockup -
+     * keep it the same except remove the text 'official remote app' I
+     * included the photo of the fractal device separately."
+     */
+    const { P1 } = await import('../shared/onboarding.mjs')
+    assert.deepEqual(P1.features, ['PRESETS', 'SCENES', 'BLOCKS', 'TUNER', 'TAP TEMPO'], 'the five tiles are not his')
+    assert.equal(P1.sub, 'Presets, scenes, blocks, tuner and tap tempo - all on the phone in your pocket.')
+    const web = read('src/components/PhoneWalkthrough.jsx')
+    assert.match(web, /import welcomeShot from '\.\.\/assets\/welcome-fm3\.jpg'/, 'his photograph is not on the first screen')
+    assert.ok(statSync(fileURLToPath(new URL('../src/assets/welcome-fm3.jpg', import.meta.url))).size < 300000, 'the photograph is too heavy for a phone on a signal')
+    const flat = web.replace(/\s+/g, ' ')
+    for (const piece of ['className="pw-welcome-shot"', '{P1.head}', '{P1.sub}', 'P1.features.map', '{P1.go}', '{P1.haveCode}']) {
+      assert.ok(flat.includes(piece), `the first screen lost ${piece}`)
+    }
+    assert.ok(!/official remote app/i.test(web + read('shared/onboarding.mjs')), 'THE OFFICIAL REMOTE APP is on the screen')
+    /* "Also add a disclaimer at the bottom in small text that says this
+       product is not affiliated or endorsed by Fractal Audio Systems." */
+    const { WELCOME_NOTICE } = await import('../shared/affiliation.mjs')
+    assert.equal(WELCOME_NOTICE, 'This product is not affiliated or endorsed by Fractal Audio Systems.', 'the disclaimer is not his')
+    assert.match(flat, /\{P1\.haveCode\} <\/button> <p className="pw-welcome-notice">\{WELCOME_NOTICE\}<\/p>/, 'the disclaimer is not at the foot of the first screen')
+  })
+
   test('the how-it-works screen is his heading alone, and its button stays on screen', async () => {
     /*
      * "On my phone's web browser I can't see the Guide button at the bottom

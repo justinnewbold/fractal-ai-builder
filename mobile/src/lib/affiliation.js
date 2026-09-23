@@ -39,6 +39,13 @@ export const TRADEMARKS =
   'Fractal Audio Systems, Inc., used here only to say which hardware this app ' +
   'works with.'
 
+/**
+ * The small line at the foot of the website's first screen, in his words:
+ * "Also add a disclaimer at the bottom in small text that says this product
+ * is not affiliated or endorsed by Fractal Audio Systems."
+ */
+export const WELCOME_NOTICE = 'This product is not affiliated or endorsed by Fractal Audio Systems.'
+
 /** Both, for the places that show one block of small print. */
 export const AFFILIATION = `${NOT_AFFILIATED} ${TRADEMARKS}`
 
