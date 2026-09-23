@@ -3205,8 +3205,8 @@ export function run(test) {
     assert.deepEqual(P1.features, ['PRESETS', 'SCENES', 'BLOCKS', 'TUNER', 'TAP TEMPO'], 'the five tiles are not his')
     assert.equal(P1.sub, 'Presets, scenes, blocks, tuner and tap tempo - all on the phone in your pocket.')
     const web = read('src/components/PhoneWalkthrough.jsx')
-    assert.match(web, /import welcomeShot from '\.\.\/assets\/welcome-fm3\.jpg'/, 'his photograph is not on the first screen')
-    assert.ok(statSync(fileURLToPath(new URL('../src/assets/welcome-fm3.jpg', import.meta.url))).size < 300000, 'the photograph is too heavy for a phone on a signal')
+    assert.match(web, /import welcomeShot from '\.\.\/\.\.\/mobile\/assets\/welcome\/fm3\.jpg'/, 'his photograph is not on the first screen')
+    assert.ok(statSync(fileURLToPath(new URL('../mobile/assets/welcome/fm3.jpg', import.meta.url))).size < 300000, 'the photograph is too heavy for a phone on a signal')
     const flat = web.replace(/\s+/g, ' ')
     for (const piece of ['className="pw-welcome-shot"', '{P1.head}', '{P1.sub}', 'P1.features.map', '{P1.go}', '{P1.haveCode}']) {
       assert.ok(flat.includes(piece), `the first screen lost ${piece}`)
@@ -3217,6 +3217,27 @@ export function run(test) {
     const { WELCOME_NOTICE } = await import('../shared/affiliation.mjs')
     assert.equal(WELCOME_NOTICE, 'This product is not affiliated or endorsed by Fractal Audio Systems.', 'the disclaimer is not his')
     assert.match(flat, /\{P1\.haveCode\} <\/button> <p className="pw-welcome-notice">\{WELCOME_NOTICE\}<\/p>/, 'the disclaimer is not at the foot of the first screen')
+  })
+
+  test('the phone app’s first screen is the same mockup as the website’s, from the same files', async () => {
+    /*
+     * "The changes we made with the walk-through screen on the web, we need
+     * to make those exact same changes using the same screen mockups that I
+     * sent you for the mobile versions as well."
+     */
+    const phone = read('mobile/src/screens/Onboarding.js')
+    const web = read('src/components/PhoneWalkthrough.jsx')
+    for (const file of ['fm3.jpg', 'presets.png', 'scenes.png', 'blocks.png', 'tuner.png', 'tempo.png']) {
+      assert.ok(phone.includes(`../../assets/welcome/${file}'`), `the phone does not draw ${file}`)
+      assert.ok(web.includes(`../../mobile/assets/welcome/${file}'`), `the browser draws a different ${file} from the phone`)
+    }
+    const flat = phone.replace(/\s+/g, ' ')
+    const welcome = flat.slice(flat.indexOf("{at === 'welcome' ? ("), flat.indexOf("{at === 'how' ? ("))
+    for (const piece of ['<Contours />', 'source={welcomeFm3}', '{P1.head}', '{P1.sub}', 'P1.features.map', 'label={P1.go}', '→', 'label={P1.haveCode}', '{WELCOME_NOTICE}']) {
+      assert.ok(welcome.includes(piece), `the phone’s first screen lost ${piece}`)
+    }
+    assert.ok(welcome.indexOf('label={P1.haveCode}') < welcome.indexOf('{WELCOME_NOTICE}'), 'the disclaimer is not at the foot')
+    assert.ok(!/official remote app/i.test(phone), 'THE OFFICIAL REMOTE APP is on the phone')
   })
 
   test('the how-it-works screen is his heading alone, and its button stays on screen', async () => {

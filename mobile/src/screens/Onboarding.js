@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { Dimensions, Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 
 import { CHAIN, P1, P2, P3, P4, P6, P7, P9, CLOSE } from '../lib/onboarding'
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
@@ -14,6 +14,17 @@ import unitFm3 from '../../assets/unit-fm3.png'
 import pieceUnit from '../../assets/piece-unit.png'
 import pieceComputer from '../../assets/piece-computer.png'
 import piecePhone from '../../assets/piece-phone.png'
+/* The first screen's pictures: his FM3 photograph, sent for it, and the five
+   tile pictures cut out of his mockup of the screen, white so they take the
+   theme's colour. The browser draws the same files. */
+import welcomeFm3 from '../../assets/welcome/fm3.jpg'
+import featurePresets from '../../assets/welcome/presets.png'
+import featureScenes from '../../assets/welcome/scenes.png'
+import featureBlocks from '../../assets/welcome/blocks.png'
+import featureTuner from '../../assets/welcome/tuner.png'
+import featureTempo from '../../assets/welcome/tempo.png'
+import { WELCOME_NOTICE } from '../lib/affiliation'
+import { at as tint } from '../lib/vivid'
 import { restorePurchase } from '../lib/purchases'
 import { sendDownloadLink, DOWNLOADS_URL } from '../lib/downloadLink'
 import Note from '../components/Note'
@@ -170,16 +181,103 @@ export default function Onboarding({ onEnterDemo, onAccount, onUnlock, replay, o
         <Press label={CLOSE} height={TAP} onPress={() => onClose?.()} />
       ) : null}
 
+      {/*
+        THE FIRST SCREEN, FROM HIS MOCKUP, as the browser's is. "The changes we
+        made with the walk-through screen on the web, we need to make those
+        exact same changes using the same screen mockups that I sent you for
+        the mobile versions as well." His FM3 in a card, the heading and the
+        line under it centred, the five tiles, the two ways in, his
+        disclaimer, and the contour lines down both edges.
+      */}
       {at === 'welcome' ? (
-        <>
-          <Head>{P1.head}</Head>
-          <Sub>{P1.sub}</Sub>
-          <Press label={P1.go} tone="signal" on height={TAP} onPress={() => go('how')} />
+        <View style={{ gap: space.md }}>
+          <Contours />
+          <View
+            style={{
+              alignItems: 'center',
+              padding: space.sm,
+              borderRadius: radius.lg * 1.4,
+              borderWidth: 1,
+              borderColor: color.rule,
+              /* His photograph's own off-white, so its edges vanish into the
+                 card in either theme. */
+              backgroundColor: '#f7f6f3'
+            }}
+          >
+            <Image
+              source={welcomeFm3}
+              style={{ width: '100%', height: Math.round(Dimensions.get('window').height * 0.24) }}
+              resizeMode="contain"
+              accessibilityLabel="A Fractal Audio FM3"
+            />
+          </View>
+          <Text
+            accessibilityRole="header"
+            style={{
+              color: color.silk,
+              fontSize: font.hero,
+              lineHeight: Math.round(font.hero * 1.08),
+              fontWeight: '800',
+              textAlign: 'center',
+              marginTop: space.xs
+            }}
+          >
+            {P1.head}
+          </Text>
+          <Text style={{ color: color.silkDim, fontSize: font.lead, lineHeight: font.lead * 1.35, textAlign: 'center' }}>
+            {P1.sub}
+          </Text>
+          <View style={{ flexDirection: 'row', gap: space.sm, marginVertical: space.xs }}>
+            {P1.features.map((label) => (
+              <View key={label} style={{ flex: 1, alignItems: 'center', gap: space.xs }}>
+                <View
+                  style={{
+                    width: '100%',
+                    aspectRatio: 1,
+                    borderRadius: radius.md,
+                    backgroundColor: tint(color.signal, 0.1),
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <Image
+                    source={FEATURE_PICTURES[label]}
+                    style={{ width: 30, height: 30, tintColor: color.signal }}
+                    resizeMode="contain"
+                    accessible={false}
+                  />
+                </View>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  /* A size under micro, so TAP TEMPO fits a tile on the
+                     narrowest phone without leaning on the shrink-to-fit
+                     that not every platform does. */
+                  style={{ color: color.silkDim, fontSize: font.micro - 1, letterSpacing: 0.3 }}
+                >
+                  {label}
+                </Text>
+              </View>
+            ))}
+          </View>
+          {/* Get started with its arrow at the far end, as drawn. */}
+          <View>
+            <Press label={P1.go} tone="signal" on height={TAP} onPress={() => go('how')} style={{ borderRadius: radius.lg * 1.4 }} />
+            <View
+              pointerEvents="none"
+              style={{ position: 'absolute', right: space.lg, top: 0, bottom: 0, justifyContent: 'center' }}
+            >
+              <Text style={{ color: color.onSignal, fontSize: font.lead, fontWeight: '700' }}>→</Text>
+            </View>
+          </View>
           {/* Was "I already have a pairing code", which opened the scanner.
               Somebody who has been here before has an ACCOUNT now, and that
               is the one door. */}
-          <Press label={P1.haveCode} height={TAP} onPress={() => onAccount?.()} />
-        </>
+          <Press label={P1.haveCode} height={TAP} onPress={() => onAccount?.()} style={{ borderRadius: radius.lg * 1.4 }} />
+          <Text style={{ color: color.silkFaint, fontSize: font.micro, lineHeight: font.micro * 1.45, textAlign: 'center', marginTop: space.xs }}>
+            {WELCOME_NOTICE}
+          </Text>
+        </View>
       ) : null}
 
       {at === 'how' ? (
@@ -428,6 +526,52 @@ export default function Onboarding({ onEnterDemo, onAccount, onUnlock, replay, o
         </>
       ) : null}
     </ScrollView>
+  )
+}
+
+/* The five tiles' pictures, by the label under each. */
+const FEATURE_PICTURES = {
+  PRESETS: featurePresets,
+  SCENES: featureScenes,
+  BLOCKS: featureBlocks,
+  TUNER: featureTuner,
+  'TAP TEMPO': featureTempo
+}
+
+/*
+ * The faint contour lines down both edges of his mockup: rings centred off
+ * each side of the screen, drawn as bordered circles so they need nothing
+ * native. Behind everything, and never in the way of a tap.
+ */
+function Contours() {
+  const { width } = Dimensions.get('window')
+  const line = tint(color.silk, 0.07)
+  /* Centred well off each side and only as large as reaches the outer third,
+     so they stay at the edges the way the browser fades them there. */
+  const RINGS = Array.from({ length: 8 }, (_, i) => width * 0.78 + i * 20)
+  const ring = (cx, cy, r, key) => (
+    <View
+      key={key}
+      style={{
+        position: 'absolute',
+        left: cx - r,
+        top: cy - r,
+        width: r * 2,
+        height: r * 2,
+        borderRadius: r,
+        borderWidth: 1,
+        borderColor: line
+      }}
+    />
+  )
+  return (
+    <View
+      pointerEvents="none"
+      style={{ position: 'absolute', top: -space.lg, left: -space.lg, width, height: 1400, overflow: 'hidden' }}
+    >
+      {RINGS.map((r, i) => ring(-width * 0.6, 420, r, `l${i}`))}
+      {RINGS.map((r, i) => ring(width * 1.6 - space.lg, 300, r, `r${i}`))}
+    </View>
   )
 }
 
