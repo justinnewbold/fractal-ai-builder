@@ -8,6 +8,7 @@ import { mayDrive } from './unlock-rule'
 import { isOwner } from './owner-unlock'
 import { currentAccount } from './relay'
 import { isDemo, setDemo } from './demo'
+import { claimRelay } from './relayPass'
 
 /**
  * The one purchase: paying to point this app at a real rig.
@@ -226,6 +227,10 @@ const linkTo = async (api, id) => {
   try {
     const out = await api.logIn(id)
     logDebug('purchases: linked to the account')
+    /* And tell the relay. logIn is the moment a handset's purchase becomes an
+       account's, so it is the moment the relay's table can first be right
+       about it. Not awaited: nothing on this screen depends on the answer. */
+    claimRelay()
     return out?.customerInfo || null
   } catch (err) {
     /* Not fatal, and not evidence of anything. The remembered answer stands
@@ -540,6 +545,8 @@ export const buyUnlock = async () => {
       setDemo(false)
       logDebug('purchases: bought, so the demo is over')
     }
+    /* Open the relay now rather than when the webhook lands. */
+    if (yes) claimRelay()
     return yes
       ? { ok: true, cancelled: false, message: null }
       : { ok: false, cancelled: false, message: 'The store did not confirm the purchase.' }
@@ -565,6 +572,7 @@ export const restorePurchase = async () => {
     const yes = entitled(info)
     await remember(yes)
     set({ unlocked: yes })
+    if (yes) claimRelay()
     return yes
       ? { ok: true, message: null }
       : { ok: false, message: 'No previous purchase was found on this account.' }
