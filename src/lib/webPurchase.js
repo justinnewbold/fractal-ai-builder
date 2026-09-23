@@ -31,8 +31,8 @@ export const PRODUCT_ID = 'cloud.newbold.fractalremote.full'
 export const ENTITLEMENT = 'full'
 
 /*
- * Loaded only when there is a price to show — somebody in the demo, or signed
- * in and not yet paid — never as part of the main bundle. The library brings
+ * Loaded only when there is a price to show — the demo's bar, Settings'
+ * Unlock row, the unlock page — never as part of the main bundle. The library brings
  * Stripe's checkout with it, and the main bundle is already past the size Vite
  * warns about; somebody driving a rig they own should not download a payment
  * form.

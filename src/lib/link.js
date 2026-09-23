@@ -876,6 +876,25 @@ export async function signInAccount({ email, password }) {
 }
 
 /**
+ * Make an account, and sign in with it.
+ *
+ * "Somebody should be able to create an account on the web and desktops,
+ * and make purchases as well." A purchase here belongs to an account, so
+ * somebody who never had the phone app needs a way to make one first.
+ *
+ * The account service may want the address confirmed before it hands out a
+ * session. Then there is nothing to sign in with yet, and the form says so
+ * in the phone's words rather than pretending it worked.
+ */
+export async function createAccount({ email, password }) {
+  const config = loadRemoteConfig() || {}
+  const { needsConfirmation } = await remoteSignUp({ url: config.url, anonKey: config.anonKey, email, password })
+  if (needsConfirmation) return { needsConfirmation: true }
+  await signInAccount({ email, password })
+  return { needsConfirmation: false }
+}
+
+/**
  * Connect again with the sign-in already here.
  *
  * `fresh` throws the socket away and joins on a new one, which is what Try

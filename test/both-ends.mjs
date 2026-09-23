@@ -448,17 +448,15 @@ export const AREAS = [
     buttons: [
       {
         does: 'make a new account',
-        web: null,
-        phone: 'Create Account',
         /*
-         * "Do not allow an account to be created on any of the desktop or the
-         * web app version, only sign-ins. On the phones, only show the create
-         * account window after the phone has been unlocked."
-         *
-         * An account exists to join a phone to a computer, and the phone is
-         * the end that is paid for. The browser signs into one made there.
+         * At both ends now. It was the phone only — "do not allow an account
+         * to be created on any of the desktop or the web app version" — until
+         * the browser could sell the unlock: "somebody should be able to
+         * create an account on the web and desktops, and make purchases as
+         * well." The same two words at both ends.
          */
-        why: 'an account is made in the phone app, after the unlock, and nowhere else'
+        web: 'Create Account',
+        phone: 'Create Account'
       },
       { does: 'sign in to an account you have', web: 'Sign in', phone: 'Sign in' },
       {
@@ -1076,7 +1074,9 @@ export function run(test) {
     assert.ok(!/^import .*@revenuecat\/purchases-js/m.test(src), 'the payment library is in the main bundle')
 
     /* And the row is only offered to somebody who can use it. */
-    assert.match(app, /\{accountId && paid\.checked && !paid\.unlocked \? \(/, 'the unlock row shows to somebody signed out, or who has paid')
+    /* To anybody who has not paid, signed in or not, as on the phone — the
+       sign-in, or the new account, comes on the way to the unlock page. */
+    assert.match(app, /\{paid\.checked && !paid\.unlocked \? \(\s*<SetupRow\s*key="unlock"[\s\S]{0,260}onClick=\{openUnlock\}/, 'the unlock row hides from somebody signed out, or skips the sign-in')
   })
 
   /**

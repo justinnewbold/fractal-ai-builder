@@ -9,23 +9,28 @@ import { loadRemoteConfig, sendPasswordReset } from '../lib/remote'
  * sign anyone in at all. Same account, same two fields, three places to type
  * them. This is the form; what happens on submit is the caller's.
  *
- * CREATE IS NOT HERE, AND THAT IS DELIBERATE.
+ * CREATE IS HERE WHERE THE CALLER ASKS FOR IT, and it was not, once.
  *
- * "On the desktop app make it so you can only sign in with account that was
- * already created on a phone. So do not allow an account to be created on
- * any of the desktop or the web app version, only sign-ins."
+ * It used to be refused outright: "do not allow an account to be created on
+ * any of the desktop or the web app version, only sign-ins." That was
+ * written when the phone was the only end that could take money, and an
+ * account made here would have been the free half of something whose paid
+ * half lived on a handset.
  *
- * An account exists to join a phone to a computer, and the phone is the end
- * that is paid for. Making one here would let somebody set up the free half
- * of the arrangement and find out later that the half they wanted costs
- * money — and it would put the app's only sign-up form on the one device
- * that can never buy the unlock.
+ * The browser and the computer app sell the unlock now, and a purchase has
+ * to belong to an account — so somebody who has never had the phone app
+ * could not buy at all. "That was old info before we decided to do
+ * purchases on the web, so yes, somebody should be able to create an account
+ * on the web and desktops, and make purchases as well."
+ *
+ * So `onCreate` turns it on, and a caller with nothing to sell leaves it
+ * off. The words are the phone's: Create Account, and I already have one.
  *
  * Forgot stays: somebody signing in here with an account made on their phone
  * is exactly the person who will have forgotten the password.
  */
-export default function SignIn({ email: initial = '', submitLabel = 'Sign in', onSubmit, busy, autoFocus }) {
-  const [mode, setMode] = useState('in') // 'in' | 'forgot'
+export default function SignIn({ email: initial = '', submitLabel = 'Sign in', onSubmit, onCreate, busy, autoFocus }) {
+  const [mode, setMode] = useState('in') // 'in' | 'up' | 'forgot'
   const [email, setEmail] = useState(initial)
   const [password, setPassword] = useState('')
   const [working, setWorking] = useState(false)
@@ -49,6 +54,13 @@ export default function SignIn({ email: initial = '', submitLabel = 'Sign in', o
     try {
       if (mode === 'in') {
         await onSubmit({ email: address, password })
+      } else if (mode === 'up') {
+        const { needsConfirmation } = await onCreate({ email: address, password })
+        if (needsConfirmation) {
+          /* The phone's sentence for the same moment. */
+          setNote('Account made. Confirm it from the email we just sent, then sign in.')
+          setMode('in')
+        }
       } else {
         await sendPasswordReset({ ...project(), email: address, redirectTo: window.location.origin })
         setNote('If that address has an account, a reset link is on its way.')
@@ -81,7 +93,7 @@ export default function SignIn({ email: initial = '', submitLabel = 'Sign in', o
           <span>Password</span>
           <input
             type="password"
-            autoComplete="current-password"
+            autoComplete={mode === 'up' ? 'new-password' : 'current-password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={off}
@@ -91,9 +103,19 @@ export default function SignIn({ email: initial = '', submitLabel = 'Sign in', o
 
       <div className="signin-actions">
         <button className="primary" type="submit" disabled={off}>
-          {working ? 'One moment…' : mode === 'forgot' ? 'Email me a reset link' : submitLabel}
+          {working
+            ? 'One moment…'
+            : mode === 'forgot'
+              ? 'Email me a reset link'
+              : mode === 'up'
+                ? 'Create Account'
+                : submitLabel}
         </button>
-        {mode === 'in' ? (
+        {mode === 'up' ? (
+          <button type="button" className="signin-link" onClick={() => setMode('in')} disabled={off}>
+            I already have one
+          </button>
+        ) : mode === 'in' ? (
           <button type="button" className="signin-link" onClick={() => setMode('forgot')} disabled={off}>
             Forgot password?
           </button>
@@ -102,6 +124,11 @@ export default function SignIn({ email: initial = '', submitLabel = 'Sign in', o
             Back to sign in
           </button>
         )}
+        {mode === 'in' && onCreate ? (
+          <button type="button" className="signin-link" onClick={() => setMode('up')} disabled={off}>
+            Create Account
+          </button>
+        ) : null}
       </div>
 
       {problem ? (
