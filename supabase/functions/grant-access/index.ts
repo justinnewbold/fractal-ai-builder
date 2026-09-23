@@ -6,11 +6,17 @@
  * account for somebody?" and "Yes, build that in and only when logged into
  * the justinnewbold@icloud.com account."
  *
- * One request, three actions, all by the customer's email:
+ * One request, four actions, the first three by the customer's email:
  *
  *   check   does this email have an account, and does it have the unlock
  *   grant   give it the unlock for good (a RevenueCat granted entitlement)
  *   revoke  take back an unlock given here — a purchase is not touched
+ *   sales   every sale so far, for Sales at a glance
+ *
+ * All three by email also answer with the Customer lookup: when they signed
+ * up, whether they confirmed, what they paid for and where, which devices
+ * they have signed in on, and the app version they were last on. "Do number
+ * one and five for now."
  *
  * WHO MAY CALL IT is the whole of the safety, and it is decided here, on the
  * server, from a token Supabase has signed: the caller's own email has to be
@@ -116,6 +122,107 @@ async function unlocked(account: string, entitlement: string): Promise<boolean> 
   return (body?.items || []).some((e: { entitlement_id?: string }) => e?.entitlement_id === entitlement)
 }
 
+/** A RevenueCat answer as JSON, or null for anything but a yes. */
+async function rcJson(path: string): Promise<any> {
+  try {
+    const res = await rc(path)
+    return res.ok ? await res.json() : null
+  } catch {
+    return null
+  }
+}
+
+type Sale = { store: string; at: number | null; sandbox: boolean; refunded: boolean; product: string; gross: number | null }
+
+/**
+ * What this account has bought, by RevenueCat's word. A hand-given unlock is
+ * not in here: RevenueCat keeps a grant as a promotional subscription, not a
+ * purchase, which is exactly what lets the lookup tell the two apart.
+ */
+async function purchasesOf(account: string): Promise<Sale[] | null> {
+  const body = await rcJson(`/customers/${encodeURIComponent(account)}/purchases?limit=100`)
+  if (!body) return null
+  return (body?.items || []).map((p: any) => ({
+    store: String(p?.store || 'unknown'),
+    at: typeof p?.purchased_at === 'number' ? p.purchased_at : null,
+    sandbox: p?.environment === 'sandbox' || p?.store === 'test_store',
+    refunded: p?.status === 'refunded',
+    product: String(p?.product_id || ''),
+    gross: typeof p?.revenue_in_usd?.gross === 'number' ? p.revenue_in_usd.gross : null
+  }))
+}
+
+/** Where and on what RevenueCat last saw them, for "which app version". */
+async function lastSeen(account: string) {
+  const c = await rcJson(`/customers/${encodeURIComponent(account)}`)
+  if (!c) return null
+  return {
+    first: c.first_seen_at ?? null,
+    last: c.last_seen_at ?? null,
+    version: c.last_seen_app_version ?? null,
+    platform: c.last_seen_platform ?? null,
+    platformVersion: c.last_seen_platform_version ?? null,
+    country: c.last_seen_country ?? null
+  }
+}
+
+/** Run `job` over `items`, a few at a time, so a long list does not trip RevenueCat's rate limit. */
+async function eachFew<T, R>(items: T[], few: number, job: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length)
+  let next = 0
+  await Promise.all(
+    Array.from({ length: Math.min(few, items.length) }, async () => {
+      while (next < items.length) {
+        const i = next++
+        out[i] = await job(items[i])
+      }
+    })
+  )
+  return out
+}
+
+/*
+ * SALES AT A GLANCE. Every account the relay's table holds as bought, asked
+ * about in turn. The totals are counted by the app, in Justin's own time zone:
+ * "today" is his today, not the server's.
+ */
+const MOST_BUYERS = 500
+
+async function sales() {
+  const overview = ((await rpc('owner_overview', {})) || {}) as {
+    accounts?: number
+    accounts_day?: number
+    accounts_week?: number
+    buyers?: { id: string; email: string }[]
+  }
+  const buyers = (overview.buyers || []).slice(0, MOST_BUYERS)
+  let unanswered = 0
+  let givenByHand = 0
+  const sold: (Sale & { email: string })[] = []
+  const answers = await eachFew(buyers, 5, async (b) => ({ b, bought: await purchasesOf(b.id) }))
+  for (const { b, bought } of answers) {
+    if (!bought) {
+      unanswered += 1
+      continue
+    }
+    const real = bought.filter((p) => p.store !== 'promotional')
+    if (!real.some((p) => !p.refunded)) givenByHand += 1
+    for (const p of real) sold.push({ ...p, email: b.email })
+  }
+  sold.sort((a, b) => (b.at || 0) - (a.at || 0))
+  return {
+    ok: true,
+    accounts: overview.accounts ?? 0,
+    accountsDay: overview.accounts_day ?? 0,
+    accountsWeek: overview.accounts_week ?? 0,
+    unlocked: buyers.length,
+    more: Math.max(0, (overview.buyers || []).length - buyers.length),
+    givenByHand,
+    unanswered,
+    sales: sold
+  }
+}
+
 /** The plain sentence for a RevenueCat refusal. */
 async function refusal(res: Response, doing: string): Promise<string> {
   const said = await res.text().catch(() => '')
@@ -143,12 +250,15 @@ Deno.serve(async (req: Request) => {
   }
   const action = String(input.action || 'check')
   const email = String(input.email || '').trim().toLowerCase()
-  if (!email.includes('@')) return json({ ok: false, message: 'Type the email address they signed up with.' }, 400)
-  if (!['check', 'grant', 'revoke'].includes(action)) return json({ ok: false, message: 'Unknown action.' }, 400)
+  if (!['check', 'grant', 'revoke', 'sales'].includes(action)) return json({ ok: false, message: 'Unknown action.' }, 400)
+  if (action !== 'sales' && !email.includes('@')) return json({ ok: false, message: 'Type the email address they signed up with.' }, 400)
   if (!env('REVENUECAT_SECRET')) return json({ ok: false, message: 'The server has no RevenueCat key set.' }, 500)
 
   try {
-    const account = (await rpc('account_for_email', { address: email })) as string | null
+    if (action === 'sales') return json(await sales())
+
+    const found = (await rpc('account_details', { address: email })) as Record<string, any> | null
+    const account = found?.id ? String(found.id) : null
     if (!account) {
       return json({
         ok: true,
@@ -188,6 +298,19 @@ Deno.serve(async (req: Request) => {
     const has = await unlocked(account, entitlement)
     /* The relay's table follows RevenueCat's answer, whichever way it went. */
     if (action !== 'check') await rpc('record_entitlement', { uid: account, is_active: has, from_source: 'revenuecat' })
+
+    /* The Customer lookup. Asked after the change, so it shows the result. */
+    const [bought, seen] = await Promise.all([purchasesOf(account), lastSeen(account)])
+    const details = {
+      signedUp: found?.signed_up ?? null,
+      confirmed: found?.confirmed ?? null,
+      lastSignIn: found?.last_sign_in ?? null,
+      devices: found?.devices || [],
+      /* One of the accounts shared/owner-unlock.mjs unlocks without a purchase. */
+      owner: found?.unlock?.source === 'owner',
+      purchases: bought,
+      seen
+    }
     const message =
       action === 'grant'
         ? `${email} has the unlock now. They may need to close and reopen the app, or reload the website.`
@@ -198,7 +321,7 @@ Deno.serve(async (req: Request) => {
           : has
             ? `${email} has the unlock.`
             : `${email} has an account but not the unlock.`
-    return json({ ok: true, found: true, email, unlocked: has, message })
+    return json({ ok: true, found: true, email, unlocked: has, message, details })
   } catch (err) {
     console.error(`grant-access: ${err}`)
     return json({ ok: false, message: `Something went wrong: ${String((err as Error)?.message || err).slice(0, 200)}` }, 500)

@@ -31,6 +31,7 @@ import { useComputerElsewhere } from '../lib/useComputerElsewhere'
 import { quitEditor } from '../lib/editors'
 import { isAdmin } from '../lib/admin'
 import AccessTool from '../components/AccessTool'
+import SalesTool from '../components/SalesTool'
 import Lamp from '../components/Lamp'
 import Note from '../components/Note'
 import PasswordBox from '../components/PasswordBox'
@@ -392,7 +393,10 @@ export default function Settings({
             <SetupRow title="About" status={`v${APP_VERSION}`} onPress={() => setPage('about')} />
             {/* Justin's own tools, on his account only — see lib/admin.js. */}
             {isAdmin(account?.email) ? (
-              <SetupRow title="Give someone access" status="Unlock an account by hand" onPress={() => setPage('access')} />
+              <SetupRow title="Give someone access" status="Look someone up, or unlock them" onPress={() => setPage('access')} />
+            ) : null}
+            {isAdmin(account?.email) ? (
+              <SetupRow title="Sales at a glance" status="Today, this week, all time" onPress={() => setPage('sales')} />
             ) : null}
           </View>
 
@@ -880,6 +884,14 @@ export default function Settings({
         <>
           {head('Give someone access', 'back')}
           <AccessTool />
+        </>
+      ) : null}
+
+      {/* ----------------------------------------------------------- sales */}
+      {page === 'sales' && isAdmin(account?.email) ? (
+        <>
+          {head('Sales at a glance', 'back')}
+          <SalesTool />
         </>
       ) : null}
 

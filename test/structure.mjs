@@ -1440,7 +1440,8 @@ export function run(test) {
         'About',
         /* Last, and drawn only on his own account: "only when logged into the
            justinnewbold@icloud.com account". See shared/admin.mjs. */
-        'Give someone access'
+        'Give someone access',
+        'Sales at a glance'
       ],
       `Settings opens on ${rows.length} rows: ${rows.join(', ')}`
     )
