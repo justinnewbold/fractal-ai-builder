@@ -159,6 +159,18 @@ export function isSilencingParam(name) {
 export const EXCLUDED_BLOCKS = ['input', 'output', 'looper', 'gate']
 
 /**
+ * Blocks that are not buttons on a stage screen: input, output and looper.
+ *
+ * NOT THE GATE, which EXCLUDED_BLOCKS above keeps out of generation and out of
+ * the knob search for its own good reason — a threshold dragged by a finger
+ * can silence quiet playing. Switching one on or off is a different thing, and
+ * a gate is a pedal people kick: "it's also missing one of the effects pedals
+ * the gate. GTE." On an AM4 it is one of the four slots, drawn on the unit's
+ * own screen between AMP and DLY, and the phone showed three.
+ */
+export const STAGE_HIDDEN = ['input', 'output', 'looper']
+
+/**
  * Strip the parameters the model may never set from a block schema.
  *
  * Levels stay in: it cannot answer "louder for the lead" with a control it

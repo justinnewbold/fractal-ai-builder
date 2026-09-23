@@ -36,6 +36,18 @@ import { slotCount } from './slots.js'
 export const EXCLUDED_BLOCKS = ['input', 'output', 'looper', 'gate']
 
 /**
+ * AND THE GATE IS A STAGE CONTROL after all — only its settings are kept out.
+ *
+ * "It's not showing the scene names and it's also missing one of the effects
+ * pedals the gate. GTE." On his AM4 the gate is one of the four slots, drawn
+ * on the unit's own screen, and the phone showed three. Switching a gate on or
+ * off is a kick like any other; what EXCLUDED_BLOCKS guards against is its
+ * threshold under a thumb, and the knob search still leaves that out. The
+ * browser's list, src/lib/guardrails.js STAGE_HIDDEN, says the same.
+ */
+export const STAGE_HIDDEN = ['input', 'output', 'looper']
+
+/**
  * How many scenes this unit has, and whether it has any at all.
  *
  * Read rather than assumed. Fractal units don't agree on what a preset is, and

@@ -467,6 +467,7 @@ export async function refreshAll() {
      names are a slow read nobody is waiting on. */
   await refreshBlocks()
   if (!quick) await refreshSceneNames()
+  followComputerNames()
   await refreshTempo()
 }
 
@@ -713,6 +714,46 @@ export async function quickSceneNames() {
   set({ sceneNames: held })
   rememberSceneNames(owner, number, held)
   return true
+}
+
+/**
+ * AND AGAIN IN A MOMENT, when the computer is still reading them.
+ *
+ * "It's not showing the scene names." On an AM4 the phone cannot read them at
+ * all: they are only in a full preset dump, which the host will not run for a
+ * phone. The computer app can, and does, the moment the preset changes — then
+ * files them where the phone looks (storedSceneNames). But that dump takes a
+ * few seconds, and the phone looked once, straight away, found nothing, and
+ * never looked again: numbered tiles for a preset whose scenes were named on
+ * the unit's own screen.
+ *
+ * So, while the tiles have no names and this is still the preset, the
+ * computer's store is asked again a few times. One small read each, no unit
+ * involved, and it stops the moment names arrive or the preset changes.
+ */
+export const COMPUTER_NAMES_AFTER_MS = [4000, 9000, 18000]
+
+const named = () => (state.sceneNames || []).some((n) => (n || '').trim())
+
+function followComputerNames() {
+  const number = state.preset?.number
+  if (!Number.isInteger(number) || named()) return
+  for (const wait of COMPUTER_NAMES_AFTER_MS) {
+    setTimeout(async () => {
+      if (state.preset?.number !== number || named()) return
+      const slug = state.deviceSlug
+      let held = null
+      try {
+        held = await device.storedSceneNames(slug, number)
+      } catch {
+        held = null
+      }
+      if (!held || state.preset?.number !== number || named()) return
+      set({ sceneNames: held })
+      rememberSceneNames(device.nameOwner(slug), number, held)
+      logDebug('scenes', `the computer had the scene names for ${number} after ${wait / 1000}s`)
+    }, wait)
+  }
 }
 
 export async function refreshBlocks({ quiet = false } = {}) {
@@ -1136,5 +1177,6 @@ export async function loadPreset(number) {
    */
   await refreshBlocks()
   if (!quick) await refreshSceneNames()
+  followComputerNames()
   return true
 }

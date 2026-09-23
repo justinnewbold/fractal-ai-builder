@@ -2598,9 +2598,31 @@ export function run(test) {
        but what it filters is checked against the real list above. */
     assert.match(
       device,
-      /export const stageBlocks = \(blocks\) =>\s*\(blocks \|\| \[\]\)\.filter\(\(b\) => !EXCLUDED_BLOCKS\.includes\(b\.slug\)\)/,
-      'the stage list is no longer the chain less the four you never kick'
+      /export const stageBlocks = \(blocks\) =>\s*\(blocks \|\| \[\]\)\.filter\(\(b\) => !STAGE_HIDDEN\.includes\(b\.slug\)\)/,
+      'the stage list is no longer the chain less the three you never kick'
     )
+
+    /*
+     * THE GATE IS A PEDAL. "It's also missing one of the effects pedals the
+     * gate. GTE." Shown on the stage at both ends; its threshold still kept
+     * out of the knob search, which is what EXCLUDED_BLOCKS was for.
+     */
+    const { STAGE_HIDDEN } = await import('../mobile/src/lib/unit.mjs')
+    const { STAGE_HIDDEN: WEB_STAGE_HIDDEN } = await import('../src/lib/guardrails.js')
+    assert.deepEqual(STAGE_HIDDEN, ['input', 'output', 'looper'], 'the gate is hidden from the stage again')
+    assert.deepEqual(WEB_STAGE_HIDDEN, STAGE_HIDDEN, 'the phone and the browser disagree about which blocks a stage hides')
+    assert.ok(EXCLUDED_BLOCKS.includes('gate'), 'the gate’s threshold is in the knob search')
+    assert.match(read('mobile/src/lib/paramIndex.js'), /const editable = knobBlocks\(blocks\)/, 'the knob search offers the gate’s threshold')
+
+    /*
+     * AND AN AM4'S SCENE NAMES ARRIVE, late. "It's not showing the scene
+     * names." The computer reads them a few seconds after a preset change;
+     * the phone looked once, straight away, and never again.
+     */
+    const rigSrc = read('mobile/src/lib/rig.js')
+    assert.equal((rigSrc.match(/followComputerNames\(\)\n/g) || []).length, 2, 'a preset load does not go back for the names the computer is still reading')
+    assert.match(rigSrc, /export const COMPUTER_NAMES_AFTER_MS = \[4000, 9000, 18000\]/)
+    assert.match(rigSrc, /if \(state\.preset\?\.number !== number \|\| named\(\)\) return/, 'a late answer lands on the wrong preset, or over names already there')
     assert.match(
       device,
       /export async function presetBlocks\(\) \{[\s\S]*?return list\.filter\(\(b\) => b\?\.slug\)\s*\}/,

@@ -54,7 +54,7 @@ export {
   slotLabel,
   stepSlot
 } from './unit.mjs'
-import { EXCLUDED_BLOCKS } from './unit.mjs'
+import { EXCLUDED_BLOCKS, STAGE_HIDDEN } from './unit.mjs'
 
 const post = (path, body) =>
   remoteRequest(path, { method: 'POST', body: body === undefined ? null : JSON.stringify(body) })
@@ -158,8 +158,12 @@ export async function sceneState() {
   return Array.isArray(list) ? list : []
 }
 
-/** The ones that belong on a stage: everything but the four you never kick. */
+/** The ones that belong on a stage: everything but the three you never kick. The gate is one you do. */
 export const stageBlocks = (blocks) =>
+  (blocks || []).filter((b) => !STAGE_HIDDEN.includes(b.slug))
+
+/** The ones whose controls may be searched and turned: not the gate's threshold. See EXCLUDED_BLOCKS. */
+export const knobBlocks = (blocks) =>
   (blocks || []).filter((b) => !EXCLUDED_BLOCKS.includes(b.slug))
 
 /**
@@ -179,8 +183,10 @@ export const stageBlocks = (blocks) =>
  * is what a player thinks in between two bars. Without it the extra width buys
  * nothing.
  *
- * Empty rather than a throw. A unit that has no scene names — an AM4 has none —
- * gets numbered tiles, which is the honest answer and the one they had before.
+ * Empty rather than a throw. An AM4's summary never carries them — its names
+ * are only in a full dump, which the phone may not ask for — so on an AM4 they
+ * come from the computer's store instead (storedSceneNames), and until then
+ * the tiles are numbered.
  */
 export async function sceneNames(number) {
   if (!Number.isInteger(number)) return []
