@@ -26,6 +26,8 @@
  * save stays on the phone.
  */
 import { isPairAccount } from '../lib/link'
+import { P6 } from '../../shared/onboarding.mjs'
+import { DOWNLOADS_URL } from '../../mobile/src/lib/downloadLink'
 
 export default function ConnectScreen({
   link,
@@ -71,6 +73,14 @@ export default function ConnectScreen({
               {paired ? 'Pair with a different computer' : 'Sign in as someone else'}
             </button>
           </div>
+          {/*
+            THE NEXT STEP FOR SOMEBODY NEW. A first-timer who has just made an
+            account and paid lands here, because there is no computer on the
+            other end yet — and this screen only said to check a computer
+            they have not set up. The connect screen's own line, and the
+            address the phone app gives for the same moment (Connect.js).
+          */}
+          <NoComputerYet />
         </>
       ) : (
         <>
@@ -100,27 +110,25 @@ export default function ConnectScreen({
                 any device, anywhere &mdash; not just at home.
               </p>
               <div className="connect-actions">
-                <button className="primary" onClick={onSwitchAccount} disabled={busy}>
-                  Sign in
-                </button>
                 {/*
-                  "Where is the sign-up button?" Beside the sign-in, where
-                  somebody without an account looks for it — not behind it.
-                  The browser can make an account since it can sell the
-                  unlock; the phone's word for it.
+                  CREATE ACCOUNT FIRST, AND BIG. "Most people coming here for
+                  the first time are going to be creating an account, not
+                  signing in." It was the second button, the quiet one, and
+                  before that it was not here at all. Sign in is the second
+                  now, still a full button, for the person coming back.
                 */}
                 {onCreateAccount ? (
-                  <button className="chip" onClick={onCreateAccount} disabled={busy}>
+                  <button className="primary" onClick={onCreateAccount} disabled={busy}>
                     Create Account
                   </button>
                 ) : null}
+                <button className={onCreateAccount ? 'chip' : 'primary'} onClick={onSwitchAccount} disabled={busy}>
+                  Sign in
+                </button>
               </div>
             </>
           )}
-          <p className="hint">
-            Haven&rsquo;t set up the computer yet? Open this app on the computer, tap{' '}
-            <strong>Set up phone remote</strong>, and sign in with this same account.
-          </p>
+          <NoComputerYet />
 
           {/*
             THE SAME-WIFI BOX IS GONE, and it was the last way in that did not
@@ -198,5 +206,21 @@ function Using({ email, paired }) {
     <p className="hint">
       Make sure you&rsquo;re connected to your computer using <strong>{email}</strong>.
     </p>
+  )
+}
+
+/** "Haven't set up the computer yet?", with where to get it — the phone's address and its label. */
+function NoComputerYet() {
+  return (
+    <>
+      <p className="hint">
+        Haven&rsquo;t set up the computer yet? Open this app on the computer, tap{' '}
+        <strong>Set up phone remote</strong>, and sign in with this same account.
+      </p>
+      <p className="hint connect-address">
+        <span className="mono">{P6.address}</span>
+        <strong>{DOWNLOADS_URL}</strong>
+      </p>
+    </>
   )
 }

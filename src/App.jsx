@@ -161,6 +161,9 @@ import {
 import { newEntry, append } from './lib/log'
 import { watchEvery, probeSays, countQuiet, unitGone } from '../shared/unit-watch.mjs'
 
+/* Session-only: "open the unlock page once the demo has ended" — see afterAccount. */
+const UNLOCK_NEXT = 'fractal.unlockNext'
+
 
 /**
  * Which log entries are worth telling the assistant about.
@@ -1829,11 +1832,60 @@ export default function App() {
   const phoneEnd = link.role === 'remote' || link.role === 'wifi' || (isDemo() && link.canHost === false)
   const computerEnd = link.role === 'mac' && !phoneEnd
 
+  /* Signed in with a real account — not the hidden one an old pairing code made. */
+  const signedInHere = Boolean(link.account?.email && !isPairAccount(link.account.email))
+
   const answeredFor = accountId && paid.checked && paid.for === accountId
   const owned = Boolean(answeredFor && paid.unlocked)
   const mustPay = Boolean(link.role === 'remote' && !isDemo() && answeredFor && !paid.unlocked && !paid.unknown)
 
-  const [unlockAfterSignIn, setUnlockAfterSignIn] = useState(false)
+  /* Carried across the reload that ends the demo (see afterAccount), so the
+     computer still lands on the unlock page it was heading for. */
+  const [unlockAfterSignIn, setUnlockAfterSignIn] = useState(() => {
+    try {
+      const next = sessionStorage.getItem(UNLOCK_NEXT) === '1'
+      sessionStorage.removeItem(UNLOCK_NEXT)
+      return next
+    } catch {
+      return false
+    }
+  })
+
+  /*
+   * WHAT SIGNING IN LEADS TO, from the sign-in with no errand attached.
+   *
+   * SIGNING IN ENDS THE DEMO, as it does on the phone (App.js's onSignedIn).
+   * "Make sure demos disappear when you're logged in." Somebody signing in is
+   * heading for their own rig, and the simulated unit would otherwise go on
+   * answering in its place. A reload, because which end this is was decided
+   * when the page loaded — the same as leave-demo. What comes up after it is
+   * the phone's order: the unlock if it is not paid for, else the computer.
+   *
+   * THE SHEET STAYS OPEN FOR THE RELOAD, and that is the fix for a reload
+   * that went missing about one time in ten. Closing a sheet steps the
+   * browser's history back (lib/nav.js), and a history step still in flight
+   * when reload() is called cancels the reload — so the demo's switch went
+   * off and the page carried on showing the demo. The reload clears the
+   * sheet anyway.
+   *
+   * Out of the demo, a phone signed in connects rather than stopping on
+   * "Connect as …" and waiting for another tap.
+   */
+  const afterAccount = async () => {
+    if (isDemo()) {
+      if (unlockAfterSignIn && !phoneEnd) {
+        try {
+          sessionStorage.setItem(UNLOCK_NEXT, '1')
+        } catch {
+          /* The unlock row in Settings is still there. */
+        }
+      }
+      setDemo(false)
+      window.location.reload()
+      return
+    }
+    if (linkState().role === 'remote') await reconnectPhone()
+  }
   const openUnlock = () => {
     if (accountId) {
       setSheet('settings')
@@ -1841,6 +1893,9 @@ export default function App() {
       return
     }
     setUnlockAfterSignIn(true)
+    /* Somebody buying who is not signed in is nearly always new, so the form
+       opens on making the account — "I already have one" is right under it. */
+    setSignInStart('up')
     setSignIn('account')
   }
   useEffect(() => {
@@ -1858,15 +1913,19 @@ export default function App() {
     setBuying(false)
     if (out.ok) {
       setPaid({ checked: true, unlocked: true, for: accountId })
-      setSetupPage(null)
       /*
        * Buying ends the demo, as it does on the phone. A reload, because
        * which end this is was decided when the page loaded — see leave-demo.
+       * Before the page is put away, not after: moving the sheet steps the
+       * browser's history, and a step in flight cancels the reload (see
+       * afterAccount).
        */
       if (isDemo()) {
         setDemo(false)
         window.location.reload()
+        return
       }
+      setSetupPage(null)
       return
     }
     if (!out.cancelled) setBuySaid(out.message)
@@ -1936,9 +1995,10 @@ export default function App() {
       if (signIn === 'account') {
         await signInAccount({ email, password })
         record('remote', `Signed in as ${email}`)
-        /* A phone signed in has one thing to do next, and it did not do it:
-           it stopped on "Connect as …" and waited for another tap. */
-        if (linkState().role === 'remote' && !isDemo()) await reconnectPhone()
+        /* Not closed first when the demo is about to end — see afterAccount. */
+        if (!isDemo()) setSignIn(false)
+        await afterAccount()
+        return
       } else if (linkState().role === 'mac') {
         await setUpMac({ email, password })
         record('remote', `Phone remote set up for ${email}`)
@@ -1948,7 +2008,7 @@ export default function App() {
       }
       setSignIn(false)
     },
-    [record, signIn]
+    [record, signIn, afterAccount]
   )
 
   /** Do at the Mac what the phone asked for, and say so at both ends. */
@@ -3801,8 +3861,8 @@ export default function App() {
           /* Then the errand the sheet was opened for — connect this phone, or
              turn the computer's phone remote on — as the sign-in would have. */
           if (signIn === 'account') {
-            setSignIn(false)
-            if (linkState().role === 'remote' && !isDemo()) await reconnectPhone()
+            if (!isDemo()) setSignIn(false)
+            await afterAccount()
           } else await signInSubmit(details)
           return out
         }}
@@ -4357,12 +4417,30 @@ export default function App() {
             user name and password after you are in the app on the demo", and
             these are its words.
           */}
-          {isDemo() && !link.account ? (
-            <Section key="account" title="Account" note="Not signed in on this device." defaultOpen>
+          {/*
+            AND THE WAY OUT, in the same place — the phone's Account section,
+            both halves of it. Signing out was four doors deep here: Settings,
+            Phone & computer, the Phone remote fold, then an Account fold
+            inside that. On the phone it is on this page, open. The computer
+            signed out keeps its own sign-in, the phone remote's, above.
+          */}
+          {signedInHere || isDemo() || link.role === 'remote' ? (
+            <Section
+              key="account"
+              title="Account"
+              note={signedInHere ? link.account.email : 'Not signed in on this device.'}
+              defaultOpen
+            >
               <div className="history-actions">
-                <button type="button" className="primary" onClick={() => setSignIn('account')} disabled={busy}>
-                  Sign in with an email and password
-                </button>
+                {signedInHere ? (
+                  <button type="button" className="chip" onClick={() => linkAction('signout')} disabled={busy}>
+                    Sign out on this device
+                  </button>
+                ) : (
+                  <button type="button" className="primary" onClick={() => setSignIn('account')} disabled={busy}>
+                    Sign in with an email and password
+                  </button>
+                )}
               </div>
             </Section>
           ) : null}

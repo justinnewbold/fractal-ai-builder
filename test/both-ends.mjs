@@ -1140,7 +1140,7 @@ export function run(test) {
      * unlock page by itself — the whole point of the request is that nobody
      * has to find Settings. And not for somebody who turns out to have paid.
      */
-    assert.match(app, /setUnlockAfterSignIn\(true\)\s*setSignIn\('account'\)/, 'signed out, UNLOCK does not ask for the sign-in')
+    assert.match(app, /setUnlockAfterSignIn\(true\)[\s\S]{0,300}setSignInStart\('up'\)\s*setSignIn\('account'\)/, 'signed out, UNLOCK does not ask for the sign-in')
 
     /*
      * And that sign-in is the plain one. On the website the demo takes the
@@ -1157,7 +1157,7 @@ export function run(test) {
     assert.match(read('mobile/src/screens/Settings.js'), /label="Sign in with an email and password"/, 'the phone lost its sign-in button')
     assert.match(
       app,
-      /\{isDemo\(\) && !link\.account \? \([\s\S]{0,200}note="Not signed in on this device\." defaultOpen>[\s\S]{0,300}setSignIn\('account'\)[\s\S]{0,120}Sign in with an email and password/,
+      /\{signedInHere \|\| isDemo\(\) \|\| link\.role === 'remote' \? \([\s\S]{0,300}'Not signed in on this device\.'[\s\S]{0,500}Sign out on this device[\s\S]{0,300}setSignIn\('account'\)[\s\S]{0,120}Sign in with an email and password/,
       'the browser’s Setup has no way to sign in from the demo'
     )
     assert.match(app, /paid\.for !== accountId/, 'the unlock page can open on the signed-out answer, before the new account’s is in')
@@ -1216,8 +1216,14 @@ export function run(test) {
       assert.ok(src.includes('Make sure you’re connected to your computer using '), `${where} does not say which account it is using`)
     }
 
-    /* And signing in on a phone connects, rather than stopping one tap short. */
-    assert.match(app, /if \(linkState\(\)\.role === 'remote' && !isDemo\(\)\) await reconnectPhone\(\)/, 'a phone signed in from the unlock stops at “Connect as …”')
+    /* Signing in ends the demo, as the phone's onSignedIn does — "make sure
+       demos disappear when you're logged in" — and out of the demo a phone
+       signed in connects, rather than stopping one tap short. */
+    const after = app.slice(app.indexOf('const afterAccount = async () => {'), app.indexOf('const afterAccount = async () => {') + 700)
+    assert.match(after, /if \(isDemo\(\)\) \{[\s\S]*?setDemo\(false\)\s*window\.location\.reload\(\)/, 'signing in leaves the person in the demo')
+    assert.match(after, /if \(linkState\(\)\.role === 'remote'\) await reconnectPhone\(\)/, 'a phone signed in from the unlock stops at “Connect as …”')
+    assert.equal((app.match(/await afterAccount\(\)/g) || []).length, 2, 'signing in and making an account lead to different places')
+    assert.match(read('mobile/App.js'), /onSignedIn=\{[\s\S]{0,1200}setDemo\(false\)/, 'the phone’s sign-in stopped ending the demo; this check follows it')
   })
 
   /**

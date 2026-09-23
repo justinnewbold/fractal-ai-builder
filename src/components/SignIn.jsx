@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { loadRemoteConfig, sendPasswordReset } from '../lib/remote'
 
 /**
@@ -29,9 +29,22 @@ import { loadRemoteConfig, sendPasswordReset } from '../lib/remote'
  * Forgot stays: somebody signing in here with an account made on their phone
  * is exactly the person who will have forgotten the password.
  */
-export default function SignIn({ email: initial = '', submitLabel = 'Sign in', onSubmit, onCreate, startIn = 'in', busy, autoFocus }) {
+export default function SignIn({
+  email: initial = '',
+  submitLabel = 'Sign in',
+  onSubmit,
+  onCreate,
+  startIn = 'in',
+  /* Told which side the form is on, so the sheet around it can say so in its title. */
+  onMode,
+  busy,
+  autoFocus
+}) {
   /* Opened by a Create Account button, the form starts on making one. */
-  const [mode, setMode] = useState(onCreate && startIn === 'up' ? 'up' : 'in') // 'in' | 'up' | 'forgot'
+  const [mode, setMode] = useState(onCreate && startIn === 'up' ? 'up' : 'in') // 'in' | 'up' | 'forgot' | 'sent'
+  useEffect(() => {
+    onMode?.(mode)
+  }, [mode, onMode])
   const [email, setEmail] = useState(initial)
   const [password, setPassword] = useState('')
   const [working, setWorking] = useState(false)
@@ -57,11 +70,14 @@ export default function SignIn({ email: initial = '', submitLabel = 'Sign in', o
         await onSubmit({ email: address, password })
       } else if (mode === 'up') {
         const { needsConfirmation } = await onCreate({ email: address, password })
-        if (needsConfirmation) {
-          /* The phone's sentence for the same moment. */
-          setNote('Account made. Confirm it from the email we just sent, then sign in.')
-          setMode('in')
-        }
+        /*
+         * THE EMAIL, AS A SCREEN OF ITS OWN. "When I did sign up and I clicked
+         * create account, it didn't give me any confirmation that I need to
+         * check my email or that account was created." It did — as one grey
+         * line under the buttons, below a phone's keyboard. Now the form gives
+         * way to it. The words are still the phone's.
+         */
+        if (needsConfirmation) setMode('sent')
       } else {
         await sendPasswordReset({ ...project(), email: address, redirectTo: window.location.origin })
         setNote('If that address has an account, a reset link is on its way.')
@@ -72,6 +88,26 @@ export default function SignIn({ email: initial = '', submitLabel = 'Sign in', o
     } finally {
       setWorking(false)
     }
+  }
+
+  if (mode === 'sent') {
+    return (
+      <div className="signin signin-sent" role="status">
+        <span className="signin-sent-mark" aria-hidden="true">
+          ✉
+        </span>
+        <p className="signin-sent-head">Account made.</p>
+        <p className="signin-sent-body">
+          Confirm it from the email we just sent, then sign in.
+        </p>
+        <p className="signin-sent-to">
+          <strong>{email.trim()}</strong>
+        </p>
+        <button className="primary signin-wide" type="button" onClick={() => setMode('in')}>
+          Sign in
+        </button>
+      </div>
+    )
   }
 
   return (
@@ -112,22 +148,30 @@ export default function SignIn({ email: initial = '', submitLabel = 'Sign in', o
                 ? 'Create Account'
                 : submitLabel}
         </button>
+        {/*
+          THE OTHER SIDE OF THE FORM, as a button the size of the one above it.
+          "When it says create account, it's in a very tiny font underneath
+          where it says sign in. Most people coming here for the first time
+          are going to be creating an account." A link-sized Create Account
+          was the thing a first-timer most needed and was least likely to see.
+        */}
         {mode === 'up' ? (
-          <button type="button" className="signin-link" onClick={() => setMode('in')} disabled={off}>
+          <button type="button" className="chip signin-wide" onClick={() => setMode('in')} disabled={off}>
             I already have one
           </button>
-        ) : mode === 'in' ? (
+        ) : mode === 'in' && onCreate ? (
+          <button type="button" className="chip signin-wide" onClick={() => setMode('up')} disabled={off}>
+            Create Account
+          </button>
+        ) : null}
+        {mode === 'in' ? (
           <button type="button" className="signin-link" onClick={() => setMode('forgot')} disabled={off}>
             Forgot password?
           </button>
-        ) : (
+        ) : null}
+        {mode === 'forgot' ? (
           <button type="button" className="signin-link" onClick={() => setMode('in')} disabled={off}>
             Back to sign in
-          </button>
-        )}
-        {mode === 'in' && onCreate ? (
-          <button type="button" className="signin-link" onClick={() => setMode('up')} disabled={off}>
-            Create Account
           </button>
         ) : null}
       </div>

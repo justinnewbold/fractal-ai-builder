@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import Sheet from './Sheet'
 import SignIn from './SignIn'
 
@@ -11,6 +12,15 @@ import SignIn from './SignIn'
 export default function SignInSheet({ open, role, account = false, startIn = 'in', email, busy, onClose, onSubmit, onCreate }) {
   const phone = role !== 'mac'
   /*
+   * WHICH SIDE THE FORM IS ON, so the title says what is being done. Opened
+   * from Create Account it read "Connect to your computer" over a form making
+   * an account — the sheet named the errand and not the step. Making an
+   * account, it says so; the words about which account to use are for
+   * signing in, so they wait until then.
+   */
+  const [side, setSide] = useState(startIn)
+  const making = side === 'up' || side === 'sent'
+  /*
    * A sign-in with no errand: the account and nothing else, for the demo and
    * for buying the unlock. The phone's words for it, not new ones — its
    * form's button says "Sign in", and its sign-in screen says what an
@@ -19,13 +29,25 @@ export default function SignInSheet({ open, role, account = false, startIn = 'in
    */
   if (account) {
     return (
-      <Sheet open={open} onClose={onClose} title="Sign in">
+      <Sheet open={open} onClose={onClose} title={making ? 'Create Account' : 'Sign in'}>
         <div className="signin-sheet">
-          <p className="hint">
-            Sign in with the same account as the computer your unit is plugged into. Your setlists
-            and starred presets follow you to any device.
-          </p>
-          <SignIn key={startIn} email={email} busy={busy} autoFocus submitLabel="Sign in" onSubmit={onSubmit} onCreate={onCreate} startIn={startIn} />
+          {making ? null : (
+            <p className="hint">
+              Sign in with the same account as the computer your unit is plugged into. Your setlists
+              and starred presets follow you to any device.
+            </p>
+          )}
+          <SignIn
+            key={startIn}
+            email={email}
+            busy={busy}
+            autoFocus
+            submitLabel="Sign in"
+            onSubmit={onSubmit}
+            onCreate={onCreate}
+            startIn={startIn}
+            onMode={setSide}
+          />
         </div>
       </Sheet>
     )
@@ -34,8 +56,8 @@ export default function SignInSheet({ open, role, account = false, startIn = 'in
     <Sheet
       open={open}
       onClose={onClose}
-      title={phone ? 'Connect to your computer' : 'Set up phone remote'}
-      note={phone ? 'Sign in once — this phone stays signed in' : 'Once, on this computer'}
+      title={making ? 'Create Account' : phone ? 'Connect to your computer' : 'Set up phone remote'}
+      note={making ? null : phone ? 'Sign in once — this phone stays signed in' : 'Once, on this computer'}
     >
       <div className="signin-sheet">
         {/*
@@ -43,7 +65,7 @@ export default function SignInSheet({ open, role, account = false, startIn = 'in
           here. "Only sign-ins" on the computer — an account is created in
           the phone app, after the unlock, and this end signs into it.
         */}
-        <p className="hint">
+        <p className="hint" hidden={making}>
           {phone
             ? 'Use the same account you set up on the computer.'
             : /* "Sign in with the account you made in the phone app." came
@@ -63,6 +85,7 @@ export default function SignInSheet({ open, role, account = false, startIn = 'in
              goes on to do this sheet's errand — connect, or turn on. */
           onCreate={onCreate}
           startIn={startIn}
+          onMode={setSide}
         />
       </div>
     </Sheet>

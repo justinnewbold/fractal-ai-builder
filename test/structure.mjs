@@ -3906,6 +3906,25 @@ export function run(test) {
     assert.match(connectScreen, /onClick=\{onCreateAccount\}[^>]*>\s*Create Account\s*</, 'the website’s first screen has no sign-up button')
     assert.match(src, /onCreateAccount=\{\(\) => \{\s*setSignInStart\('up'\)/, 'Create Account opens the form on signing in instead')
     assert.match(webForm, /useState\(onCreate && startIn === 'up' \? 'up' : 'in'\)/, 'the form ignores which button opened it')
+    /*
+     * A first-timer's way in is the big one. "When it says create account,
+     * it's in a very tiny font underneath where it says sign in. Most people
+     * coming here for the first time are going to be creating an account."
+     * And making one is answered on a screen of its own: "it didn't give me
+     * any confirmation that I need to check my email or that account was
+     * created."
+     */
+    assert.match(connectScreen, /<button className="primary" onClick=\{onCreateAccount\}/, 'Create Account is not the big button on the first screen')
+    assert.match(webForm, /className="chip signin-wide" onClick=\{\(\) => setMode\('up'\)\}/, 'the form’s Create Account is link-sized again')
+    assert.match(webForm, /if \(needsConfirmation\) setMode\('sent'\)/, 'a new account is told to check its email in a line under the buttons again')
+    assert.match(webForm, /if \(mode === 'sent'\) \{[\s\S]{0,400}Account made\.[\s\S]{0,200}Confirm it from the email we just sent, then sign in\./, 'the check-your-email screen lost the phone’s words')
+    assert.match(sheet, /title=\{making \? 'Create Account' : 'Sign in'\}/, 'the sheet says Sign in over a form making an account')
+    /* Create Account pressed by somebody who already has one signs them in —
+       never "Account made, check your email" for an email that will not come. */
+    const remoteLib = readFileSync(new URL('../src/lib/remote.js', import.meta.url), 'utf8')
+    const linkLib = readFileSync(new URL('../src/lib/link.js', import.meta.url), 'utf8')
+    assert.match(remoteLib, /const existing = Array\.isArray\(data\?\.user\?\.identities\) && data\.user\.identities\.length === 0/, 'an address that already has an account reads as a new one')
+    assert.match(linkLib, /if \(existing\) \{\s*try \{\s*await signInAccount\(\{ email, password \}\)/, 'Create Account with an existing account’s details does not sign them in')
     assert.match(src, /onCreate=\{async \(details\) => \{\s*const out = await createAccount\(details\)/, 'the browser cannot make an account on the way to the unlock')
 
     const native = readFileSync(new URL('../mobile/src/screens/SignIn.js', import.meta.url), 'utf8')

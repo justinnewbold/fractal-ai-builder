@@ -9174,10 +9174,27 @@ button.phone-chip.dim {
   width: 100%;
 }
 
-.connect-actions .primary {
+/* The second way on, as wide as the first: Sign in under Create Account was a
+   small box a returning player had to hunt for. The primary's width, the
+   chip's quieter face. */
+.connect-actions .primary,
+.connect-actions .chip {
   min-height: 52px;
   min-width: min(280px, 100%);
   font-size: var(--f-2);
+}
+
+/* Where to get the computer app: the phone's label over the address, stacked. */
+.connect-address {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-1);
+}
+.connect-address .mono {
+  font-size: var(--f-1);
+  letter-spacing: 0.12em;
+  color: var(--silk-faint);
 }
 
 /*
@@ -9276,6 +9293,49 @@ button.signin-link {
   color: var(--silk-dim);
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+/* The other side of the form, as big as the button above it — a first-timer's
+   Create Account was a link-sized afterthought. */
+.signin-actions .signin-wide,
+.signin .signin-wide {
+  flex: 1 1 100%;
+  width: 100%;
+  min-height: 48px;
+}
+
+/* "Account made." as a screen of its own, not a line under the buttons. */
+.signin-sent {
+  align-items: center;
+  text-align: center;
+  gap: var(--s-3);
+  padding: var(--s-6) var(--s-4);
+}
+.signin-sent p {
+  margin: 0;
+}
+.signin-sent-mark {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 1.5px solid var(--signal);
+  color: var(--signal);
+  font-size: var(--f-6);
+}
+.signin-sent-head {
+  font-weight: 700;
+  font-size: var(--f-5);
+}
+.signin-sent-body {
+  color: var(--silk-dim);
+  font-size: var(--f-4);
+  line-height: 1.45;
+}
+.signin-sent-to {
+  font-size: var(--f-4);
+  word-break: break-all;
 }
 
 .signin .problem {

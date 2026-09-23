@@ -894,7 +894,20 @@ export async function signInAccount({ email, password }) {
  */
 export async function createAccount({ email, password }) {
   const config = loadRemoteConfig() || {}
-  const { needsConfirmation } = await remoteSignUp({ url: config.url, anonKey: config.anonKey, email, password })
+  const { needsConfirmation, existing } = await remoteSignUp({ url: config.url, anonKey: config.anonKey, email, password })
+  /*
+   * Create Account, pressed by somebody who already has one — which is what
+   * a big Create Account button invites. Their details are the sign-in they
+   * meant, so this signs them in; only a wrong password gets them a message.
+   */
+  if (existing) {
+    try {
+      await signInAccount({ email, password })
+    } catch {
+      throw new Error('That email already has an account. Sign in with it, or reset the password.')
+    }
+    return { needsConfirmation: false }
+  }
   if (needsConfirmation) return { needsConfirmation: true }
   await signInAccount({ email, password })
   return { needsConfirmation: false }
