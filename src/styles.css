@@ -10782,6 +10782,41 @@ button.setup-back {
   min-height: 48px;
   font-size: var(--f-4);
 }
+/*
+ * THE WAY ON, ALWAYS ON SCREEN. "On my phone's web browser I can't see the
+ * Guide button at the bottom so people might not know they need to scroll."
+ * Stuck to the bottom of the walkthrough while what is above it scrolls; the
+ * button is solid, so the boxes pass behind it. On a screen tall enough for
+ * everything it sits where it always did.
+ */
+.pw-stick {
+  position: sticky;
+  bottom: var(--s-3);
+  z-index: 1;
+}
+/*
+ * And on a short phone, the three boxes take less of it: less padding, the
+ * pictures smaller, the heading a size down. An iPhone's browser, with its
+ * address bar, is about 660 points tall.
+ */
+@media (max-height: 760px) {
+  .pw .pw-sheet {
+    gap: var(--s-3);
+  }
+  .pw .pw-box {
+    padding: var(--s-3);
+  }
+  .pw .pw-art {
+    width: 72px;
+    height: 44px;
+  }
+  .pw .pw-wire-line {
+    height: 8px;
+  }
+  .pw .pw-head {
+    font-size: var(--f-5);
+  }
+}
 .pw-note {
   margin: 0;
   color: var(--silk-dim);
