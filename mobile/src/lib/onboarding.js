@@ -214,11 +214,19 @@ export const P1 = {
 /** P2 — the same three boxes, down a phone. */
 export const P2 = {
   count: '1 OF 2',
-  eyebrow: 'ONE SIMPLE PATH',
-  head: 'Your phone talks to your computer.',
-  /* MINE, from his mockup. The three boxes underneath are the answer to "what
-     are the pieces"; this says how many there are before somebody counts. */
-  sub: 'Three pieces. One powerful connection.',
+  /*
+   * HIS WORDS, and only a heading. "On my phone's web browser I can't see the
+   * Guide button at the bottom so people might not know they need to scroll.
+   * Let's remove a little text out of the top of the screen… Remove this
+   * text. One simple path. Three pieces one powerful connection. And change
+   * the text about the phone connects to the computer. Instead say 'HOW IT
+   * WORKS'."
+   *
+   * The eyebrow and the line under the heading are gone rather than blank:
+   * the three boxes say what the pieces are, and the room they took is the
+   * room the button at the bottom needed.
+   */
+  head: 'HOW IT WORKS',
   foot: 'No computer yet? Try a simulated unit free, with no time limit.',
   go: 'Got it'
 }

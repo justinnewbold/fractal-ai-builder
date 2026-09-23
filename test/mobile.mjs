@@ -3195,6 +3195,26 @@ export function run(test) {
     assert.match(flat, /Finding \$\{link\.macName \|\| 'your computer'\}/, 'the wait does not say what it is waiting for')
   })
 
+  test('the how-it-works screen is his heading alone, and its button stays on screen', async () => {
+    /*
+     * "On my phone's web browser I can't see the Guide button at the bottom
+     * so people might not know they need to scroll… Remove this text. One
+     * simple path. Three pieces one powerful connection. And change the text
+     * about the phone connects to the computer. Instead say 'HOW IT WORKS'."
+     */
+    const { P2 } = await import('../shared/onboarding.mjs')
+    assert.equal(P2.head, 'HOW IT WORKS', 'the heading is not his')
+    assert.equal(P2.eyebrow, undefined, 'ONE SIMPLE PATH is back')
+    assert.equal(P2.sub, undefined, 'Three pieces. One powerful connection. is back')
+    for (const file of ['src/components/PhoneWalkthrough.jsx', 'mobile/src/screens/Onboarding.js']) {
+      assert.ok(!/P2\.(eyebrow|sub)/.test(read(file)), `${file} still draws a line that is gone`)
+    }
+    const web = read('src/components/PhoneWalkthrough.jsx').replace(/\s+/g, ' ')
+    assert.match(web, /className="primary pw-go pw-stick" onClick=\{\(\) => setAt\('mode'\)\}/, 'the browser’s Got it can scroll off the bottom again')
+    const css = read('src/styles.css').replace(/\s+/g, ' ')
+    assert.match(css, /\.pw-stick \{ position: sticky; bottom: var\(--s-3\);/, 'the browser’s Got it is not held to the bottom')
+  })
+
   test('Unlock waits for the box saying a computer and a USB cable are needed', async () => {
     /*
      * "On the unlock part of this can we add a disclaimer question that

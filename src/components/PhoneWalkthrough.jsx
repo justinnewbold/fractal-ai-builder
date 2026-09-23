@@ -87,9 +87,7 @@ export default function PhoneWalkthrough({ open, replay = false, onClose, onAcco
         {at === 'how' ? (
           <>
             <Progress count={P2.count} at={0} of={2} />
-            <p className="pw-eyebrow">{P2.eyebrow}</p>
             <h1 className="pw-head">{P2.head}</h1>
-            <p className="pw-sub">{P2.sub}</p>
             <div className="pw-chain">
               {CHAIN.map((box, i) => (
                 <div key={box.key}>
@@ -112,7 +110,10 @@ export default function PhoneWalkthrough({ open, replay = false, onClose, onAcco
               ))}
             </div>
             <p className="pw-note">{P2.foot}</p>
-            <button type="button" className="primary pw-go" onClick={() => setAt('mode')}>
+            {/* Held at the bottom of the screen while the boxes scroll under
+                it, so a phone too short for the whole page still shows the
+                way on. */}
+            <button type="button" className="primary pw-go pw-stick" onClick={() => setAt('mode')}>
               {`${P2.go}  ›`}
             </button>
           </>
@@ -211,7 +212,7 @@ export default function PhoneWalkthrough({ open, replay = false, onClose, onAcco
                 <p className="pw-card-body">{tip.body}</p>
               </div>
             ))}
-            <button type="button" className="primary pw-go" onClick={intoDemo}>
+            <button type="button" className="primary pw-go pw-stick" onClick={intoDemo}>
               {P9.go}
             </button>
             <p className="pw-note">{P9.foot}</p>

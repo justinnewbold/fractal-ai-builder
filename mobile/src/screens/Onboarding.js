@@ -195,9 +195,7 @@ export default function Onboarding({ onEnterDemo, onAccount, onUnlock, replay, o
             shot still ships over the air and costs no build.
           */}
           <Progress count={P2.count} at={0} of={2} />
-          <Eyebrow>{P2.eyebrow}</Eyebrow>
           <Head>{P2.head}</Head>
-          <Sub>{P2.sub}</Sub>
           <View style={{ gap: 0 }}>
             {CHAIN.map((box, i) => (
               <View key={box.key}>
