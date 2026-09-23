@@ -6978,6 +6978,40 @@ button.gig-block:disabled {
 .access-email {
   width: 100%;
 }
+/* Customer lookup and Sales at a glance: labelled facts, one to a line. */
+.facts-title {
+  margin: 0 0 var(--s-1);
+  font-size: var(--f-1);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--silk-dim);
+}
+.facts {
+  margin: 0;
+  padding: 0 var(--s-3);
+  border-radius: var(--r-2);
+  background: var(--panel);
+}
+.facts-row {
+  display: flex;
+  gap: var(--s-3);
+  padding: var(--s-2) 0;
+  font-size: var(--f-2);
+}
+.facts-row + .facts-row {
+  border-top: 1px solid var(--rule);
+}
+.facts-row dt {
+  flex: 0 0 8rem;
+  color: var(--silk-dim);
+}
+.facts-row dd {
+  flex: 1;
+  margin: 0;
+  color: var(--silk);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
 
 .save-error {
   display: flex;

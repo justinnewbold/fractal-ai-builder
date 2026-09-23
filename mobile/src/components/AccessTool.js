@@ -4,7 +4,8 @@ import { Text, TextInput, View } from 'react-native'
 import { color, font, radius, space, TAP } from '../lib/theme'
 import { DEFAULT_PROJECT } from '../lib/project'
 import { supabaseClient } from '../lib/relay'
-import { accessAction } from '../lib/admin'
+import { accessAction, lookupRows } from '../lib/admin'
+import Facts from './Facts'
 import Note from './Note'
 import Press from './Press'
 
@@ -17,6 +18,10 @@ import Press from './Press'
  * unlock; Give access gives it to them for good; Take it back removes one given
  * here. The server does the work and decides who may ask — see
  * supabase/functions/grant-access.
+ *
+ * And the Customer lookup under whichever answer comes back: when they signed
+ * up, what they paid for and where, which devices they are signed in on, the
+ * app version they were last on. "Do number one and five for now."
  */
 export default function AccessTool() {
   const [email, setEmail] = useState('')
@@ -83,6 +88,7 @@ export default function AccessTool() {
       />
       <Press label={busy === 'revoke' ? 'Taking it back…' : 'Take it back'} height={TAP} disabled={!!busy} onPress={() => run('revoke')} />
       {said ? <Note tone={said.ok ? undefined : 'fault'}>{said.message}</Note> : null}
+      <Facts rows={lookupRows(said)} />
     </View>
   )
 }

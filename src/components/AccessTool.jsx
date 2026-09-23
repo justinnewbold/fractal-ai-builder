@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { DEFAULT_PROJECT, supabaseClient } from '../lib/remote'
-import { accessAction } from '../../shared/admin.mjs'
+import { accessAction, lookupRows } from '../../shared/admin.mjs'
+import Facts from './Facts'
 
 /**
  * GIVE SOMEONE ACCESS — Justin's page, and nobody else's. The browser's copy
@@ -66,6 +67,7 @@ export default function AccessTool() {
         </button>
       </div>
       {said ? <p className={said.ok ? 'hint' : 'save-error'} role="status">{said.message}</p> : null}
+      <Facts rows={lookupRows(said)} />
     </div>
   )
 }

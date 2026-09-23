@@ -3349,7 +3349,7 @@ export function run(test) {
     const server = read('supabase/functions/grant-access/index.ts')
     const copied = JSON.parse((server.match(/const ADMINS = (\[[^\]]*\])/) || [])[1]?.replace(/'/g, '"') || 'null')
     assert.deepEqual(copied, ADMINS, 'the server and the apps disagree about whose tools these are')
-    assert.ok(server.indexOf('ADMINS.includes(fold(me.email))') < server.indexOf("rpc('account_for_email'"), 'the server looks somebody up before checking who is asking')
+    assert.ok(server.indexOf('ADMINS.includes(fold(me.email))') < server.indexOf("rpc('account_details'"), 'the server looks somebody up before checking who is asking')
     assert.match(server, /actions\/grant_entitlement/, 'the server does not grant through RevenueCat')
     assert.match(server, /actions\/revoke_granted_entitlement/, 'the server cannot take a grant back')
     const sql = read('supabase/migrations/20260923_account_for_email.sql')
@@ -3364,6 +3364,91 @@ export function run(test) {
     assert.equal(down.ok, false)
     const signedOut = await accessAction({ url: 'x', anonKey: 'k', token: null, action: 'check', email: 'a@b.c' })
     assert.equal(signedOut.message, 'Sign in first.')
+  })
+
+  test('Customer lookup and Sales at a glance say what happened, in his words', async () => {
+    /*
+     * "Do number one and five for now." One: Check also says when they signed
+     * up, whether they paid or were given access, where they are signed in,
+     * and the app version. Five: sales today, this week and ever, per platform.
+     */
+    const { lookupRows, salesSections, ago, dayOf } = await import('../shared/admin.mjs')
+    const now = new Date(2026, 8, 23, 15, 0).getTime()
+    const at = (y, m, d) => new Date(y, m, d, 12).getTime()
+    assert.equal(dayOf(at(2026, 8, 12)), 'Sep 12, 2026')
+    assert.equal(ago(at(2026, 8, 23), now), 'today')
+    assert.equal(ago(at(2026, 8, 22), now), 'yesterday')
+    assert.equal(ago(at(2026, 8, 20), now), '3 days ago')
+
+    const details = (over = {}) => ({
+      signedUp: '2026-09-01T10:00:00Z',
+      confirmed: '2026-09-01T10:05:00Z',
+      lastSignIn: new Date(at(2026, 8, 22)).toISOString(),
+      devices: [
+        { kind: 'iphone-app', last_seen: new Date(at(2026, 8, 23)).toISOString() },
+        { kind: 'computer', last_seen: new Date(at(2026, 8, 20)).toISOString() }
+      ],
+      owner: false,
+      purchases: [],
+      seen: { version: '1.79.0', platform: 'iOS', platformVersion: '18.7', last: at(2026, 8, 23) },
+      ...over
+    })
+    const row = (rows, label) => rows.find((r) => r.label === label)?.value
+
+    const paid = lookupRows({ found: true, unlocked: true, details: details({ purchases: [{ store: 'app_store', at: at(2026, 8, 12), sandbox: false, refunded: false }] }) }, now)
+    assert.equal(row(paid, 'Unlock'), 'Paid, on iPhone, Sep 12, 2026')
+    assert.equal(row(paid, 'Signed in on'), 'iPhone app, today\nComputer app, 3 days ago')
+    assert.equal(row(paid, 'App version'), '1.79.0 on iOS 18.7, last opened today')
+    assert.equal(row(paid, 'Last signed in'), 'yesterday')
+
+    const given = lookupRows({ found: true, unlocked: true, details: details() }, now)
+    assert.equal(row(given, 'Unlock'), 'Given by hand', 'a hand-given unlock is taken for a purchase')
+    assert.equal(row(lookupRows({ found: true, unlocked: false, details: details({ owner: true }) }, now), 'Unlock'), 'Unlocked as an owner account', 'an owner reads as locked out')
+    const test = lookupRows({ found: true, unlocked: true, details: details({ purchases: [{ store: 'play_store', at: at(2026, 8, 12), sandbox: true, refunded: false }] }) }, now)
+    assert.match(row(test, 'Unlock'), /a test purchase, no money taken/, 'a test purchase reads like a sale')
+    const refunded = lookupRows({ found: true, unlocked: false, details: details({ purchases: [{ store: 'play_store', at: at(2026, 8, 12), refunded: true }] }) }, now)
+    assert.match(row(refunded, 'Unlock'), /^Not unlocked\. Refunded \(bought on Android/)
+    const unconfirmed = lookupRows({ found: true, unlocked: false, details: details({ confirmed: null, devices: [] }) }, now)
+    assert.match(row(unconfirmed, 'Email confirmed'), /^Not yet/)
+    assert.match(row(unconfirmed, 'Signed in on'), /signed out everywhere/)
+    assert.deepEqual(lookupRows({ found: false, message: 'No account uses x' }), [], 'no account still draws a lookup')
+    assert.deepEqual(lookupRows({ ok: false, message: 'Not allowed.' }), [])
+
+    /* Sales: today is today where the phone is; tests and refunds kept out. */
+    const sold = salesSections({
+      ok: true,
+      accounts: 40,
+      accountsWeek: 6,
+      accountsDay: 1,
+      givenByHand: 2,
+      sales: [
+        { email: 'a@x.com', store: 'app_store', at: at(2026, 8, 23), gross: 9.99 },
+        { email: 'b@x.com', store: 'play_store', at: at(2026, 8, 20), gross: 9.99 },
+        { email: 'c@x.com', store: 'rc_billing', at: at(2026, 7, 1), gross: 9.99 },
+        { email: 'd@x.com', store: 'play_store', at: at(2026, 8, 23), sandbox: true },
+        { email: 'e@x.com', store: 'app_store', at: at(2026, 8, 21), refunded: true }
+      ]
+    }, now)
+    const section = (title) => sold.find((s) => s.title === title)?.rows || []
+    assert.deepEqual(section('Sales').slice(0, 3).map((r) => r.value), ['1', '2', '3'], 'today, the last week and ever are miscounted')
+    assert.match(row(section('Sales'), 'Money in, all time'), /^\$29\.97/)
+    assert.deepEqual(section('Where they bought').map((r) => [r.label, r.value]), [['iPhone', '1'], ['Android', '1'], ['Website', '1']])
+    assert.equal(row(section('Not sales'), 'Given by hand'), '2')
+    assert.match(row(section('Not sales'), 'Test purchases'), /^1,/)
+    assert.match(row(section('Not sales'), 'Refunded'), /^1,/)
+    assert.equal(row(section('Accounts'), 'New in the last 7 days'), '6')
+    assert.equal(section('Latest sales')[0].value, 'a@x.com, iPhone')
+
+    /* The server: one more action, behind the same lock, and nothing a client can call. */
+    const server = read('supabase/functions/grant-access/index.ts')
+    assert.ok(server.indexOf('ADMINS.includes(fold(me.email))') < server.indexOf("await sales()"), 'sales are counted before checking who is asking')
+    assert.match(server, /\/purchases\?limit=100/, 'the lookup never asks what they bought')
+    const sql = read('supabase/migrations/20260923_owner_lookup.sql')
+    for (const fn of ['account_details(text)', 'owner_overview()']) {
+      assert.ok(sql.includes(`revoke all on function public.${fn} from public, anon, authenticated`), `a client can call ${fn}`)
+    }
+    assert.match(read('mobile/src/screens/Settings.js'), /\{page === 'sales' && isAdmin\(account\?\.email\) \?/)
+    assert.match(read('src/App.jsx'), /\{setupPage === 'sales' && isAdmin\(link\.account\?\.email\) \?/)
   })
 
   test('the advice to close Fractal’s own software names it, per unit where the unit is known', async () => {
@@ -4346,7 +4431,8 @@ export function run(test) {
       'Unlock the full version',
       'About',
       /* Last, and drawn only on his own account — shared/admin.mjs. */
-      'Give someone access'
+      'Give someone access',
+      'Sales at a glance'
     ], 'the Setup rows are not in the order he asked for')
 
     /*
