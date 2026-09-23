@@ -3195,6 +3195,25 @@ export function run(test) {
     assert.match(flat, /Finding \$\{link\.macName \|\| 'your computer'\}/, 'the wait does not say what it is waiting for')
   })
 
+  test('the website’s first screen is his mockup, without the official line', async () => {
+    /*
+     * "Redo the initial landing page at fractal.Newbold.com use the mockup -
+     * keep it the same except remove the text 'official remote app' I
+     * included the photo of the fractal device separately."
+     */
+    const { P1 } = await import('../shared/onboarding.mjs')
+    assert.deepEqual(P1.features, ['PRESETS', 'SCENES', 'BLOCKS', 'TUNER', 'TAP TEMPO'], 'the five tiles are not his')
+    assert.equal(P1.sub, 'Presets, scenes, blocks, tuner and tap tempo - all on the phone in your pocket.')
+    const web = read('src/components/PhoneWalkthrough.jsx')
+    assert.match(web, /import welcomeShot from '\.\.\/assets\/welcome-fm3\.jpg'/, 'his photograph is not on the first screen')
+    assert.ok(statSync(fileURLToPath(new URL('../src/assets/welcome-fm3.jpg', import.meta.url))).size < 300000, 'the photograph is too heavy for a phone on a signal')
+    const flat = web.replace(/\s+/g, ' ')
+    for (const piece of ['className="pw-welcome-shot"', '{P1.head}', '{P1.sub}', 'P1.features.map', '{P1.go}', '{P1.haveCode}']) {
+      assert.ok(flat.includes(piece), `the first screen lost ${piece}`)
+    }
+    assert.ok(!/official remote app/i.test(web + read('shared/onboarding.mjs')), 'THE OFFICIAL REMOTE APP is on the screen')
+  })
+
   test('Unlock waits for the box saying a computer and a USB cable are needed', async () => {
     /*
      * "On the unlock part of this can we add a disclaimer question that

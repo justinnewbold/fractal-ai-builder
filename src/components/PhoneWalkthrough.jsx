@@ -6,6 +6,9 @@ import { setDemo, setDemoUnit } from '../lib/forgefx'
 import { markOnboarded } from './Onboarding'
 /* His own pictures, the phone's files — one copy of the artwork for both ends. */
 import unitShot from '../../mobile/assets/unit-fm3.png'
+/* His photograph of an FM3, sent for the first screen: "I included the photo
+   of the fractal device separately". */
+import welcomeShot from '../assets/welcome-fm3.jpg'
 import pieceUnit from '../../mobile/assets/piece-unit.png'
 import pieceComputer from '../../mobile/assets/piece-computer.png'
 import piecePhone from '../../mobile/assets/piece-phone.png'
@@ -63,7 +66,7 @@ export default function PhoneWalkthrough({ open, replay = false, onClose, onAcco
     })
 
   return (
-    <div className="onb pw" role="dialog" aria-modal="true" aria-label={P1.head}>
+    <div className={`onb pw${at === 'welcome' ? ' pw-at-welcome' : ''}`} role="dialog" aria-modal="true" aria-label={P1.head}>
       <div className="pw-sheet">
         {replay ? (
           <button type="button" className="chip pw-close" onClick={() => leave()}>
@@ -71,17 +74,37 @@ export default function PhoneWalkthrough({ open, replay = false, onClose, onAcco
           </button>
         ) : null}
 
+        {/*
+          THE FIRST SCREEN, FROM HIS MOCKUP. "Redo the initial landing page…
+          use the mockup - keep it the same except remove the text 'official
+          remote app'." The unit in a card, the heading, the line under it,
+          the five things the app does as tiles, then the two ways in.
+        */}
         {at === 'welcome' ? (
-          <>
-            <h1 className="pw-head pw-hero">{P1.head}</h1>
-            <p className="pw-sub">{P1.sub}</p>
-            <button type="button" className="primary pw-go" onClick={() => setAt('how')}>
-              {P1.go}
+          <div className="pw-welcome">
+            <div className="pw-welcome-shot">
+              <img src={welcomeShot} alt="A Fractal Audio FM3" />
+            </div>
+            <h1 className="pw-welcome-head">{P1.head}</h1>
+            <p className="pw-welcome-sub">{P1.sub}</p>
+            <ul className="pw-features">
+              {P1.features.map((label) => (
+                <li key={label}>
+                  <span className="pw-feature-tile" aria-hidden="true">
+                    <FeatureIcon name={label} />
+                  </span>
+                  <span className="pw-feature-label">{label}</span>
+                </li>
+              ))}
+            </ul>
+            <button type="button" className="primary pw-go pw-welcome-go" onClick={() => setAt('how')}>
+              <span>{P1.go}</span>
+              <span className="pw-welcome-arrow" aria-hidden="true">→</span>
             </button>
             <button type="button" className="chip pw-go" onClick={() => leave(onAccount)}>
               {P1.haveCode}
             </button>
-          </>
+          </div>
         ) : null}
 
         {at === 'how' ? (
@@ -237,5 +260,51 @@ function Progress({ count, at, of, title }) {
         ))}
       </div>
     </div>
+  )
+}
+
+/*
+ * The five tiles' pictures, drawn after his mockup: a list, two scenes
+ * overlapping, three blocks, a tuning fork, a metronome. Lines in the
+ * current colour, so the tile's CSS decides it.
+ */
+function FeatureIcon({ name }) {
+  const common = { width: 30, height: 30, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round', strokeLinejoin: 'round' }
+  if (name === 'PRESETS')
+    return (
+      <svg {...common}>
+        <path d="M8 6h12M8 12h12M8 18h12" />
+        <circle cx="4" cy="6" r="0.6" fill="currentColor" />
+        <circle cx="4" cy="12" r="0.6" fill="currentColor" />
+        <circle cx="4" cy="18" r="0.6" fill="currentColor" />
+      </svg>
+    )
+  if (name === 'SCENES')
+    return (
+      <svg {...common}>
+        <rect x="4" y="4" width="11" height="11" rx="2" />
+        <rect x="9" y="9" width="11" height="11" rx="2" />
+      </svg>
+    )
+  if (name === 'BLOCKS')
+    return (
+      <svg {...common}>
+        <rect x="2" y="12.5" width="5.5" height="5.5" rx="1.2" />
+        <rect x="9.25" y="6" width="5.5" height="5.5" rx="1.2" />
+        <rect x="16.5" y="12.5" width="5.5" height="5.5" rx="1.2" />
+      </svg>
+    )
+  if (name === 'TUNER')
+    return (
+      <svg {...common}>
+        <path d="M8 3v7a4 4 0 0 0 8 0V3M12 14v7" />
+      </svg>
+    )
+  return (
+    <svg {...common}>
+      <path d="M9.5 3h5L19 21H5L9.5 3z" />
+      <path d="M7.5 15h9M12 15l4-9" />
+      <circle cx="12" cy="15" r="1.2" />
+    </svg>
   )
 }
