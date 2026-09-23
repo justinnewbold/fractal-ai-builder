@@ -97,6 +97,7 @@ import {
 } from './lib/forgefx'
 import { isDemo, setDemo, resetCacheClear, demoUnit, setDemoUnit } from './lib/forgefx'
 import { UNITS as DEMO_UNITS, demoSentence, unitByKey } from './lib/demoUnits'
+import { buyOnWeb, checkUnlocked, webPrice } from './lib/webPurchase'
 import {
   detect,
   currentPreset,
@@ -373,7 +374,9 @@ const SETUP_PAGES = {
   rename: 'Rename presets and scenes',
   help: 'Troubleshooting',
   updates: 'Updates',
-  about: 'About'
+  about: 'About',
+  /* The phone's sheet is titled Unlock; so is this page. */
+  unlock: 'Unlock'
 }
 
 /**
@@ -1095,6 +1098,23 @@ export default function App() {
     []
   )
   const [setupPage, setSetupPage] = useState(null)
+  /*
+   * WHETHER THIS ACCOUNT HAS PAID, asked of the server rather than decided here.
+   *
+   * "We already decided that we ARE gonna offer the purchases on the desktop
+   * apps and the web app." A browser has no App Store and no Play Store, so it
+   * asks the `entitlement` function — the same one the phone calls — which
+   * reads who is asking out of the session and asks RevenueCat. A purchase
+   * made on a phone shows as paid here without this page knowing anything
+   * about Apple or Google, and the answer is written where the relay reads it.
+   *
+   * `checked` so the unlock row does not flash up for somebody who has paid
+   * during the second it takes to find out that they have.
+   */
+  const [paid, setPaid] = useState({ checked: false, unlocked: false })
+  const [webPriceText, setWebPriceText] = useState(null)
+  const [buying, setBuying] = useState(false)
+  const [buySaid, setBuySaid] = useState(null)
   /* Which fix the guide opens on, when an error notice sent you there. Null is
      the guide with everything folded shut, which is what Setup opens on. */
   const [fix, setFix] = useState(null)
@@ -1710,6 +1730,40 @@ export default function App() {
       window.removeEventListener(MARKS_CHANGED, later)
     }
   }, [link.account, record])
+
+  /*
+   * Ask again whenever the account changes: signing in, signing out, or a
+   * different person signing in on the same browser. Signed out is simply
+   * unpaid — there is nobody for a purchase to belong to.
+   */
+  const accountId = link.account?.id || null
+  useEffect(() => {
+    let live = true
+    if (!accountId) {
+      setPaid({ checked: true, unlocked: false })
+      setWebPriceText(null)
+      return undefined
+    }
+    setPaid((p) => ({ ...p, checked: false }))
+    checkUnlocked().then((out) => live && setPaid({ checked: true, unlocked: out.unlocked }))
+    webPrice(accountId).then((price) => live && setWebPriceText(price))
+    return () => {
+      live = false
+    }
+  }, [accountId])
+
+  const buyHere = async () => {
+    setBuying(true)
+    setBuySaid(null)
+    const out = await buyOnWeb({ accountId, email: link.account?.email })
+    setBuying(false)
+    if (out.ok) {
+      setPaid({ checked: true, unlocked: true })
+      setSetupPage(null)
+      return
+    }
+    if (!out.cancelled) setBuySaid(out.message)
+  }
 
   const linkAction = useCallback(
     async (kind) => {
@@ -3827,6 +3881,29 @@ export default function App() {
               */}
               <SetupRow key="rename" title="Rename presets and scenes" status={status === 'live' ? 'Give them names you will know on a dark stage' : 'Connect a unit first'} onClick={() => setSetupPage('rename')} />
               {/*
+                THE SAME ROW THE PHONE HAS, in the same place: after renaming,
+                before About. "Unlock the full version" over the price, the
+                phone's words for the phone's errand.
+
+                Only for somebody signed in who has not paid. Signed out there
+                is no account for a purchase to belong to, and once it is
+                bought there is nothing left to offer — the phone hides this
+                row for the same reason.
+
+                The phone's other wording, "Drive a real rig, or restore a
+                purchase", is for a store that has not answered with a price.
+                A browser has no store to restore from, so until the price
+                arrives it says the first half and nothing it cannot back up.
+              */}
+              {accountId && paid.checked && !paid.unlocked ? (
+                <SetupRow
+                  key="unlock"
+                  title="Unlock the full version"
+                  status={webPriceText ? `Drive a real rig · ${webPriceText}` : 'Drive a real rig'}
+                  onClick={() => setSetupPage('unlock')}
+                />
+              ) : null}
+              {/*
                 THE ONE ROW HERE THE PHONE HAS NOT GOT, and it stays on the
                 front page rather than moving into About with the other
                 once-ever errands.
@@ -4247,6 +4324,45 @@ export default function App() {
 <Section key="what-s-changed-this-session" title="What's changed this session">
             <ChangeLog log={log} onClear={() => setLog([])} />
           </Section>
+          </div>
+        ) : null}
+
+        {/*
+          THE UNLOCK PAGE, in the phone paywall's own words.
+
+          Every sentence here is copied from mobile/src/screens/Paywall.js, and
+          test/both-ends.mjs holds them to it: the same offer, worded the same
+          way at both ends, and none of it written fresh for the browser. What
+          is left out is what a browser cannot do — Restore asks Apple or
+          Google, and there is neither here; a purchase made on a phone already
+          shows as paid on this page, through the account.
+
+          The checkout itself is RevenueCat's, drawn over this page by the
+          library. Stripe marks it TEST MODE for as long as webPurchase.js is
+          on the sandbox key, which is how it ships until somebody has walked
+          through it.
+        */}
+        {setupPage === 'unlock' ? (
+          <div className="setup-page">
+            <button type="button" className="setup-back" onClick={() => setSetupPage(upFrom('unlock'))}>
+              {upLabel('unlock')}
+            </button>
+            <p className="setup-page-title">{SETUP_PAGES.unlock}</p>
+            <p className="device-meta">One payment, once</p>
+            <h3 className="unlock-head">Phone Remote</h3>
+            <p className="hint">
+              {`One-time payment unlocks the full version of this app, forever, including all future updates, on all supported Fractal devices: ${
+                DEMO_UNITS.slice(0, -1).map((u) => u.name).join(', ') + ' and ' + DEMO_UNITS[DEMO_UNITS.length - 1].name
+              }. Sign in with the same account on another phone or tablet and it is unlocked there too.`}
+            </p>
+            <p className="unlock-features">
+              You&rsquo;ll be able to control and switch presets, scenes, amp &amp; effects blocks,
+              tuner, tap tempo, setlists, and so much more.
+            </p>
+            {buySaid ? <p className="hint tone-bad">{buySaid}</p> : null}
+            <button type="button" className="primary unlock-buy" disabled={buying || !accountId} onClick={buyHere}>
+              {webPriceText ? `Unlock Full Version — ${webPriceText}` : 'Unlock Full Version'}
+            </button>
           </div>
         ) : null}
 

@@ -1417,6 +1417,14 @@ export function run(test) {
         'Phone & computer',
         'Rename presets and scenes',
         /*
+         * The same row the phone has, in the same place. It used to be the
+         * one the browser could not have, because a browser has no App Store;
+         * Web Billing takes the card through Stripe instead. Drawn only for
+         * somebody signed in who has not paid, and this reads the file as
+         * text, so it is always in this list.
+         */
+        'Unlock the full version',
+        /*
          * The one row here the phone has not got, and the reason it is not
          * inside About with the other once-ever errands: "Somebody who has a
          * rig connected and wants the remote in their pocket is the likeliest

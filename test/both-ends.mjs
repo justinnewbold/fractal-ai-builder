@@ -919,8 +919,10 @@ export function run(test) {
     /* A row at one end only, and why. Same contract as AREAS: unexplained
        fails, explained passes, and the list is the open questions. */
     const ONE_END = {
-      'Get it on your phone': 'browser only — a phone has no use for a way to get itself onto a phone, and it stays on the front page rather than inside About because "somebody who has a rig connected and wants the remote in their pocket is the likeliest buyer there is"',
-      'Unlock the full version': 'phone only — the purchase is an in-app purchase and happens on a handset or not at all; the browser has nothing to sell'
+      'Get it on your phone': 'browser only — a phone has no use for a way to get itself onto a phone, and it stays on the front page rather than inside About because "somebody who has a rig connected and wants the remote in their pocket is the likeliest buyer there is"'
+      /* 'Unlock the full version' was here as phone-only — "the browser has
+         nothing to sell". Web Billing changed that, and the row is at both
+         ends now, in the same place. */
     }
 
     const rowsIn = (block, attr) =>
@@ -971,6 +973,19 @@ export function run(test) {
         return false
       })
 
+    /*
+     * AN EXCUSE THAT NO LONGER APPLIES FAILS TOO. "Unlock the full version"
+     * sat in ONE_END as phone-only after the browser had grown the same row,
+     * and nothing complained — an entry that excuses a row present at both
+     * ends is a reason that has stopped being true, and left there it would go
+     * on excusing the next row to drift under that name.
+     */
+    for (const row of Object.keys(ONE_END)) {
+      const web = webFront.includes(row) || webAbout.includes(row)
+      const phone = phoneFront.includes(row) || phoneAbout.includes(row)
+      assert.ok(web !== phone, `"${row}" is excused in ONE_END as one-end-only, and it is ${web && phone ? 'at both ends' : 'at neither'} now. Take it out.`)
+    }
+
     const bothFront = [shared(webFront, phoneFront), shared(phoneFront, webFront)]
     assert.deepEqual(
       bothFront[0],
@@ -1003,4 +1018,64 @@ export function run(test) {
     assert.ok(phoneAbout.includes('REPLAY'), "the walkthrough is not inside the phone's About")
   })
 
+  test('the web unlock page says what the phone paywall says, word for word', () => {
+    /*
+     * "I do not like the way that you write copy." So the browser's unlock
+     * page has none of mine: every sentence on it is the phone paywall's.
+     * This holds them together, so rewording one end without the other fails.
+     */
+    const web = read('src/App.jsx')
+    const page = web.slice(web.indexOf("setupPage === 'unlock' ? ("), web.indexOf("setupPage === 'about' ? ("))
+    const phone = read('mobile/src/screens/Paywall.js')
+    const norm = (t) => t.replace(/&rsquo;/g, '’').replace(/&amp;/g, '&').replace(/\s+/g, ' ')
+    for (const line of [
+      'Phone Remote',
+      'One-time payment unlocks the full version of this app, forever, including all future updates, on all supported Fractal devices:',
+      'Sign in with the same account on another phone or tablet and it is unlocked there too.',
+      'You’ll be able to control and switch presets, scenes, amp & effects blocks, tuner, tap tempo, setlists, and so much more.',
+      'Unlock Full Version — ${'
+    ]) {
+      assert.ok(norm(phone).includes(line), `the phone paywall no longer says: ${line}`)
+      assert.ok(norm(page).includes(line), `the web unlock page does not say what the phone says: ${line}`)
+    }
+    /* The Setup row is the phone's row, word for word. */
+    const settings = read('mobile/src/screens/Settings.js')
+    assert.match(settings, /title="Unlock the full version"/, 'the phone renamed its unlock row')
+    assert.match(web, /title="Unlock the full version"/, 'the web unlock row is named differently from the phone’s')
+    assert.ok(settings.includes('`Drive a real rig · ${purchase.price}`') && web.includes('`Drive a real rig · ${webPriceText}`'), 'the unlock row’s price line differs between the two ends')
+  })
+
+  test('a web purchase belongs to the account, and cannot take real money by accident', () => {
+    const src = read('src/lib/webPurchase.js')
+    /*
+     * FILED UNDER THE ACCOUNT. appUserId is the signed-in account's id — the
+     * same id the phone gives RevenueCat's logIn — which is the whole reason a
+     * card taken in a browser unlocks the phone.
+     */
+    assert.match(src, /Purchases\.configure\(\{ apiKey: WEB_KEY, appUserId: accountId \}\)/, 'the web purchase is not filed under the account')
+    const app = read('src/App.jsx')
+    assert.match(app, /const accountId = link\.account\?\.id \|\| null/, 'the web unlock does not take the signed-in account’s id')
+    assert.match(src, /if \(!accountId\) return \{ ok: false/, 'a purchase can be made with no account to belong to')
+
+    /* The package by product id, as on the phone — first-wins could sell a
+       subscription on a page that says "One-time payment". */
+    assert.match(src, /p\?\.webBillingProduct\?\.identifier === PRODUCT_ID/, 'the web picks a package by position')
+    assert.match(src, /export const PRODUCT_ID = 'cloud\.newbold\.fractalremote\.full'/, 'the web sells a different product id from the phones')
+
+    /*
+     * THE SANDBOX KEY, UNTIL HE SAYS OTHERWISE. A checkout nobody has walked
+     * through must not be able to charge a real card. Going live is one line
+     * in webPurchase.js — and this line here, on purpose, so it is a decision
+     * somebody makes rather than a default that drifts.
+     */
+    assert.match(src, /export const WEB_KEY = SANDBOX_KEY/, 'the web checkout is taking real money; if that was meant, change this check with it')
+    assert.match(src, /const SANDBOX_KEY = 'rcb_sb_/, 'the sandbox key is not a sandbox key')
+
+    /* Loaded only on the unlock page: nobody who never buys downloads Stripe. */
+    assert.match(src, /await import\('@revenuecat\/purchases-js'\)/, 'the payment library is loaded for everybody')
+    assert.ok(!/^import .*@revenuecat\/purchases-js/m.test(src), 'the payment library is in the main bundle')
+
+    /* And the row is only offered to somebody who can use it. */
+    assert.match(app, /\{accountId && paid\.checked && !paid\.unlocked \? \(/, 'the unlock row shows to somebody signed out, or who has paid')
+  })
 }

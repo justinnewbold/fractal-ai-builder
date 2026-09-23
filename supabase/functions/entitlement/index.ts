@@ -67,7 +67,7 @@ const json = (body: unknown, status = 200) =>
  * `auth.getUser` does. Reading `sub` out of the middle segment would be
  * reading the attacker's own claim about themselves.
  */
-async function accountFrom(token: string): Promise<string | null> {
+async function accountFrom(token: string): Promise<{ id: string; email: string } | null> {
   const url = Deno.env.get('SUPABASE_URL')
   const key = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   if (!url || !key) return null
@@ -78,7 +78,7 @@ async function accountFrom(token: string): Promise<string | null> {
     if (!res.ok) return null
     const user = await res.json()
     const id = String(user?.id || '')
-    return id || null
+    return id ? { id, email: String(user?.email || '') } : null
   } catch (err) {
     console.error(`entitlement: could not verify the token (${err})`)
     return null
@@ -168,6 +168,56 @@ async function owns(account: string): Promise<boolean | null> {
   }
 }
 
+/*
+ * THE ACCOUNTS UNLOCKED WITHOUT PAYING, the same list the phone reads.
+ *
+ * shared/owner-unlock.mjs is the source. It cannot be imported here — this
+ * runs in Deno on Supabase and that file lives in the app's repository — so it
+ * is copied, and test/server.mjs fails if the two ever differ. Hashes rather
+ * than addresses for the reason that file gives: nobody's inbox in a public
+ * repository. It grants nothing on its own; the caller has already proved,
+ * with a signed token, which account they are.
+ */
+const OWNERS = ['8a9f8fc4']
+
+/** djb2, as the phone computes it. Must match shared/owner-unlock.mjs exactly. */
+function fold(text: string): string {
+  let h = 5381
+  const s = String(text || '').trim().toLowerCase()
+  for (let i = 0; i < s.length; i += 1) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0
+  return h.toString(16).padStart(8, '0')
+}
+
+/**
+ * Write down what was learned, so the relay can read it.
+ *
+ * The relay's policy asks public.is_entitled, which reads public.entitlements
+ * — see the migration of the same date. This is the self-healing half of
+ * keeping that table right: whenever a paying customer opens the app, the row
+ * is written from a definite answer, so a webhook that never arrived costs
+ * them nothing.
+ *
+ * Through record_entitlement rather than a plain upsert, because that is where
+ * the one rule lives: a sale's "no" never overwrites an owner. A failure here
+ * is logged and swallowed — the caller still gets the answer they asked for,
+ * and the next open tries again.
+ */
+async function record(account: string, active: boolean, source: 'revenuecat' | 'owner'): Promise<void> {
+  const url = Deno.env.get('SUPABASE_URL')
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!url || !key) return
+  try {
+    const res = await fetch(`${url}/rest/v1/rpc/record_entitlement`, {
+      method: 'POST',
+      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: account, is_active: active, from_source: source })
+    })
+    if (!res.ok) console.error(`entitlement: could not record (${res.status} ${await res.text()})`)
+  } catch (err) {
+    console.error(`entitlement: could not record (${err})`)
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: CORS })
@@ -176,8 +226,17 @@ Deno.serve(async (req: Request) => {
   const token = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : ''
   if (!token) return json({ unlocked: false, why: 'signed out' }, 401)
 
-  const account = await accountFrom(token)
-  if (!account) return json({ unlocked: false, why: 'signed out' }, 401)
+  const who = await accountFrom(token)
+  if (!who) return json({ unlocked: false, why: 'signed out' }, 401)
+  const account = who.id
+
+  /* An owner is unlocked whatever RevenueCat says, and is written down as one
+     so the relay agrees. Checked first: RevenueCat's honest "never bought
+     it" about an owner must not be the answer anybody records. */
+  if (OWNERS.includes(fold(who.email))) {
+    await record(account, true, 'owner')
+    return json({ unlocked: true })
+  }
 
   const answer = await owns(account)
 
@@ -195,5 +254,12 @@ Deno.serve(async (req: Request) => {
    * with its eyes open and say something honest on screen if it wants to.
    */
   if (answer === null) return json({ unlocked: true, unknown: true })
+  /*
+   * Only a DEFINITE answer is written down. The fail-open above is right for
+   * the screen and would be wrong for the table: writing "active" because
+   * RevenueCat was unreachable would hand the relay to anybody who happened to
+   * ask during an outage, for ever.
+   */
+  await record(account, answer, 'revenuecat')
   return json({ unlocked: answer })
 })

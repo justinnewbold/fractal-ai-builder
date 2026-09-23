@@ -116,4 +116,132 @@ export function run(test) {
       'the server and the phone are asking about different entitlements'
     )
   })
+
+  test('the server’s owner list is the phone’s owner list', async () => {
+    /*
+     * shared/owner-unlock.mjs cannot be imported into a Deno function on
+     * Supabase, so `entitlement` carries a copy. A copy that drifted would
+     * unlock an owner on the phone and lock them out of the relay — the
+     * phone saying yes and the rig saying nothing, with no way to tell why.
+     */
+    const { OWNERS, fold } = await import('../shared/owner-unlock.mjs')
+    const src = code(read('supabase/functions/entitlement/index.ts'))
+    const copied = JSON.parse((src.match(/const OWNERS = (\[[^\]]*\])/) || [])[1]?.replace(/'/g, '"') || 'null')
+    assert.deepEqual(copied, OWNERS, 'the server and the phone disagree about who is an owner')
+    /* And the fold is the same fold: one hash, reached two ways. */
+    assert.match(src, /h = \(\(h << 5\) \+ h \+ s\.charCodeAt\(i\)\) >>> 0/, 'the server hashes an address differently from the phone')
+    assert.match(src, /padStart\(8, '0'\)/, 'the server pads the hash differently from the phone')
+    assert.equal(fold('  Someone@Example.com '), fold('someone@example.com'), 'the phone’s fold stopped ignoring case and spaces')
+  })
+
+  test('only a definite answer is ever written down', () => {
+    /*
+     * `entitlement` fails OPEN for the screen — a store that cannot be
+     * reached is not evidence somebody did not pay. That is right for a
+     * phone on a stage and would be a disaster in the table: writing
+     * "active" during an outage hands the relay to whoever asked, for ever.
+     */
+    const src = code(read('supabase/functions/entitlement/index.ts'))
+    const handler = src.slice(src.indexOf('Deno.serve'))
+    const unknown = handler.indexOf('if (answer === null) return json({ unlocked: true, unknown: true })')
+    const written = handler.indexOf("await record(account, answer, 'revenuecat')")
+    assert.ok(unknown > 0 && written > 0, 'the handler moved; this check reads it')
+    assert.ok(unknown < written, 'the table is written before the unreachable case has returned')
+    /* The owner check comes before RevenueCat is asked at all. */
+    assert.ok(handler.indexOf('OWNERS.includes(fold(who.email))') < handler.indexOf('await owns(account)'), 'an owner is asked about as a customer first')
+  })
+
+  test('the webhook trusts nobody without the secret, and reads nothing into the event', () => {
+    const src = code(read('supabase/functions/revenuecat-webhook/index.ts'))
+    /* No secret configured is a refusal, not an open door. */
+    assert.match(src, /if \(!expected \|\| !same\(/, 'a webhook with no secret configured accepts anybody')
+    assert.match(src, /diff \|= a\.charCodeAt\(i\) \^ b\.charCodeAt\(i\)/, 'the secret is compared in a way that leaks how close a guess was')
+    /*
+     * THE EVENT IS A DOORBELL. Twenty-one types, and most of the ways to get
+     * this wrong are in reading them — a CANCELLATION is a refund for one
+     * product and a lapse for another. So the only type it ever branches on
+     * is TEST; everything else is "go and ask RevenueCat who has paid now".
+     */
+    const types = [...src.matchAll(/event\.type === '([A-Z_]+)'/g)].map((m) => m[1])
+    assert.deepEqual(types, ['TEST'], 'the webhook has started interpreting event types')
+    assert.match(src, /const answer = await owns\(id, project, key\)/, 'the webhook writes what the event says rather than what RevenueCat says now')
+    /* Only account ids are written; a handset id names nobody. */
+    assert.match(src, /\.filter\(\(id\) => ACCOUNT\.test\(id\)\)/, 'anonymous handset ids are being written as accounts')
+    /* A failure is reported as one, which is how RevenueCat knows to retry. */
+    assert.match(src, /failed \? 500 : 200/, 'a failed write is acknowledged and lost')
+  })
+
+  test('the webhook recognises the entitlement by both names, as the check does', () => {
+    /*
+     * The trap from the last round, in its second home. RevenueCat reported
+     * this project's entitlement as entl… rather than `full`. The webhook
+     * matching only the key would turn every purchase and every refund into
+     * nothing.
+     */
+    const hook = code(read('supabase/functions/revenuecat-webhook/index.ts'))
+    const check = code(read('supabase/functions/entitlement/index.ts'))
+    for (const [where, src] of [['webhook', hook], ['entitlement', check]]) {
+      assert.match(src, /lookup_key === ENTITLEMENT/, `${where} does not resolve the id from the lookup key`)
+      assert.match(src, /names\.has\(String\(e\.entitlement_id\)\)/, `${where} does not accept both names`)
+      assert.match(src, /const ENTITLEMENT = 'full'/, `${where} asks about a different entitlement`)
+    }
+  })
+
+  test('nobody but the server can write who has paid', () => {
+    const sql = read('supabase/migrations/20260923_entitlements.sql')
+    /* The write path is service_role only; a client that could call it could
+       unlock itself. */
+    assert.match(sql, /revoke all on function public\.record_entitlement\(uuid, boolean, text\) from public, anon, authenticated;/, 'a client can write its own entitlement')
+    assert.ok(!/grant[^;]*record_entitlement[^;]*authenticated/i.test(sql), 'record_entitlement is granted to signed-in users')
+    /* The table has a read policy and no write policy at all. */
+    assert.match(sql, /create policy "own entitlement: read"\s+on public\.entitlements for select/, 'somebody cannot see their own row')
+    assert.ok(!/on public\.entitlements for (insert|update|delete|all)/i.test(sql), 'a client can write to the entitlements table')
+    /* Security definer functions pin their search path, or the caller can
+       redirect every name inside them. */
+    for (const fn of ['is_entitled', 'record_entitlement']) {
+      const body = sql.slice(sql.indexOf(`function public.${fn}`), sql.indexOf('$$;', sql.indexOf(`function public.${fn}`)))
+      assert.match(body, /security definer/, `${fn} is not security definer`)
+      assert.match(body, /set search_path = public, pg_temp/, `${fn} resolves names through the caller’s path`)
+    }
+    /* A sale's "no" never overwrites an owner. */
+    assert.match(sql, /where e\.source <> 'owner' or excluded\.source = 'owner'/, 'a refund can revoke an owner')
+  })
+
+  test('the switch adds one condition to the relay and nothing else', () => {
+    /*
+     * The migration that decides who can use the relay. It replaces the two
+     * existing rules — your own channel only — with the same two rules plus
+     * "and has paid". If it ever widened a rule instead, the gate would be a
+     * hole with a lock drawn on it.
+     */
+    const sql = read('supabase/migrations/20260923_relay_needs_a_purchase.sql')
+    const live = sql.slice(0, sql.indexOf('-- UNDO'))
+    for (const [name, clause] of [['own remote channel: read', 'using'], ['own remote channel: write', 'with check']]) {
+      const at = live.indexOf(`create policy "${name}"`)
+      assert.ok(at > 0, `the switch no longer rewrites "${name}"`)
+      const body = live.slice(at, live.indexOf(');', at))
+      assert.match(body, new RegExp(`${clause} \\(`), `"${name}" lost its ${clause}`)
+      assert.match(body, /realtime\.topic\(\) = \('remote:'::text \|\| \(auth\.uid\(\)\)::text\)/, `"${name}" no longer confines an account to its own channel`)
+      assert.match(body, /and public\.is_entitled\(auth\.uid\(\)\)/, `"${name}" does not ask whether the account has paid`)
+      assert.match(body, /to authenticated/, `"${name}" is open to signed-out callers`)
+    }
+    /* And the way back is written down beside it. */
+    assert.match(sql, /-- UNDO/, 'the switch has no written way back')
+  })
+
+  test('the phone tells the relay at every moment the answer can change', () => {
+    const purchases = read('mobile/src/lib/purchases.js')
+    const pass = read('mobile/src/lib/relayPass.js')
+    /* The session's token, never the anon key: the server reads who is asking
+       out of it, which is why this cannot unlock somebody else. */
+    assert.match(pass, /Authorization: `Bearer \$\{token\}`/, 'the relay pass is sent without the session, so it proves nothing')
+    assert.match(pass, /const token = data\?\.session\?\.access_token/, 'the relay pass does not use the signed-in session')
+    /* Linking (launch and sign-in), buying, restoring. */
+    const link = purchases.slice(purchases.indexOf('const linkTo = async'), purchases.indexOf('const linkTo = async') + 700)
+    assert.match(link, /await api\.logIn\(id\)[\s\S]*claimRelay\(\)/, 'linking an account does not tell the relay')
+    const buy = purchases.slice(purchases.indexOf('export const buyUnlock'), purchases.indexOf('export const restorePurchase'))
+    assert.match(buy, /if \(yes\) claimRelay\(\)/, 'buying does not open the relay')
+    const restore = purchases.slice(purchases.indexOf('export const restorePurchase'))
+    assert.match(restore, /if \(yes\) claimRelay\(\)/, 'restoring does not open the relay')
+  })
 }
