@@ -3169,7 +3169,7 @@ export function run(test) {
     assert.match(flat, /!demo &&/, 'the demo is made to wait for a computer it does not have')
     assert.match(
       flat,
-      /\{settling && screen === 'stage' \? \( <Waking link=\{link\} onRetry=\{probeNow\} \/>/,
+      /\{settling && screen === 'stage' \? \( <Waking link=\{link\} onRetry=\{probeNow\} onSwitch=\{\(\) => setScreen\('settings'\)\} \/>/,
       'nothing is shown while the app waits'
     )
 
@@ -3217,6 +3217,99 @@ export function run(test) {
     const { WELCOME_NOTICE } = await import('../shared/affiliation.mjs')
     assert.equal(WELCOME_NOTICE, 'This product is not affiliated or endorsed by Fractal Audio Systems.', 'the disclaimer is not his')
     assert.match(flat, /\{P1\.haveCode\} <\/button> <p className="pw-welcome-notice">\{WELCOME_NOTICE\}<\/p>/, 'the disclaimer is not at the foot of the first screen')
+  })
+
+  test('the how-it-works screen is his heading alone, and its button stays on screen', async () => {
+    /*
+     * "On my phone's web browser I can't see the Guide button at the bottom
+     * so people might not know they need to scroll… Remove this text. One
+     * simple path. Three pieces one powerful connection. And change the text
+     * about the phone connects to the computer. Instead say 'HOW IT WORKS'."
+     */
+    const { P2 } = await import('../shared/onboarding.mjs')
+    assert.equal(P2.head, 'HOW IT WORKS', 'the heading is not his')
+    assert.equal(P2.eyebrow, undefined, 'ONE SIMPLE PATH is back')
+    assert.equal(P2.sub, undefined, 'Three pieces. One powerful connection. is back')
+    for (const file of ['src/components/PhoneWalkthrough.jsx', 'mobile/src/screens/Onboarding.js']) {
+      assert.ok(!/P2\.(eyebrow|sub)/.test(read(file)), `${file} still draws a line that is gone`)
+    }
+    const web = read('src/components/PhoneWalkthrough.jsx').replace(/\s+/g, ' ')
+    assert.match(web, /className="primary pw-go pw-stick" onClick=\{\(\) => setAt\('mode'\)\}/, 'the browser’s Got it can scroll off the bottom again')
+    const css = read('src/styles.css').replace(/\s+/g, ' ')
+    assert.match(css, /\.pw-stick \{ position: sticky; bottom: var\(--s-3\);/, 'the browser’s Got it is not held to the bottom')
+  })
+
+  test('Settings says which account is signed in beside the version, and opens it', async () => {
+    /*
+     * "On this screen at the top either next to the version number or next
+     * to where it says the unit name can we also list the user account if
+     * they're signed in and if they're not signed in, have it say not signed
+     * in. Then clicking on it will take them to where they can sign in or
+     * otherwise show them their account info."
+     */
+    const phone = read('mobile/src/screens/Settings.js').replace(/\s+/g, ' ')
+    const top = phone.slice(phone.indexOf("{head('Settings')}"), phone.indexOf('title="Amp & pedal names"'))
+    assert.match(top, /\{`v\$\{APP_VERSION\}`\}/, 'the version left the top of the phone’s Settings')
+    assert.match(top, /signedInAs \|\| \(isPairAccount\(account\?\.email\) \? 'Paired, no account' : 'Not signed in'\)/, 'the phone does not say who is signed in, or that nobody is')
+    assert.match(top, /setPage\('link'\) setAccountMenu\(true\)/, 'the phone’s account line does not open the account')
+    assert.match(top, /onSignIn\(\)/, 'the phone’s Not signed in goes nowhere near a sign-in')
+
+    const web = read('src/App.jsx').replace(/\s+/g, ' ')
+    const head = web.slice(web.indexOf('<div className="setup-version-row">'), web.indexOf('<div className="setup-rows">'))
+    assert.match(head, /\{FULL\}/, 'the version left the top of the browser’s Settings')
+    assert.match(head, /signedInHere \? link\.account\.email : isPairAccount\(link\.account\?\.email\) \? 'Paired, no account' : 'Not signed in'/, 'the browser does not say who is signed in, or that nobody is')
+    assert.match(head, /onClick=\{\(\) => setSetupPage\('link'\)\}/, 'the browser’s account line does not open the page with the account on it')
+  })
+
+  test('the phone’s preset list has the browser’s jumps, sized to the unit', async () => {
+    /*
+     * "Can we add the 100 200 300 400 500 thing to the mobile apps as well?
+     * And obviously on the AM4/VP4 since they have less slots, maybe just make
+     * those like 20 40 60 80 100?"
+     */
+    const { jumpsFor } = await import('../src/lib/presetJumps.js')
+    assert.deepEqual(jumpsFor(512), [100, 200, 300, 400, 500], 'a 512-slot unit does not get hundreds')
+    assert.deepEqual(jumpsFor(104), [20, 40, 60, 80, 100], 'an AM4 or VP4 does not get twenties')
+    const src = read('mobile/src/screens/Presets.js').replace(/\s+/g, ' ')
+    assert.match(src, /import \{ jumpsFor \} from '\.\.\/lib\/presetJumps'/, 'the phone has its own rule for where the jumps land')
+    assert.match(src, /const jumps = jumpsFor\(slots\)/, 'the phone’s jumps are not sized to the unit')
+    assert.match(src, /\{jumps\.length && !hunting \?/, 'the jumps stay up over search results they cannot jump through')
+    /* They scroll, never load: a tap on 300 mid-set must not change the sound. */
+    const jump = src.slice(src.indexOf('const jumpTo = (n) =>'), src.indexOf('return ( <View style={{ flex: 1 }}>'))
+    assert.match(jump, /scrollToIndex/, 'a jump does not move the list')
+    assert.ok(!/load|choose|select|setPreset/i.test(jump.replace(/\/\*[\s\S]*?\*\//g, '')), 'a jump loads a preset')
+  })
+
+  test('a computer on this wifi signed into another account is said, not waited on', async () => {
+    /*
+     * "The issue it wasn't connecting is because I was signed into the wrong
+     * account, but it didn't notify me at all… Please be clear which account
+     * needs to be trying to sign into, or which one it is signing into, and
+     * they don't match somehow."
+     */
+    const sql = read('supabase/migrations/20260923_computer_elsewhere.sql')
+    assert.match(sql, /returns boolean/, 'the account server says more than yes or no about another account')
+    assert.ok(!/auth\.users/.test(sql), 'the check reads other accounts’ details, which it has no need of')
+    assert.match(sql, /grant execute on function public\.computer_elsewhere\(\) to authenticated/, 'a signed-in phone cannot ask')
+    assert.match(sql, /revoke all on function public\.computer_elsewhere\(\) from public, anon/, 'anybody at all can ask')
+
+    for (const file of ['mobile/src/lib/relay.js', 'src/lib/remote.js']) {
+      const src = read(file)
+      assert.match(src, /rpc\('computer_elsewhere'\)/, `${file} never asks`)
+      assert.match(src, /return !error && data === true/, `${file} reads a failure as a yes`)
+    }
+
+    const phone = read('mobile/App.js').replace(/\s+/g, ' ')
+    const waking = phone.slice(phone.indexOf('function Waking('))
+    assert.match(waking, /useComputerElsewhere\(long && link\.link !== 'connected'\)/, 'the phone never asks while it waits')
+    assert.match(waking, /This phone is signed in as \$\{email\}/, 'the phone does not say which account it is on')
+    assert.match(waking, /Switch account on this phone/, 'the phone gives no way to change account')
+    assert.match(read('mobile/src/screens/Settings.js'), /useComputerElsewhere\(link === 'no-answer'\)/, 'Setup never asks')
+
+    const web = read('src/components/ConnectScreen.jsx').replace(/\s+/g, ' ')
+    assert.match(web, /computerElsewhere\(\)\.then/, 'the browser never asks')
+    assert.match(web, /This browser is signed in as \$\{email\}/, 'the browser does not say which account it is on')
+    assert.match(web, /\{mismatch \|\|/, 'the browser says the generic line over the real reason')
   })
 
   test('Unlock waits for the box saying a computer and a USB cable are needed', async () => {

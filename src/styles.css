@@ -9117,6 +9117,17 @@ button.phone-chip.dim {
   color: var(--silk-dim);
 }
 
+/* The computer on this wifi is on another account. Said in the fault colour
+   along its edge, as the phone's fault note is, because it is the reason. */
+.connect > p.connect-mismatch {
+  color: var(--silk);
+  text-align: left;
+  border-left: 2px solid var(--fault);
+  padding: var(--s-2) var(--s-3);
+  background: var(--fault-halo);
+  border-radius: var(--r-1);
+}
+
 .connect-lamp {
   width: 12px;
   height: 12px;
@@ -9950,6 +9961,40 @@ button.phone-chip.compact.bad {
 
 .setup-version {
   margin: 0 0 var(--s-3);
+}
+
+/* The version and the account on one line, the account at the right end and
+   cut short in the middle of a long email rather than pushing the row wide. */
+.setup-version-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin: 0 0 var(--s-3);
+}
+
+.setup-version-row .setup-version {
+  margin: 0;
+  flex: none;
+}
+
+.setup-account {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: none;
+  border: none;
+  padding: var(--s-1) 0;
+  color: var(--silk-dim);
+  font-size: var(--f-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.setup-account.out {
+  color: var(--signal);
 }
 
 .setup-rows {
@@ -10866,6 +10911,41 @@ button.setup-back {
   width: 100%;
   min-height: 48px;
   font-size: var(--f-4);
+}
+/*
+ * THE WAY ON, ALWAYS ON SCREEN. "On my phone's web browser I can't see the
+ * Guide button at the bottom so people might not know they need to scroll."
+ * Stuck to the bottom of the walkthrough while what is above it scrolls; the
+ * button is solid, so the boxes pass behind it. On a screen tall enough for
+ * everything it sits where it always did.
+ */
+.pw-stick {
+  position: sticky;
+  bottom: var(--s-3);
+  z-index: 1;
+}
+/*
+ * And on a short phone, the three boxes take less of it: less padding, the
+ * pictures smaller, the heading a size down. An iPhone's browser, with its
+ * address bar, is about 660 points tall.
+ */
+@media (max-height: 760px) {
+  .pw .pw-sheet {
+    gap: var(--s-3);
+  }
+  .pw .pw-box {
+    padding: var(--s-3);
+  }
+  .pw .pw-art {
+    width: 72px;
+    height: 44px;
+  }
+  .pw .pw-wire-line {
+    height: 8px;
+  }
+  .pw .pw-head {
+    font-size: var(--f-5);
+  }
 }
 .pw-note {
   margin: 0;
