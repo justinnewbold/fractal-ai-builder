@@ -280,14 +280,12 @@ export const AREAS = [
         web: null,
         phone: 'Done',
         why: 'the browser’s editor is part of the page, so there is nothing to leave'
-      },
-      {
-        does: 'switch between a block’s main controls and the rest of them',
-        web: null,
-        phone: 'Main',
-        also: ['More'],
-        why: 'a handset cannot show every control at once, so the phone splits them over two tabs; the browser shows them together'
       }
+      /*
+       * The page tabs over a block's controls are not listed: they are named
+       * by the unit (Basic, Tone, Preamp…), not written here, and both ends
+       * draw them from the same lib/editPages.js.
+       */
     ]
   },
   {

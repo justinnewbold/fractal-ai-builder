@@ -280,6 +280,9 @@ export const FILES = [
    * file to keep.
    */
   { source: '../src/lib/mockDevice.js', target: '../mobile/src/lib/mockDevice.js' },
+  /* How EDIT splits a block's controls into the editor's pages. One rule on
+     both ends, or a Drive is four pages in the browser and two on the phone. */
+  { source: '../src/lib/editPages.js', target: '../mobile/src/lib/editPages.js' },
   { source: '../src/lib/sceneState.js', target: '../mobile/src/lib/sceneState.js' },
   { source: '../src/lib/demoMemory.js', target: '../mobile/src/lib/demoMemory.js' },
   { source: '../src/lib/tunerStream.js', target: '../mobile/src/lib/tunerStream.js' },

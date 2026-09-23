@@ -3195,6 +3195,69 @@ export function run(test) {
     assert.match(flat, /Finding \$\{link\.macName \|\| 'your computer'\}/, 'the wait does not say what it is waiting for')
   })
 
+  test('EDIT splits a block into the pages Fractal’s editor uses', async () => {
+    /*
+     * "Splitting EDIT's long list of controls into pages, like Fractal's own
+     * editor." The unit sends those pages with every params read, as
+     * `layout`; the list used to be cut after six controls into Main and More.
+     */
+    const { editPages, pageHolding } = await import('../src/lib/editPages.js')
+    const knob = (id, name) => ({ id, name, value: 0, min: 0, max: 10 })
+    const params = [knob(1, 'Drive'), knob(2, 'Tone'), knob(12, 'Bass'), knob(13, 'Mid'), knob(4, 'Mix'), knob(99, 'Unplaced')]
+    const layout = {
+      pages: [
+        { name: 'Basic', rows: [
+          { section: 'parameters', controls: [{ paramId: 1 }, { paramId: 2 }, { paramId: null }, { paramId: 7 }] },
+          { section: 'mixer', controls: [{ paramId: 4 }] }
+        ] },
+        { name: 'Tone', rows: [{ section: 'parameters', controls: [{ paramId: 12 }, { paramId: 13 }, { paramId: 2 }] }] },
+        { name: 'Empty', rows: [{ section: 'parameters', controls: [{ paramId: 50 }] }] }
+      ]
+    }
+    const pages = editPages(params, layout)
+    assert.deepEqual(
+      pages.map((p) => [p.name, p.params.map((q) => q.id)]),
+      [['Basic', [1, 2]], ['Tone', [12, 13, 2]], ['More', [4, 99]]],
+      'the pages are not the editor’s, or a control the unit sent became unreachable'
+    )
+    assert.equal(pageHolding(pages, 13).name, 'Tone', 'a search cannot find the page its control is on')
+
+    /* No layout — an older unit, or a block the editor has none for — is the old split. */
+    const many = Array.from({ length: 9 }, (_, i) => knob(i, `K${i}`))
+    assert.deepEqual(editPages(many, null).map((p) => [p.name, p.params.length]), [['Main', 6], ['More', 3]])
+    assert.deepEqual(editPages(many.slice(0, 4), undefined).map((p) => p.name), ['Main'], 'four controls grew a More tab')
+
+    /* Both ends draw their tabs from it, and keep the layout a model swap brings. */
+    for (const [where, file] of [['phone', 'mobile/src/screens/Edit.js'], ['browser', 'src/components/Console.jsx']]) {
+      const src = read(file)
+      assert.match(src, /const pages = editPages\(editable, layout\)/, `the ${where} still cuts the list after six`)
+      assert.match(src, /pages\.map\(\(pg\) =>/, `the ${where} draws no tab per page`)
+      assert.ok((src.match(/setLayout\((p|fresh)\?\.layout \|\| null\)/g) || []).length >= 2, `the ${where} keeps an old model’s pages after a swap`)
+      assert.ok(!/editable\.slice\(0, 6\)/.test(src), `the ${where} still has its own six-and-the-rest split`)
+    }
+  })
+
+  test('the demo’s blocks have the editor’s pages, and its Compressor the FM3’s own ranges', async () => {
+    const { createMockDevice } = await import('../src/lib/mockDevice.js')
+    const { editPages } = await import('../src/lib/editPages.js')
+    const unit = createMockDevice('fm3')
+    const blocks = await unit.presetBlocks()
+    const pagesOf = async (slug) => {
+      const b = blocks.find((x) => x.slug === slug)
+      const r = await unit.blockParams(b.effectId)
+      return editPages(r.named, r.layout).map((p) => p.name)
+    }
+    assert.deepEqual(await pagesOf('drive'), ['Basic', 'Tone', 'Graphic EQ', 'Advanced', 'More'], 'the demo Drive is not on its editor pages')
+    assert.deepEqual((await pagesOf('comp')).slice(0, 2), ['Basic', 'Sidechain'], 'the demo Compressor is not on its editor pages')
+
+    /* Read off the FM3's tables rather than typed in as typical. */
+    const comp = JSON.parse(read('src/data/block-params.json')).blocks.comp
+    const by = Object.fromEntries(comp.named.map((p) => [p.name, p]))
+    assert.deepEqual([by.Threshold.min, by.Threshold.max], [-60, 20], 'the demo Threshold stops at 0 dB, which the FM3’s does not')
+    assert.equal(by.Q.value, 0.707, 'the demo Q does not start where the FM3’s does')
+    assert.ok(!comp.source, 'the demo Compressor still says its ranges are only typical')
+  })
+
   test('the waiting screen stops just spinning after fifteen seconds', async () => {
     /*
      * "Been stuck on connecting screen for over a minute on iOS. How long
@@ -6708,7 +6771,15 @@ export function run(test) {
     /* And the browser end still does the same thing, because this was asked
        for once about one app that exists twice. */
     const web = read('src/components/TopBar.jsx')
-    assert.match(web, /aria-label=\{demo \? 'Demo Unit' : 'About this unit'\}/, 'the browser’s unit name stopped being two destinations')
+    assert.match(web, /aria-label=\{demo \? 'Demo Unit' : 'Phone & computer'\}/, 'the browser’s unit name stopped being two destinations')
+    /* Each end's name says where it goes. "About this unit" opened Phone &
+       computer in the browser and Setup on the phone. */
+    assert.match(
+      read('mobile/src/components/TopBar.js'),
+      /accessibilityLabel=\{demo \? 'Demo Unit' : 'Settings'\}/,
+      'the phone’s unit name is labelled for a page it does not open'
+    )
+    assert.ok(!/About this unit/.test(web + read('mobile/src/components/TopBar.js')), 'the unit name still promises a page that is not there')
   })
 
 

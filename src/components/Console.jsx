@@ -47,6 +47,7 @@ const colorFor = (slug) => blockColor(slug).fill
 import Knob from './Knob'
 import { blockParams, blockTypes, setParamConfirmed, setType, setBypass, setChannel } from '../lib/forgefx'
 import { isSilencingParam } from '../lib/guardrails'
+import { editPages, pageFor, pageHolding } from '../lib/editPages'
 import { bringIntoView } from '../lib/feedback'
 import { useOverflow } from '../lib/overflow'
 import { slotLabel, startsBank } from '../lib/slots'
@@ -733,6 +734,8 @@ export function PresetList({
  */
 export function BlockPanel({ block, channels, onError, onChanged, busy, focus }) {
   const [params, setParams] = useState([])
+  // The editor's own pages for this block, as the unit sent them.
+  const [layout, setLayout] = useState(null)
   const [models, setModels] = useState([])
   // Which model this block is actually on. It comes back on the params read
   // and nowhere else: /preset/blocks has never carried a typeName, so the
@@ -782,6 +785,7 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
         ])
         if (stop) return
         setParams(p?.named || [])
+        setLayout(p?.layout || null)
         setModels(t || [])
         setTypeState(p?.type ?? null)
       } catch (err) {
@@ -813,11 +817,11 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
   const editable = params.filter((p) => !isSilencingParam(p.name))
   const level = params.find((p) => /^.*\bLevel$/i.test(p.name) && !/boost|input/i.test(p.name))
 
-  // The first handful are the controls anyone reaches for first; the rest are
-  // there but behind a tab, the way the hardware editors split them.
-  const primary = editable.slice(0, 6)
-  const rest = editable.slice(6)
-  const shown = tab === 'main' ? primary : rest
+  // Split into the pages Fractal's editor uses, where the unit says what they
+  // are — see lib/editPages.js.
+  const pages = editPages(editable, layout)
+  const onPage = pageFor(pages, tab)
+  const shown = onPage?.params || []
 
   /*
    * Search hands over here: open the right block, then put your eyes — and the
@@ -829,13 +833,20 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
    * indistinguishable from a search result that did nothing.
    */
   const wanted = useRef(null)
+  const turned = useRef(null)
   useEffect(() => {
     if (!focus?.nonce || focus.eid !== block?.effectId) return
-    wanted.current = focus
-    // A control on the second page is unreachable until that page is showing.
-    const onMore = rest.some((p) => p.id === focus.paramId)
-    setTab(onMore ? 'more' : 'main')
-  }, [focus, block?.effectId, rest])
+    if (turned.current !== focus.nonce) wanted.current = focus
+    // A control on another page is unreachable until that page is showing —
+    // and the page is only known once the read is in. Turned once per search,
+    // so a tab pressed afterwards stays pressed.
+    const holding = !loading && pageHolding(pages, focus.paramId)
+    if (holding && turned.current !== focus.nonce) {
+      turned.current = focus.nonce
+      setTab(holding.key)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus, block?.effectId, loading])
 
   useEffect(() => {
     const want = wanted.current
@@ -1032,6 +1043,8 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
     await setType(block.effectId, Number(value))
     const fresh = await blockParams(block.effectId)
     setParams(fresh?.named || [])
+    // A new model can bring different pages with it.
+    setLayout(fresh?.layout || null)
     setTypeState(fresh?.type ?? null)
     setLocal({})
     const name = models.find((m) => m.value === Number(value))?.name
@@ -1211,14 +1224,19 @@ export function BlockPanel({ block, channels, onError, onChanged, busy, focus })
         </figure>
       ) : null}
 
-      {rest.length ? (
-        <div className="block-tabs">
-          <button className={tab === 'main' ? 'current' : ''} onClick={() => setTab('main')}>
-            Main
-          </button>
-          <button className={tab === 'more' ? 'current' : ''} onClick={() => setTab('more')}>
-            More
-          </button>
+      {pages.length > 1 ? (
+        <div className="block-tabs" role="tablist">
+          {pages.map((pg) => (
+            <button
+              key={pg.key}
+              role="tab"
+              aria-selected={pg.key === onPage?.key}
+              className={pg.key === onPage?.key ? 'current' : ''}
+              onClick={() => setTab(pg.key)}
+            >
+              {pg.name}
+            </button>
+          ))}
         </div>
       ) : null}
 

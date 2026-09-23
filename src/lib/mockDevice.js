@@ -447,6 +447,24 @@ export function createMockDevice(unitKey = DEFAULT_UNIT) {
     return state.models.get(key)
   }
 
+  /*
+   * The editor's pages for a demo block, in the shape a real unit sends them,
+   * so EDIT splits a demo Drive into Basic, Tone, Graphic EQ and Advanced as
+   * it does a real one. The amp's file carries the whole layout as read; the
+   * others carry only what the pages need (data/block-params.json).
+   */
+  function layoutOf(slug) {
+    if (slug === 'amp') return ampParams.layout ? clone(ampParams.layout) : null
+    const pages = blockParams.blocks[slug]?.pages
+    if (!pages?.length) return null
+    return {
+      pages: pages.map((pg) => ({
+        name: pg.name,
+        rows: [{ section: 'parameters', controls: pg.ids.map((paramId) => ({ paramId })) }]
+      }))
+    }
+  }
+
   function paramsFor(slug) {
     if (slug === 'amp') {
       return clone(ampParams.named).map((p) => ({ ...p, log: !!p.log }))
@@ -556,7 +574,8 @@ export function createMockDevice(unitKey = DEFAULT_UNIT) {
         page: eid,
         named: clone(paramsOf(eid)),
         enums: [],
-        type: chosen ? { value: chosen.value, name: chosen.name } : null
+        type: chosen ? { value: chosen.value, name: chosen.name } : null,
+        layout: layoutOf(block.slug)
       }
     },
 
