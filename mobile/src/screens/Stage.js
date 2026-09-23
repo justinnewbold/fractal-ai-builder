@@ -516,6 +516,10 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
                   key={i}
                   caption={String(i + 1)}
                   label={sceneNames[i] || ''}
+                  /* The rule under the name, from his mockup of this screen.
+                     Scenes wear one; the chain tiles below do not, which is
+                     how he drew them. */
+                  bar
                   fill={hue.fill}
                   ink={hue.ink}
                   on={i === scene}

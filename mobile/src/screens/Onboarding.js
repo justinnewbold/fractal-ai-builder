@@ -11,6 +11,9 @@ import { tick } from '../lib/feedback'
 /* An ES import rather than require(): Metro resolves both, but require is not
    a name this app has anywhere, and a test is right to refuse it. */
 import unitFm3 from '../../assets/unit-fm3.png'
+import pieceUnit from '../../assets/piece-unit.png'
+import pieceComputer from '../../assets/piece-computer.png'
+import piecePhone from '../../assets/piece-phone.png'
 import { restorePurchase } from '../lib/purchases'
 import { sendDownloadLink, DOWNLOADS_URL } from '../lib/downloadLink'
 import Note from '../components/Note'
@@ -638,73 +641,36 @@ const Footnote = ({ question, links }) => (
  * WHEN THE REAL ART ARRIVES it drops in here and nothing else moves — the row
  * already gives it a fixed box to sit in.
  */
-const Art = ({ kind }) => {
-  const box = { width: 92, height: 56, alignItems: 'center', justifyContent: 'center' }
-  const skin = { backgroundColor: color.panelHi, borderWidth: 1, borderColor: color.rule }
-  if (kind === 'computer') {
-    return (
-      <View style={box}>
-        <View style={{ ...skin, width: 74, height: 44, borderRadius: radius.sm }} />
-        <View style={{ ...skin, width: 88, height: 5, borderRadius: 3, marginTop: 2 }} />
-      </View>
-    )
-  }
-  if (kind === 'phone') {
-    return (
-      <View style={box}>
-        <View
-          style={{
-            ...skin,
-            width: 34,
-            height: 56,
-            borderRadius: radius.sm,
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexDirection: 'row',
-            gap: 2
-          }}
-        >
-          {[8, 14, 10, 16, 9].map((h, i) => (
-            <View key={i} style={{ width: 2, height: h, borderRadius: 1, backgroundColor: color.signal }} />
-          ))}
-        </View>
-      </View>
-    )
-  }
-  /* The unit: a chassis, a lit display and a row of knobs. */
-  return (
-    <View style={box}>
-      <View
-        style={{
-          ...skin,
-          width: 92,
-          height: 40,
-          borderRadius: radius.sm,
-          padding: 5,
-          justifyContent: 'space-between'
-        }}
-      >
-        <View
-          style={{
-            height: 16,
-            borderRadius: 2,
-            backgroundColor: color.chassis,
-            borderWidth: 1,
-            borderColor: color.signalWash
-          }}
-        />
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 }}>
-          {[0, 1, 2, 3, 4].map((i) => (
-            <View
-              key={i}
-              style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color.rule }}
-            />
-          ))}
-        </View>
-      </View>
-    </View>
-  )
-}
+/**
+ * THE THREE PIECES, PHOTOGRAPHED RATHER THAN DRAWN.
+ *
+ * "Crop the laptop and phone artwork from the second mockup to replace the
+ * shapes I drew."
+ *
+ * They were three little assemblies of Views — a rounded rectangle with a
+ * lid for the laptop, a rectangle with five amber bars for the phone, a
+ * chassis with a display and five dots for the unit. Honest placeholders, and
+ * they read as diagrams of the things rather than the things.
+ *
+ * What is here instead is cut straight out of his own mockup of this screen,
+ * the same way the play screen's icons were. The edges are feathered to
+ * transparent so each one sits on its card rather than on a rectangle of
+ * somebody else's background.
+ *
+ * Kept as `Art` with the same `kind` so the three boxes below did not have to
+ * learn anything new, and at the same 92×56 box so nothing above or below
+ * moves.
+ */
+const PIECES = { unit: pieceUnit, computer: pieceComputer, phone: piecePhone }
+
+const Art = ({ kind }) => (
+  <Image
+    source={PIECES[kind] || PIECES.unit}
+    accessible={false}
+    resizeMode="contain"
+    style={{ width: 92, height: 56 }}
+  />
+)
 
 /** One of the three boxes: a number, what it is, and a picture of it. */
 const ChainBox = ({ n, title, body, kind }) => (

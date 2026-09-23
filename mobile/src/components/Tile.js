@@ -41,6 +41,11 @@ export default function Tile({
    * letters alone, exactly as the grid looked before any of this.
    */
   icon,
+  /*
+   * The rule under the name, in the tile's own colour. Scenes wear one and
+   * blocks do not — see the note where it is drawn.
+   */
+  bar = false,
   fill,
   ink,
   on = false,
@@ -199,6 +204,35 @@ export default function Tile({
           >
             {sub}
           </Text>
+        ) : null}
+        {/*
+          THE BAR UNDER THE NAME, which is the one thing his mockup of the
+          play screen has that this did not.
+
+          Every scene tile in it carries a short rule under the name in the
+          tile's own hue. It does a real job rather than a decorative one: the
+          grid is eight tiles, and on an unlit one the only colour is a
+          two-pixel border at arm's length. The bar puts a piece of that hue
+          in the middle of the tile where the eye already is, which is the
+          whole argument for colouring these tiles at all.
+
+          Scenes only — the chain tiles in the same mockup have no bar, and a
+          block already says On or Off in words.
+
+          Its width is the tile's rather than the name's: a rule that changed
+          length with the word would read as a progress bar.
+        */}
+        {bar ? (
+          <View
+            pointerEvents="none"
+            style={{
+              marginTop: 5,
+              width: '52%',
+              height: 3,
+              borderRadius: 2,
+              backgroundColor: on ? at(ink, 0.8) : hue
+            }}
+          />
         ) : null}
       </View>
     </Pressable>

@@ -3782,6 +3782,38 @@ export function run(test) {
     assert.ok(!/label="Try the Demo"/.test(settings), 'Setup is pitching the demo at somebody who already owns it')
   })
 
+  test('the three pieces and the scene bar come from his mockups, not from Views', () => {
+    /*
+     * "Crop the laptop and phone artwork from the second mockup to replace
+     * the shapes I drew." And the play mockup's scene tiles each carry a rule
+     * under the name that this screen did not have.
+     */
+    const onboarding = read('mobile/src/screens/Onboarding.js')
+    for (const piece of ['piece-unit', 'piece-computer', 'piece-phone']) {
+      assert.ok(onboarding.includes(`assets/${piece}.png`), `the walkthrough still draws ${piece} rather than showing it`)
+    }
+    /* The shapes are gone, not merely unused: three assemblies of Views that
+       nothing renders is worse than either answer. */
+    const art = onboarding.slice(onboarding.indexOf('const Art = ('), onboarding.indexOf('const ChainBox'))
+    assert.ok(!/backgroundColor: color\.signal \}/.test(art), 'the drawn phone waveform is still in Art')
+    assert.match(art, /source=\{PIECES\[kind\] \|\| PIECES\.unit\}/, 'Art no longer picks the picture by kind')
+
+    /*
+     * THE BAR, and the half of it worth holding: scenes have one, blocks do
+     * not. He drew it that way, and a block already says On or Off in words —
+     * a rule under those would be colour repeating what the text just said.
+     */
+    const tile = read('mobile/src/components/Tile.js')
+    assert.match(tile, /\{bar \? \(/, 'the tile cannot draw the rule under the name')
+    assert.match(tile, /backgroundColor: on \? at\(ink, 0\.8\) : hue/, 'the rule is not the tile’s own colour')
+
+    const stage = read('mobile/src/screens/Stage.js')
+    const scenes = stage.slice(stage.indexOf('<Label>Scenes</Label>'), stage.indexOf('blocks.map'))
+    const chain = stage.slice(stage.indexOf('blocks.map'))
+    assert.match(scenes, /\n\s+bar\n/, 'the scene tiles lost their rule')
+    assert.ok(!/\n\s+bar\n/.test(chain), 'the chain tiles have a rule his mockup does not draw')
+  })
+
   test('buying the app ends the demo', () => {
     /*
      * "After I did the test purchase, it just takes me back to the demo
