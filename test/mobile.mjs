@@ -3349,6 +3349,14 @@ export function run(test) {
     for (const src of [read('src/lib/link.js'), read('shared/onboarding.mjs'), read('shared/ways-in.mjs')]) {
       assert.ok(!/another editor|FM3-Edit or Axe-Edit|Quit any Fractal editor/.test(src), 'an old, vaguer line is still there')
     }
+    /*
+     * And once it is closed, the phone picks the unit up by itself. "Will they
+     * have to like refresh or something, or will it automatically start
+     * working?" It did not: a unit that came back stayed "no unit" until a tap.
+     */
+    const rig = read('mobile/src/lib/rig.js').replace(/\s+/g, ' ')
+    assert.match(rig, /if \(said === 'answering' && \(state\.unit === 'missing' \|\| state\.unit === 'silent'\)\) \{ logDebug\('unit', 'the unit is answering again'\) quiet = 0 try \{ await refreshAll\(\)/, 'a unit that answers again is not picked back up without a tap')
+    assert.match(rig, /state\.unit === 'missing' \|\| state\.unit === 'silent' \? MISSING_WATCH_MS : watchEvery\(true\)/, 'the phone waits half a minute to notice an editor was closed')
   })
 
   test('Unlock waits for the box saying a computer and a USB cable are needed', async () => {

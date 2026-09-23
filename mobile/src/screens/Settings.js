@@ -515,7 +515,7 @@ export default function Settings({
                     ? /* The usual reason besides the cable is Fractal's own
                          editor holding the unit — named, per unit where it is
                          known (lib/editors.js). */
-                      `Connected to ${macName || 'your computer'} — but it has no unit. Check your unit is on and its cable is in. ${quitEditor(deviceName)}`
+                      `Connected to ${macName || 'your computer'} — but it has no unit. Check your unit is on and its cable is in. ${quitEditor(deviceName)} This finds the unit again by itself once it is free.`
                     : unitState === 'silent'
                       ? `Connected to ${macName || 'your computer'} — ${deviceName || 'your unit'} isn’t answering. A frozen unit looks like this; turn it off and on. ${quitEditor(deviceName)}`
                       : `Connected to ${macName || 'your computer'}${deviceName ? ` — ${deviceName}` : ''}`}
