@@ -248,7 +248,7 @@ export function describeLink(state) {
  * until the link connects and only the unit is missing.
  *
  * The rule now: the bar names the thing that is absent. No link, no Mac —
- * "Not connected", quietly, because a phone that has not connected yet is not
+ * a dash, quietly (it said "Not connected" until the phone's dash won), because a phone that has not connected yet is not
  * broken and the screen behind it is already asking it to connect. Link up and
  * no unit — "No unit", in red, because there is a red notice under it saying
  * the same and a cable the player can go and check.
@@ -272,7 +272,13 @@ export function describeUnit({ demo, role, status, device, link, reason = null }
      * check a cable that was never the problem.
      */
     const missing = reason === 'no-answer' ? 'No answer' : reason === 'unreadable' ? 'Can’t read' : 'No unit'
-    const unit = linkUp ? (status === 'fault' ? missing : 'Looking…') : 'Not connected'
+    /*
+     * A dash, as the phone's bar draws it (mobile/src/components/TopBar.js).
+     * "Not connected" said what the red word at the other end of the same
+     * bar was already saying, and on a phone it was cut to "NOT …" — two
+     * words about one fact, and one of them unreadable.
+     */
+    const unit = linkUp ? (status === 'fault' ? missing : 'Looking…') : '—'
     return { unit, lamp: demo ? 'demo' : linkUp ? status : 'idle' }
   }
   const unit = status === 'live' ? named : status === 'fault' ? 'No device' : 'Looking…'
@@ -888,7 +894,20 @@ export async function signInAccount({ email, password }) {
  */
 export async function createAccount({ email, password }) {
   const config = loadRemoteConfig() || {}
-  const { needsConfirmation } = await remoteSignUp({ url: config.url, anonKey: config.anonKey, email, password })
+  const { needsConfirmation, existing } = await remoteSignUp({ url: config.url, anonKey: config.anonKey, email, password })
+  /*
+   * Create Account, pressed by somebody who already has one — which is what
+   * a big Create Account button invites. Their details are the sign-in they
+   * meant, so this signs them in; only a wrong password gets them a message.
+   */
+  if (existing) {
+    try {
+      await signInAccount({ email, password })
+    } catch {
+      throw new Error('That email already has an account. Sign in with it, or reset the password.')
+    }
+    return { needsConfirmation: false }
+  }
   if (needsConfirmation) return { needsConfirmation: true }
   await signInAccount({ email, password })
   return { needsConfirmation: false }

@@ -141,7 +141,8 @@ export default function TopBar({
     <div className="topbar"
       data-status={lampState}
       data-preset={presetInBar ? 'yes' : 'no'}
-      data-unlock={canBuy ? 'yes' : 'no'}
+      /* Either demo pill — the price or Exit demo — takes NO PHONE's room on a phone. */
+      data-unlock={canBuy || canLeave ? 'yes' : 'no'}
     >
       <div className="topbar-row">
         <span className="lamp" data-state={lampState} />

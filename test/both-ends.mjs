@@ -516,6 +516,17 @@ export const AREAS = [
         why: 'the same offer at both ends, in the same three words; the browser also says Try now on the not-connected screen and Go beside the code box, neither of which the phone has a place for'
       },
       {
+        does: 'go into the demo, for somebody who has paid',
+        /* "If they are already signed in and the app is unlocked, instead of
+           saying try the demo, have it just say Demo." The phone says it on
+           Setup's Phone & computer page; the browser says it here too,
+           because this is the screen a paid phone is left on while its
+           computer is not answering. */
+        web: 'Demo',
+        phone: null,
+        why: 'the phone’s Demo button is on Setup → Phone & computer rather than on its sign-in screen, which somebody who has paid never sees'
+      },
+      {
         does: 'choose which of the five Fractals the demo is',
         web: 'Demo Unit',
         phone: 'Demo Unit',
@@ -1023,7 +1034,11 @@ export function run(test) {
      * This holds them together, so rewording one end without the other fails.
      */
     const web = read('src/App.jsx')
-    const page = web.slice(web.indexOf("setupPage === 'unlock' ? ("), web.indexOf("setupPage === 'about' ? ("))
+    /* Written once and drawn twice — the Unlock page and the screen an unpaid
+       phone sees instead of connecting — so the words are read where they are. */
+    assert.match(web, /setupPage === 'unlock' \? \([\s\S]{0,400}\{unlockBody\}/, 'the Unlock page no longer draws the paywall’s words')
+    assert.match(web, /\{mustPay \? \([\s\S]{0,600}\{unlockBody\}/, 'the unpaid phone’s screen no longer draws the paywall’s words')
+    const page = web.slice(web.indexOf('const unlockBody = ('), web.indexOf('{mustPay ? ('))
     const phone = read('mobile/src/screens/Paywall.js')
     const norm = (t) => t.replace(/&rsquo;/g, '’').replace(/&amp;/g, '&').replace(/\s+/g, ' ')
     for (const line of [
@@ -1061,12 +1076,14 @@ export function run(test) {
     assert.match(src, /export const PRODUCT_ID = 'cloud\.newbold\.fractalremote\.full'/, 'the web sells a different product id from the phones')
 
     /*
-     * THE SANDBOX KEY, UNTIL HE SAYS OTHERWISE. A checkout nobody has walked
-     * through must not be able to charge a real card. Going live is one line
-     * in webPurchase.js — and this line here, on purpose, so it is a decision
-     * somebody makes rather than a default that drifts.
+     * THE LIVE KEY, BECAUSE HE SAID SO. It shipped on sandbox until the
+     * checkout had been walked through: "Payment on web working. You can go
+     * ahead and set it live instead of the sandbox." Which key it is stays
+     * written down here, on purpose, so going back to test cards is a
+     * decision somebody makes rather than a default that drifts.
      */
-    assert.match(src, /export const WEB_KEY = SANDBOX_KEY/, 'the web checkout is taking real money; if that was meant, change this check with it')
+    assert.match(src, /export const WEB_KEY = PRODUCTION_KEY/, 'the web checkout is on test cards; if that was meant, change this check with it')
+    assert.match(src, /const PRODUCTION_KEY = 'rcb_(?!sb_)/, 'the live key is a sandbox key')
     assert.match(src, /const SANDBOX_KEY = 'rcb_sb_/, 'the sandbox key is not a sandbox key')
 
     /* Loaded only when there is a price to show: nobody driving their own rig downloads Stripe. */
@@ -1123,7 +1140,7 @@ export function run(test) {
      * unlock page by itself — the whole point of the request is that nobody
      * has to find Settings. And not for somebody who turns out to have paid.
      */
-    assert.match(app, /setUnlockAfterSignIn\(true\)\s*setSignIn\('account'\)/, 'signed out, UNLOCK does not ask for the sign-in')
+    assert.match(app, /setUnlockAfterSignIn\(true\)[\s\S]{0,300}setSignInStart\('up'\)\s*setSignIn\('account'\)/, 'signed out, UNLOCK does not ask for the sign-in')
 
     /*
      * And that sign-in is the plain one. On the website the demo takes the
@@ -1140,7 +1157,7 @@ export function run(test) {
     assert.match(read('mobile/src/screens/Settings.js'), /label="Sign in with an email and password"/, 'the phone lost its sign-in button')
     assert.match(
       app,
-      /\{isDemo\(\) && !link\.account \? \([\s\S]{0,200}note="Not signed in on this device\." defaultOpen>[\s\S]{0,300}setSignIn\('account'\)[\s\S]{0,120}Sign in with an email and password/,
+      /\{signedInHere \|\| isDemo\(\) \|\| link\.role === 'remote' \? \([\s\S]{0,300}'Not signed in on this device\.'[\s\S]{0,500}Sign out on this device[\s\S]{0,300}setSignIn\('account'\)[\s\S]{0,120}Sign in with an email and password/,
       'the browser’s Setup has no way to sign in from the demo'
     )
     assert.match(app, /paid\.for !== accountId/, 'the unlock page can open on the signed-out answer, before the new account’s is in')
@@ -1155,5 +1172,86 @@ export function run(test) {
 
     /* And buying in the demo ends it, as on the phone. */
     assert.match(app, /if \(isDemo\(\)\) \{\s*setDemo\(false\)\s*window\.location\.reload\(\)/, 'buying in the browser leaves the person in the demo')
+  })
+
+  /**
+   * THE BROWSER ON A PHONE PLAYS BY THE PHONE'S RULES.
+   *
+   * "We need to make sure we're on the same page as far as what the app does
+   * and what the web app does… Everything's chaos." A play-through of both
+   * found the browser acting as a phone breaking three of the phone's rules:
+   * it connected for somebody who had not paid, it offered "Try the Demo" to
+   * somebody who had, and when nothing answered it never said which account
+   * it was on — which was the whole of why it did not connect that night.
+   */
+  test('the browser acting as a phone plays by the phone’s rules', () => {
+    const app = read('src/App.jsx')
+    const phoneRule = read('mobile/src/lib/unlock-rule.js')
+
+    /* Not paid: the unlock first, as the phone's shouldAskToPay does — and
+       only on a definite no, as the phone fails open. */
+    assert.match(phoneRule, /export const shouldAskToPay/, 'the phone’s paywall rule moved; this check follows it')
+    assert.match(
+      app,
+      /const mustPay = Boolean\(link\.role === 'remote' && !isDemo\(\) && answeredFor && !paid\.unlocked && !paid\.unknown\)/,
+      'the browser on a phone drives a rig for somebody who has not paid, or shuts out somebody the server could not answer for'
+    )
+    assert.match(app, /unknown: out\.unknown/, 'a question the server could not answer is read as a no')
+
+    /* Paid: "Demo", never "Try the Demo". */
+    const connect = read('src/components/ConnectScreen.jsx')
+    assert.match(connect, /\{owned \? 'Demo' : 'Try the Demo'\}/, 'the connect screen offers Try the Demo to somebody who has paid')
+    assert.match(app, /\{owned \? 'Demo' : 'Try the demo'\}/, 'the fault notice offers Try the demo to somebody who has paid')
+    assert.match(app, /owned=\{owned\}/, 'the connect screen is never told who has paid')
+
+    /* Connecting, and nothing answering: which account this is, in his words —
+       "make sure you're connected to your computer using and then show the
+       user's email address". At both ends. */
+    const using = /Make sure you&rsquo;re connected to your computer using <strong>\{email\}<\/strong>\./
+    assert.match(connect, using, 'the connect screen does not say which account it is using')
+    assert.equal((connect.match(/<Using email=\{remembered\} paired=\{paired\} \/>/g) || []).length, 2, 'the account line is missing while connecting or when nothing answers')
+    const phoneApp = read('mobile/App.js')
+    const phoneSettings = read('mobile/src/screens/Settings.js')
+    for (const [where, src] of [['the phone’s connecting screen', phoneApp], ['the phone’s Phone & computer page', phoneSettings]]) {
+      assert.ok(src.includes('Make sure you’re connected to your computer using '), `${where} does not say which account it is using`)
+    }
+
+    /* Signing in ends the demo, as the phone's onSignedIn does — "make sure
+       demos disappear when you're logged in" — and out of the demo a phone
+       signed in connects, rather than stopping one tap short. */
+    const after = app.slice(app.indexOf('const afterAccount = async () => {'), app.indexOf('const afterAccount = async () => {') + 700)
+    assert.match(after, /if \(isDemo\(\)\) \{[\s\S]*?setDemo\(false\)\s*window\.location\.reload\(\)/, 'signing in leaves the person in the demo')
+    assert.match(after, /if \(linkState\(\)\.role === 'remote'\) await reconnectPhone\(\)/, 'a phone signed in from the unlock stops at “Connect as …”')
+    assert.equal((app.match(/await afterAccount\(\)/g) || []).length, 2, 'signing in and making an account lead to different places')
+    assert.match(read('mobile/App.js'), /onSignedIn=\{[\s\S]{0,1200}setDemo\(false\)/, 'the phone’s sign-in stopped ending the demo; this check follows it')
+  })
+
+  /**
+   * A PHONE GETS THE PHONE'S WALKTHROUGH, in the browser too.
+   *
+   * The browser showed every visitor the computer's — "YOU ARE HERE · This
+   * computer", "Plug your unit into this computer" — and most of them are on
+   * a phone. The phone app's own walkthrough is drawn instead there, from the
+   * same words and the same pictures as the phone's.
+   */
+  test('a phone gets the phone’s walkthrough, in the browser too', () => {
+    const app = read('src/App.jsx')
+    const web = read('src/components/PhoneWalkthrough.jsx')
+    const phone = read('mobile/src/screens/Onboarding.js')
+
+    assert.match(app, /const phoneEnd = link\.role === 'remote' \|\| link\.role === 'wifi' \|\| \(isDemo\(\) && link\.canHost === false\)/, 'the browser no longer tells a phone from a computer for its walkthrough')
+    assert.match(app, /<PhoneWalkthrough\s+open=\{walkthrough && phoneEnd\}/, 'a phone’s browser is not shown the phone’s walkthrough')
+    assert.match(app, /<Onboarding\s+open=\{walkthrough && computerEnd\}/, 'the computer’s walkthrough is shown to something that is not the computer')
+
+    /* The same steps, from the same words file, in the same order. */
+    for (const words of ['P1.head', 'P1.go', 'P1.haveCode', 'P2.head', 'P2.go', 'P3.head', 'P3.demo.go', 'P3.real.go', 'P3.signIn', 'P4.head', 'P4.go(unitName)', 'P4.back', 'P9.demo.head', 'P9.go']) {
+      assert.ok(phone.includes(words), `the phone’s walkthrough no longer says ${words}; this check follows it`)
+      assert.ok(web.includes(words), `the browser’s phone walkthrough does not say ${words}, and the phone’s does`)
+    }
+    assert.match(web, /from '\.\.\/\.\.\/shared\/onboarding\.mjs'/, 'the browser’s phone walkthrough has words of its own')
+    /* His pictures, the phone's own files. */
+    for (const art of ['unit-fm3.png', 'piece-unit.png', 'piece-computer.png', 'piece-phone.png']) {
+      assert.ok(web.includes(`mobile/assets/${art}`), `the browser’s phone walkthrough is missing ${art}`)
+    }
   })
 }

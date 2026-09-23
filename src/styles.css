@@ -9174,10 +9174,27 @@ button.phone-chip.dim {
   width: 100%;
 }
 
-.connect-actions .primary {
+/* The second way on, as wide as the first: Sign in under Create Account was a
+   small box a returning player had to hunt for. The primary's width, the
+   chip's quieter face. */
+.connect-actions .primary,
+.connect-actions .chip {
   min-height: 52px;
   min-width: min(280px, 100%);
   font-size: var(--f-2);
+}
+
+/* Where to get the computer app: the phone's label over the address, stacked. */
+.connect-address {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-1);
+}
+.connect-address .mono {
+  font-size: var(--f-1);
+  letter-spacing: 0.12em;
+  color: var(--silk-faint);
 }
 
 /*
@@ -9276,6 +9293,49 @@ button.signin-link {
   color: var(--silk-dim);
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+/* The other side of the form, as big as the button above it — a first-timer's
+   Create Account was a link-sized afterthought. */
+.signin-actions .signin-wide,
+.signin .signin-wide {
+  flex: 1 1 100%;
+  width: 100%;
+  min-height: 48px;
+}
+
+/* "Account made." as a screen of its own, not a line under the buttons. */
+.signin-sent {
+  align-items: center;
+  text-align: center;
+  gap: var(--s-3);
+  padding: var(--s-6) var(--s-4);
+}
+.signin-sent p {
+  margin: 0;
+}
+.signin-sent-mark {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 1.5px solid var(--signal);
+  color: var(--signal);
+  font-size: var(--f-6);
+}
+.signin-sent-head {
+  font-weight: 700;
+  font-size: var(--f-5);
+}
+.signin-sent-body {
+  color: var(--silk-dim);
+  font-size: var(--f-4);
+  line-height: 1.45;
+}
+.signin-sent-to {
+  font-size: var(--f-4);
+  word-break: break-all;
 }
 
 .signin .problem {
@@ -10649,5 +10709,290 @@ button.setup-back {
   width: 100%;
   min-height: 52px;
   margin-top: var(--s-4);
+  font-size: var(--f-3);
+}
+
+/*
+ * THE PHONE APP'S WALKTHROUGH, in the browser on a phone (PhoneWalkthrough).
+ *
+ * A phone-width column — this is the screen the phone app draws, and on a
+ * phone the browser is exactly that wide anyway. The same overlay as the
+ * computer's walkthrough (.onb), a different sheet inside it.
+ */
+.pw {
+  place-items: start center;
+  padding: var(--s-5) var(--s-4);
+}
+.pw-sheet {
+  width: 100%;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+.pw-close {
+  align-self: stretch;
+}
+.pw-head {
+  margin: 0;
+  font-size: var(--f-6);
+  line-height: 1.15;
+}
+.pw-hero {
+  margin-top: var(--s-6);
+}
+.pw-sub {
+  margin: 0;
+  color: var(--silk-dim);
+  font-size: var(--f-4);
+  line-height: 1.45;
+}
+.pw-eyebrow {
+  margin: 0;
+  color: var(--signal);
+  font-size: var(--f-1);
+  letter-spacing: 0.14em;
+}
+.pw-go {
+  width: 100%;
+  min-height: 48px;
+  font-size: var(--f-4);
+}
+.pw-note {
+  margin: 0;
+  color: var(--silk-dim);
+  font-size: var(--f-3);
+  line-height: 1.45;
+}
+
+.pw-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.pw-progress-top {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
+.pw-progress-title {
+  font-weight: 700;
+  font-size: var(--f-4);
+}
+.pw-count {
+  justify-self: end;
+  color: var(--silk-faint);
+  font-size: var(--f-1);
+  letter-spacing: 0.12em;
+}
+.pw-bars {
+  display: flex;
+  justify-content: center;
+  gap: var(--s-1);
+}
+.pw-bar {
+  width: 64px;
+  height: 4px;
+  border-radius: var(--r-1);
+  background: var(--rule);
+}
+.pw-bar.on {
+  background: var(--signal);
+}
+
+.pw-chain {
+  display: flex;
+  flex-direction: column;
+}
+.pw-box {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2);
+  background: var(--panel);
+}
+.pw-n {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1.5px solid var(--signal);
+  color: var(--signal);
+  font-weight: 700;
+  font-size: var(--f-4);
+}
+.pw-box-words {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+}
+.pw-box-title {
+  font-weight: 700;
+  font-size: var(--f-4);
+  letter-spacing: 0.04em;
+}
+.pw-box-body {
+  color: var(--silk-dim);
+  font-size: var(--f-3);
+}
+.pw-art {
+  flex: 0 0 auto;
+  width: 92px;
+  height: 56px;
+  object-fit: contain;
+}
+.pw-wire {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.pw-wire-line {
+  width: 2px;
+  height: 14px;
+  background: var(--signal);
+}
+.pw-wire-label {
+  padding: var(--s-1) var(--s-3);
+  border: 1px solid var(--signal);
+  border-radius: var(--r-3);
+  background: var(--chassis);
+  color: var(--signal);
+  font-size: var(--f-1);
+  letter-spacing: 0.12em;
+}
+
+.pw-choice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2);
+  background: var(--panel);
+}
+.pw-choice.lit {
+  border-color: var(--signal);
+  background: var(--signal-wash);
+}
+.pw-choice-top {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+}
+.pw-choice-words {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+.pw-choice-words p {
+  margin: 0;
+}
+.pw-choice-eyebrow {
+  color: var(--silk-faint);
+  font-size: var(--f-1);
+  letter-spacing: 0.14em;
+}
+.pw-choice.lit .pw-choice-eyebrow {
+  color: var(--signal);
+}
+.pw-choice-title {
+  font-weight: 700;
+  font-size: var(--f-5);
+}
+.pw-choice-body {
+  color: var(--silk-dim);
+  font-size: var(--f-3);
+  line-height: 1.45;
+}
+.pw-unit-shot {
+  flex: 0 0 auto;
+  width: 132px;
+  height: 105px;
+  object-fit: contain;
+}
+/* The phone's lock, drawn the phone's way: a shackle over a body, in the rule colour. */
+.pw-lock {
+  position: relative;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 58px;
+}
+.pw-lock::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 6px;
+  height: 22px;
+  border: 4px solid var(--rule);
+  border-bottom: 0;
+  border-radius: var(--r-3) var(--r-3) 0 0;
+}
+.pw-lock::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4px;
+  height: 28px;
+  border: 4px solid var(--rule);
+  border-radius: var(--r-1);
+}
+
+.pw-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+}
+.pw-foot-q {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  color: var(--silk-dim);
+  font-size: var(--f-3);
+}
+.pw-rule {
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--rule);
+}
+.pw-link {
+  color: var(--signal);
+  font-size: var(--f-4);
+}
+.pw-units {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+.pw-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2);
+  background: var(--panel);
+}
+.pw-card p {
+  margin: 0;
+}
+.pw-card-label {
+  color: var(--silk-faint);
+  font-size: var(--f-1);
+  letter-spacing: 0.12em;
+}
+.pw-card-body {
+  color: var(--silk-dim);
   font-size: var(--f-3);
 }

@@ -125,6 +125,7 @@ import {
 } from './lib/forgefx'
 import ConnectScreen from './components/ConnectScreen'
 import PhoneRemote from './components/PhoneRemote'
+import PhoneWalkthrough from './components/PhoneWalkthrough'
 import LinkDetails from './components/LinkDetails'
 import SignInSheet from './components/SignInSheet'
 import {
@@ -159,6 +160,9 @@ import {
 } from './lib/remote'
 import { newEntry, append } from './lib/log'
 import { watchEvery, probeSays, countQuiet, unitGone } from '../shared/unit-watch.mjs'
+
+/* Session-only: "open the unlock page once the demo has ended" — see afterAccount. */
+const UNLOCK_NEXT = 'fractal.unlockNext'
 
 
 /**
@@ -428,6 +432,8 @@ export default function App() {
    * that keeps coming back is the thing everybody remembers hating.
    */
   const [walkthrough, setWalkthrough] = useState(() => !onboarded())
+  /* Opened again from Settings, which is when the phone's walkthrough offers a way out at the top. */
+  const [walkReplay, setWalkReplay] = useState(false)
   useEffect(() => {
     if (walkthrough) markOnboarded()
   }, [walkthrough])
@@ -849,6 +855,11 @@ export default function App() {
     /* false, true for the sign-in this end's role calls for, or 'account'
        for a sign-in with no errand attached — see signInAccount. */
     const [signIn, setSignIn] = useState(false)
+    /* Which side the form opens on: 'up' when a Create Account button opened it. */
+    const [signInStart, setSignInStart] = useState('in')
+    useEffect(() => {
+      if (!signIn) setSignInStart('in')
+    }, [signIn])
   /*
    * Whether the phone has ever had the Mac answer this session. A blip after
    * that keeps the screen (the chip goes red; the loop retries); before it,
@@ -1758,7 +1769,11 @@ export default function App() {
       }
     }
     setPaid((p) => ({ ...p, checked: false }))
-    checkUnlocked().then((out) => live && setPaid({ checked: true, unlocked: out.unlocked, for: accountId }))
+    /* `unknown` kept: a question that could not be put is not a no, and the
+       one place that shuts a door on "not paid" — mustPay — leaves it open. */
+    checkUnlocked().then(
+      (out) => live && setPaid({ checked: true, unlocked: out.unlocked, unknown: out.unknown, for: accountId })
+    )
     webPrice(accountId).then((price) => live && setWebPriceText(price))
     return () => {
       live = false
@@ -1792,7 +1807,85 @@ export default function App() {
     }
   }, [sheet, accountId, webPriceText])
 
-  const [unlockAfterSignIn, setUnlockAfterSignIn] = useState(false)
+  /*
+   * THE PHONE'S RULES, NAMED ONCE, so the browser on a phone plays by them.
+   *
+   * "We need to make sure we're on the same page as far as what the app does
+   * and what the web app does." Two of the phone's rules had never reached
+   * this end:
+   *
+   * OWNED — somebody signed in who has paid. The phone offers them "Demo",
+   * never "Try the Demo".
+   *
+   * MUST PAY — a phone signed in, not paid, and not in the demo. The phone
+   * puts the unlock in front of everything before it will drive a rig
+   * (shouldAskToPay, mobile/src/lib/unlock-rule.js); this end connected
+   * anyway. Only the browser acting as a phone: the computer driving its
+   * own unit over USB is free, and always has been. And only on a definite
+   * no — a question the server could not answer lets them through, as the
+   * phone does, so a bad minute on a venue's wifi does not lock out somebody
+   * who paid.
+   */
+  /* Which walkthrough this end gets — see where they are drawn. The demo takes
+     the computer's role everywhere, so a phone in it is told apart by whether
+     it could really host. */
+  const phoneEnd = link.role === 'remote' || link.role === 'wifi' || (isDemo() && link.canHost === false)
+  const computerEnd = link.role === 'mac' && !phoneEnd
+
+  /* Signed in with a real account — not the hidden one an old pairing code made. */
+  const signedInHere = Boolean(link.account?.email && !isPairAccount(link.account.email))
+
+  const answeredFor = accountId && paid.checked && paid.for === accountId
+  const owned = Boolean(answeredFor && paid.unlocked)
+  const mustPay = Boolean(link.role === 'remote' && !isDemo() && answeredFor && !paid.unlocked && !paid.unknown)
+
+  /* Carried across the reload that ends the demo (see afterAccount), so the
+     computer still lands on the unlock page it was heading for. */
+  const [unlockAfterSignIn, setUnlockAfterSignIn] = useState(() => {
+    try {
+      const next = sessionStorage.getItem(UNLOCK_NEXT) === '1'
+      sessionStorage.removeItem(UNLOCK_NEXT)
+      return next
+    } catch {
+      return false
+    }
+  })
+
+  /*
+   * WHAT SIGNING IN LEADS TO, from the sign-in with no errand attached.
+   *
+   * SIGNING IN ENDS THE DEMO, as it does on the phone (App.js's onSignedIn).
+   * "Make sure demos disappear when you're logged in." Somebody signing in is
+   * heading for their own rig, and the simulated unit would otherwise go on
+   * answering in its place. A reload, because which end this is was decided
+   * when the page loaded — the same as leave-demo. What comes up after it is
+   * the phone's order: the unlock if it is not paid for, else the computer.
+   *
+   * THE SHEET STAYS OPEN FOR THE RELOAD, and that is the fix for a reload
+   * that went missing about one time in ten. Closing a sheet steps the
+   * browser's history back (lib/nav.js), and a history step still in flight
+   * when reload() is called cancels the reload — so the demo's switch went
+   * off and the page carried on showing the demo. The reload clears the
+   * sheet anyway.
+   *
+   * Out of the demo, a phone signed in connects rather than stopping on
+   * "Connect as …" and waiting for another tap.
+   */
+  const afterAccount = async () => {
+    if (isDemo()) {
+      if (unlockAfterSignIn && !phoneEnd) {
+        try {
+          sessionStorage.setItem(UNLOCK_NEXT, '1')
+        } catch {
+          /* The unlock row in Settings is still there. */
+        }
+      }
+      setDemo(false)
+      window.location.reload()
+      return
+    }
+    if (linkState().role === 'remote') await reconnectPhone()
+  }
   const openUnlock = () => {
     if (accountId) {
       setSheet('settings')
@@ -1800,6 +1893,9 @@ export default function App() {
       return
     }
     setUnlockAfterSignIn(true)
+    /* Somebody buying who is not signed in is nearly always new, so the form
+       opens on making the account — "I already have one" is right under it. */
+    setSignInStart('up')
     setSignIn('account')
   }
   useEffect(() => {
@@ -1817,15 +1913,19 @@ export default function App() {
     setBuying(false)
     if (out.ok) {
       setPaid({ checked: true, unlocked: true, for: accountId })
-      setSetupPage(null)
       /*
        * Buying ends the demo, as it does on the phone. A reload, because
        * which end this is was decided when the page loaded — see leave-demo.
+       * Before the page is put away, not after: moving the sheet steps the
+       * browser's history, and a step in flight cancels the reload (see
+       * afterAccount).
        */
       if (isDemo()) {
         setDemo(false)
         window.location.reload()
+        return
       }
+      setSetupPage(null)
       return
     }
     if (!out.cancelled) setBuySaid(out.message)
@@ -1895,6 +1995,10 @@ export default function App() {
       if (signIn === 'account') {
         await signInAccount({ email, password })
         record('remote', `Signed in as ${email}`)
+        /* Not closed first when the demo is about to end — see afterAccount. */
+        if (!isDemo()) setSignIn(false)
+        await afterAccount()
+        return
       } else if (linkState().role === 'mac') {
         await setUpMac({ email, password })
         record('remote', `Phone remote set up for ${email}`)
@@ -1904,7 +2008,7 @@ export default function App() {
       }
       setSignIn(false)
     },
-    [record, signIn]
+    [record, signIn, afterAccount]
   )
 
   /** Do at the Mac what the phone asked for, and say so at both ends. */
@@ -2998,6 +3102,34 @@ export default function App() {
     </>
   )
 
+  /*
+   * THE UNLOCK, IN THE PHONE PAYWALL'S OWN WORDS — drawn in two places, so
+   * written once: the Unlock page in Settings, and the screen a phone that
+   * has not paid sees in place of connecting (mustPay, above).
+   *
+   * Every sentence here is copied from mobile/src/screens/Paywall.js, and
+   * test/both-ends.mjs holds them to it.
+   */
+  const unlockBody = (
+    <>
+      <p className="device-meta">One payment, once</p>
+      <h3 className="unlock-head">Phone Remote</h3>
+      <p className="hint">
+        {`One-time payment unlocks the full version of this app, forever, including all future updates, on all supported Fractal devices: ${
+          DEMO_UNITS.slice(0, -1).map((u) => u.name).join(', ') + ' and ' + DEMO_UNITS[DEMO_UNITS.length - 1].name
+        }. Sign in with the same account on another phone or tablet and it is unlocked there too.`}
+      </p>
+      <p className="unlock-features">
+        You&rsquo;ll be able to control and switch presets, scenes, amp &amp; effects blocks,
+        tuner, tap tempo, setlists, and so much more.
+      </p>
+      {buySaid ? <p className="hint tone-bad">{buySaid}</p> : null}
+      <button type="button" className="primary unlock-buy" disabled={buying || !accountId} onClick={buyHere}>
+        {webPriceText ? `Unlock Full Version — ${webPriceText}` : 'Unlock Full Version'}
+      </button>
+    </>
+  )
+
   return (
     <div className="shell">
       {/*
@@ -3108,7 +3240,35 @@ export default function App() {
         grace, so a phone in a pocket losing a socket for a moment keeps the
         Play screen and gets it back without anyone noticing.
       */}
-      {showConnect ? (
+      {mustPay ? (
+        /*
+         * The phone's imposed paywall, on the phone's terms: the unlock, then
+         * its three ways out in its own words — a different account, the
+         * demo, or back to the start signed out.
+         */
+        <section className="connect connect-unlock">
+          {unlockBody}
+          <div className="connect-actions">
+            <button className="chip" onClick={() => linkAction('switch')} disabled={busy}>
+              Sign in with an email and password
+            </button>
+          </div>
+          <button
+            type="button"
+            className="connect-demo"
+            onClick={() => {
+              setDemo(true)
+              window.location.reload()
+            }}
+            disabled={busy}
+          >
+            Keep using the demo
+          </button>
+          <button type="button" className="signin-link" onClick={() => linkAction('signout')} disabled={busy}>
+            Back
+          </button>
+        </section>
+      ) : showConnect ? (
         <ConnectScreen
           key={tick}
           link={link}
@@ -3116,6 +3276,11 @@ export default function App() {
           onConnect={() => linkAction('connect')}
           onRetry={() => linkAction('retry')}
           onSwitchAccount={() => linkAction('switch')}
+          onCreateAccount={() => {
+            setSignInStart('up')
+            linkAction('switch')
+          }}
+          owned={owned}
           onUnpair={() => linkAction('signout')}
           onDemo={() => {
             setDemo(true)
@@ -3145,7 +3310,8 @@ export default function App() {
                 window.location.reload()
               }}
             >
-              Try the demo
+              {/* "Demo" to somebody who owns it, as on the phone. */}
+              {owned ? 'Demo' : 'Try the demo'}
             </button>
           </p>
           {/*
@@ -3653,25 +3819,51 @@ export default function App() {
         useful behind this until the unit is plugged in, and showing the app
         greyed out behind a dialog shows somebody a thing they cannot use yet.
       */}
+      {/*
+        WHICH WALKTHROUGH, by which end this is. The computer's — "YOU ARE
+        HERE · This computer", "Plug your unit into this computer" — was shown
+        to every browser, and most of them are phones. A phone now gets the
+        phone app's own, and nobody gets either until the page knows which end
+        it is, so the wrong one never flashes up first.
+      */}
+      <PhoneWalkthrough
+        open={walkthrough && phoneEnd}
+        replay={walkReplay}
+        onClose={() => {
+          setWalkthrough(false)
+          setWalkReplay(false)
+        }}
+        onAccount={() => linkAction('connect')}
+        onUnlock={openUnlock}
+      />
       <Onboarding
-        open={walkthrough}
-        onClose={() => setWalkthrough(false)}
+        open={walkthrough && computerEnd}
+        onClose={() => {
+          setWalkthrough(false)
+          setWalkReplay(false)
+        }}
         device={device}
         status={status}
         faultReason={faultReason}
         link={link}
         onLookAgain={() => read()}
+        onSignIn={() => linkAction('mac-setup')}
       />
 
       <SignInSheet
         open={Boolean(signIn)}
         account={signIn === 'account'}
+        startIn={signInStart}
         onCreate={async (details) => {
           const out = await createAccount(details)
-          if (!out.needsConfirmation) {
-            record('remote', `Account made for ${details.email}`)
-            setSignIn(false)
-          }
+          if (out.needsConfirmation) return out
+          record('remote', `Account made for ${details.email}`)
+          /* Then the errand the sheet was opened for — connect this phone, or
+             turn the computer's phone remote on — as the sign-in would have. */
+          if (signIn === 'account') {
+            if (!isDemo()) setSignIn(false)
+            await afterAccount()
+          } else await signInSubmit(details)
           return out
         }}
         role={link.role}
@@ -4225,12 +4417,30 @@ export default function App() {
             user name and password after you are in the app on the demo", and
             these are its words.
           */}
-          {isDemo() && !link.account ? (
-            <Section key="account" title="Account" note="Not signed in on this device." defaultOpen>
+          {/*
+            AND THE WAY OUT, in the same place — the phone's Account section,
+            both halves of it. Signing out was four doors deep here: Settings,
+            Phone & computer, the Phone remote fold, then an Account fold
+            inside that. On the phone it is on this page, open. The computer
+            signed out keeps its own sign-in, the phone remote's, above.
+          */}
+          {signedInHere || isDemo() || link.role === 'remote' ? (
+            <Section
+              key="account"
+              title="Account"
+              note={signedInHere ? link.account.email : 'Not signed in on this device.'}
+              defaultOpen
+            >
               <div className="history-actions">
-                <button type="button" className="primary" onClick={() => setSignIn('account')} disabled={busy}>
-                  Sign in with an email and password
-                </button>
+                {signedInHere ? (
+                  <button type="button" className="chip" onClick={() => linkAction('signout')} disabled={busy}>
+                    Sign out on this device
+                  </button>
+                ) : (
+                  <button type="button" className="primary" onClick={() => setSignIn('account')} disabled={busy}>
+                    Sign in with an email and password
+                  </button>
+                )}
               </div>
             </Section>
           ) : null}
@@ -4444,9 +4654,8 @@ export default function App() {
           shows as paid on this page, through the account.
 
           The checkout itself is RevenueCat's, drawn over this page by the
-          library. Stripe marks it TEST MODE for as long as webPurchase.js is
-          on the sandbox key, which is how it ships until somebody has walked
-          through it.
+          library. It takes real cards: webPurchase.js is on the live key since
+          the sandbox checkout was walked through end to end.
         */}
         {setupPage === 'unlock' ? (
           <div className="setup-page">
@@ -4454,21 +4663,7 @@ export default function App() {
               {upLabel('unlock')}
             </button>
             <p className="setup-page-title">{SETUP_PAGES.unlock}</p>
-            <p className="device-meta">One payment, once</p>
-            <h3 className="unlock-head">Phone Remote</h3>
-            <p className="hint">
-              {`One-time payment unlocks the full version of this app, forever, including all future updates, on all supported Fractal devices: ${
-                DEMO_UNITS.slice(0, -1).map((u) => u.name).join(', ') + ' and ' + DEMO_UNITS[DEMO_UNITS.length - 1].name
-              }. Sign in with the same account on another phone or tablet and it is unlocked there too.`}
-            </p>
-            <p className="unlock-features">
-              You&rsquo;ll be able to control and switch presets, scenes, amp &amp; effects blocks,
-              tuner, tap tempo, setlists, and so much more.
-            </p>
-            {buySaid ? <p className="hint tone-bad">{buySaid}</p> : null}
-            <button type="button" className="primary unlock-buy" disabled={buying || !accountId} onClick={buyHere}>
-              {webPriceText ? `Unlock Full Version — ${webPriceText}` : 'Unlock Full Version'}
-            </button>
+            {unlockBody}
           </div>
         ) : null}
 
@@ -4511,6 +4706,7 @@ export default function App() {
                 status="The three-step setup, again"
                 onClick={() => {
                   setSheet(null)
+                  setWalkReplay(true)
                   setWalkthrough(true)
                 }}
               />

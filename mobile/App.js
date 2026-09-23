@@ -5,7 +5,8 @@ import { StatusBar } from 'expo-status-bar'
 
 import { color, font, space, isDark, loadMode, setSystemDark, themeVersion, watchTheme } from './src/lib/theme'
 import { haveSession, linkState, probeNow, startLink, stopLink, subscribeLink } from './src/lib/link'
-import { signOut } from './src/lib/relay'
+import { currentAccount, signOut } from './src/lib/relay'
+import { isPairAccount } from './src/lib/pairing'
 import Note from './src/components/Note'
 import TopBar from './src/components/TopBar'
 import DemoUnit from './src/components/DemoUnit'
@@ -599,7 +600,19 @@ export default function App() {
             {buying ? (
               <Paywall
                 asked
-                onSignIn={toSignIn}
+                /*
+                 * Out of the walkthrough as well as into the sign-in. toSignIn
+                 * alone set auth to 'out' and left the walkthrough standing —
+                 * it is drawn ahead of the sign-in screen — so the sheet closed
+                 * and nothing else happened: "Sign in with an email and
+                 * password" did nothing at all from here.
+                 */
+                onSignIn={() => {
+                  markWalkthrough()
+                  setSeenWalk(true)
+                  setReplaying(false)
+                  toSignIn()
+                }}
                 onUnlocked={() => {
                   setBuying(false)
                   markWalkthrough()
@@ -902,6 +915,22 @@ function Waking({ link }) {
     link.link === 'connected'
       ? 'Asking your unit what it is\u2026'
       : `Finding ${link.macName || 'your computer'}\u2026`
+  /*
+   * WHICH ACCOUNT THIS IS, while it looks. "Shouldn't we have it say when
+   * it's trying to connect, say, make sure you're connected to your computer
+   * using and then show the user's email address?" — the night the browser
+   * would not connect, it was signed in as a second account and nothing said
+   * so. Only while it is still finding the computer: once the computer has
+   * answered, the account was right.
+   */
+  const [email, setEmail] = useState(null)
+  useEffect(() => {
+    let live = true
+    currentAccount().then((a) => live && setEmail(a?.email && !isPairAccount(a.email) ? a.email : null))
+    return () => {
+      live = false
+    }
+  }, [])
   return (
     <View
       accessibilityLiveRegion="polite"
@@ -909,6 +938,12 @@ function Waking({ link }) {
     >
       <ActivityIndicator color={color.silkDim} />
       <Text style={{ color: color.silkDim, fontSize: font.body, textAlign: 'center' }}>{said}</Text>
+      {email && link.link !== 'connected' ? (
+        <Text style={{ color: color.silkFaint, fontSize: font.small, textAlign: 'center' }}>
+          {'Make sure you’re connected to your computer using '}
+          <Text style={{ color: color.silkDim, fontWeight: '700' }}>{email}</Text>.
+        </Text>
+      ) : null}
     </View>
   )
 }

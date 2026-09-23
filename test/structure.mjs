@@ -1959,7 +1959,9 @@ export function run(test) {
 
     // The phone gets a connect screen, not an error; the Mac keeps the notice.
     assert.match(src, /const showConnect =\s*\n\s*link\.role === 'remote' &&/, 'the connect screen is no longer keyed to the phone role')
-    assert.match(src, /\{showConnect \? \(\s*\n\s*<ConnectScreen/, 'the connect screen is no longer the phone’s screen when not connected')
+    assert.match(src, /(\{| : )showConnect \? \(\s*\n\s*<ConnectScreen/, 'the connect screen is no longer the phone’s screen when not connected')
+    /* Ahead of it, only the phone's own rule: signed in, not paid, the unlock first. */
+    assert.match(src, /\{mustPay \? \([\s\S]{0,2000}\) : showConnect \? \(/, 'something other than the unlock stands in front of the connect screen')
     assert.match(
       src,
       /if \(showConnect && status === 'live'\) \{\s*\n[^}]*setStatus\('fault'\)/,
@@ -3888,15 +3890,41 @@ export function run(test) {
      * decided to do purchases on the web, so yes, somebody should be able to
      * create an account on the web and desktops, and make purchases as well."
      *
-     * The form offers it only to a caller that hands it `onCreate`, and the
-     * one that does is the plain sign-in the unlock goes through.
+     * The form offers it only to a caller that hands it `onCreate`, and every
+     * sign-in hands it now. It was on the unlock's sign-in only, and the
+     * website's first screen had no way to make one: "Where is the sign-up
+     * button?" So the connect screen has a Create Account of its own, beside
+     * Sign in, and it opens the form already on making one.
      */
     const webForm = readFileSync(new URL('../src/components/SignIn.jsx', import.meta.url), 'utf8')
     assert.ok(!/remoteSignUp/.test(webForm), 'the form makes accounts itself rather than through its caller')
     assert.match(webForm, /mode === 'in' && onCreate \? \(/, 'the browser offers to make an account to a caller with nothing to sell')
     assert.match(webForm, /Forgot password\?/, 'the browser lost the reset it still needs')
     const sheet = readFileSync(new URL('../src/components/SignInSheet.jsx', import.meta.url), 'utf8')
-    assert.equal((sheet.match(/onCreate=\{onCreate\}/g) || []).length, 1, 'Create Account is on a sign-in other than the plain one')
+    assert.equal((sheet.match(/onCreate=\{onCreate\}/g) || []).length, 2, 'one of the sign-ins cannot make an account')
+    const connectScreen = readFileSync(new URL('../src/components/ConnectScreen.jsx', import.meta.url), 'utf8')
+    assert.match(connectScreen, /onClick=\{onCreateAccount\}[^>]*>\s*Create Account\s*</, 'the website’s first screen has no sign-up button')
+    assert.match(src, /onCreateAccount=\{\(\) => \{\s*setSignInStart\('up'\)/, 'Create Account opens the form on signing in instead')
+    assert.match(webForm, /useState\(onCreate && startIn === 'up' \? 'up' : 'in'\)/, 'the form ignores which button opened it')
+    /*
+     * A first-timer's way in is the big one. "When it says create account,
+     * it's in a very tiny font underneath where it says sign in. Most people
+     * coming here for the first time are going to be creating an account."
+     * And making one is answered on a screen of its own: "it didn't give me
+     * any confirmation that I need to check my email or that account was
+     * created."
+     */
+    assert.match(connectScreen, /<button className="primary" onClick=\{onCreateAccount\}/, 'Create Account is not the big button on the first screen')
+    assert.match(webForm, /className="chip signin-wide" onClick=\{\(\) => setMode\('up'\)\}/, 'the form’s Create Account is link-sized again')
+    assert.match(webForm, /if \(needsConfirmation\) setMode\('sent'\)/, 'a new account is told to check its email in a line under the buttons again')
+    assert.match(webForm, /if \(mode === 'sent'\) \{[\s\S]{0,400}Account made\.[\s\S]{0,200}Confirm it from the email we just sent, then sign in\./, 'the check-your-email screen lost the phone’s words')
+    assert.match(sheet, /title=\{making \? 'Create Account' : 'Sign in'\}/, 'the sheet says Sign in over a form making an account')
+    /* Create Account pressed by somebody who already has one signs them in —
+       never "Account made, check your email" for an email that will not come. */
+    const remoteLib = readFileSync(new URL('../src/lib/remote.js', import.meta.url), 'utf8')
+    const linkLib = readFileSync(new URL('../src/lib/link.js', import.meta.url), 'utf8')
+    assert.match(remoteLib, /const existing = Array\.isArray\(data\?\.user\?\.identities\) && data\.user\.identities\.length === 0/, 'an address that already has an account reads as a new one')
+    assert.match(linkLib, /if \(existing\) \{\s*try \{\s*await signInAccount\(\{ email, password \}\)/, 'Create Account with an existing account’s details does not sign them in')
     assert.match(src, /onCreate=\{async \(details\) => \{\s*const out = await createAccount\(details\)/, 'the browser cannot make an account on the way to the unlock')
 
     const native = readFileSync(new URL('../mobile/src/screens/SignIn.js', import.meta.url), 'utf8')
@@ -5144,8 +5172,19 @@ export function run(test) {
        button stopped merely advancing to the next step. */
     assert.equal(
       (app.match(/onSignIn=\{toSignIn\}/g) || []).length,
-      4,
-      'the sign-in route is no longer wired to Setup, the walkthrough and both unlock screens'
+      3,
+      'the sign-in route is no longer wired to Setup and both unlock screens'
+    )
+    /*
+     * The walkthrough's door goes through the same handler, and out of the
+     * walkthrough first. On toSignIn alone it did nothing visible: the
+     * walkthrough is drawn ahead of the sign-in screen, so setting auth to
+     * 'out' behind it changed nothing on screen.
+     */
+    assert.match(
+      app,
+      /onSignIn=\{\(\) => \{\s*markWalkthrough\(\)\s*setSeenWalk\(true\)\s*setReplaying\(false\)\s*toSignIn\(\)/,
+      'the walkthrough’s sign-in leaves the walkthrough standing again'
     )
     assert.match(app, /const toSignIn = \(\) => \{/, 'the sign-in route is gone')
     assert.match(app, /const toSignIn = \(\) => \{[^}]*setAuth\('out'\)/, 'it no longer lands on the sign-in screen')

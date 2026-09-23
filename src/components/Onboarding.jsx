@@ -62,7 +62,9 @@ export default function Onboarding({
   /** The relay's view — role, link, account. */
   link,
   /** Ask the computer to look for the unit again. */
-  onLookAgain
+  onLookAgain,
+  /** Open this computer's sign-in — what step 3 asks for. */
+  onSignIn
 }) {
   const [at, setAt] = useState('welcome')
 
@@ -254,6 +256,16 @@ export default function Onboarding({
             <p className="onb-waiting mono">{D4.waiting}</p>
             <p className="onb-note">{D4.note}</p>
             <div className="onb-acts">
+              {/*
+                The step says "Sign in on this computer." and, until now, gave
+                nothing to sign in with — only Skip. The sign-in it means is
+                the one Settings opens for the phone remote, so it is that one.
+              */}
+              {onSignIn && link?.link === 'signed-out' ? (
+                <button className="primary" onClick={onSignIn}>
+                  Sign in
+                </button>
+              ) : null}
               <button className="chip" onClick={finish}>
                 {D4.skip}
               </button>

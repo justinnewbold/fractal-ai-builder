@@ -26,8 +26,23 @@
  * save stays on the phone.
  */
 import { isPairAccount } from '../lib/link'
+import { P6 } from '../../shared/onboarding.mjs'
+import { DOWNLOADS_URL } from '../../mobile/src/lib/downloadLink'
 
-export default function ConnectScreen({ link, onConnect, onRetry, onSwitchAccount, onUnpair, onDemo, busy }) {
+export default function ConnectScreen({
+  link,
+  onConnect,
+  onRetry,
+  onSwitchAccount,
+  onCreateAccount,
+  onUnpair,
+  onDemo,
+  /* Somebody who has paid. The phone never offers them "Try the Demo" —
+     "if they are already signed in and the app is unlocked, instead of
+     saying try the demo, have it just say Demo." */
+  owned = false,
+  busy
+}) {
   const { link: state, account } = link
   const remembered = account?.email || null
   const paired = isPairAccount(remembered)
@@ -40,6 +55,7 @@ export default function ConnectScreen({ link, onConnect, onRetry, onSwitchAccoun
         <>
           <h2>Connecting…</h2>
           <p>Finding your computer.</p>
+          {account ? <Using email={remembered} paired={paired} /> : null}
         </>
       ) : state === 'no-answer' ? (
         <>
@@ -48,6 +64,7 @@ export default function ConnectScreen({ link, onConnect, onRetry, onSwitchAccoun
             Make sure the Fractal app is open on the computer and the computer is awake. This keeps trying on
             its own.
           </p>
+          <Using email={remembered} paired={paired} />
           <div className="connect-actions">
             <button className="primary" onClick={onRetry} disabled={busy}>
               Try now
@@ -56,6 +73,14 @@ export default function ConnectScreen({ link, onConnect, onRetry, onSwitchAccoun
               {paired ? 'Pair with a different computer' : 'Sign in as someone else'}
             </button>
           </div>
+          {/*
+            THE NEXT STEP FOR SOMEBODY NEW. A first-timer who has just made an
+            account and paid lands here, because there is no computer on the
+            other end yet — and this screen only said to check a computer
+            they have not set up. The connect screen's own line, and the
+            address the phone app gives for the same moment (Connect.js).
+          */}
+          <NoComputerYet />
         </>
       ) : (
         <>
@@ -85,16 +110,25 @@ export default function ConnectScreen({ link, onConnect, onRetry, onSwitchAccoun
                 any device, anywhere &mdash; not just at home.
               </p>
               <div className="connect-actions">
-                <button className="primary" onClick={onSwitchAccount} disabled={busy}>
+                {/*
+                  CREATE ACCOUNT FIRST, AND BIG. "Most people coming here for
+                  the first time are going to be creating an account, not
+                  signing in." It was the second button, the quiet one, and
+                  before that it was not here at all. Sign in is the second
+                  now, still a full button, for the person coming back.
+                */}
+                {onCreateAccount ? (
+                  <button className="primary" onClick={onCreateAccount} disabled={busy}>
+                    Create Account
+                  </button>
+                ) : null}
+                <button className={onCreateAccount ? 'chip' : 'primary'} onClick={onSwitchAccount} disabled={busy}>
                   Sign in
                 </button>
               </div>
             </>
           )}
-          <p className="hint">
-            Haven&rsquo;t set up the computer yet? Open this app on the computer, tap{' '}
-            <strong>Set up phone remote</strong>, and sign in with this same account.
-          </p>
+          <NoComputerYet />
 
           {/*
             THE SAME-WIFI BOX IS GONE, and it was the last way in that did not
@@ -147,8 +181,46 @@ export default function ConnectScreen({ link, onConnect, onRetry, onSwitchAccoun
         not a footnote to the other.
       */}
       <button type="button" className="connect-demo" onClick={onDemo} disabled={busy}>
-        Try the Demo
+        {owned ? 'Demo' : 'Try the Demo'}
       </button>
     </section>
+  )
+}
+
+/**
+ * WHICH ACCOUNT THIS IS, while it connects and when nothing answers.
+ *
+ * The likeliest reason nothing answers is a computer signed in as somebody
+ * else. "I am connected, both the android app and the Apple app connects just
+ * fine, so I'm not sure why this isn't connecting" — the browser was on a
+ * second account made that evening, and nothing on the screen said so.
+ *
+ * His words for it: "shouldn't we have it say when it's trying to connect,
+ * say, make sure you're connected to your computer using and then show the
+ * user's email address? Could probably save me some trouble… the more
+ * information we can provide the better."
+ */
+function Using({ email, paired }) {
+  if (!email || paired) return null
+  return (
+    <p className="hint">
+      Make sure you&rsquo;re connected to your computer using <strong>{email}</strong>.
+    </p>
+  )
+}
+
+/** "Haven't set up the computer yet?", with where to get it — the phone's address and its label. */
+function NoComputerYet() {
+  return (
+    <>
+      <p className="hint">
+        Haven&rsquo;t set up the computer yet? Open this app on the computer, tap{' '}
+        <strong>Set up phone remote</strong>, and sign in with this same account.
+      </p>
+      <p className="hint connect-address">
+        <span className="mono">{P6.address}</span>
+        <strong>{DOWNLOADS_URL}</strong>
+      </p>
+    </>
   )
 }

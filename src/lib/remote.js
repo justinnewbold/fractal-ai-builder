@@ -592,8 +592,16 @@ export async function remoteSignUp({ url, anonKey, email, password }) {
   const c = createClient(url || DEFAULT_PROJECT.url, anonKey || DEFAULT_PROJECT.anonKey)
   const { data, error } = await c.auth.signUp({ email, password })
   if (error) throw new Error(explainAuth(error.message))
+  /*
+   * An address that already has an account is not an error to the account
+   * service: it answers as if it had made one — a user with no identities
+   * and no session — so a stranger cannot learn which addresses are taken.
+   * Said here, so the form does not tell somebody coming back "Account made,
+   * check your email" for an email that will never arrive.
+   */
+  const existing = Array.isArray(data?.user?.identities) && data.user.identities.length === 0
   // Confirmation may be required, in which case there is no session yet.
-  return { needsConfirmation: !data?.session, userId: data?.user?.id || null }
+  return { needsConfirmation: !data?.session, existing, userId: data?.user?.id || null }
 }
 
 /**
