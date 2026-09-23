@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { ScrollView, Text, TextInput, View } from 'react-native'
 
-import { color, font, mono, radius, space, TAP } from '../lib/theme'
-import { Platform } from 'react-native'
+import { color, font, radius, space, TAP } from '../lib/theme'
+import { P6 } from '../lib/onboarding'
+import CopyAddress from '../components/CopyAddress'
 import Note from '../components/Note'
 import Press from '../components/Press'
-import { DOWNLOADS_URL, sendDownloadLink } from '../lib/downloadLink'
+import { sendDownloadLink } from '../lib/downloadLink'
 
 /**
  * How to get a computer on the other end of this — asked from a phone.
@@ -51,7 +52,6 @@ import { DOWNLOADS_URL, sendDownloadLink } from '../lib/downloadLink'
  * arm's length. The subtitle went with them: it promised "what it is", and
  * what it is has moved to the page that explains it.
  */
-const face = Platform.select(mono)
 
 export default function Connect({ onBack }) {
   const [email, setEmail] = useState('')
@@ -65,7 +65,7 @@ export default function Connect({ onBack }) {
     setSaid(null)
     const out = await sendDownloadLink(email)
     setBusy(false)
-    if (out.ok) setSaid(`Sent to ${email.trim()}.`)
+    if (out.ok) setSaid(P6.sent(email.trim()))
     else setError(out.message)
   }
 
@@ -102,19 +102,7 @@ export default function Connect({ onBack }) {
       <Text style={{ color: color.silkFaint, fontSize: font.small, letterSpacing: 1.2 }}>
         TYPE THIS ON YOUR COMPUTER · NOT ON THIS PHONE
       </Text>
-      <View
-        style={{
-          padding: space.md,
-          borderRadius: radius.md,
-          borderWidth: 1,
-          borderColor: color.rule,
-          backgroundColor: color.panel
-        }}
-      >
-        <Text selectable style={{ color: color.silk, fontSize: font.title, fontFamily: face }}>
-          {DOWNLOADS_URL}
-        </Text>
-      </View>
+      <CopyAddress size={font.lead} />
       <Note size={font.body}>
         That page has the Mac, Windows and Linux downloads, and the steps for each. The computer app
         is free.
@@ -151,7 +139,7 @@ export default function Connect({ onBack }) {
         height={TAP}
         onPress={mail}
       />
-      {said ? <Note>{said}</Note> : null}
+      {said ? <Note strong size={font.body}>{said}</Note> : null}
       {error ? <Note tone="fault">{error}</Note> : null}
     </ScrollView>
   )

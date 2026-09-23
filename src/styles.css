@@ -9230,6 +9230,28 @@ button.phone-chip.dim {
   letter-spacing: 0.12em;
   color: var(--silk-faint);
 }
+/* The address on a phone: a tap copies it, and the line under it says so. */
+.connect-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-1);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2);
+  background: var(--panel);
+  color: var(--silk);
+  font: inherit;
+  cursor: pointer;
+}
+.connect-copy span {
+  font-size: var(--f-1);
+  color: var(--silk-dim);
+}
+.connect-copy .connect-copied {
+  color: var(--signal);
+  font-weight: 700;
+}
 
 /*
  * The demo, as a button rather than a chip on the end of a question.
