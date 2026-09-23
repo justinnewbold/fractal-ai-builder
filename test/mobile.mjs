@@ -3167,7 +3167,11 @@ export function run(test) {
     /* The demo has nothing to wait for — it answers from memory — so waiting on
        it would be a spinner in front of a unit that is already there. */
     assert.match(flat, /!demo &&/, 'the demo is made to wait for a computer it does not have')
-    assert.match(flat, /\{settling && screen === 'stage' \? \( <Waking link=\{link\} \/>/, 'nothing is shown while the app waits')
+    assert.match(
+      flat,
+      /\{settling && screen === 'stage' \? \( <Waking link=\{link\} onRetry=\{probeNow\} \/>/,
+      'nothing is shown while the app waits'
+    )
 
     /*
      * BOUNDED ON BOTH SIDES. A waiting screen that can wait forever is worse
@@ -3189,6 +3193,37 @@ export function run(test) {
     /* It says which thing it is waiting for, not "Loading…" — the one a person
        can act on is usually the Mac. */
     assert.match(flat, /Finding \$\{link\.macName \|\| 'your computer'\}/, 'the wait does not say what it is waiting for')
+  })
+
+  test('the waiting screen stops just spinning after fifteen seconds', async () => {
+    /*
+     * "Been stuck on connecting screen for over a minute on iOS. How long
+     * until it times out and displays troubleshooting or refresh button. I
+     * usually force close."
+     *
+     * A join that fails goes back to joining, so the wait has no end of its
+     * own. After fifteen seconds it has to say what to check and give him
+     * something to press, on both ends.
+     */
+    const flat = read('mobile/App.js').replace(/\s+/g, ' ')
+    assert.match(flat, /const WAKING_LONG_MS = 15000/, 'the phone never says more than "Finding your computer"')
+    const waking = flat.slice(flat.indexOf('function Waking('))
+    assert.match(waking, /setTimeout\(\(\) => setLong\(true\), WAKING_LONG_MS\)/, 'the phone never says more')
+    assert.match(waking, /clearTimeout\(t\)/, 'the timer outlives the waiting screen')
+    assert.match(
+      waking,
+      /\{long && link\.link !== 'connected' \?/,
+      'the help shows while the unit is being asked, when the computer has already answered'
+    )
+    assert.match(waking, /Open the Fractal app on the computer and make sure the computer is awake\./, 'no advice on the phone')
+    assert.match(waking, /<Press label="Look for the computer again" onPress=\{\(\) => onRetry\?\.\(\)\} \/>/, 'no button on the phone')
+
+    const web = read('src/components/ConnectScreen.jsx').replace(/\s+/g, ' ')
+    assert.match(web, /if \(state !== 'joining'\) return undefined const t = setTimeout\(\(\) => setLong\(true\), 15000\)/, 'the browser never says more than Connecting')
+    const joining = web.slice(web.indexOf('<h2>Connecting…</h2>'), web.indexOf("state === 'no-answer'", web.indexOf('<h2>Connecting…</h2>')))
+    assert.match(joining, /\{long \?/, 'the browser shows its help at once rather than after a wait')
+    assert.match(joining, /Make sure the Fractal app is open on the computer and the computer is awake\./, 'no advice in the browser')
+    assert.match(joining, /onClick=\{onRetry\}[^>]*>\s*Try now/, 'no button in the browser')
   })
 
   test('the phone can teach somebody how to connect a computer', async () => {

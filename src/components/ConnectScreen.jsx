@@ -25,6 +25,7 @@
  * route at the bottom of this page, where nothing is signed into and what you
  * save stays on the phone.
  */
+import { useEffect, useState } from 'react'
 import { isPairAccount } from '../lib/link'
 import { P6 } from '../../shared/onboarding.mjs'
 import { DOWNLOADS_URL } from '../../mobile/src/lib/downloadLink'
@@ -46,6 +47,18 @@ export default function ConnectScreen({
   const { link: state, account } = link
   const remembered = account?.email || null
   const paired = isPairAccount(remembered)
+  /*
+   * "Connecting…" does not stand on its own for ever: after fifteen seconds it
+   * says what to check and offers Try now, as the phone's does. "Been stuck on
+   * connecting screen for over a minute… I usually force close."
+   */
+  const [long, setLong] = useState(false)
+  useEffect(() => {
+    setLong(false)
+    if (state !== 'joining') return undefined
+    const t = setTimeout(() => setLong(true), 15000)
+    return () => clearTimeout(t)
+  }, [state])
 
   return (
     <section className="connect" data-state={state}>
@@ -56,6 +69,19 @@ export default function ConnectScreen({
           <h2>Connecting…</h2>
           <p>Finding your computer.</p>
           {account ? <Using email={remembered} paired={paired} /> : null}
+          {long ? (
+            <>
+              <p className="hint">
+                Make sure the Fractal app is open on the computer and the computer is awake. This keeps
+                trying on its own.
+              </p>
+              <div className="connect-actions">
+                <button className="primary" onClick={onRetry} disabled={busy}>
+                  Try now
+                </button>
+              </div>
+            </>
+          ) : null}
         </>
       ) : state === 'no-answer' ? (
         <>
