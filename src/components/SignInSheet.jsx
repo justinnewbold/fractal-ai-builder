@@ -8,8 +8,28 @@ import SignIn from './SignIn'
  * it is "Connect to your Mac", because that is what the person is doing —
  * the account is the means. At the Mac it is "Set up phone remote", once.
  */
-export default function SignInSheet({ open, role, email, busy, onClose, onSubmit }) {
+export default function SignInSheet({ open, role, account = false, email, busy, onClose, onSubmit }) {
   const phone = role !== 'mac'
+  /*
+   * A sign-in with no errand: the account and nothing else, for the demo and
+   * for buying the unlock. The phone's words for it, not new ones — its
+   * form's button says "Sign in", and its sign-in screen says what an
+   * account is. (Its Setup button's "Sign in with an email and password"
+   * was the title here first, and ran off the edge of a phone.)
+   */
+  if (account) {
+    return (
+      <Sheet open={open} onClose={onClose} title="Sign in">
+        <div className="signin-sheet">
+          <p className="hint">
+            Sign in with the same account as the computer your unit is plugged into. Your setlists
+            and starred presets follow you to any device.
+          </p>
+          <SignIn email={email} busy={busy} autoFocus submitLabel="Sign in" onSubmit={onSubmit} />
+        </div>
+      </Sheet>
+    )
+  }
   return (
     <Sheet
       open={open}

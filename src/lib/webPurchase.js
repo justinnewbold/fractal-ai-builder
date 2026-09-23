@@ -31,9 +31,11 @@ export const PRODUCT_ID = 'cloud.newbold.fractalremote.full'
 export const ENTITLEMENT = 'full'
 
 /*
- * Loaded only when somebody opens the unlock page. The library brings Stripe's
- * checkout with it, and the main bundle is already past the size Vite warns
- * about — nobody who never buys should download a payment form.
+ * Loaded only when there is a price to show — somebody in the demo, or signed
+ * in and not yet paid — never as part of the main bundle. The library brings
+ * Stripe's checkout with it, and the main bundle is already past the size Vite
+ * warns about; somebody driving a rig they own should not download a payment
+ * form.
  */
 let sdk = null
 let instance = null
@@ -91,11 +93,41 @@ export async function checkUnlocked() {
   }
 }
 
+/*
+ * Who asks for the price before anybody has signed in.
+ *
+ * "When someone's on the demo, it should always say unlock, and then the
+ * price at the top." Most people in the demo are not signed in — the price is
+ * part of what makes them want to — and RevenueCat will not quote a price
+ * without somebody to quote it to. So a browser that has no account yet asks
+ * as an anonymous visitor, the kind RevenueCat makes for exactly this, kept
+ * in this browser so every visit is the same visitor rather than a new one.
+ *
+ * Only ever used to READ the price. The purchase itself still refuses to run
+ * without a signed-in account, so a card is never filed under a visitor.
+ */
+const VISITOR = 'fractal.webVisitor'
+async function visitorId() {
+  try {
+    const kept = window.localStorage.getItem(VISITOR)
+    if (kept) return kept
+  } catch {
+    /* Private window, blocked storage: a fresh visitor for this page is fine. */
+  }
+  const { Purchases } = await load()
+  const made = Purchases.generateRevenueCatAnonymousAppUserId()
+  try {
+    window.localStorage.setItem(VISITOR, made)
+  } catch {
+    /* Same as above. */
+  }
+  return made
+}
+
 /** What it costs here, as Stripe will charge it — or null when there is nothing to sell. */
 export async function webPrice(accountId) {
-  if (!accountId) return null
   try {
-    const p = await purchasesFor(accountId)
+    const p = await purchasesFor(accountId || (await visitorId()))
     const pkg = theUnlockIn(await p.getOfferings())
     return pkg?.webBillingProduct?.currentPrice?.formattedPrice || null
   } catch {

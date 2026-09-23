@@ -1066,6 +1066,27 @@ input[type='text']:focus-visible {
   }
 
   /*
+   * Except UNLOCK. In the demo the word is not a repeat of anything: it is
+   * the way to buy, and on a phone is exactly where somebody needs to find
+   * it. "When someone's on the demo, it should always say unlock, and then
+   * the price at the top."
+   */
+  .topbar[data-status='demo'] .topbar-how.is-unlock {
+    display: inline;
+  }
+
+  /*
+   * And the room for it comes from NO PHONE, which in the demo says nothing
+   * worth its width: nothing here is connected to anything, by design. The
+   * phone's bar makes the same trade — in the demo its one word is UNLOCK,
+   * and it does not also say the state of a link. Without it the unit's name
+   * was the thing squeezed, down to a single letter.
+   */
+  .topbar[data-unlock='yes'] .phone-link {
+    display: none;
+  }
+
+  /*
    * The name gets the room the bar is not using.
    *
    * "AXE-FX III cuts off. It looks like there's some room up there." Both
@@ -10223,6 +10244,56 @@ button.setup-back {
   text-decoration: underline;
   text-decoration-style: dotted;
   text-underline-offset: 3px;
+}
+
+/*
+ * UNLOCK, as the phone draws it: the status word's own face, in amber, the
+ * colour that says "this is the thing to do" everywhere else in the bar. No
+ * underline — the price pill right beside it already says this goes
+ * somewhere, and the phone's has none.
+ */
+.topbar-how.is-unlock {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: var(--f-1);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--signal);
+}
+
+/*
+ * The demo's pill: the price beside UNLOCK, or Exit demo for somebody who
+ * has paid. Filled amber, as on the phone — it is the one thing in this bar
+ * anybody is being asked to DO, and an outline would read as one more label.
+ */
+.topbar-pill {
+  /* The button is the touch target and keeps the 44px floor on a phone; the
+     amber face inside it is what the eye sees, so the pill can be pill-sized
+     without being a miss under a thumb. */
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.topbar-pill-face {
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--r-3);
+  background: var(--signal);
+  color: var(--on-signal);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: var(--f-1);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.topbar-pill:hover .topbar-pill-face,
+.topbar-pill:active .topbar-pill-face {
+  background: var(--signal-wash);
+  color: var(--signal);
 }
 
 /* Where the two store squares sit. Side by side with room, stacking on a

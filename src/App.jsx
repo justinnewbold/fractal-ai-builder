@@ -137,6 +137,7 @@ import {
   reconnectPhone,
   disconnectPhone,
   setUpMac,
+  signInAccount,
   isPairAccount,
   setMacRemote,
   signOutHere,
@@ -844,6 +845,8 @@ export default function App() {
    * in it means the Mac answered, never merely that a channel was joined.
    */
   const [link, setLink] = useState(() => linkState())
+    /* false, true for the sign-in this end's role calls for, or 'account'
+       for a sign-in with no errand attached — see signInAccount. */
     const [signIn, setSignIn] = useState(false)
   /*
    * Whether the phone has ever had the Mac answer this session. A blip after
@@ -1737,20 +1740,60 @@ export default function App() {
    * unpaid — there is nobody for a purchase to belong to.
    */
   const accountId = link.account?.id || null
+  /*
+   * `for` says whose answer this is. Signing in changes the account a render
+   * before the question has been put again, and without it the answer that
+   * belonged to nobody — not paid — reads for a moment as the new account's.
+   */
   useEffect(() => {
     let live = true
     if (!accountId) {
-      setPaid({ checked: true, unlocked: false })
-      setWebPriceText(null)
-      return undefined
+      setPaid({ checked: true, unlocked: false, for: null })
+      /* The demo shows the price to somebody not signed in: see TopBar. */
+      if (isDemo()) webPrice(null).then((price) => live && setWebPriceText(price))
+      else setWebPriceText(null)
+      return () => {
+        live = false
+      }
     }
     setPaid((p) => ({ ...p, checked: false }))
-    checkUnlocked().then((out) => live && setPaid({ checked: true, unlocked: out.unlocked }))
+    checkUnlocked().then((out) => live && setPaid({ checked: true, unlocked: out.unlocked, for: accountId }))
     webPrice(accountId).then((price) => live && setWebPriceText(price))
     return () => {
       live = false
     }
   }, [accountId])
+
+  /*
+   * UNLOCK in the demo's top bar, and the price beside it.
+   *
+   * "When someone's on the demo, it should always say unlock, and then the
+   * price at the top? Otherwise, how's a user supposed to know how to go to
+   * settings to sign in?"
+   *
+   * A purchase here has to belong to an account, so somebody not signed in
+   * is asked to sign in first and lands on the unlock page the moment they
+   * have — one press from the bar to the checkout, with the sign-in on the
+   * way rather than a hunt through Settings for it. Somebody who turns out
+   * to have paid already, on a phone, is not shown the unlock page at all.
+   */
+  const [unlockAfterSignIn, setUnlockAfterSignIn] = useState(false)
+  const openUnlock = () => {
+    if (accountId) {
+      setSheet('settings')
+      setSetupPage('unlock')
+      return
+    }
+    setUnlockAfterSignIn(true)
+    setSignIn('account')
+  }
+  useEffect(() => {
+    if (!unlockAfterSignIn || !accountId || paid.for !== accountId || !paid.checked) return
+    setUnlockAfterSignIn(false)
+    if (paid.unlocked) return
+    setSheet('settings')
+    setSetupPage('unlock')
+  }, [unlockAfterSignIn, accountId, paid])
 
   const buyHere = async () => {
     setBuying(true)
@@ -1758,8 +1801,16 @@ export default function App() {
     const out = await buyOnWeb({ accountId, email: link.account?.email })
     setBuying(false)
     if (out.ok) {
-      setPaid({ checked: true, unlocked: true })
+      setPaid({ checked: true, unlocked: true, for: accountId })
       setSetupPage(null)
+      /*
+       * Buying ends the demo, as it does on the phone. A reload, because
+       * which end this is was decided when the page loaded — see leave-demo.
+       */
+      if (isDemo()) {
+        setDemo(false)
+        window.location.reload()
+      }
       return
     }
     if (!out.cancelled) setBuySaid(out.message)
@@ -1826,7 +1877,10 @@ export default function App() {
   /** The sign-in sheet's submit: the same form does a different job per role. */
   const signInSubmit = useCallback(
     async ({ email, password }) => {
-      if (linkState().role === 'mac') {
+      if (signIn === 'account') {
+        await signInAccount({ email, password })
+        record('remote', `Signed in as ${email}`)
+      } else if (linkState().role === 'mac') {
         await setUpMac({ email, password })
         record('remote', `Phone remote set up for ${email}`)
       } else {
@@ -1835,7 +1889,7 @@ export default function App() {
       }
       setSignIn(false)
     },
-    [record]
+    [record, signIn]
   )
 
   /** Do at the Mac what the phone asked for, and say so at both ends. */
@@ -2961,6 +3015,11 @@ export default function App() {
               setSetupPage('phone')
             }}
             status={status}
+        /* In the demo: UNLOCK and the price for somebody who has not paid,
+           Exit demo for somebody who has. As on the phone. */
+        onUnlock={isDemo() && paid.checked && !paid.unlocked ? openUnlock : null}
+        unlockPrice={webPriceText}
+        onExitDemo={isDemo() && paid.unlocked ? () => linkAction('leave-demo') : null}
         device={device}
         faultReason={faultReason}
         preset={preset}
@@ -3590,11 +3649,16 @@ export default function App() {
       />
 
       <SignInSheet
-        open={signIn}
+        open={Boolean(signIn)}
+        account={signIn === 'account'}
         role={link.role}
         email={[link.account?.email, loadRemoteConfig()?.email].find((e) => e && !isPairAccount(e)) || ''}
         busy={busy}
-        onClose={() => setSignIn(false)}
+        onClose={() => {
+          setSignIn(false)
+          /* Closed without signing in: nobody is waiting for the unlock page. */
+          setUnlockAfterSignIn(false)
+        }}
         onSubmit={signInSubmit}
       />
 
@@ -4128,6 +4192,23 @@ export default function App() {
             */}
             <PhoneRemote link={link} onAction={linkAction} onError={setError} error={error} busy={busy} />
           </Section>
+          {/*
+            THE WAY IN, FROM THE DEMO. "There's actually no place to even sign
+            in anywhere on the web app." In the demo the panel above says the
+            phone remote is not part of it, and that was the whole page. The
+            phone's Setup has had this since "there is no way to login with
+            user name and password after you are in the app on the demo", and
+            these are its words.
+          */}
+          {isDemo() && !link.account ? (
+            <Section key="account" title="Account" note="Not signed in on this device." defaultOpen>
+              <div className="history-actions">
+                <button type="button" className="primary" onClick={() => setSignIn('account')} disabled={busy}>
+                  Sign in with an email and password
+                </button>
+              </div>
+            </Section>
+          ) : null}
           {/*
             How to get a computer on the other end at all, which is the
             question somebody has when there is nothing on the other end.

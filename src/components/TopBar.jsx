@@ -34,6 +34,12 @@ export default function TopBar({
   device,
   /* Where the DEMO word goes when there is one. See below. */
   onGetPhoneApp,
+  /* In the demo, for somebody who has not paid: the unlock, and what it
+     costs. Null when there is nothing to sell them. */
+  onUnlock = null,
+  unlockPrice = null,
+  /* In the demo, for somebody who HAS paid: the way back to their own rig. */
+  onExitDemo = null,
   /* Which kind of fault this is, so the word beside the lamp is about the
      thing that is actually missing. See describeUnit. */
   faultReason = null,
@@ -98,8 +104,19 @@ export default function TopBar({
    * the state of the link — connected, no answer — so the bar does not say it
    * twice; here the word is about the unit.
    */
+  /*
+   * In the demo the word is UNLOCK for anybody who has not paid — the phone's
+   * rule, and his: "when someone's on the demo, it should always say unlock,
+   * and then the price at the top". Somebody who owns it still reads DEMO,
+   * with Exit demo beside it, because offering an unlock to a person who has
+   * paid sends them to a page with nothing on it for them.
+   */
+  const canBuy = demo && Boolean(onUnlock)
+  const canLeave = demo && !canBuy && Boolean(onExitDemo)
   const how = demo
-    ? 'demo'
+    ? canBuy
+      ? 'unlock'
+      : 'demo'
     : remote
       ? ''
       : status === 'live'
@@ -121,7 +138,11 @@ export default function TopBar({
   const presetInBar = status === 'live' && showPreset
 
   return (
-    <div className="topbar" data-status={lampState} data-preset={presetInBar ? 'yes' : 'no'}>
+    <div className="topbar"
+      data-status={lampState}
+      data-preset={presetInBar ? 'yes' : 'no'}
+      data-unlock={canBuy ? 'yes' : 'no'}
+    >
       <div className="topbar-row">
         <span className="lamp" data-state={lampState} />
         {/*
@@ -143,21 +164,31 @@ export default function TopBar({
           IN THE DEMO THE WORD IS A BUTTON, and it goes somewhere this app can
           actually deliver.
 
-          "Make it so demo can be clicked to bring up the unlock page." On the
-          phone that is exactly what it does. HERE it cannot: this app has no
-          purchase in it and never will — the unlock is an in-app purchase,
-          which means Apple's and Google's, which means it happens on a phone.
-          A Buy button on a Mac would be a button that cannot take money.
+          "Make it so demo can be clicked to bring up the unlock page." This
+          end could not, once: the unlock was only ever an in-app purchase on
+          a phone. It can now — the browser and the computer app take a card
+          through Web Billing (lib/webPurchase.js) — so for somebody who has
+          not paid the word reads UNLOCK and does exactly what the phone's
+          does, with the price in a pill beside it.
 
-          What this end CAN do is hand somebody the phone app, which is the
-          thing being sold. So DEMO opens that: what the remote does, what it
-          costs, and a square to point a camera at.
+          Where it still reads DEMO — the answer about paying not in yet, or
+          nothing to sell — it hands somebody the phone app instead: what the
+          remote does, what it costs, and a square to point a camera at.
 
           Outside the demo the same word reads CONNECTED or FINDING, means
           nothing of the sort, and stays a plain label rather than becoming a
           control that would surprise somebody mid-set.
         */}
-        {how && demo && onGetPhoneApp ? (
+        {canBuy ? (
+          <button
+            className="topbar-how is-button is-unlock" data-state={lampState}
+            onClick={onUnlock}
+            title={demoSentence(demoUnit())}
+            aria-label="Unlock the full version"
+          >
+            {how}
+          </button>
+        ) : how && demo && onGetPhoneApp ? (
           <button
             className="topbar-how is-button" data-state={lampState}
             onClick={onGetPhoneApp}
@@ -179,6 +210,24 @@ export default function TopBar({
           >
             {how}
           </span>
+        ) : null}
+
+        {/*
+          The pill beside the word, the same one the phone draws in the same
+          place. For somebody who has not paid it carries the price and
+          nothing else — UNLOCK $9.99 reading across the two, rather than the
+          same verb twice in half an inch. For somebody who has, it is the way
+          out of the demo, in his words: "have it just clearly say exit demo
+          if they're in the demo and they've already paid."
+        */}
+        {canBuy && unlockPrice ? (
+          <button className="topbar-pill" onClick={onUnlock} aria-label="Unlock the full version">
+            <span className="topbar-pill-face">{unlockPrice}</span>
+          </button>
+        ) : canLeave ? (
+          <button className="topbar-pill" onClick={onExitDemo} aria-label="Exit demo">
+            <span className="topbar-pill-face">Exit demo</span>
+          </button>
         ) : null}
 
         {/* The preset is a button because it's the thing you change most, and
