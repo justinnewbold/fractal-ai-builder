@@ -440,6 +440,12 @@ export default function App() {
   const [walkthrough, setWalkthrough] = useState(() => !onboarded())
   /* Opened again from Settings, which is when the phone's walkthrough offers a way out at the top. */
   const [walkReplay, setWalkReplay] = useState(false)
+  /*
+   * On the computer, whether the walkthrough has moved on from its phone-style
+   * welcome and choice to the computer's own plug-in steps — which is where
+   * "Use it on this computer" goes.
+   */
+  const [computerSetup, setComputerSetup] = useState(false)
   useEffect(() => {
     if (walkthrough) markOnboarded()
   }, [walkthrough])
@@ -1920,6 +1926,27 @@ export default function App() {
     if (out.ok) {
       setPaid({ checked: true, unlocked: true, for: accountId })
       /*
+       * On the computer, what was bought is the phone remote, so it comes on
+       * now. The server is asked first, which writes the purchase where the
+       * relay reads it; then the host is switched on. If this computer's
+       * device server was never signed in, the one sheet that does that opens
+       * instead — "Set up phone remote", with the email filled in.
+       */
+      if (!isDemo() && linkState().role === 'mac') {
+        await checkUnlocked()
+        try {
+          await setMacRemote(true)
+          record('remote', 'Phone remote turned on after the unlock')
+          setSetupPage(null)
+          setSheet(null)
+        } catch {
+          setSetupPage(null)
+          setSheet(null)
+          setSignIn(true)
+        }
+        return
+      }
+      /*
        * Buying ends the demo, as it does on the phone. A reload, because
        * which end this is was decided when the page loaded — see leave-demo.
        * Before the page is put away, not after: moving the sheet steps the
@@ -2006,7 +2033,26 @@ export default function App() {
         await afterAccount()
         return
       } else if (linkState().role === 'mac') {
-        await setUpMac({ email, password })
+        try {
+          await setUpMac({ email, password })
+        } catch (err) {
+          /*
+           * SIGNED IN, BUT NOT UNLOCKED. "It gave that error… realtime
+           * CHANNEL_ERROR… no way to unlock it at that point." The relay only
+           * lets an account that has bought the phone remote through, so the
+           * phone remote cannot come on — and what that needs is the unlock,
+           * not an error. The sign-in stands; the unlock page opens (see
+           * unlockAfterSignIn), and buying it turns the phone remote on
+           * (buyHere).
+           */
+          if (err?.code !== 'not-unlocked') throw err
+          record('remote', `Signed in as ${email}; the phone remote needs the unlock`)
+          setSignIn(false)
+          setWalkthrough(false)
+          setComputerSetup(false)
+          setUnlockAfterSignIn(true)
+          return
+        }
         record('remote', `Phone remote set up for ${email}`)
       } else {
         await connectPhone({ email, password })
@@ -3833,21 +3879,33 @@ export default function App() {
         phone app's own, and nobody gets either until the page knows which end
         it is, so the wrong one never flashes up first.
       */}
+      {/*
+        THE COMPUTER GETS THE PHONE'S WELCOME TOO. "Make sure that the desktop
+        apps have been updated with all of the new features and icons and
+        screens that we created for the phones, but it needs to be desktop
+        related." The same welcome and the same three pieces, and at the
+        choice three ways in — use it here, the demo, or the phone remote's
+        unlock. "Use it here" hands over to the computer's own steps below.
+      */}
       <PhoneWalkthrough
-        open={walkthrough && phoneEnd}
+        open={walkthrough && (phoneEnd || (computerEnd && !computerSetup))}
         replay={walkReplay}
+        computer={computerEnd}
         onClose={() => {
           setWalkthrough(false)
           setWalkReplay(false)
         }}
-        onAccount={() => linkAction('connect')}
+        onAccount={() => linkAction(computerEnd ? 'mac-setup' : 'connect')}
         onUnlock={openUnlock}
+        onHere={() => setComputerSetup(true)}
       />
       <Onboarding
-        open={walkthrough && computerEnd}
+        open={walkthrough && computerEnd && computerSetup}
+        start="unit"
         onClose={() => {
           setWalkthrough(false)
           setWalkReplay(false)
+          setComputerSetup(false)
         }}
         device={device}
         status={status}
@@ -3855,6 +3913,8 @@ export default function App() {
         link={link}
         onLookAgain={() => read()}
         onSignIn={() => linkAction('mac-setup')}
+        paid={answeredFor ? paid.unlocked : null}
+        onUnlock={openUnlock}
       />
 
       <SignInSheet
@@ -4764,6 +4824,7 @@ export default function App() {
                 onClick={() => {
                   setSheet(null)
                   setWalkReplay(true)
+                  setComputerSetup(false)
                   setWalkthrough(true)
                 }}
               />

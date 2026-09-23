@@ -64,15 +64,26 @@ export default function Onboarding({
   /** Ask the computer to look for the unit again. */
   onLookAgain,
   /** Open this computer's sign-in — what step 3 asks for. */
-  onSignIn
+  onSignIn,
+  /**
+   * Where to open. The computer's welcome is the phone-style one now
+   * (PhoneWalkthrough, `computer`), and "Use it here" there hands over to
+   * these steps at the unit — so they open at 'unit', not at their own
+   * welcome.
+   */
+  start = 'welcome',
+  /** Whether the account signed in here has the unlock, once known: true, false or null. */
+  paid = null,
+  /** Open the unlock — offered on step 3 to an account signed in without it. */
+  onUnlock
 }) {
-  const [at, setAt] = useState('welcome')
+  const [at, setAt] = useState(start)
 
   /* Back to the start when it is asked for again from Settings. Reopening on
      the last screen is a small thing that makes it feel broken. */
   useEffect(() => {
-    if (open) setAt('welcome')
-  }, [open])
+    if (open) setAt(start)
+  }, [open, start])
 
   const paired = link?.link === 'connected'
 
@@ -255,7 +266,11 @@ export default function Onboarding({
               see it.
             */}
             <p className="onb-note">{D4.owned}</p>
-            <p className="onb-waiting mono">{D4.waiting}</p>
+            {link?.account?.email && paid === false ? (
+              <p className="onb-note">{D4.notUnlocked(link.account.email)}</p>
+            ) : (
+              <p className="onb-waiting mono">{D4.waiting}</p>
+            )}
             <p className="onb-note">{D4.note}</p>
             <div className="onb-acts">
               {/*
@@ -266,6 +281,16 @@ export default function Onboarding({
               {onSignIn && link?.link === 'signed-out' ? (
                 <button className="primary" onClick={onSignIn}>
                   Sign in
+                </button>
+              ) : null}
+              {/*
+                SIGNED IN WITHOUT THE UNLOCK: say so, and offer it. The relay
+                refuses an account that has not bought the phone remote, so
+                "Waiting for your phone…" would wait for ever.
+              */}
+              {onUnlock && link?.account?.email && paid === false ? (
+                <button className="primary" onClick={() => { finish(); onUnlock() }}>
+                  {D4.unlock}
                 </button>
               ) : null}
               <button className="chip" onClick={finish}>

@@ -3208,7 +3208,7 @@ export function run(test) {
     assert.match(web, /import welcomeShot from '\.\.\/\.\.\/mobile\/assets\/welcome\/fm3\.jpg'/, 'his photograph is not on the first screen')
     assert.ok(statSync(fileURLToPath(new URL('../mobile/assets/welcome/fm3.jpg', import.meta.url))).size < 300000, 'the photograph is too heavy for a phone on a signal')
     const flat = web.replace(/\s+/g, ' ')
-    for (const piece of ['className="pw-welcome-shot"', '{P1.head}', '{P1.sub}', 'P1.features.map', '{P1.go}', '{P1.haveCode}']) {
+    for (const piece of ['className="pw-welcome-shot"', '{P1.head}', 'computer ? C3.welcomeSub : P1.sub', 'P1.features.map', '{P1.go}', '{P1.haveCode}']) {
       assert.ok(flat.includes(piece), `the first screen lost ${piece}`)
     }
     assert.ok(!/official remote app/i.test(web + read('shared/onboarding.mjs')), 'THE OFFICIAL REMOTE APP is on the screen')

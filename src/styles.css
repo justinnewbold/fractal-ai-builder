@@ -10966,6 +10966,11 @@ button.setup-back {
 .pw-welcome .chip.pw-go {
   border-radius: var(--r-3);
 }
+/* A chip in the walkthrough is a full button, the primary's size — `.chip`
+   alone would draw it in the small type of a filter pill. */
+.pw-sheet .chip.pw-go {
+  font-size: var(--f-4);
+}
 /* The disclaimer at the foot, small and quiet. */
 .pw-welcome-notice {
   margin: var(--s-2) 0 0;

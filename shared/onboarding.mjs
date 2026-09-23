@@ -174,7 +174,52 @@ export const D4 = {
    * Nothing here is being withheld, and somebody who has not bought it yet is
    * not doing anything wrong by scanning.
    */
-  owned: 'If you’ve bought the phone app, sign in on it with this same account and it will connect. The phone checks — it will say so if it isn’t unlocked yet.'
+  owned: 'If you’ve bought the phone app, sign in on it with this same account and it will connect. The phone checks — it will say so if it isn’t unlocked yet.',
+  /*
+   * THE UNLOCK, ON THE STEP THAT NEEDS IT. MY WORDING. "There needs to be a
+   * clear way to unlock it from the beginning… It needs to be part of the
+   * onboarding process." The phone remote is what the purchase buys, so a
+   * computer signed in without one is offered it here rather than left
+   * waiting for a phone that the relay will never let through.
+   */
+  unlock: 'Unlock the phone remote',
+  notUnlocked: (email) =>
+    `${email} hasn’t unlocked the phone remote yet. This computer app is free to use on its own; the phone remote is the one-time unlock.`
+}
+
+/**
+ * C3 — the computer app's own choice screen.
+ *
+ * "It's not showing any unlock options, basically in the beginning… I didn't
+ * see any demo options whatsoever. If they just wanna look around. It's
+ * totally fine that they can control the Mac app without any other login or
+ * anything… But there needs to be a clear way to unlock it from the beginning
+ * or try a demo or just use the Mac app without the phone."
+ *
+ * So the computer gets the phone's walkthrough — the welcome, the three pieces
+ * — and at the choice, three cards where the phone has two: use it here, try
+ * the demo, or unlock the phone remote. The demo's title and button, and the
+ * box to tick before Unlock, are the phone's own (P3). MY WORDING otherwise;
+ * he can change any of it.
+ */
+export const C3 = {
+  /* The welcome's line under the heading, on the computer: the heading is
+     his, and the phone is still the point, but this app works here too. */
+  welcomeSub: 'Presets, scenes, blocks, tuner and tap tempo - on this computer, or on the phone in your pocket.',
+  sub: 'Use it right here, try the demo, or add your phone as the remote.',
+  here: {
+    eyebrow: 'ON THIS COMPUTER',
+    title: 'Use it on this computer',
+    body: 'Plug your Fractal into this computer with a USB cable and control it right here. Free, with nothing to sign in to.',
+    go: 'Use it here'
+  },
+  demoBody: 'Use a simulated Fractal unit. Every screen works, with nothing plugged in.',
+  phone: {
+    eyebrow: 'ADD YOUR PHONE',
+    title: 'Use your phone as the remote',
+    body: 'Presets, scenes, blocks, tuner and tap tempo from your pocket, anywhere. A one-time unlock.',
+    go: 'Unlock'
+  }
 }
 
 /** The three things worth knowing, said once at the end of each walkthrough. */
