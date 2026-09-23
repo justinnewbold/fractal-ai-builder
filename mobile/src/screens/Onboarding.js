@@ -49,6 +49,8 @@ const face = Platform.select(mono)
 export default function Onboarding({ onEnterDemo, onAccount, onUnlock, replay, onClose }) {
   const [at, setAt] = useState('welcome')
   const [unit, setUnit] = useState(UNITS[0].key)
+  /* The box under Connect my real rig. Unlock stays grey until it is ticked. */
+  const [agreed, setAgreed] = useState(false)
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [said, setSaid] = useState(null)
@@ -266,7 +268,8 @@ export default function Onboarding({ onEnterDemo, onAccount, onUnlock, replay, o
                 one glyph is the wrong trade — the card's own lock, above
                 right, already says it.
             */}
-            <Press label={P3.real.go} height={TAP} onPress={() => onUnlock?.()} />
+            <Agree on={agreed} label={P3.real.agree} onPress={() => setAgreed((v) => !v)} />
+            <Press label={P3.real.go} height={TAP} disabled={!agreed} onPress={() => agreed && onUnlock?.()} />
           </Choice>
 
           {/*
@@ -770,5 +773,41 @@ function Field({ mono: isMono, ...rest }) {
         backgroundColor: color.panel
       }}
     />
+  )
+}
+
+/**
+ * The tick box Unlock waits on: a square that fills when it is on, and the
+ * sentence beside it pressable too, since that is the bigger target. The
+ * checkbox role, so a screen reader says "checked" rather than "selected".
+ */
+function Agree({ on, label, onPress }) {
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: !!on }}
+      accessibilityLabel={label}
+      onPress={() => {
+        tick()
+        onPress?.()
+      }}
+      style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.md, paddingVertical: space.xs }}
+    >
+      <View
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: radius.sm,
+          borderWidth: on ? 0 : 1,
+          borderColor: color.silkFaint,
+          backgroundColor: on ? color.signal : color.panel,
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        {on ? <Text style={{ color: color.onSignal, fontSize: font.body, fontWeight: '700' }}>✓</Text> : null}
+      </View>
+      <Text style={{ flex: 1, color: color.silk, fontSize: font.small, lineHeight: font.small * 1.5 }}>{label}</Text>
+    </Pressable>
   )
 }

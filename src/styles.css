@@ -10890,6 +10890,28 @@ button.setup-back {
   font-size: var(--f-3);
   line-height: 1.45;
 }
+/* The box Unlock waits on. The sentence is part of the label, so pressing
+   the words ticks it too. */
+.pw-agree {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  color: var(--silk);
+  font-size: var(--f-3);
+  line-height: 1.45;
+  cursor: pointer;
+}
+.pw-agree input {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 2px 0 0;
+  accent-color: var(--signal);
+}
+.pw-go:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .pw-unit-shot {
   flex: 0 0 auto;
   width: 132px;

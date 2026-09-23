@@ -3195,6 +3195,30 @@ export function run(test) {
     assert.match(flat, /Finding \$\{link\.macName \|\| 'your computer'\}/, 'the wait does not say what it is waiting for')
   })
 
+  test('Unlock waits for the box saying a computer and a USB cable are needed', async () => {
+    /*
+     * "On the unlock part of this can we add a disclaimer question that
+     * says… I understand this app requires a computer connected to my
+     * Fractal unit via USB cable for the Fractal Remote app to work. With a
+     * checkbox that must be selected to select the unlock button?"
+     */
+    const { P3 } = await import('../shared/onboarding.mjs')
+    assert.equal(
+      P3.real.agree,
+      'I understand this app requires a computer connected to my Fractal unit via USB cable for the Fractal Remote app to work.',
+      'the sentence is not his'
+    )
+    const phone = read('mobile/src/screens/Onboarding.js').replace(/\s+/g, ' ')
+    assert.match(phone, /const \[agreed, setAgreed\] = useState\(false\)/, 'the phone’s box starts ticked, or is not there')
+    assert.match(phone, /<Agree on=\{agreed\} label=\{P3\.real\.agree\}/, 'the phone draws no box')
+    assert.match(phone, /<Press label=\{P3\.real\.go\} height=\{TAP\} disabled=\{!agreed\}/, 'the phone’s Unlock presses before the box is ticked')
+    assert.match(phone, /accessibilityRole="checkbox"/, 'a screen reader cannot tell the phone’s box is a box')
+    const web = read('src/components/PhoneWalkthrough.jsx').replace(/\s+/g, ' ')
+    assert.match(web, /const \[agreed, setAgreed\] = useState\(false\)/, 'the browser’s box starts ticked, or is not there')
+    assert.match(web, /<input type="checkbox" checked=\{agreed\}/, 'the browser draws no box')
+    assert.match(web, /disabled=\{!agreed\} onClick=\{\(\) => agreed && leave\(onUnlock\)\}/, 'the browser’s Unlock presses before the box is ticked')
+  })
+
   test('EDIT splits a block into the pages Fractal’s editor uses', async () => {
     /*
      * "Splitting EDIT's long list of controls into pages, like Fractal's own
@@ -8204,7 +8228,7 @@ export function run(test) {
     /* And buying from there claims the purchase onto an account rather than
        leaving it on the handset — see linkAccount on SignIn's onSignedIn. */
     assert.match(walk, /onUnlocked=\{\(\) => \{[\s\S]{0,200}setAuth\('out'\)/, 'a purchase made in the walkthrough is left unattached to an account')
-    assert.match(read('mobile/src/screens/Onboarding.js'), /onPress=\{\(\) => onUnlock\?\.\(\)\}/, 'the Unlock card still advances the walkthrough instead of selling')
+    assert.match(read('mobile/src/screens/Onboarding.js'), /onPress=\{\(\) => agreed && onUnlock\?\.\(\)\}/, 'the Unlock card still advances the walkthrough instead of selling')
 
     /* The fourth is the word DEMO itself, inside the bar. */
     const bar = read('mobile/src/components/TopBar.js')

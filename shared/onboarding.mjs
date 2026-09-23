@@ -289,7 +289,21 @@ export const P3 = {
      * string rather than a function of the store's price. The price still
      * belongs on P8, which IS the paywall.
      */
-    go: 'Unlock'
+    go: 'Unlock',
+    /*
+     * THE BOX THAT HAS TO BE TICKED BEFORE UNLOCK WILL PRESS. His words:
+     * "On the unlock part of this can we add a disclaimer question that
+     * says… I understand this app requires a computer connected to my
+     * Fractal unit via USB cable for the Fractal Remote app to work. With a
+     * checkbox that must be selected to select the unlock button?"
+     *
+     * Somebody who pays expecting the phone to reach the unit on its own has
+     * paid for something this app does not do, and the whole arrangement is
+     * the three pieces the screen before this one drew. This makes them say
+     * they have read it before the store's sheet ever opens.
+     */
+    agree:
+      'I understand this app requires a computer connected to my Fractal unit via USB cable for the Fractal Remote app to work.'
   },
   /*
    * THE TWO WAYS BACK IN, UNDER ONE QUESTION.
