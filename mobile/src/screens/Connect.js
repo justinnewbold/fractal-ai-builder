@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ScrollView, Text, TextInput, View } from 'react-native'
 
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
+import { P6 } from '../lib/onboarding'
 import { Platform } from 'react-native'
 import Note from '../components/Note'
 import Press from '../components/Press'
@@ -65,7 +66,7 @@ export default function Connect({ onBack }) {
     setSaid(null)
     const out = await sendDownloadLink(email)
     setBusy(false)
-    if (out.ok) setSaid(`Sent to ${email.trim()}.`)
+    if (out.ok) setSaid(P6.sent(email.trim()))
     else setError(out.message)
   }
 
@@ -151,7 +152,7 @@ export default function Connect({ onBack }) {
         height={TAP}
         onPress={mail}
       />
-      {said ? <Note>{said}</Note> : null}
+      {said ? <Note strong size={font.body}>{said}</Note> : null}
       {error ? <Note tone="fault">{error}</Note> : null}
     </ScrollView>
   )

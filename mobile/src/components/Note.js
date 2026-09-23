@@ -24,7 +24,13 @@ import { color, font, radius, space } from '../lib/theme'
  * screen can be skimmed; that one has to be read, and it is the last thing
  * between somebody and losing a preset they built.
  */
-export default function Note({ tone = 'hint', onDismiss, size, children }) {
+/*
+ * `strong` is for the line that says the download link went out: "have the
+ * text bold and a little bit bigger than what it is now". Bold, and in the
+ * bright ink rather than the hint's grey, because it is the answer to the
+ * button just pressed.
+ */
+export default function Note({ tone = 'hint', onDismiss, size, strong, children }) {
   const accent = tone === 'fault' ? color.fault : tone === 'warn' ? color.signal : color.rule
   return (
     <View
@@ -44,8 +50,9 @@ export default function Note({ tone = 'hint', onDismiss, size, children }) {
       <Text
         style={{
           flex: 1,
-          color: tone === 'hint' ? color.silkDim : color.silk,
+          color: tone === 'hint' && !strong ? color.silkDim : color.silk,
           fontSize: size || font.small,
+          fontWeight: strong ? '700' : undefined,
           /* The default stays the exact 20 every other note has had, rather
              than a ratio that would nudge all of them. */
           lineHeight: size ? Math.round(size * 1.45) : 20

@@ -155,7 +155,7 @@ export default function Onboarding({ onEnterDemo, onAccount, onUnlock, replay, o
     setSaid(null)
     const out = await sendDownloadLink(email)
     setBusy(false)
-    if (out.ok) setSaid(`Sent to ${email.trim()}.`)
+    if (out.ok) setSaid(P6.sent(email.trim()))
     else setError(out.message)
   }
 
@@ -492,7 +492,7 @@ export default function Onboarding({ onEnterDemo, onAccount, onUnlock, replay, o
                 onPress={mail}
               />
               <Note>{P6.foot}</Note>
-              {said ? <Note>{said}</Note> : null}
+              {said ? <Note strong size={font.body}>{said}</Note> : null}
               {error ? <Note tone="fault">{error}</Note> : null}
             </>
           ) : null}

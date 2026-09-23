@@ -8053,6 +8053,15 @@ export function run(test) {
     assert.equal(P6.head, 'Is the Fractal Remote app installed on your computer?')
     assert.equal(P6.no, 'No - I need to download computer app')
     assert.equal(P6.emailLabel, 'Email me the download link')
+    /* "Email link has been sent to (show email address), open on your desktop
+       computer to install app", "bold and a little bit bigger". */
+    assert.equal(P6.sent('a@b.com'), 'Email link has been sent to a@b.com, open on your desktop computer to install app.')
+    for (const file of ['mobile/src/screens/Onboarding.js', 'mobile/src/screens/Connect.js']) {
+      const src = read(file)
+      assert.match(src, /if \(out\.ok\) setSaid\(P6\.sent\(email\.trim\(\)\)\)/, `${file} still says only "Sent to"`)
+      assert.match(src, /<Note strong size=\{font\.body\}>\{said\}<\/Note>/, `${file} says it small and grey`)
+    }
+    assert.match(read('mobile/src/components/Note.js'), /fontWeight: strong \? '700' : undefined/)
     assert.ok(!/P6\.(tag|eyebrow)\b/.test(block.app), 'the two tiny CONNECT lines are back')
     assert.ok(block.app.indexOf('{P6.yes}') < block.app.indexOf('{P6.no}'), 'No is not under Yes')
     const opened = block.app.slice(block.app.indexOf('{needsApp ? ('))

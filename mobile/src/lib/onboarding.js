@@ -425,7 +425,14 @@ export const P6 = {
   address: 'TYPE THIS ON YOUR COMPUTER · NOT ON THIS PHONE',
   /* "Email me the download link", bold — his words, where the tiny
      "OR HAVE THE LINK SENT TO YOU" was. */
-  emailLabel: 'Email me the download link'
+  emailLabel: 'Email me the download link',
+  /*
+   * "After the email link is sent, have the text say 'Email link has been
+   * sent to (show email address), open on your desktop computer to install
+   * app' and have the text bold and a little bit bigger." His words; the
+   * phone's Connect screen says the same after its own Send link.
+   */
+  sent: (email) => `Email link has been sent to ${email}, open on your desktop computer to install app.`
 }
 
 /**
