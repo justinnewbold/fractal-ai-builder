@@ -1,4 +1,5 @@
 import { PresetList } from './Console'
+import { slotProblem } from '../lib/slots'
 
 /**
  * Where a preset goes, chosen rather than typed.
@@ -23,8 +24,9 @@ import { PresetList } from './Console'
  * up. The footer does not scroll, so the button is under your thumb wherever
  * the list is, and it names the slot you just picked.
  */
-export function SaveFooter({ preset, slot, onSave, busy, saving, remote, queued, slots }) {
-  const target = slot === '' ? preset?.number : Number(slot)
+export function SaveFooter({ preset, slot, onSave, busy, saving, remote, queued, slots, deviceSlots }) {
+  const problem = slotProblem(slot, deviceSlots)
+  const target = problem ? NaN : slot === '' ? preset?.number : Number(slot)
   const targetLabel = Number.isInteger(target) ? target : '--'
   const elsewhere = Number.isInteger(target) && target !== preset?.number
   const occupant = slots?.find((s) => s.number === target)
@@ -45,7 +47,7 @@ export function SaveFooter({ preset, slot, onSave, busy, saving, remote, queued,
           slot 478" said who holds the pen, which is this app's business and
           not the player's; the queued line above says so once it is in
           flight. */}
-      <button className="primary save-confirm" onClick={onSave} disabled={busy || !!queued}>
+      <button className="primary save-confirm" onClick={onSave} disabled={busy || !!queued || !!problem}>
         {saving ? 'Saving…' : `Save to slot ${targetLabel}`}
       </button>
     </div>
@@ -77,7 +79,8 @@ export default function SaveSheet({
   onScan,
   onStopScan
 }) {
-  const target = slot === '' ? preset?.number : Number(slot)
+  const problem = slotProblem(slot, deviceSlots)
+  const target = problem ? NaN : slot === '' ? preset?.number : Number(slot)
   const targetLabel = Number.isInteger(target) ? target : '--'
   const elsewhere = Number.isInteger(target) && target !== preset?.number
   const occupant = slots?.find((s) => s.number === target)
@@ -118,11 +121,18 @@ export default function SaveSheet({
           type="text"
           inputMode="numeric"
           value={slot === '' ? String(preset?.number ?? '') : slot}
-          onChange={(e) => onSlot(e.target.value.replace(/[^0-9]/g, ''))}
+          onChange={(e) => onSlot(e.target.value.trim())}
           placeholder="Slot"
           aria-label="Preset slot to save into"
+          aria-invalid={problem ? 'true' : undefined}
+          aria-describedby={problem ? 'save-slot-problem' : undefined}
         />
       </label>
+      {problem ? (
+        <p className="problem save-slot-problem" id="save-slot-problem" role="alert">
+          {problem}
+        </p>
+      ) : null}
 
       {/*
         The one sentence that makes an overwrite a decision rather than an

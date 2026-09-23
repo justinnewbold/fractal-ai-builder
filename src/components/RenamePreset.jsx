@@ -23,7 +23,9 @@ export default function RenamePreset({ preset, busy, onRename }) {
     setName(preset?.name || '')
   }, [preset?.number, preset?.name])
   const current = (preset?.name || '').trim()
-  const wanted = name.trim()
+  /* The unit's 31, however the text got in: the box stops a typist at 31, and
+     a paste or a script does not have to stop. */
+  const wanted = name.trim().slice(0, 31)
   const changed = wanted !== '' && wanted !== current
   return (
     <form

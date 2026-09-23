@@ -138,7 +138,7 @@ const range = (param) =>
   isNumber(param.min) && isNumber(param.max) ? `${param.min}–${param.max}` : '—'
 
 /**
- * The whole read, as one piece of text to paste into the chat.
+ * The whole read, as one piece of text to copy into a message or a bug report.
  *
  * The grid comes through as the unit's own JSON rather than as a summary. Its
  * shape is the one thing this app has never seen the inside of — block
@@ -172,7 +172,12 @@ export function formatPresetReport({
 
   lines.push('WHAT WOULD STOP THIS MAKING A SOUND')
   if (faults.length) lines.push(...faults.map((f) => `- ${f}`))
-  else lines.push('- Nothing this read can see. Every block is connected, on, and above its floor.')
+  /* "Every block is connected, on, and above its floor" came off the end: it
+     said so over a list with bypassed blocks in it — "reported that every
+     block was connected and on, while simultaneously listing several blocks
+     as bypassed". A block switched off in a scene is a choice, not a fault;
+     the BLOCKS list below says which blocks are off. */
+  else lines.push('- Nothing this read can see would keep it quiet.')
   lines.push('')
 
   lines.push('BLOCKS — name | where | this scene | channel | fed by')

@@ -264,3 +264,21 @@ export function slotsForChat(names = [], capabilities = null, loaded = null, cap
     unread: runsOf(unread)
   }
 }
+
+/*
+ * WHAT IS WRONG WITH WHAT WAS TYPED IN THE SLOT BOX, or null.
+ *
+ * The box used to strip anything that was not a digit as it was typed, so
+ * "-1" became slot 1 and "abc" became the loaded slot, silently: "Reject
+ * invalid entries rather than silently converting them." And a slot past the
+ * end was only refused after Save was pressed. Now the box keeps what was
+ * typed, says what is wrong under it, and Save waits until it is right.
+ *
+ * Empty is still fine: it means the slot that is loaded, as it always has.
+ */
+export function slotProblem(slot, count) {
+  if (slot === '' || slot === null || slot === undefined) return null
+  if (!/^\d+$/.test(String(slot))) return 'A slot is a whole number.'
+  if (Number.isInteger(count) && count > 0 && Number(slot) >= count) return `This unit’s slots run from 0 to ${count - 1}.`
+  return null
+}

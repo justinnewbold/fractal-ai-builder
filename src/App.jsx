@@ -2553,7 +2553,7 @@ export default function App() {
         setQueuedSave({
           id,
           slot: number,
-          name: saveName.trim() || preset?.name || '',
+          name: saveName.trim().slice(0, 31) || preset?.name || '',
           scenes: Array.isArray(sceneNames) ? [...sceneNames] : []
         })
         record('save', `Asked the computer to save "${saveName.trim() || preset?.name}" to slot ${number}`)
@@ -2562,7 +2562,8 @@ export default function App() {
 
       // Name first: /preset/name writes the working buffer, and storePreset is
       // what makes it permanent. Doing it the other way round saves the old name.
-      const name = saveName.trim()
+      /* The unit's 31, however the text got into the box. */
+      const name = saveName.trim().slice(0, 31)
       if (name && name !== preset?.name?.trim()) {
         await setPresetName(name)
       }
@@ -3895,6 +3896,7 @@ export default function App() {
             remote={remote}
             queued={queuedSave}
             slots={allSlots}
+            deviceSlots={device?.capabilities?.presets?.count}
           />
         }
       >
