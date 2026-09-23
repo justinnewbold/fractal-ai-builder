@@ -66,6 +66,8 @@ export default function Onboarding({ onEnterDemo, onAccount, onUnlock, replay, o
   const [busy, setBusy] = useState(false)
   const [said, setSaid] = useState(null)
   const [error, setError] = useState(null)
+  /* Whether the download help on the "installed?" step is open — see there. */
+  const [needsApp, setNeedsApp] = useState(false)
 
   const unitName = UNITS.find((u) => u.key === unit)?.name || UNITS[0].name
 
@@ -428,8 +430,6 @@ export default function Onboarding({ onEnterDemo, onAccount, onUnlock, replay, o
 
       {at === 'app' ? (
         <>
-          <Eyebrow>{P6.tag}</Eyebrow>
-          <Eyebrow>{P6.eyebrow}</Eyebrow>
           <Head>{P6.head}</Head>
           {/*
             The one way on from here. An account is the only thing that joins
@@ -444,48 +444,58 @@ export default function Onboarding({ onEnterDemo, onAccount, onUnlock, replay, o
             height={TAP}
             onPress={() => onAccount?.()}
           />
-
-          <Eyebrow>{P6.notYet}</Eyebrow>
           {/*
-            PRINTED, NOT PRESSED.
-            
-            "It just says download when you click on it. And it tries
-            downloading it on the phone."
-
-            It did. The address was a button, and tapping a button on a phone
-            opens the thing on the phone — so it went to the downloads page on
-            the handset and started fetching a Mac installer onto a device
-            that can do nothing whatever with it.
-
-            This phone is never the computer that needs this download. That is
-            the whole difficulty of the step, and a button is a promise that
-            pressing it does something useful. So the address is text to read
-            and type somewhere else, with the eyebrow above it saying where,
-            and the only thing to press is the one that sends the link to a
-            machine that can use it.
+            HIDDEN UNTIL ASKED FOR. "Hide information on how to download the
+            computer app until they click no." Somebody who already has it
+            installed sees two buttons and nothing to read; the address and
+            the email box open under No, and No shows it is open.
           */}
-          <Eyebrow>{P6.address}</Eyebrow>
-          <Card>
-            <Text selectable style={{ color: color.silk, fontSize: font.lead, fontFamily: face }}>
-              {DOWNLOADS_URL}
-            </Text>
-          </Card>
-          <Eyebrow>{P6.emailLabel}</Eyebrow>
-          <Field
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@example.com"
-            keyboardType="email-address"
-          />
-          <Press
-            label={P6.platforms[0].go}
-            disabled={busy || !email.includes('@')}
-            height={TAP}
-            onPress={mail}
-          />
-          <Note>{P6.foot}</Note>
-          {said ? <Note>{said}</Note> : null}
-          {error ? <Note tone="fault">{error}</Note> : null}
+          <Press label={P6.no} on={needsApp} height={TAP} onPress={() => setNeedsApp((open) => !open)} />
+          {needsApp ? (
+            <>
+              <Eyebrow>{P6.notYet}</Eyebrow>
+              {/*
+                PRINTED, NOT PRESSED.
+
+                "It just says download when you click on it. And it tries
+                downloading it on the phone."
+
+                It did. The address was a button, and tapping a button on a phone
+                opens the thing on the phone — so it went to the downloads page on
+                the handset and started fetching a Mac installer onto a device
+                that can do nothing whatever with it.
+
+                This phone is never the computer that needs this download. That is
+                the whole difficulty of the step, and a button is a promise that
+                pressing it does something useful. So the address is text to read
+                and type somewhere else, with the eyebrow above it saying where,
+                and the only thing to press is the one that sends the link to a
+                machine that can use it.
+              */}
+              <Eyebrow>{P6.address}</Eyebrow>
+              <Card>
+                <Text selectable style={{ color: color.silk, fontSize: font.lead, fontFamily: face }}>
+                  {DOWNLOADS_URL}
+                </Text>
+              </Card>
+              <Text style={{ color: color.silk, fontSize: font.body, fontWeight: '700' }}>{P6.emailLabel}</Text>
+              <Field
+                value={email}
+                onChangeText={setEmail}
+                placeholder="you@example.com"
+                keyboardType="email-address"
+              />
+              <Press
+                label={P6.platforms[0].go}
+                disabled={busy || !email.includes('@')}
+                height={TAP}
+                onPress={mail}
+              />
+              <Note>{P6.foot}</Note>
+              {said ? <Note>{said}</Note> : null}
+              {error ? <Note tone="fault">{error}</Note> : null}
+            </>
+          ) : null}
           <Press label={P6.back} height={TAP} onPress={() => go('mode')} />
         </>
       ) : null}

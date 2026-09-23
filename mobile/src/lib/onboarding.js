@@ -376,9 +376,14 @@ export const P5 = {
 
 /** P6 — is the computer app installed yet. */
 export const P6 = {
-  tag: 'CONNECT',
-  eyebrow: 'CONNECT YOUR COMPUTER',
-  head: 'Is Fractal Remote installed there?',
+  /*
+   * "On this screen, connect is shown twice at the top… Let's actually remove
+   * both of those lines, as they're tiny text that are hard to read, and
+   * change the bigger text to say 'Is the Fractal Remote app installed on
+   * your computer?'" So there is no tag and no eyebrow any more — the
+   * question says which computer by itself.
+   */
+  head: 'Is the Fractal Remote app installed on your computer?',
   /*
    * WAS "Yes - show me the scanner", and there is no scanner.
    *
@@ -390,6 +395,12 @@ export const P6 = {
    * MY WORDING. The plain hyphen matches the rest of his lines.
    */
   yes: 'Yes - sign in to connect',
+  /*
+   * "Let's make a second button underneath… have that button say No - I need
+   * to download computer app. Hide information on how to download the
+   * computer app until they click no." His words.
+   */
+  no: 'No - I need to download computer app',
   notYet: 'NOT YET  ·  THE COMPUTER APP IS FREE',
   platforms: [
     { key: 'mac', badge: 'M', label: 'MAC', go: 'Send link' },
@@ -412,7 +423,9 @@ export const P6 = {
    * it is printed rather than pressed now, and this line says where.
    */
   address: 'TYPE THIS ON YOUR COMPUTER · NOT ON THIS PHONE',
-  emailLabel: 'OR HAVE THE LINK SENT TO YOU'
+  /* "Email me the download link", bold — his words, where the tiny
+     "OR HAVE THE LINK SENT TO YOU" was. */
+  emailLabel: 'Email me the download link'
 }
 
 /**

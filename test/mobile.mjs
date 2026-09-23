@@ -7849,7 +7849,7 @@ export function run(test) {
     }
   })
 
-  test('every screen in the walkthrough is reachable, and none of them is a trap', () => {
+  test('every screen in the walkthrough is reachable, and none of them is a trap', async () => {
     /*
      * "The whole onboarding process and tutorials have been an absolute
      * nightmare. Can we please go through everything again, double check it
@@ -8043,7 +8043,20 @@ export function run(test) {
     assert.ok(!/import \{ Linking,/.test(src), 'Linking is imported but no longer used')
     assert.match(block.app, /<Eyebrow>\{P6\.address\}<\/Eyebrow>/, 'nothing says the address is for the computer')
     assert.match(block.app, /<Text selectable style=\{\{ color: color\.silk, fontSize: font\.lead, fontFamily: face \}\}>\s*\n?\s*\{DOWNLOADS_URL\}/, 'the address is not printed as text to read and type')
-    assert.match(block.app, /<Eyebrow>\{P6\.emailLabel\}<\/Eyebrow>/, 'the email route is unlabelled')
+    /* "Email me the download link" — "make that text bold". */
+    assert.match(block.app, /<Text style=\{\{ color: color\.silk, fontSize: font\.body, fontWeight: '700' \}\}>\{P6\.emailLabel\}<\/Text>/, 'the email route is unlabelled, or not bold')
+    /*
+     * "Connect is shown twice at the top… remove both of those lines", and a
+     * No button under Yes that opens the download help, hidden until then.
+     */
+    const { P6 } = await import('../shared/onboarding.mjs')
+    assert.equal(P6.head, 'Is the Fractal Remote app installed on your computer?')
+    assert.equal(P6.no, 'No - I need to download computer app')
+    assert.equal(P6.emailLabel, 'Email me the download link')
+    assert.ok(!/P6\.(tag|eyebrow)\b/.test(block.app), 'the two tiny CONNECT lines are back')
+    assert.ok(block.app.indexOf('{P6.yes}') < block.app.indexOf('{P6.no}'), 'No is not under Yes')
+    const opened = block.app.slice(block.app.indexOf('{needsApp ? ('))
+    assert.ok(block.app.indexOf('{needsApp ? (') > block.app.indexOf('{P6.no}') && opened.indexOf('{DOWNLOADS_URL}') > 0 && opened.indexOf('{P6.emailLabel}') > 0, 'the download help shows before No is tapped')
     /* Said where he said to say it: above the address, not under it. */
     assert.ok(
       block.app.indexOf('{P6.address}') < block.app.indexOf('{DOWNLOADS_URL}'),
