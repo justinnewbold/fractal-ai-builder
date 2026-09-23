@@ -4,6 +4,7 @@ import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'r
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
 import { Platform } from 'react-native'
 import { slotCount, slotLabel } from '../lib/device'
+import { jumpsFor } from '../lib/presetJumps'
 import { knownCount, nameOf, namedSlots, readFailed, refresh, useNames, wantOnly } from '../lib/presetNames'
 import { marksFor, toggleFavourite } from '../lib/lists'
 import { useStored } from '../lib/store'
@@ -152,6 +153,28 @@ export default function Presets({ onBack }) {
     return () => cancelAnimationFrame(id)
   }, [slots, preset?.number, hunting])
 
+  /*
+   * THE JUMPS. "Can we add the 100 200 300 400 500 thing to the mobile apps
+   * as well? And obviously on the AM4/VP4 since they have less slots, maybe
+   * just make those like 20 40 60 80 100?"
+   *
+   * The browser's rule, the same file (lib/presetJumps.js): about five stops
+   * on round numbers, from the unit's own size — a 512-slot unit gets
+   * hundreds, a 104-slot AM4 or VP4 gets twenties, a 384-slot unit fifties.
+   *
+   * They SCROLL, they do not load: tapping 300 mid-set must not change what
+   * comes out of the amp. Every slot is a row here, so row n is slot n, and
+   * the row lands at the top of the screen with the run after it below.
+   */
+  const jumps = jumpsFor(slots)
+  const jumpTo = (n) => {
+    try {
+      list.current?.scrollToIndex({ index: Math.min(n, (slots || 1) - 1), viewPosition: 0, animated: true })
+    } catch {
+      /* Only while the list is still measuring; the next tap works. */
+    }
+  }
+
   return (
     <View style={{ flex: 1 }}>
       <View
@@ -207,6 +230,18 @@ export default function Presets({ onBack }) {
           }}
         />
       </View>
+
+      {jumps.length && !hunting ? (
+        <View
+          accessibilityRole="toolbar"
+          accessibilityLabel="Jump to a range"
+          style={{ flexDirection: 'row', gap: space.sm, paddingHorizontal: space.lg, paddingBottom: space.sm }}
+        >
+          {jumps.map((n) => (
+            <Press key={n} grow label={String(n)} height={44} onPress={() => jumpTo(n)} />
+          ))}
+        </View>
+      ) : null}
 
       {readFailed() ? (
         <View style={{ paddingHorizontal: space.lg, paddingBottom: space.sm }}>

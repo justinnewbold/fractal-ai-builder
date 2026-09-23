@@ -3195,6 +3195,25 @@ export function run(test) {
     assert.match(flat, /Finding \$\{link\.macName \|\| 'your computer'\}/, 'the wait does not say what it is waiting for')
   })
 
+  test('the phone’s preset list has the browser’s jumps, sized to the unit', async () => {
+    /*
+     * "Can we add the 100 200 300 400 500 thing to the mobile apps as well?
+     * And obviously on the AM4/VP4 since they have less slots, maybe just make
+     * those like 20 40 60 80 100?"
+     */
+    const { jumpsFor } = await import('../src/lib/presetJumps.js')
+    assert.deepEqual(jumpsFor(512), [100, 200, 300, 400, 500], 'a 512-slot unit does not get hundreds')
+    assert.deepEqual(jumpsFor(104), [20, 40, 60, 80, 100], 'an AM4 or VP4 does not get twenties')
+    const src = read('mobile/src/screens/Presets.js').replace(/\s+/g, ' ')
+    assert.match(src, /import \{ jumpsFor \} from '\.\.\/lib\/presetJumps'/, 'the phone has its own rule for where the jumps land')
+    assert.match(src, /const jumps = jumpsFor\(slots\)/, 'the phone’s jumps are not sized to the unit')
+    assert.match(src, /\{jumps\.length && !hunting \?/, 'the jumps stay up over search results they cannot jump through')
+    /* They scroll, never load: a tap on 300 mid-set must not change the sound. */
+    const jump = src.slice(src.indexOf('const jumpTo = (n) =>'), src.indexOf('return ( <View style={{ flex: 1 }}>'))
+    assert.match(jump, /scrollToIndex/, 'a jump does not move the list')
+    assert.ok(!/load|choose|select|setPreset/i.test(jump.replace(/\/\*[\s\S]*?\*\//g, '')), 'a jump loads a preset')
+  })
+
   test('Unlock waits for the box saying a computer and a USB cable are needed', async () => {
     /*
      * "On the unlock part of this can we add a disclaimer question that
