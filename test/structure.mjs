@@ -5122,11 +5122,13 @@ export function run(test) {
     const settings = readFileSync(new URL('../mobile/src/screens/Settings.js', import.meta.url), 'utf8')
     const paywall = readFileSync(new URL('../mobile/src/screens/Paywall.js', import.meta.url), 'utf8')
 
-    /* All three doors, from the one handler. */
+    /* All four doors, from the one handler — Setup, both unlock screens, and
+       the walkthrough's, which got a paywall of its own when its Unlock
+       button stopped merely advancing to the next step. */
     assert.equal(
       (app.match(/onSignIn=\{toSignIn\}/g) || []).length,
-      3,
-      'the sign-in route is no longer wired to Setup and both unlock screens'
+      4,
+      'the sign-in route is no longer wired to Setup, the walkthrough and both unlock screens'
     )
     assert.match(app, /const toSignIn = \(\) => \{/, 'the sign-in route is gone')
     assert.match(app, /const toSignIn = \(\) => \{[^}]*setAuth\('out'\)/, 'it no longer lands on the sign-in screen')

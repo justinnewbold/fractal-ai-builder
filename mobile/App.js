@@ -492,8 +492,9 @@ export default function App() {
            * walkthrough, and the sign-in screen's own onSignedIn does those
            * same two things. The demo has onEnterDemo.
            */
-          <Onboarding
-            replay={replaying}
+          <>
+            <Onboarding
+              replay={replaying}
             /*
              * Out, and nothing else. No account touched, no demo started, no
              * walkthrough state rewound — they came to look at it.
@@ -529,7 +530,56 @@ export default function App() {
               setReplaying(false)
               setAuth('out')
             }}
-          />
+              /*
+               * THE UNLOCK BUTTON BUYS THE APP, which it did not until now.
+               *
+               * "The unlock button and the two buttons at the bottom where it
+               * says sign in and the button where it says restore purchase,
+               * all take you to the other screen." Three buttons saying three
+               * different things, all landing on the sign-in form — because
+               * this one advanced the walkthrough rather than opening the
+               * paywall, and the walkthrough's next step is sign-in.
+               */
+              onUnlock={() => setBuying(true)}
+            />
+            {/*
+              AND THE PAYWALL IS DRAWN HERE TOO, or that button does nothing.
+
+              The other one lives inside the signed-in branch, which the
+              walkthrough is not, so `buying` could go true and nothing would
+              appear. A button that fires a haptic and changes no pixels is
+              worse than the wrong screen.
+
+              `onUnlocked` goes to sign-in rather than just closing. A purchase
+              is anonymous until an account claims it — which is exactly how
+              Justin's own test purchase landed on a handset id instead of on
+              him — and SignIn's linkAccount is what claims it. An account is
+              needed to reach the computer anyway, so this is a step earlier,
+              not a step extra.
+            */}
+            {buying ? (
+              <Paywall
+                asked
+                onSignIn={toSignIn}
+                onUnlocked={() => {
+                  setBuying(false)
+                  markWalkthrough()
+                  setSeenWalk(true)
+                  setReplaying(false)
+                  setAuth('out')
+                }}
+                onDemo={() => {
+                  setBuying(false)
+                  setDemo(true)
+                  markWalkthrough()
+                  setSeenWalk(true)
+                  setReplaying(false)
+                  setAuth('in')
+                }}
+                onBack={() => setBuying(false)}
+              />
+            ) : null}
+          </>
         ) : auth === 'out' ? (
           <SignIn
             onSignedIn={() => {

@@ -7909,13 +7909,35 @@ export function run(test) {
    * different screens, not to the point that it's annoying but to the point
    * where there is a clear path."
    */
-  test('there are four ways to the purchase and they all go to one place', () => {
+  test('there are five ways to the purchase and they all go to one place', () => {
     const app = read('mobile/App.js')
     assert.equal(
       (app.match(/onUnlock=\{\(\) => setBuying\(true\)\}/g) || []).length,
-      3,
-      'the bar, Settings and the stage screen do not all open the same paywall'
+      4,
+      'the bar, Settings, the stage screen and the walkthrough do not all open the same paywall'
     )
+
+    /*
+     * AND THE WALKTHROUGH'S ONE HAS A PAYWALL TO OPEN.
+     *
+     * "The unlock button and the two buttons at the bottom where it says sign
+     * in and the button where it says restore purchase, all take you to the
+     * other screen." That button used to advance the walkthrough, whose next
+     * step is the sign-in form — so three buttons saying three different
+     * things did one thing.
+     *
+     * The paywall lives inside the signed-in branch, which the walkthrough is
+     * not. Wiring the button without drawing a Paywall in that branch would
+     * set `buying` true and change no pixels, which is worse than the wrong
+     * screen: a haptic and nothing else reads as a broken app.
+     */
+    const walk = app.slice(app.indexOf('seenWalk === false ? ('), app.indexOf("auth === 'out' ? ("))
+    assert.match(walk, /onUnlock=\{\(\) => setBuying\(true\)\}/, 'the walkthrough cannot open the paywall')
+    assert.match(walk, /\{buying \? \(\s*<Paywall/, 'the walkthrough opens a paywall that is never drawn')
+    /* And buying from there claims the purchase onto an account rather than
+       leaving it on the handset — see linkAccount on SignIn's onSignedIn. */
+    assert.match(walk, /onUnlocked=\{\(\) => \{[\s\S]{0,200}setAuth\('out'\)/, 'a purchase made in the walkthrough is left unattached to an account')
+    assert.match(read('mobile/src/screens/Onboarding.js'), /onPress=\{\(\) => onUnlock\?\.\(\)\}/, 'the Unlock card still advances the walkthrough instead of selling')
 
     /* The fourth is the word DEMO itself, inside the bar. */
     const bar = read('mobile/src/components/TopBar.js')
