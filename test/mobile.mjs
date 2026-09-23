@@ -3814,7 +3814,7 @@ export function run(test) {
      */
     assert.match(
       read('mobile/src/screens/Settings.js'),
-      /label="Leave the demo"[\s\S]{0,120}setDemo\(false\)/,
+      /label="Exit demo"[\s\S]{0,120}setDemo\(false\)/,
       'the way out of the demo moved; this test names it'
     )
   })
@@ -5947,9 +5947,28 @@ export function run(test) {
     )
     assert.match(signIn, /setDemo\(true\)/, 'the button does not turn the demo on')
 
-    /* And escapable, or it is a trap rather than a demo. */
+    /*
+     * AND ESCAPABLE, or it is a trap rather than a demo — but the door is
+     * not the same one for everybody.
+     *
+     * "Someone should only be able to exit a demo if they've already
+     * purchased the app or paid." So Settings' way out is behind the
+     * purchase now: for somebody who has not paid it led to an empty room,
+     * the live app with nothing it can drive.
+     *
+     * Which makes the OTHER door the one that matters, and it is the one
+     * this check now holds. Heading for Sign in ends the demo — App.js's
+     * toSignIn — and the sign-in screen offers the demo again, so somebody
+     * who has not paid can always get out and back in. Lose that and the
+     * gate above turns the demo into a room with no handle on the inside.
+     */
     const settings = read('mobile/src/screens/Settings.js').replace(/\s+/g, ' ')
-    assert.match(settings, /Leave the demo/, 'there is no way out of the demo')
+    assert.match(settings, /purchase\.unlocked \? \( <Press label="Exit demo"/, 'the way out of the demo is not behind the purchase')
+
+    const app = read('mobile/App.js')
+    const toSignIn = app.slice(app.indexOf('const toSignIn = ()'), app.indexOf('const toSignIn = ()') + 260)
+    assert.match(toSignIn, /setDemo\(false\)/, 'signing in no longer ends the demo, so an unpaid phone is shut in')
+    assert.match(signIn, /setDemo\(true\)/, 'the sign-in screen no longer offers the way back in')
     assert.match(settings, /onPress=\{\(\) => setDemo\(false\)\}/, 'the way out does not turn it off')
     /* It says what it is, every time, rather than letting somebody think a
        simulated FM3 is their FM3. */

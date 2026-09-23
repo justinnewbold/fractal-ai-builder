@@ -513,7 +513,29 @@ export default function Settings({
                     />
                   ))}
                 </View>
-                <Press label="Leave the demo" tone="signal" onPress={() => setDemo(false)} />
+                {/*
+                  THE WAY OUT IS FOR SOMEBODY WHO HAS PAID.
+
+                  "Someone should only be able to exit a demo if they've
+                  already purchased the app or paid."
+
+                  It used to be here for everybody, and for somebody who has
+                  not paid it was a door to an empty room: the live app with
+                  no unlock is a screen that cannot drive anything. The demo
+                  IS the app until it is bought.
+
+                  Nobody is shut in. Heading for Sign in ends the demo too —
+                  see App.js's toSignIn — and the sign-in screen offers the
+                  demo again, so the way out for somebody who has not paid is
+                  the one they would take anyway.
+
+                  The same words as the bar, because it is the same errand and
+                  two words for one action is how the two ends drifted apart
+                  everywhere else in this app.
+                */}
+                {purchase.unlocked ? (
+                  <Press label="Exit demo" tone="signal" onPress={() => setDemo(false)} />
+                ) : null}
               </>
             ) : null}
 
