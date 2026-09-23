@@ -612,6 +612,13 @@ export default function Settings({
                 its own.
               </Note>
             ) : null}
+            {/* Which account this is — his words: "make sure you're connected
+                to your computer using and then show the user's email
+                address". A computer signed in as somebody else is the
+                likeliest reason nothing answers. */}
+            {link === 'no-answer' && account?.email && !isPairAccount(account.email) ? (
+              <Note>{`Make sure you’re connected to your computer using ${account.email}.`}</Note>
+            ) : null}
 
             {/*
               The way in to getting a computer on the other end at all.

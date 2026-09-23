@@ -1204,14 +1204,17 @@ export function run(test) {
     assert.match(app, /\{owned \? 'Demo' : 'Try the demo'\}/, 'the fault notice offers Try the demo to somebody who has paid')
     assert.match(app, /owned=\{owned\}/, 'the connect screen is never told who has paid')
 
-    /* Nothing answering: which account this is, in the link test's words. */
-    const details = read('src/components/LinkDetails.jsx')
-    assert.ok(details.includes('Signed in here as') && details.includes('Is the Fractal app open there, signed in as this same account?'), 'the link test changed its words; these follow them')
-    assert.match(
-      connect,
-      /Signed in here as <strong>\{remembered\}<\/strong>\. Is the Fractal app open there, signed in as\s+this same account\?/,
-      'the not-answering screen does not say which account it is on'
-    )
+    /* Connecting, and nothing answering: which account this is, in his words —
+       "make sure you're connected to your computer using and then show the
+       user's email address". At both ends. */
+    const using = /Make sure you&rsquo;re connected to your computer using <strong>\{email\}<\/strong>\./
+    assert.match(connect, using, 'the connect screen does not say which account it is using')
+    assert.equal((connect.match(/<Using email=\{remembered\} paired=\{paired\} \/>/g) || []).length, 2, 'the account line is missing while connecting or when nothing answers')
+    const phoneApp = read('mobile/App.js')
+    const phoneSettings = read('mobile/src/screens/Settings.js')
+    for (const [where, src] of [['the phone’s connecting screen', phoneApp], ['the phone’s Phone & computer page', phoneSettings]]) {
+      assert.ok(src.includes('Make sure you’re connected to your computer using '), `${where} does not say which account it is using`)
+    }
 
     /* And signing in on a phone connects, rather than stopping one tap short. */
     assert.match(app, /if \(linkState\(\)\.role === 'remote' && !isDemo\(\)\) await reconnectPhone\(\)/, 'a phone signed in from the unlock stops at “Connect as …”')

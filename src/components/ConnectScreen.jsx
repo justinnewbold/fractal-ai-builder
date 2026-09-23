@@ -53,6 +53,7 @@ export default function ConnectScreen({
         <>
           <h2>Connecting…</h2>
           <p>Finding your computer.</p>
+          {account ? <Using email={remembered} paired={paired} /> : null}
         </>
       ) : state === 'no-answer' ? (
         <>
@@ -61,20 +62,7 @@ export default function ConnectScreen({
             Make sure the Fractal app is open on the computer and the computer is awake. This keeps trying on
             its own.
           </p>
-          {/*
-            WHICH ACCOUNT THIS IS, because the likeliest reason nothing answers
-            is a computer signed in as somebody else. "I am connected, both the
-            android app and the Apple app connects just fine, so I'm not sure
-            why this isn't connecting" — the browser was on a second account
-            made that evening, and nothing on this screen said so. Both
-            sentences are the link test's own, from LinkDetails.
-          */}
-          {remembered && !paired ? (
-            <p className="hint">
-              Signed in here as <strong>{remembered}</strong>. Is the Fractal app open there, signed in as
-              this same account?
-            </p>
-          ) : null}
+          <Using email={remembered} paired={paired} />
           <div className="connect-actions">
             <button className="primary" onClick={onRetry} disabled={busy}>
               Try now
@@ -188,5 +176,27 @@ export default function ConnectScreen({
         {owned ? 'Demo' : 'Try the Demo'}
       </button>
     </section>
+  )
+}
+
+/**
+ * WHICH ACCOUNT THIS IS, while it connects and when nothing answers.
+ *
+ * The likeliest reason nothing answers is a computer signed in as somebody
+ * else. "I am connected, both the android app and the Apple app connects just
+ * fine, so I'm not sure why this isn't connecting" — the browser was on a
+ * second account made that evening, and nothing on the screen said so.
+ *
+ * His words for it: "shouldn't we have it say when it's trying to connect,
+ * say, make sure you're connected to your computer using and then show the
+ * user's email address? Could probably save me some trouble… the more
+ * information we can provide the better."
+ */
+function Using({ email, paired }) {
+  if (!email || paired) return null
+  return (
+    <p className="hint">
+      Make sure you&rsquo;re connected to your computer using <strong>{email}</strong>.
+    </p>
   )
 }
