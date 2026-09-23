@@ -171,9 +171,11 @@ export default function Onboarding({
               <div className="onb-help">
                 <p className="onb-box-title">{D2B.title}</p>
                 <ol className="onb-list">
-                  {D2B.steps.map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
+                  {D2B.steps
+                    .map((line) => (typeof line === 'function' ? line(unitName) : line))
+                    .map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
                 </ol>
               </div>
             ) : found ? null : (

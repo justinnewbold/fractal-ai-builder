@@ -27,6 +27,8 @@
  * mobile/src/lib/onboarding.js is generated from this by `npm run sync:rules`.
  */
 
+import { holders, quitEditor } from './editors.js'
+
 /**
  * The price when the store has not said one.
  *
@@ -104,7 +106,9 @@ export const D2 = {
       .filter(Boolean)
       .join('  ·  '),
   helpTitle: 'Nothing found?',
-  helpBody: 'Quit FM3-Edit or Axe-Edit. One app can hold USB at a time.',
+  /* Nothing found, so the unit is not known: every editor, by name, where
+     this used to name only two. See editors.mjs. */
+  helpBody: quitEditor(null),
   next: 'Next',
   later: 'I’ll plug in later'
 }
@@ -116,7 +120,8 @@ export const D2B = {
   sub: 'Your unit is visible, but another app is holding the connection.',
   title: 'Close the app holding USB',
   steps: [
-    'Quit FM3-Edit, Axe-Edit, or another copy of Fractal Remote.',
+    /* The unit is visible here, so its own editor is named when it is known. */
+    (unit) => `Quit ${holders(unit)}, or another copy of Fractal Remote.`,
     'On Windows, allow firewall access so the phone can reach this computer.'
   ],
   again: 'Look again',

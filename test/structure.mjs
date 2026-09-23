@@ -4995,7 +4995,10 @@ export function run(test) {
     assert.equal(c.D1.sub, 'Three clear steps. About a minute.')
     assert.equal(c.D1.skip, 'Skip walkthrough')
     assert.equal(c.D2.head, 'Plug your unit into this computer.')
-    assert.equal(c.D2.helpBody, 'Quit FM3-Edit or Axe-Edit. One app can hold USB at a time.')
+    assert.equal(
+      c.D2.helpBody,
+      'Quit FM3-Edit, FM9-Edit, Axe-Edit III, AM4-Edit, VP4-Edit or Fractal-Bot if one is open. Only one program can use the USB connection at a time.'
+    )
     assert.equal(c.D2B.head, 'Something else has the USB port.')
     assert.equal(c.D2B.without, 'Continue without it')
     assert.equal(c.D3.head, 'Use your phone as the remote?')

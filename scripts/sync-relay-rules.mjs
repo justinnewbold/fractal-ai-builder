@@ -99,7 +99,13 @@ export const FILES = [
    */
   /* How to get a computer on the other end, so the browser and the phone
      offer the same four routes with the same honest status on each. */
-  { source: '../shared/ways-in.mjs', target: '../mobile/src/lib/ways-in.js' },
+  /* Which program to close so the unit is free, named per unit. */
+  { source: '../shared/editors.mjs', target: '../mobile/src/lib/editors.js' },
+  {
+    source: '../shared/ways-in.mjs',
+    target: '../mobile/src/lib/ways-in.js',
+    render: (text) => banner('../shared/ways-in.mjs') + text.replace("from './editors.mjs'", "from './editors.js'")
+  },
   /*
    * What a report carries, and what it must never carry.
    *
@@ -121,7 +127,11 @@ export const FILES = [
    * "Do not change any wording without asking me first." One file to read when
    * checking that, and one line in a diff when it changes.
    */
-  { source: '../shared/onboarding.mjs', target: '../mobile/src/lib/onboarding.js' },
+  {
+    source: '../shared/onboarding.mjs',
+    target: '../mobile/src/lib/onboarding.js',
+    render: (text) => banner('../shared/onboarding.mjs') + text.replace("from './editors.mjs'", "from './editors.js'")
+  },
   /*
    * Who owns this copy, and the reason it is here rather than imported.
    *
@@ -141,7 +151,8 @@ export const FILES = [
     source: '../shared/troubleshooting.mjs',
     target: '../mobile/src/lib/troubleshooting.js',
     render: (text) =>
-      banner('../shared/troubleshooting.mjs') + text.replace("from './versions.mjs'", "from './versions.js'")
+      banner('../shared/troubleshooting.mjs') +
+      text.replace("from './versions.mjs'", "from './versions.js'").replace("from './editors.mjs'", "from './editors.js'")
   },
 
 

@@ -326,6 +326,27 @@ export function watchUnit() {
       said = probeSays({ failed: true })
     }
     if (run !== watchRun) return
+    /*
+     * AND BACK AGAIN, WITHOUT A TAP. "If they do have the fractal software
+     * open when they first try to connect and then they close that app, will
+     * they have to like refresh or something?" They did: this only ever
+     * decided a unit had GONE, and a unit that started answering again — the
+     * editor quit, the cable back in — stayed "no unit" until somebody
+     * pressed Look for the computer again. An answer after a quiet spell is
+     * now the cue to read the whole rig again.
+     */
+    if (said === 'answering' && (state.unit === 'missing' || state.unit === 'silent')) {
+      logDebug('unit', 'the unit is answering again')
+      quiet = 0
+      try {
+        await refreshAll()
+      } catch {
+        /* refreshAll records its own failure; the next tick tries again. */
+      }
+      if (run !== watchRun) return
+      watchTimer = setTimeout(tick, nextWatch())
+      return
+    }
     quiet = countQuiet(quiet, said)
     /*
      * One quiet answer is not evidence — the computer asks this same port
@@ -342,11 +363,21 @@ export function watchUnit() {
       await refreshPreset()
       if (run !== watchRun) return
     }
-    watchTimer = setTimeout(tick, watchEvery(true))
+    watchTimer = setTimeout(tick, nextWatch())
   }
-  watchTimer = setTimeout(tick, watchEvery(true))
+  watchTimer = setTimeout(tick, nextWatch())
   return stopWatching
 }
+
+/*
+ * Sooner while the unit is missing. The half-minute is for checking a unit
+ * that is there is still there; somebody who has just quit FM3-Edit is
+ * looking at the screen waiting for it to come back, and ten seconds is the
+ * browser's "every few seconds".
+ */
+const MISSING_WATCH_MS = 10000
+const nextWatch = () =>
+  state.unit === 'missing' || state.unit === 'silent' ? MISSING_WATCH_MS : watchEvery(true)
 
 export function stopWatching() {
   watchRun += 1
