@@ -3761,9 +3761,25 @@ export function run(test) {
        sensible window, and a check that depends on prose length is a check
        that breaks when somebody explains themselves properly. */
     const bare = settings.replace(/\{?\/\*[\s\S]*?\*\/\}?/g, ' ').replace(/\s+/g, ' ')
-    assert.match(bare, /\) : purchase\.unlocked \? \( <Press label="Try the Demo" onPress=\{\(\) => setDemo\(true\)\} \/>/, 'a paid phone has no way into the demo')
-    /* The same three words the sign-in screen uses: one errand, one name. */
-    assert.match(read('mobile/src/screens/SignIn.js'), /label="Try the Demo"/, 'the two ways into the demo are called different things')
+    assert.match(bare, /\) : purchase\.unlocked \? \( <Press label="Demo" onPress=\{\(\) => setDemo\(true\)\} \/>/, 'a paid phone has no way into the demo')
+
+    /*
+     * AND THE TWO DOORS ARE NAMED FOR THE TWO PEOPLE WALKING THROUGH THEM.
+     *
+     * "If they are already signed in and the app is unlocked, instead of
+     * saying try the demo, have it just say Demo."
+     *
+     * Everywhere else in this app one errand gets one name, and that rule is
+     * why Exit demo reads the same in the bar and in Setup. This is the
+     * deliberate exception. "Try the Demo" is an offer, made to somebody who
+     * has not paid and is still deciding. By the time the other button is on
+     * screen the deciding is over — signed in, paid, and the demo is one of
+     * the things they own. A place, not a pitch.
+     *
+     * Held from both ends so neither drifts into the other's wording.
+     */
+    assert.match(read('mobile/src/screens/SignIn.js'), /label="Try the Demo"/, 'the offer to somebody who has not paid stopped being an offer')
+    assert.ok(!/label="Try the Demo"/.test(settings), 'Setup is pitching the demo at somebody who already owns it')
   })
 
   test('buying the app ends the demo', () => {

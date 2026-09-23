@@ -556,12 +556,22 @@ export default function Settings({
                 than on the front list because this page is what the phone is
                 talking to, and the demo is a thing to talk to.
 
-                The same three words the sign-in screen uses. There is no
-                fourth name for one errand in this app, and no heading over
-                it: a heading would be a sentence I wrote rather than one he
-                did, and the button already says what it does.
+                ONE WORD, not the sign-in screen's three. "If they are
+                already signed in and the app is unlocked, instead of saying
+                try the demo, have it just say Demo."
+
+                The two are not the same sentence because the two readers are
+                not the same person. "Try the Demo" is an offer, made to
+                somebody who has not paid and is deciding — try it, see what
+                it does. By the time this button is on screen that decision is
+                made: they are signed in, they own the app, and the demo is
+                simply one of the things it has. A place, not a pitch.
+
+                And no heading over it, which he confirmed. A heading here
+                would be a sentence I wrote rather than one he did, and the
+                button already says what it does.
               */
-              <Press label="Try the Demo" onPress={() => setDemo(true)} />
+              <Press label="Demo" onPress={() => setDemo(true)} />
             ) : null}
 
             {/*
