@@ -23,6 +23,9 @@
 const EDITORS = [
   { unit: /axe-?fx\s*(iii|3)\b/i, editor: 'Axe-Edit III' },
   { unit: /axe-?fx\s*(ii|2)\b/i, editor: 'Axe-Edit' },
+  /* The XL and XL+ by their short names, "II XL" and "II XL+", which is what
+     a connected one calls itself. */
+  { unit: /^ii\s*xl\b/i, editor: 'Axe-Edit' },
   { unit: /\bfm3\b/i, editor: 'FM3-Edit' },
   { unit: /\bfm9\b/i, editor: 'FM9-Edit' },
   { unit: /\bam4\b/i, editor: 'AM4-Edit' },
@@ -33,7 +36,7 @@ const EDITORS = [
 export const UPDATER = 'Fractal-Bot'
 
 /** Every editor, for when the unit is not known. */
-export const ALL_EDITORS = 'FM3-Edit, FM9-Edit, Axe-Edit III, AM4-Edit, VP4-Edit'
+export const ALL_EDITORS = 'FM3-Edit, FM9-Edit, Axe-Edit III, Axe-Edit, AM4-Edit, VP4-Edit'
 
 /** The editor for a unit named like "FM3" or "Axe-Fx III", or null. */
 export function editorFor(unit) {

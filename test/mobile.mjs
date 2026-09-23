@@ -3488,11 +3488,13 @@ export function run(test) {
     assert.equal(editorFor('FM9'), 'FM9-Edit')
     assert.equal(editorFor('Axe-Fx III'), 'Axe-Edit III')
     assert.equal(editorFor('Axe-Fx II'), 'Axe-Edit', 'the Axe-Fx II is taken for a III, or the other way round')
+    assert.equal(editorFor('II XL+'), 'Axe-Edit', 'an XL+ by its short name')
+    assert.equal(editorFor('II XL'), 'Axe-Edit', 'an XL by its short name')
     assert.equal(editorFor('AM4'), 'AM4-Edit')
     assert.equal(editorFor('VP4'), 'VP4-Edit')
     assert.equal(editorFor(null), null)
     assert.equal(quitEditor('FM3'), 'Quit FM3-Edit or Fractal-Bot if either is open. Only one program can use the USB connection at a time.')
-    assert.equal(holders(null), 'FM3-Edit, FM9-Edit, Axe-Edit III, AM4-Edit, VP4-Edit or Fractal-Bot', 'an unknown unit is not given every editor')
+    assert.equal(holders(null), 'FM3-Edit, FM9-Edit, Axe-Edit III, Axe-Edit, AM4-Edit, VP4-Edit or Fractal-Bot', 'an unknown unit is not given every editor')
 
     /* In the places it was missing. */
     const { fixById } = await import('../shared/troubleshooting.mjs')

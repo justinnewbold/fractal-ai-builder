@@ -5001,7 +5001,7 @@ export function run(test) {
     assert.equal(c.D2.head, 'Plug your unit into this computer.')
     assert.equal(
       c.D2.helpBody,
-      'Quit FM3-Edit, FM9-Edit, Axe-Edit III, AM4-Edit, VP4-Edit or Fractal-Bot if one is open. Only one program can use the USB connection at a time.'
+      'Quit FM3-Edit, FM9-Edit, Axe-Edit III, Axe-Edit, AM4-Edit, VP4-Edit or Fractal-Bot if one is open. Only one program can use the USB connection at a time.'
     )
     assert.equal(c.D2B.head, 'Something else has the USB port.')
     assert.equal(c.D2B.without, 'Continue without it')
