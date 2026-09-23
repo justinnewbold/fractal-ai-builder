@@ -7,6 +7,7 @@ import { logDebug } from './debugLog'
 import { mayDrive } from './unlock-rule'
 import { isOwner } from './owner-unlock'
 import { currentAccount } from './relay'
+import { isDemo, setDemo } from './demo'
 
 /**
  * The one purchase: paying to point this app at a real rig.
@@ -273,13 +274,40 @@ export const unlinkAccount = async () => {
   const api = await load()
   if (!api?.logOut) return
   try {
-    await api.logOut()
-    logDebug('purchases: unlinked from the account')
+    const info = await api.logOut()
+    /*
+     * AND THE PHONE STOPS CLAIMING WHAT THE ACCOUNT TOOK WITH IT.
+     *
+     * This used to keep the remembered answer, on the reasoning that logOut
+     * returns a fresh anonymous id which owns nothing, so re-reading would
+     * lock out somebody who bought on this very phone and then signed out of
+     * an account they never needed in order to buy.
+     *
+     * That reasoning protected one person and broke the screen for everybody
+     * else. "When I log out of the phone... no option to unlock the app
+     * anywhere or restore the purchase." Of course not: the app still
+     * believed it was unlocked, so it hid both — the Setup row and the
+     * paywall are the same `unlocked` flag. A phone that cannot be unlocked
+     * and cannot be restored is a dead end, and it also means the next person
+     * to sign in on that handset gets the app for nothing.
+     *
+     * So the answer follows whoever is actually signed in, and Restore is the
+     * way back for the person the old rule was protecting. It asks Apple or
+     * Google directly rather than asking RevenueCat who this anonymous id is,
+     * so a purchase made on this handset comes back in one tap — and Apple
+     * requires that button to exist anyway.
+     */
+    const yes = entitled(info)
+    await remember(yes)
+    set({ unlocked: yes })
+    logDebug(`purchases: unlinked from the account (unlocked ${yes})`)
   } catch (err) {
-    /* Logging out of an already-anonymous user throws, and is a no-op. */
+    /* Logging out of an already-anonymous user throws, and is a no-op — there
+       was no account to stop answering as, so nothing is claimed wrongly. */
     logDebug(`purchases: nothing to unlink (${err?.message || err})`)
   }
 }
+
 
 export const startPurchases = async () => {
   const known = await remembered()
@@ -396,6 +424,32 @@ export const startPurchases = async () => {
 }
 
 /**
+ * THE PACKAGE THAT SELLS THE UNLOCK, out of however many an offering holds.
+ *
+ * It used to be whichever package came first, and that was a coin toss wearing
+ * a confident face. A RevenueCat project starts life with three sample
+ * packages — $rc_monthly, $rc_annual, $rc_lifetime — and this one's account has
+ * all three sitting in the offering the app reads. They resolve to nothing
+ * today, because the only products on them are Test Store ones, so first-wins
+ * happens to land on the right package. The day a real product is attached to
+ * the monthly sample, first-wins sells a MONTHLY SUBSCRIPTION for an app whose
+ * entire pitch is "One payment, once" — and the button would still say the
+ * right-looking price while doing it.
+ *
+ * So the product id decides, and the id is the same one the entitlement is
+ * wired to. First-wins stays as the fallback, because an offering built by
+ * hand with a differently-named product in it should still sell something
+ * rather than nothing, and because that is what shipped.
+ */
+const theUnlockIn = (offerings) => {
+  const every = [
+    ...(offerings?.current?.availablePackages || []),
+    ...Object.values(offerings?.all || {}).flatMap((o) => o?.availablePackages || [])
+  ]
+  return every.find((p) => p?.product?.identifier === PRODUCT_ID) || every[0] || null
+}
+
+/**
  * Ask the store what it charges here, so the button can say so.
  *
  * ANSWERS WHETHER THERE IS ANYTHING TO SELL, which the caller needs before it
@@ -408,10 +462,7 @@ const loadPrice = async () => {
   if (!api) return false
   try {
     const offerings = await api.getOfferings()
-    const found =
-      offerings?.current?.availablePackages?.[0] ||
-      Object.values(offerings?.all || {})[0]?.availablePackages?.[0] ||
-      null
+    const found = theUnlockIn(offerings)
     if (found) {
       pkg = found
       set({ price: found.product?.priceString || null, detail: null })
@@ -466,6 +517,29 @@ export const buyUnlock = async () => {
     const yes = entitled(bought?.customerInfo)
     await remember(yes)
     set({ unlocked: yes })
+    /*
+     * AND THE SIMULATION ENDS HERE.
+     *
+     * "After I did the test purchase, it just takes me back to the demo
+     * screen." It did — the paywall is reachable from inside the demo, the
+     * purchase went through, and the sheet closed onto a simulated AM4. The
+     * one moment somebody has definitely decided they want the real thing is
+     * the moment the app was still pretending.
+     *
+     * Turning it off HERE rather than on the screen that opened the paywall,
+     * because there are several ways to that paywall and this is the only
+     * place that knows the money actually moved. Leaving the demo tears down
+     * the mock and brings up the real link — see App.js, where the effect
+     * depends on `demo` as well as `auth` for exactly this reason.
+     *
+     * Only on the way out of a demo. Buying from the live app has no demo to
+     * leave, and calling setDemo(false) there would be a write and a redraw
+     * for nothing.
+     */
+    if (yes && isDemo()) {
+      setDemo(false)
+      logDebug('purchases: bought, so the demo is over')
+    }
     return yes
       ? { ok: true, cancelled: false, message: null }
       : { ok: false, cancelled: false, message: 'The store did not confirm the purchase.' }

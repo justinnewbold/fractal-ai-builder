@@ -507,10 +507,15 @@ export const AREAS = [
       },
       {
         does: 'look around without a rig',
-        web: 'Try the demo',
+        /* Both ends say it the same way now. "Change just looking to just Try
+           the Demo - no text underneath" was carried out on the phone and not
+           here, so the browser went on asking "Just looking?" with the offer
+           tucked into the sentence as a chip. It is a button under the primary
+           at both ends. */
+        web: 'Try the Demo',
         also: ['Try now', 'Go'],
         phone: 'Try the Demo',
-        why: 'the same offer at both ends, in the same three words now; the browser also says Try now on the not-connected screen and Go beside the code box, neither of which the phone has a place for'
+        why: 'the same offer at both ends, in the same three words; the browser also says Try now on the not-connected screen and Go beside the code box, neither of which the phone has a place for'
       },
       {
         does: 'choose which of the five Fractals the demo is',
@@ -881,6 +886,121 @@ export function run(test) {
          for and the order the questions arrive in. */
       assert.ok(card.indexOf('photo.credit') < card.indexOf('about.map'), `${where} puts the writing above the photograph`)
     }
+  })
+
+
+  /*
+   * THE SETUP LIST, WHICH NOTHING WAS WATCHING.
+   *
+   * "It looks like some of the menus aren't matching up, some of the changes
+   * we made recently, like nesting some of the menus and things like that,
+   * and some of the wording. I also thought we had checks in place to make
+   * sure that they didn't drift apart??"
+   *
+   * There were, and they did not cover this. The AREAS above watch five
+   * screens — the chain editor, the play screen, setlists, the log, and
+   * getting connected — and Setup is not one of them. They also only see a
+   * label a person could mistake for a button name: LOOKS_LIKE_A_BUTTON tops
+   * out at three words, so "Amp & pedal names" and "Rename presets and
+   * scenes" were invisible to the whole mechanism.
+   *
+   * And none of it watches SHAPE. Every check in this file asks whether a
+   * word exists somewhere in a file. A row that moved one level down still
+   * exists, so "Move walkthrough, updates and troubleshooting INSIDE of the
+   * 'About' menu" could be carried out on the phone and skipped in the
+   * browser with everything green.
+   *
+   * This reads the two lists as lists: which rows are on the front page, in
+   * what order, and which are behind About. A row that exists at one end only
+   * is fine and has to be written down with the reason, exactly as a button
+   * does above.
+   */
+  test('Setup is the same list, in the same order, at both ends', () => {
+    /* A row at one end only, and why. Same contract as AREAS: unexplained
+       fails, explained passes, and the list is the open questions. */
+    const ONE_END = {
+      'Get it on your phone': 'browser only — a phone has no use for a way to get itself onto a phone, and it stays on the front page rather than inside About because "somebody who has a rig connected and wants the remote in their pocket is the likeliest buyer there is"',
+      'Unlock the full version': 'phone only — the purchase is an in-app purchase and happens on a handset or not at all; the browser has nothing to sell'
+    }
+
+    const rowsIn = (block, attr) =>
+      [...block.matchAll(new RegExp(`<SetupRow\\b[\\s\\S]*?${attr}=(?:"([^"]+)"|\\{([A-Z_]+)\\})`, 'g'))].map(
+        (m) => m[1] || m[2]
+      )
+
+    /* The browser: the front list is the first setup-rows block on the
+       Settings sheet, and About's rows are the first one inside its page. */
+    const web = read('src/App.jsx')
+    const webSheet = web.slice(web.indexOf('title="Settings"'))
+    const firstList = (block) => {
+      const at = block.indexOf('<div className="setup-rows">')
+      assert.notEqual(at, -1, 'the browser Setup list moved; this check reads it')
+      return block.slice(at, block.indexOf('</div>', at))
+    }
+    const webFront = rowsIn(firstList(webSheet), 'title')
+    const webAbout = rowsIn(firstList(webSheet.slice(webSheet.indexOf("setupPage === 'about'"))), 'title')
+
+    /* The phone: the front page is `page === null`, About is `page === 'about'`. */
+    const app = read('mobile/src/screens/Settings.js')
+    const between = (from, to) => {
+      const at = app.indexOf(from)
+      assert.notEqual(at, -1, `the phone Setup screen moved; this check reads ${from}`)
+      const end = to ? app.indexOf(to, at) : -1
+      return app.slice(at, end === -1 ? undefined : end)
+    }
+    /* Up to the first page that is not the front one — 'unit', today. Named
+       by the shape rather than by which page happens to come first, so adding
+       a page does not silently widen the slice. */
+    const phoneFront = rowsIn(between('{page === null ? (', "{page === '"), 'title')
+    const phoneAbout = rowsIn(between("{page === 'about' ? (", '<Section>What stays at the computer</Section>'), 'title')
+
+    for (const [where, rows] of [['browser front', webFront], ['phone front', phoneFront], ['browser About', webAbout], ['phone About', phoneAbout]]) {
+      assert.ok(rows.length > 0, `${where} came back empty; this check no longer reads the list`)
+    }
+
+    /* Rows only one end has drop out, with a written reason. Everything left
+       is a row both have, and those must be in the same order. */
+    const shared = (rows, other) =>
+      rows.filter((r) => {
+        if (other.includes(r)) return true
+        assert.ok(
+          ONE_END[r],
+          `"${r}" is on one end's Setup and not the other's, and no reason is written down. ` +
+            'Put one in ONE_END in test/both-ends.mjs, or put the row on both ends.'
+        )
+        return false
+      })
+
+    const bothFront = [shared(webFront, phoneFront), shared(phoneFront, webFront)]
+    assert.deepEqual(
+      bothFront[0],
+      bothFront[1],
+      `the Setup front page is a different order at the two ends:\n  browser: ${webFront.join(', ')}\n  phone:   ${phoneFront.join(', ')}`
+    )
+
+    const bothAbout = [shared(webAbout, phoneAbout), shared(phoneAbout, webAbout)]
+    assert.deepEqual(
+      bothAbout[0],
+      bothAbout[1],
+      `the About page is a different order at the two ends:\n  browser: ${webAbout.join(', ')}\n  phone:   ${phoneAbout.join(', ')}`
+    )
+
+    /*
+     * AND THE NESTING ITSELF, named rather than inferred. These three are the
+     * instruction — "Move walkthrough, updates and troubleshooting INSIDE of
+     * the 'About' menu" — so they are behind the door at both ends and on
+     * neither front page.
+     */
+    for (const row of ['Updates', 'Troubleshooting']) {
+      assert.ok(webAbout.includes(row), `${row} is not inside the browser's About`)
+      assert.ok(phoneAbout.includes(row), `${row} is not inside the phone's About`)
+      assert.ok(!webFront.includes(row), `${row} is back on the browser's front list`)
+      assert.ok(!phoneFront.includes(row), `${row} is back on the phone's front list`)
+    }
+    /* The walkthrough is the third, and both ends name it from the same
+       constant rather than typing the words, so it reads as REPLAY here. */
+    assert.ok(webAbout.includes('REPLAY'), "the walkthrough is not inside the browser's About")
+    assert.ok(phoneAbout.includes('REPLAY'), "the walkthrough is not inside the phone's About")
   })
 
 }

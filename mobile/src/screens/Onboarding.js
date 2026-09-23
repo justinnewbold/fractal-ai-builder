@@ -43,7 +43,7 @@ import Press from '../components/Press'
  */
 const face = Platform.select(mono)
 
-export default function Onboarding({ onEnterDemo, onAccount, replay, onClose }) {
+export default function Onboarding({ onEnterDemo, onAccount, onUnlock, replay, onClose }) {
   const [at, setAt] = useState('welcome')
   const [unit, setUnit] = useState(UNITS[0].key)
   const [email, setEmail] = useState('')
@@ -238,15 +238,32 @@ export default function Onboarding({ onEnterDemo, onAccount, replay, onClose }) 
             body={P3.real.body}
             art={<Lock size={58} faint />}
           >
-            {/* No price on this button: it takes no money. It opens the
-                computer-app step, and the store's own sheet quotes the price
-                at the paywall.
+            {/*
+                IT OPENS THE PAYWALL. It used to open the computer-app step.
+
+                The reasoning at the time was that this button takes no money
+                and the store's own sheet quotes the price, so the walkthrough
+                should go on explaining the arrangement and let the purchase
+                happen later. That is defensible and it is not what the screen
+                says: a button reading Unlock, under a lock, under "Unlock
+                live control for your Fractal hardware", promises a purchase.
+
+                What actually happened when Justin pressed it: "the unlock
+                button and the two buttons at the bottom where it says sign in
+                and the button where it says restore purchase, all take you to
+                the other screen" — the sign-in form, three times over, from
+                three buttons that say three different things.
+
+                No price on the button itself. The store quotes it in its own
+                sheet a moment later, and a price here would be this app's
+                guess at one.
 
                 His mockup puts a small lock in the button too. Press has no
                 icon slot and widening a component used on every screen for
                 one glyph is the wrong trade — the card's own lock, above
-                right, already says it. */}
-            <Press label={P3.real.go} height={TAP} onPress={() => go('app')} />
+                right, already says it.
+            */}
+            <Press label={P3.real.go} height={TAP} onPress={() => onUnlock?.()} />
           </Choice>
 
           {/*

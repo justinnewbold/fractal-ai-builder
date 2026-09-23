@@ -5458,6 +5458,10 @@ console.log('\nboth ends')
 const { run: bothEnds } = await import('./both-ends.mjs')
 bothEnds(test)
 
+console.log('\nthe server')
+const { run: server } = await import('./server.mjs')
+server(test)
+
 test('both file kinds are listed and told apart', async () => {
   // A .syx goes back to the unit verbatim; a design re-validates first. Load
   // treating one as the other would either corrupt or silently no-op.

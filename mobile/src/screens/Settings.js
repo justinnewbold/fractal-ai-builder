@@ -261,7 +261,12 @@ export default function Settings({
               title="Phone & computer"
               status={
                 demo
-                  ? 'Demo — simulated FM3'
+                  ? /* The unit the demo actually IS, not the one it used to be
+                       only able to be. This said "simulated FM3" whatever was
+                       picked, so an Axe-Fx III demo described itself as an
+                       FM3 one row above a bar reading Axe-Fx III — the exact
+                       fault the five demo units were added to end. */
+                    `Demo — simulated ${DEMO_UNITS.find((u) => u.key === unit)?.name || 'unit'}`
                   : link !== 'connected'
                     ? linkWord
                     : unitState === 'missing'
@@ -513,8 +518,50 @@ export default function Settings({
                     />
                   ))}
                 </View>
-                <Press label="Leave the demo" tone="signal" onPress={() => setDemo(false)} />
+                {/*
+                  THE WAY OUT IS FOR SOMEBODY WHO HAS PAID.
+
+                  "Someone should only be able to exit a demo if they've
+                  already purchased the app or paid."
+
+                  It used to be here for everybody, and for somebody who has
+                  not paid it was a door to an empty room: the live app with
+                  no unlock is a screen that cannot drive anything. The demo
+                  IS the app until it is bought.
+
+                  Nobody is shut in. Heading for Sign in ends the demo too —
+                  see App.js's toSignIn — and the sign-in screen offers the
+                  demo again, so the way out for somebody who has not paid is
+                  the one they would take anyway.
+
+                  The same words as the bar, because it is the same errand and
+                  two words for one action is how the two ends drifted apart
+                  everywhere else in this app.
+                */}
+                {purchase.unlocked ? (
+                  <Press label="Exit demo" tone="signal" onPress={() => setDemo(false)} />
+                ) : null}
               </>
+            ) : purchase.unlocked ? (
+              /*
+                THE WAY IN, FOR SOMEBODY WHO HAS PAID.
+
+                "It would be a good idea for somebody that wants to maybe view
+                what it looks like having an AxeFX 3 or another model they
+                don't have yet to play around with it."
+
+                The demo is hidden from everybody who has bought the app —
+                it is not on the walkthrough they have been past, and signing
+                in ends it — so this is the door he asked to keep. Here rather
+                than on the front list because this page is what the phone is
+                talking to, and the demo is a thing to talk to.
+
+                The same three words the sign-in screen uses. There is no
+                fourth name for one errand in this app, and no heading over
+                it: a heading would be a sentence I wrote rather than one he
+                did, and the button already says what it does.
+              */
+              <Press label="Try the Demo" onPress={() => setDemo(true)} />
             ) : null}
 
             {/*

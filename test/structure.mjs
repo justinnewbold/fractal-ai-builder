@@ -1380,7 +1380,28 @@ export function run(test) {
      */
     const setup = sheet('Settings')
     assert.match(setup, /<div className="device-meta mono setup-version">\{FULL\}<\/div>/, 'the version line is not at the top')
-    const rows = [...setup.matchAll(/<SetupRow key="([^"]+)" title="([^"]+)" status=/g)].map((m) => m[2])
+    /*
+     * THE FRONT LIST ONLY, and that is the whole point of this check now.
+     *
+     * It used to scan the entire Settings sheet, every page inside it
+     * included, so a row could move one level down and still satisfy it. That
+     * is exactly how Troubleshooting and the walkthrough went on reading as
+     * front-list rows here for weeks after the phone had moved them into
+     * About — "some of the menus aren't matching up". A rows list that counts
+     * rows wherever they happen to be cannot catch a nesting change.
+     *
+     * Multi-line SetupRows count too, for the same reason: the old pattern
+     * required key, title and status on one line, so a row wrapped over four
+     * lines was invisible to it.
+     */
+    const frontList = (page) => {
+      const at = page.indexOf('<div className="setup-rows">')
+      assert.notEqual(at, -1, 'the Setup list moved; this check reads it')
+      return page.slice(at, page.indexOf('</div>', at))
+    }
+    const rowsIn = (block) =>
+      [...block.matchAll(/<SetupRow\b[\s\S]*?title=(?:"([^"]+)"|\{([A-Z_]+)\})/g)].map((m) => m[1] || m[2])
+    const rows = rowsIn(frontList(setup))
     assert.deepEqual(
       rows,
       [
@@ -1394,22 +1415,36 @@ export function run(test) {
          */
         'Amp & pedal names',
         'Phone & computer',
-        /*
-         * Only drawn while the demo is on, and this reads App.jsx as text
-         * rather than running it, so it is always in this list. It sits high
-         * because the demo is the whole app for somebody who has not plugged
-         * anything in yet, and because it was unfindable where it used to be:
-         * two doors inside Phone & computer, a row named after pairing a
-         * phone. "Only shows FM3 is the only model available."
-         */
-        'Demo Unit',
         'Rename presets and scenes',
+        /*
+         * The one row here the phone has not got, and the reason it is not
+         * inside About with the other once-ever errands: "Somebody who has a
+         * rig connected and wants the remote in their pocket is the likeliest
+         * buyer there is." A phone needs no way to get itself onto a phone.
+         */
+        'Get it on your phone',
         /* No 'Play screen'. Stage tiles and Appearance are not doors any more;
-           they are open at the bottom of this list. Asserted below. */
-        'Troubleshooting',
+           they are open at the bottom of this list. Asserted below.
+           No 'Demo Unit' either — it is inside Phone & computer, where the
+           phone keeps it. No 'Troubleshooting' and no walkthrough — inside
+           About, where Justin put the phone's. */
         'About'
       ],
       `Settings opens on ${rows.length} rows: ${rows.join(', ')}`
+    )
+
+    /*
+     * AND WHAT IS BEHIND THE ONE DOOR, in the phone's order.
+     *
+     * "Move walkthrough, updates and troubleshooting INSIDE of the 'About'
+     * menu." Carried out on the phone; this is the browser holding the same
+     * shape, so the next change to either list has to be made to both.
+     */
+    const about = setup.slice(setup.indexOf("setupPage === 'about'"))
+    assert.deepEqual(
+      rowsIn(frontList(about)),
+      ['Updates', 'Troubleshooting', 'REPLAY'],
+      'the About page is not the three rows the phone has, in that order'
     )
     assert.ok(!setup.includes('<Group'), 'the doors are back')
 
@@ -1475,10 +1510,13 @@ export function run(test) {
          about it is a fault being fixed: it is what the app is and how it
          works, and somebody hunting for it under Troubleshooting has first
          had to decide they have a problem. */
-      /* 'how-this-works' went with the tour. The walkthrough that replaced it
-         sits first, because it is the one thing on this page somebody opens
-         on purpose rather than to check a fact. */
-      ['about', ['walkthrough', 'updates', 'small-print']]
+      /* Updates is a page of its own now rather than a panel on About, for
+         the same reason the walkthrough is a row rather than a chip: they are
+         rows inside About, which is where Justin put the phone's. The rows
+         themselves are asserted above; what is left folded on About is the
+         small print. */
+      ['updates', []],
+      ['about', ['small-print']]
     ]) {
       assert.deepEqual(behind(page), panels, `the ${page} page holds ${behind(page).join(', ')}`)
     }
@@ -4788,13 +4826,26 @@ export function run(test) {
      * can be refused for making too many.
      */
     /*
-     * THE WALKTHROUGH, on the list rather than two doors in. Checked by
-     * position: the About page is where it used to live, and a row that
-     * follows the About row is a row nobody reaches from the promise.
+     * THE WALKTHROUGH IS A ROW INSIDE ABOUT, which reverses what this check
+     * used to require.
+     *
+     * It was lifted onto the front list because the last screen of the tour
+     * promises "Settings → Show the walkthrough" and it had been two doors in.
+     * Then: "Move walkthrough, updates and troubleshooting INSIDE of the
+     * 'About' menu." That is one door, not two, and it is where the phone's
+     * has been since — the browser's stayed on the front list, which is the
+     * drift this pass is closing.
+     *
+     * The promise still holds, because what it names is the Settings screen
+     * and this is on it. What the check holds instead is the shape: a ROW,
+     * not a chip inside a fold, because everything else at that level is a row
+     * and the one thing that is not is the one thing nobody finds.
      */
-    const rows = app.slice(app.indexOf('<SetupRow key="link"'), app.indexOf('<SetupRow key="about"'))
-    assert.match(rows, /<SetupRow\s*\n?\s*key="walkthrough"\s*\n?\s*title=\{REPLAY\}/, 'the walkthrough is not on the Settings list')
-    assert.match(rows, /setWalkthrough\(true\)/, 'the row on the list does not open the walkthrough')
+    const aboutPage = app.slice(app.indexOf("setupPage === 'about' ? ("))
+    assert.match(aboutPage, /<SetupRow\s*\n?\s*key="walkthrough"\s*\n?\s*title=\{REPLAY\}/, 'the walkthrough is not a row on the About page')
+    assert.match(aboutPage, /setWalkthrough\(true\)/, 'the row on the About page does not open the walkthrough')
+    const frontRows = app.slice(app.indexOf('<SetupRow key="link"'), app.indexOf('<SetupRow key="about"'))
+    assert.ok(!frontRows.includes('key="walkthrough"'), 'the walkthrough is back on the front list, where the phone does not have it')
   })
 
   test('the computer states the condition, and the phone is what answers it', () => {
@@ -5071,11 +5122,13 @@ export function run(test) {
     const settings = readFileSync(new URL('../mobile/src/screens/Settings.js', import.meta.url), 'utf8')
     const paywall = readFileSync(new URL('../mobile/src/screens/Paywall.js', import.meta.url), 'utf8')
 
-    /* All three doors, from the one handler. */
+    /* All four doors, from the one handler — Setup, both unlock screens, and
+       the walkthrough's, which got a paywall of its own when its Unlock
+       button stopped merely advancing to the next step. */
     assert.equal(
       (app.match(/onSignIn=\{toSignIn\}/g) || []).length,
-      3,
-      'the sign-in route is no longer wired to Setup and both unlock screens'
+      4,
+      'the sign-in route is no longer wired to Setup, the walkthrough and both unlock screens'
     )
     assert.match(app, /const toSignIn = \(\) => \{/, 'the sign-in route is gone')
     assert.match(app, /const toSignIn = \(\) => \{[^}]*setAuth\('out'\)/, 'it no longer lands on the sign-in screen')

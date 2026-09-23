@@ -9159,8 +9159,21 @@ button.phone-chip.dim {
   font-size: var(--f-2);
 }
 
+/*
+ * The demo, as a button rather than a chip on the end of a question.
+ *
+ * It was `Just looking?` with `Try the demo` tucked inside the sentence.
+ * "Change just looking to just Try the Demo - no text underneath" was said
+ * about the phone and never carried over here. It is the same size and width
+ * as the primary above it so the two read as the two ways off this screen,
+ * and it stays a plain button — the base style is already the panel-and-rule
+ * shape the phone's second button has.
+ */
 .connect-demo {
   margin-top: var(--s-6);
+  min-height: 52px;
+  min-width: min(280px, 100%);
+  font-size: var(--f-2);
 }
 
 /* What macOS said while it tried to install, folded away for pasting. */

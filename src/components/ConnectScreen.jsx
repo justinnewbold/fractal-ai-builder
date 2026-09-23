@@ -134,12 +134,21 @@ export default function ConnectScreen({ link, onConnect, onRetry, onSwitchAccoun
         </>
       )}
 
-      <p className="hint connect-demo">
-        Just looking?{' '}
-        <button className="chip" onClick={onDemo} disabled={busy}>
-          Try the demo
-        </button>
-      </p>
+      {/*
+        THREE WORDS AND NOTHING OVER THEM.
+
+        "Change just looking to just Try the Demo - no text underneath." That
+        was said about the phone's sign-in screen and carried out there; this
+        screen went on asking the same question for weeks afterwards, which is
+        the drift Justin caught — "some of the wording".
+
+        A button rather than a chip on the end of a sentence, for the same
+        reason the phone's is one: it is one of the two ways off this screen,
+        not a footnote to the other.
+      */}
+      <button type="button" className="connect-demo" onClick={onDemo} disabled={busy}>
+        Try the Demo
+      </button>
     </section>
   )
 }

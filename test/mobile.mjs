@@ -1974,7 +1974,7 @@ export function run(test) {
 
     /* Each row says something true about the state it leads to, which is the
        whole point of the list: it answers most questions without a tap. */
-    assert.match(settings, /status=\{\s*demo\s*\?\s*'Demo — simulated FM3'[\s\S]{0,500}?`\$\{deviceName \|\| 'Unit'\} · connected`/)
+    assert.match(settings, /status=\{\s*demo\s*\?[\s\S]{0,900}?`\$\{deviceName \|\| 'Unit'\} · connected`/)
   })
 
   test('the version on the About page is the version that was built', async () => {
@@ -3588,6 +3588,219 @@ export function run(test) {
     assert.match(read('mobile/src/screens/Stage.js'), /icon=\{blockIcon\(block\.slug\)\}/, 'the chain tiles are drawn without their pictures')
   })
 
+  test('the paywall sells the unlock, not whichever package came first', async () => {
+    /*
+     * FOUND IN THE LIVE ACCOUNT, not imagined.
+     *
+     * RevenueCat starts a project with three sample packages — $rc_monthly,
+     * $rc_annual and $rc_lifetime — and all three are sitting in the offering
+     * this app reads. They resolve to nothing today, because the only products
+     * on them belong to the Test Store, so taking the first package happened
+     * to land on the right one.
+     *
+     * Attach a real product to the monthly sample and first-wins sells a
+     * MONTHLY SUBSCRIPTION in an app whose paywall says "One payment, once" —
+     * with the button showing a plausible price the whole time. Nothing would
+     * fail; somebody would just be billed every month for a thing they were
+     * told they were buying outright.
+     *
+     * So the product id chooses, and first-wins is only the fallback.
+     */
+    const src = read('mobile/src/lib/purchases.js')
+    const picker = src.slice(src.indexOf('const theUnlockIn'), src.indexOf('const loadPrice'))
+    assert.ok(picker.length > 50, 'the package picker moved; this check reads it')
+    assert.match(picker, /p\?\.product\?\.identifier === PRODUCT_ID/, 'the package is not chosen by which product it sells')
+    assert.ok(
+      picker.indexOf('=== PRODUCT_ID') < picker.indexOf('every[0]'),
+      'first-wins is tried before the product id, so the id changes nothing'
+    )
+
+    /* And nothing reaches for a package by position any more. */
+    const noProse = src.replace(/\/\*[\s\S]*?\*\//g, ' ')
+    assert.ok(
+      !/availablePackages\?\.\[0\]/.test(noProse),
+      'something still takes the first package out of an offering'
+    )
+
+    /* The picker itself, run against the shape RevenueCat actually returns —
+       the three sample packages, with the real unlock on the last of them. */
+    const mod = await import(`data:text/javascript,${encodeURIComponent(
+      picker.replace('const theUnlockIn', 'export const theUnlockIn') +
+        "\nexport const PRODUCT_ID = 'cloud.newbold.fractalremote.full'\n"
+    )}`).catch(() => null)
+    if (mod) {
+      const pack = (id) => ({ product: { identifier: id } })
+      const offerings = {
+        current: {
+          availablePackages: [pack('monthly.sub'), pack('yearly.sub'), pack('cloud.newbold.fractalremote.full')]
+        },
+        all: {}
+      }
+      assert.equal(
+        mod.theUnlockIn(offerings)?.product?.identifier,
+        'cloud.newbold.fractalremote.full',
+        'the picker took the monthly subscription over the unlock'
+      )
+      assert.equal(mod.theUnlockIn({ current: { availablePackages: [] }, all: {} }), null, 'an empty offering does not come back empty')
+    }
+  })
+
+  test('somebody who has paid gets a door out of the demo, where the price used to be', () => {
+    /*
+     * "There needs to be a more clear way to exit the demo if it's
+     * registering the purchase... instead of it saying unlock 999 at the top
+     * have it just clearly say exit demo if they're in the demo and they've
+     * already paid."
+     *
+     * The demo stays useful after a purchase — "somebody that wants to maybe
+     * view what it looks like having an AxeFX 3 or another model they don't
+     * have yet" — so it is not taken away. What was missing was a way out on
+     * the same wall as the way in. The only one was Settings, two screens
+     * away, because the pill beside DEMO is the unlock, and an unlock is the
+     * one thing that person does not need.
+     */
+    const bar = read('mobile/src/components/TopBar.js')
+    const flat = bar.replace(/\{?\/\*[\s\S]*?\*\/\}?/g, ' ').replace(/\s+/g, ' ')
+
+    assert.match(flat, /const canLeave = demo && purchase\.unlocked/, 'the bar cannot tell a paid demo from an unpaid one')
+    assert.match(flat, /accessibilityLabel="Exit demo"/, 'there is no way out of the demo in the bar')
+    assert.match(flat, /onPress=\{\(\) => \{ tick\(\) setDemo\(false\) \}\}/, 'the way out does not leave the demo')
+    assert.match(bar, /import \{ setDemo, useDemo \} from '\.\.\/lib\/demo'/, 'the bar cannot turn the demo off')
+
+    /*
+     * `unlocked`, NOT `!canBuy`, and this is the part worth holding.
+     *
+     * canBuy is also false on a screen handed no onUnlock, and on a phone
+     * whose store could not be reached. Neither of those is somebody who has
+     * paid, and telling either of them that leaving is their only option
+     * would be the paywall disappearing on the people most likely to need it.
+     */
+    assert.ok(!/canLeave = demo && !canBuy/.test(flat), 'a phone that merely cannot buy is treated as one that has paid')
+
+    /* The two pills never appear together: one is for somebody who has paid
+       and the other only shows when there is something to sell. */
+    const buy = flat.indexOf('{canBuy && purchase.price ?')
+    const leave = flat.indexOf('{canLeave ?')
+    assert.ok(buy > 0 && leave > 0, 'one of the two pills is gone')
+    assert.ok(leave < buy, 'the way out is drawn after the price, so a paid phone reads second')
+  })
+
+  test('the live app is never reached without an account', () => {
+    /*
+     * "Right now I'm not signed in and it's still letting me use it... the
+     * user should be required to either sign in if they already have a sign
+     * in or sign up right after they unlock it and they shouldn't be able to
+     * get past that screen."
+     *
+     * THE HOLE, AND IT WAS OPENED BY THE FIX BEFORE THIS ONE.
+     *
+     * `auth` becomes 'in' at startup if the demo is on OR a session is found,
+     * because the demo needs no account. That was honest while the only way
+     * out of the demo was a button. Then buying started ending the demo —
+     * right in itself — and left 'in' standing behind it: the live app,
+     * unlocked, signed in to nothing, reaching nothing, and nothing on screen
+     * saying so.
+     *
+     * So the state has to be rechecked whenever the demo goes off.
+     */
+    const app = read('mobile/App.js')
+
+    /* The startup read is what grants 'in' to a demo with no session. */
+    assert.match(app, /restoreDemo\(\)\s*\n\s*\.then\(\(on\) => \(on \? true : haveSession\(\)\)\)/, 'the startup check moved; this test reads it')
+
+    /* And this is what takes it back. */
+    const guard = app.slice(app.indexOf('THE DEMO IS NOT AN ACCOUNT'))
+    assert.match(guard, /if \(demo \|\| auth !== 'in'\) return undefined/, 'the guard runs while the demo is on, or when nobody is in')
+    assert.match(guard, /haveSession\(\)\s*\n\s*\.then\(\(id\) => alive && !id && setAuth\('out'\)\)/, 'a phone with no session is left in the live app')
+    assert.match(guard, /\}, \[demo, auth\]\)/, 'the guard does not re-run when the demo ends')
+
+    /*
+     * ON THE DEMO ENDING, NOT ON THE PURCHASE. Leaving by the Exit demo
+     * button has the identical gap, and a check on the state cannot be
+     * forgotten by a route somebody adds later.
+     */
+    assert.ok(
+      !/buyUnlock[\s\S]{0,400}setAuth\('out'\)/.test(read('mobile/src/lib/purchases.js')),
+      'the account check hangs off the purchase, so other ways out of the demo skip it'
+    )
+
+    /* And the screen they land on is the one that claims the purchase. */
+    assert.match(app, /onSignedIn=\{\(\) => \{[\s\S]{0,600}linkAccount\(\)/, 'signing in no longer attaches the purchase to the account')
+  })
+
+  test('signing in ends the demo, and a paid phone can start one', () => {
+    /*
+     * "When I sign in, it takes me directly to the demo."
+     *
+     * The way OUT to the sign-in screen already cleared the demo — toSignIn
+     * does — but the way back IN did not. So somebody who tapped Try the Demo
+     * on that screen, looked around, came back and signed in, arrived at a
+     * simulated unit with their real one waiting behind it. Two halves of one
+     * door disagreeing.
+     */
+    const app = read('mobile/App.js')
+    const signedIn = app.slice(app.indexOf('onSignedIn={() => {'), app.indexOf("setAuth('in')", app.indexOf('onSignedIn={() => {')) + 20)
+    assert.match(signedIn, /linkAccount\(\)/, 'signing in no longer claims the purchase')
+    assert.match(signedIn, /setDemo\(false\)/, 'signing in leaves the phone in the demo')
+    /* And the other half is still there, or the door only shuts one way. */
+    assert.match(app, /const toSignIn = \(\) => \{[\s\S]{0,200}setDemo\(false\)/, 'leaving for the sign-in screen no longer ends the demo')
+
+    /*
+     * WHICH CLOSES THE ONLY WAY IN, so there has to be another.
+     *
+     * "It would be a good idea for somebody that wants to maybe view what it
+     * looks like having an AxeFX 3 or another model they don't have yet." The
+     * demo is off the walkthrough for anybody who has paid and signing in now
+     * ends it, so without this a paying customer could never see one again.
+     *
+     * On the Phone & computer page, because that page is what the phone is
+     * talking to. Behind the purchase, for the same reason Exit demo is.
+     */
+    const settings = read('mobile/src/screens/Settings.js')
+    /* Comments out first: the note above this button is longer than any
+       sensible window, and a check that depends on prose length is a check
+       that breaks when somebody explains themselves properly. */
+    const bare = settings.replace(/\{?\/\*[\s\S]*?\*\/\}?/g, ' ').replace(/\s+/g, ' ')
+    assert.match(bare, /\) : purchase\.unlocked \? \( <Press label="Try the Demo" onPress=\{\(\) => setDemo\(true\)\} \/>/, 'a paid phone has no way into the demo')
+    /* The same three words the sign-in screen uses: one errand, one name. */
+    assert.match(read('mobile/src/screens/SignIn.js'), /label="Try the Demo"/, 'the two ways into the demo are called different things')
+  })
+
+  test('buying the app ends the demo', () => {
+    /*
+     * "After I did the test purchase, it just takes me back to the demo
+     * screen."
+     *
+     * It did. The paywall is reachable from inside the demo — that is the
+     * point of the demo — the purchase went through, the sheet closed, and
+     * behind it was a simulated AM4 with DEMO in the bar. The one moment
+     * somebody has definitely decided they want the real thing is the moment
+     * the app was still pretending.
+     *
+     * In buyUnlock rather than on the screen that opened the paywall: there
+     * is more than one way to that paywall, and this is the only place that
+     * knows the money actually moved.
+     */
+    const src = read('mobile/src/lib/purchases.js')
+    const buy = src.slice(src.indexOf('export const buyUnlock'), src.indexOf('export const restorePurchase'))
+    assert.ok(buy.length > 100, 'buyUnlock moved; this check reads it')
+    assert.match(buy, /if \(yes && isDemo\(\)\) \{\s*\n\s*setDemo\(false\)/, 'a purchase leaves the app in the demo')
+    /* Guarded on both, and the order matters. A purchase that did NOT go
+       through must not end the demo — somebody who cancelled is still
+       looking around — and setDemo(false) in the live app is a write and a
+       redraw for nothing. */
+    assert.ok(
+      buy.indexOf('if (yes && isDemo())') > buy.indexOf('set({ unlocked: yes })'),
+      'the demo is ended before the purchase is known to have worked'
+    )
+    assert.match(src, /import \{ isDemo, setDemo \} from '\.\/demo'/, 'purchases cannot see the demo switch')
+
+    /* And demo.js must not import purchases back, or Metro resolves one of
+       the two to undefined at load and the failure is a blank screen. */
+    const demo = read('mobile/src/lib/demo.js')
+    assert.ok(!/from '\.\/purchases'/.test(demo), 'the demo and the purchases now import each other')
+  })
+
   test('a purchase follows the person, not the handset', () => {
     /*
      * "It does unlock it on android because you can sign in with a user name
@@ -3615,18 +3828,41 @@ export function run(test) {
     assert.ok(order > 0 && order < buy.indexOf('const info = linked ||'), 'the store is asked before it is told who is asking')
 
     /*
-     * AND SIGNING OUT NEVER TAKES AN UNLOCK AWAY.
+     * AND SIGNING OUT FOLLOWS THE ACCOUNT OUT — which reverses what this
+     * check used to require, so the reasoning matters.
      *
-     * RevenueCat's logOut returns to a fresh anonymous id, which by definition
-     * owns nothing. Re-reading the entitlement after it would lock out
-     * somebody who bought on this very phone and then signed out of an account
-     * they did not need in order to buy. The remembered answer stands.
+     * It used to keep the remembered answer: logOut returns a fresh anonymous
+     * id that owns nothing, so re-reading would lock out somebody who bought
+     * on this very phone and then signed out of an account they never needed
+     * in order to buy.
+     *
+     * That protected one person and broke the screen for everybody else.
+     * "When I log out of the phone... no option to unlock the app anywhere or
+     * restore the purchase." Of course not — the Setup row and the paywall
+     * are both hidden by the same `unlocked` flag, and the flag was still
+     * true. A phone that can neither be unlocked nor restored is a dead end,
+     * and the next person to sign in on it got the app for nothing.
+     *
+     * Restore is what the old rule was really reaching for, and it is better
+     * at the job: it asks Apple or Google directly rather than asking
+     * RevenueCat about an anonymous id, so a purchase made on this handset
+     * comes back in one tap. Apple requires that button to exist anyway.
      */
     const out = buy.slice(buy.indexOf('export const unlinkAccount'))
     const body = out.slice(0, out.indexOf('\n}'))
-    assert.match(body, /api\.logOut\(\)/, 'signing out still answers as the last person')
-    assert.ok(!/set\(\{ unlocked: false/.test(body), 'signing out takes the unlock away')
-    assert.ok(!/remember\(false\)/.test(body), 'signing out forgets a purchase made on this phone')
+    assert.match(body, /const info = await api\.logOut\(\)/, 'signing out throws away the answer logOut gives back')
+    assert.match(body, /const yes = entitled\(info\)/, 'nothing reads whether the phone still owns anything')
+    assert.match(body, /await remember\(yes\)/, 'the claim is not written down, so the next launch believes the old one')
+    assert.match(body, /set\(\{ unlocked: yes \}\)/, 'the screen goes on showing the last person’s unlock')
+    assert.ok(!/set\(\{ unlocked: true/.test(body), 'signing out hands the unlock to whoever signs in next')
+
+    /* And the way back is still on the screen for the person the old rule
+       protected: the Setup row appears the moment `unlocked` is false. */
+    assert.match(
+      read('mobile/src/screens/Settings.js'),
+      /\{purchase\.unlocked \? null : \(/,
+      'the unlock and restore row no longer comes back when the phone is locked'
+    )
 
     /* Both ends wired: signing in links, signing out unlinks. */
     const app = read('mobile/App.js')
@@ -3682,7 +3918,7 @@ export function run(test) {
      */
     assert.match(
       read('mobile/src/screens/Settings.js'),
-      /label="Leave the demo"[\s\S]{0,120}setDemo\(false\)/,
+      /label="Exit demo"[\s\S]{0,120}setDemo\(false\)/,
       'the way out of the demo moved; this test names it'
     )
   })
@@ -5815,9 +6051,28 @@ export function run(test) {
     )
     assert.match(signIn, /setDemo\(true\)/, 'the button does not turn the demo on')
 
-    /* And escapable, or it is a trap rather than a demo. */
+    /*
+     * AND ESCAPABLE, or it is a trap rather than a demo — but the door is
+     * not the same one for everybody.
+     *
+     * "Someone should only be able to exit a demo if they've already
+     * purchased the app or paid." So Settings' way out is behind the
+     * purchase now: for somebody who has not paid it led to an empty room,
+     * the live app with nothing it can drive.
+     *
+     * Which makes the OTHER door the one that matters, and it is the one
+     * this check now holds. Heading for Sign in ends the demo — App.js's
+     * toSignIn — and the sign-in screen offers the demo again, so somebody
+     * who has not paid can always get out and back in. Lose that and the
+     * gate above turns the demo into a room with no handle on the inside.
+     */
     const settings = read('mobile/src/screens/Settings.js').replace(/\s+/g, ' ')
-    assert.match(settings, /Leave the demo/, 'there is no way out of the demo')
+    assert.match(settings, /purchase\.unlocked \? \( <Press label="Exit demo"/, 'the way out of the demo is not behind the purchase')
+
+    const app = read('mobile/App.js')
+    const toSignIn = app.slice(app.indexOf('const toSignIn = ()'), app.indexOf('const toSignIn = ()') + 260)
+    assert.match(toSignIn, /setDemo\(false\)/, 'signing in no longer ends the demo, so an unpaid phone is shut in')
+    assert.match(signIn, /setDemo\(true\)/, 'the sign-in screen no longer offers the way back in')
     assert.match(settings, /onPress=\{\(\) => setDemo\(false\)\}/, 'the way out does not turn it off')
     /* It says what it is, every time, rather than letting somebody think a
        simulated FM3 is their FM3. */
@@ -5830,7 +6085,16 @@ export function run(test) {
        another one. */
     assert.match(settings, /const unit = useDemoUnit\(\)/, 'the demo screen does not follow which unit it is')
     assert.match(settings, /DEMO_UNITS\.find\(\(u\) => u\.key === unit\)/, 'the demo says a unit it may not be')
-    assert.match(settings, /status=\{ demo \? 'Demo — simulated FM3' :/, 'Setup does not show that the demo is on')
+    /*
+     * AND IT NAMES THE UNIT THE DEMO ACTUALLY IS.
+     *
+     * This was the literal 'Demo — simulated FM3' whatever had been picked,
+     * so an Axe-Fx III demo described itself as an FM3 one row under a bar
+     * reading Axe-Fx III. That is the exact fault the five demo units were
+     * added to end, left behind in a string.
+     */
+    assert.match(settings, /`Demo — simulated \$\{DEMO_UNITS\.find\(\(u\) => u\.key === unit\)\?\.name \|\| 'unit'\}`/, 'Setup does not say which unit the demo is')
+    assert.ok(!/'Demo — simulated FM3'/.test(settings), 'Setup calls every demo an FM3 again')
 
     /* The link reads as connected, because from every screen's point of view it
        is: the questions get answered. Otherwise the app refuses to open the
@@ -7758,13 +8022,35 @@ export function run(test) {
    * different screens, not to the point that it's annoying but to the point
    * where there is a clear path."
    */
-  test('there are four ways to the purchase and they all go to one place', () => {
+  test('there are five ways to the purchase and they all go to one place', () => {
     const app = read('mobile/App.js')
     assert.equal(
       (app.match(/onUnlock=\{\(\) => setBuying\(true\)\}/g) || []).length,
-      3,
-      'the bar, Settings and the stage screen do not all open the same paywall'
+      4,
+      'the bar, Settings, the stage screen and the walkthrough do not all open the same paywall'
     )
+
+    /*
+     * AND THE WALKTHROUGH'S ONE HAS A PAYWALL TO OPEN.
+     *
+     * "The unlock button and the two buttons at the bottom where it says sign
+     * in and the button where it says restore purchase, all take you to the
+     * other screen." That button used to advance the walkthrough, whose next
+     * step is the sign-in form — so three buttons saying three different
+     * things did one thing.
+     *
+     * The paywall lives inside the signed-in branch, which the walkthrough is
+     * not. Wiring the button without drawing a Paywall in that branch would
+     * set `buying` true and change no pixels, which is worse than the wrong
+     * screen: a haptic and nothing else reads as a broken app.
+     */
+    const walk = app.slice(app.indexOf('seenWalk === false ? ('), app.indexOf("auth === 'out' ? ("))
+    assert.match(walk, /onUnlock=\{\(\) => setBuying\(true\)\}/, 'the walkthrough cannot open the paywall')
+    assert.match(walk, /\{buying \? \(\s*<Paywall/, 'the walkthrough opens a paywall that is never drawn')
+    /* And buying from there claims the purchase onto an account rather than
+       leaving it on the handset — see linkAccount on SignIn's onSignedIn. */
+    assert.match(walk, /onUnlocked=\{\(\) => \{[\s\S]{0,200}setAuth\('out'\)/, 'a purchase made in the walkthrough is left unattached to an account')
+    assert.match(read('mobile/src/screens/Onboarding.js'), /onPress=\{\(\) => onUnlock\?\.\(\)\}/, 'the Unlock card still advances the walkthrough instead of selling')
 
     /* The fourth is the word DEMO itself, inside the bar. */
     const bar = read('mobile/src/components/TopBar.js')

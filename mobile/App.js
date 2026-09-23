@@ -295,6 +295,45 @@ export default function App() {
   }, [])
 
   /*
+   * THE DEMO IS NOT AN ACCOUNT, AND WHEN IT ENDS THE APP HAS TO ADMIT THAT.
+   *
+   * "Right now I'm not signed in and it's still letting me use it... the user
+   * should be required to either sign in if they already have a sign in or
+   * sign up right after they unlock it and they shouldn't be able to get past
+   * that screen."
+   *
+   * He is right, and the hole is mine. `auth` goes to 'in' on startup if the
+   * demo is on OR a session is found — the demo needs no account, which is
+   * the whole point of it. That was honest while the only way out of the demo
+   * was a button nobody pressed by accident. Then 1.56.0 made a purchase end
+   * the demo, which is correct, and left 'in' standing behind it: the live
+   * app, unlocked, signed in to nothing, reaching nothing, with no sign of
+   * anything wrong.
+   *
+   * So 'in' has to keep meaning what it meant. Whenever the demo goes off,
+   * the session is asked for again, and a phone that has not got one goes to
+   * the sign-in screen — which is also where the purchase gets claimed, since
+   * SignIn's onSignedIn calls linkAccount.
+   *
+   * On the demo ending rather than on the purchase, deliberately: leaving by
+   * the Exit demo button has the same gap, and a check on the state cannot be
+   * forgotten by a route added later.
+   *
+   * Nobody is stranded. The sign-in screen signs in, makes an account, resets
+   * a password, and still offers the demo.
+   */
+  useEffect(() => {
+    if (demo || auth !== 'in') return undefined
+    let alive = true
+    haveSession()
+      .then((id) => alive && !id && setAuth('out'))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [demo, auth])
+
+  /*
    * THE ONE PLACE THE PAYWALL IS RAISED, and it waits to be sure.
    *
    * Both ways in land on `auth === 'in'` — a code typed just now, and a
@@ -492,8 +531,9 @@ export default function App() {
            * walkthrough, and the sign-in screen's own onSignedIn does those
            * same two things. The demo has onEnterDemo.
            */
-          <Onboarding
-            replay={replaying}
+          <>
+            <Onboarding
+              replay={replaying}
             /*
              * Out, and nothing else. No account touched, no demo started, no
              * walkthrough state rewound — they came to look at it.
@@ -529,7 +569,56 @@ export default function App() {
               setReplaying(false)
               setAuth('out')
             }}
-          />
+              /*
+               * THE UNLOCK BUTTON BUYS THE APP, which it did not until now.
+               *
+               * "The unlock button and the two buttons at the bottom where it
+               * says sign in and the button where it says restore purchase,
+               * all take you to the other screen." Three buttons saying three
+               * different things, all landing on the sign-in form — because
+               * this one advanced the walkthrough rather than opening the
+               * paywall, and the walkthrough's next step is sign-in.
+               */
+              onUnlock={() => setBuying(true)}
+            />
+            {/*
+              AND THE PAYWALL IS DRAWN HERE TOO, or that button does nothing.
+
+              The other one lives inside the signed-in branch, which the
+              walkthrough is not, so `buying` could go true and nothing would
+              appear. A button that fires a haptic and changes no pixels is
+              worse than the wrong screen.
+
+              `onUnlocked` goes to sign-in rather than just closing. A purchase
+              is anonymous until an account claims it — which is exactly how
+              Justin's own test purchase landed on a handset id instead of on
+              him — and SignIn's linkAccount is what claims it. An account is
+              needed to reach the computer anyway, so this is a step earlier,
+              not a step extra.
+            */}
+            {buying ? (
+              <Paywall
+                asked
+                onSignIn={toSignIn}
+                onUnlocked={() => {
+                  setBuying(false)
+                  markWalkthrough()
+                  setSeenWalk(true)
+                  setReplaying(false)
+                  setAuth('out')
+                }}
+                onDemo={() => {
+                  setBuying(false)
+                  setDemo(true)
+                  markWalkthrough()
+                  setSeenWalk(true)
+                  setReplaying(false)
+                  setAuth('in')
+                }}
+                onBack={() => setBuying(false)}
+              />
+            ) : null}
+          </>
         ) : auth === 'out' ? (
           <SignIn
             onSignedIn={() => {
@@ -541,6 +630,18 @@ export default function App() {
                  purchase follows the account, so signing in is what tells
                  RevenueCat which account to answer for. */
               linkAccount()
+              /*
+               * AND THE DEMO ENDS, because signing in is heading for a real
+               * rig. "When I sign in, it takes me directly to the demo."
+               *
+               * The way OUT to this screen already cleared it — toSignIn does
+               * — but the way back IN did not, so somebody who tapped Try the
+               * Demo from the sign-in form, looked around, then signed in,
+               * came back to a simulated unit with their real one waiting.
+               *
+               * The two halves of one door now agree.
+               */
+              setDemo(false)
               setAuth('in')
             }}
             onDemo={() => setAuth('in')}
