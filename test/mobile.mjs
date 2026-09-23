@@ -3312,6 +3312,45 @@ export function run(test) {
     assert.match(web, /\{mismatch \|\|/, 'the browser says the generic line over the real reason')
   })
 
+  test('the advice to close Fractal’s own software names it, per unit where the unit is known', async () => {
+    /*
+     * "What kind of information do we have to let people know they need to
+     * close any of the fractal software, like FM3 edit… maybe we should add
+     * it in more places." "Is there a way to name the device specifically by
+     * detecting which device they're using?"
+     */
+    const { editorFor, holders, quitEditor } = await import('../shared/editors.mjs')
+    assert.equal(editorFor('FM3'), 'FM3-Edit')
+    assert.equal(editorFor('FM9'), 'FM9-Edit')
+    assert.equal(editorFor('Axe-Fx III'), 'Axe-Edit III')
+    assert.equal(editorFor('Axe-Fx II'), 'Axe-Edit', 'the Axe-Fx II is taken for a III, or the other way round')
+    assert.equal(editorFor('AM4'), 'AM4-Edit')
+    assert.equal(editorFor('VP4'), 'VP4-Edit')
+    assert.equal(editorFor(null), null)
+    assert.equal(quitEditor('FM3'), 'Quit FM3-Edit or Fractal-Bot if either is open. Only one program can use the USB connection at a time.')
+    assert.equal(holders(null), 'FM3-Edit, FM9-Edit, Axe-Edit III, AM4-Edit, VP4-Edit or Fractal-Bot', 'an unknown unit is not given every editor')
+
+    /* In the places it was missing. */
+    const { fixById } = await import('../shared/troubleshooting.mjs')
+    assert.ok(fixById('connect').steps.includes(quitEditor(null)), 'Troubleshooting never says to close the editor')
+    const phone = read('mobile/src/screens/Settings.js')
+    assert.match(phone, /but it has no unit\. Check your unit is on and its cable is in\. \$\{quitEditor\(deviceName\)\}/, 'the phone’s no-unit line never says to close the editor')
+    assert.match(read('src/components/LinkDetails.jsx'), /check the cable there\. \$\{quitEditor\(null\)\}/, 'the browser’s no-unit line never says to close the editor')
+
+    /* And in the places it was, naming them all rather than two. */
+    const { WAYS } = await import('../shared/ways-in.mjs')
+    for (const id of ['mac-app', 'windows-app']) {
+      assert.ok(WAYS.find((w) => w.id === id).steps.includes(quitEditor(null)), `the ${id} steps still name two editors`)
+    }
+    const { D2B } = await import('../shared/onboarding.mjs')
+    assert.equal(D2B.steps[0]('AM4'), 'Quit AM4-Edit or Fractal-Bot, or another copy of Fractal Remote.', 'the port-held step does not name the unit’s editor')
+    const { faultCopy } = await import('../src/lib/link.js')
+    assert.match(faultCopy({ role: 'remote', device: { connected: false, short: 'FM3' }, reason: 'no-unit' }).body, /FM3-Edit or Fractal-Bot/)
+    for (const src of [read('src/lib/link.js'), read('shared/onboarding.mjs'), read('shared/ways-in.mjs')]) {
+      assert.ok(!/another editor|FM3-Edit or Axe-Edit|Quit any Fractal editor/.test(src), 'an old, vaguer line is still there')
+    }
+  })
+
   test('Unlock waits for the box saying a computer and a USB cable are needed', async () => {
     /*
      * "On the unlock part of this can we add a disclaimer question that
@@ -3577,7 +3616,8 @@ export function run(test) {
      */
     assert.match(src, /plugs into a computer|USB cable/, 'the downloads page never says why a computer is involved')
     /* And the trap that eats an evening: two programs, one port. */
-    assert.match(src, /Only one program can hold the USB port/, 'nothing warns about the editor already holding the port')
+    assert.match(src, /quitEditor\(null\)/, 'nothing warns about the editor already holding the port')
+    assert.match(read('shared/editors.mjs'), /Only one program can use the USB connection at a time/, 'the warning no longer says why')
 
     /* Reachable from both ends: Setup, and the sign-in screen — which is where
        somebody is stuck when they have no computer to get a code from. */

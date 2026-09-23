@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { quitEditor } from '../../shared/editors.mjs'
 import { remoteActive, hostResponds, currentAccount } from '../lib/remote'
 
 /**
@@ -59,7 +60,7 @@ export default function LinkDetails() {
       lines.push(
         info?.connected
           ? `The computer has a ${info.short || info.name} attached. The link is working.`
-          : 'The computer is answering but has no unit attached to it — check the cable there.'
+          : `The computer is answering but has no unit attached to it — check the cable there. ${quitEditor(null)}`
       )
     } catch (err) {
       lines.push(`Stopped at: ${err.message}`)

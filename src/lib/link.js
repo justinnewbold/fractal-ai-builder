@@ -61,6 +61,7 @@ import {
  * a code, and nothing makes one any more.
  */
 import { isPairAccount } from '../../shared/pairing.mjs'
+import { holders } from '../../shared/editors.mjs'
 export { isPairAccount, HOSTED_ORIGIN } from '../../shared/pairing.mjs'
 
 /**
@@ -331,6 +332,9 @@ export function faultCopy({
   /* How many times the unit was actually asked, so the notice can say. */
   asks = 0
 }) {
+  /* Which program is likeliest to have the unit: its own editor when the
+     unit is known, every editor by name when it is not (editors.mjs). */
+  const others = `${holders(device?.short || device?.name)}, or a second copy of the Fractal app`
   /*
    * The reason comes first, because the two failures it separates were being
    * told apart by a variable that cannot tell them apart.
@@ -359,12 +363,12 @@ export function faultCopy({
     if (role === 'remote' || role === 'wifi') {
       return {
         title: 'Your computer has lost the unit',
-        body: 'The Fractal app on your computer is running, but nothing it sends is reaching your unit, so what was on screen can no longer be trusted. At the computer: check the unit is switched on and its cable is in, and that nothing else has taken it — another editor, or a second copy of the Fractal app.'
+        body: `The Fractal app on your computer is running, but nothing it sends is reaching your unit, so what was on screen can no longer be trusted. At the computer: check the unit is switched on and its cable is in, and that nothing else has taken it — ${others}.`
       }
     }
     return {
       title: 'Lost the unit',
-      body: 'The Fractal app is running but nothing it sends is reaching the unit. Check the unit is switched on and its cable is in, and that nothing else is using it.'
+      body: `The Fractal app is running but nothing it sends is reaching the unit. Check the unit is switched on and its cable is in, and that nothing else is using it — ${others}.`
     }
   }
   if (role === 'remote' && reason === 'no-answer') {
@@ -376,7 +380,7 @@ export function faultCopy({
   if (role === 'remote' && reason === 'unreadable') {
     return {
       title: 'Your computer answered, but the unit wouldn’t read',
-      body: 'The computer is there and replying; the unit didn’t finish answering it. Usually something else is holding the port — another editor, or a second copy of the Fractal app.'
+      body: `The computer is there and replying; the unit didn’t finish answering it. Usually something else is holding the port — ${others}.`
     }
   }
   if (device && device.connected === false) {
@@ -400,12 +404,12 @@ export function faultCopy({
         title: 'The computer can’t see your unit',
         body: `${
           said ? `It asked ${said} over a few seconds and got no answer.` : 'It asked and got no answer.'
-        } At the computer: check the unit is on and plugged in, and that nothing else is talking to it — another editor, or a second copy of the Fractal app.`
+        } At the computer: check the unit is on and plugged in, and that nothing else is talking to it — ${others}.`
       }
     }
     return {
       title: 'No unit found',
-      body: 'Your computer is connected, but no Fractal is plugged into it. Check the cable, and that nothing else is using it, then tap Try again.'
+      body: `Your computer is connected, but no Fractal is plugged into it. Check the cable, and that nothing else is using it — ${others} — then tap Try again.`
     }
   }
   if (role === 'mac') {
