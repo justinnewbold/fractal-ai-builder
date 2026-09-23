@@ -295,6 +295,45 @@ export default function App() {
   }, [])
 
   /*
+   * THE DEMO IS NOT AN ACCOUNT, AND WHEN IT ENDS THE APP HAS TO ADMIT THAT.
+   *
+   * "Right now I'm not signed in and it's still letting me use it... the user
+   * should be required to either sign in if they already have a sign in or
+   * sign up right after they unlock it and they shouldn't be able to get past
+   * that screen."
+   *
+   * He is right, and the hole is mine. `auth` goes to 'in' on startup if the
+   * demo is on OR a session is found — the demo needs no account, which is
+   * the whole point of it. That was honest while the only way out of the demo
+   * was a button nobody pressed by accident. Then 1.56.0 made a purchase end
+   * the demo, which is correct, and left 'in' standing behind it: the live
+   * app, unlocked, signed in to nothing, reaching nothing, with no sign of
+   * anything wrong.
+   *
+   * So 'in' has to keep meaning what it meant. Whenever the demo goes off,
+   * the session is asked for again, and a phone that has not got one goes to
+   * the sign-in screen — which is also where the purchase gets claimed, since
+   * SignIn's onSignedIn calls linkAccount.
+   *
+   * On the demo ending rather than on the purchase, deliberately: leaving by
+   * the Exit demo button has the same gap, and a check on the state cannot be
+   * forgotten by a route added later.
+   *
+   * Nobody is stranded. The sign-in screen signs in, makes an account, resets
+   * a password, and still offers the demo.
+   */
+  useEffect(() => {
+    if (demo || auth !== 'in') return undefined
+    let alive = true
+    haveSession()
+      .then((id) => alive && !id && setAuth('out'))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [demo, auth])
+
+  /*
    * THE ONE PLACE THE PAYWALL IS RAISED, and it waits to be sure.
    *
    * Both ways in land on `auth === 'in'` — a code typed just now, and a

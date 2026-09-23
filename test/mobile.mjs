@@ -3685,6 +3685,49 @@ export function run(test) {
     assert.ok(leave < buy, 'the way out is drawn after the price, so a paid phone reads second')
   })
 
+  test('the live app is never reached without an account', () => {
+    /*
+     * "Right now I'm not signed in and it's still letting me use it... the
+     * user should be required to either sign in if they already have a sign
+     * in or sign up right after they unlock it and they shouldn't be able to
+     * get past that screen."
+     *
+     * THE HOLE, AND IT WAS OPENED BY THE FIX BEFORE THIS ONE.
+     *
+     * `auth` becomes 'in' at startup if the demo is on OR a session is found,
+     * because the demo needs no account. That was honest while the only way
+     * out of the demo was a button. Then buying started ending the demo —
+     * right in itself — and left 'in' standing behind it: the live app,
+     * unlocked, signed in to nothing, reaching nothing, and nothing on screen
+     * saying so.
+     *
+     * So the state has to be rechecked whenever the demo goes off.
+     */
+    const app = read('mobile/App.js')
+
+    /* The startup read is what grants 'in' to a demo with no session. */
+    assert.match(app, /restoreDemo\(\)\s*\n\s*\.then\(\(on\) => \(on \? true : haveSession\(\)\)\)/, 'the startup check moved; this test reads it')
+
+    /* And this is what takes it back. */
+    const guard = app.slice(app.indexOf('THE DEMO IS NOT AN ACCOUNT'))
+    assert.match(guard, /if \(demo \|\| auth !== 'in'\) return undefined/, 'the guard runs while the demo is on, or when nobody is in')
+    assert.match(guard, /haveSession\(\)\s*\n\s*\.then\(\(id\) => alive && !id && setAuth\('out'\)\)/, 'a phone with no session is left in the live app')
+    assert.match(guard, /\}, \[demo, auth\]\)/, 'the guard does not re-run when the demo ends')
+
+    /*
+     * ON THE DEMO ENDING, NOT ON THE PURCHASE. Leaving by the Exit demo
+     * button has the identical gap, and a check on the state cannot be
+     * forgotten by a route somebody adds later.
+     */
+    assert.ok(
+      !/buyUnlock[\s\S]{0,400}setAuth\('out'\)/.test(read('mobile/src/lib/purchases.js')),
+      'the account check hangs off the purchase, so other ways out of the demo skip it'
+    )
+
+    /* And the screen they land on is the one that claims the purchase. */
+    assert.match(app, /onSignedIn=\{\(\) => \{[\s\S]{0,600}linkAccount\(\)/, 'signing in no longer attaches the purchase to the account')
+  })
+
   test('buying the app ends the demo', () => {
     /*
      * "After I did the test purchase, it just takes me back to the demo
