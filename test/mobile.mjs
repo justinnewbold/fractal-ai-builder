@@ -3645,6 +3645,46 @@ export function run(test) {
     }
   })
 
+  test('somebody who has paid gets a door out of the demo, where the price used to be', () => {
+    /*
+     * "There needs to be a more clear way to exit the demo if it's
+     * registering the purchase... instead of it saying unlock 999 at the top
+     * have it just clearly say exit demo if they're in the demo and they've
+     * already paid."
+     *
+     * The demo stays useful after a purchase — "somebody that wants to maybe
+     * view what it looks like having an AxeFX 3 or another model they don't
+     * have yet" — so it is not taken away. What was missing was a way out on
+     * the same wall as the way in. The only one was Settings, two screens
+     * away, because the pill beside DEMO is the unlock, and an unlock is the
+     * one thing that person does not need.
+     */
+    const bar = read('mobile/src/components/TopBar.js')
+    const flat = bar.replace(/\{?\/\*[\s\S]*?\*\/\}?/g, ' ').replace(/\s+/g, ' ')
+
+    assert.match(flat, /const canLeave = demo && purchase\.unlocked/, 'the bar cannot tell a paid demo from an unpaid one')
+    assert.match(flat, /accessibilityLabel="Exit demo"/, 'there is no way out of the demo in the bar')
+    assert.match(flat, /onPress=\{\(\) => \{ tick\(\) setDemo\(false\) \}\}/, 'the way out does not leave the demo')
+    assert.match(bar, /import \{ setDemo, useDemo \} from '\.\.\/lib\/demo'/, 'the bar cannot turn the demo off')
+
+    /*
+     * `unlocked`, NOT `!canBuy`, and this is the part worth holding.
+     *
+     * canBuy is also false on a screen handed no onUnlock, and on a phone
+     * whose store could not be reached. Neither of those is somebody who has
+     * paid, and telling either of them that leaving is their only option
+     * would be the paywall disappearing on the people most likely to need it.
+     */
+    assert.ok(!/canLeave = demo && !canBuy/.test(flat), 'a phone that merely cannot buy is treated as one that has paid')
+
+    /* The two pills never appear together: one is for somebody who has paid
+       and the other only shows when there is something to sell. */
+    const buy = flat.indexOf('{canBuy && purchase.price ?')
+    const leave = flat.indexOf('{canLeave ?')
+    assert.ok(buy > 0 && leave > 0, 'one of the two pills is gone')
+    assert.ok(leave < buy, 'the way out is drawn after the price, so a paid phone reads second')
+  })
+
   test('buying the app ends the demo', () => {
     /*
      * "After I did the test purchase, it just takes me back to the demo

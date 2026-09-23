@@ -8,7 +8,7 @@ import { tick } from '../lib/feedback'
 import { linkTone, linkWord, toneOfRemote, unitWord } from '../lib/link-word'
 import { APP_VERSION } from '../lib/version'
 import { useRig } from '../lib/rig'
-import { useDemo } from '../lib/demo'
+import { setDemo, useDemo } from '../lib/demo'
 import { shouldOffer, usePurchase } from '../lib/purchases'
 import setupIcon from '../../assets/icons/setup.png'
 import { idOf } from '../lib/device'
@@ -77,6 +77,29 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
    * to be findable.
    */
   const canBuy = Boolean(onUnlock) && shouldOffer({ demo })
+  /*
+   * THE WAY OUT, FOR SOMEBODY WHO HAS ALREADY PAID.
+   *
+   * "There needs to be a more clear way to exit the demo if it's registering
+   * the purchase... instead of it saying unlock 999 at the top have it just
+   * clearly say exit demo if they're in the demo and they've already paid."
+   *
+   * The demo does not stop being useful the moment somebody buys the app —
+   * "it would be a good idea for somebody that wants to maybe view what it
+   * looks like having an AxeFX 3 or another model they don't have yet" — so
+   * it stays reachable. What it needed was a door on the same wall as the
+   * one they came in by.
+   *
+   * Until now the only way out was Settings, two screens away, because the
+   * pill beside DEMO is the unlock and an unlock is exactly what this person
+   * does not need. The pill is not gone for them, it changes job.
+   *
+   * `unlocked` rather than `!canBuy`, and the difference matters: canBuy is
+   * also false on a screen that was handed no onUnlock, and on a phone where
+   * the store is having a bad minute. Neither of those is somebody who has
+   * paid, and neither should be told the demo is all they have left.
+   */
+  const canLeave = demo && purchase.unlocked
   const connected = link?.link === 'connected'
   const tone = toneOfRemote(link?.link)
   const mark = demo ? 'wait' : linkTone(tone)
@@ -297,6 +320,42 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
        * it is bought — a button that charges a person twice, or that cannot
        * take money at all, is worse than no button.
        */}
+      {canLeave ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Exit demo"
+          onPress={() => {
+            tick()
+            setDemo(false)
+          }}
+          hitSlop={8}
+          /* The same pill as the unlock, in the same place, doing the job
+             that person actually has. Amber for the same reason it is amber
+             there: in this bar it is the one thing anybody is being asked to
+             do, and a quieter treatment would read as another label in a row
+             that is already mostly labels. It cannot be mistaken for buying,
+             because it says what it does. */
+          style={({ pressed }) => ({
+            paddingHorizontal: space.md,
+            paddingVertical: 4,
+            borderRadius: radius.pill,
+            backgroundColor: pressed ? color.signalWash : color.signal
+          })}
+        >
+          <Text
+            style={{
+              color: color.onSignal,
+              fontSize: font.micro,
+              fontWeight: '700',
+              letterSpacing: 0.6
+            }}
+          >
+            {/* His words, not a tidied-up version of them. */}
+            Exit demo
+          </Text>
+        </Pressable>
+      ) : null}
+
       {canBuy && purchase.price ? (
         <Pressable
           accessibilityRole="button"
