@@ -99,6 +99,12 @@ export const FILES = [
    */
   /* How to get a computer on the other end, so the browser and the phone
      offer the same four routes with the same honest status on each. */
+  /* Justin's own tools, and the one account they are for. */
+  {
+    source: '../shared/admin.mjs',
+    target: '../mobile/src/lib/admin.js',
+    render: (text) => banner('../shared/admin.mjs') + text.replace("from './owner-unlock.mjs'", "from './owner-unlock.js'")
+  },
   /* Which program to close so the unit is free, named per unit. */
   { source: '../shared/editors.mjs', target: '../mobile/src/lib/editors.js' },
   {

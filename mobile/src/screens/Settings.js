@@ -29,6 +29,8 @@ import { isPairAccount } from '../lib/pairing'
 import { mayDrive } from '../lib/unlock-rule'
 import { useComputerElsewhere } from '../lib/useComputerElsewhere'
 import { quitEditor } from '../lib/editors'
+import { isAdmin } from '../lib/admin'
+import AccessTool from '../components/AccessTool'
 import Lamp from '../components/Lamp'
 import Note from '../components/Note'
 import PasswordBox from '../components/PasswordBox'
@@ -388,6 +390,10 @@ export default function Settings({
               />
             )}
             <SetupRow title="About" status={`v${APP_VERSION}`} onPress={() => setPage('about')} />
+            {/* Justin's own tools, on his account only — see lib/admin.js. */}
+            {isAdmin(account?.email) ? (
+              <SetupRow title="Give someone access" status="Unlock an account by hand" onPress={() => setPage('access')} />
+            ) : null}
           </View>
 
           {/*
@@ -866,6 +872,14 @@ export default function Settings({
             }}
             onClose={() => setChanging(false)}
           />
+        </>
+      ) : null}
+
+      {/* ---------------------------------------------------------- access */}
+      {page === 'access' && isAdmin(account?.email) ? (
+        <>
+          {head('Give someone access', 'back')}
+          <AccessTool />
         </>
       ) : null}
 

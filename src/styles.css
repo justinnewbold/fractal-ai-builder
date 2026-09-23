@@ -6969,6 +6969,16 @@ button.gig-block:disabled {
   flex: 1 1 100%;
 }
 
+/* Give someone access: the email box, full width over its three buttons. */
+.access-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.access-email {
+  width: 100%;
+}
+
 .save-error {
   display: flex;
   align-items: center;

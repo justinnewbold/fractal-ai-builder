@@ -1437,7 +1437,10 @@ export function run(test) {
            No 'Demo Unit' either — it is inside Phone & computer, where the
            phone keeps it. No 'Troubleshooting' and no walkthrough — inside
            About, where Justin put the phone's. */
-        'About'
+        'About',
+        /* Last, and drawn only on his own account: "only when logged into the
+           justinnewbold@icloud.com account". See shared/admin.mjs. */
+        'Give someone access'
       ],
       `Settings opens on ${rows.length} rows: ${rows.join(', ')}`
     )
