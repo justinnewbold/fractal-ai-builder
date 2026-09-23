@@ -85,6 +85,9 @@
   --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   --z-bar: 40;
+  /* The walkthrough: over the app and its bar, under every sheet — the
+     sign-in it asks for opens over it rather than hidden behind it. */
+  --z-onb: 45;
   --z-scrim: 50;
   --z-sheet: 60;
   --z-toast: 70;
@@ -10490,7 +10493,13 @@ button.setup-back {
 .onb {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  /*
+   * UNDER THE SHEETS. "The sign-in button on this mac app screen doesn't
+   * work." It did — it opened the sign-in, at the sheets' height, and this
+   * page sat above them, so it opened out of sight. The sheets are what the
+   * walkthrough sends people to (the sign-in, the unlock), so they go over it.
+   */
+  z-index: var(--z-onb);
   display: grid;
   place-items: center;
   padding: var(--s-5);
