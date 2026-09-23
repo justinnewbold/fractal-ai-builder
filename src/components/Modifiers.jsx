@@ -32,6 +32,17 @@ export function Modifiers({ blocks, onError, onChanged, busy }) {
   const [source, setSource] = useState('')
   const [params, setParams] = useState([])
   const [loading, setLoading] = useState(false)
+  /*
+   * WHAT WAS JUST ATTACHED, said where the button is. "Attaching a modifier
+   * (Amp → Gain → LFO) only showed an orange border — confirmation/
+   * persistence unclear." It went to the change log and nowhere a player was
+   * looking. The phone's sentence for the same moment (Edit.js). Cleared the
+   * moment any choice changes, so it never describes a different pick.
+   */
+  const [said, setSaid] = useState(null)
+  useEffect(() => {
+    setSaid(null)
+  }, [slot, eid, paramId, source])
 
   useEffect(() => {
     let stop = false
@@ -101,6 +112,7 @@ export function Modifiers({ blocks, onError, onChanged, busy }) {
       const param = params.find((p) => p.id === Number(paramId))
       const src = model.sources?.find((s) => s.ordinal === Number(source))
       onChanged(`${src?.name} → ${block?.name} · ${param?.name} (slot ${slot})`)
+      setSaid(`${src?.name} now moves ${block?.name} ${param?.name}.`)
     } catch (err) {
       onError(err.message)
     }
@@ -205,6 +217,12 @@ export function Modifiers({ blocks, onError, onChanged, busy }) {
       {why ? (
         <p className="hint mod-why" id="mod-why" role="status">
           {why}
+        </p>
+      ) : null}
+      {said ? (
+        <p className="mod-said" role="status">
+          <span aria-hidden="true">✓ </span>
+          {said}
         </p>
       ) : null}
     </section>

@@ -1,7 +1,11 @@
 # Fractal Remote
 
-Describe a tone in plain language and get a working preset written to your Fractal
-device.
+A remote for Fractal Audio units — the FM3, FM9, Axe-Fx III, AM4 and VP4 — on the
+phone, in the browser, and on the computer the unit is plugged into.
+
+The AI features this project began with — describing a tone and having a preset
+written, and the Ask screen that took instructions in words — are gone from the
+app. Nothing a player sees generates or asks anything.
 
 ## What changed in v2
 
@@ -107,24 +111,6 @@ So the shape, scene count, and channel names all come from `/device/detect`
 rather than from an assumption about which unit is plugged in. A device that
 reports no scenes doesn't get scene buttons.
 
-### The generator reads the device's own manual
-
-ForgeFX ships reference copy for every block family and every parameter, keyed
-by param id. Without it the generator infers what a control does from its name —
-which is exactly how "Amp1 Level" came to be dialled like a tone control.
-
-That reference now goes in with the rosters, in the cached half of the request,
-so it grounds every generation without costing tokens on repeat runs.
-
-### References are grounded in real gear
-
-Every model in the roster carries `manufacturer` and `basedOn` — the actual amp
-or pedal it was modelled on. That's what makes "the mid-80s Mark IIC+ sound" a
-answerable request rather than a vibe: the generator matches the reference to the
-model built from that hardware, and says in the summary which one it matched. If
-nothing in the roster is a close counterpart it says so, because a player who
-knows the reference would rather hear that than be handed a substitute.
-
 ### Scenes can only be read by visiting them
 
 A scene isn't a saved set of values — it's which blocks are engaged and which
@@ -156,44 +142,6 @@ anything that differs from what was sent is reported rather than assumed. If
 values look wrong and a restart changes them with no writes in between, that is
 the cache, not your preset.
 
-## Generation
-
-Built on the [Vercel AI SDK](https://sdk.vercel.ai). `generateObject` constrains
-the model to a Zod schema, so malformed replies are handled by the SDK rather
-than by parsing text.
-
-Two ways to supply a model, set in the Vercel project settings:
-
-| Variable | Notes |
-| --- | --- |
-| `ANTHROPIC_API_KEY` | Direct. Preferred — works on a fresh account. |
-| `AI_GATEWAY_API_KEY` | Vercel AI Gateway. Needs credit; the free tier returns 403 for every Anthropic model. |
-| `GENERATOR_MODEL` | Optional override. `claude-sonnet-5` direct, `anthropic/claude-sonnet-4.5` via gateway. |
-| `RIG_LOOKUP` | Off unless set. `on` = web-search the band's real rig before designing (costs ~2x tokens + $10/1k searches). Direct path only. |
-| `GENERATOR_EFFORT` | Optional. How hard the model thinks — `low`, `medium` or `high`. Leave unset: a design runs at `medium`, a refine at `low`. |
-
-Whichever key is set, it is read only inside `api/generate.js` and never reaches
-the browser.
-
-### The band book
-
-Every finished design that names a band is written down against that band —
-by block family and control name, not by effect id, so it fits any preset.
-The next request naming the band is rebuilt from the note in the browser with
-nothing sent to the model. It is skipped for a refine, for more scenes than
-the note holds, for a single sound, and whenever the words ask for something
-fresh. Kept in this browser and, signed in, on the account (`band_book` in
-`supabase/migrations`). See `src/lib/bandBook.js`.
-
-Nothing generated is trusted. At generation time the app reads the live model
-roster and parameter ranges off the attached unit, hands those to the model as
-the only legal vocabulary, then re-checks every value on the way back in
-`src/lib/validate.js`. A model number that doesn't exist, or a gain of 15 on a
-0–10 control, is dropped and reported rather than written.
-
-Writes are sequential because they all travel down one serial port. Model swaps
-go first, since changing a block's model resets its parameters.
-
 ### Which write encoding works is learned, not assumed
 
 ForgeFX exposes two write paths — `continuous: false` builds a discrete frame,
@@ -205,63 +153,6 @@ were last reset to, and the write still returns `{"ok":true}`.
 So writes are confirmed. Each one is read back, and a value that didn't take is
 retried on the other encoding. What worked is remembered per parameter, so a
 preset full of frequency controls doesn't pay the retry cost twice.
-
-### Gain staging is off limits
-
-A block's output Level reads like a tone control by name — "Amp1 Level" sits in
-the same list as Bass, Mid and Treble — so a generator will set it to -60 dB
-while every other value is musically right. The preset then looks perfect and
-makes no sound, and range checking can't catch it because -60 dB is legal.
-
-So output levels, balance and pan are stripped from the schema before the model
-sees them, and dropped again on the way back. The Gate block is excluded for the
-same reason: a threshold set too high mutes quiet playing, and the safe value
-depends on pickups and room rather than on a text description. See
-`src/lib/guardrails.js`.
-
-## Asking for changes
-
-`/api/command` is the conversation on the Ask screen: the player's Fractal
-agent. Give it an instruction in words — "move the drive before the amp", "turn
-up the gain a little and cut the bass" — and it returns an ordered list of
-actions covering everything a player can do by hand: parameters, models, bypass,
-channels, block placement and moves, per-scene states, tempo and naming. Ask it
-a question — why it picked that amp, what Angus actually used, what a control
-does — and it answers, in paragraphs when the question deserves them.
-
-The model chooses actions; it does not perform them. Every id is checked against
-what the device reported, every value against its real range, and the plan is
-shown before anything is written. Each action carries its reason, shown under
-it.
-
-To answer for itself it is given the last design with the designer's summary
-(which is the reasoning), whether that design has been written to the unit, the
-taste profile and corrections the designer gets, and the recent transcript with
-the app's own notes labelled. It runs on `CHAT_MODEL` (falling back to
-`GENERATOR_MODEL`, then Claude Opus 5).
-
-Ordering is enforced in `src/lib/actions.js` rather than trusted from the model.
-Structure has to settle before the values that depend on it, and a model swap
-resets that block's parameters — a plan that sets gain and then swaps the amp
-silently discards the gain.
-
-## Cost
-
-Each generation is priced from the token counts the API returns and shown next
-to the result, with a running session total. Rates live in `src/lib/cost.js`.
-
-The request is split in two because the halves have very different lifetimes.
-Model rosters are around 11k tokens and identical on every run; parameter values
-and bypass states change constantly. Rosters go in their own content part marked
-for caching and sorted by slug so the text is byte-identical between runs and
-actually hits.
-
-Cached reads bill at a tenth of base, so after the first run of a session the
-bulk of the input is nearly free. The first run pays a write premium — the cost
-panel says so rather than looking like a regression. Measured live: a second
-identical run served 26,944 of 26,968 input tokens from cache.
-
-A model with no published rate on file shows a blank rather than a guess.
 
 ## Nothing is permanent until you save it
 

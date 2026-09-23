@@ -77,14 +77,12 @@ export default function Gig({
   onError,
   onChanged,
   onPickPreset,
-  /** Where the preset's name and its scene names can be typed. Absent means no pencil. */
-  onAsk,
   /*
    * The way to the chain and its knobs.
    *
-   * Absent, not disabled, when there is no unit to edit. Unlike onAsk it does
-   * not go with play mode or the AI switch: editing the chain is not asking
-   * the AI for anything. It used to, and play mode is
+   * Absent, not disabled, when there is no unit to edit. It does not go with
+   * play mode: editing the chain is not asking anything of anybody. It used
+   * to, and play mode is
    * on — because it is the same kind of thing: work you do between songs, not
    * during one. On a phone this is the ONLY way in, since the Edit screen is
    * deliberately unreachable there (see BENCH in Screens.jsx); on a wide screen
@@ -875,12 +873,11 @@ export default function Gig({
       */}
       {hasScenes && !names.some((n) => (n || '').trim()) && !remoteActive() ? (
         <p className="gig-note">
-          {/* Both routes named here are ones that really exist: a scene plan
-              from Create writes each scene's name as it goes, and the Scenes
-              sheet on Edit renames one directly. */}
+          {/* The route named here is one that really exists: the Scenes sheet
+              on Edit renames one directly. The line that sent people to the
+              AI's Create screen for named scenes went with the AI. */}
           Those are scenes &mdash; the same blocks, switched on and off in different combinations.
-          Tap one to hear it. Ask Create for a rhythm and a lead and it builds them named, or name
-          them yourself under Scenes on Edit.
+          Tap one to hear it. Name them yourself under Scenes on Edit.
         </p>
       ) : null}
 
@@ -959,7 +956,7 @@ export default function Gig({
         predating the flag, and unknown still gets to try.
       */}
       {/*
-        The foot of the screen: Previous / Next, then Tuner, Tap and Ask.
+        The foot of the screen: Previous / Next, then Tuner, Tap and Edit.
 
         "Move Previous / Next directly above the bottom tap bar." They sat
         between the volume and the scenes, which is where you read, not where
@@ -1038,26 +1035,6 @@ export default function Gig({
           ) : null}
         </div>
         {/*
-          Ask, on the bar rather than floating over the rig.
-
-          The floating button this replaces is fixed to the bottom-right
-          corner, and styles.css says why it is hidden below 700px: that corner
-          is where the last tile in every grid lands, so on a phone it sits ON
-          scene 6. Unhiding it would have covered a scene button to reach a
-          conversation — worse than not having it.
-
-          Here it costs nothing. The bar is already the strip for the things
-          you use BETWEEN songs rather than during one, which is exactly what
-          asking for a tone is, and it reflows to two buttons when play mode
-          takes this away.
-        */}
-        {onAsk ? (
-          <button className="gig-bar-btn gig-ask" onClick={onAsk} aria-label="Ask for a change">
-            <span aria-hidden="true">✦</span>
-            <span>Ask</span>
-          </button>
-        ) : null}
-        {/*
           And what is actually in the preset, which until now a phone could not
           see at all.
 
@@ -1068,7 +1045,7 @@ export default function Gig({
         */}
         {/*
           Called Edit, because that is the tab it stands in for. A phone has no
-          Play / Ask / Edit row — Ask and Edit are bench work — so this button
+          Play / Edit row — Edit is bench work — so this button
           IS the way to the chain and its knobs, and "Chain" did not say so:
           "EDIT is easy to miss." The label under the glyph is the same word
           the tab carries on a wide screen.
