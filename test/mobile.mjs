@@ -3465,6 +3465,9 @@ export function run(test) {
     const server = read('supabase/functions/grant-access/index.ts')
     assert.ok(server.indexOf('ADMINS.includes(fold(me.email))') < server.indexOf("await sales()"), 'sales are counted before checking who is asking')
     assert.match(server, /\/purchases\?limit=100/, 'the lookup never asks what they bought')
+    /* A database function that returns nothing answers with an empty body.
+       Reading that as JSON said "Something went wrong" after a grant worked. */
+    assert.match(server, /const text = await res\.text\(\)\s+return text \? JSON\.parse\(text\) : null/, 'an empty answer from the database is read as broken JSON again')
     const sql = read('supabase/migrations/20260923_owner_lookup.sql')
     for (const fn of ['account_details(text)', 'owner_overview()']) {
       assert.ok(sql.includes(`revoke all on function public.${fn} from public, anon, authenticated`), `a client can call ${fn}`)

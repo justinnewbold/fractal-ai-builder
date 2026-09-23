@@ -88,7 +88,14 @@ async function rpc(name: string, args: Record<string, unknown>): Promise<unknown
     body: JSON.stringify(args)
   })
   if (!res.ok) throw new Error(`${name}: ${res.status} ${await res.text()}`)
-  return res.json()
+  /*
+   * A function that returns nothing (record_entitlement) answers 204 with an
+   * empty body, and reading that as JSON threw "Unexpected end of JSON input"
+   * AFTER the unlock had already been given — so the page said it failed
+   * when it had worked. Nothing back is null, not an error.
+   */
+  const text = await res.text()
+  return text ? JSON.parse(text) : null
 }
 
 /** RevenueCat, with the project's secret key. */
