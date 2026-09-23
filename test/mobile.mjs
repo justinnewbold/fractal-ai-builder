@@ -3645,6 +3645,41 @@ export function run(test) {
     }
   })
 
+  test('buying the app ends the demo', () => {
+    /*
+     * "After I did the test purchase, it just takes me back to the demo
+     * screen."
+     *
+     * It did. The paywall is reachable from inside the demo — that is the
+     * point of the demo — the purchase went through, the sheet closed, and
+     * behind it was a simulated AM4 with DEMO in the bar. The one moment
+     * somebody has definitely decided they want the real thing is the moment
+     * the app was still pretending.
+     *
+     * In buyUnlock rather than on the screen that opened the paywall: there
+     * is more than one way to that paywall, and this is the only place that
+     * knows the money actually moved.
+     */
+    const src = read('mobile/src/lib/purchases.js')
+    const buy = src.slice(src.indexOf('export const buyUnlock'), src.indexOf('export const restorePurchase'))
+    assert.ok(buy.length > 100, 'buyUnlock moved; this check reads it')
+    assert.match(buy, /if \(yes && isDemo\(\)\) \{\s*\n\s*setDemo\(false\)/, 'a purchase leaves the app in the demo')
+    /* Guarded on both, and the order matters. A purchase that did NOT go
+       through must not end the demo — somebody who cancelled is still
+       looking around — and setDemo(false) in the live app is a write and a
+       redraw for nothing. */
+    assert.ok(
+      buy.indexOf('if (yes && isDemo())') > buy.indexOf('set({ unlocked: yes })'),
+      'the demo is ended before the purchase is known to have worked'
+    )
+    assert.match(src, /import \{ isDemo, setDemo \} from '\.\/demo'/, 'purchases cannot see the demo switch')
+
+    /* And demo.js must not import purchases back, or Metro resolves one of
+       the two to undefined at load and the failure is a blank screen. */
+    const demo = read('mobile/src/lib/demo.js')
+    assert.ok(!/from '\.\/purchases'/.test(demo), 'the demo and the purchases now import each other')
+  })
+
   test('a purchase follows the person, not the handset', () => {
     /*
      * "It does unlock it on android because you can sign in with a user name

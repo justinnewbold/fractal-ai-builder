@@ -7,6 +7,7 @@ import { logDebug } from './debugLog'
 import { mayDrive } from './unlock-rule'
 import { isOwner } from './owner-unlock'
 import { currentAccount } from './relay'
+import { isDemo, setDemo } from './demo'
 
 /**
  * The one purchase: paying to point this app at a real rig.
@@ -489,6 +490,29 @@ export const buyUnlock = async () => {
     const yes = entitled(bought?.customerInfo)
     await remember(yes)
     set({ unlocked: yes })
+    /*
+     * AND THE SIMULATION ENDS HERE.
+     *
+     * "After I did the test purchase, it just takes me back to the demo
+     * screen." It did — the paywall is reachable from inside the demo, the
+     * purchase went through, and the sheet closed onto a simulated AM4. The
+     * one moment somebody has definitely decided they want the real thing is
+     * the moment the app was still pretending.
+     *
+     * Turning it off HERE rather than on the screen that opened the paywall,
+     * because there are several ways to that paywall and this is the only
+     * place that knows the money actually moved. Leaving the demo tears down
+     * the mock and brings up the real link — see App.js, where the effect
+     * depends on `demo` as well as `auth` for exactly this reason.
+     *
+     * Only on the way out of a demo. Buying from the live app has no demo to
+     * leave, and calling setDemo(false) there would be a write and a redraw
+     * for nothing.
+     */
+    if (yes && isDemo()) {
+      setDemo(false)
+      logDebug('purchases: bought, so the demo is over')
+    }
     return yes
       ? { ok: true, cancelled: false, message: null }
       : { ok: false, cancelled: false, message: 'The store did not confirm the purchase.' }
