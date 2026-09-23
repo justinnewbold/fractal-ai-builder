@@ -15,6 +15,7 @@
  * says what went wrong and offers nothing to do about it is where this started.
  */
 import { isOlder } from './versions.mjs'
+import { quitEditor } from './editors.mjs'
 
 export const FIXES = [
   {
@@ -34,6 +35,8 @@ export const FIXES = [
     steps: [
       'Check the USB cable is a data cable. A charge-only cable fits perfectly and carries nothing — this is the single most common cause.',
       'Try a different USB port, straight into the computer rather than through a hub.',
+      /* The other common one: Fractal's own editor already has the unit. */
+      quitEditor(null),
       'Make sure the computer app is actually running. It lives in the menu bar, not the Dock.',
       'If the phone cannot reach the computer, check both are on the same wifi, and that a firewall or a VPN on the computer is not blocking it.'
     ]

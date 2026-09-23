@@ -28,6 +28,7 @@ import { sync, useStored } from '../lib/store'
 import { isPairAccount } from '../lib/pairing'
 import { mayDrive } from '../lib/unlock-rule'
 import { useComputerElsewhere } from '../lib/useComputerElsewhere'
+import { quitEditor } from '../lib/editors'
 import Lamp from '../components/Lamp'
 import Note from '../components/Note'
 import PasswordBox from '../components/PasswordBox'
@@ -511,9 +512,12 @@ export default function Settings({
                 {link !== 'connected'
                   ? `${linkWord}.`
                   : unitState === 'missing'
-                    ? `Connected to ${macName || 'your computer'} — but it has no unit. Check your unit is on and its cable is in.`
+                    ? /* The usual reason besides the cable is Fractal's own
+                         editor holding the unit — named, per unit where it is
+                         known (lib/editors.js). */
+                      `Connected to ${macName || 'your computer'} — but it has no unit. Check your unit is on and its cable is in. ${quitEditor(deviceName)} This finds the unit again by itself once it is free.`
                     : unitState === 'silent'
-                      ? `Connected to ${macName || 'your computer'} — ${deviceName || 'your unit'} isn’t answering. A frozen unit looks like this; turn it off and on.`
+                      ? `Connected to ${macName || 'your computer'} — ${deviceName || 'your unit'} isn’t answering. A frozen unit looks like this; turn it off and on. ${quitEditor(deviceName)}`
                       : `Connected to ${macName || 'your computer'}${deviceName ? ` — ${deviceName}` : ''}`}
               </Text>
             </View>

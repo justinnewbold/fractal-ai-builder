@@ -36,6 +36,8 @@
  * download IS the tokenless version.
  */
 
+import { quitEditor } from './editors.js'
+
 /*
  * The list, not `/releases/latest`.
  *
@@ -85,7 +87,7 @@ export const WAYS = [
       'On the Mac, open the download page below and take the newest file ending in .dmg.',
       'Drag it to Applications and open it.',
       'Plug your unit into the Mac with its USB cable.',
-      'Quit FM3-Edit or Axe-Edit if either is open. Only one program can hold the USB port, and whichever got there first keeps it.',
+      quitEditor(null),
       'In the app, choose Set up phone remote and sign in. Make an account there if you have not got one.',
       'On your phone, sign in with that same account. That is the whole of it.'
     ],
@@ -101,7 +103,7 @@ export const WAYS = [
       'On the PC, open the download page below and take the newest file ending in .exe.',
       'Open it. Windows shows a blue box that says "Windows protected your PC" — click More info, then Run anyway. It says that because the installer is not signed yet, not because anything is wrong with it.',
       'Plug your unit into the PC with its USB cable.',
-      'Quit any Fractal editor if one is open. Only one program can hold the USB port, and whichever got there first keeps it.',
+      quitEditor(null),
       'The first time it starts its server, Windows asks whether to allow it through the firewall. Say yes, or your phone cannot reach this computer over wifi.',
       'In the app, choose Set up phone remote and sign in, then sign in on the phone with that same account. Same as the Mac.'
     ],
