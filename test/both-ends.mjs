@@ -303,7 +303,8 @@ export const AREAS = [
         phone: 'Tuner',
         also: ['Stop tuner']
       },
-      { does: 'ask the app for a tone', web: 'Ask', phone: '✦ Tone', unreadable: ['phone'] },
+      /* 'ask the app for a tone' — Ask here, ✦ Tone on the phone — was listed
+         here until both went with the AI. Neither end has it now. */
       {
         does: 'step to the preset before this one',
         /* The word is the same at both ends; only the arrow differs. The
@@ -1253,5 +1254,18 @@ export function run(test) {
     for (const art of ['unit-fm3.png', 'piece-unit.png', 'piece-computer.png', 'piece-phone.png']) {
       assert.ok(web.includes(`mobile/assets/${art}`), `the browser’s phone walkthrough is missing ${art}`)
     }
+  })
+
+  /*
+   * An attached modifier is said out loud, at both ends, in the same words.
+   * "Attaching a modifier (Amp → Gain → LFO) only showed an orange border —
+   * confirmation/persistence unclear." The browser told only its change log.
+   */
+  test('attaching a modifier says what now moves what, at both ends', () => {
+    const phone = read('mobile/src/screens/Edit.js')
+    const web = read('src/components/Modifiers.jsx')
+    assert.ok(phone.includes('setSaid(`${src?.name} now moves ${b?.name} ${p?.name}.`)'), 'the phone changed its words for an attach; this check follows them')
+    assert.ok(web.includes('setSaid(`${src?.name} now moves ${block?.name} ${param?.name}.`)'), 'the browser does not say what an attach did, in the phone’s words')
+    assert.match(web, /\{said \? \(\s*<p className="mod-said" role="status">/, 'the browser keeps the attach to its change log again')
   })
 }

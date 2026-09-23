@@ -1279,10 +1279,11 @@ export function run(test) {
 
     const gig = readFileSync(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8')
     assert.match(gig, /\{onChain \?/, 'the stage screen has no way to the chain')
-    assert.ok(
-      gig.indexOf('onAsk ?') < gig.indexOf('onChain ?'),
-      'the chain button jumped in front of Ask on the bar'
-    )
+    /* "We removed that a long time ago and there shouldn't be any user
+       facing ASK buttons." The switched-off one went too, so a tester reading
+       the code finds none either. */
+    assert.ok(!/onAsk|gig-ask|>\s*Ask\s*</.test(gig), 'the stage bar has an Ask button again')
+    assert.ok(!/Ask Create/.test(gig), 'the stage screen tells somebody to ask the AI for scenes again')
   })
 
   test('the Connection panel has one fold rather than two', () => {

@@ -7368,24 +7368,11 @@ button.gig-tap {
   margin: 0;
 }
 
-/* Ask sits with the tuner and the tap, and reads as the same kind of thing:
-   something you press between songs, not during one. The star is the same mark
-   the wide-screen button uses, so the two are recognisably one control in two
-   places. */
-button.gig-ask {
-  align-items: center;
-  justify-content: center;
-  gap: var(--s-1);
-  /*
-   * Off by default: above the breakpoint below, the ✦ Ask tab in the row
-   * above is the way in and two Ask buttons on one screen is one too many.
-   *
-   * The breakpoint is deliberately wider than `narrow` in App.jsx (620px),
-   * which is where the tab row appears: gating this on that instead would
-   * leave every window between 620 and 700 with two ways in at worst, and a
-   * narrower one would leave a band with none.
-   */
-  display: none;
+/* The modifier just attached, in the colour of a thing that worked. */
+.mod-said {
+  margin: var(--s-2) 0 0;
+  color: var(--ok);
+  font-size: var(--f-3);
 }
 
 button.gig-bar-btn.on {
@@ -8745,20 +8732,6 @@ button.topbar-preset.open .topbar-caret {
   border-bottom: 0;
   border-radius: 0;
   background: none;
-}
-
-/*
- * Ask on a phone is the stage bar's button; on a wide one it is the tab.
- *
- * The bar button shows below the same width the floating one used to hide
- * at, which is wider than `narrow` in App.jsx (620px) on purpose: between
- * 620 and 700 the tab row is there too, and one band of widths with two ways
- * in beats one with none.
- */
-@media (max-width: 700px) {
-  button.gig-ask {
-    display: flex;
-  }
 }
 
 /* ---------- the introduction ---------- */

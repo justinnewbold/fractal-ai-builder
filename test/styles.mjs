@@ -1224,35 +1224,15 @@ export function run(test) {
    * side of it. Also, let's make the chat box text entry a little more rounded
    * instead of square."
    */
-  test('every width has a way into the conversation', () => {
+  test('no width has a way into a conversation that no longer exists', () => {
     /*
-     * Two ways in: the ✦ Ask tab on any window wider than `narrow` (620px in
-     * App.jsx), and .gig-ask in the stage bar below its own breakpoint. The
-     * floating .ask-anywhere that used to cover the wide end is gone. What
-     * must hold is that the bar's breakpoint is not BELOW the tab's — move it
-     * to 600 and every window between 600 and 620 has neither.
+     * This used to insist on the opposite — a ✦ Ask tab wide, an Ask button
+     * in the stage bar narrow — and outlived the AI it was for. "Big issue is
+     * the ASK. We removed that a long time ago and there shouldn't be any
+     * user facing ASK buttons." There are none, and no style waiting for one.
      */
-    const breakpointOver = (needle) => {
-      const at = code.indexOf(needle)
-      if (at === -1) return null
-      const before = code.slice(0, at)
-      const media = [...before.matchAll(/@media \(max-width: (\d+)px\)/g)].pop()
-      return media ? Number(media[1]) : null
-    }
-
-    const barOn = code.search(/button\.gig-ask\s*\{\s*display:\s*flex/)
-    assert.ok(barOn > -1, 'the stage bar never gets an Ask button, so a phone has no way in')
-    const onAt = breakpointOver(code.slice(barOn, barOn + 22))
-    assert.ok(onAt, 'the bar Ask is shown outside any breakpoint — a wide screen draws it beside the tab')
-    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
-    const narrow = Number((app.match(/const narrow = useAsks\('\(max-width: (\d+)px\)'\)/) || [])[1])
-    assert.ok(narrow, 'App no longer says where a phone starts')
-    assert.ok(onAt >= narrow, `the bar Ask appears below ${onAt}px but the tab row only above ${narrow}px — windows between have no way in`)
-
-    /* Off by default, or a wide screen draws it beside the tab. */
-    const base = code.slice(code.indexOf('button.gig-ask {'), code.indexOf('}', code.indexOf('button.gig-ask {')))
-    assert.ok(base.length > 20, 'the bar Ask has no style of its own')
-    assert.match(base, /display:\s*none/, 'the bar Ask is drawn on desktop too, beside the tab')
+    assert.ok(!/gig-ask/.test(code), 'the stage bar’s Ask button has a style again')
+    assert.ok(!/ask-anywhere/.test(code), 'the floating Ask button has a style again')
   })
 
   test('the composer ends in a round arrow and the box is not a rectangle', () => {
