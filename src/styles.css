@@ -9117,6 +9117,17 @@ button.phone-chip.dim {
   color: var(--silk-dim);
 }
 
+/* The computer on this wifi is on another account. Said in the fault colour
+   along its edge, as the phone's fault note is, because it is the reason. */
+.connect > p.connect-mismatch {
+  color: var(--silk);
+  text-align: left;
+  border-left: 2px solid var(--fault);
+  padding: var(--s-2) var(--s-3);
+  background: var(--fault-halo);
+  border-radius: var(--r-1);
+}
+
 .connect-lamp {
   width: 12px;
   height: 12px;
@@ -9950,6 +9961,40 @@ button.phone-chip.compact.bad {
 
 .setup-version {
   margin: 0 0 var(--s-3);
+}
+
+/* The version and the account on one line, the account at the right end and
+   cut short in the middle of a long email rather than pushing the row wide. */
+.setup-version-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin: 0 0 var(--s-3);
+}
+
+.setup-version-row .setup-version {
+  margin: 0;
+  flex: none;
+}
+
+.setup-account {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: none;
+  border: none;
+  padding: var(--s-1) 0;
+  color: var(--silk-dim);
+  font-size: var(--f-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.setup-account.out {
+  color: var(--signal);
 }
 
 .setup-rows {

@@ -155,6 +155,25 @@ export async function currentAccount() {
 }
 
 /**
+ * Whether a computer on this wifi is signed into a different account.
+ *
+ * "I was signed into the wrong account, but it didn't notify me at all." A
+ * phone and a computer on two accounts never hear each other, and to the
+ * phone that looks exactly like a computer that is off. The account server
+ * can tell them apart, and answers yes or no and nothing more
+ * (supabase/migrations/20260923_computer_elsewhere.sql). Any failure is a
+ * no, so this can only ever add a sentence.
+ */
+export async function computerElsewhere() {
+  try {
+    const { data, error } = await supabase().rpc('computer_elsewhere')
+    return !error && data === true
+  } catch {
+    return false
+  }
+}
+
+/**
  * Sign out here, and nowhere else.
  *
  * Scope 'local' on purpose: signing out on a phone must not sign out the Mac
