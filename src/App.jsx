@@ -125,6 +125,7 @@ import {
 } from './lib/forgefx'
 import ConnectScreen from './components/ConnectScreen'
 import PhoneRemote from './components/PhoneRemote'
+import PhoneWalkthrough from './components/PhoneWalkthrough'
 import LinkDetails from './components/LinkDetails'
 import SignInSheet from './components/SignInSheet'
 import {
@@ -428,6 +429,8 @@ export default function App() {
    * that keeps coming back is the thing everybody remembers hating.
    */
   const [walkthrough, setWalkthrough] = useState(() => !onboarded())
+  /* Opened again from Settings, which is when the phone's walkthrough offers a way out at the top. */
+  const [walkReplay, setWalkReplay] = useState(false)
   useEffect(() => {
     if (walkthrough) markOnboarded()
   }, [walkthrough])
@@ -1820,6 +1823,12 @@ export default function App() {
    * phone does, so a bad minute on a venue's wifi does not lock out somebody
    * who paid.
    */
+  /* Which walkthrough this end gets — see where they are drawn. The demo takes
+     the computer's role everywhere, so a phone in it is told apart by whether
+     it could really host. */
+  const phoneEnd = link.role === 'remote' || link.role === 'wifi' || (isDemo() && link.canHost === false)
+  const computerEnd = link.role === 'mac' && !phoneEnd
+
   const answeredFor = accountId && paid.checked && paid.for === accountId
   const owned = Boolean(answeredFor && paid.unlocked)
   const mustPay = Boolean(link.role === 'remote' && !isDemo() && answeredFor && !paid.unlocked && !paid.unknown)
@@ -3750,9 +3759,29 @@ export default function App() {
         useful behind this until the unit is plugged in, and showing the app
         greyed out behind a dialog shows somebody a thing they cannot use yet.
       */}
+      {/*
+        WHICH WALKTHROUGH, by which end this is. The computer's — "YOU ARE
+        HERE · This computer", "Plug your unit into this computer" — was shown
+        to every browser, and most of them are phones. A phone now gets the
+        phone app's own, and nobody gets either until the page knows which end
+        it is, so the wrong one never flashes up first.
+      */}
+      <PhoneWalkthrough
+        open={walkthrough && phoneEnd}
+        replay={walkReplay}
+        onClose={() => {
+          setWalkthrough(false)
+          setWalkReplay(false)
+        }}
+        onAccount={() => linkAction('connect')}
+        onUnlock={openUnlock}
+      />
       <Onboarding
-        open={walkthrough}
-        onClose={() => setWalkthrough(false)}
+        open={walkthrough && computerEnd}
+        onClose={() => {
+          setWalkthrough(false)
+          setWalkReplay(false)
+        }}
         device={device}
         status={status}
         faultReason={faultReason}
@@ -4599,6 +4628,7 @@ export default function App() {
                 status="The three-step setup, again"
                 onClick={() => {
                   setSheet(null)
+                  setWalkReplay(true)
                   setWalkthrough(true)
                 }}
               />

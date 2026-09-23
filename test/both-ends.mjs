@@ -1216,4 +1216,33 @@ export function run(test) {
     /* And signing in on a phone connects, rather than stopping one tap short. */
     assert.match(app, /if \(linkState\(\)\.role === 'remote' && !isDemo\(\)\) await reconnectPhone\(\)/, 'a phone signed in from the unlock stops at “Connect as …”')
   })
+
+  /**
+   * A PHONE GETS THE PHONE'S WALKTHROUGH, in the browser too.
+   *
+   * The browser showed every visitor the computer's — "YOU ARE HERE · This
+   * computer", "Plug your unit into this computer" — and most of them are on
+   * a phone. The phone app's own walkthrough is drawn instead there, from the
+   * same words and the same pictures as the phone's.
+   */
+  test('a phone gets the phone’s walkthrough, in the browser too', () => {
+    const app = read('src/App.jsx')
+    const web = read('src/components/PhoneWalkthrough.jsx')
+    const phone = read('mobile/src/screens/Onboarding.js')
+
+    assert.match(app, /const phoneEnd = link\.role === 'remote' \|\| link\.role === 'wifi' \|\| \(isDemo\(\) && link\.canHost === false\)/, 'the browser no longer tells a phone from a computer for its walkthrough')
+    assert.match(app, /<PhoneWalkthrough\s+open=\{walkthrough && phoneEnd\}/, 'a phone’s browser is not shown the phone’s walkthrough')
+    assert.match(app, /<Onboarding\s+open=\{walkthrough && computerEnd\}/, 'the computer’s walkthrough is shown to something that is not the computer')
+
+    /* The same steps, from the same words file, in the same order. */
+    for (const words of ['P1.head', 'P1.go', 'P1.haveCode', 'P2.head', 'P2.go', 'P3.head', 'P3.demo.go', 'P3.real.go', 'P3.signIn', 'P4.head', 'P4.go(unitName)', 'P4.back', 'P9.demo.head', 'P9.go']) {
+      assert.ok(phone.includes(words), `the phone’s walkthrough no longer says ${words}; this check follows it`)
+      assert.ok(web.includes(words), `the browser’s phone walkthrough does not say ${words}, and the phone’s does`)
+    }
+    assert.match(web, /from '\.\.\/\.\.\/shared\/onboarding\.mjs'/, 'the browser’s phone walkthrough has words of its own')
+    /* His pictures, the phone's own files. */
+    for (const art of ['unit-fm3.png', 'piece-unit.png', 'piece-computer.png', 'piece-phone.png']) {
+      assert.ok(web.includes(`mobile/assets/${art}`), `the browser’s phone walkthrough is missing ${art}`)
+    }
+  })
 }
