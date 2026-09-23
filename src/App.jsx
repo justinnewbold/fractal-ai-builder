@@ -137,6 +137,7 @@ import {
   reconnectPhone,
   disconnectPhone,
   setUpMac,
+  signInAccount,
   isPairAccount,
   setMacRemote,
   signOutHere,
@@ -844,6 +845,8 @@ export default function App() {
    * in it means the Mac answered, never merely that a channel was joined.
    */
   const [link, setLink] = useState(() => linkState())
+    /* false, true for the sign-in this end's role calls for, or 'account'
+       for a sign-in with no errand attached — see signInAccount. */
     const [signIn, setSignIn] = useState(false)
   /*
    * Whether the phone has ever had the Mac answer this session. A blip after
@@ -1782,7 +1785,7 @@ export default function App() {
       return
     }
     setUnlockAfterSignIn(true)
-    setSignIn(true)
+    setSignIn('account')
   }
   useEffect(() => {
     if (!unlockAfterSignIn || !accountId || paid.for !== accountId || !paid.checked) return
@@ -1874,7 +1877,10 @@ export default function App() {
   /** The sign-in sheet's submit: the same form does a different job per role. */
   const signInSubmit = useCallback(
     async ({ email, password }) => {
-      if (linkState().role === 'mac') {
+      if (signIn === 'account') {
+        await signInAccount({ email, password })
+        record('remote', `Signed in as ${email}`)
+      } else if (linkState().role === 'mac') {
         await setUpMac({ email, password })
         record('remote', `Phone remote set up for ${email}`)
       } else {
@@ -1883,7 +1889,7 @@ export default function App() {
       }
       setSignIn(false)
     },
-    [record]
+    [record, signIn]
   )
 
   /** Do at the Mac what the phone asked for, and say so at both ends. */
@@ -3643,7 +3649,8 @@ export default function App() {
       />
 
       <SignInSheet
-        open={signIn}
+        open={Boolean(signIn)}
+        account={signIn === 'account'}
         role={link.role}
         email={[link.account?.email, loadRemoteConfig()?.email].find((e) => e && !isPairAccount(e)) || ''}
         busy={busy}
@@ -4185,6 +4192,23 @@ export default function App() {
             */}
             <PhoneRemote link={link} onAction={linkAction} onError={setError} error={error} busy={busy} />
           </Section>
+          {/*
+            THE WAY IN, FROM THE DEMO. "There's actually no place to even sign
+            in anywhere on the web app." In the demo the panel above says the
+            phone remote is not part of it, and that was the whole page. The
+            phone's Setup has had this since "there is no way to login with
+            user name and password after you are in the app on the demo", and
+            these are its words.
+          */}
+          {isDemo() && !link.account ? (
+            <Section key="account" title="Account" note="Not signed in on this device." defaultOpen>
+              <div className="history-actions">
+                <button type="button" className="primary" onClick={() => setSignIn('account')} disabled={busy}>
+                  Sign in with an email and password
+                </button>
+              </div>
+            </Section>
+          ) : null}
           {/*
             How to get a computer on the other end at all, which is the
             question somebody has when there is nothing on the other end.

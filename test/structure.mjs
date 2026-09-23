@@ -1505,8 +1505,10 @@ export function run(test) {
       /* Which unit and which port lead, because they are the far end of the
          chain this page is about. The guide to getting a computer on the
          other end sits above the details about the line to it: it is the
-         question somebody has when there is nothing on the other end at all. */
-      ['link', ['connection', 'phone-remote', 'ways-in', 'link-details']],
+         question somebody has when there is nothing on the other end at all.
+         Account follows the phone remote, only in the demo and signed out:
+         "there's actually no place to even sign in anywhere on the web app." */
+      ['link', ['connection', 'phone-remote', 'account', 'ways-in', 'link-details']],
       /* Fixes first: it is the one somebody is looking for when they open
          this page at all, and the log is what they send if it did not help. */
       ['help', ['fixes', 'preset-check', 'debug-log', 'feedback', 'what-s-changed-this-session']],

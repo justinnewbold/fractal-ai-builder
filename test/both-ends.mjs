@@ -1123,7 +1123,26 @@ export function run(test) {
      * unlock page by itself — the whole point of the request is that nobody
      * has to find Settings. And not for somebody who turns out to have paid.
      */
-    assert.match(app, /setUnlockAfterSignIn\(true\)\s*setSignIn\(true\)/, 'signed out, UNLOCK does not ask for the sign-in')
+    assert.match(app, /setUnlockAfterSignIn\(true\)\s*setSignIn\('account'\)/, 'signed out, UNLOCK does not ask for the sign-in')
+
+    /*
+     * And that sign-in is the plain one. On the website the demo takes the
+     * computer's role, whose own sign-in turns the phone remote on through a
+     * helper a website does not have — it failed every time. "There's
+     * actually no place to even sign in anywhere on the web app."
+     */
+    assert.match(app, /if \(signIn === 'account'\) \{\s*await signInAccount\(/, 'the unlock’s sign-in sets up a phone remote instead of signing in')
+    const link = read('src/lib/link.js')
+    const plain = link.slice(link.indexOf('export async function signInAccount'), link.indexOf('export async function reconnectPhone'))
+    assert.ok(plain.length > 0 && !/join\(|turnOnMac|autoConnect/.test(plain), 'the plain sign-in has an errand attached again')
+
+    /* The phone's Setup has a way in from the demo; so does the browser's, in the phone's words. */
+    assert.match(read('mobile/src/screens/Settings.js'), /label="Sign in with an email and password"/, 'the phone lost its sign-in button')
+    assert.match(
+      app,
+      /\{isDemo\(\) && !link\.account \? \([\s\S]{0,200}note="Not signed in on this device\." defaultOpen>[\s\S]{0,300}setSignIn\('account'\)[\s\S]{0,120}Sign in with an email and password/,
+      'the browser’s Setup has no way to sign in from the demo'
+    )
     assert.match(app, /paid\.for !== accountId/, 'the unlock page can open on the signed-out answer, before the new account’s is in')
     assert.match(app, /if \(paid\.unlocked\) return\s*setSheet\('settings'\)\s*setSetupPage\('unlock'\)/, 'somebody who has paid is sent to the unlock page after signing in')
 

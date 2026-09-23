@@ -853,6 +853,29 @@ export async function connectPhone({ email, password }) {
 }
 
 /**
+ * Sign in, and do nothing else.
+ *
+ * "There's actually no place to even sign in anywhere on the web app." In
+ * the demo there was not: the browser's two sign-ins are both errands, and
+ * the demo cannot run either. connectPhone joins a computer's line, and
+ * setUpMac turns this computer's phone remote on through a helper that a
+ * website does not have — so from fractal.newbold.cloud it failed with
+ * "Can't reach the Fractal app on your Mac".
+ *
+ * What the demo needs an account for is the account itself: buying the
+ * unlock, which has to belong to somebody. So this is the sign-in with no
+ * errand attached — the one the phone's Setup offers as "Sign in with an
+ * email and password".
+ */
+export async function signInAccount({ email, password }) {
+  const config = loadRemoteConfig() || {}
+  await remoteSignIn({ url: config.url, anonKey: config.anonKey, email, password })
+  saveRemoteConfig({ ...config, email: email.trim() })
+  set({ account: await currentAccount() })
+  return state
+}
+
+/**
  * Connect again with the sign-in already here.
  *
  * `fresh` throws the socket away and joins on a new one, which is what Try
