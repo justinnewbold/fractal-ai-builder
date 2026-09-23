@@ -10843,6 +10843,13 @@ button.setup-back {
 .pw-welcome .chip.pw-go {
   border-radius: var(--r-3);
 }
+/* The disclaimer at the foot, small and quiet. */
+.pw-welcome-notice {
+  margin: var(--s-2) 0 0;
+  color: var(--silk-faint);
+  font-size: var(--f-1);
+  line-height: 1.4;
+}
 .pw-sub {
   margin: 0;
   color: var(--silk-dim);

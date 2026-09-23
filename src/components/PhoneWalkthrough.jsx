@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { CHAIN, CLOSE, P1, P2, P3, P4, P9 } from '../../shared/onboarding.mjs'
+import { WELCOME_NOTICE } from '../../shared/affiliation.mjs'
 import { UNITS } from '../lib/demoUnits'
 import { setDemo, setDemoUnit } from '../lib/forgefx'
 import { markOnboarded } from './Onboarding'
@@ -104,6 +105,7 @@ export default function PhoneWalkthrough({ open, replay = false, onClose, onAcco
             <button type="button" className="chip pw-go" onClick={() => leave(onAccount)}>
               {P1.haveCode}
             </button>
+            <p className="pw-welcome-notice">{WELCOME_NOTICE}</p>
           </div>
         ) : null}
 

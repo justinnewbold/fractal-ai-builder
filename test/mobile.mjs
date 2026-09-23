@@ -3212,6 +3212,11 @@ export function run(test) {
       assert.ok(flat.includes(piece), `the first screen lost ${piece}`)
     }
     assert.ok(!/official remote app/i.test(web + read('shared/onboarding.mjs')), 'THE OFFICIAL REMOTE APP is on the screen')
+    /* "Also add a disclaimer at the bottom in small text that says this
+       product is not affiliated or endorsed by Fractal Audio Systems." */
+    const { WELCOME_NOTICE } = await import('../shared/affiliation.mjs')
+    assert.equal(WELCOME_NOTICE, 'This product is not affiliated or endorsed by Fractal Audio Systems.', 'the disclaimer is not his')
+    assert.match(flat, /\{P1\.haveCode\} <\/button> <p className="pw-welcome-notice">\{WELCOME_NOTICE\}<\/p>/, 'the disclaimer is not at the foot of the first screen')
   })
 
   test('Unlock waits for the box saying a computer and a USB cable are needed', async () => {
