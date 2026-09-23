@@ -10867,6 +10867,18 @@ button.setup-back {
   background: color-mix(in srgb, var(--signal) 8%, var(--panel));
   color: var(--signal);
 }
+.pw-feature-picture {
+  display: block;
+  width: 30px;
+  height: 30px;
+  background: var(--signal);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
 .pw-feature-label {
   color: var(--silk-dim);
   font-size: var(--f-1);
