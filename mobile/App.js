@@ -630,6 +630,18 @@ export default function App() {
                  purchase follows the account, so signing in is what tells
                  RevenueCat which account to answer for. */
               linkAccount()
+              /*
+               * AND THE DEMO ENDS, because signing in is heading for a real
+               * rig. "When I sign in, it takes me directly to the demo."
+               *
+               * The way OUT to this screen already cleared it — toSignIn does
+               * — but the way back IN did not, so somebody who tapped Try the
+               * Demo from the sign-in form, looked around, then signed in,
+               * came back to a simulated unit with their real one waiting.
+               *
+               * The two halves of one door now agree.
+               */
+              setDemo(false)
               setAuth('in')
             }}
             onDemo={() => setAuth('in')}

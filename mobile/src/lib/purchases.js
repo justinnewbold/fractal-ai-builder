@@ -274,13 +274,40 @@ export const unlinkAccount = async () => {
   const api = await load()
   if (!api?.logOut) return
   try {
-    await api.logOut()
-    logDebug('purchases: unlinked from the account')
+    const info = await api.logOut()
+    /*
+     * AND THE PHONE STOPS CLAIMING WHAT THE ACCOUNT TOOK WITH IT.
+     *
+     * This used to keep the remembered answer, on the reasoning that logOut
+     * returns a fresh anonymous id which owns nothing, so re-reading would
+     * lock out somebody who bought on this very phone and then signed out of
+     * an account they never needed in order to buy.
+     *
+     * That reasoning protected one person and broke the screen for everybody
+     * else. "When I log out of the phone... no option to unlock the app
+     * anywhere or restore the purchase." Of course not: the app still
+     * believed it was unlocked, so it hid both — the Setup row and the
+     * paywall are the same `unlocked` flag. A phone that cannot be unlocked
+     * and cannot be restored is a dead end, and it also means the next person
+     * to sign in on that handset gets the app for nothing.
+     *
+     * So the answer follows whoever is actually signed in, and Restore is the
+     * way back for the person the old rule was protecting. It asks Apple or
+     * Google directly rather than asking RevenueCat who this anonymous id is,
+     * so a purchase made on this handset comes back in one tap — and Apple
+     * requires that button to exist anyway.
+     */
+    const yes = entitled(info)
+    await remember(yes)
+    set({ unlocked: yes })
+    logDebug(`purchases: unlinked from the account (unlocked ${yes})`)
   } catch (err) {
-    /* Logging out of an already-anonymous user throws, and is a no-op. */
+    /* Logging out of an already-anonymous user throws, and is a no-op — there
+       was no account to stop answering as, so nothing is claimed wrongly. */
     logDebug(`purchases: nothing to unlink (${err?.message || err})`)
   }
 }
+
 
 export const startPurchases = async () => {
   const known = await remembered()
