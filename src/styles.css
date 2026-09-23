@@ -10552,3 +10552,31 @@ button.setup-back {
 .onb-dot.on {
   background: var(--signal);
 }
+
+/*
+ * The unlock page. Borrowed from the phone's paywall: a heading, the offer,
+ * the list of what it buys in its own panel, and one button that takes money.
+ * The button is the full width of the page because it is the only thing on
+ * it anybody is being asked to do.
+ */
+.unlock-head {
+  margin: var(--s-4) 0 var(--s-2);
+  font-size: var(--f-5);
+  color: var(--silk);
+}
+
+.unlock-features {
+  margin: var(--s-4) 0;
+  padding: var(--s-4);
+  border-radius: var(--r-2);
+  background: var(--panel);
+  color: var(--silk);
+  line-height: 1.45;
+}
+
+.unlock-buy {
+  width: 100%;
+  min-height: 52px;
+  margin-top: var(--s-4);
+  font-size: var(--f-3);
+}
