@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar'
 import { color, font, space, isDark, loadMode, setSystemDark, themeVersion, watchTheme } from './src/lib/theme'
 import { haveSession, linkState, probeNow, startLink, stopLink, subscribeLink } from './src/lib/link'
 import { currentAccount, signOut } from './src/lib/relay'
+import { useComputerElsewhere } from './src/lib/useComputerElsewhere'
 import { isPairAccount } from './src/lib/pairing'
 import Note from './src/components/Note'
 import Press from './src/components/Press'
@@ -728,7 +729,7 @@ export default function App() {
             */}
             <EdgeBack onBack={backFrom}>
             {settling && screen === 'stage' ? (
-              <Waking link={link} onRetry={probeNow} />
+              <Waking link={link} onRetry={probeNow} onSwitch={() => setScreen('settings')} />
             ) : screen === 'presets' ? (
               <Presets onBack={() => setScreen('stage')} />
             ) : screen === 'setlists' ? (
@@ -914,7 +915,7 @@ const ofError = (s) => s.error
 /* How long "Finding your computer…" stands on its own before it says more. */
 const WAKING_LONG_MS = 15000
 
-function Waking({ link, onRetry }) {
+function Waking({ link, onRetry, onSwitch }) {
   const said =
     link.link === 'connected'
       ? 'Asking your unit what it is\u2026'
@@ -953,6 +954,16 @@ function Waking({ link, onRetry }) {
     const t = setTimeout(() => setLong(true), WAKING_LONG_MS)
     return () => clearTimeout(t)
   }, [link.link])
+  /*
+   * AND WHEN THE ACCOUNTS DON'T MATCH, IT SAYS SO. "I was signed into the
+   * wrong account, but it didn't notify me at all… Please be clear which
+   * account needs to be trying to sign into, or which one it is signing into,
+   * and they don't match somehow." A computer on another account never
+   * hears this phone, and until now that looked exactly like a computer that
+   * was off. The account server can tell: a computer on this wifi, signed
+   * into a different account, is a yes (lib/useComputerElsewhere.js).
+   */
+  const elsewhere = useComputerElsewhere(long && link.link !== 'connected')
   return (
     <View
       accessibilityLiveRegion="polite"
@@ -968,10 +979,19 @@ function Waking({ link, onRetry }) {
       ) : null}
       {long && link.link !== 'connected' ? (
         <View style={{ alignSelf: 'stretch', gap: space.md }}>
-          <Note tone="warn">
-            Open the Fractal app on the computer and make sure the computer is awake. This keeps trying on
-            its own.
-          </Note>
+          {elsewhere ? (
+            <Note tone="fault">
+              {email
+                ? `The computer on this wifi is signed into a different account. This phone is signed in as ${email}. Sign the Fractal app on the computer in with ${email}, or sign this phone into the computer’s account.`
+                : 'The computer on this wifi is signed into a different account than this phone. Sign both into the same account.'}
+            </Note>
+          ) : (
+            <Note tone="warn">
+              Open the Fractal app on the computer and make sure the computer is awake. This keeps trying on
+              its own.
+            </Note>
+          )}
+          {elsewhere && onSwitch ? <Press label="Switch account on this phone" onPress={onSwitch} /> : null}
           <Press label="Look for the computer again" onPress={() => onRetry?.()} />
         </View>
       ) : null}

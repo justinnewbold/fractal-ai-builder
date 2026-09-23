@@ -27,6 +27,7 @@ import { REPLAY } from '../lib/onboarding'
 import { sync, useStored } from '../lib/store'
 import { isPairAccount } from '../lib/pairing'
 import { mayDrive } from '../lib/unlock-rule'
+import { useComputerElsewhere } from '../lib/useComputerElsewhere'
 import Lamp from '../components/Lamp'
 import Note from '../components/Note'
 import PasswordBox from '../components/PasswordBox'
@@ -72,6 +73,9 @@ export default function Settings({
   const firmware = useRig(ofFirmware)
   const unitState = useRig(ofUnitState)
   const [account, setAccount] = useState(null)
+  /* A computer on this wifi signed into another account — the likeliest
+     reason nothing answers, and until now one nothing on this page could see. */
+  const elsewhere = useComputerElsewhere(link === 'no-answer')
   /*
    * Whether the account service has answered yet.
    *
@@ -606,7 +610,15 @@ export default function Settings({
               </Note>
             ) : null}
 
-            {link === 'no-answer' ? (
+            {/* A computer on this wifi on another account is the reason, and it is
+                said instead — see useComputerElsewhere. */}
+            {link === 'no-answer' && elsewhere ? (
+              <Note tone="fault">
+                {account?.email && !isPairAccount(account.email)
+                  ? `The computer on this wifi is signed into a different account. This phone is signed in as ${account.email}. Sign the Fractal app on the computer in with ${account.email}, or sign this phone out below and into the computer’s account.`
+                  : 'The computer on this wifi is signed into a different account than this phone. Sign both into the same account.'}
+              </Note>
+            ) : link === 'no-answer' ? (
               <Note tone="warn">
                 Open the Fractal app on the computer and make sure the computer is awake. This keeps trying on
                 its own.
