@@ -13,7 +13,7 @@ import {
 } from '../lib/deviceState'
 import { keepTaps, tappedBpm, tempoSender, TAP_REREAD_MS } from '../../shared/tempo.mjs'
 import { remoteActive } from '../lib/remote'
-import { EXCLUDED_BLOCKS } from '../lib/guardrails'
+import { STAGE_HIDDEN } from '../lib/guardrails'
 import { blockColor } from '../lib/blockColors'
 import { sceneColor } from '../lib/sceneColors'
 import { shortBlock } from '../lib/shortName'
@@ -114,9 +114,9 @@ export default function Gig({
   const tuning = useDevice(ofTuning)
   const bpm = useDevice(ofBpm)
 
-  // Input, output, looper and gate are not stage controls.
+  // Input, output and looper are not stage controls. The gate is — see STAGE_HIDDEN.
   const blocks = useMemo(
-    () => allBlocks.filter((b) => b.slug && !EXCLUDED_BLOCKS.includes(b.slug)),
+    () => allBlocks.filter((b) => b.slug && !STAGE_HIDDEN.includes(b.slug)),
     [allBlocks]
   )
 

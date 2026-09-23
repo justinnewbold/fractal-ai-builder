@@ -1,4 +1,4 @@
-import { blockParams, idOf, stageBlocks } from './device'
+import { blockParams, idOf, knobBlocks } from './device'
 import { disambiguate } from './encoding'
 import { isSilencingParam } from './guardrails'
 
@@ -33,7 +33,7 @@ let cached = null
 
 /** What makes this a different chain: the blocks in it, in order. */
 export const chainKey = (blocks) =>
-  stageBlocks(blocks)
+  knobBlocks(blocks)
     .map((b) => idOf(b))
     .join(',')
 
@@ -51,7 +51,7 @@ export async function buildParamIndex(blocks, onProgress) {
   const key = chainKey(blocks)
   if (cached?.key === key) return cached.index
 
-  const editable = stageBlocks(blocks)
+  const editable = knobBlocks(blocks)
   const out = []
   let done = 0
   onProgress?.(0, editable.length)

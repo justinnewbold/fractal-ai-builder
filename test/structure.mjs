@@ -1107,7 +1107,7 @@ export function run(test) {
     const gig = readFileSync(new URL('../src/components/Gig.jsx', import.meta.url), 'utf8')
     assert.match(
       gig,
-      /EXCLUDED_BLOCKS\.includes\(b\.slug\)/,
+      /STAGE_HIDDEN\.includes\(b\.slug\)/,
       'the stage screen now carries input and output tiles nobody can use there'
     )
   })
