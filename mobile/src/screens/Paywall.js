@@ -7,6 +7,7 @@ import Press from '../components/Press'
 import Sheet from '../components/Sheet'
 import { buyUnlock, restorePurchase, usePurchase } from '../lib/purchases'
 import { UNITS } from '../lib/demoUnits'
+import { ALREADY_UNLOCKED } from '../lib/onboarding'
 
 /*
  * The units named on the offer, read off the list the app actually carries.
@@ -125,7 +126,9 @@ export default function Paywall({ onUnlocked, onDemo, onBack, onSignIn, asked = 
         */}
         {onSignIn ? (
           <Press
-            label="Sign in with an email and password"
+            /* "I'm already unlocked, sign in" — his words, and the browser's
+               unlock page says the same (shared/onboarding.mjs). */
+            label={ALREADY_UNLOCKED}
             disabled={busy}
             onPress={onSignIn}
           />

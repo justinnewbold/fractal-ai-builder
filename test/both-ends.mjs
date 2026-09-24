@@ -443,7 +443,7 @@ export const AREAS = [
   {
     area: 'getting connected and signed in',
     web: ['src/components/ConnectScreen.jsx', 'src/components/SignIn.jsx', 'src/components/SignInSheet.jsx'],
-    phone: ['mobile/src/screens/Connect.js', 'mobile/src/screens/SignIn.js'],
+    phone: ['mobile/src/screens/Connect.js', 'mobile/src/screens/SignIn.js', 'mobile/src/components/WrongAccount.js'],
     buttons: [
       {
         does: 'make a new account',
@@ -499,8 +499,19 @@ export const AREAS = [
       {
         does: 'find out how to get a computer on the other end',
         web: 'Set up phone remote',
-        phone: 'Connect my computer',
-        why: 'the browser says it from the computer being set up, the phone from the end that needs one — "Change how to connect computer to Connect my computer", which is the phone saying what pressing it gets you rather than asking a question on your behalf'
+        phone: 'How to connect my computer',
+        why: 'the browser says it from the computer being set up, the phone from the end that needs one — "Instead of saying connect my computer on the android app, have it say how to connect my computer", because a tester read the action as the way to sign in'
+      },
+      {
+        does: 'open Troubleshooting when the computer or the unit will not come up',
+        web: 'Troubleshooting',
+        phone: 'Troubleshooting'
+      },
+      {
+        does: 'unlock the app from the sign-in screen',
+        web: null,
+        phone: 'Unlock',
+        why: 'the phone only makes an account once the app is unlocked, so its sign-in screen needs the way to the unlock; the browser makes an account for anybody and has no such gate'
       },
       {
         does: 'look around without a rig',

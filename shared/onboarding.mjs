@@ -580,6 +580,32 @@ export const P9 = {
   }
 }
 
+/**
+ * HOW IT FITS TOGETHER, on the sign-in screen at both ends.
+ *
+ * "I found a few testers for android already and they're already kind of
+ * having issues being confused." The first tester asked whether Connect my
+ * computer was how to sign in: the unit, the computer app and this app were
+ * only ever explained on the downloads page. Three lines, in the order they
+ * are done, and the same three at both ends — "make sure the onboarding flow
+ * is the same, all of our changes are drifting apart again". MY WORDING.
+ */
+export const SETUP = {
+  intro: 'This app controls your Fractal through your computer. To set it up:',
+  steps: [
+    'Plug your Fractal into your computer with a USB cable.',
+    'Install the free Fractal Remote app on that computer.',
+    'Sign in on both with the same account. Your setlists and starred presets follow you to any device.'
+  ]
+}
+
+/**
+ * The paywall's way in for somebody who already has it, at both ends.
+ * "On the paywall unlock screen, also add the button that says I'm already
+ * unlocked, sign in." His words; the plain hyphen matches his other lines.
+ */
+export const ALREADY_UNLOCKED = 'I’m already unlocked - sign in'
+
 /** What Settings calls the way back in, on both ends. */
 export const REPLAY = 'Show the walkthrough'
 

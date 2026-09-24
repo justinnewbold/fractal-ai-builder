@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   KeyboardAvoidingView,
   Platform,
@@ -16,6 +16,7 @@ import Connect from './Connect'
 import { setDemo } from '../lib/demo'
 import { usePurchase } from '../lib/purchases'
 import { mayDrive } from '../lib/unlock-rule'
+import { SETUP } from '../lib/onboarding'
 
 /**
  * One account, two ends.
@@ -40,7 +41,7 @@ import { mayDrive } from '../lib/unlock-rule'
  * Nothing here mentions a channel, a relay, or the name of the account
  * service — that part has not changed.
  */
-export default function SignIn({ onSignedIn, onDemo }) {
+export default function SignIn({ onSignedIn, onDemo, onUnlock }) {
   const [mode_, setMode] = useState('in') // 'in' | 'up'
   /*
    * The instructions, from the one screen that needs them most.
@@ -77,6 +78,24 @@ export default function SignIn({ onSignedIn, onDemo }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [note, setNote] = useState(null)
+
+  /*
+   * UNLOCKED FROM THIS SCREEN, IT GOES STRAIGHT TO MAKING THE ACCOUNT.
+   *
+   * The unlock is the step before the account, so the moment it lands the
+   * form turns into Create Account and says so, rather than leaving somebody
+   * who has just paid looking at a sign-in form for an account they do not
+   * have yet.
+   */
+  const couldMake = useRef(canMakeAccount)
+  useEffect(() => {
+    if (canMakeAccount && !couldMake.current) {
+      setMode('up')
+      setError(null)
+      setNote('Unlocked. Now make your account — use the same one on your computer.')
+    }
+    couldMake.current = canMakeAccount
+  }, [canMakeAccount])
 
   const ready = email.includes('@') && password.length >= 6
 
@@ -192,9 +211,35 @@ export default function SignIn({ onSignedIn, onDemo }) {
               between devices is the setlists you built and the presets you
               starred, so that is what it says. MY WORDING.
             */}
-            Sign in with the same account as the computer your unit is plugged into. Your setlists
-            and starred presets follow you to any device.
+            {/* And now it leads into the three steps under it rather than
+                saying the third of them on its own. The words are shared with
+                the browser's sign-in screen (shared/onboarding.mjs, SETUP). */}
+            {SETUP.intro}
           </Text>
+        </View>
+
+        {/*
+          HOW THE THING WORKS, BEFORE ANYTHING IS ASKED OF THEM.
+
+          "I found a few testers for android already and they're already kind
+          of having issues being confused." The first tester's question was
+          whether Connect my computer was how to sign in. The screen asked for
+          an account on a computer nobody had told them about: the three
+          pieces — the unit, the computer app, this phone — were only ever
+          explained on the downloads page. Three short lines, in the order
+          they are done.
+        */}
+        <View style={{ gap: space.xs }}>
+          {SETUP.steps.map((line, i) => (
+            <View key={line} style={{ flexDirection: 'row', gap: space.sm }}>
+              <Text style={{ color: color.signal, fontSize: font.body, fontWeight: '700', minWidth: 16 }}>
+                {i + 1}
+              </Text>
+              <Text style={{ color: color.silk, fontSize: font.body, lineHeight: 22, flexShrink: 1 }}>
+                {line}
+              </Text>
+            </View>
+          ))}
         </View>
 
         <View style={{ gap: space.md }}>
@@ -258,14 +303,29 @@ export default function SignIn({ onSignedIn, onDemo }) {
         </View>
         {/* Said rather than left to be guessed at: a sign-in form with no way
             to sign up looks broken to somebody who has never made one. */}
+        {/*
+          AND A WAY TO DO WHAT IT SAYS. It told somebody to unlock the app
+          first and offered no button to do it with — the only unlock was
+          inside the demo, which is not where anybody looks for it. And it
+          said nothing to a tester who was given access for free and so has
+          nothing to unlock: the computer app makes accounts for anybody.
+        */}
         {canMakeAccount ? null : (
-          <Note>
-            An account is what joins this phone to your computer. Unlock the app first and you can
-            make one here — the demo needs no account at all.
-          </Note>
+          <>
+            <Note>
+              New here? Unlock the app to make your account on this phone, or make it in the
+              Fractal Remote app on your computer and sign in here with it. The demo needs no
+              account.
+            </Note>
+            {onUnlock ? <Press label="Unlock" tone="signal" disabled={busy} onPress={onUnlock} /> : null}
+          </>
         )}
 
-        <Press label="Connect my computer" disabled={busy} onPress={() => setHelping(true)} />
+        {/* "Instead of saying connect my computer on the android app, have it
+            say how to connect my computer." Said as the instructions it opens
+            rather than as an action, because a tester read "Connect my
+            computer" as the way to sign in. */}
+        <Press label="How to connect my computer" disabled={busy} onPress={() => setHelping(true)} />
 
         {/*
           The demo, offered here because here is where somebody with no

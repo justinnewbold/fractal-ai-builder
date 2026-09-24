@@ -11,6 +11,7 @@ import { isPairAccount } from './src/lib/pairing'
 import Note from './src/components/Note'
 import Press from './src/components/Press'
 import TopBar from './src/components/TopBar'
+import WrongAccount from './src/components/WrongAccount'
 import DemoUnit from './src/components/DemoUnit'
 import Settings from './src/screens/Settings'
 import EdgeBack from './src/components/EdgeBack'
@@ -109,6 +110,13 @@ export default function App() {
   /* Which fix the guide opens on, and which screen Done goes back to. */
   const [fixOpen, setFixOpen] = useState(null)
   const [fixFrom, setFixFrom] = useState('settings')
+  /* Troubleshooting, open on the fix for a link that will not come up, and
+     Done comes back to the stage. */
+  const openConnectFix = () => {
+    setFixOpen('connect')
+    setFixFrom('stage')
+    setScreen('fixes')
+  }
   /* Where Done goes back to, for the same reason `fixFrom` exists: this screen
      is reached from Setup and from the log, and returning somebody to Setup
      from the log they were reading is the wrong room. */
@@ -635,6 +643,7 @@ export default function App() {
             ) : null}
           </>
         ) : auth === 'out' ? (
+          <>
           <SignIn
             onSignedIn={() => {
               /* An owner signing in is unlocked from that moment, not from
@@ -660,7 +669,27 @@ export default function App() {
               setAuth('in')
             }}
             onDemo={() => setAuth('in')}
+            /* The note on that screen says to unlock first, and this is the
+               button it now has for it. */
+            onUnlock={() => setBuying(true)}
           />
+          {/* Drawn in this branch too, or the sign-in screen's Unlock would
+              set `buying` and nothing would appear. Unlocking lands back on
+              the form, which then turns into Create Account by itself. */}
+          {buying ? (
+            <Paywall
+              asked
+              onSignIn={() => setBuying(false)}
+              onUnlocked={() => setBuying(false)}
+              onDemo={() => {
+                setBuying(false)
+                setDemo(true)
+                setAuth('in')
+              }}
+              onBack={() => setBuying(false)}
+            />
+          ) : null}
+          </>
         ) : auth === 'paywall' ? (
           <Paywall
             onSignIn={toSignIn}
@@ -707,6 +736,13 @@ export default function App() {
               />
             ) : null}
             {picked ? <Arrived picked={picked} /> : null}
+            {/* A computer on another account, said on the stage too and not
+                only in Setup — Waking says it for itself while it is up. */}
+            <WrongAccount
+              active={auth === 'in' && !demo && !settling && screen === 'stage' && link.link !== 'connected'}
+              onSwitch={() => setScreen('settings')}
+              onTroubleshoot={openConnectFix}
+            />
             {/*
               The bar stays up while this waits, which is what makes the wait
               safe: whatever happens, Setup is one tap away in the corner.
@@ -729,7 +765,12 @@ export default function App() {
             */}
             <EdgeBack onBack={backFrom}>
             {settling && screen === 'stage' ? (
-              <Waking link={link} onRetry={probeNow} onSwitch={() => setScreen('settings')} />
+              <Waking
+                link={link}
+                onRetry={probeNow}
+                onSwitch={() => setScreen('settings')}
+                onTroubleshoot={openConnectFix}
+              />
             ) : screen === 'presets' ? (
               <Presets onBack={() => setScreen('stage')} />
             ) : screen === 'setlists' ? (
@@ -849,7 +890,8 @@ export default function App() {
                 /* Only once the Mac is answering: a list of slot numbers with
                    no names behind them is a screen that cannot do its one job. */
                 onOpenPresets={
-                  link.link === 'connected' ? () => setScreen('presets') : null
+                  /* The demo is its own far end: always answering. */
+                  demo || link.link === 'connected' ? () => setScreen('presets') : null
                 }
                 /*
                  * The setlist, unlike the preset list, works with the Mac off.
@@ -866,7 +908,7 @@ export default function App() {
                  * end it is a screen of empty knobs.
                  */
                 onOpenEdit={
-                  BENCH && link.link === 'connected' ? () => setScreen('edit') : null
+                  BENCH && (demo || link.link === 'connected') ? () => setScreen('edit') : null
                 }
                 onUnlock={() => setBuying(true)}
               />
@@ -915,7 +957,7 @@ const ofError = (s) => s.error
 /* How long "Finding your computer…" stands on its own before it says more. */
 const WAKING_LONG_MS = 15000
 
-function Waking({ link, onRetry, onSwitch }) {
+function Waking({ link, onRetry, onSwitch, onTroubleshoot }) {
   const said =
     link.link === 'connected'
       ? 'Asking your unit what it is\u2026'
@@ -993,6 +1035,9 @@ function Waking({ link, onRetry, onSwitch }) {
           )}
           {elsewhere && onSwitch ? <Press label="Switch account on this phone" onPress={onSwitch} /> : null}
           <Press label="Look for the computer again" onPress={() => onRetry?.()} />
+          {/* "Open the troubleshooting if it doesn't connect" — the browser's
+              connecting screen has the same button. */}
+          {onTroubleshoot ? <Press label="Troubleshooting" onPress={onTroubleshoot} /> : null}
         </View>
       ) : null}
     </View>

@@ -457,7 +457,13 @@ export function run(test) {
        * the first thing under the bar is the point of them.
        */
       'UpdateNotice',
-      'UpdateReadyNotice'
+      'UpdateReadyNotice',
+      /*
+       * Inside the No unit found notice, which is one of the states that mean
+       * the app can't work yet: which account this is, and whether a computer
+       * on this wifi is on another one. It draws nothing on a working rig.
+       */
+      'AccountCheck'
     ])
     // The assistant used to be on this list — it sat above every screen at
     // once. It is the Ask tab now, which is what took the chrome down again.
@@ -5210,12 +5216,13 @@ export function run(test) {
 
     for (const [name, file] of [['Settings', settings], ['Paywall', paywall]]) {
       assert.match(file, /onSignIn/, `${name} no longer offers a way to sign in`)
-      assert.match(
-        file,
-        /label="Sign in with an email and password"/,
-        `${name} lost the sign-in button`
-      )
     }
+    assert.match(settings, /label="Sign in with an email and password"/, 'Settings lost the sign-in button')
+    /* The paywall's says it in his words, the same at both ends: "also add
+       the button that says I'm already unlocked, sign in". */
+    assert.match(paywall, /label=\{ALREADY_UNLOCKED\}/, 'Paywall lost the sign-in button')
+    assert.match(src, /\{ALREADY_UNLOCKED\}/, 'the browser’s unlock page has no way to sign in')
+    assert.match(readFileSync(new URL('../shared/onboarding.mjs', import.meta.url), 'utf8'), /ALREADY_UNLOCKED = 'I’m already unlocked - sign in'/, 'the words moved')
 
     /*
      * And Setup stops claiming a session that is not there. `account` is null

@@ -23,7 +23,7 @@ import GearNames from './components/GearNames'
 import PhoneApp from './components/PhoneApp'
 import SetupRow from './components/SetupRow'
 import Onboarding, { onboarded, markOnboarded } from './components/Onboarding'
-import { REPLAY } from '../shared/onboarding.mjs'
+import { ALREADY_UNLOCKED, REPLAY } from '../shared/onboarding.mjs'
 import { FULL, BUILT_AT, VERSION } from './lib/version'
 import Theme from './components/Theme'
 import Section from './components/Section'
@@ -127,7 +127,7 @@ import {
   getHost,
   servedLocally
 } from './lib/forgefx'
-import ConnectScreen from './components/ConnectScreen'
+import ConnectScreen, { AccountCheck } from './components/ConnectScreen'
 import PhoneRemote from './components/PhoneRemote'
 import PhoneWalkthrough from './components/PhoneWalkthrough'
 import LinkDetails from './components/LinkDetails'
@@ -1156,6 +1156,12 @@ export default function App() {
   /* Which fix the guide opens on, when an error notice sent you there. Null is
      the guide with everything folded shut, which is what Setup opens on. */
   const [fix, setFix] = useState(null)
+  /* Troubleshooting, open on the fix for a link that will not come up. */
+  const openConnectFix = () => {
+    setFix('connect')
+    setSheet('settings')
+    setSetupPage('help')
+  }
   /*
    * Named rather than written inline in the tab row.
    *
@@ -3191,6 +3197,24 @@ export default function App() {
       <button type="button" className="primary unlock-buy" disabled={buying || !accountId} onClick={buyHere}>
         {webPriceText ? `Unlock Full Version — ${webPriceText}` : 'Unlock Full Version'}
       </button>
+      {/*
+        "On the paywall unlock screen, also add the button that says I'm
+        already unlocked, sign in." For somebody who paid on another device,
+        or was given access, and is looking at this page on an account that
+        does not have it — or on no account at all. His words, and the same
+        button on the phone's paywall.
+      */}
+      <button
+        type="button"
+        className="chip unlock-signin"
+        onClick={() => {
+          setSheet(null)
+          linkAction('switch')
+        }}
+        disabled={busy}
+      >
+        {ALREADY_UNLOCKED}
+      </button>
     </>
   )
 
@@ -3311,12 +3335,9 @@ export default function App() {
          * demo, or back to the start signed out.
          */
         <section className="connect connect-unlock">
+          {/* Its sign-in button is inside unlockBody now, in his words — it
+              used to be here as "Sign in with an email and password". */}
           {unlockBody}
-          <div className="connect-actions">
-            <button className="chip" onClick={() => linkAction('switch')} disabled={busy}>
-              Sign in with an email and password
-            </button>
-          </div>
           <button
             type="button"
             className="connect-demo"
@@ -3345,6 +3366,7 @@ export default function App() {
             linkAction('switch')
           }}
           owned={owned}
+          onTroubleshoot={openConnectFix}
           onUnpair={() => linkAction('signout')}
           onDemo={() => {
             setDemo(true)
@@ -3356,6 +3378,9 @@ export default function App() {
           <h2>{fault.title}</h2>
           <p>{fault.body}</p>
           {faultWhy ? <p className="hint">What came back: {faultWhy}</p> : null}
+          {/* Which account this is, and whether a computer on this wifi is on
+              another one — see AccountCheck. */}
+          <AccountCheck link={link} />
           <p>
             {/*
               The label moves, because this button takes several seconds and
@@ -3376,6 +3401,10 @@ export default function App() {
             >
               {/* "Demo" to somebody who owns it, as on the phone. */}
               {owned ? 'Demo' : 'Try the demo'}
+            </button>{' '}
+            {/* "Open the troubleshooting if it doesn't connect." */}
+            <button className="chip" onClick={openConnectFix}>
+              Troubleshooting
             </button>
           </p>
           {/*

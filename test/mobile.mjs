@@ -2156,7 +2156,7 @@ export function run(test) {
 
     const app = read('mobile/App.js')
     assert.match(app, /BENCH && screen === 'edit'/, 'the route no longer reads the switch, so turning it off would leave the screen reachable')
-    assert.match(app, /BENCH && link\.link === 'connected'/, 'the Edit button no longer reads the switch')
+    assert.match(app, /BENCH && \(demo \|\| link\.link === 'connected'\)/, 'the Edit button no longer reads the switch')
 
     /*
      * Absent rather than disabled when there is nowhere to go — and now on the
@@ -3212,7 +3212,7 @@ export function run(test) {
     assert.match(flat, /!demo &&/, 'the demo is made to wait for a computer it does not have')
     assert.match(
       flat,
-      /\{settling && screen === 'stage' \? \( <Waking link=\{link\} onRetry=\{probeNow\} onSwitch=\{\(\) => setScreen\('settings'\)\} \/>/,
+      /\{settling && screen === 'stage' \? \( <Waking link=\{link\} onRetry=\{probeNow\} onSwitch=\{\(\) => setScreen\('settings'\)\} onTroubleshoot=\{openConnectFix\} \/>/,
       'nothing is shown while the app waits'
     )
 
@@ -3369,6 +3369,37 @@ export function run(test) {
     assert.match(waking, /This phone is signed in as \$\{email\}/, 'the phone does not say which account it is on')
     assert.match(waking, /Switch account on this phone/, 'the phone gives no way to change account')
     assert.match(read('mobile/src/screens/Settings.js'), /useComputerElsewhere\(link === 'no-answer'\)/, 'Setup never asks')
+
+    /* "When the app is signed in on the wrong account it should say so on the
+       main screen, not just in settings." */
+    const wrong = read('mobile/src/components/WrongAccount.js').replace(/\s+/g, ' ')
+    assert.match(wrong, /useComputerElsewhere\(active\)/, 'the stage never asks')
+    assert.match(wrong, /This phone is signed in as \$\{email\}/, 'the stage does not say which account it is on')
+    assert.match(wrong, /Switch account on this phone/, 'the stage gives no way to change account')
+    assert.match(
+      phone,
+      /<WrongAccount active=\{auth === 'in' && !demo && !settling && screen === 'stage' && link\.link !== 'connected'\}/,
+      'the stage screen says nothing while the link is down on another account'
+    )
+
+    /* "Let's make sure that's added when there is no connection, and open the
+       troubleshooting if it doesn't connect" — said of the browser's No unit
+       found notice, and held at both ends. */
+    const webApp = read('src/App.jsx').replace(/\s+/g, ' ')
+    assert.match(webApp, /<AccountCheck link=\{link\} \/>/, 'the No unit found notice does not say which account')
+    assert.match(webApp, /onClick=\{openConnectFix\}> Troubleshooting <\/button>/, 'the No unit found notice cannot open Troubleshooting')
+    assert.match(webApp, /setFix\('connect'\) setSheet\('settings'\) setSetupPage\('help'\)/, 'the browser opens Troubleshooting somewhere other than the connect fix')
+    const connectWeb = read('src/components/ConnectScreen.jsx')
+    assert.match(connectWeb, /export function AccountCheck/, 'there is no account check for the notice to draw')
+    assert.match(connectWeb, /computerElsewhere\(\)\.then/, 'the account check never asks about another account')
+    assert.equal((connectWeb.match(/onClick=\{onTroubleshoot\}/g) || []).length, 2, 'Connecting and Not answering do not both offer Troubleshooting')
+    assert.match(wrong, /label="Troubleshooting"/, 'the phone’s wrong-account note cannot open Troubleshooting')
+    assert.match(phone, /setFixOpen\('connect'\) setFixFrom\('stage'\) setScreen\('fixes'\)/, 'the phone opens Troubleshooting somewhere other than the connect fix')
+    assert.match(
+      read('shared/troubleshooting.mjs'),
+      /signed into the same account/,
+      'the connect fix does not mention the account'
+    )
 
     const web = read('src/components/ConnectScreen.jsx').replace(/\s+/g, ' ')
     assert.match(web, /computerElsewhere\(\)\.then/, 'the browser never asks')
@@ -3927,7 +3958,21 @@ export function run(test) {
     assert.match(read('mobile/src/screens/Settings.js'), /onPress=\{onOpenConnect\}/, 'Setup has no door to it')
     const signIn = read('mobile/src/screens/SignIn.js')
     assert.match(signIn, /if \(helping\) return <Connect onBack=/, 'the sign-in screen cannot reach it')
-    assert.match(signIn, /Connect my computer/, 'the sign-in screen does not offer it')
+    assert.match(signIn, /label="How to connect my computer"/, 'the sign-in screen does not offer it')
+    /* "They're already kind of having issues being confused." The screen says
+       how the three pieces fit before it asks for anything, and the note that
+       says to unlock first has a button that does it. */
+    assert.match(signIn, /\{SETUP\.intro\}/, 'the sign-in screen does not say how it works')
+    assert.match(signIn, /SETUP\.steps\.map/, 'the sign-in screen lost the steps')
+    assert.match(read('shared/onboarding.mjs'), /'Install the free Fractal Remote app on that computer\.'/, 'the steps lost the computer app')
+    /* And the browser's signed-out connect screen says the same three, from
+       the same place: "all of our changes are drifting apart again". */
+    const web = read('src/components/ConnectScreen.jsx')
+    assert.match(web, /SETUP\.steps\.map/, 'the browser does not show the steps the phone shows')
+    assert.match(web, /<Steps \/>/, 'the browser draws its steps nowhere')
+    assert.match(signIn, /<Press label="Unlock" tone="signal"/, 'the note says to unlock with nothing to unlock with')
+    const outBranch = read('mobile/App.js').replace(/\s+/g, ' ')
+    assert.match(outBranch, /onUnlock=\{\(\) => setBuying\(true\)\} \/> \{\/\*[^]*?\*\/\} \{buying \? \( <Paywall asked/, 'the sign-in Unlock opens a paywall that is never drawn')
   })
 
   test('the App Store review notes name buttons that exist', () => {
@@ -4389,6 +4434,22 @@ export function run(test) {
     const chain = stage.slice(stage.indexOf('blocks.map'))
     assert.match(scenes, /\n\s+bar\n/, 'the scene tiles lost their rule')
     assert.ok(!/\n\s+bar\n/.test(chain), 'the chain tiles have a rule his mockup does not draw')
+  })
+
+  test('the demo stays connected, so its preset list opens', () => {
+    /*
+     * "I'm in the demo and the preset is greyed out and can't be pressed." The
+     * log: "no-answer → connected — the demo", then "connected → off" — the
+     * tail of the real link's stopLink landing after startLink had spoken.
+     */
+    const link = read('mobile/src/lib/link.js')
+    const stop = link.slice(link.indexOf('export async function stopLink()'))
+    assert.ok(stop.indexOf('set({ ...initial })') < stop.indexOf('await remoteDisconnect()'), 'stopLink resets the link after the wait again, over the demo’s connected')
+    assert.match(link, /if \(isDemo\(\)\) return enterDemo\(\)/, 'a real loop can run on under the demo')
+    assert.match(link, /if \(!running\) return\s+delay = state\.link === 'connected'/, 'a turn stopped mid-wait schedules another anyway')
+    assert.match(link, /await remoteConnect\(\)\s+if \(!running\) return/, 'a join finishing after stopLink carries on as if running')
+    const app = read('mobile/App.js')
+    assert.match(app, /demo \|\| link\.link === 'connected' \? \(\) => setScreen\('presets'\) : null/, 'the demo’s preset list waits on a real link')
   })
 
   test('buying the app ends the demo', () => {
@@ -5323,7 +5384,7 @@ export function run(test) {
     assert.match(link, /export const NAME_AGAIN = 2 \* 60 \* 1000/, 'the phone has no interval for asking again')
     assert.match(
       link.replace(/\s+/g, ' '),
-      /if \(state\.link === 'connected' && Date\.now\(\) - namedAt > NAME_AGAIN\) await readMacName\(\)/,
+      /if \(running && state\.link === 'connected' && Date\.now\(\) - namedAt > NAME_AGAIN\) await readMacName\(\)/,
       'the computer is asked what it is only at join, so an update while connected is never noticed'
     )
 
@@ -6730,7 +6791,7 @@ export function run(test) {
        preset list over a unit that is right there. */
     assert.match(
       read('mobile/src/lib/link.js').replace(/\s+/g, ' '),
-      /if \(isDemo\(\)\) \{ set\(\{ link: 'connected', macName: 'the demo', hostVersion: null \}\)/,
+      /if \(isDemo\(\)\) \{ enterDemo\(\) return stopLink \}[\s\S]*function enterDemo\(\) \{ running = false if \(timer\) clearTimeout\(timer\) timer = null set\(\{ link: 'connected', macName: 'the demo', hostVersion: null \}\)/,
       'the demo does not read as a working link, so the app refuses to use it'
     )
 
@@ -6767,7 +6828,7 @@ export function run(test) {
        is fetched: the demo makes no request at all. */
     assert.match(
       read('mobile/src/lib/link.js').replace(/\s+/g, ' '),
-      /if \(isDemo\(\)\) \{ set\(\{ link: 'connected'/,
+      /if \(isDemo\(\)\) \{ enterDemo\(\) return stopLink \} if \(running\)/,
       'the demo starts the link loop, which joins a channel it has no use for'
     )
   })
@@ -8702,8 +8763,8 @@ export function run(test) {
     const app = read('mobile/App.js')
     assert.equal(
       (app.match(/onUnlock=\{\(\) => setBuying\(true\)\}/g) || []).length,
-      4,
-      'the bar, Settings, the stage screen and the walkthrough do not all open the same paywall'
+      5,
+      'the bar, Settings, the stage screen, the walkthrough and the sign-in screen do not all open the same paywall'
     )
 
     /*

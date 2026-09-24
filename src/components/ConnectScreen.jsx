@@ -28,7 +28,7 @@
 import { useEffect, useState } from 'react'
 import { isPairAccount } from '../lib/link'
 import { computerElsewhere } from '../lib/remote'
-import { P6 } from '../../shared/onboarding.mjs'
+import { P6, SETUP } from '../../shared/onboarding.mjs'
 import { DOWNLOADS_URL } from '../../mobile/src/lib/downloadLink'
 import { inDesktopApp, onAPhoneOrTablet } from '../lib/desktop'
 
@@ -40,6 +40,9 @@ export default function ConnectScreen({
   onCreateAccount,
   onUnpair,
   onDemo,
+  /* Opens Troubleshooting on "It will not connect at all". "Open the
+     troubleshooting if it doesn't connect." */
+  onTroubleshoot,
   /* Somebody who has paid. The phone never offers them "Try the Demo" —
      "if they are already signed in and the app is unlocked, instead of
      saying try the demo, have it just say Demo." */
@@ -112,6 +115,11 @@ export default function ConnectScreen({
                     Sign in as someone else
                   </button>
                 ) : null}
+                {onTroubleshoot ? (
+                  <button className="chip" onClick={onTroubleshoot}>
+                    Troubleshooting
+                  </button>
+                ) : null}
               </div>
             </>
           ) : null}
@@ -133,6 +141,11 @@ export default function ConnectScreen({
             <button className="chip" onClick={paired ? onUnpair : onSwitchAccount} disabled={busy}>
               {paired ? 'Pair with a different computer' : 'Sign in as someone else'}
             </button>
+            {onTroubleshoot ? (
+              <button className="chip" onClick={onTroubleshoot}>
+                Troubleshooting
+              </button>
+            ) : null}
           </div>
           {/*
             THE NEXT STEP FOR SOMEBODY NEW. A first-timer who has just made an
@@ -170,6 +183,13 @@ export default function ConnectScreen({
                 phone becomes its remote. Your setlists and the presets you starred follow you to
                 any device, anywhere &mdash; not just at home.
               </p>
+              {/*
+                The phone's three steps, in the phone's words, from the one
+                place both ends read them (shared/onboarding.mjs, SETUP):
+                "make sure the onboarding flow is the same, all of our
+                changes are drifting apart again".
+              */}
+              <Steps />
               <div className="connect-actions">
                 {/*
                   CREATE ACCOUNT FIRST, AND BIG. "Most people coming here for
@@ -316,6 +336,58 @@ function NoComputerYet() {
         </div>
       )}
     </>
+  )
+}
+
+/** How the unit, the computer app and this app fit, as three numbered lines. */
+function Steps() {
+  return (
+    <>
+      <p className="hint">{SETUP.intro}</p>
+      <ol className="connect-steps">
+        {SETUP.steps.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ol>
+    </>
+  )
+}
+
+/**
+ * WHICH ACCOUNT, ON THE NO UNIT FOUND NOTICE.
+ *
+ * "I think it's connected to a different account on the computer. We added
+ * to the mobile version to state it needed to be signed in with the same
+ * account — let's make sure that's added when there is no connection."
+ *
+ * The notice is drawn when the computer this app reached has no unit on it.
+ * The likeliest reason, when a unit IS plugged in somewhere, is that it is
+ * plugged into a different computer on a different account — so the account
+ * this end is using is named, and the account server's yes-or-no about a
+ * computer on this wifi on another account turns it into the red sentence
+ * the connect screen already says.
+ */
+export function AccountCheck({ link }) {
+  const email = link.account?.email || link.cloud?.user?.email || null
+  const paired = isPairAccount(email)
+  const [elsewhere, setElsewhere] = useState(false)
+  useEffect(() => {
+    if (paired) return undefined
+    let live = true
+    const ask = () => computerElsewhere().then((yes) => live && setElsewhere(yes))
+    ask()
+    const t = setInterval(ask, 30000)
+    return () => {
+      live = false
+      clearInterval(t)
+    }
+  }, [paired])
+  if (elsewhere) return <Mismatch email={email} />
+  if (!email || paired) return null
+  return (
+    <p className="hint">
+      Make sure the computer your Fractal is plugged into is signed in with <strong>{email}</strong>.
+    </p>
   )
 }
 

@@ -147,6 +147,8 @@ function schedule(ms) {
  */
 async function tick() {
   if (!running) return
+  /* A real loop has no business running under the demo. See startLink. */
+  if (isDemo()) return enterDemo()
 
   if (!remoteActive()) {
     await join()
@@ -161,8 +163,11 @@ async function tick() {
 
   // A computer that was updated while this phone watched says so within a
   // couple of minutes, rather than at the next join.
-  if (state.link === 'connected' && Date.now() - namedAt > NAME_AGAIN) await readMacName()
+  if (running && state.link === 'connected' && Date.now() - namedAt > NAME_AGAIN) await readMacName()
 
+  /* Stopped while this turn was waiting on the network: no next turn. A turn
+     that rescheduled itself after stopLink is a loop nobody can see running. */
+  if (!running) return
   delay = state.link === 'connected' ? KEEPALIVE : nextDelay(delay)
   schedule(delay)
 }
@@ -172,6 +177,7 @@ async function join() {
   const began = Date.now()
   try {
     await remoteConnect()
+    if (!running) return
   } catch (err) {
     // A join that failed is a Mac that isn't there yet. The loop is the retry.
     // Said in the log with why and how long, because "joining" for minutes
@@ -302,7 +308,7 @@ export function startLink() {
    * The name is what tells anybody it is not a real rig, and the bar shows it.
    */
   if (isDemo()) {
-    set({ link: 'connected', macName: 'the demo', hostVersion: null })
+    enterDemo()
     return stopLink
   }
   if (running) {
@@ -346,6 +352,29 @@ export function startLink() {
   return stopLink
 }
 
+/*
+ * THE DEMO IS ALWAYS CONNECTED, and nothing that finishes late may say otherwise.
+ *
+ * "I'm in the demo and the preset is greyed out and can't be pressed." The
+ * preset list opens only while the link says connected. Entering the demo runs
+ * stopLink and then startLink — and stopLink used to reset the link AFTER
+ * awaiting the channel's disconnect, so its tail landed after startLink had
+ * already said connected, and put 'off' back:
+ *
+ *   [link] no-answer → connected — the demo
+ *   [link] connected → off
+ *
+ * So the reset now happens before the wait, and a real loop found running
+ * under the demo is stopped here rather than left to join a computer the
+ * demo does not use.
+ */
+function enterDemo() {
+  running = false
+  if (timer) clearTimeout(timer)
+  timer = null
+  set({ link: 'connected', macName: 'the demo', hostVersion: null })
+}
+
 export async function stopLink() {
   running = false
   if (timer) clearTimeout(timer)
@@ -360,9 +389,10 @@ export async function stopLink() {
   unbind = []
   namedAt = 0
   namedSaid = null
-  await remoteDisconnect()
+  /* Reset first, then wait: see enterDemo. */
   resetRig()
   set({ ...initial })
+  await remoteDisconnect()
 }
 
 /** Whether a session was left over from last time, without joining anything. */
