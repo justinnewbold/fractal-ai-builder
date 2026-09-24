@@ -230,6 +230,54 @@ async function sales() {
   }
 }
 
+/*
+ * "Is there any way we can send an email to them when I grant access to
+ * somebody?"
+ *
+ * The unlock lands without the person knowing, and a tester who is never told
+ * goes on seeing a paywall in an app they already closed. So a grant that
+ * CHANGED something sends one email, from the same verified address the
+ * download link uses. A grant to somebody who already had it sends nothing:
+ * pressing Give twice must not mean two emails.
+ *
+ * Every word is fixed here. The only thing from outside is the recipient, and
+ * that is the address on the account itself (account_details), not what was
+ * typed into the box: a typo in the box finds no account and never gets here.
+ */
+const FROM = 'Fractal Remote <noreply@newbold.cloud>'
+const SITE = 'https://fractal.newbold.cloud'
+
+const escape = (t: string) => t.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
+
+async function tellThem(to: string): Promise<boolean> {
+  const key = env('RESEND_API_KEY')
+  if (!key || !to) return false
+  const shown = escape(to)
+  const html = `
+    <div style="font:15px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1a1d21">
+      <p style="margin:0 0 16px;font-size:18px;font-weight:700">You have full access to Fractal Remote.</p>
+      <p style="margin:0 0 16px">Everything in the app is unlocked for this account, for good. There is nothing to pay.</p>
+      <p style="margin:0 0 20px">Sign in with this email address, <b>${shown}</b>, in the Fractal Remote app on your phone, or on the website:</p>
+      <p style="margin:0 0 20px">
+        <a href="${SITE}" style="background:#7c5cff;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;display:inline-block;font-weight:600">Open Fractal Remote</a>
+      </p>
+      <p style="margin:0 0 16px">To control your Fractal unit, you also need the free computer app, which holds the USB cable:<br><a href="${SITE}/downloads">${SITE}/downloads</a></p>
+      <p style="margin:0;color:#8b9099;font-size:13px">If the app was already open, close it and open it again to see the unlock.</p>
+    </div>`
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: FROM, to: [to], subject: 'You have full access to Fractal Remote', html })
+    })
+    if (!res.ok) console.error('grant-access: the email was refused', res.status, await res.text())
+    return res.ok
+  } catch (err) {
+    console.error('grant-access: the email did not go', err)
+    return false
+  }
+}
+
 /** The plain sentence for a RevenueCat refusal. */
 async function refusal(res: Response, doing: string): Promise<string> {
   const said = await res.text().catch(() => '')
@@ -277,6 +325,9 @@ Deno.serve(async (req: Request) => {
     const entitlement = await entitlementId()
     if (!entitlement) return json({ ok: false, message: 'Could not find the unlock in RevenueCat.' }, 502)
 
+    /* Whether this grant is news to them, which is when they are told. */
+    const before = action === 'grant' ? await unlocked(account, entitlement) : false
+
     if (action === 'grant') {
       /* RevenueCat only grants to a customer it knows; somebody who has never
          opened the app signed in is not one yet. Creating one that exists
@@ -306,6 +357,8 @@ Deno.serve(async (req: Request) => {
     /* The relay's table follows RevenueCat's answer, whichever way it went. */
     if (action !== 'check') await rpc('record_entitlement', { uid: account, is_active: has, from_source: 'revenuecat' })
 
+    const told = action === 'grant' && has && !before ? await tellThem(String(found?.email || email)) : null
+
     /* The Customer lookup. Asked after the change, so it shows the result. */
     const [bought, seen] = await Promise.all([purchasesOf(account), lastSeen(account)])
     const details = {
@@ -320,7 +373,11 @@ Deno.serve(async (req: Request) => {
     }
     const message =
       action === 'grant'
-        ? `${email} has the unlock now. They may need to close and reopen the app, or reload the website.`
+        ? before
+          ? `${email} already had the unlock, so no email was sent.`
+          : told
+            ? `${email} has the unlock now, and they've been emailed to say so.`
+            : `${email} has the unlock now. The email to tell them did not go out, so let them know yourself. They may need to close and reopen the app.`
         : action === 'revoke'
           ? has
             ? `The unlock given here is taken back, but ${email} still has one — they bought it, and a purchase is not touched here.`
@@ -328,7 +385,7 @@ Deno.serve(async (req: Request) => {
           : has
             ? `${email} has the unlock.`
             : `${email} has an account but not the unlock.`
-    return json({ ok: true, found: true, email, unlocked: has, message, details })
+    return json({ ok: true, found: true, email, unlocked: has, emailed: told === true, message, details })
   } catch (err) {
     console.error(`grant-access: ${err}`)
     return json({ ok: false, message: `Something went wrong: ${String((err as Error)?.message || err).slice(0, 200)}` }, 500)

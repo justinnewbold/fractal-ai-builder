@@ -3474,6 +3474,21 @@ export function run(test) {
     }
     assert.match(read('mobile/src/screens/Settings.js'), /\{page === 'sales' && isAdmin\(account\?\.email\) \?/)
     assert.match(read('src/App.jsx'), /\{setupPage === 'sales' && isAdmin\(link\.account\?\.email\) \?/)
+
+    /*
+     * "Is there any way we can send an email to them when I grant access to
+     * somebody?" Once per grant that changed something, to the account's own
+     * address, with every word fixed in the function.
+     */
+    const grant = server.slice(server.indexOf("if (action === 'grant') {"))
+    assert.match(server, /const before = action === 'grant' \? await unlocked\(account, entitlement\) : false/, 'a grant does not know whether it was news')
+    assert.match(server, /action === 'grant' && has && !before \? await tellThem\(String\(found\?\.email \|\| email\)\)/, 'the email is not tied to a grant that changed something')
+    assert.ok(server.indexOf('await tellThem(') > server.indexOf('ADMINS.includes(fold(me.email))'), 'the email can be sent before checking who is asking')
+    assert.match(server, /subject: 'You have full access to Fractal Remote'/)
+    assert.match(server, /from: FROM/)
+    assert.match(server, /<b>\$\{shown\}<\/b>/, 'the address goes into the email unescaped')
+    assert.match(grant, /already had the unlock, so no email was sent/, 'pressing Give twice does not say why no email went')
+    assert.match(grant, /did not go out, so let them know yourself/, 'a failed email is reported as sent')
   })
 
   test('the advice to close Fractal’s own software names it, per unit where the unit is known', async () => {
