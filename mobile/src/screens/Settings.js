@@ -31,6 +31,7 @@ import { useComputerElsewhere } from '../lib/useComputerElsewhere'
 import { quitEditor } from '../lib/editors'
 import { isAdmin } from '../lib/admin'
 import AccessTool from '../components/AccessTool'
+import AccountsTool from '../components/AccountsTool'
 import SalesTool from '../components/SalesTool'
 import Lamp from '../components/Lamp'
 import Note from '../components/Note'
@@ -397,6 +398,9 @@ export default function Settings({
             ) : null}
             {isAdmin(account?.email) ? (
               <SetupRow title="Sales at a glance" status="Today, this week, all time" onPress={() => setPage('sales')} />
+            ) : null}
+            {isAdmin(account?.email) ? (
+              <SetupRow title="Everyone with an account" status="Who has signed up" onPress={() => setPage('accounts')} />
             ) : null}
           </View>
 
@@ -892,6 +896,14 @@ export default function Settings({
         <>
           {head('Sales at a glance', 'back')}
           <SalesTool />
+        </>
+      ) : null}
+
+      {/* -------------------------------------------------------- accounts */}
+      {page === 'accounts' && isAdmin(account?.email) ? (
+        <>
+          {head('Everyone with an account', 'back')}
+          <AccountsTool />
         </>
       ) : null}
 

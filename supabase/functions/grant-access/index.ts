@@ -364,14 +364,16 @@ Deno.serve(async (req: Request) => {
   }
   const action = String(input.action || 'check')
   const email = String(input.email || '').trim().toLowerCase()
-  if (internal ? action !== 'claim' : !['check', 'grant', 'revoke', 'sales'].includes(action)) {
+  if (internal ? action !== 'claim' : !['check', 'grant', 'revoke', 'sales', 'accounts'].includes(action)) {
     return json({ ok: false, message: 'Unknown action.' }, 400)
   }
-  if (action !== 'sales' && !email.includes('@')) return json({ ok: false, message: 'Type the email address they signed up with.' }, 400)
+  if (action !== 'sales' && action !== 'accounts' && !email.includes('@')) return json({ ok: false, message: 'Type the email address they signed up with.' }, 400)
   if (!env('REVENUECAT_SECRET')) return json({ ok: false, message: 'The server has no RevenueCat key set.' }, 500)
 
   try {
     if (action === 'sales') return json(await sales())
+    /* "How do I see a list of who has set up an account?" */
+    if (action === 'accounts') return json({ ok: true, ...((await rpc('owner_accounts', {})) as Record<string, unknown>) })
 
     const found = (await rpc('account_details', { address: email })) as Record<string, any> | null
     const account = found?.id ? String(found.id) : null

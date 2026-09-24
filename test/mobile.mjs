@@ -3535,6 +3535,34 @@ export function run(test) {
     const app = read('src/App.jsx')
     assert.match(app, /if \(!arrivedToJoin\(\)\) return\s+window\.history\.replaceState\(null, '', '\/'\)\s+setSignInStart\('up'\)\s+setSignIn\('account'\)/, 'the join link does not open the form on the Create Account side')
     assert.ok(!/"source": "\/join"/.test(read('vercel.json')), 'the join link is sent somewhere other than the app')
+
+    /* "How do I see a list of who has set up an account?" */
+    const { accountSections } = await import('../shared/admin.mjs')
+    const nowAt = Date.parse('2026-09-24T12:00:00Z')
+    const list = {
+      ok: true,
+      total: 3,
+      accounts: [
+        { email: 'new@x.com', signed_up: '2026-09-24T10:00:00Z', confirmed: false, last_sign_in: null, unlocked: false },
+        { email: 'paid@x.com', signed_up: '2026-09-20T10:00:00Z', confirmed: true, last_sign_in: '2026-09-23T10:00:00Z', unlocked: true, source: 'revenuecat' },
+        { email: 'me@x.com', signed_up: '2026-09-01T10:00:00Z', confirmed: true, last_sign_in: '2026-09-24T09:00:00Z', unlocked: true, source: 'owner' }
+      ],
+      waiting: [{ email: 'l4@x.com', added: '2026-09-24T01:00:00Z' }]
+    }
+    const everyone = accountSections(list, '', nowAt)
+    assert.equal(everyone[0].title, 'Everyone with an account (3)')
+    assert.equal(everyone[0].rows[0].value, 'new@x.com\nSigned up today, has not confirmed their email yet, Not unlocked')
+    assert.equal(everyone[0].rows[1].value, 'paid@x.com\nSigned up 4 days ago, last on yesterday, Unlocked')
+    assert.match(everyone[0].rows[2].value, /Unlocked, owner account$/)
+    assert.equal(everyone[1].title, 'Waiting for them to sign up (1)')
+    const found = accountSections(list, 'PAID', nowAt)
+    assert.equal(found[0].rows.length, 1, 'finding an email does not narrow the list')
+    assert.equal(accountSections(list, 'nobody', nowAt)[0].rows[0].value, 'Nobody with an account matches that.')
+    assert.match(server, /if \(action === 'accounts'\) return json\(\{ ok: true, \.\.\.\(\(await rpc\('owner_accounts', \{\}\)\)/)
+    assert.ok(server.indexOf("action === 'accounts'") > server.indexOf('ADMINS.includes(fold(me.email))'), 'the list is read before checking who is asking')
+    assert.match(read('supabase/migrations/20260924_owner_accounts.sql'), /revoke all on function public\.owner_accounts\(\) from public, anon, authenticated/, 'a client can read every account')
+    assert.match(read('mobile/src/screens/Settings.js'), /\{page === 'accounts' && isAdmin\(account\?\.email\) \?/)
+    assert.match(read('src/App.jsx'), /\{setupPage === 'accounts' && isAdmin\(link\.account\?\.email\) \?/)
   })
 
   test('the advice to close Fractal’s own software names it, per unit where the unit is known', async () => {
@@ -4520,7 +4548,8 @@ export function run(test) {
       'About',
       /* Last, and drawn only on his own account — shared/admin.mjs. */
       'Give someone access',
-      'Sales at a glance'
+      'Sales at a glance',
+      'Everyone with an account'
     ], 'the Setup rows are not in the order he asked for')
 
     /*
