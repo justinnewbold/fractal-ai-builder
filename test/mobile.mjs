@@ -3834,8 +3834,18 @@ export function run(test) {
     const screen = read('mobile/src/screens/Connect.js')
     assert.ok(!/WAYS/.test(screen), 'the phone lists the desktop download routes again')
     assert.ok(!/Linking\.openURL/.test(screen), 'the phone can be sent to a download page again')
-    assert.match(screen, /TYPE THIS ON YOUR COMPUTER/, 'nothing says which machine the address is for')
-    assert.match(screen, /<CopyAddress size=\{font\.lead\} \/>/, 'the address to type is not shown')
+    /* His mockup: the card says it is the desktop app, for which computers,
+       and the address sits in it with a copy button. */
+    assert.match(screen, /\{CONNECT\.cardBody\}/, 'nothing says which machine the address is for')
+    assert.match(read('shared/onboarding.mjs'), /cardBody: 'Download for Mac, Windows, or Linux\./, 'the card lost which computers it is for')
+    assert.match(screen, /<CopyAddress row size=\{font\.lead\} \/>/, 'the address to type is not shown')
+    /* "Can we update this screen to look like this?" — and the browser's
+       How to connect my computer draws the same page from the same words. */
+    assert.match(screen, /\{CONNECT\.pill\}/, 'the phone lost the pill')
+    const webConnect = read('src/components/ConnectScreen.jsx')
+    assert.match(webConnect, /\{howTo \? <ConnectComputer \/> : null\}/, 'the browser draws something else under How to connect my computer')
+    assert.match(webConnect, /sendDownloadLink\(email\)/, 'the browser cannot send the link')
+    assert.match(read('shared/onboarding.mjs'), /pill: 'SAME ACCOUNT ON BOTH'/, 'the pill says something untrue about this app again')
     /* Tapping it copies the address, and never opens the page on the phone. */
     const copy = read('mobile/src/components/CopyAddress.js')
     assert.match(copy, /\{DOWNLOADS_URL\}/, 'the address is not on the card')
@@ -5075,6 +5085,9 @@ export function run(test) {
         /* A real machine's own name is data, not copy: "MacBook Pro SG 566"
            comes off the host and is not ours to rewrite. */
         if (/MacBook/.test(line)) continue
+        /* Naming the three platforms the computer app runs on is saying which
+           computers, not calling every computer a Mac. */
+        if (/Mac, Windows,? (or |and )?Linux/.test(line)) continue
         assert.ok(
           !/\bMac\b/.test(line),
           `${file.split('/mobile/')[1]}: "${line}" still says Mac`

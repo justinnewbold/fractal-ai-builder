@@ -29,8 +29,16 @@ import { useEffect, useState } from 'react'
 import SignIn from './SignIn'
 import { isPairAccount } from '../lib/link'
 import { computerElsewhere } from '../lib/remote'
-import { P6, SETUP } from '../../shared/onboarding.mjs'
-import { DOWNLOADS_URL } from '../../mobile/src/lib/downloadLink'
+import { CONNECT, P6, SETUP } from '../../shared/onboarding.mjs'
+import { DOWNLOADS_URL, sendDownloadLink } from '../../mobile/src/lib/downloadLink'
+import laptopIcon from '../../mobile/assets/icons/laptop.png'
+import copyIcon from '../../mobile/assets/icons/copy.png'
+import checkIcon from '../../mobile/assets/icons/check.png'
+import mailIcon from '../../mobile/assets/icons/mail.png'
+import sendIcon from '../../mobile/assets/icons/send.png'
+import appleIcon from '../../mobile/assets/icons/apple.png'
+import windowsIcon from '../../mobile/assets/icons/windows.png'
+import linuxIcon from '../../mobile/assets/icons/linux.png'
 import { inDesktopApp, onAPhoneOrTablet } from '../lib/desktop'
 
 export default function ConnectScreen({
@@ -121,7 +129,7 @@ export default function ConnectScreen({
           <ExternalIcon />
           {SETUP.howTo}
         </button>
-        {howTo ? <NoComputerYet /> : null}
+        {howTo ? <ConnectComputer /> : null}
         <button type="button" className="connect-demo connect-demo-quiet" onClick={onDemo} disabled={busy}>
           {owned ? 'Demo' : 'Try the Demo'}
         </button>
@@ -376,6 +384,120 @@ function NoComputerYet() {
         </div>
       )}
     </>
+  )
+}
+
+/** One of the phone's white-on-clear pictures, tinted by CSS through a mask. */
+function Pic({ src, className = '' }) {
+  return (
+    <span
+      className={`cc-pic ${className}`}
+      aria-hidden="true"
+      style={{ WebkitMaskImage: `url(${src})`, maskImage: `url(${src})` }}
+    />
+  )
+}
+
+/**
+ * CONNECT A COMPUTER, the phone's page for it (mobile/src/screens/Connect.js),
+ * opened under "How to connect my computer". His mockup, in the app's amber:
+ * the pill, the Desktop app card with the address and a copy button — or a
+ * Download button when this browser IS a computer — the link by email, and
+ * the three platforms. The words are shared/onboarding.mjs's CONNECT.
+ */
+function ConnectComputer() {
+  const [copied, setCopied] = useState(false)
+  const [email, setEmail] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [said, setSaid] = useState(null)
+  const [error, setError] = useState(null)
+  const url = `https://${DOWNLOADS_URL}`
+  const onPhone = onAPhoneOrTablet()
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+    } catch {
+      /* No clipboard here: the address is on screen to read. */
+    }
+  }
+  const mail = async (e) => {
+    e?.preventDefault?.()
+    setBusy(true)
+    setError(null)
+    setSaid(null)
+    const out = await sendDownloadLink(email)
+    setBusy(false)
+    if (out.ok) setSaid(P6.sent(email.trim()))
+    else setError(out.message)
+  }
+  return (
+    <div className="cc">
+      <p className="cc-sub">{CONNECT.sub}</p>
+      <span className="cc-pill">
+        <i aria-hidden="true" />
+        {CONNECT.pill}
+      </span>
+      <div className="cc-card">
+        <div className="cc-card-head">
+          <span className="cc-tile">
+            <Pic src={laptopIcon} className="cc-pic-lg" />
+          </span>
+          <div>
+            <h3>{CONNECT.card}</h3>
+            <p>{CONNECT.cardBody}</p>
+          </div>
+        </div>
+        {onPhone ? (
+          <button type="button" className="cc-address" onClick={copy} data-copied={copied || undefined}>
+            <span className="mono">{DOWNLOADS_URL}</span>
+            <span className="cc-copy">
+              <Pic src={copied ? checkIcon : copyIcon} />
+            </span>
+          </button>
+        ) : (
+          <button type="button" className="primary cc-download" onClick={() => window.open(url, '_blank', 'noopener')}>
+            {P6.downloadNow}
+          </button>
+        )}
+        {copied ? <p className="cc-copied">{P6.copied}</p> : null}
+      </div>
+      <div className="cc-or">
+        <span>{CONNECT.or}</span>
+      </div>
+      <form className="cc-mail" onSubmit={mail}>
+        <label className="signin-iconfield">
+          <Pic src={mailIcon} className="signin-fieldicon" />
+          <input
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            aria-label="Where to send the download link"
+          />
+        </label>
+        <button type="submit" className="primary cc-send" disabled={busy || !email.includes('@')}>
+          <Pic src={sendIcon} />
+          Send link
+        </button>
+        {said ? <p className="cc-said">{said}</p> : null}
+        {error ? (
+          <p className="problem" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </form>
+      <div className="cc-foot">
+        <span>{CONNECT.foot}</span>
+        <span className="cc-os">
+          <Pic src={appleIcon} />
+          <Pic src={windowsIcon} />
+          <Pic src={linuxIcon} />
+        </span>
+      </div>
+    </div>
   )
 }
 

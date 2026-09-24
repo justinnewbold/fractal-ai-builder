@@ -9479,6 +9479,184 @@ button.phone-chip.dim {
   color: var(--silk-dim);
 }
 
+/*
+ * CONNECT A COMPUTER (ConnectScreen's ConnectComputer), the phone's page for
+ * it drawn in the browser: his mockup, in the app's amber.
+ */
+.cc {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-4);
+  text-align: left;
+}
+.cc-pic {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  background: currentColor;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  flex: none;
+}
+.cc-pic-lg {
+  width: 34px;
+  height: 34px;
+}
+.cc-sub {
+  margin: 0;
+  color: var(--silk-dim);
+  font-size: var(--f-4);
+}
+.cc-pill {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--ok);
+  border-radius: var(--r-3);
+  background: var(--panel);
+  color: var(--ok);
+  font-size: var(--f-2);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.cc-pill i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+.cc-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-4);
+  padding: var(--s-4);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-3);
+}
+.cc-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  min-width: 0;
+}
+.cc-card-head h3 {
+  margin: 0 0 var(--s-1);
+  font-size: var(--f-5);
+  font-weight: 800;
+  color: var(--silk);
+}
+.cc-card-head p {
+  margin: 0;
+  color: var(--silk-dim);
+  font-size: var(--f-3);
+  line-height: 1.5;
+}
+.cc-tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--r-3);
+  background: var(--panel-hi);
+  color: var(--signal);
+}
+.cc-address {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  padding: var(--s-2) var(--s-2) var(--s-2) var(--s-3);
+  background: var(--chassis);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2);
+  color: var(--silk);
+  font-size: var(--f-4);
+  cursor: pointer;
+}
+.cc-address .mono {
+  flex: 1;
+  font-size: var(--f-3);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.cc-address[data-copied] {
+  border-color: var(--signal);
+}
+.cc-copy {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-2);
+  background: var(--panel-hi);
+  color: var(--signal);
+}
+.cc-address[data-copied] .cc-copy {
+  background: var(--signal);
+  color: var(--on-signal);
+}
+.cc-copied,
+.cc-said {
+  margin: 0;
+  color: var(--signal);
+  font-weight: 700;
+  font-size: var(--f-3);
+}
+.cc-download {
+  min-height: 52px;
+}
+.cc-or {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  color: var(--silk-dim);
+  font-size: var(--f-2);
+  letter-spacing: 0.08em;
+}
+.cc-or::before,
+.cc-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+}
+.cc-mail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-3);
+}
+.cc-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-3);
+  min-height: 56px;
+  font-size: var(--f-5);
+  font-weight: 700;
+}
+.cc-foot {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-2);
+  color: var(--silk-dim);
+  font-size: var(--f-4);
+}
+.cc-os {
+  display: flex;
+  gap: var(--s-5);
+}
+
 /* What macOS said while it tried to install, folded away for pasting. */
 .updates-detail summary {
   cursor: pointer;

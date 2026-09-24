@@ -612,6 +612,27 @@ export const SETUP = {
 }
 
 /**
+ * CONNECT A COMPUTER, from his mockup of the phone's page for it.
+ *
+ * "Can we update this screen to look like this? You could change the colors a
+ * little bit to match the rest of the app." His words, with two changed
+ * because they were not true of this app: the pill said SAME NETWORK
+ * REQUIRED, and a phone reaches its computer over the internet from anywhere
+ * — what both ends need is the same ACCOUNT; and the divider said "connect by
+ * email", when what the email carries is the download link. MY WORDING for
+ * those two.
+ */
+export const CONNECT = {
+  title: 'Connect a computer',
+  sub: 'Use the free desktop app to connect your Fractal rig.',
+  pill: 'SAME ACCOUNT ON BOTH',
+  card: 'Desktop app',
+  cardBody: 'Download for Mac, Windows, or Linux. The app includes setup steps.',
+  or: 'OR SEND THE LINK BY EMAIL',
+  foot: 'Free • Mac, Windows, Linux'
+}
+
+/**
  * The paywall's way in for somebody who already has it, at both ends.
  * "On the paywall unlock screen, also add the button that says I'm already
  * unlocked, sign in." His words; the plain hyphen matches his other lines.
