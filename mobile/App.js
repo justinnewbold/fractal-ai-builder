@@ -11,6 +11,7 @@ import { isPairAccount } from './src/lib/pairing'
 import Note from './src/components/Note'
 import Press from './src/components/Press'
 import TopBar from './src/components/TopBar'
+import WrongAccount from './src/components/WrongAccount'
 import DemoUnit from './src/components/DemoUnit'
 import Settings from './src/screens/Settings'
 import EdgeBack from './src/components/EdgeBack'
@@ -707,6 +708,12 @@ export default function App() {
               />
             ) : null}
             {picked ? <Arrived picked={picked} /> : null}
+            {/* A computer on another account, said on the stage too and not
+                only in Setup — Waking says it for itself while it is up. */}
+            <WrongAccount
+              active={auth === 'in' && !demo && !settling && screen === 'stage' && link.link !== 'connected'}
+              onSwitch={() => setScreen('settings')}
+            />
             {/*
               The bar stays up while this waits, which is what makes the wait
               safe: whatever happens, Setup is one tap away in the corner.

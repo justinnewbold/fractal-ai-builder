@@ -3370,6 +3370,18 @@ export function run(test) {
     assert.match(waking, /Switch account on this phone/, 'the phone gives no way to change account')
     assert.match(read('mobile/src/screens/Settings.js'), /useComputerElsewhere\(link === 'no-answer'\)/, 'Setup never asks')
 
+    /* "When the app is signed in on the wrong account it should say so on the
+       main screen, not just in settings." */
+    const wrong = read('mobile/src/components/WrongAccount.js').replace(/\s+/g, ' ')
+    assert.match(wrong, /useComputerElsewhere\(active\)/, 'the stage never asks')
+    assert.match(wrong, /This phone is signed in as \$\{email\}/, 'the stage does not say which account it is on')
+    assert.match(wrong, /Switch account on this phone/, 'the stage gives no way to change account')
+    assert.match(
+      phone,
+      /<WrongAccount active=\{auth === 'in' && !demo && !settling && screen === 'stage' && link\.link !== 'connected'\}/,
+      'the stage screen says nothing while the link is down on another account'
+    )
+
     const web = read('src/components/ConnectScreen.jsx').replace(/\s+/g, ' ')
     assert.match(web, /computerElsewhere\(\)\.then/, 'the browser never asks')
     assert.match(web, /This browser is signed in as \$\{email\}/, 'the browser does not say which account it is on')
