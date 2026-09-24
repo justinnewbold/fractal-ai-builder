@@ -3939,7 +3939,15 @@ export function run(test) {
     assert.match(read('mobile/src/screens/Settings.js'), /onPress=\{onOpenConnect\}/, 'Setup has no door to it')
     const signIn = read('mobile/src/screens/SignIn.js')
     assert.match(signIn, /if \(helping\) return <Connect onBack=/, 'the sign-in screen cannot reach it')
-    assert.match(signIn, /Connect my computer/, 'the sign-in screen does not offer it')
+    assert.match(signIn, /label="How to connect my computer"/, 'the sign-in screen does not offer it')
+    /* "They're already kind of having issues being confused." The screen says
+       how the three pieces fit before it asks for anything, and the note that
+       says to unlock first has a button that does it. */
+    assert.match(signIn, /This phone controls your Fractal through your computer/, 'the sign-in screen does not say how it works')
+    assert.match(signIn, /Install the free Fractal Remote app on that computer/, 'the steps lost the computer app')
+    assert.match(signIn, /<Press label="Unlock" tone="signal"/, 'the note says to unlock with nothing to unlock with')
+    const outBranch = read('mobile/App.js').replace(/\s+/g, ' ')
+    assert.match(outBranch, /onUnlock=\{\(\) => setBuying\(true\)\} \/> \{\/\*[^]*?\*\/\} \{buying \? \( <Paywall asked/, 'the sign-in Unlock opens a paywall that is never drawn')
   })
 
   test('the App Store review notes name buttons that exist', () => {
@@ -8730,8 +8738,8 @@ export function run(test) {
     const app = read('mobile/App.js')
     assert.equal(
       (app.match(/onUnlock=\{\(\) => setBuying\(true\)\}/g) || []).length,
-      4,
-      'the bar, Settings, the stage screen and the walkthrough do not all open the same paywall'
+      5,
+      'the bar, Settings, the stage screen, the walkthrough and the sign-in screen do not all open the same paywall'
     )
 
     /*
