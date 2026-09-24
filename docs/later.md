@@ -57,3 +57,11 @@ a real one yet — a friend of Justin's is the first tester. After that:
   (`expo.install.exclude`) instead. When a build is being made anyway, run
   `npx expo install expo@~57.0.25` in `mobile/`, delete that exclude, and let
   the build carry it.
+- **The camera permission, at the next phone build.** `mobile/app.json` still
+  carries the `expo-camera` plugin, and `mobile/package.json` still installs
+  it. Both ask for the camera "to read the pairing code", and the scanner is
+  long gone. Apple rejects permission strings for features that do not exist,
+  so this must be out of the build that goes to App Review. Removing it moves
+  the fingerprint, so it rides the same build as the Expo patch above. The
+  no-internet route never needed it: the computer shows a QR code, and the
+  phone's own camera opens it in the browser.

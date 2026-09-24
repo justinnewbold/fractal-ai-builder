@@ -33,6 +33,9 @@ let win = null
 let server = null
 let advert = { stop: async () => {} }
 let where = null
+/* The port and name `where` was built from, so the wifi address can be asked
+   again when the page wants it — see host:wifi. */
+let hostAt = null
 /** What armHost found: null until it answers, then { on, email, reason }. */
 let phone = null
 /* What the phones were last told, and what they hear when they read it back. */
@@ -173,6 +176,7 @@ async function start() {
   }
 
   where = addresses({ port, name, ip: lanAddress() })
+  hostAt = { port, name }
 
   let Bonjour = null
   try {
@@ -467,6 +471,22 @@ function buildTray() {
  * can act on.
  */
 function wireUpdateChannel() {
+  /*
+   * AND THE WIFI ADDRESS, for the QR code on the Phone & computer page.
+   *
+   * "Yes add the QR code to the computer." A phone's own camera reads a QR
+   * code and opens it in the browser, which is the whole of the no-internet
+   * route — so the computer shows its address as one. Asked afresh each time
+   * rather than read off `where`, because a laptop that moved networks since
+   * launch has a different address and the old one would be a code that
+   * opens nothing.
+   */
+  ipcMain.handle('host:wifi', async () => {
+    if (!hostAt) return { lan: null, mdns: null }
+    const { addresses, lanAddress } = await host()
+    const now = addresses({ ...hostAt, ip: lanAddress() })
+    return { lan: now.lan, mdns: now.mdns }
+  })
   ipcMain.handle('updates:state', () =>
     update ? { ...update, line: updateLine(update) } : { kind: 'idle', line: null }
   )

@@ -25,6 +25,21 @@ export function desktopBridge() {
 export const inDesktopApp = () => desktopBridge() !== null
 
 /**
+ * This computer's wifi address as {lan, mdns}, or null outside the computer
+ * app (and in a computer app too old to have been asked). See host:wifi in
+ * desktop/main.js.
+ */
+export async function wifiAddress() {
+  const api = desktopBridge()
+  if (!api || typeof api.wifi !== 'function') return null
+  try {
+    return await api.wifi()
+  } catch {
+    return null
+  }
+}
+
+/**
  * Whether this browser is on a phone or a tablet rather than a computer.
  *
  * "Is there a way to detect if they're on a desktop versus a phone so that…

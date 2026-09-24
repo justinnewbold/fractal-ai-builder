@@ -36,6 +36,13 @@ contextBridge.exposeInMainWorld('fractalDesktop', {
   /** Present at all: how a page knows it is inside the Mac app. */
   isDesktop: true,
 
+  /**
+   * This computer's address on the wifi, as {lan, mdns}, for the QR code a
+   * phone's camera opens with no internet. Either can be null — lan when the
+   * computer is on no network at all.
+   */
+  wifi: () => ipcRenderer.invoke('host:wifi'),
+
   updates: {
     /** What is happening now, as {kind, line, version}. Null before anything has. */
     state: () => ipcRenderer.invoke('updates:state'),
