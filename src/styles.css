@@ -2817,7 +2817,7 @@ button.gig-name {
 
 .gig-name-num {
   flex: 0 0 auto;
-  font-size: var(--f-4);
+  font-size: var(--f-5);
   color: var(--silk-faint);
 }
 
@@ -2835,7 +2835,9 @@ button.gig-name {
 .gig-name-word {
   font-family: var(--display);
   font-weight: 700;
-  font-size: var(--f-4);
+  /* A step above a scene's name: "make the preset name a little bit
+     bigger". It is the one line on Play that says what is loaded. */
+  font-size: var(--f-5);
   letter-spacing: 0.02em;
   overflow: hidden;
   text-overflow: ellipsis;

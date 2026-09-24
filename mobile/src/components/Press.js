@@ -47,6 +47,9 @@ export default function Press({
   disabled = false,
   grow = false,
   height = TAP,
+  /* The label's size, for the one button whose label is the headline: the
+     preset name on the stage screen. Everything else keeps the body size. */
+  labelSize = font.body,
   haptic = tick,
   style,
   /*
@@ -127,7 +130,12 @@ export default function Press({
           ) : null}
           <Text
             numberOfLines={1}
-            style={{ color: ink, fontSize: font.body, fontWeight: '600', textAlign: 'center' }}
+            style={{
+              color: ink,
+              fontSize: labelSize,
+              fontWeight: labelSize > font.body ? '700' : '600',
+              textAlign: 'center'
+            }}
           >
             {label}
           </Text>

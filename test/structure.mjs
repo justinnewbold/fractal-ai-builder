@@ -3740,8 +3740,11 @@ export function run(test) {
     const sceneCss = css.match(/button\.gig-scene\.named \.gig-scene-name \{([^}]*)\}/)?.[1] || ''
     const size = (r) => r.match(/font-size: (var\(--f-\d\))/)?.[1]
     assert.ok(size(sceneCss), 'a named scene no longer sets its size')
-    assert.equal(size(nameCss), size(sceneCss), 'the preset name is not the size of a scene name')
-    assert.equal(size(numCss), size(sceneCss), 'the slot number is not the size of the name beside it')
+    /* "Make the preset name a little bit bigger": one step above a scene's
+       name, and the slot number beside it the same size as the name. */
+    const step = (v) => Number(v?.match(/--f-(\d)/)?.[1])
+    assert.equal(step(size(nameCss)), step(size(sceneCss)) + 1, 'the preset name is not one step above a scene name')
+    assert.equal(size(numCss), size(nameCss), 'the slot number is not the size of the name beside it')
     assert.ok(!/clamp\(30px, 9vw, 52px\)/.test(css), 'the preset name is a headline again')
 
     /*
