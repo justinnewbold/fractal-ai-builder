@@ -10273,25 +10273,31 @@ input.gig-volume-slider:focus-visible {
 input.gig-volume-slider::-webkit-slider-runnable-track {
   height: 6px;
   border-radius: var(--r-1);
-  background: linear-gradient(to right, var(--signal) 0 var(--vol), var(--panel-hi) var(--vol) 100%);
+  background: linear-gradient(to right, var(--signal) 0 var(--vol), color-mix(in srgb, var(--silk) 22%, transparent) var(--vol) 100%);
 }
 
+/*
+ * THE iOS KNOB. "Make the volume slider more iOS type looking, where it's
+ * more like a pill shaped with rounded edges. Update it on all platforms."
+ * A round white knob with a soft shadow and no ring, on the thin rounded
+ * track, drawn the same on the phone (mobile/src/components/Volume.js).
+ */
 input.gig-volume-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 22px;
-  height: 22px;
-  margin-top: -8px; /* (22 − 6) / 2: centred on the track */
+  width: 26px;
+  height: 26px;
+  margin-top: -10px; /* (26 − 6) / 2: centred on the track */
   border-radius: 50%;
-  background: var(--silk);
-  border: 2px solid var(--chassis);
-  box-shadow: var(--e-1);
+  background: #fff;
+  border: 0;
+  box-shadow: var(--e-2);
 }
 
 input.gig-volume-slider::-moz-range-track {
   height: 6px;
   border-radius: var(--r-1);
-  background: var(--panel-hi);
+  background: color-mix(in srgb, var(--silk) 22%, transparent);
 }
 
 input.gig-volume-slider::-moz-range-progress {
@@ -10301,12 +10307,12 @@ input.gig-volume-slider::-moz-range-progress {
 }
 
 input.gig-volume-slider::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  background: var(--silk);
-  border: 2px solid var(--chassis);
-  box-shadow: var(--e-1);
+  background: #fff;
+  border: 0;
+  box-shadow: var(--e-2);
 }
 
 /* At Smallest the meter above it goes; the slider stays, because it is a
@@ -10342,6 +10348,11 @@ input.gig-volume-slider::-moz-range-thumb {
 
 .gig .gig-signal,
 .gig .gig-signal-fill {
+  border-radius: var(--r-3);
+}
+
+/* The − and + beside the volume, round like the iOS knob between them. */
+.gig button.gig-volume-step {
   border-radius: var(--r-3);
 }
 

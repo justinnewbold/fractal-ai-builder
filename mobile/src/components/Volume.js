@@ -18,6 +18,7 @@ import {
 import { tick } from '../lib/feedback'
 import { logDebug } from '../lib/debugLog'
 import Press from './Press'
+import { at as tint } from '../lib/vivid'
 
 const face = Platform.select(mono)
 
@@ -317,11 +318,20 @@ export default function Volume({ blocks, open, onClose, onError }) {
         <Press
           label="−"
           height={TAP}
-          style={{ width: 56 }}
+          style={{ width: TAP, borderRadius: TAP / 2 }}
           accessibilityLabel="Volume down"
           onPress={() => nudge(-1)}
         />
 
+        {/*
+          AN iOS SLIDER. "Make the volume slider more iOS type looking, where
+          it's more like a pill shaped with rounded edges." A thin rounded
+          track, amber up to the level, and a round white knob, the way the
+          iPhone's own sliders are drawn and the way the browser's already
+          was. The whole 44pt row is still the thing a thumb grabs; only the
+          drawing got thinner. The knob's half-width is padding either side,
+          so at the ends it sits on the track rather than off it.
+        */}
         <View
           {...pan.panHandlers}
           accessibilityRole="adjustable"
@@ -329,49 +339,49 @@ export default function Volume({ blocks, open, onClose, onError }) {
           accessibilityValue={{ min: param.min, max: param.max, now: value, text: volumeLabel(value, param) }}
           accessibilityActions={ROTOR}
           onAccessibilityAction={(e) => nudge(e.nativeEvent.actionName === 'increment' ? 1 : -1)}
-          onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
-          style={{
-            flex: 1,
-            height: TAP,
-            justifyContent: 'center',
-            borderRadius: radius.md,
-            borderWidth: 1,
-            borderColor: dragging ? color.signal : color.rule,
-            backgroundColor: color.panel,
-            overflow: 'hidden'
-          }}
+          style={{ flex: 1, height: TAP, justifyContent: 'center', paddingHorizontal: KNOB / 2 }}
         >
           <View
             pointerEvents="none"
-            style={{
-              position: 'absolute',
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: `${pct}%`,
-              backgroundColor: color.signalWash
-            }}
-          />
-          {/* The thumb, drawn as a bar so it reads at arm's length. */}
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              left: `${pct}%`,
-              top: 6,
-              bottom: 6,
-              width: 4,
-              marginLeft: -2,
-              borderRadius: 2,
-              backgroundColor: color.signal
-            }}
-          />
+            onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+            style={{ height: TRACK, borderRadius: TRACK / 2, backgroundColor: tint(color.silk, 0.22) }}
+          >
+            <View
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: `${pct}%`,
+                borderRadius: TRACK / 2,
+                backgroundColor: color.signal
+              }}
+            />
+            <View
+              style={{
+                position: 'absolute',
+                left: `${pct}%`,
+                top: TRACK / 2 - KNOB / 2,
+                width: KNOB,
+                height: KNOB,
+                marginLeft: -KNOB / 2,
+                borderRadius: KNOB / 2,
+                backgroundColor: '#ffffff',
+                transform: [{ scale: dragging ? 1.12 : 1 }],
+                shadowColor: '#000',
+                shadowOpacity: 0.35,
+                shadowRadius: 4,
+                shadowOffset: { width: 0, height: 2 },
+                elevation: 4
+              }}
+            />
+          </View>
         </View>
 
         <Press
           label="+"
           height={TAP}
-          style={{ width: 56 }}
+          style={{ width: TAP, borderRadius: TAP / 2 }}
           accessibilityLabel="Volume up"
           onPress={() => nudge(1)}
         />
@@ -388,6 +398,10 @@ export default function Volume({ blocks, open, onClose, onError }) {
     </Modal>
   )
 }
+
+/* The slider's drawing: the track's thickness and the knob's size. */
+const TRACK = 6
+const KNOB = 28
 
 /** What VoiceOver's rotor offers on the slider. */
 const ROTOR = [{ name: 'increment' }, { name: 'decrement' }]
