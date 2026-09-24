@@ -32,7 +32,7 @@
  * download IS the tokenless version.
  */
 
-import { quitEditor } from './editors.mjs'
+import { FRACTAL_DOWNLOADS, WINDOWS_DRIVER, quitEditor } from './editors.mjs'
 
 /*
  * The list, not `/releases/latest`.
@@ -98,12 +98,16 @@ export const WAYS = [
     steps: [
       'On the PC, open the download page below and take the newest file ending in .exe.',
       'Open it. Windows shows a blue box that says "Windows protected your PC" — click More info, then Run anyway. It says that because the installer is not signed yet, not because anything is wrong with it.',
+      WINDOWS_DRIVER,
       'Plug your unit into the PC with its USB cable.',
       quitEditor(null),
       'The first time it starts its server, Windows asks whether to allow it through the firewall. Say yes, or your phone cannot reach this computer over wifi.',
       'In the app, choose Set up phone remote and sign in, then sign in on the phone with that same account. Same as the Mac.'
     ],
-    links: [{ label: 'Download Fractal Remote for Windows', url: RELEASES }]
+    links: [
+      { label: 'Download Fractal Remote for Windows', url: RELEASES },
+      { label: "Fractal's downloads, for the USB driver", url: FRACTAL_DOWNLOADS }
+    ]
   },
   {
     id: 'linux-app',
