@@ -12,6 +12,8 @@ import Note from './src/components/Note'
 import Press from './src/components/Press'
 import TopBar from './src/components/TopBar'
 import WrongAccount from './src/components/WrongAccount'
+import UpdateReady from './src/components/UpdateReady'
+import { watchForUpdates } from './src/lib/updates'
 import DemoUnit from './src/components/DemoUnit'
 import Settings from './src/screens/Settings'
 import EdgeBack from './src/components/EdgeBack'
@@ -392,6 +394,10 @@ export default function App() {
    */
   useEffect(() => installCrashCapture(), [])
 
+  /* Ask about updates in the background, and offer a downloaded one as a
+     restart — see watchForUpdates and components/UpdateReady. */
+  useEffect(() => watchForUpdates(), [])
+
   // A session left over from last time is the ordinary case: a phone that
   // signed in once is a remote, and it should say "Connecting…" from its first
   // frame rather than showing a sign-in form for the second it takes to find
@@ -736,6 +742,8 @@ export default function App() {
               />
             ) : null}
             {picked ? <Arrived picked={picked} /> : null}
+            {/* A downloaded update, offered as a restart — never taken on its own. */}
+            <UpdateReady />
             {/* A computer on another account, said on the stage too and not
                 only in Setup — Waking says it for itself while it is up. */}
             <WrongAccount

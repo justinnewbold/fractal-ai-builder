@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { Platform, Pressable, Text } from 'react-native'
+import { Image, Platform, Pressable, Text, View } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
 
 import { color, font, mono, radius, space } from '../lib/theme'
 import { P6 } from '../lib/onboarding'
 import { tick } from '../lib/feedback'
 import { DOWNLOADS_URL } from '../lib/downloadLink'
+import copyIcon from '../../assets/icons/copy.png'
+import checkIcon from '../../assets/icons/check.png'
 
 const face = Platform.select(mono)
 
@@ -24,7 +26,13 @@ const face = Platform.select(mono)
  *
  * On the walkthrough's "installed?" step and the phone's Connect screen.
  */
-export default function CopyAddress({ size = font.body }) {
+/*
+ * `row` is the Connect a computer page's version, from his mockup: the
+ * address in a box, one line, with a square copy button at its right end
+ * that turns into a tick once it has copied. The card version stays for the
+ * walkthrough, where the whole card is the button.
+ */
+export default function CopyAddress({ size = font.body, row = false }) {
   const [copied, setCopied] = useState(false)
   const copy = async () => {
     try {
@@ -34,6 +42,56 @@ export default function CopyAddress({ size = font.body }) {
     } catch {
       /* Nothing to say: the address is on screen to read either way. */
     }
+  }
+  if (row) {
+    return (
+      <View style={{ gap: space.sm }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${DOWNLOADS_URL}. ${P6.copyHint}`}
+          onPress={copy}
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: space.sm,
+            paddingLeft: space.md,
+            paddingRight: space.sm,
+            paddingVertical: space.sm,
+            borderRadius: radius.md,
+            borderWidth: 1,
+            borderColor: copied ? color.signal : color.rule,
+            backgroundColor: pressed ? color.panelHi : color.chassis
+          })}
+        >
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.6}
+            style={{ flex: 1, color: color.silk, fontSize: size, fontFamily: face }}
+          >
+            {DOWNLOADS_URL}
+          </Text>
+          <View
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: radius.md,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: copied ? color.signal : color.panelHi
+            }}
+          >
+            <Image
+              source={copied ? checkIcon : copyIcon}
+              style={{ width: 22, height: 22, tintColor: copied ? color.onSignal : color.signal }}
+            />
+          </View>
+        </Pressable>
+        {copied ? (
+          <Text style={{ color: color.signal, fontSize: font.small, fontWeight: '700' }}>{P6.copied}</Text>
+        ) : null}
+      </View>
+    )
   }
   return (
     <Pressable

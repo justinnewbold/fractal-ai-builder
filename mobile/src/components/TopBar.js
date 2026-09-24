@@ -11,6 +11,7 @@ import { useRig } from '../lib/rig'
 import { setDemo, useDemo } from '../lib/demo'
 import { shouldOffer, usePurchase } from '../lib/purchases'
 import setupIcon from '../../assets/icons/setup.png'
+import volumeIcon from '../../assets/icons/volume.png'
 import { idOf } from '../lib/device'
 import Lamp from './Lamp'
 import Volume from './Volume'
@@ -404,7 +405,16 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
           hitSlop={10}
           onPress={() => setVolume(true)}
         >
-          <Text style={{ fontSize: font.lead }}>🔊</Text>
+          {/* The browser's speaker, drawn the same: "make the mobile app
+              volume icon look like the web icon". A colour emoji at this size
+              was a smudge that no theme could tint; this takes the bar's grey,
+              the way the browser's takes its ink. */}
+          <Image
+            source={volumeIcon}
+            accessible={false}
+            resizeMode="contain"
+            style={{ width: 24, height: 24, tintColor: color.silkDim }}
+          />
         </Pressable>
       ) : null}
 
@@ -423,7 +433,7 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
         The one in the file is cut out of Justin's mockup of the play screen,
         so both phones now show the gear he drew. Tinted rather than coloured
         in, for the same reason every other picture here is — see
-        mobile/assets/icons. The speaker beside it is still a true emoji.
+        mobile/assets/icons. The speaker beside it is one too now, the browser's shape.
       */}
       <Pressable
         accessibilityRole="button"

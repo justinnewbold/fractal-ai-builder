@@ -1643,6 +1643,11 @@ export function run(test) {
     /* And the stage screen no longer has a second one. Two speakers on one
        screen is the clutter moving it up was meant to end. */
     assert.ok(!/🔊/.test(read('mobile/src/screens/Stage.js')), 'the stage screen kept its own speaker')
+    /* "Make the mobile app volume icon look like the web icon": the browser's
+       drawn speaker, not the colour emoji. */
+    const speakerBar = read('mobile/src/components/TopBar.js')
+    assert.ok(!/🔊/.test(speakerBar), 'the bar is back to the colour emoji speaker')
+    assert.match(speakerBar, /source=\{volumeIcon\}/, 'the bar has no speaker picture')
     assert.match(vol, /<Modal visible=\{open\}/, 'the volume is back in the page flow, where the scroll view takes its drag')
     assert.match(vol, /from 'expo-blur'/, 'the volume pop-up is not glass like the tuner')
     /* A thumb that slips off the slider must not close the thing it is holding. */
@@ -3834,8 +3839,18 @@ export function run(test) {
     const screen = read('mobile/src/screens/Connect.js')
     assert.ok(!/WAYS/.test(screen), 'the phone lists the desktop download routes again')
     assert.ok(!/Linking\.openURL/.test(screen), 'the phone can be sent to a download page again')
-    assert.match(screen, /TYPE THIS ON YOUR COMPUTER/, 'nothing says which machine the address is for')
-    assert.match(screen, /<CopyAddress size=\{font\.lead\} \/>/, 'the address to type is not shown')
+    /* His mockup: the card says it is the desktop app, for which computers,
+       and the address sits in it with a copy button. */
+    assert.match(screen, /\{CONNECT\.cardBody\}/, 'nothing says which machine the address is for')
+    assert.match(read('shared/onboarding.mjs'), /cardBody: 'Download for Mac, Windows, or Linux\./, 'the card lost which computers it is for')
+    assert.match(screen, /<CopyAddress row size=\{font\.lead\} \/>/, 'the address to type is not shown')
+    /* "Can we update this screen to look like this?" — and the browser's
+       How to connect my computer draws the same page from the same words. */
+    assert.match(screen, /\{CONNECT\.pill\}/, 'the phone lost the pill')
+    const webConnect = read('src/components/ConnectScreen.jsx')
+    assert.match(webConnect, /\{howTo \? <ConnectComputer \/> : null\}/, 'the browser draws something else under How to connect my computer')
+    assert.match(webConnect, /sendDownloadLink\(email\)/, 'the browser cannot send the link')
+    assert.match(read('shared/onboarding.mjs'), /pill: 'SAME ACCOUNT ON BOTH'/, 'the pill says something untrue about this app again')
     /* Tapping it copies the address, and never opens the page on the phone. */
     const copy = read('mobile/src/components/CopyAddress.js')
     assert.match(copy, /\{DOWNLOADS_URL\}/, 'the address is not on the card')
@@ -3958,19 +3973,25 @@ export function run(test) {
     assert.match(read('mobile/src/screens/Settings.js'), /onPress=\{onOpenConnect\}/, 'Setup has no door to it')
     const signIn = read('mobile/src/screens/SignIn.js')
     assert.match(signIn, /if \(helping\) return <Connect onBack=/, 'the sign-in screen cannot reach it')
-    assert.match(signIn, /label="How to connect my computer"/, 'the sign-in screen does not offer it')
+    assert.match(signIn, /label=\{SETUP\.howTo\}/, 'the sign-in screen does not offer it')
+    assert.match(read('shared/onboarding.mjs'), /howTo: 'How to connect my computer'/, 'the button lost his words')
     /* "They're already kind of having issues being confused." The screen says
        how the three pieces fit before it asks for anything, and the note that
        says to unlock first has a button that does it. */
-    assert.match(signIn, /\{SETUP\.intro\}/, 'the sign-in screen does not say how it works')
+    assert.match(signIn, /\{SETUP\.title\}/, 'the sign-in screen does not say how it works')
     assert.match(signIn, /SETUP\.steps\.map/, 'the sign-in screen lost the steps')
-    assert.match(read('shared/onboarding.mjs'), /'Install the free Fractal Remote app on that computer\.'/, 'the steps lost the computer app')
+    assert.match(read('shared/onboarding.mjs'), /'Install the free desktop app on your computer\.'/, 'the steps lost the computer app')
     /* And the browser's signed-out connect screen says the same three, from
        the same place: "all of our changes are drifting apart again". */
     const web = read('src/components/ConnectScreen.jsx')
     assert.match(web, /SETUP\.steps\.map/, 'the browser does not show the steps the phone shows')
     assert.match(web, /<Steps \/>/, 'the browser draws its steps nowhere')
-    assert.match(signIn, /<Press label="Unlock" tone="signal"/, 'the note says to unlock with nothing to unlock with')
+    /* "Redo this screen to match this photo in both the web app and the
+       mobile apps": the form on the first screen itself, as drawn. */
+    assert.match(web, /<SignIn variant="stage"/, 'the browser’s first screen has no form of its own')
+    assert.match(web, /\{SETUP\.howTo\}/, 'the browser’s first screen lost How to connect my computer')
+    assert.match(read('src/components/SignIn.jsx'), /className="signin-pair"/, 'Create account and Forgot password are not side by side in the browser')
+    assert.match(signIn, /canMakeAccount \? switchTo\('up'\) : onUnlock\?\.\(\)/, 'Create account before the unlock has nothing to unlock with')
     const outBranch = read('mobile/App.js').replace(/\s+/g, ' ')
     assert.match(outBranch, /onUnlock=\{\(\) => setBuying\(true\)\} \/> \{\/\*[^]*?\*\/\} \{buying \? \( <Paywall asked/, 'the sign-in Unlock opens a paywall that is never drawn')
   })
@@ -5069,6 +5090,9 @@ export function run(test) {
         /* A real machine's own name is data, not copy: "MacBook Pro SG 566"
            comes off the host and is not ours to rewrite. */
         if (/MacBook/.test(line)) continue
+        /* Naming the three platforms the computer app runs on is saying which
+           computers, not calling every computer a Mac. */
+        if (/Mac, Windows,? (or |and )?Linux/.test(line)) continue
         assert.ok(
           !/\bMac\b/.test(line),
           `${file.split('/mobile/')[1]}: "${line}" still says Mac`
@@ -5078,6 +5102,28 @@ export function run(test) {
 
     /* And the word the top bar shows when there is nothing on the other end. */
     assert.match(read('shared/link-word.mjs'), /'no computer' : 'no phone'/, 'the bar still says NO MAC')
+  })
+
+  test('a downloaded update is offered as a restart, and never taken on its own', () => {
+    /*
+     * "Is it possible to do that once the phone actually downloads an update
+     * so that they could just click that to restart it?" — and before it, "I
+     * don't want it to pause for a few seconds every time they open the app."
+     */
+    const updates = read('mobile/src/lib/updates.js')
+    const watch = updates.slice(updates.indexOf('const askQuietly'), updates.indexOf('export const updateState'))
+    assert.ok(watch.length > 100, 'watchForUpdates is gone')
+    assert.ok(!/applyNow|reloadAsync/.test(watch), 'the background check restarts the app by itself')
+    assert.match(watch, /status === 'active' && Date\.now\(\) - lastAsked > ASK_AGAIN_MS/, 'coming back from the background never asks again')
+    assert.match(read('mobile/app.json'), /"fallbackToCacheTimeout": 0/, 'the app waits on a download at launch')
+
+    const banner = read('mobile/src/components/UpdateReady.js')
+    assert.match(banner, /updates\.phase !== 'ready'/, 'the banner offers an update that has not downloaded')
+    assert.match(banner, /onPress=\{\(\) => applyNow\(\)\}/, 'the banner has no restart')
+    assert.match(banner, /onDismiss=\{dismissReady\}/, 'the banner cannot be put away')
+    const app = read('mobile/App.js')
+    assert.match(app, /useEffect\(\(\) => watchForUpdates\(\), \[\]\)/, 'nothing starts the background check')
+    assert.match(app, /<UpdateReady \/>/, 'the banner is drawn nowhere')
   })
 
   test('a new version number does not cost a build', async () => {

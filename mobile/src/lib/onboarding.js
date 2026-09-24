@@ -595,12 +595,41 @@ export const P9 = {
  * is the same, all of our changes are drifting apart again". MY WORDING.
  */
 export const SETUP = {
-  intro: 'This app controls your Fractal through your computer. To set it up:',
+  /*
+   * HIS MOCKUP, WORD FOR WORD. "Redo this screen to match this photo in both
+   * the web app and the mobile apps." The line under the name, the card's
+   * heading, its three steps and the button under the form are all read off
+   * the picture he sent.
+   */
+  tagline: 'Control your Fractal rig from your phone.',
+  title: 'Get connected',
   steps: [
-    'Plug your Fractal into your computer with a USB cable.',
-    'Install the free Fractal Remote app on that computer.',
-    'Sign in on both with the same account. Your setlists and starred presets follow you to any device.'
-  ]
+    'Connect your Fractal to your computer with USB.',
+    'Install the free desktop app on your computer.',
+    'Sign in here and in the desktop app.'
+  ],
+  howTo: 'How to connect my computer'
+}
+
+/**
+ * CONNECT A COMPUTER, from his mockup of the phone's page for it.
+ *
+ * "Can we update this screen to look like this? You could change the colors a
+ * little bit to match the rest of the app." His words, with two changed
+ * because they were not true of this app: the pill said SAME NETWORK
+ * REQUIRED, and a phone reaches its computer over the internet from anywhere
+ * — what both ends need is the same ACCOUNT; and the divider said "connect by
+ * email", when what the email carries is the download link. MY WORDING for
+ * those two.
+ */
+export const CONNECT = {
+  title: 'Connect a computer',
+  sub: 'Use the free desktop app to connect your Fractal rig.',
+  pill: 'SAME ACCOUNT ON BOTH',
+  card: 'Desktop app',
+  cardBody: 'Download for Mac, Windows, or Linux. The app includes setup steps.',
+  or: 'OR SEND THE LINK BY EMAIL',
+  foot: 'Free • Mac, Windows, Linux'
 }
 
 /**

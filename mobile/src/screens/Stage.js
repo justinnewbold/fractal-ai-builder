@@ -43,7 +43,6 @@ import { blockIcon } from '../lib/blockIcons'
 import chevronIcon from '../../assets/icons/chevron.png'
 import chainIcon from '../../assets/icons/chain.png'
 import editIcon from '../../assets/icons/edit.png'
-import presetsIcon from '../../assets/icons/presets.png'
 import tempoIcon from '../../assets/icons/tempo.png'
 import tunerIcon from '../../assets/icons/tuner.png'
 import { sceneColor } from '../lib/sceneColors'
@@ -478,8 +477,11 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
         <Press
           label={preset?.pending && !preset?.name ? '…' : presetLabel(preset)}
           sub={onOpenPresets ? 'Tap for all presets' : undefined}
-          icon={onOpenPresets ? presetsIcon : undefined}
+          /* No list picture on the left any more: "take that off of that
+             one", and make the name "a little bit bigger". The chevron on
+             the right still says the tap opens something. */
           after={onOpenPresets ? chevronIcon : undefined}
+          labelSize={font.lead + 2}
           height={tight ? TAP : TAP + 12}
           disabled={!onOpenPresets}
           onPress={onOpenPresets}

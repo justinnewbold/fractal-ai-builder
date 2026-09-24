@@ -65,3 +65,11 @@ a real one yet — a friend of Justin's is the first tester. After that:
   the fingerprint, so it rides the same build as the Expo patch above. The
   no-internet route never needed it: the computer shows a QR code, and the
   phone's own camera opens it in the browser.
+- **Android uploads to Closed testing, at the next phone build.** "Switch it to
+  the automated testing for the closed builds." `mobile/eas.json` sends a
+  production Android build to the `internal` track; the testers are on Closed
+  testing, whose track is `alpha`. Change `submit.production.android.track` to
+  `"alpha"` in the same pull request as the build — eas.json is hashed into
+  the fingerprint whole (@expo/fingerprint, `getEasBuildSourcesAsync`), so
+  changing it on its own would cut every installed copy off from updates until
+  the build lands. Riding the build it costs nothing.

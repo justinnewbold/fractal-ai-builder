@@ -2817,7 +2817,7 @@ button.gig-name {
 
 .gig-name-num {
   flex: 0 0 auto;
-  font-size: var(--f-4);
+  font-size: var(--f-5);
   color: var(--silk-faint);
 }
 
@@ -2835,7 +2835,9 @@ button.gig-name {
 .gig-name-word {
   font-family: var(--display);
   font-weight: 700;
-  font-size: var(--f-4);
+  /* A step above a scene's name: "make the preset name a little bit
+     bigger". It is the one line on Play that says what is loaded. */
+  font-size: var(--f-5);
   letter-spacing: 0.02em;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -9305,6 +9307,354 @@ button.phone-chip.dim {
   min-height: 52px;
   min-width: min(280px, 100%);
   font-size: var(--f-2);
+}
+
+/*
+ * HIS MOCKUP OF THE FIRST SCREEN (ConnectScreen, connect-fresh): the mark and
+ * the name centred, a card that says how the pieces fit with amber numbered
+ * circles, the form with a picture in each field, Sign in full width, Create
+ * account and Forgot password side by side, the way to the computer app
+ * outlined in amber, and the demo last and quietest. The phone's sign-in
+ * screen is drawn the same.
+ */
+.connect-fresh {
+  align-items: stretch;
+  gap: var(--s-4);
+  margin-top: var(--s-6);
+}
+.connect-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+}
+.connect-brand h1 {
+  margin: 0;
+  font-size: var(--f-sign);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--silk);
+}
+.connect-tagline {
+  margin: 0;
+  font-size: var(--f-5);
+  color: var(--silk-dim);
+}
+.connect-mark {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  height: 48px;
+}
+.connect-mark i {
+  display: block;
+  width: 7px;
+  border-radius: var(--r-1);
+  background: var(--signal);
+}
+.connect-card {
+  text-align: left;
+  padding: var(--s-5);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-3);
+  display: grid;
+  gap: var(--s-3);
+}
+.connect-card h2 {
+  font-family: inherit;
+  font-size: var(--f-6);
+  font-weight: 800;
+  letter-spacing: 0;
+}
+.connect-card .connect-steps {
+  gap: var(--s-3);
+}
+.connect-card .connect-steps li {
+  align-items: center;
+  gap: var(--s-3);
+  font-size: var(--f-4);
+  line-height: 1.45;
+}
+.connect-card .connect-steps li::before {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--signal);
+  color: var(--on-signal);
+  font-weight: 800;
+}
+.signin.signin-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-3);
+  padding: 0;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.connect-fresh > * {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}
+.signin-iconfield {
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2);
+  color: var(--silk-dim);
+}
+.signin-fieldicon {
+  flex: none;
+  margin: 0 var(--s-3);
+}
+.signin-iconfield::after {
+  content: none;
+}
+.signin-iconfield input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  align-self: stretch;
+  border: 0;
+  border-left: 1px solid var(--rule);
+  background: transparent;
+  color: var(--silk);
+  font-size: var(--f-5);
+  padding: 0 var(--s-3);
+  margin: var(--s-2) 0;
+}
+.signin-iconfield input:focus {
+  outline: none;
+}
+.signin-iconfield:focus-within {
+  border-color: var(--signal);
+}
+.signin-stage .signin-go {
+  min-height: 56px;
+  font-size: var(--f-5);
+  font-weight: 700;
+}
+.signin-pair {
+  display: flex;
+  gap: var(--s-3);
+}
+.signin-pair .chip {
+  flex: 1;
+  min-height: 52px;
+  font-size: var(--f-3);
+  font-weight: 700;
+  min-width: 0;
+  padding-inline: var(--s-2);
+  color: var(--silk);
+}
+.connect-howto {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-3);
+  min-height: 56px;
+  background: transparent;
+  color: var(--silk);
+  border: 1.5px solid var(--signal);
+  border-radius: var(--r-2);
+  font-size: var(--f-4);
+  font-weight: 700;
+  cursor: pointer;
+}
+.connect-howto svg {
+  color: var(--signal);
+}
+.connect-demo.connect-demo-quiet {
+  margin-top: 0;
+  width: 100%;
+  color: var(--silk-dim);
+}
+
+/*
+ * CONNECT A COMPUTER (ConnectScreen's ConnectComputer), the phone's page for
+ * it drawn in the browser: his mockup, in the app's amber.
+ */
+.cc {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-4);
+  text-align: left;
+}
+.cc-pic {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  background: currentColor;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  flex: none;
+}
+.cc-pic-lg {
+  width: 34px;
+  height: 34px;
+}
+.cc-sub {
+  margin: 0;
+  color: var(--silk-dim);
+  font-size: var(--f-4);
+}
+.cc-pill {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--ok);
+  border-radius: var(--r-3);
+  background: var(--panel);
+  color: var(--ok);
+  font-size: var(--f-2);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.cc-pill i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+.cc-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-4);
+  padding: var(--s-4);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-3);
+}
+.cc-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  min-width: 0;
+}
+.cc-card-head h3 {
+  margin: 0 0 var(--s-1);
+  font-size: var(--f-5);
+  font-weight: 800;
+  color: var(--silk);
+}
+.cc-card-head p {
+  margin: 0;
+  color: var(--silk-dim);
+  font-size: var(--f-3);
+  line-height: 1.5;
+}
+.cc-tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--r-3);
+  background: var(--panel-hi);
+  color: var(--signal);
+}
+.cc-address {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  padding: var(--s-2) var(--s-2) var(--s-2) var(--s-3);
+  background: var(--chassis);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2);
+  color: var(--silk);
+  font-size: var(--f-4);
+  cursor: pointer;
+}
+.cc-address .mono {
+  flex: 1;
+  font-size: var(--f-3);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.cc-address[data-copied] {
+  border-color: var(--signal);
+}
+.cc-copy {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-2);
+  background: var(--panel-hi);
+  color: var(--signal);
+}
+.cc-address[data-copied] .cc-copy {
+  background: var(--signal);
+  color: var(--on-signal);
+}
+.cc-copied,
+.cc-said {
+  margin: 0;
+  color: var(--signal);
+  font-weight: 700;
+  font-size: var(--f-3);
+}
+.cc-download {
+  min-height: 52px;
+}
+.cc-or {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  color: var(--silk-dim);
+  font-size: var(--f-2);
+  letter-spacing: 0.08em;
+}
+.cc-or::before,
+.cc-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+}
+.cc-mail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-3);
+}
+.cc-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-3);
+  min-height: 56px;
+  font-size: var(--f-5);
+  font-weight: 700;
+}
+.cc-foot {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-2);
+  color: var(--silk-dim);
+  font-size: var(--f-4);
+}
+.cc-os {
+  display: flex;
+  gap: var(--s-5);
 }
 
 /* What macOS said while it tried to install, folded away for pasting. */
