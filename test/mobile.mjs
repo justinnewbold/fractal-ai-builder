@@ -1643,6 +1643,11 @@ export function run(test) {
     /* And the stage screen no longer has a second one. Two speakers on one
        screen is the clutter moving it up was meant to end. */
     assert.ok(!/🔊/.test(read('mobile/src/screens/Stage.js')), 'the stage screen kept its own speaker')
+    /* "Make the mobile app volume icon look like the web icon": the browser's
+       drawn speaker, not the colour emoji. */
+    const speakerBar = read('mobile/src/components/TopBar.js')
+    assert.ok(!/🔊/.test(speakerBar), 'the bar is back to the colour emoji speaker')
+    assert.match(speakerBar, /source=\{volumeIcon\}/, 'the bar has no speaker picture')
     assert.match(vol, /<Modal visible=\{open\}/, 'the volume is back in the page flow, where the scroll view takes its drag')
     assert.match(vol, /from 'expo-blur'/, 'the volume pop-up is not glass like the tuner')
     /* A thumb that slips off the slider must not close the thing it is holding. */
