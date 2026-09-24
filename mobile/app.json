@@ -47,13 +47,6 @@
           "backgroundColor": "#0d0f12",
           "imageWidth": 200
         }
-      ],
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "Fractal Remote uses the camera only to read the pairing code your computer shows on screen.",
-          "recordAudioAndroid": false
-        }
       ]
     ],
     "extra": {
