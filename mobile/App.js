@@ -849,7 +849,8 @@ export default function App() {
                 /* Only once the Mac is answering: a list of slot numbers with
                    no names behind them is a screen that cannot do its one job. */
                 onOpenPresets={
-                  link.link === 'connected' ? () => setScreen('presets') : null
+                  /* The demo is its own far end: always answering. */
+                  demo || link.link === 'connected' ? () => setScreen('presets') : null
                 }
                 /*
                  * The setlist, unlike the preset list, works with the Mac off.
@@ -866,7 +867,7 @@ export default function App() {
                  * end it is a screen of empty knobs.
                  */
                 onOpenEdit={
-                  BENCH && link.link === 'connected' ? () => setScreen('edit') : null
+                  BENCH && (demo || link.link === 'connected') ? () => setScreen('edit') : null
                 }
                 onUnlock={() => setBuying(true)}
               />

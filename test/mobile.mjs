@@ -2156,7 +2156,7 @@ export function run(test) {
 
     const app = read('mobile/App.js')
     assert.match(app, /BENCH && screen === 'edit'/, 'the route no longer reads the switch, so turning it off would leave the screen reachable')
-    assert.match(app, /BENCH && link\.link === 'connected'/, 'the Edit button no longer reads the switch')
+    assert.match(app, /BENCH && \(demo \|\| link\.link === 'connected'\)/, 'the Edit button no longer reads the switch')
 
     /*
      * Absent rather than disabled when there is nowhere to go — and now on the
@@ -4391,6 +4391,22 @@ export function run(test) {
     assert.ok(!/\n\s+bar\n/.test(chain), 'the chain tiles have a rule his mockup does not draw')
   })
 
+  test('the demo stays connected, so its preset list opens', () => {
+    /*
+     * "I'm in the demo and the preset is greyed out and can't be pressed." The
+     * log: "no-answer → connected — the demo", then "connected → off" — the
+     * tail of the real link's stopLink landing after startLink had spoken.
+     */
+    const link = read('mobile/src/lib/link.js')
+    const stop = link.slice(link.indexOf('export async function stopLink()'))
+    assert.ok(stop.indexOf('set({ ...initial })') < stop.indexOf('await remoteDisconnect()'), 'stopLink resets the link after the wait again, over the demo’s connected')
+    assert.match(link, /if \(isDemo\(\)\) return enterDemo\(\)/, 'a real loop can run on under the demo')
+    assert.match(link, /if \(!running\) return\s+delay = state\.link === 'connected'/, 'a turn stopped mid-wait schedules another anyway')
+    assert.match(link, /await remoteConnect\(\)\s+if \(!running\) return/, 'a join finishing after stopLink carries on as if running')
+    const app = read('mobile/App.js')
+    assert.match(app, /demo \|\| link\.link === 'connected' \? \(\) => setScreen\('presets'\) : null/, 'the demo’s preset list waits on a real link')
+  })
+
   test('buying the app ends the demo', () => {
     /*
      * "After I did the test purchase, it just takes me back to the demo
@@ -5323,7 +5339,7 @@ export function run(test) {
     assert.match(link, /export const NAME_AGAIN = 2 \* 60 \* 1000/, 'the phone has no interval for asking again')
     assert.match(
       link.replace(/\s+/g, ' '),
-      /if \(state\.link === 'connected' && Date\.now\(\) - namedAt > NAME_AGAIN\) await readMacName\(\)/,
+      /if \(running && state\.link === 'connected' && Date\.now\(\) - namedAt > NAME_AGAIN\) await readMacName\(\)/,
       'the computer is asked what it is only at join, so an update while connected is never noticed'
     )
 
@@ -6730,7 +6746,7 @@ export function run(test) {
        preset list over a unit that is right there. */
     assert.match(
       read('mobile/src/lib/link.js').replace(/\s+/g, ' '),
-      /if \(isDemo\(\)\) \{ set\(\{ link: 'connected', macName: 'the demo', hostVersion: null \}\)/,
+      /if \(isDemo\(\)\) \{ enterDemo\(\) return stopLink \}[\s\S]*function enterDemo\(\) \{ running = false if \(timer\) clearTimeout\(timer\) timer = null set\(\{ link: 'connected', macName: 'the demo', hostVersion: null \}\)/,
       'the demo does not read as a working link, so the app refuses to use it'
     )
 
@@ -6767,7 +6783,7 @@ export function run(test) {
        is fetched: the demo makes no request at all. */
     assert.match(
       read('mobile/src/lib/link.js').replace(/\s+/g, ' '),
-      /if \(isDemo\(\)\) \{ set\(\{ link: 'connected'/,
+      /if \(isDemo\(\)\) \{ enterDemo\(\) return stopLink \} if \(running\)/,
       'the demo starts the link loop, which joins a channel it has no use for'
     )
   })
