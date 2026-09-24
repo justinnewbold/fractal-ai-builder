@@ -234,3 +234,49 @@ export function salesSections(answer, now = Date.now()) {
   if (notes.length) sections.push({ title: 'Note', rows: notes.map((n) => ({ label: '', value: n })) })
   return sections
 }
+
+/**
+ * Everyone with an account, as sections of facts.
+ *
+ * "How do I see a list of who has set up an account?" Newest first, one line
+ * each: the address, when they signed up, when they were last on, and whether
+ * they are unlocked. `filter` narrows it to addresses containing what was
+ * typed. The waiting list — addresses given access before they signed up —
+ * comes after, so both kinds of person are on one screen.
+ */
+export function accountSections(answer, filter = '', now = Date.now()) {
+  if (!answer?.ok) return []
+  const want = String(filter || '').trim().toLowerCase()
+  const match = (email) => !want || String(email || '').toLowerCase().includes(want)
+  const people = (Array.isArray(answer.accounts) ? answer.accounts : []).filter((a) => match(a.email))
+  const waiting = (Array.isArray(answer.waiting) ? answer.waiting : []).filter((w) => match(w.email))
+
+  const unlock = (a) => {
+    if (!a.unlocked) return 'Not unlocked'
+    return a.source === 'owner' ? 'Unlocked, owner account' : 'Unlocked'
+  }
+  const line = (a) =>
+    [
+      `Signed up ${ago(a.signed_up, now)}`,
+      a.confirmed ? (a.last_sign_in ? `last on ${ago(a.last_sign_in, now)}` : 'never signed in') : 'has not confirmed their email yet',
+      unlock(a)
+    ].join(', ')
+
+  const total = Number(answer.total) || people.length
+  const sections = [
+    {
+      title: want ? `Accounts matching "${want}" (${people.length})` : `Everyone with an account (${total})`,
+      rows: people.length ? people.map((a) => ({ label: '', value: `${a.email}\n${line(a)}` })) : [{ label: '', value: want ? 'Nobody with an account matches that.' : 'Nobody has made an account yet.' }]
+    }
+  ]
+  if (waiting.length) {
+    sections.push({
+      title: `Waiting for them to sign up (${waiting.length})`,
+      rows: waiting.map((w) => ({ label: '', value: `${w.email}\nGiven access ${ago(w.added, now)}. Unlocked the first time they sign in.` }))
+    })
+  }
+  if (!want && total > people.length) {
+    sections.push({ title: 'Note', rows: [{ label: '', value: `Only the newest ${people.length} of ${total} accounts are shown.` }] })
+  }
+  return sections
+}

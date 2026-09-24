@@ -222,6 +222,31 @@ export const checkOwner = async () => {
  * making an account gets it aliased onto the account, which is the ordinary
  * order of events here — the paywall comes before the sign-in screen.
  */
+/*
+ * The server said yes and the store has not heard yet.
+ *
+ * Somebody Justin put on the waiting list is unlocked on the server the first
+ * time they sign in — by the same call claimRelay makes — and RevenueCat's SDK
+ * on this phone is still holding the answer it fetched a moment before. So
+ * when the server says yes, the SDK is asked again, fresh. Only the STORE's
+ * answer unlocks the screen: the server's yes can be a fail-open "unknown",
+ * and that must not unlock anything here.
+ */
+const catchUp = async (api) => {
+  if (state.unlocked) return
+  try {
+    await api.invalidateCustomerInfoCache?.()
+    const info = await api.getCustomerInfo()
+    if (entitled(info)) {
+      await remember(true)
+      set({ unlocked: true })
+      logDebug('purchases: unlocked by the server (a grant given before this account existed)')
+    }
+  } catch (err) {
+    logDebug(`purchases: could not re-read the store (${err?.message || err})`)
+  }
+}
+
 const linkTo = async (api, id) => {
   if (!api?.logIn || !id) return null
   try {
@@ -230,7 +255,7 @@ const linkTo = async (api, id) => {
     /* And tell the relay. logIn is the moment a handset's purchase becomes an
        account's, so it is the moment the relay's table can first be right
        about it. Not awaited: nothing on this screen depends on the answer. */
-    claimRelay()
+    claimRelay().then((yes) => (yes ? catchUp(api) : null))
     return out?.customerInfo || null
   } catch (err) {
     /* Not fatal, and not evidence of anything. The remembered answer stands

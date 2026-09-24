@@ -6981,6 +6981,12 @@ button.gig-block:disabled {
 .access-email {
   width: 100%;
 }
+/* The server's answer, under the address: bold and body-sized, so it is read. */
+.access-said {
+  margin: 0;
+  font-size: var(--f-4);
+  font-weight: 700;
+}
 /* Customer lookup and Sales at a glance: labelled facts, one to a line. */
 .facts-title {
   margin: 0 0 var(--s-1);

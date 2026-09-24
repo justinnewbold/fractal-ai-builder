@@ -1441,7 +1441,9 @@ export function run(test) {
         /* Last, and drawn only on his own account: "only when logged into the
            justinnewbold@icloud.com account". See shared/admin.mjs. */
         'Give someone access',
-        'Sales at a glance'
+        'Sales at a glance',
+        /* "How do I see a list of who has set up an account?" */
+        'Everyone with an account'
       ],
       `Settings opens on ${rows.length} rows: ${rows.join(', ')}`
     )

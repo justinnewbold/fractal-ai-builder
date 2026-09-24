@@ -67,6 +67,7 @@ import { AFFILIATION } from '../shared/affiliation.mjs'
 import { isAdmin } from '../shared/admin.mjs'
 import AccessTool from './components/AccessTool'
 import SalesTool from './components/SalesTool'
+import AccountsTool from './components/AccountsTool'
 import { remember as rememberPreset, CHANGED as MARKS_CHANGED } from './lib/presetMarks'
 import { CHANGED as SETLISTS_CHANGED } from './lib/setlists'
 import { syncSetlists, setlistCloudReady } from './lib/cloudSetlists'
@@ -131,6 +132,7 @@ import PhoneRemote from './components/PhoneRemote'
 import PhoneWalkthrough from './components/PhoneWalkthrough'
 import LinkDetails from './components/LinkDetails'
 import SignInSheet from './components/SignInSheet'
+import { arrivedToJoin } from './lib/joinLink.js'
 import {
   bootLink,
   linkState,
@@ -387,6 +389,7 @@ const SETUP_PAGES = {
   /* Justin's own tools, on his account only — see shared/admin.mjs. */
   access: 'Give someone access',
   sales: 'Sales at a glance',
+  accounts: 'Everyone with an account',
   /* The phone's sheet is titled Unlock; so is this page. */
   unlock: 'Unlock'
 }
@@ -872,6 +875,14 @@ export default function App() {
     useEffect(() => {
       if (!signIn) setSignInStart('in')
     }, [signIn])
+    /* Opened from fractal.newbold.cloud/join: straight onto Create Account,
+       over the welcome, and the address back to plain `/`. See lib/joinLink. */
+    useEffect(() => {
+      if (!arrivedToJoin()) return
+      window.history.replaceState(null, '', '/')
+      setSignInStart('up')
+      setSignIn('account')
+    }, [])
   /*
    * Whether the phone has ever had the Mac answer this session. A blip after
    * that keeps the screen (the chip goes red; the loop retries); before it,
@@ -4300,6 +4311,9 @@ export default function App() {
               {isAdmin(link.account?.email) ? (
                 <SetupRow key="sales" title="Sales at a glance" status="Today, this week, all time" onClick={() => setSetupPage('sales')} />
               ) : null}
+              {isAdmin(link.account?.email) ? (
+                <SetupRow key="accounts" title="Everyone with an account" status="Who has signed up" onClick={() => setSetupPage('accounts')} />
+              ) : null}
             </div>
             {/*
               THE TWO THAT ARE NOT DOORS, and they are here rather than behind one.
@@ -4781,6 +4795,16 @@ export default function App() {
             </button>
             <p className="setup-page-title">{SETUP_PAGES.sales}</p>
             <SalesTool />
+          </div>
+        ) : null}
+
+        {setupPage === 'accounts' && isAdmin(link.account?.email) ? (
+          <div className="setup-page">
+            <button type="button" className="setup-back" onClick={() => setSetupPage(null)}>
+              ‹ Settings
+            </button>
+            <p className="setup-page-title">{SETUP_PAGES.accounts}</p>
+            <AccountsTool />
           </div>
         ) : null}
 

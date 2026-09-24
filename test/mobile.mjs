@@ -3474,6 +3474,95 @@ export function run(test) {
     }
     assert.match(read('mobile/src/screens/Settings.js'), /\{page === 'sales' && isAdmin\(account\?\.email\) \?/)
     assert.match(read('src/App.jsx'), /\{setupPage === 'sales' && isAdmin\(link\.account\?\.email\) \?/)
+
+    /*
+     * "Is there any way we can send an email to them when I grant access to
+     * somebody?" Once per grant that changed something, to the account's own
+     * address, with every word fixed in the function.
+     */
+    const grant = server.slice(server.indexOf("if (action === 'grant') {"))
+    assert.match(server, /const giving = action === 'grant' \|\| action === 'claim'\s+const before = giving \? await unlocked\(account, entitlement\) : false/, 'a grant does not know whether it was news')
+    assert.match(server, /giving && has && !before \? await tellThem\(String\(found\?\.email \|\| email\)\)/, 'the email is not tied to a grant that changed something')
+    assert.ok(server.indexOf('await tellThem(') > server.indexOf('ADMINS.includes(fold(me.email))'), 'the email can be sent before checking who is asking')
+    assert.match(server, /subject: 'You have full access to Fractal Remote'/)
+    assert.match(server, /from: FROM/)
+    assert.match(server, /<b>\$\{shown\}<\/b>/, 'the address goes into the email unescaped')
+    assert.match(grant, /already had the unlock, so no email was sent/, 'pressing Give twice does not say why no email went')
+    assert.match(grant, /did not go out, so let them know yourself/, 'a failed email is reported as sent')
+
+    /*
+     * "There was no confirmation that it added them." The server had said,
+     * three times, that no account used the address; the answer sat under all
+     * three buttons, below the phone's keyboard. It goes under the field now,
+     * and an address with no account reads as a warning, not a success.
+     */
+    assert.match(server, /hasn't signed up yet, so they're on the waiting list/, 'an address with no account does not say plainly what happened to it')
+    for (const file of ['mobile/src/components/AccessTool.js', 'src/components/AccessTool.jsx']) {
+      const ui = read(file)
+      assert.ok(ui.indexOf('said.message') < ui.indexOf("run('check')"), `${file}: the answer is below the buttons again`)
+      assert.match(ui, /said\.ok && \(said\.found !== false \|\| said\.waiting\)/, `${file}: no account (and not waiting) reads as a success`)
+    }
+    assert.match(read('mobile/src/components/AccessTool.js'), /Keyboard\.dismiss\(\)/, 'the keyboard is left covering the answer')
+
+    /*
+     * "So I can't give access to someone until after they have created an
+     * account themselves?" Now an address with no account waits, and is
+     * claimed by its owner's first sign-in.
+     */
+    const waitSql = read('supabase/migrations/20260924_waiting_grants.sql')
+    assert.match(waitSql, /enable row level security/)
+    assert.match(waitSql, /revoke all on table public\.waiting_grants from public, anon, authenticated/, 'a client can read the waiting list')
+    for (const fn of ['wait_for_grant(text)', 'is_waiting_grant(text)', 'drop_waiting_grant(text)']) {
+      assert.ok(waitSql.includes(`revoke all on function public.${fn} from public, anon, authenticated`), `a client can call ${fn}`)
+    }
+    assert.doesNotMatch(waitSql, /on auth\.users|vault\.create_secret/, 'the claim is back inside every sign-up, or needs a secret typed in')
+    assert.match(server, /await rpc\('wait_for_grant', \{ address: email \}\)/, 'Give access on an address with no account adds nothing')
+    assert.match(server, /internal \? action !== 'claim'/, 'the internal caller may ask for more than a claim')
+    assert.match(server, /action === 'claim' && !\(await rpc\('is_waiting_grant'/, 'a claim can unlock an address nobody put on the list')
+    assert.match(server, /if \(!internal && \(!me \|\| !ADMINS\.includes\(fold\(me\.email\)\)\)\)/, 'the lock no longer holds for everybody else')
+    const ent = read('supabase/functions/entitlement/index.ts')
+    assert.match(ent, /if \(answer === false && who\.email && \(await waiting\(who\.email\)\)\)/, 'a waiting address is claimed on something other than a definite no, or not by its own verified owner')
+    assert.ok(ent.indexOf('await waiting(who.email)') > ent.indexOf('const who = await accountFrom(token)'), 'the claim is made before the token is verified')
+    const buy = read('mobile/src/lib/purchases.js')
+    assert.match(buy, /claimRelay\(\)\.then\(\(yes\) => \(yes \? catchUp\(api\) : null\)\)/, 'the phone does not re-read the store when the server has just unlocked it')
+    assert.match(buy, /if \(entitled\(info\)\) \{\s+await remember\(true\)/, "the server's word unlocks the phone without the store agreeing")
+
+    /* "Is there a direct link I can give out that takes people directly to the create account page?" */
+    const { arrivedToJoin, JOIN_LINK } = await import('../src/lib/joinLink.js')
+    assert.equal(JOIN_LINK, 'https://fractal.newbold.cloud/join')
+    for (const p of ['/join', '/join/', '/JOIN', '/signup']) assert.ok(arrivedToJoin({ pathname: p }), `${p} does not open Create Account`)
+    for (const p of ['/', '/joined', '/downloads', '']) assert.ok(!arrivedToJoin({ pathname: p }), `${p} opens Create Account`)
+    const app = read('src/App.jsx')
+    assert.match(app, /if \(!arrivedToJoin\(\)\) return\s+window\.history\.replaceState\(null, '', '\/'\)\s+setSignInStart\('up'\)\s+setSignIn\('account'\)/, 'the join link does not open the form on the Create Account side')
+    assert.ok(!/"source": "\/join"/.test(read('vercel.json')), 'the join link is sent somewhere other than the app')
+
+    /* "How do I see a list of who has set up an account?" */
+    const { accountSections } = await import('../shared/admin.mjs')
+    const nowAt = Date.parse('2026-09-24T12:00:00Z')
+    const list = {
+      ok: true,
+      total: 3,
+      accounts: [
+        { email: 'new@x.com', signed_up: '2026-09-24T10:00:00Z', confirmed: false, last_sign_in: null, unlocked: false },
+        { email: 'paid@x.com', signed_up: '2026-09-20T10:00:00Z', confirmed: true, last_sign_in: '2026-09-23T10:00:00Z', unlocked: true, source: 'revenuecat' },
+        { email: 'me@x.com', signed_up: '2026-09-01T10:00:00Z', confirmed: true, last_sign_in: '2026-09-24T09:00:00Z', unlocked: true, source: 'owner' }
+      ],
+      waiting: [{ email: 'l4@x.com', added: '2026-09-24T01:00:00Z' }]
+    }
+    const everyone = accountSections(list, '', nowAt)
+    assert.equal(everyone[0].title, 'Everyone with an account (3)')
+    assert.equal(everyone[0].rows[0].value, 'new@x.com\nSigned up today, has not confirmed their email yet, Not unlocked')
+    assert.equal(everyone[0].rows[1].value, 'paid@x.com\nSigned up 4 days ago, last on yesterday, Unlocked')
+    assert.match(everyone[0].rows[2].value, /Unlocked, owner account$/)
+    assert.equal(everyone[1].title, 'Waiting for them to sign up (1)')
+    const found = accountSections(list, 'PAID', nowAt)
+    assert.equal(found[0].rows.length, 1, 'finding an email does not narrow the list')
+    assert.equal(accountSections(list, 'nobody', nowAt)[0].rows[0].value, 'Nobody with an account matches that.')
+    assert.match(server, /if \(action === 'accounts'\) return json\(\{ ok: true, \.\.\.\(\(await rpc\('owner_accounts', \{\}\)\)/)
+    assert.ok(server.indexOf("action === 'accounts'") > server.indexOf('ADMINS.includes(fold(me.email))'), 'the list is read before checking who is asking')
+    assert.match(read('supabase/migrations/20260924_owner_accounts.sql'), /revoke all on function public\.owner_accounts\(\) from public, anon, authenticated/, 'a client can read every account')
+    assert.match(read('mobile/src/screens/Settings.js'), /\{page === 'accounts' && isAdmin\(account\?\.email\) \?/)
+    assert.match(read('src/App.jsx'), /\{setupPage === 'accounts' && isAdmin\(link\.account\?\.email\) \?/)
   })
 
   test('the advice to close Fractal’s own software names it, per unit where the unit is known', async () => {
@@ -4459,7 +4548,8 @@ export function run(test) {
       'About',
       /* Last, and drawn only on his own account — shared/admin.mjs. */
       'Give someone access',
-      'Sales at a glance'
+      'Sales at a glance',
+      'Everyone with an account'
     ], 'the Setup rows are not in the order he asked for')
 
     /*

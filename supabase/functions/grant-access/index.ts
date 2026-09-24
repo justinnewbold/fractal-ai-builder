@@ -230,6 +230,104 @@ async function sales() {
   }
 }
 
+/*
+ * "Is there any way we can send an email to them when I grant access to
+ * somebody?"
+ *
+ * The unlock lands without the person knowing, and a tester who is never told
+ * goes on seeing a paywall in an app they already closed. So a grant that
+ * CHANGED something sends one email, from the same verified address the
+ * download link uses. A grant to somebody who already had it sends nothing:
+ * pressing Give twice must not mean two emails.
+ *
+ * Every word is fixed here. The only thing from outside is the recipient, and
+ * that is the address on the account itself (account_details), not what was
+ * typed into the box: a typo in the box finds no account and never gets here.
+ */
+const FROM = 'Fractal Remote <noreply@newbold.cloud>'
+const SITE = 'https://fractal.newbold.cloud'
+
+const escape = (t: string) => t.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
+
+async function tellThem(to: string): Promise<boolean> {
+  const key = env('RESEND_API_KEY')
+  if (!key || !to) return false
+  const shown = escape(to)
+  const html = `
+    <div style="font:15px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1a1d21">
+      <p style="margin:0 0 16px;font-size:18px;font-weight:700">You have full access to Fractal Remote.</p>
+      <p style="margin:0 0 16px">Everything in the app is unlocked for this account, for good. There is nothing to pay.</p>
+      <p style="margin:0 0 20px">Sign in with this email address, <b>${shown}</b>, in the Fractal Remote app on your phone, or on the website:</p>
+      <p style="margin:0 0 20px">
+        <a href="${SITE}" style="background:#7c5cff;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;display:inline-block;font-weight:600">Open Fractal Remote</a>
+      </p>
+      <p style="margin:0 0 16px">To control your Fractal unit, you also need the free computer app, which holds the USB cable:<br><a href="${SITE}/downloads">${SITE}/downloads</a></p>
+      <p style="margin:0;color:#8b9099;font-size:13px">If the app was already open, close it and open it again to see the unlock.</p>
+    </div>`
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: FROM, to: [to], subject: 'You have full access to Fractal Remote', html })
+    })
+    if (!res.ok) console.error('grant-access: the email was refused', res.status, await res.text())
+    return res.ok
+  } catch (err) {
+    console.error('grant-access: the email did not go', err)
+    return false
+  }
+}
+
+/* One address, one domain with a dot, no spaces or separators: the same rule
+   as download-link's, because this is typed into a box too. */
+const LOOKS_LIKE_EMAIL = /^[^@\s,;<>"]+@[^@\s,;<>".]+\.[^@\s,;<>"]{2,}$/
+
+/*
+ * An address nobody has signed up with yet.
+ *
+ * "So I can't give access to someone until after they have created an account
+ * themselves?" Now he can: Give access puts it on the waiting list
+ * (supabase/migrations/20260924_waiting_grants.sql), and the first time that
+ * person signs in, the entitlement function claims it through here. Check says
+ * whether it is waiting; Take it back takes it off.
+ */
+async function noAccountYet(action: string, email: string): Promise<Record<string, unknown>> {
+  const waiting = Boolean(await rpc('is_waiting_grant', { address: email }))
+  if (action === 'grant') {
+    if (email.length > 254 || !LOOKS_LIKE_EMAIL.test(email)) {
+      return { ok: false, found: false, email, message: `${email} does not look like an email address, so nothing was added.` }
+    }
+    await rpc('wait_for_grant', { address: email })
+    return {
+      ok: true,
+      found: false,
+      waiting: true,
+      email,
+      message: `${email} hasn't signed up yet, so they're on the waiting list. The first time they sign in with this email, they'll be unlocked and emailed to say so.`
+    }
+  }
+  if (action === 'revoke') {
+    const dropped = Boolean(await rpc('drop_waiting_grant', { address: email }))
+    return {
+      ok: true,
+      found: false,
+      waiting: false,
+      email,
+      message: dropped ? `${email} is off the waiting list.` : `No account uses ${email}, and they weren't on the waiting list.`
+    }
+  }
+  if (action === 'claim') return { ok: false, found: false, email, message: 'No account.' }
+  return {
+    ok: true,
+    found: false,
+    waiting,
+    email,
+    message: waiting
+      ? `${email} hasn't signed up yet. They're on the waiting list, and will be unlocked the first time they sign in.`
+      : `No account uses ${email} yet. Give access puts them on the waiting list, and they're unlocked the first time they sign in.`
+  }
+}
+
 /** The plain sentence for a RevenueCat refusal. */
 async function refusal(res: Response, doing: string): Promise<string> {
   const said = await res.text().catch(() => '')
@@ -245,9 +343,18 @@ Deno.serve(async (req: Request) => {
 
   const auth = req.headers.get('Authorization') || ''
   const token = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : ''
-  const me = token ? await caller(token) : null
+  /*
+   * Two callers, and only two. Justin, proved by his signed token. And the
+   * entitlement function beside this one, proved by the service role key that
+   * Supabase gives every function here and nothing outside it: that is how a
+   * waiting address is claimed when its owner first signs in, and 'claim' is
+   * the only thing it may ask for.
+   */
+  const service = env('SUPABASE_SERVICE_ROLE_KEY')
+  const internal = Boolean(token && service && token === service)
+  const me = token && !internal ? await caller(token) : null
   /* The lock. Anybody else gets the same answer as nobody at all. */
-  if (!me || !ADMINS.includes(fold(me.email))) return json({ ok: false, message: 'Not allowed.' }, 403)
+  if (!internal && (!me || !ADMINS.includes(fold(me.email)))) return json({ ok: false, message: 'Not allowed.' }, 403)
 
   let input: { action?: string; email?: string } = {}
   try {
@@ -257,27 +364,33 @@ Deno.serve(async (req: Request) => {
   }
   const action = String(input.action || 'check')
   const email = String(input.email || '').trim().toLowerCase()
-  if (!['check', 'grant', 'revoke', 'sales'].includes(action)) return json({ ok: false, message: 'Unknown action.' }, 400)
-  if (action !== 'sales' && !email.includes('@')) return json({ ok: false, message: 'Type the email address they signed up with.' }, 400)
+  if (internal ? action !== 'claim' : !['check', 'grant', 'revoke', 'sales', 'accounts'].includes(action)) {
+    return json({ ok: false, message: 'Unknown action.' }, 400)
+  }
+  if (action !== 'sales' && action !== 'accounts' && !email.includes('@')) return json({ ok: false, message: 'Type the email address they signed up with.' }, 400)
   if (!env('REVENUECAT_SECRET')) return json({ ok: false, message: 'The server has no RevenueCat key set.' }, 500)
 
   try {
     if (action === 'sales') return json(await sales())
+    /* "How do I see a list of who has set up an account?" */
+    if (action === 'accounts') return json({ ok: true, ...((await rpc('owner_accounts', {})) as Record<string, unknown>) })
 
     const found = (await rpc('account_details', { address: email })) as Record<string, any> | null
     const account = found?.id ? String(found.id) : null
-    if (!account) {
-      return json({
-        ok: true,
-        found: false,
-        email,
-        message: `No account uses ${email}. They need to create one first (Create Account, in the app or on the website), with this same email.`
-      })
+    if (!account) return json(await noAccountYet(action, email))
+
+    /* A claim is only ever for an address Justin put on the list. */
+    if (action === 'claim' && !(await rpc('is_waiting_grant', { address: email }))) {
+      return json({ ok: false, message: 'Not waiting.' }, 404)
     }
     const entitlement = await entitlementId()
     if (!entitlement) return json({ ok: false, message: 'Could not find the unlock in RevenueCat.' }, 502)
 
-    if (action === 'grant') {
+    /* Whether this grant is news to them, which is when they are told. */
+    const giving = action === 'grant' || action === 'claim'
+    const before = giving ? await unlocked(account, entitlement) : false
+
+    if (giving) {
       /* RevenueCat only grants to a customer it knows; somebody who has never
          opened the app signed in is not one yet. Creating one that exists
          answers 409, which is fine. */
@@ -292,6 +405,8 @@ Deno.serve(async (req: Request) => {
       })
       if (!res.ok) return json({ ok: false, message: await refusal(res, 'give them the unlock') }, 502)
       await rpc('record_entitlement', { uid: account, is_active: true, from_source: 'revenuecat' })
+      /* Given, so no longer waiting — whichever way it was given. */
+      await rpc('drop_waiting_grant', { address: email })
     }
 
     if (action === 'revoke') {
@@ -305,6 +420,9 @@ Deno.serve(async (req: Request) => {
     const has = await unlocked(account, entitlement)
     /* The relay's table follows RevenueCat's answer, whichever way it went. */
     if (action !== 'check') await rpc('record_entitlement', { uid: account, is_active: has, from_source: 'revenuecat' })
+
+    const told = giving && has && !before ? await tellThem(String(found?.email || email)) : null
+    if (action === 'claim') return json({ ok: true, unlocked: has, emailed: told === true })
 
     /* The Customer lookup. Asked after the change, so it shows the result. */
     const [bought, seen] = await Promise.all([purchasesOf(account), lastSeen(account)])
@@ -320,7 +438,11 @@ Deno.serve(async (req: Request) => {
     }
     const message =
       action === 'grant'
-        ? `${email} has the unlock now. They may need to close and reopen the app, or reload the website.`
+        ? before
+          ? `${email} already had the unlock, so no email was sent.`
+          : told
+            ? `${email} has the unlock now, and they've been emailed to say so.`
+            : `${email} has the unlock now. The email to tell them did not go out, so let them know yourself. They may need to close and reopen the app.`
         : action === 'revoke'
           ? has
             ? `The unlock given here is taken back, but ${email} still has one — they bought it, and a purchase is not touched here.`
@@ -328,7 +450,7 @@ Deno.serve(async (req: Request) => {
           : has
             ? `${email} has the unlock.`
             : `${email} has an account but not the unlock.`
-    return json({ ok: true, found: true, email, unlocked: has, message, details })
+    return json({ ok: true, found: true, email, unlocked: has, emailed: told === true, message, details })
   } catch (err) {
     console.error(`grant-access: ${err}`)
     return json({ ok: false, message: `Something went wrong: ${String((err as Error)?.message || err).slice(0, 200)}` }, 500)

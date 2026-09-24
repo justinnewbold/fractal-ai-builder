@@ -218,6 +218,44 @@ async function record(account: string, active: boolean, source: 'revenuecat' | '
   }
 }
 
+/** Whether this address is on Justin's waiting list. False when unsure. */
+async function waiting(email: string): Promise<boolean> {
+  const url = Deno.env.get('SUPABASE_URL')
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!url || !key) return false
+  try {
+    const res = await fetch(`${url}/rest/v1/rpc/is_waiting_grant`, {
+      method: 'POST',
+      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: email })
+    })
+    return res.ok && (await res.json()) === true
+  } catch (err) {
+    console.error(`entitlement: could not read the waiting list (${err})`)
+    return false
+  }
+}
+
+/** Ask grant-access to unlock a waiting address. True when it did. */
+async function claim(email: string): Promise<boolean> {
+  const url = Deno.env.get('SUPABASE_URL')
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!url || !key) return false
+  try {
+    const res = await fetch(`${url}/functions/v1/grant-access`, {
+      method: 'POST',
+      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'claim', email })
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok || !body?.unlocked) console.error(`entitlement: the claim did not unlock (${res.status} ${JSON.stringify(body).slice(0, 200)})`)
+    return Boolean(res.ok && body?.unlocked)
+  } catch (err) {
+    console.error(`entitlement: could not claim (${err})`)
+    return false
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: CORS })
@@ -238,7 +276,22 @@ Deno.serve(async (req: Request) => {
     return json({ unlocked: true })
   }
 
-  const answer = await owns(account)
+  let answer = await owns(account)
+
+  /*
+   * SOMEBODY JUSTIN GAVE ACCESS TO BEFORE THEY HAD AN ACCOUNT.
+   *
+   * Give access puts an address with no account on a waiting list. This is the
+   * first thing every app asks after a sign-in, on the phone and the computer,
+   * so it is where the list is claimed: the token above has already proved
+   * which address this is, which is all a claim needs. grant-access does the
+   * unlocking, the recording and the email, so there is one copy of each.
+   * Only on a definite "no", and never fatal: a failed claim is tried again at
+   * the next sign-in, and the person's answer is whatever RevenueCat says.
+   */
+  if (answer === false && who.email && (await waiting(who.email))) {
+    if (await claim(who.email)) answer = await owns(account)
+  }
 
   /*
    * A QUESTION THAT COULD NOT BE ASKED IS NOT A NO, and this is the same rule

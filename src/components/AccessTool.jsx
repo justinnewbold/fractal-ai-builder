@@ -41,8 +41,9 @@ export default function AccessTool() {
   return (
     <div className="access-tool">
       <p className="hint">
-        For a purchase that did not register. Type the email they signed up with, then Check. Give access
-        unlocks them for good; Take it back removes an unlock given here and never touches one they paid for.
+        Type their email. Give access unlocks them for good and emails them to say so; if they have not signed up
+        yet, they go on a waiting list and are unlocked the first time they sign in. Take it back removes an unlock
+        given here, or takes them off the list, and never touches one they paid for.
       </p>
       <input
         type="text"
@@ -55,6 +56,13 @@ export default function AccessTool() {
         autoCorrect="off"
         spellCheck={false}
       />
+      {/* The answer under the address it is about, and an address with no
+          account as a warning: it is not a success. Same as the phone's. */}
+      {said ? (
+        <p className={said.ok && (said.found !== false || said.waiting) ? 'hint access-said' : 'save-error access-said'} role="status">
+          {said.message}
+        </p>
+      ) : null}
       <div className="history-actions">
         <button type="button" className="chip" disabled={!!busy} onClick={() => run('check')}>
           {busy === 'check' ? 'Checking…' : 'Check'}
@@ -66,7 +74,6 @@ export default function AccessTool() {
           {busy === 'revoke' ? 'Taking it back…' : 'Take it back'}
         </button>
       </div>
-      {said ? <p className={said.ok ? 'hint' : 'save-error'} role="status">{said.message}</p> : null}
       <Facts rows={lookupRows(said)} />
     </div>
   )
