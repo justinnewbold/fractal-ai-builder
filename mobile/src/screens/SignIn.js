@@ -16,6 +16,7 @@ import Connect from './Connect'
 import { setDemo } from '../lib/demo'
 import { usePurchase } from '../lib/purchases'
 import { mayDrive } from '../lib/unlock-rule'
+import { SETUP } from '../lib/onboarding'
 
 /**
  * One account, two ends.
@@ -211,8 +212,9 @@ export default function SignIn({ onSignedIn, onDemo, onUnlock }) {
               starred, so that is what it says. MY WORDING.
             */}
             {/* And now it leads into the three steps under it rather than
-                saying the third of them on its own. */}
-            This phone controls your Fractal through your computer. To set it up:
+                saying the third of them on its own. The words are shared with
+                the browser's sign-in screen (shared/onboarding.mjs, SETUP). */}
+            {SETUP.intro}
           </Text>
         </View>
 
@@ -228,11 +230,7 @@ export default function SignIn({ onSignedIn, onDemo, onUnlock }) {
           they are done.
         */}
         <View style={{ gap: space.xs }}>
-          {[
-            'Plug your Fractal into your computer with a USB cable.',
-            'Install the free Fractal Remote app on that computer.',
-            'Sign in on both with the same account. Your setlists and starred presets follow you to any device.'
-          ].map((line, i) => (
+          {SETUP.steps.map((line, i) => (
             <View key={line} style={{ flexDirection: 'row', gap: space.sm }}>
               <Text style={{ color: color.signal, fontSize: font.body, fontWeight: '700', minWidth: 16 }}>
                 {i + 1}

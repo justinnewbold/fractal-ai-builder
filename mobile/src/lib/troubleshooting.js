@@ -44,6 +44,10 @@ export const FIXES = [
       /* The one a new Windows user can hit before any of the above. */
       WINDOWS_DRIVER,
       'Make sure the computer app is actually running. It lives in the menu bar, not the Dock.',
+      /* "I think it's connected to a different account on the computer." A
+         computer on another account never hears this app, and looks exactly
+         like one that is switched off. */
+      'Make sure this app and the Fractal app on the computer with your unit are signed into the same account. Settings on each one shows which account it is using.',
       'If the phone cannot reach the computer, check both are on the same wifi, and that a firewall or a VPN on the computer is not blocking it.'
     ]
   },

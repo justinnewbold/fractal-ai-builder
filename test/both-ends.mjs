@@ -443,7 +443,7 @@ export const AREAS = [
   {
     area: 'getting connected and signed in',
     web: ['src/components/ConnectScreen.jsx', 'src/components/SignIn.jsx', 'src/components/SignInSheet.jsx'],
-    phone: ['mobile/src/screens/Connect.js', 'mobile/src/screens/SignIn.js'],
+    phone: ['mobile/src/screens/Connect.js', 'mobile/src/screens/SignIn.js', 'mobile/src/components/WrongAccount.js'],
     buttons: [
       {
         does: 'make a new account',
@@ -501,6 +501,11 @@ export const AREAS = [
         web: 'Set up phone remote',
         phone: 'How to connect my computer',
         why: 'the browser says it from the computer being set up, the phone from the end that needs one — "Instead of saying connect my computer on the android app, have it say how to connect my computer", because a tester read the action as the way to sign in'
+      },
+      {
+        does: 'open Troubleshooting when the computer or the unit will not come up',
+        web: 'Troubleshooting',
+        phone: 'Troubleshooting'
       },
       {
         does: 'unlock the app from the sign-in screen',

@@ -9172,13 +9172,41 @@ button.phone-chip.dim {
 
 /* The computer on this wifi is on another account. Said in the fault colour
    along its edge, as the phone's fault note is, because it is the reason. */
-.connect > p.connect-mismatch {
+/* The same red sentence on the No unit found notice (AccountCheck). */
+.connect > p.connect-mismatch,
+.notice p.connect-mismatch {
   color: var(--silk);
   text-align: left;
   border-left: 2px solid var(--fault);
   padding: var(--s-2) var(--s-3);
   background: var(--fault-halo);
   border-radius: var(--r-1);
+}
+
+/*
+ * The three setup steps on the signed-out connect screen, numbered in the
+ * signal colour the way the phone's sign-in screen numbers them.
+ */
+.connect-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+  display: grid;
+  gap: var(--s-2);
+  text-align: left;
+}
+.connect-steps li {
+  counter-increment: step;
+  display: flex;
+  gap: var(--s-2);
+  color: var(--silk);
+}
+.connect-steps li::before {
+  content: counter(step);
+  color: var(--signal);
+  font-weight: 700;
+  min-width: 1em;
 }
 
 .connect-lamp {
@@ -10814,6 +10842,15 @@ button.setup-back {
   width: 100%;
   min-height: 52px;
   margin-top: var(--s-4);
+  font-size: var(--f-3);
+}
+
+/* "I'm already unlocked - sign in", full width under the buy button like the
+   phone paywall's, but quieter: it is the second way through the page. */
+.unlock-signin {
+  width: 100%;
+  min-height: 48px;
+  margin-top: var(--s-3);
   font-size: var(--f-3);
 }
 

@@ -110,6 +110,13 @@ export default function App() {
   /* Which fix the guide opens on, and which screen Done goes back to. */
   const [fixOpen, setFixOpen] = useState(null)
   const [fixFrom, setFixFrom] = useState('settings')
+  /* Troubleshooting, open on the fix for a link that will not come up, and
+     Done comes back to the stage. */
+  const openConnectFix = () => {
+    setFixOpen('connect')
+    setFixFrom('stage')
+    setScreen('fixes')
+  }
   /* Where Done goes back to, for the same reason `fixFrom` exists: this screen
      is reached from Setup and from the log, and returning somebody to Setup
      from the log they were reading is the wrong room. */
@@ -734,6 +741,7 @@ export default function App() {
             <WrongAccount
               active={auth === 'in' && !demo && !settling && screen === 'stage' && link.link !== 'connected'}
               onSwitch={() => setScreen('settings')}
+              onTroubleshoot={openConnectFix}
             />
             {/*
               The bar stays up while this waits, which is what makes the wait
@@ -757,7 +765,12 @@ export default function App() {
             */}
             <EdgeBack onBack={backFrom}>
             {settling && screen === 'stage' ? (
-              <Waking link={link} onRetry={probeNow} onSwitch={() => setScreen('settings')} />
+              <Waking
+                link={link}
+                onRetry={probeNow}
+                onSwitch={() => setScreen('settings')}
+                onTroubleshoot={openConnectFix}
+              />
             ) : screen === 'presets' ? (
               <Presets onBack={() => setScreen('stage')} />
             ) : screen === 'setlists' ? (
@@ -944,7 +957,7 @@ const ofError = (s) => s.error
 /* How long "Finding your computer…" stands on its own before it says more. */
 const WAKING_LONG_MS = 15000
 
-function Waking({ link, onRetry, onSwitch }) {
+function Waking({ link, onRetry, onSwitch, onTroubleshoot }) {
   const said =
     link.link === 'connected'
       ? 'Asking your unit what it is\u2026'
@@ -1022,6 +1035,9 @@ function Waking({ link, onRetry, onSwitch }) {
           )}
           {elsewhere && onSwitch ? <Press label="Switch account on this phone" onPress={onSwitch} /> : null}
           <Press label="Look for the computer again" onPress={() => onRetry?.()} />
+          {/* "Open the troubleshooting if it doesn't connect" — the browser's
+              connecting screen has the same button. */}
+          {onTroubleshoot ? <Press label="Troubleshooting" onPress={onTroubleshoot} /> : null}
         </View>
       ) : null}
     </View>

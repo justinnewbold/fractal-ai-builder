@@ -20,7 +20,7 @@ import Press from './Press'
  * DISCONNECTED in the corner and nothing saying why. The same question and the
  * same sentence as Waking, asked while the link is down.
  */
-export default function WrongAccount({ active, onSwitch }) {
+export default function WrongAccount({ active, onSwitch, onTroubleshoot }) {
   const elsewhere = useComputerElsewhere(active)
   const [email, setEmail] = useState(null)
   useEffect(() => {
@@ -40,6 +40,7 @@ export default function WrongAccount({ active, onSwitch }) {
           : 'The computer on this wifi is signed into a different account than this phone. Sign both into the same account.'}
       </Note>
       {onSwitch ? <Press label="Switch account on this phone" onPress={onSwitch} /> : null}
+      {onTroubleshoot ? <Press label="Troubleshooting" onPress={onTroubleshoot} /> : null}
     </View>
   )
 }

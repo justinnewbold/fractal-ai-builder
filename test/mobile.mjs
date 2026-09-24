@@ -3212,7 +3212,7 @@ export function run(test) {
     assert.match(flat, /!demo &&/, 'the demo is made to wait for a computer it does not have')
     assert.match(
       flat,
-      /\{settling && screen === 'stage' \? \( <Waking link=\{link\} onRetry=\{probeNow\} onSwitch=\{\(\) => setScreen\('settings'\)\} \/>/,
+      /\{settling && screen === 'stage' \? \( <Waking link=\{link\} onRetry=\{probeNow\} onSwitch=\{\(\) => setScreen\('settings'\)\} onTroubleshoot=\{openConnectFix\} \/>/,
       'nothing is shown while the app waits'
     )
 
@@ -3380,6 +3380,25 @@ export function run(test) {
       phone,
       /<WrongAccount active=\{auth === 'in' && !demo && !settling && screen === 'stage' && link\.link !== 'connected'\}/,
       'the stage screen says nothing while the link is down on another account'
+    )
+
+    /* "Let's make sure that's added when there is no connection, and open the
+       troubleshooting if it doesn't connect" — said of the browser's No unit
+       found notice, and held at both ends. */
+    const webApp = read('src/App.jsx').replace(/\s+/g, ' ')
+    assert.match(webApp, /<AccountCheck link=\{link\} \/>/, 'the No unit found notice does not say which account')
+    assert.match(webApp, /onClick=\{openConnectFix\}> Troubleshooting <\/button>/, 'the No unit found notice cannot open Troubleshooting')
+    assert.match(webApp, /setFix\('connect'\) setSheet\('settings'\) setSetupPage\('help'\)/, 'the browser opens Troubleshooting somewhere other than the connect fix')
+    const connectWeb = read('src/components/ConnectScreen.jsx')
+    assert.match(connectWeb, /export function AccountCheck/, 'there is no account check for the notice to draw')
+    assert.match(connectWeb, /computerElsewhere\(\)\.then/, 'the account check never asks about another account')
+    assert.equal((connectWeb.match(/onClick=\{onTroubleshoot\}/g) || []).length, 2, 'Connecting and Not answering do not both offer Troubleshooting')
+    assert.match(wrong, /label="Troubleshooting"/, 'the phone’s wrong-account note cannot open Troubleshooting')
+    assert.match(phone, /setFixOpen\('connect'\) setFixFrom\('stage'\) setScreen\('fixes'\)/, 'the phone opens Troubleshooting somewhere other than the connect fix')
+    assert.match(
+      read('shared/troubleshooting.mjs'),
+      /signed into the same account/,
+      'the connect fix does not mention the account'
     )
 
     const web = read('src/components/ConnectScreen.jsx').replace(/\s+/g, ' ')
@@ -3943,8 +3962,14 @@ export function run(test) {
     /* "They're already kind of having issues being confused." The screen says
        how the three pieces fit before it asks for anything, and the note that
        says to unlock first has a button that does it. */
-    assert.match(signIn, /This phone controls your Fractal through your computer/, 'the sign-in screen does not say how it works')
-    assert.match(signIn, /Install the free Fractal Remote app on that computer/, 'the steps lost the computer app')
+    assert.match(signIn, /\{SETUP\.intro\}/, 'the sign-in screen does not say how it works')
+    assert.match(signIn, /SETUP\.steps\.map/, 'the sign-in screen lost the steps')
+    assert.match(read('shared/onboarding.mjs'), /'Install the free Fractal Remote app on that computer\.'/, 'the steps lost the computer app')
+    /* And the browser's signed-out connect screen says the same three, from
+       the same place: "all of our changes are drifting apart again". */
+    const web = read('src/components/ConnectScreen.jsx')
+    assert.match(web, /SETUP\.steps\.map/, 'the browser does not show the steps the phone shows')
+    assert.match(web, /<Steps \/>/, 'the browser draws its steps nowhere')
     assert.match(signIn, /<Press label="Unlock" tone="signal"/, 'the note says to unlock with nothing to unlock with')
     const outBranch = read('mobile/App.js').replace(/\s+/g, ' ')
     assert.match(outBranch, /onUnlock=\{\(\) => setBuying\(true\)\} \/> \{\/\*[^]*?\*\/\} \{buying \? \( <Paywall asked/, 'the sign-in Unlock opens a paywall that is never drawn')
