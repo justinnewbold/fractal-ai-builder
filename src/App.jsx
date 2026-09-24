@@ -131,6 +131,9 @@ import ConnectScreen, { AccountCheck } from './components/ConnectScreen'
 import PhoneRemote from './components/PhoneRemote'
 import WifiQr from './components/WifiQr'
 import PhoneWalkthrough from './components/PhoneWalkthrough'
+import { ChainCards } from './components/Walk'
+import { linkChain } from '../shared/link-chain.mjs'
+import { firmwareOf } from '../shared/firmware.mjs'
 import LinkDetails from './components/LinkDetails'
 import SignInSheet from './components/SignInSheet'
 import { arrivedToJoin } from './lib/joinLink.js'
@@ -4528,6 +4531,37 @@ export default function App() {
               ‹ Settings
             </button>
             <p className="setup-page-title">{SETUP_PAGES.link}</p>
+            {/*
+              THE CHAIN, AS CARDS, the same three the phone's page opens on.
+              "Always make sure you're updating all the platforms." The words
+              are shared/link-chain.mjs's, so the two ends cannot word the
+              same chain two ways; which card is "this" follows which end the
+              browser is.
+            */}
+            <ChainCards
+              cards={linkChain({
+                here: link.role === 'remote' || link.role === 'wifi' ? 'phone' : 'computer',
+                demo: isDemo(),
+                unit: {
+                  name: isDemo() ? unitByKey(demoUnit()).name : device?.short || device?.name || null,
+                  firmware: firmwareOf(device),
+                  state: status === 'live' && device ? 'present' : status === 'fault' ? (faultReason === 'no-answer' ? 'silent' : 'missing') : 'unknown'
+                },
+                computer:
+                  link.role === 'remote'
+                    ? { name: link.macName, version: link.macVersion, link: link.link }
+                    : link.role === 'wifi'
+                      ? { link: 'connected' }
+                      : { version: VERSION },
+                phone:
+                  link.role === 'remote' || link.role === 'wifi'
+                    ? { version: VERSION, email: signedInHere ? link.account.email : null }
+                    : {
+                        remote: link.link === 'connected' ? 'on' : link.link === 'signed-out' ? 'signed-out' : 'off',
+                        email: signedInHere ? link.account.email : null
+                      }
+              })}
+            />
             {/*
               The unit's own state leads, because it is the far end of the
               chain this page is about and the thing that was hardest to find:

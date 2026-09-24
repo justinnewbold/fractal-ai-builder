@@ -86,6 +86,11 @@ export const FILES = [
    */
   { source: '../shared/versions.mjs', target: '../mobile/src/lib/versions.js' },
   /*
+   * The three cards at the top of Phone & computer — the unit, the computer
+   * and the phone — so both ends say the same thing about the same chain.
+   */
+  { source: '../shared/link-chain.mjs', target: '../mobile/src/lib/link-chain.js' },
+  /*
    * The troubleshooting guide, so a fix reads the same wherever somebody
    * standing in front of a dead rig happens to look it up.
    *

@@ -1243,7 +1243,10 @@ export function run(test) {
     /* Either bracket: the browser's fits on one line and opens a tag, the
        phone's wraps and opens a paren. What is held is the guard. */
     assert.match(read('src/components/DeviceDetail.jsx'), /\{firmware \? [(<]/, 'the browser draws a firmware line for a unit that never reported one')
-    assert.match(read('mobile/src/screens/Settings.js'), /\{firmware \? [(<]/, 'the phone draws a firmware line for a unit that never reported one')
+    /* The phone's firmware is on the unit's card now, worded in
+       shared/link-chain.mjs, which prints it only when the unit said one. */
+    assert.match(read('mobile/src/screens/Settings.js'), /unit: \{[^}]*firmware,/, 'the phone no longer hands the unit card its firmware')
+    assert.match(read('shared/link-chain.mjs'), /unit\.firmware \? `firmware \$\{unit\.firmware\}` : null/, 'the phone draws a firmware line for a unit that never reported one')
   })
 
   test('the phone icon is one Apple will accept, and the others keep their alpha', () => {

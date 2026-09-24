@@ -29,6 +29,7 @@ import { sendDownloadLink, DOWNLOADS_URL } from '../lib/downloadLink'
 import CopyAddress from '../components/CopyAddress'
 import Note from '../components/Note'
 import Press from '../components/Press'
+import { TipCard } from '../components/Walk'
 import playIcon from '../../assets/icons/play.png'
 import slidersIcon from '../../assets/icons/sliders.png'
 import saveIcon from '../../assets/icons/save.png'
@@ -610,50 +611,6 @@ const Steps = ({ at, of, label }) => (
     </View>
     <Text style={{ color: color.silkDim, fontSize: font.small }}>{label || `${Math.min(at, of - 1) + 1} of ${of}`}</Text>
   </View>
-)
-
-/** The amber picture tile a card leads with. */
-const Tile = ({ icon, size = 64 }) => (
-  <View
-    style={{
-      width: size,
-      height: size,
-      borderRadius: radius.lg,
-      borderWidth: 1,
-      borderColor: tint(color.signal, 0.35),
-      backgroundColor: tint(color.signal, 0.14),
-      alignItems: 'center',
-      justifyContent: 'center'
-    }}
-  >
-    <Image source={icon} style={{ width: size * 0.5, height: size * 0.5, tintColor: color.signal }} />
-  </View>
-)
-
-/** A card: the tile, an amber label, a line under it, and a chevron when it goes somewhere. */
-const TipCard = ({ icon, label, body, onPress }) => (
-  <Pressable
-    accessibilityRole={onPress ? 'button' : undefined}
-    disabled={!onPress}
-    onPress={onPress}
-    style={({ pressed }) => ({
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: space.lg,
-      padding: space.lg,
-      borderRadius: radius.lg,
-      borderWidth: 1,
-      borderColor: color.rule,
-      backgroundColor: pressed ? color.panelHi : color.panel
-    })}
-  >
-    <Tile icon={icon} />
-    <View style={{ flex: 1, gap: space.xs }}>
-      <Text style={{ color: color.signal, fontSize: font.lead, fontWeight: '800', letterSpacing: 1 }}>{label}</Text>
-      <Text style={{ color: color.silkDim, fontSize: font.body + 1, lineHeight: 22 }}>{body}</Text>
-    </View>
-    {onPress ? <Image source={chevronIcon} style={{ width: 16, height: 16, tintColor: color.silkDim }} /> : null}
-  </Pressable>
 )
 
 /** The one amber button: the words on the left, the arrow at the far end. */

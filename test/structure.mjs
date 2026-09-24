@@ -528,9 +528,8 @@ export function run(test) {
     /*
      * Both ends. The phone's bar is the browser's bar — "Make sure the iOS app
      * shows this exact header" — and a name that presses in one and not the
-     * other is the seam this suite exists to hold. Setup is one screen there
-     * rather than a stack, so it cannot open already standing on a page; it
-     * lands at the top, where the demo block is the first thing drawn.
+     * other is the seam this suite exists to hold. It opens the same page
+     * now, too: Settings takes the page to open on (see both-ends.mjs).
      */
     const phone = readFileSync(new URL('../mobile/src/components/TopBar.js', import.meta.url), 'utf8')
     assert.match(phone, /onPress=\{onOpenUnit \|\| onOpenSettings\}/, 'the phone still reads its unit name without pressing it')

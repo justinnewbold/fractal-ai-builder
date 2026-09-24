@@ -1929,7 +1929,7 @@ export function run(test) {
         `Setup has no ${row} row`
       )
     }
-    assert.match(settings, /const \[page, setPage\] = useState\(null\)/, 'Setup is one scroll again rather than a list of pages')
+    assert.match(settings, /const \[page, setPage\] = useState\(startPage\)/, 'Setup is one scroll again rather than a list of pages')
 
     /*
      * The renaming boxes are behind their own row, not in front of everything.
@@ -3217,7 +3217,7 @@ export function run(test) {
     assert.match(flat, /!demo &&/, 'the demo is made to wait for a computer it does not have')
     assert.match(
       flat,
-      /\{settling && screen === 'stage' \? \( <Waking link=\{link\} onRetry=\{probeNow\} onSwitch=\{\(\) => setScreen\('settings'\)\} onTroubleshoot=\{openConnectFix\} \/>/,
+      /\{settling && screen === 'stage' \? \( <Waking link=\{link\} onRetry=\{probeNow\} onSwitch=\{\(\) => openSettings\('link'\)\} onTroubleshoot=\{openConnectFix\} \/>/,
       'nothing is shown while the app waits'
     )
 
@@ -3661,7 +3661,8 @@ export function run(test) {
     const { fixById } = await import('../shared/troubleshooting.mjs')
     assert.ok(fixById('connect').steps.includes(quitEditor(null)), 'Troubleshooting never says to close the editor')
     const phone = read('mobile/src/screens/Settings.js')
-    assert.match(phone, /but it has no unit\. Check your unit is on and its cable is in\. \$\{quitEditor\(deviceName\)\}/, 'the phone’s no-unit line never says to close the editor')
+    /* The chain card says the unit is missing; the note under it names the editor. */
+    assert.match(phone, /unitState === 'missing'\s*\? `\$\{quitEditor\(deviceName\)\} This finds the unit again/, 'the phone’s no-unit line never says to close the editor')
     assert.match(read('src/components/LinkDetails.jsx'), /check the cable there\. \$\{quitEditor\(null\)\}/, 'the browser’s no-unit line never says to close the editor')
 
     /* And in the places it was, naming them all rather than two. */
@@ -4406,7 +4407,7 @@ export function run(test) {
        sensible window, and a check that depends on prose length is a check
        that breaks when somebody explains themselves properly. */
     const bare = settings.replace(/\{?\/\*[\s\S]*?\*\/\}?/g, ' ').replace(/\s+/g, ' ')
-    assert.match(bare, /\) : purchase\.unlocked \? \( <Press label="Demo" onPress=\{\(\) => setDemo\(true\)\} \/>/, 'a paid phone has no way into the demo')
+    assert.match(bare, /\) : purchase\.unlocked \? \( <TipCard icon=\{playIcon\} label="DEMO" onPress=\{\(\) => setDemo\(true\)\} \/>/, 'a paid phone has no way into the demo')
 
     /*
      * AND THE TWO DOORS ARE NAMED FOR THE TWO PEOPLE WALKING THROUGH THEM.
@@ -4627,7 +4628,7 @@ export function run(test) {
      */
     assert.match(
       read('mobile/src/screens/Settings.js'),
-      /label="Exit demo"[\s\S]{0,120}setDemo\(false\)/,
+      /label="EXIT DEMO"[\s\S]{0,120}setDemo\(false\)/,
       'the way out of the demo moved; this test names it'
     )
   })
@@ -5466,10 +5467,12 @@ export function run(test) {
 
     /* And on screen, where somebody can act on it. */
     const settings = read('mobile/src/screens/Settings.js').replace(/\s+/g, ' ')
-    assert.match(settings, /The app on the computer is v\$\{hostVersion\}/, 'Setup never says the computer’s version')
+    /* On the computer's card now: its name and version, from shared/link-chain.mjs. */
+    assert.match(settings, /computer: \{ name: macName, version: hostVersion, link \}/, 'Setup never says the computer’s version')
+    assert.match(read('shared/link-chain.mjs'), /\$\{computerName\}\$\{version\(computer\.version\)\}/, 'the computer card forgot its version')
     assert.match(settings, /const behind = !!hostVersion && isOlder\(hostVersion, APP_VERSION\) === true/, 'a computer that did not say its version is told it is behind')
     /* A missing version is said as missing, with where to look, not as "behind". */
-    assert.match(settings, /link === 'connected' && !demo && !hostVersion \? \( <Note> If the computer is on 7\.295\.0 or newer, its menu bar icon has a line saying what the phones hear about its version/, 'a missing version does not point at the Mac’s own menu line')
+    assert.match(settings, /link === 'connected' && !demo && !hostVersion \? \( <Note> The computer didn’t say which version it is running: its app is older than 7\.205\.0, or it could not write its name for the phone\. If the computer is on 7\.295\.0 or newer, its menu bar icon has a line saying what the phones hear about its version/, 'a missing version does not point at the Mac’s own menu line')
 
     /*
      * The comparison is strict about what it will answer, and that is the
@@ -6115,7 +6118,7 @@ export function run(test) {
      */
     const flat = read('mobile/src/screens/Settings.js').replace(/\s+/g, ' ')
     assert.doesNotMatch(flat, /placeholder="New password"/, 'a password box still sits open on the Setup page')
-    assert.match(flat, /<Press label=\{`⚙ \$\{account\.email\}`\} sub="Signed in · tap for password options"/, 'the account line is not the way in')
+    assert.match(flat, /<TipCard icon=\{mailIcon\} label="SIGNED IN" body=\{`\$\{account\.email\}\\nTap for password options`\}/, 'the account line is not the way in')
     assert.match(flat, /<Sheet open=\{accountMenu\}/, 'the account line opens nothing')
     assert.match(flat, /label="Change password" sub="Type a new one here, twice"/, 'the sheet has no Change password')
     assert.match(flat, /await sendPasswordReset\(account\.email\)/, 'the sheet cannot send a reset email')
@@ -6805,7 +6808,7 @@ export function run(test) {
      * gate above turns the demo into a room with no handle on the inside.
      */
     const settings = read('mobile/src/screens/Settings.js').replace(/\s+/g, ' ')
-    assert.match(settings, /purchase\.unlocked \? \( <Press label="Exit demo"/, 'the way out of the demo is not behind the purchase')
+    assert.match(settings, /purchase\.unlocked \? \( <TipCard icon=\{playIcon\} label="EXIT DEMO"/, 'the way out of the demo is not behind the purchase')
 
     const app = read('mobile/App.js')
     const toSignIn = app.slice(app.indexOf('const toSignIn = ()'), app.indexOf('const toSignIn = ()') + 260)
@@ -7354,7 +7357,7 @@ export function run(test) {
     const app = read('mobile/App.js')
     assert.match(
       app,
-      /onOpenUnit=\{\(\) => \(demo \? setPickUnit\(true\) : setScreen\('settings'\)\)\}/,
+      /onOpenUnit=\{\(\) => \(demo \? setPickUnit\(true\) : openSettings\('link'\)\)\}/,
       'the unit name opens Setup in the demo again, with the five units two doors further in'
     )
     assert.match(app, /<DemoUnit open=\{pickUnit\} onClose=\{\(\) => setPickUnit\(false\)\}/, 'the picker is never drawn')

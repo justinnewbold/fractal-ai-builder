@@ -11865,6 +11865,68 @@ button.walk-foot-row {
 .walk-foot-text {
   flex: 1 1 auto;
 }
+/* The chain at the top of Phone & computer: smaller tiles, a lamp, and the
+   two wires from How it works, lit when both ends answer. */
+.walk-tile-sm {
+  display: flex;
+  flex: none;
+}
+.walk-tile-sm .walk-tile {
+  width: 52px;
+  height: 52px;
+}
+.walk-tile-sm .walk-tile .walk-pic {
+  width: 26px;
+  height: 26px;
+}
+.walk-lamp {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--silk-faint);
+}
+.walk-lamp[data-tone='good'] {
+  background: var(--ok);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 25%, transparent);
+}
+.walk-lamp[data-tone='bad'] {
+  background: var(--fault);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--fault) 25%, transparent);
+}
+.walk-lamp[data-tone='busy'] {
+  background: var(--signal);
+}
+.walk-chain {
+  display: flex;
+  flex-direction: column;
+  margin: var(--s-2) 0 var(--s-4);
+}
+.walk-wire {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.walk-wire-line {
+  width: 2px;
+  height: 10px;
+  background: var(--rule);
+}
+.walk-wire-label {
+  padding: var(--s-1) var(--s-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-3);
+  color: var(--silk-faint);
+  font-size: var(--f-1);
+  letter-spacing: 0.12em;
+}
+.walk-wire.lit .walk-wire-line {
+  background: var(--signal);
+}
+.walk-wire.lit .walk-wire-label {
+  border-color: var(--signal);
+  color: var(--signal);
+}
 .walk-units {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
