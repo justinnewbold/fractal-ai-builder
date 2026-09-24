@@ -10510,6 +10510,11 @@ button.setup-back {
   border-radius: var(--r-1);
   background: #fff;
 }
+/* The computer's own address as a code, on Phone & computer (WifiQr). */
+.wifi-qr {
+  text-align: center;
+}
+
 .phone-store-qr.placeholder {
   background: var(--panel-hi);
 }

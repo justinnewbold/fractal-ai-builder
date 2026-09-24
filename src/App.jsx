@@ -129,6 +129,7 @@ import {
 } from './lib/forgefx'
 import ConnectScreen, { AccountCheck } from './components/ConnectScreen'
 import PhoneRemote from './components/PhoneRemote'
+import WifiQr from './components/WifiQr'
 import PhoneWalkthrough from './components/PhoneWalkthrough'
 import LinkDetails from './components/LinkDetails'
 import SignInSheet from './components/SignInSheet'
@@ -4549,6 +4550,13 @@ export default function App() {
             */}
             <PhoneRemote link={link} onAction={linkAction} onError={setError} error={error} busy={busy} />
           </Section>
+          {/* The no-internet route as a code the phone's own camera opens.
+              Draws nothing outside the computer app's window. */}
+          {inDesktopApp() ? (
+            <Section key="no-internet" title="Playing with no internet" note="Same wifi, no internet needed">
+              <WifiQr />
+            </Section>
+          ) : null}
           {/*
             THE WAY IN, FROM THE DEMO. "There's actually no place to even sign
             in anywhere on the web app." In the demo the panel above says the

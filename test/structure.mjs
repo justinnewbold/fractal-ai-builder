@@ -1521,7 +1521,7 @@ export function run(test) {
          question somebody has when there is nothing on the other end at all.
          Account follows the phone remote, only in the demo and signed out:
          "there's actually no place to even sign in anywhere on the web app." */
-      ['link', ['connection', 'phone-remote', 'account', 'ways-in', 'link-details']],
+      ['link', ['connection', 'phone-remote', 'no-internet', 'account', 'ways-in', 'link-details']],
       /* Fixes first: it is the one somebody is looking for when they open
          this page at all, and the log is what they send if it did not help. */
       ['help', ['fixes', 'preset-check', 'debug-log', 'feedback', 'what-s-changed-this-session']],
@@ -2907,6 +2907,26 @@ export function run(test) {
       'the preload reaches past updates into the rest of the app'
     )
     assert.match(bridge, /exposeInMainWorld\('fractalDesktop'/, 'the bridge is not exposed')
+  })
+
+  test('the computer shows its wifi address as a code a phone camera opens', () => {
+    /*
+     * "Yes add the QR code to the computer." The no-internet route is the
+     * phone's browser on the computer's own page, and a phone's own camera
+     * opens a QR code in that browser — so nothing in the phone app needs a
+     * camera for it.
+     */
+    const main = readFileSync(new URL('../desktop/main.js', import.meta.url), 'utf8')
+    const preload = readFileSync(new URL('../desktop/preload.js', import.meta.url), 'utf8')
+    assert.match(main, /ipcMain\.handle\('host:wifi'/, 'the app never answers the page about its address')
+    assert.match(main, /addresses\(\{ \.\.\.hostAt, ip: lanAddress\(\) \}\)/, 'the address is not asked afresh, so a laptop that moved networks shows a dead code')
+    assert.match(preload, /wifi: \(\) => ipcRenderer\.invoke\('host:wifi'\)/, 'the page cannot ask for the address')
+    const qr = readFileSync(new URL('../src/components/WifiQr.jsx', import.meta.url), 'utf8')
+    assert.match(qr, /QRCode\.toDataURL\(where\.lan/, 'the code is not the wifi address')
+    assert.match(qr, /not the\s+Fractal Remote app/, 'the page does not say the code opens in the browser rather than the app')
+    assert.match(src.replace(/\s+/g, ' '), /\{inDesktopApp\(\) \? \( <Section key="no-internet"/, 'the code is drawn somewhere that does not know the address')
+    const phone = readFileSync(new URL('../mobile/src/screens/Settings.js', import.meta.url), 'utf8')
+    assert.match(phone, /point\s+the phone&rsquo;s camera at the code there/, 'the phone never tells anyone the code is there')
   })
 
   test('a channel is written where the scene that plays it can keep it', () => {

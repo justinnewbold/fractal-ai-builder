@@ -742,10 +742,12 @@ export default function Settings({
                   that has none, there is another way round and it does not use this app.
                 </Text>
                 <Text style={{ color: color.silkDim, fontSize: font.small }}>
-                  Put the phone on the same wifi as the computer, then open the computer&rsquo;s
-                  address in the phone&rsquo;s web browser. The computer shows that address in its
-                  menu bar, next to the Fractal icon. You get the same screens, and no part of it
-                  goes near the internet.
+                  Put the phone on the same wifi as the computer. On the computer, open the Fractal
+                  app&rsquo;s Settings &rarr; Phone &amp; computer &rarr; Playing with no internet, and point
+                  the phone&rsquo;s camera at the code there &mdash; it opens in the phone&rsquo;s web browser. The same address is
+                  in the computer&rsquo;s menu bar (the system tray on Windows), next to the Fractal
+                  icon, to type instead. You get the same screens, and no part of it goes near the
+                  internet.
                 </Text>
                 <Note>
                   What you change there is kept by that browser rather than in your account, so it
