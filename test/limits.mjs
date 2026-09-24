@@ -1624,6 +1624,10 @@ export function run(test) {
     assert.match(policy, /setlist/i, 'nothing is said about the setlists that sync')
     assert.match(policy, /[Bb]ug reports? and suggestions|Something is broken/, 'nothing is said about reports')
     assert.match(policy, /email address/i, 'nothing is said about the account')
+    /* The unlock is sold, so the purchase record is said — and the camera the
+       pairing scanner once used is not claimed. */
+    assert.match(policy, /RevenueCat/, 'nothing is said about the purchase record')
+    assert.ok(!/pairing code/.test(policy), 'the policy still describes the camera scanner that was removed')
 
     /*
      * THE LEAD, because it is the true and reassuring thing and it is what most

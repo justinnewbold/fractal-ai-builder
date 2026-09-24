@@ -15,7 +15,7 @@ notes*. Read that one even if you skip the rest.
 | **Name** | 30 | `Fractal Remote` |
 | **Subtitle** | 30 | `Run your rig from your phone` |
 | **Category** | — | Primary: **Music**. Secondary: **Utilities** |
-| **Price** | — | Your call. Paid, per what we discussed |
+| **Price** | — | **Free** (USD 0.00). The $9.99 unlock is an in-app purchase, set up separately under In-App Purchases |
 
 ### Promotional text (170, editable any time without a new build)
 
@@ -52,22 +52,21 @@ WHAT YOU CAN DO
 • Build setlists and star the presets you reach for
 • Reach for a knob and change it without walking back to the rack
 
-ON YOUR OWN WIFI, NOTHING LEAVES THE ROOM
+ONE ACCOUNT, BOTH ENDS
 
-No account. No sign-up. Your phone talks to your computer, your computer talks
-to your unit, and that is all that happens. If you want to reach your rig from
-somewhere else, sign in and it follows you.
+Sign the phone and the computer app into the same account and they find each
+other — at home, at rehearsal, or at the venue. Your setlists and starred
+presets follow you to any device.
 
 BUILT FOR A STAGE, NOT A DESK
 
 Big targets you can hit without looking. A screen that stays readable when the
 lights go down. Nothing that needs two hands.
 
-WHAT STAYS AT THE COMPUTER
+FREE TO TRY
 
-Saving to a slot, backups, restores and firmware are refused from a distance —
-by your computer, not by this app. A phone on a dark stage should not be able
-to overwrite a preset you spent a week on.
+The demo is free, with every screen working on a simulated unit. A one-time
+purchase unlocks control of your own rig.
 
 WHAT YOU NEED
 
@@ -126,9 +125,10 @@ Tracking Transparency entirely.
 | User Content → **Other User Content** | Yes | Yes | Setlists, so they follow you between devices |
 | Identifiers → **User ID** | Yes | Yes | The account id that ties your setlists to you |
 | Diagnostics → **Other Diagnostic Data** | Yes | Yes | The debug log, and only when somebody presses Send on a bug report |
+| Purchases → **Purchase History** | Yes | Yes | The unlock. RevenueCat keeps the purchase record so it follows the account to other devices |
 
-Do **not** declare location, contacts, photos, audio, purchases, search
-history, browsing history or advertising data. None are collected — and the
+Do **not** declare location, contacts, photos, audio, search history, browsing
+history or advertising data. None are collected — and the
 privacy page says so, so a wrong answer here contradicts a published document.
 
 **Why the log is declared even though it is opt-in:** Apple asks what the app
@@ -139,10 +139,24 @@ to point at a policy that explains it is the strong position.
 
 ## Age rating
 
-**4+.** Every question in the questionnaire is None / No. There is no user
+**4+.** Every question in the questionnaire is None / No — including the newer
+ones about parental controls, age assurance, unrestricted web access,
+user-generated content, messaging, advertising, and medical or wellness
+topics. Links to the downloads page open in the phone's own browser; that is
+not unrestricted web access inside the app. There is no user
 generated content shown to other people, no web browsing, no gambling, no
 contests and no messaging between users — a bug report goes to one inbox and
 is never shown to anyone else.
+
+---
+
+## Content rights
+
+**Yes, it contains third-party content** — the names of Fractal Audio's
+hardware (FM3, FM9, Axe-Fx, AM4, VP4) and pictures of those units. Answer
+**Yes** to having the rights only if the unit pictures are photos you took or
+were given permission to use; the names are used only to say which hardware
+the app works with, which the affiliation line in the description covers.
 
 ---
 
