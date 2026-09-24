@@ -454,8 +454,11 @@ export const AREAS = [
          * create an account on the web and desktops, and make purchases as
          * well." The same two words at both ends.
          */
-        web: 'Create Account',
-        phone: 'Create Account'
+        web: 'Create account',
+        /* The two-button fallback the connect screen keeps for a caller that
+           hands it no form. His mockup's form says "Create account". */
+        also: ['Create Account'],
+        phone: 'Create account'
       },
       { does: 'sign in to an account you have', web: 'Sign in', phone: 'Sign in' },
       {
@@ -491,9 +494,9 @@ export const AREAS = [
       {
         does: 'send yourself a password reset',
         web: 'Forgot password?',
-        phone: 'Forgot password',
-        /* The browser's carries a question mark because it sits in a row of
-           links; the phone's is a button and does not ask. */
+        /* Both ask now: his mockup puts "Forgot password?" in a button beside
+           Create account at both ends. */
+        phone: 'Forgot password?',
         unreadable: ['web']
       },
       {
@@ -506,12 +509,6 @@ export const AREAS = [
         does: 'open Troubleshooting when the computer or the unit will not come up',
         web: 'Troubleshooting',
         phone: 'Troubleshooting'
-      },
-      {
-        does: 'unlock the app from the sign-in screen',
-        web: null,
-        phone: 'Unlock',
-        why: 'the phone only makes an account once the app is unlocked, so its sign-in screen needs the way to the unlock; the browser makes an account for anybody and has no such gate'
       },
       {
         does: 'look around without a rig',

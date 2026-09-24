@@ -9307,6 +9307,176 @@ button.phone-chip.dim {
   font-size: var(--f-2);
 }
 
+/*
+ * HIS MOCKUP OF THE FIRST SCREEN (ConnectScreen, connect-fresh): the mark and
+ * the name centred, a card that says how the pieces fit with amber numbered
+ * circles, the form with a picture in each field, Sign in full width, Create
+ * account and Forgot password side by side, the way to the computer app
+ * outlined in amber, and the demo last and quietest. The phone's sign-in
+ * screen is drawn the same.
+ */
+.connect-fresh {
+  align-items: stretch;
+  gap: var(--s-4);
+  margin-top: var(--s-6);
+}
+.connect-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+}
+.connect-brand h1 {
+  margin: 0;
+  font-size: var(--f-sign);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--silk);
+}
+.connect-tagline {
+  margin: 0;
+  font-size: var(--f-5);
+  color: var(--silk-dim);
+}
+.connect-mark {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  height: 48px;
+}
+.connect-mark i {
+  display: block;
+  width: 7px;
+  border-radius: var(--r-1);
+  background: var(--signal);
+}
+.connect-card {
+  text-align: left;
+  padding: var(--s-5);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-3);
+  display: grid;
+  gap: var(--s-3);
+}
+.connect-card h2 {
+  font-family: inherit;
+  font-size: var(--f-6);
+  font-weight: 800;
+  letter-spacing: 0;
+}
+.connect-card .connect-steps {
+  gap: var(--s-3);
+}
+.connect-card .connect-steps li {
+  align-items: center;
+  gap: var(--s-3);
+  font-size: var(--f-4);
+  line-height: 1.45;
+}
+.connect-card .connect-steps li::before {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--signal);
+  color: var(--on-signal);
+  font-weight: 800;
+}
+.signin.signin-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-3);
+  padding: 0;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.connect-fresh > * {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}
+.signin-iconfield {
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2);
+  color: var(--silk-dim);
+}
+.signin-fieldicon {
+  flex: none;
+  margin: 0 var(--s-3);
+}
+.signin-iconfield::after {
+  content: none;
+}
+.signin-iconfield input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  align-self: stretch;
+  border: 0;
+  border-left: 1px solid var(--rule);
+  background: transparent;
+  color: var(--silk);
+  font-size: var(--f-5);
+  padding: 0 var(--s-3);
+  margin: var(--s-2) 0;
+}
+.signin-iconfield input:focus {
+  outline: none;
+}
+.signin-iconfield:focus-within {
+  border-color: var(--signal);
+}
+.signin-stage .signin-go {
+  min-height: 56px;
+  font-size: var(--f-5);
+  font-weight: 700;
+}
+.signin-pair {
+  display: flex;
+  gap: var(--s-3);
+}
+.signin-pair .chip {
+  flex: 1;
+  min-height: 52px;
+  font-size: var(--f-3);
+  font-weight: 700;
+  min-width: 0;
+  padding-inline: var(--s-2);
+  color: var(--silk);
+}
+.connect-howto {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-3);
+  min-height: 56px;
+  background: transparent;
+  color: var(--silk);
+  border: 1.5px solid var(--signal);
+  border-radius: var(--r-2);
+  font-size: var(--f-4);
+  font-weight: 700;
+  cursor: pointer;
+}
+.connect-howto svg {
+  color: var(--signal);
+}
+.connect-demo.connect-demo-quiet {
+  margin-top: 0;
+  width: 100%;
+  color: var(--silk-dim);
+}
+
 /* What macOS said while it tried to install, folded away for pasting. */
 .updates-detail summary {
   cursor: pointer;

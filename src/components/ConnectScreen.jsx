@@ -26,6 +26,7 @@
  * save stays on the phone.
  */
 import { useEffect, useState } from 'react'
+import SignIn from './SignIn'
 import { isPairAccount } from '../lib/link'
 import { computerElsewhere } from '../lib/remote'
 import { P6, SETUP } from '../../shared/onboarding.mjs'
@@ -43,6 +44,11 @@ export default function ConnectScreen({
   /* Opens Troubleshooting on "It will not connect at all". "Open the
      troubleshooting if it doesn't connect." */
   onTroubleshoot,
+  /* The form on the first screen itself, as his mockup draws it: sign in and
+     make an account here rather than in a sheet. Without them the screen
+     falls back to the two buttons that open the sheet. */
+  onSignIn,
+  onCreate,
   /* Somebody who has paid. The phone never offers them "Try the Demo" —
      "if they are already signed in and the app is unlocked, instead of
      saying try the demo, have it just say Demo." */
@@ -88,6 +94,40 @@ export default function ConnectScreen({
     }
   }, [asking, paired])
   const mismatch = elsewhere ? <Mismatch email={remembered} /> : null
+  /* The mockup's first screen: nobody signed in, nothing being joined. */
+  const fresh = state !== 'joining' && state !== 'no-answer' && !remembered
+  const [howTo, setHowTo] = useState(false)
+
+  if (fresh && onSignIn) {
+    return (
+      <section className="connect connect-fresh" data-state={state}>
+        {/*
+          HIS MOCKUP, TOP TO BOTTOM, the same as the phone's sign-in screen.
+          "Redo this screen to match this photo in both the web app and the
+          mobile apps." The words come from shared/onboarding.mjs (SETUP), so
+          the two ends say the same thing.
+        */}
+        <header className="connect-brand">
+          <Mark />
+          <h1>Fractal Remote</h1>
+          <p className="connect-tagline">{SETUP.tagline}</p>
+        </header>
+        <div className="connect-card">
+          <h2>{SETUP.title}</h2>
+          <Steps />
+        </div>
+        <SignIn variant="stage" submitLabel="Sign in" onSubmit={onSignIn} onCreate={onCreate} busy={busy} />
+        <button type="button" className="connect-howto" onClick={() => setHowTo((v) => !v)} aria-expanded={howTo}>
+          <ExternalIcon />
+          {SETUP.howTo}
+        </button>
+        {howTo ? <NoComputerYet /> : null}
+        <button type="button" className="connect-demo connect-demo-quiet" onClick={onDemo} disabled={busy}>
+          {owned ? 'Demo' : 'Try the Demo'}
+        </button>
+      </section>
+    )
+  }
 
   return (
     <section className="connect" data-state={state}>
@@ -342,14 +382,43 @@ function NoComputerYet() {
 /** How the unit, the computer app and this app fit, as three numbered lines. */
 function Steps() {
   return (
-    <>
-      <p className="hint">{SETUP.intro}</p>
-      <ol className="connect-steps">
-        {SETUP.steps.map((line) => (
-          <li key={line}>{line}</li>
-        ))}
-      </ol>
-    </>
+    <ol className="connect-steps">
+      {SETUP.steps.map((line) => (
+        <li key={line}>{line}</li>
+      ))}
+    </ol>
+  )
+}
+
+/** Five amber bars over the name, tallest in the middle, as drawn. */
+function Mark() {
+  return (
+    <span className="connect-mark" aria-hidden="true">
+      {[14, 30, 46, 30, 14].map((h, i) => (
+        <i key={i} style={{ height: h }} />
+      ))}
+    </span>
+  )
+}
+
+/** The box-and-arrow on "How to connect my computer": it opens something. */
+function ExternalIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="22"
+      height="22"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M14 4h6v6" />
+      <path d="M20 4 11 13" />
+      <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+    </svg>
   )
 }
 

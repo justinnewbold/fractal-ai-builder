@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -17,6 +18,9 @@ import { setDemo } from '../lib/demo'
 import { usePurchase } from '../lib/purchases'
 import { mayDrive } from '../lib/unlock-rule'
 import { SETUP } from '../lib/onboarding'
+import mailIcon from '../../assets/icons/mail.png'
+import lockIcon from '../../assets/icons/lock.png'
+import externalIcon from '../../assets/icons/external.png'
 
 /**
  * One account, two ends.
@@ -100,6 +104,14 @@ export default function SignIn({ onSignedIn, onDemo, onUnlock }) {
   const ready = email.includes('@') && password.length >= 6
 
   const go = async () => {
+    if (!ready) {
+      setError(
+        email.includes('@')
+          ? 'Your password is at least 6 characters.'
+          : 'Type your email address and password.'
+      )
+      return
+    }
     setBusy(true)
     setError(null)
     setNote(null)
@@ -145,15 +157,12 @@ export default function SignIn({ onSignedIn, onDemo, onUnlock }) {
     setNote(null)
   }
 
-  const field = {
+  const fieldText = {
+    flex: 1,
     minHeight: TAP,
-    backgroundColor: color.panel,
-    borderWidth: 1,
-    borderColor: color.rule,
-    borderRadius: radius.md,
-    paddingHorizontal: space.md,
     color: color.silk,
-    fontSize: font.lead
+    fontSize: font.lead,
+    paddingHorizontal: space.md
   }
 
   if (helping) return <Connect onBack={() => setHelping(false)} />
@@ -191,51 +200,51 @@ export default function SignIn({ onSignedIn, onDemo, onUnlock }) {
         }}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={{ gap: space.xs }}>
-          <Text style={{ color: color.silk, fontSize: font.hero, fontWeight: '700' }}>
+        {/*
+          HIS MOCKUP, TOP TO BOTTOM. "Redo this screen to match this photo in
+          both the web app and the mobile apps." The mark, the name and the
+          line under it; a card that says how the three pieces fit; the form
+          with a picture in each field; Sign in, then Create account and
+          Forgot password side by side; the way to the computer app, outlined
+          in amber; and the demo last, quietest.
+
+          The words are shared with the browser's version of this screen
+          (shared/onboarding.mjs, SETUP), so the two cannot drift again.
+        */}
+        <View style={{ alignItems: 'center', gap: space.sm, paddingTop: space.lg }}>
+          <Mark />
+          <Text style={{ color: color.silk, fontSize: font.hero + 6, fontWeight: '800', textAlign: 'center' }}>
             Fractal Remote
           </Text>
-          <Text style={{ color: color.silkDim, fontSize: font.body, lineHeight: 22 }}>
-            {/*
-              ONE SENTENCE NOW, because there is one way in. It used to
-              switch on whether the code box or the email box was showing.
-
-              AND IT NO LONGER PROMISES TWO THINGS THAT ARE NOT TRUE.
-
-              "Read the text. We don't have AI features in this app anymore."
-
-              It said "your presets and what the AI has learned about your
-              taste follow you to any device". The AI half is gone from the
-              app. The other half was wrong on its own terms: presets live on
-              the unit, not in an account. What an account actually carries
-              between devices is the setlists you built and the presets you
-              starred, so that is what it says. MY WORDING.
-            */}
-            {/* And now it leads into the three steps under it rather than
-                saying the third of them on its own. The words are shared with
-                the browser's sign-in screen (shared/onboarding.mjs, SETUP). */}
-            {SETUP.intro}
-          </Text>
+          <Text style={{ color: color.silkDim, fontSize: font.lead, textAlign: 'center' }}>{SETUP.tagline}</Text>
         </View>
 
-        {/*
-          HOW THE THING WORKS, BEFORE ANYTHING IS ASKED OF THEM.
-
-          "I found a few testers for android already and they're already kind
-          of having issues being confused." The first tester's question was
-          whether Connect my computer was how to sign in. The screen asked for
-          an account on a computer nobody had told them about: the three
-          pieces — the unit, the computer app, this phone — were only ever
-          explained on the downloads page. Three short lines, in the order
-          they are done.
-        */}
-        <View style={{ gap: space.xs }}>
+        <View
+          style={{
+            backgroundColor: color.panel,
+            borderWidth: 1,
+            borderColor: color.rule,
+            borderRadius: radius.lg,
+            padding: space.lg,
+            gap: space.md
+          }}
+        >
+          <Text style={{ color: color.silk, fontSize: font.title, fontWeight: '800' }}>{SETUP.title}</Text>
           {SETUP.steps.map((line, i) => (
-            <View key={line} style={{ flexDirection: 'row', gap: space.sm }}>
-              <Text style={{ color: color.signal, fontSize: font.body, fontWeight: '700', minWidth: 16 }}>
-                {i + 1}
-              </Text>
-              <Text style={{ color: color.silk, fontSize: font.body, lineHeight: 22, flexShrink: 1 }}>
+            <View key={line} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+              <View
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 15,
+                  backgroundColor: color.signal,
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <Text style={{ color: color.onSignal, fontSize: font.body, fontWeight: '800' }}>{i + 1}</Text>
+              </View>
+              <Text style={{ color: color.silk, fontSize: font.body + 1, lineHeight: 22, flexShrink: 1 }}>
                 {line}
               </Text>
             </View>
@@ -243,8 +252,9 @@ export default function SignIn({ onSignedIn, onDemo, onUnlock }) {
         </View>
 
         <View style={{ gap: space.md }}>
+          <Field icon={mailIcon}>
             <TextInput
-              style={field}
+              style={fieldText}
               value={email}
               onChangeText={setEmail}
               placeholder="Email"
@@ -257,8 +267,10 @@ export default function SignIn({ onSignedIn, onDemo, onUnlock }) {
               keyboardType="email-address"
               returnKeyType="next"
             />
+          </Field>
+          <Field icon={lockIcon}>
             <TextInput
-              style={field}
+              style={fieldText}
               value={password}
               onChangeText={setPassword}
               placeholder="Password"
@@ -269,63 +281,59 @@ export default function SignIn({ onSignedIn, onDemo, onUnlock }) {
               autoComplete={mode === 'up' ? 'new-password' : 'current-password'}
               secureTextEntry
               returnKeyType="go"
-              onSubmitEditing={() => ready && !busy && go()}
+              onSubmitEditing={() => !busy && go()}
             />
+          </Field>
         </View>
 
         {error ? <Note tone="fault">{error}</Note> : null}
         {note ? <Note>{note}</Note> : null}
 
+        {/* Amber whether or not the fields are filled in, as drawn: a pale
+            button reads as switched off, and the form says what is missing
+            when it is pressed early. */}
         <Press
-          label={busy ? 'Working…' : mode === 'up' ? 'Create Account' : 'Sign in'}
+          label={busy ? 'Working…' : mode === 'up' ? 'Create account' : 'Sign in'}
           tone="signal"
-          on={ready && !busy}
-          disabled={!ready || busy}
+          on
+          disabled={busy}
           onPress={go}
         />
 
-        {/* Create Account and Sign in are the same form with one button
-            swapped, which is why they are one screen and not two. The third
-            button that used to sit under these — "Use the code from the
-            computer instead" — is gone with the codes. */}
+        {/*
+          CREATE ACCOUNT FOR EVERYBODY, AS DRAWN — and still after the unlock.
+
+          "On the phones, only show the create account window after the phone
+          has been unlocked." The mockup shows the button to everybody, and
+          both hold: before the unlock it opens the unlock, and the moment the
+          unlock lands the form turns into Create account by itself (see
+          couldMake above). The note and the separate Unlock button that stood
+          here are gone into it.
+        */}
         <View style={{ flexDirection: 'row', gap: space.md }}>
-          {canMakeAccount ? (
-            <Press
-              grow
-              label={mode === 'up' ? 'I already have one' : 'Create Account'}
-              disabled={busy}
-              onPress={() => switchTo(mode === 'up' ? 'in' : 'up')}
-            />
-          ) : null}
+          <Press
+            grow
+            label={mode === 'up' ? 'I already have one' : 'Create account'}
+            disabled={busy}
+            onPress={() =>
+              mode === 'up' ? switchTo('in') : canMakeAccount ? switchTo('up') : onUnlock?.()
+            }
+          />
           {mode === 'in' ? (
-            <Press grow label="Forgot password" disabled={busy} onPress={reset} />
+            <Press grow label="Forgot password?" disabled={busy} onPress={reset} />
           ) : null}
         </View>
-        {/* Said rather than left to be guessed at: a sign-in form with no way
-            to sign up looks broken to somebody who has never made one. */}
-        {/*
-          AND A WAY TO DO WHAT IT SAYS. It told somebody to unlock the app
-          first and offered no button to do it with — the only unlock was
-          inside the demo, which is not where anybody looks for it. And it
-          said nothing to a tester who was given access for free and so has
-          nothing to unlock: the computer app makes accounts for anybody.
-        */}
-        {canMakeAccount ? null : (
-          <>
-            <Note>
-              New here? Unlock the app to make your account on this phone, or make it in the
-              Fractal Remote app on your computer and sign in here with it. The demo needs no
-              account.
-            </Note>
-            {onUnlock ? <Press label="Unlock" tone="signal" disabled={busy} onPress={onUnlock} /> : null}
-          </>
-        )}
 
         {/* "Instead of saying connect my computer on the android app, have it
-            say how to connect my computer." Said as the instructions it opens
-            rather than as an action, because a tester read "Connect my
-            computer" as the way to sign in. */}
-        <Press label="How to connect my computer" disabled={busy} onPress={() => setHelping(true)} />
+            say how to connect my computer." Outlined in amber, with the
+            picture that says it opens something, as drawn. */}
+        <Press
+          label={SETUP.howTo}
+          icon={externalIcon}
+          disabled={busy}
+          onPress={() => setHelping(true)}
+          style={{ borderColor: color.signal }}
+        />
 
         {/*
           The demo, offered here because here is where somebody with no
@@ -368,5 +376,45 @@ export default function SignIn({ onSignedIn, onDemo, onUnlock }) {
         */}
       </ScrollView>
     </KeyboardAvoidingView>
+  )
+}
+
+/**
+ * The mark over the name: five amber bars, tallest in the middle, as drawn.
+ * Views rather than a picture, so it is sharp at every size and takes the
+ * theme's amber in light mode too.
+ */
+function Mark() {
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 48 }}
+    >
+      {[14, 30, 46, 30, 14].map((h, i) => (
+        <View key={i} style={{ width: 7, height: h, borderRadius: 4, backgroundColor: color.signal }} />
+      ))}
+    </View>
+  )
+}
+
+/** A field with its picture on the left and a hairline between them, as drawn. */
+function Field({ icon, children }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        minHeight: TAP + 8,
+        backgroundColor: color.panel,
+        borderWidth: 1,
+        borderColor: color.rule,
+        borderRadius: radius.md
+      }}
+    >
+      <Image source={icon} style={{ width: 22, height: 22, marginHorizontal: space.md, tintColor: color.silkDim }} />
+      <View style={{ width: 1, alignSelf: 'stretch', marginVertical: space.sm, backgroundColor: color.rule }} />
+      {children}
+    </View>
   )
 }

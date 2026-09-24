@@ -3368,6 +3368,16 @@ export default function App() {
           }}
           owned={owned}
           onTroubleshoot={openConnectFix}
+          /* The form on the screen itself, as in his mockup — the same two
+             calls the sign-in sheet makes from here. */
+          onSignIn={signInSubmit}
+          onCreate={async (details) => {
+            const out = await createAccount(details)
+            if (out.needsConfirmation) return out
+            record('remote', `Account made for ${details.email}`)
+            await signInSubmit(details)
+            return out
+          }}
           onUnpair={() => linkAction('signout')}
           onDemo={() => {
             setDemo(true)
@@ -3936,7 +3946,16 @@ export default function App() {
           setWalkthrough(false)
           setWalkReplay(false)
         }}
-        onAccount={() => linkAction(computerEnd ? 'mac-setup' : 'connect')}
+        /* A phone with nobody signed in is already looking at the sign-in
+           form once the walkthrough goes — his mockup of the first screen
+           puts it there — so a sheet over it would be the same form twice. */
+        onAccount={() =>
+          computerEnd
+            ? linkAction('mac-setup')
+            : link.account || isDemo()
+              ? linkAction('connect')
+              : null
+        }
         onUnlock={openUnlock}
         onHere={() => setComputerSetup(true)}
       />

@@ -595,12 +595,20 @@ export const P9 = {
  * is the same, all of our changes are drifting apart again". MY WORDING.
  */
 export const SETUP = {
-  intro: 'This app controls your Fractal through your computer. To set it up:',
+  /*
+   * HIS MOCKUP, WORD FOR WORD. "Redo this screen to match this photo in both
+   * the web app and the mobile apps." The line under the name, the card's
+   * heading, its three steps and the button under the form are all read off
+   * the picture he sent.
+   */
+  tagline: 'Control your Fractal rig from your phone.',
+  title: 'Get connected',
   steps: [
-    'Plug your Fractal into your computer with a USB cable.',
-    'Install the free Fractal Remote app on that computer.',
-    'Sign in on both with the same account. Your setlists and starred presets follow you to any device.'
-  ]
+    'Connect your Fractal to your computer with USB.',
+    'Install the free desktop app on your computer.',
+    'Sign in here and in the desktop app.'
+  ],
+  howTo: 'How to connect my computer'
 }
 
 /**

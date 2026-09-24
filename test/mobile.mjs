@@ -3958,19 +3958,25 @@ export function run(test) {
     assert.match(read('mobile/src/screens/Settings.js'), /onPress=\{onOpenConnect\}/, 'Setup has no door to it')
     const signIn = read('mobile/src/screens/SignIn.js')
     assert.match(signIn, /if \(helping\) return <Connect onBack=/, 'the sign-in screen cannot reach it')
-    assert.match(signIn, /label="How to connect my computer"/, 'the sign-in screen does not offer it')
+    assert.match(signIn, /label=\{SETUP\.howTo\}/, 'the sign-in screen does not offer it')
+    assert.match(read('shared/onboarding.mjs'), /howTo: 'How to connect my computer'/, 'the button lost his words')
     /* "They're already kind of having issues being confused." The screen says
        how the three pieces fit before it asks for anything, and the note that
        says to unlock first has a button that does it. */
-    assert.match(signIn, /\{SETUP\.intro\}/, 'the sign-in screen does not say how it works')
+    assert.match(signIn, /\{SETUP\.title\}/, 'the sign-in screen does not say how it works')
     assert.match(signIn, /SETUP\.steps\.map/, 'the sign-in screen lost the steps')
-    assert.match(read('shared/onboarding.mjs'), /'Install the free Fractal Remote app on that computer\.'/, 'the steps lost the computer app')
+    assert.match(read('shared/onboarding.mjs'), /'Install the free desktop app on your computer\.'/, 'the steps lost the computer app')
     /* And the browser's signed-out connect screen says the same three, from
        the same place: "all of our changes are drifting apart again". */
     const web = read('src/components/ConnectScreen.jsx')
     assert.match(web, /SETUP\.steps\.map/, 'the browser does not show the steps the phone shows')
     assert.match(web, /<Steps \/>/, 'the browser draws its steps nowhere')
-    assert.match(signIn, /<Press label="Unlock" tone="signal"/, 'the note says to unlock with nothing to unlock with')
+    /* "Redo this screen to match this photo in both the web app and the
+       mobile apps": the form on the first screen itself, as drawn. */
+    assert.match(web, /<SignIn variant="stage"/, 'the browser’s first screen has no form of its own')
+    assert.match(web, /\{SETUP\.howTo\}/, 'the browser’s first screen lost How to connect my computer')
+    assert.match(read('src/components/SignIn.jsx'), /className="signin-pair"/, 'Create account and Forgot password are not side by side in the browser')
+    assert.match(signIn, /canMakeAccount \? switchTo\('up'\) : onUnlock\?\.\(\)/, 'Create account before the unlock has nothing to unlock with')
     const outBranch = read('mobile/App.js').replace(/\s+/g, ' ')
     assert.match(outBranch, /onUnlock=\{\(\) => setBuying\(true\)\} \/> \{\/\*[^]*?\*\/\} \{buying \? \( <Paywall asked/, 'the sign-in Unlock opens a paywall that is never drawn')
   })

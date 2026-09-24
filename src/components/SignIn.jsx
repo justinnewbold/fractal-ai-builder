@@ -38,8 +38,16 @@ export default function SignIn({
   /* Told which side the form is on, so the sheet around it can say so in its title. */
   onMode,
   busy,
-  autoFocus
+  autoFocus,
+  /*
+   * 'stage' is his mockup of the first screen: a picture in each field and no
+   * label over it, Sign in full width, then Create account and Forgot
+   * password side by side — the phone's sign-in screen, drawn the same.
+   * Anything else is the form as the sheets have always shown it.
+   */
+  variant
 }) {
+  const stage = variant === 'stage'
   /* Opened by a Create Account button, the form starts on making one. */
   const [mode, setMode] = useState(onCreate && startIn === 'up' ? 'up' : 'in') // 'in' | 'up' | 'forgot' | 'sent'
   useEffect(() => {
@@ -110,6 +118,74 @@ export default function SignIn({
     )
   }
 
+  if (stage) {
+    return (
+      <form className="signin signin-stage" onSubmit={go}>
+        <label className="signin-iconfield">
+          <FieldIcon kind="mail" />
+          <input
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            autoFocus={autoFocus}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={off}
+            placeholder="Email"
+            aria-label="Email"
+          />
+        </label>
+        {mode !== 'forgot' ? (
+          <label className="signin-iconfield">
+            <FieldIcon kind="lock" />
+            <input
+              type="password"
+              autoComplete={mode === 'up' ? 'new-password' : 'current-password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={off}
+              placeholder="Password"
+              aria-label="Password"
+            />
+          </label>
+        ) : null}
+        {problem ? (
+          <p className="problem" role="alert">
+            {problem}
+          </p>
+        ) : null}
+        {note ? <p className="hint">{note}</p> : null}
+        <button className="primary signin-wide signin-go" type="submit" disabled={off}>
+          {working
+            ? 'One moment…'
+            : mode === 'forgot'
+              ? 'Email me a reset link'
+              : mode === 'up'
+                ? 'Create account'
+                : submitLabel}
+        </button>
+        <div className="signin-pair">
+          {mode === 'in' ? (
+            <>
+              {onCreate ? (
+                <button type="button" className="chip" onClick={() => setMode('up')} disabled={off}>
+                  Create account
+                </button>
+              ) : null}
+              <button type="button" className="chip" onClick={() => setMode('forgot')} disabled={off}>
+                Forgot password?
+              </button>
+            </>
+          ) : (
+            <button type="button" className="chip" onClick={() => setMode('in')} disabled={off}>
+              {mode === 'up' ? 'I already have one' : 'Back to sign in'}
+            </button>
+          )}
+        </div>
+      </form>
+    )
+  }
+
   return (
     <form className="signin" onSubmit={go}>
       <label className="signin-field">
@@ -145,7 +221,7 @@ export default function SignIn({
             : mode === 'forgot'
               ? 'Email me a reset link'
               : mode === 'up'
-                ? 'Create Account'
+                ? 'Create account'
                 : submitLabel}
         </button>
         {/*
@@ -161,7 +237,7 @@ export default function SignIn({
           </button>
         ) : mode === 'in' && onCreate ? (
           <button type="button" className="chip signin-wide" onClick={() => setMode('up')} disabled={off}>
-            Create Account
+            Create account
           </button>
         ) : null}
         {mode === 'in' ? (
@@ -183,5 +259,35 @@ export default function SignIn({
       ) : null}
       {note ? <p className="hint">{note}</p> : null}
     </form>
+  )
+}
+
+/** The envelope and the padlock in the mockup's fields, drawn in the field's own ink. */
+function FieldIcon({ kind }) {
+  return (
+    <svg
+      className="signin-fieldicon"
+      viewBox="0 0 24 24"
+      width="22"
+      height="22"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {kind === 'mail' ? (
+        <>
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <path d="m3 7 9 6 9-6" />
+        </>
+      ) : (
+        <>
+          <rect x="4" y="11" width="16" height="10" rx="2" />
+          <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+        </>
+      )}
+    </svg>
   )
 }
