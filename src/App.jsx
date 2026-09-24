@@ -131,6 +131,7 @@ import PhoneRemote from './components/PhoneRemote'
 import PhoneWalkthrough from './components/PhoneWalkthrough'
 import LinkDetails from './components/LinkDetails'
 import SignInSheet from './components/SignInSheet'
+import { arrivedToJoin } from './lib/joinLink.js'
 import {
   bootLink,
   linkState,
@@ -872,6 +873,14 @@ export default function App() {
     useEffect(() => {
       if (!signIn) setSignInStart('in')
     }, [signIn])
+    /* Opened from fractal.newbold.cloud/join: straight onto Create Account,
+       over the welcome, and the address back to plain `/`. See lib/joinLink. */
+    useEffect(() => {
+      if (!arrivedToJoin()) return
+      window.history.replaceState(null, '', '/')
+      setSignInStart('up')
+      setSignIn('account')
+    }, [])
   /*
    * Whether the phone has ever had the Mac answer this session. A blip after
    * that keeps the screen (the chip goes red; the loop retries); before it,

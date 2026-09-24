@@ -278,6 +278,56 @@ async function tellThem(to: string): Promise<boolean> {
   }
 }
 
+/* One address, one domain with a dot, no spaces or separators: the same rule
+   as download-link's, because this is typed into a box too. */
+const LOOKS_LIKE_EMAIL = /^[^@\s,;<>"]+@[^@\s,;<>".]+\.[^@\s,;<>"]{2,}$/
+
+/*
+ * An address nobody has signed up with yet.
+ *
+ * "So I can't give access to someone until after they have created an account
+ * themselves?" Now he can: Give access puts it on the waiting list
+ * (supabase/migrations/20260924_waiting_grants.sql), and the first time that
+ * person signs in, the entitlement function claims it through here. Check says
+ * whether it is waiting; Take it back takes it off.
+ */
+async function noAccountYet(action: string, email: string): Promise<Record<string, unknown>> {
+  const waiting = Boolean(await rpc('is_waiting_grant', { address: email }))
+  if (action === 'grant') {
+    if (email.length > 254 || !LOOKS_LIKE_EMAIL.test(email)) {
+      return { ok: false, found: false, email, message: `${email} does not look like an email address, so nothing was added.` }
+    }
+    await rpc('wait_for_grant', { address: email })
+    return {
+      ok: true,
+      found: false,
+      waiting: true,
+      email,
+      message: `${email} hasn't signed up yet, so they're on the waiting list. The first time they sign in with this email, they'll be unlocked and emailed to say so.`
+    }
+  }
+  if (action === 'revoke') {
+    const dropped = Boolean(await rpc('drop_waiting_grant', { address: email }))
+    return {
+      ok: true,
+      found: false,
+      waiting: false,
+      email,
+      message: dropped ? `${email} is off the waiting list.` : `No account uses ${email}, and they weren't on the waiting list.`
+    }
+  }
+  if (action === 'claim') return { ok: false, found: false, email, message: 'No account.' }
+  return {
+    ok: true,
+    found: false,
+    waiting,
+    email,
+    message: waiting
+      ? `${email} hasn't signed up yet. They're on the waiting list, and will be unlocked the first time they sign in.`
+      : `No account uses ${email} yet. Give access puts them on the waiting list, and they're unlocked the first time they sign in.`
+  }
+}
+
 /** The plain sentence for a RevenueCat refusal. */
 async function refusal(res: Response, doing: string): Promise<string> {
   const said = await res.text().catch(() => '')
@@ -293,9 +343,18 @@ Deno.serve(async (req: Request) => {
 
   const auth = req.headers.get('Authorization') || ''
   const token = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : ''
-  const me = token ? await caller(token) : null
+  /*
+   * Two callers, and only two. Justin, proved by his signed token. And the
+   * entitlement function beside this one, proved by the service role key that
+   * Supabase gives every function here and nothing outside it: that is how a
+   * waiting address is claimed when its owner first signs in, and 'claim' is
+   * the only thing it may ask for.
+   */
+  const service = env('SUPABASE_SERVICE_ROLE_KEY')
+  const internal = Boolean(token && service && token === service)
+  const me = token && !internal ? await caller(token) : null
   /* The lock. Anybody else gets the same answer as nobody at all. */
-  if (!me || !ADMINS.includes(fold(me.email))) return json({ ok: false, message: 'Not allowed.' }, 403)
+  if (!internal && (!me || !ADMINS.includes(fold(me.email)))) return json({ ok: false, message: 'Not allowed.' }, 403)
 
   let input: { action?: string; email?: string } = {}
   try {
@@ -305,7 +364,9 @@ Deno.serve(async (req: Request) => {
   }
   const action = String(input.action || 'check')
   const email = String(input.email || '').trim().toLowerCase()
-  if (!['check', 'grant', 'revoke', 'sales'].includes(action)) return json({ ok: false, message: 'Unknown action.' }, 400)
+  if (internal ? action !== 'claim' : !['check', 'grant', 'revoke', 'sales'].includes(action)) {
+    return json({ ok: false, message: 'Unknown action.' }, 400)
+  }
   if (action !== 'sales' && !email.includes('@')) return json({ ok: false, message: 'Type the email address they signed up with.' }, 400)
   if (!env('REVENUECAT_SECRET')) return json({ ok: false, message: 'The server has no RevenueCat key set.' }, 500)
 
@@ -314,21 +375,20 @@ Deno.serve(async (req: Request) => {
 
     const found = (await rpc('account_details', { address: email })) as Record<string, any> | null
     const account = found?.id ? String(found.id) : null
-    if (!account) {
-      return json({
-        ok: true,
-        found: false,
-        email,
-        message: `Nobody was added: no account uses ${email} yet. They need to tap Create Account in the app or on the website, with this same email, and then you press Give access again.`
-      })
+    if (!account) return json(await noAccountYet(action, email))
+
+    /* A claim is only ever for an address Justin put on the list. */
+    if (action === 'claim' && !(await rpc('is_waiting_grant', { address: email }))) {
+      return json({ ok: false, message: 'Not waiting.' }, 404)
     }
     const entitlement = await entitlementId()
     if (!entitlement) return json({ ok: false, message: 'Could not find the unlock in RevenueCat.' }, 502)
 
     /* Whether this grant is news to them, which is when they are told. */
-    const before = action === 'grant' ? await unlocked(account, entitlement) : false
+    const giving = action === 'grant' || action === 'claim'
+    const before = giving ? await unlocked(account, entitlement) : false
 
-    if (action === 'grant') {
+    if (giving) {
       /* RevenueCat only grants to a customer it knows; somebody who has never
          opened the app signed in is not one yet. Creating one that exists
          answers 409, which is fine. */
@@ -343,6 +403,8 @@ Deno.serve(async (req: Request) => {
       })
       if (!res.ok) return json({ ok: false, message: await refusal(res, 'give them the unlock') }, 502)
       await rpc('record_entitlement', { uid: account, is_active: true, from_source: 'revenuecat' })
+      /* Given, so no longer waiting — whichever way it was given. */
+      await rpc('drop_waiting_grant', { address: email })
     }
 
     if (action === 'revoke') {
@@ -357,7 +419,8 @@ Deno.serve(async (req: Request) => {
     /* The relay's table follows RevenueCat's answer, whichever way it went. */
     if (action !== 'check') await rpc('record_entitlement', { uid: account, is_active: has, from_source: 'revenuecat' })
 
-    const told = action === 'grant' && has && !before ? await tellThem(String(found?.email || email)) : null
+    const told = giving && has && !before ? await tellThem(String(found?.email || email)) : null
+    if (action === 'claim') return json({ ok: true, unlocked: has, emailed: told === true })
 
     /* The Customer lookup. Asked after the change, so it shows the result. */
     const [bought, seen] = await Promise.all([purchasesOf(account), lastSeen(account)])

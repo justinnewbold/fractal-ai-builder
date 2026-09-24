@@ -3481,8 +3481,8 @@ export function run(test) {
      * address, with every word fixed in the function.
      */
     const grant = server.slice(server.indexOf("if (action === 'grant') {"))
-    assert.match(server, /const before = action === 'grant' \? await unlocked\(account, entitlement\) : false/, 'a grant does not know whether it was news')
-    assert.match(server, /action === 'grant' && has && !before \? await tellThem\(String\(found\?\.email \|\| email\)\)/, 'the email is not tied to a grant that changed something')
+    assert.match(server, /const giving = action === 'grant' \|\| action === 'claim'\s+const before = giving \? await unlocked\(account, entitlement\) : false/, 'a grant does not know whether it was news')
+    assert.match(server, /giving && has && !before \? await tellThem\(String\(found\?\.email \|\| email\)\)/, 'the email is not tied to a grant that changed something')
     assert.ok(server.indexOf('await tellThem(') > server.indexOf('ADMINS.includes(fold(me.email))'), 'the email can be sent before checking who is asking')
     assert.match(server, /subject: 'You have full access to Fractal Remote'/)
     assert.match(server, /from: FROM/)
@@ -3496,13 +3496,45 @@ export function run(test) {
      * three buttons, below the phone's keyboard. It goes under the field now,
      * and an address with no account reads as a warning, not a success.
      */
-    assert.match(server, /Nobody was added: no account uses/, 'an address with no account does not say plainly that nobody was added')
+    assert.match(server, /hasn't signed up yet, so they're on the waiting list/, 'an address with no account does not say plainly what happened to it')
     for (const file of ['mobile/src/components/AccessTool.js', 'src/components/AccessTool.jsx']) {
       const ui = read(file)
       assert.ok(ui.indexOf('said.message') < ui.indexOf("run('check')"), `${file}: the answer is below the buttons again`)
-      assert.match(ui, /said\.ok && said\.found !== false/, `${file}: no account reads as a success`)
+      assert.match(ui, /said\.ok && \(said\.found !== false \|\| said\.waiting\)/, `${file}: no account (and not waiting) reads as a success`)
     }
     assert.match(read('mobile/src/components/AccessTool.js'), /Keyboard\.dismiss\(\)/, 'the keyboard is left covering the answer')
+
+    /*
+     * "So I can't give access to someone until after they have created an
+     * account themselves?" Now an address with no account waits, and is
+     * claimed by its owner's first sign-in.
+     */
+    const waitSql = read('supabase/migrations/20260924_waiting_grants.sql')
+    assert.match(waitSql, /enable row level security/)
+    assert.match(waitSql, /revoke all on table public\.waiting_grants from public, anon, authenticated/, 'a client can read the waiting list')
+    for (const fn of ['wait_for_grant(text)', 'is_waiting_grant(text)', 'drop_waiting_grant(text)']) {
+      assert.ok(waitSql.includes(`revoke all on function public.${fn} from public, anon, authenticated`), `a client can call ${fn}`)
+    }
+    assert.doesNotMatch(waitSql, /on auth\.users|vault\.create_secret/, 'the claim is back inside every sign-up, or needs a secret typed in')
+    assert.match(server, /await rpc\('wait_for_grant', \{ address: email \}\)/, 'Give access on an address with no account adds nothing')
+    assert.match(server, /internal \? action !== 'claim'/, 'the internal caller may ask for more than a claim')
+    assert.match(server, /action === 'claim' && !\(await rpc\('is_waiting_grant'/, 'a claim can unlock an address nobody put on the list')
+    assert.match(server, /if \(!internal && \(!me \|\| !ADMINS\.includes\(fold\(me\.email\)\)\)\)/, 'the lock no longer holds for everybody else')
+    const ent = read('supabase/functions/entitlement/index.ts')
+    assert.match(ent, /if \(answer === false && who\.email && \(await waiting\(who\.email\)\)\)/, 'a waiting address is claimed on something other than a definite no, or not by its own verified owner')
+    assert.ok(ent.indexOf('await waiting(who.email)') > ent.indexOf('const who = await accountFrom(token)'), 'the claim is made before the token is verified')
+    const buy = read('mobile/src/lib/purchases.js')
+    assert.match(buy, /claimRelay\(\)\.then\(\(yes\) => \(yes \? catchUp\(api\) : null\)\)/, 'the phone does not re-read the store when the server has just unlocked it')
+    assert.match(buy, /if \(entitled\(info\)\) \{\s+await remember\(true\)/, "the server's word unlocks the phone without the store agreeing")
+
+    /* "Is there a direct link I can give out that takes people directly to the create account page?" */
+    const { arrivedToJoin, JOIN_LINK } = await import('../src/lib/joinLink.js')
+    assert.equal(JOIN_LINK, 'https://fractal.newbold.cloud/join')
+    for (const p of ['/join', '/join/', '/JOIN', '/signup']) assert.ok(arrivedToJoin({ pathname: p }), `${p} does not open Create Account`)
+    for (const p of ['/', '/joined', '/downloads', '']) assert.ok(!arrivedToJoin({ pathname: p }), `${p} opens Create Account`)
+    const app = read('src/App.jsx')
+    assert.match(app, /if \(!arrivedToJoin\(\)\) return\s+window\.history\.replaceState\(null, '', '\/'\)\s+setSignInStart\('up'\)\s+setSignIn\('account'\)/, 'the join link does not open the form on the Create Account side')
+    assert.ok(!/"source": "\/join"/.test(read('vercel.json')), 'the join link is sent somewhere other than the app')
   })
 
   test('the advice to close Fractal’s own software names it, per unit where the unit is known', async () => {

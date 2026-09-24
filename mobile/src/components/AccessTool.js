@@ -57,8 +57,9 @@ export default function AccessTool() {
   return (
     <View style={{ gap: space.md }}>
       <Text style={{ color: color.silkDim, fontSize: font.small, lineHeight: font.small * 1.5 }}>
-        For a purchase that did not register. Type the email they signed up with, then Check. Give access
-        unlocks them for good; Take it back removes an unlock given here and never touches one they paid for.
+        Type their email. Give access unlocks them for good and emails them to say so; if they have not signed up
+        yet, they go on a waiting list and are unlocked the first time they sign in. Take it back removes an unlock
+        given here, or takes them off the list, and never touches one they paid for.
       </Text>
       <TextInput
         value={email}
@@ -87,7 +88,7 @@ export default function AccessTool() {
         An address with no account is not a success, so it reads as a warning.
       */}
       {said ? (
-        <Note tone={said.ok && said.found !== false ? undefined : 'fault'} strong size={font.body}>
+        <Note tone={said.ok && (said.found !== false || said.waiting) ? undefined : 'fault'} strong size={font.body}>
           {said.message}
         </Note>
       ) : null}
