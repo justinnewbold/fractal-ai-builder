@@ -15,6 +15,7 @@ import volumeIcon from '../../assets/icons/volume.png'
 import { idOf } from '../lib/device'
 import Lamp from './Lamp'
 import Volume from './Volume'
+import { probeNow } from '../lib/link'
 
 const face = Platform.select(mono)
 
@@ -47,6 +48,8 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
   const blocks = useRig(ofAllBlocks)
   const [volume, setVolume] = useState(false)
   const [failed, setFailed] = useState(null)
+  /* Whether the note under CONNECTED is open: which computer, as the browser says. */
+  const [saying, setSaying] = useState(false)
   const purchase = usePurchase()
   /*
    * The demo says DEMO, not CONNECTED.
@@ -270,6 +273,15 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
         CONNECTED or FINDING and means nothing of the sort, so it stays a
         plain label rather than a control that would do nothing.
       */}
+      {/*
+        AND OUTSIDE THE DEMO IT SAYS WHICH COMPUTER.
+
+        "On the web app, when I tap connected, it shows me what computer is
+        connected to. It's supposed to do that on all platforms." The
+        browser's CONNECTED opens a small note, "Connected to MacBook Pro";
+        this one was only a label. Now it opens the same note under the bar,
+        with Try now when the computer has stopped answering.
+      */}
       <Text
         numberOfLines={1}
         {...(canBuy
@@ -282,7 +294,17 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
                 onUnlock()
               }
             }
-          : null)}
+          : demo
+            ? null
+            : {
+                accessibilityRole: 'button',
+                accessibilityLabel: 'Which computer this phone is connected to',
+                suppressHighlighting: true,
+                onPress: () => {
+                  tick()
+                  setSaying((open) => !open)
+                }
+              })}
         style={{
           color:
             mark === 'ok'
@@ -456,6 +478,7 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
       */}
       <Volume blocks={blocks} open={volume} onClose={() => setVolume(false)} onError={setFailed} />
       {failed ? <Reported said={failed} onClear={() => setFailed(null)} /> : null}
+      {saying && !demo ? <Which link={link} onClose={() => setSaying(false)} /> : null}
     </BlurView>
   )
 }
@@ -463,6 +486,65 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
 const ofDeviceName = (s) => s.deviceName
 const ofUnitState = (s) => s.unit
 const ofAllBlocks = (s) => s.allBlocks
+
+/**
+ * Which computer this phone is talking to, under the bar: the browser's
+ * note from its CONNECTED, in the same words. A tap on it puts it away.
+ */
+function Which({ link, onClose }) {
+  const where = link?.macName || 'your computer'
+  const said =
+    link?.link === 'connected'
+      ? `Connected to ${where}.`
+      : link?.link === 'joining'
+        ? `Finding ${where}…`
+        : link?.link === 'no-answer'
+          ? `${where === 'your computer' ? 'Your computer' : where} isn’t answering.`
+          : 'Not connected to a computer.'
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${said} Tap to close.`}
+      onPress={onClose}
+      style={{
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: '100%',
+        zIndex: 3,
+        gap: space.md,
+        padding: space.lg,
+        borderBottomWidth: 1,
+        borderBottomColor: color.rule,
+        backgroundColor: color.panelHi
+      }}
+    >
+      <Text style={{ color: color.silk, fontSize: font.body }}>{said}</Text>
+      {link?.link === 'no-answer' ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            tick()
+            probeNow()
+            onClose()
+          }}
+          style={({ pressed }) => ({
+            alignSelf: 'flex-start',
+            minHeight: 44,
+            justifyContent: 'center',
+            paddingHorizontal: space.lg,
+            borderRadius: radius.md,
+            borderWidth: 1,
+            borderColor: color.rule,
+            backgroundColor: pressed ? color.panel : color.chassis
+          })}
+        >
+          <Text style={{ color: color.silk, fontSize: font.body }}>Try now</Text>
+        </Pressable>
+      ) : null}
+    </Pressable>
+  )
+}
 
 /**
  * A volume that would not take, said on the bar that owns the speaker.
