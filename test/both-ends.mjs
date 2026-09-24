@@ -1324,4 +1324,42 @@ export function run(test) {
     assert.ok(web.includes('setSaid(`${src?.name} now moves ${block?.name} ${param?.name}.`)'), 'the browser does not say what an attach did, in the phone’s words')
     assert.match(web, /\{said \? \(\s*<p className="mod-said" role="status">/, 'the browser keeps the attach to its change log again')
   })
+
+  /*
+   * PHONE & COMPUTER IS ONE PAGE AT BOTH ENDS, and it opens the same way.
+   *
+   * "This screen is supposed to pull up when you tap the unit name in the
+   * top left of the screen, and it works fine on one platform, then not the
+   * other… I thought we had testing in place to make sure that when you
+   * change one platform that it automatically will change the other."
+   *
+   * Only for what a test was written for, which this had not been: the
+   * phone's unit name opened the Settings list and the browser's opened the
+   * page, and a comment in the suite recorded the difference as a limit
+   * rather than a fault. So, held here: the name opens the page at both
+   * ends, both pages open on the same three cards worded in one shared
+   * file, and CONNECTED says which computer at both ends.
+   */
+  test('Phone & computer opens from the unit name and shows the same chain, at both ends', async () => {
+    const phoneApp = read('mobile/App.js')
+    const webApp = read('src/App.jsx').replace(/\s+/g, ' ')
+    assert.match(phoneApp, /onOpenUnit=\{\(\) => \(demo \? setPickUnit\(true\) : openSettings\('link'\)\)\}/, 'the phone’s unit name no longer opens Phone & computer')
+    assert.match(read('mobile/src/screens/Settings.js'), /const \[page, setPage\] = useState\(startPage\)/, 'the phone’s Settings cannot open on a page')
+    assert.match(webApp, /onOpenUnit=\{\(\) => \{.*setSetupPage\(isDemo\(\) \? 'demo' : 'link'\)/, 'the browser’s unit name no longer opens Phone & computer')
+
+    /* One set of words for the chain, and both pages draw it. */
+    assert.match(read('mobile/src/screens/Settings.js'), /<ChainCards\s+cards=\{linkChain\(\{\s+here: 'phone'/, 'the phone’s Phone & computer does not open on the chain')
+    assert.match(webApp, /<ChainCards cards=\{linkChain\(\{/, 'the browser’s Phone & computer does not open on the chain')
+    assert.match(read('mobile/src/lib/link-chain.js'), /Generated from shared\/link-chain\.mjs/, 'the phone words its chain for itself')
+    const { linkChain } = await import('../shared/link-chain.mjs')
+    const cards = linkChain({ here: 'phone', unit: { name: 'FM3', firmware: '13.0', state: 'present' }, computer: { name: 'MacBook Pro', version: '1.86.8', link: 'connected' }, phone: { version: '1.86.8' } })
+    assert.deepEqual(cards.map((c) => c.body), ['FM3 · firmware 13.0', 'MacBook Pro · v1.86.8', 'v1.86.8'])
+    assert.deepEqual(cards.map((c) => c.lit), [true, true, undefined], 'a wire between two answering ends is not lit')
+
+    /* And CONNECTED says which computer, at both ends. */
+    assert.match(read('src/components/LinkChip.jsx'), /<p className="hint">\{said\.sentence\}\.<\/p>/, 'the browser’s CONNECTED stopped saying which computer')
+    const bar = read('mobile/src/components/TopBar.js')
+    assert.match(bar, /setSaying\(\(open\) => !open\)/, 'the phone’s CONNECTED is a label again')
+    assert.match(bar, /`Connected to \$\{where\}\.`/, 'the phone’s CONNECTED note does not name the computer')
+  })
 }

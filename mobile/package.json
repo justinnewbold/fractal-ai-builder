@@ -14,9 +14,8 @@
     "@supabase/supabase-js": "^2.115.0",
     "babel-preset-expo": "~57.0.0",
     "base64-js": "^1.5.1",
-    "expo": "~57.0.24",
+    "expo": "~57.0.25",
     "expo-blur": "~57.0.3",
-    "expo-camera": "~57.0.5",
     "expo-clipboard": "~57.0.2",
     "expo-haptics": "~57.0.3",
     "expo-keep-awake": "~57.0.2",
@@ -32,12 +31,5 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2"
-  },
-  "expo": {
-    "install": {
-      "exclude": [
-        "expo"
-      ]
-    }
   }
 }

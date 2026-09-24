@@ -10123,6 +10123,26 @@ button.view-tab {
   overflow: hidden;
 }
 
+/*
+ * THE NAME FITS THE TILE IT IS IN, rather than being cut off by it.
+ *
+ * "If you look at the scene, some of them are clipped." Two lines of a name
+ * at full size need a tile about 60px tall. Fit makes the tile whatever the
+ * screen can spare, and on a phone with a lot of blocks that can be less,
+ * so WANNA BE STARTIN' drew its second line under the bottom edge of the
+ * tile, cut in half.
+ *
+ * So each tile measures its own height (a container query, which reads the
+ * inside of the tile, so padding and border are already off) and the name
+ * follows it: two lines at full size when there is room, two lines a size
+ * smaller when there is a little less, and one line ending in "…" when the
+ * tile is at its smallest. A cut-off line of text is the one outcome that
+ * is never right.
+ */
+.gig[data-compact] button.gig-scene {
+  container-type: size;
+}
+
 .gig[data-compact] .gig-scene-name {
   line-height: 1.15;
   /* Two lines, then stop. -webkit-line-clamp is the only cross-browser way to
@@ -10134,6 +10154,19 @@ button.view-tab {
   overflow: hidden;
   min-width: 0;
   word-break: break-word;
+}
+
+/* After the rule above, so the one-line clamp wins over its two. */
+@container (max-height: 50px) {
+  .gig[data-compact] button.gig-scene.named .gig-scene-name {
+    font-size: var(--f-3);
+  }
+}
+
+@container (max-height: 45px) {
+  .gig[data-compact] .gig-scene-name {
+    -webkit-line-clamp: 1;
+  }
 }
 
 .gig[data-compact] button.gig-block {
@@ -11831,6 +11864,68 @@ button.walk-foot-row {
 }
 .walk-foot-text {
   flex: 1 1 auto;
+}
+/* The chain at the top of Phone & computer: smaller tiles, a lamp, and the
+   two wires from How it works, lit when both ends answer. */
+.walk-tile-sm {
+  display: flex;
+  flex: none;
+}
+.walk-tile-sm .walk-tile {
+  width: 52px;
+  height: 52px;
+}
+.walk-tile-sm .walk-tile .walk-pic {
+  width: 26px;
+  height: 26px;
+}
+.walk-lamp {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--silk-faint);
+}
+.walk-lamp[data-tone='good'] {
+  background: var(--ok);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 25%, transparent);
+}
+.walk-lamp[data-tone='bad'] {
+  background: var(--fault);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--fault) 25%, transparent);
+}
+.walk-lamp[data-tone='busy'] {
+  background: var(--signal);
+}
+.walk-chain {
+  display: flex;
+  flex-direction: column;
+  margin: var(--s-2) 0 var(--s-4);
+}
+.walk-wire {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.walk-wire-line {
+  width: 2px;
+  height: 10px;
+  background: var(--rule);
+}
+.walk-wire-label {
+  padding: var(--s-1) var(--s-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-3);
+  color: var(--silk-faint);
+  font-size: var(--f-1);
+  letter-spacing: 0.12em;
+}
+.walk-wire.lit .walk-wire-line {
+  background: var(--signal);
+}
+.walk-wire.lit .walk-wire-label {
+  border-color: var(--signal);
+  color: var(--signal);
 }
 .walk-units {
   display: grid;

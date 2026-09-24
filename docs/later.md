@@ -50,26 +50,3 @@ a real one yet — a friend of Justin's is the first tester. After that:
 - **RevenueCat's sample products.** The test store still holds the three
   sample packages RevenueCat starts every project with. They need deleting
   in the RevenueCat dashboard.
-- **Expo 57.0.25, at the next phone build.** Expo shipped a patch while the
-  phone was on 57.0.24, and `expo-doctor` in CI started failing on the
-  mismatch. Taking the patch moves the fingerprint, which means a new build,
-  so `mobile/package.json` tells the doctor to skip the `expo` version check
-  (`expo.install.exclude`) instead. When a build is being made anyway, run
-  `npx expo install expo@~57.0.25` in `mobile/`, delete that exclude, and let
-  the build carry it.
-- **The camera permission, at the next phone build.** `mobile/app.json` still
-  carries the `expo-camera` plugin, and `mobile/package.json` still installs
-  it. Both ask for the camera "to read the pairing code", and the scanner is
-  long gone. Apple rejects permission strings for features that do not exist,
-  so this must be out of the build that goes to App Review. Removing it moves
-  the fingerprint, so it rides the same build as the Expo patch above. The
-  no-internet route never needed it: the computer shows a QR code, and the
-  phone's own camera opens it in the browser.
-- **Android uploads to Closed testing, at the next phone build.** "Switch it to
-  the automated testing for the closed builds." `mobile/eas.json` sends a
-  production Android build to the `internal` track; the testers are on Closed
-  testing, whose track is `alpha`. Change `submit.production.android.track` to
-  `"alpha"` in the same pull request as the build — eas.json is hashed into
-  the fingerprint whole (@expo/fingerprint, `getEasBuildSourcesAsync`), so
-  changing it on its own would cut every installed copy off from updates until
-  the build lands. Riding the build it costs nothing.

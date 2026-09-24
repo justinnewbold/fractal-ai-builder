@@ -778,7 +778,9 @@ export function run(test) {
     const { photoFor } = await import('../src/lib/gearPhotos.js')
     const one = photoFor('1959SLP Treble')
     assert.ok(one?.src && one?.credit && one?.rights, 'photoFor no longer returns the credit with the picture')
-    assert.equal(photoFor('Recto2 Orange Vintage'), null, 'a model with no photograph is being given one')
+    /* A Dumble-style amp: the searches have never found an openly licensed
+       photo of one, so it is the safest example of a model with none. */
+    assert.equal(photoFor('Bludojai Clean'), null, 'a model with no photograph is being given one')
     assert.equal(photoFor(''), null)
     assert.equal(photoFor(), null, 'photoFor throws rather than answering for a missing name')
 
@@ -1243,7 +1245,10 @@ export function run(test) {
     /* Either bracket: the browser's fits on one line and opens a tag, the
        phone's wraps and opens a paren. What is held is the guard. */
     assert.match(read('src/components/DeviceDetail.jsx'), /\{firmware \? [(<]/, 'the browser draws a firmware line for a unit that never reported one')
-    assert.match(read('mobile/src/screens/Settings.js'), /\{firmware \? [(<]/, 'the phone draws a firmware line for a unit that never reported one')
+    /* The phone's firmware is on the unit's card now, worded in
+       shared/link-chain.mjs, which prints it only when the unit said one. */
+    assert.match(read('mobile/src/screens/Settings.js'), /unit: \{[^}]*firmware,/, 'the phone no longer hands the unit card its firmware')
+    assert.match(read('shared/link-chain.mjs'), /unit\.firmware \? `firmware \$\{unit\.firmware\}` : null/, 'the phone draws a firmware line for a unit that never reported one')
   })
 
   test('the phone icon is one Apple will accept, and the others keep their alpha', () => {

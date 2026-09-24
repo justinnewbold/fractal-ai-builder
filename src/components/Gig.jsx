@@ -628,10 +628,34 @@ export default function Gig({
     schedule()
     window.addEventListener('resize', schedule)
     window.visualViewport?.addEventListener('resize', schedule)
+    /*
+     * AND WHENEVER ANYTHING AROUND THE GRIDS CHANGES SIZE.
+     *
+     * "When I switch presets, it shrinks it on the screen a little bit, and
+     * then if I pull down on the phone, then it expands." The measure used to
+     * run only on a resize or when the number of scenes or blocks changed.
+     * Everything else that takes height was missed: a note over the screen
+     * closing, the preset name wrapping to a second line for a moment while
+     * the new one loads. A measure taken during one of those moments stayed
+     * until something else happened to trigger another, and pulling the page
+     * down was the something else.
+     *
+     * So this screen and everything it sits inside are watched, up to the
+     * page: a note closing above it shrinks the box that holds both, even
+     * when the page itself stays the height of the phone. Changing the tiles
+     * changes those heights too, and that triggers one more measure, which
+     * gets the same answer and stops, because what is measured is the space
+     * around the grids, not the grids themselves.
+     */
+    const watch = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule)
+    for (let box = gigRef.current; watch && box && box !== document.documentElement; box = box.parentElement) {
+      watch.observe(box)
+    }
     return () => {
       cancelAnimationFrame(raf)
       window.removeEventListener('resize', schedule)
       window.visualViewport?.removeEventListener('resize', schedule)
+      watch?.disconnect()
     }
   }, [fit, hasScenes, sceneCount, blocks.length])
 

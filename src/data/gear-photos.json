@@ -1,4 +1,10 @@
 {
+  "5153": {
+    "file": "5153.jpg",
+    "holder": "fvancini",
+    "licence": "CC BY 2.0",
+    "rights": "https://commons.wikimedia.org/wiki/File:EVH_5150III_dual_head.jpg"
+  },
   "1959slp": {
     "file": "1959slp.jpg",
     "holder": "Roadside Guitars",
@@ -29,6 +35,12 @@
     "licence": "CC0",
     "rights": "https://commons.wikimedia.org/wiki/File:Fender_Deluxe_Reverb_Amp_%28by_cptbuzz%29.jpg"
   },
+  "1x12-hot-kitty": {
+    "file": "1x12-hot-kitty.jpg",
+    "holder": "Whey",
+    "licence": "public domain",
+    "rights": "https://commons.wikimedia.org/wiki/File:Badcatjem.jpg"
+  },
   "1x12-jr-blues": {
     "file": "1x12-jr-blues.jpg",
     "holder": "Tiled",
@@ -53,6 +65,12 @@
     "licence": "CC BY-SA 3.0",
     "rights": "https://commons.wikimedia.org/wiki/File:1964_Fender_Vibroverb.JPG"
   },
+  "2x10-super-6g4": {
+    "file": "2x10-super-6g4.jpg",
+    "holder": "Centervolume",
+    "licence": "CC BY-SA 4.0",
+    "rights": "https://commons.wikimedia.org/wiki/File:Fender_Super_Amps.jpg"
+  },
   "2x12-class-a-30w": {
     "file": "2x12-class-a-30w.jpg",
     "holder": "Karl Jonsson",
@@ -71,6 +89,12 @@
     "licence": "CC BY-SA 2.0",
     "rights": "https://commons.wikimedia.org/wiki/File:Mesa_Boogie_Lone_Star_2x12%22_Combo.jpg"
   },
+  "4x10-bassguy-ri": {
+    "file": "4x10-bassguy-ri.jpg",
+    "holder": "Roadside Guitars",
+    "licence": "CC BY-SA 2.0",
+    "rights": "https://www.flickr.com/photos/32742419@N04/3288593900/"
+  },
   "4x12-5153": {
     "file": "4x12-5153.jpg",
     "holder": "fvancini",
@@ -83,11 +107,23 @@
     "licence": "Public domain",
     "rights": "https://commons.wikimedia.org/wiki/File:Orange_AD30HTC_and_PPC412.jpg"
   },
+  "4x12-recto-slant": {
+    "file": "4x12-recto-slant.jpg",
+    "holder": "Roadside Guitars",
+    "licence": "CC BY-SA 2.0",
+    "rights": "https://www.flickr.com/photos/32742419@N04/3193180622/"
+  },
   "6g12-concert": {
     "file": "6g12-concert.jpg",
     "holder": "Centervolume",
     "licence": "CC BY-SA 4.0",
     "rights": "https://commons.wikimedia.org/wiki/File:Fender_Concert_Amp.jpg"
+  },
+  "6g4-super": {
+    "file": "6g4-super.jpg",
+    "holder": "Centervolume",
+    "licence": "CC BY-SA 4.0",
+    "rights": "https://commons.wikimedia.org/wiki/File:Fender_Super_Amps.jpg"
   },
   "8x10-sv-bass": {
     "file": "8x10-sv-bass.jpg",
@@ -107,6 +143,18 @@
     "licence": "CC0",
     "rights": "https://commons.wikimedia.org/wiki/File:1968_Fender_Bandmaster_front.jpg"
   },
+  "bb-pre": {
+    "file": "bb-pre.jpg",
+    "holder": "_2008-09-20_(almost_done).jpg",
+    "licence": "ArtBrom",
+    "rights": "https://commons.wikimedia.org/wiki/File:Art_Bromage%27s_Pedalboard"
+  },
+  "bender-fuzz": {
+    "file": "bender-fuzz.jpg",
+    "holder": "Johann from Munich",
+    "licence": "Germany",
+    "rights": "https://commons.wikimedia.org/wiki/File:Vox_Tone_Bender.jpg"
+  },
   "brit-800": {
     "file": "brit-800.jpg",
     "holder": "John2112",
@@ -119,11 +167,23 @@
     "licence": "CC BY-SA 4.0",
     "rights": "https://commons.wikimedia.org/wiki/File:PDB_2022-30%2C_Marshall_JVM.jpg"
   },
+  "brit-silver": {
+    "file": "brit-silver.jpg",
+    "holder": "Gavin Tapp",
+    "licence": "CC BY 2.0",
+    "rights": "https://commons.wikimedia.org/wiki/File:Marshall_Silver_Jubilee_combo.jpg"
+  },
   "citrus-a30": {
     "file": "citrus-a30.jpg",
     "holder": "muzyczny.pl",
     "licence": "CC BY-SA 4.0",
     "rights": "https://commons.wikimedia.org/wiki/File:Wzmacniacz_gitarowy_AD30HTC_firmy_Orange.jpg"
+  },
+  "citrus-rv50": {
+    "file": "citrus-rv50.jpg",
+    "holder": "Roadside Guitars",
+    "licence": "CC BY-SA 2.0",
+    "rights": "https://commons.wikimedia.org/wiki/File:JaguarLes_Paul_%2B_Orange_Rig.jpg"
   },
   "citrus-terrier": {
     "file": "citrus-terrier.jpg",
@@ -143,6 +203,24 @@
     "licence": "CC BY 2.0",
     "rights": "https://commons.wikimedia.org/wiki/File:VOX_AC30_Twin.jpg"
   },
+  "colortone-booster": {
+    "file": "colortone-booster.jpg",
+    "holder": "Andy Mabbett",
+    "licence": "CC BY-SA 4.0",
+    "rights": "https://commons.wikimedia.org/wiki/File:Pink_Floyd_Their_Mortal_Remains_-_2017-10-13_-_Andy_Mabbett_-_28_(cropped_1).jpg"
+  },
+  "compulsion-distortion": {
+    "file": "compulsion-distortion.jpg",
+    "holder": "_2008-09-20_(almost_done).jpg",
+    "licence": "ArtBrom",
+    "rights": "https://commons.wikimedia.org/wiki/File:Art_Bromage%27s_Pedalboard"
+  },
+  "deluxe-tweed": {
+    "file": "deluxe-tweed.jpg",
+    "holder": "Johnny Bgood123",
+    "licence": "CC BY-SA 3.0 de",
+    "rights": "https://commons.wikimedia.org/wiki/File:Fender1953Deluxe.jpg"
+  },
   "deluxe-verb": {
     "file": "deluxe-verb.jpg",
     "holder": "cptbuzz",
@@ -161,17 +239,47 @@
     "licence": "CC BY 2.5",
     "rights": "https://commons.wikimedia.org/wiki/File:Boss-DS-1.jpg"
   },
+  "energyball": {
+    "file": "energyball.jpg",
+    "holder": "mmxcpiny75",
+    "licence": "CC BY-SA 2.0",
+    "rights": "https://commons.wikimedia.org/wiki/File:ENGL_Wall_With_Rocky_%26_Fender_Stratocaster.jpg"
+  },
+  "esoteric-acb": {
+    "file": "esoteric-acb.jpg",
+    "holder": "RIchie Adiyat",
+    "licence": "CC BY-SA 2.0",
+    "rights": "https://commons.wikimedia.org/wiki/File:Xotic_effects_usa.jpg"
+  },
   "esoteric-rcb": {
     "file": "esoteric-rcb.jpg",
     "holder": "Mekkjp from Japan",
     "licence": "CC BY-SA 2.0",
     "rights": "https://commons.wikimedia.org/wiki/File:Xotic_RC_Booster_%286967384793%29.jpg"
   },
+  "eternal-love": {
+    "file": "eternal-love.jpg",
+    "holder": "Johann Burkard",
+    "licence": "CC BY 2.0",
+    "rights": "https://commons.wikimedia.org/wiki/File:Pedals_(2006-11-04)_by_Johann_Burkard.jpg"
+  },
   "face-fuzz": {
     "file": "face-fuzz.jpg",
     "holder": "sploshette",
     "licence": "CC BY 2.0",
     "rights": "https://commons.wikimedia.org/wiki/File:Dallas_Arbiter_Fuzz_Face.jpg"
+  },
+  "fryette-d60": {
+    "file": "fryette-d60.jpg",
+    "holder": "fvancini",
+    "licence": "CC BY 2.0",
+    "rights": "https://commons.wikimedia.org/wiki/File:VHT_deliverance_amplifier_head.jpg"
+  },
+  "full-od": {
+    "file": "full-od.jpg",
+    "holder": "Matticuss22",
+    "licence": "Public domain",
+    "rights": "https://commons.wikimedia.org/wiki/File:Line6DL4.jpg"
   },
   "herbie": {
     "file": "herbie.jpg",
@@ -203,6 +311,12 @@
     "licence": "CC BY-SA 2.0",
     "rights": "https://commons.wikimedia.org/wiki/File:Klon_Centaur.jpg"
   },
+  "legend-100": {
+    "file": "legend-100.jpg",
+    "holder": "fvancini",
+    "licence": "CC BY 2.0",
+    "rights": "https://commons.wikimedia.org/wiki/File:Carvin_Legacy_Stack.jpg"
+  },
   "m-zone-distortion": {
     "file": "m-zone-distortion.jpg",
     "holder": "Kuriosatempel",
@@ -214,6 +328,24 @@
     "holder": "Red Rooster",
     "licence": "CC0",
     "rights": "https://commons.wikimedia.org/wiki/File:Gibson_maestro_fuzz_tone_1_752.jpg"
+  },
+  "matchbox-chiefman": {
+    "file": "matchbox-chiefman.jpg",
+    "holder": "George Coller",
+    "licence": "CC BY-SA 2.0",
+    "rights": "https://www.flickr.com/photos/devilelephant/3736142367/"
+  },
+  "maxoff-808": {
+    "file": "maxoff-808.jpg",
+    "holder": "Mekkjp from Japan",
+    "licence": "CC BY-SA 2.0",
+    "rights": "https://commons.wikimedia.org/wiki/File:Maxon_OD808_(10081674934).jpg"
+  },
+  "micro-boost": {
+    "file": "micro-boost.jpg",
+    "holder": "ben dalton",
+    "licence": "CC BY-SA 2.0",
+    "rights": "https://commons.wikimedia.org/wiki/File:MXR_M-133_Micro_Amp_(angled).jpg"
   },
   "noamp-bass-di": {
     "file": "noamp-bass-di.jpg",
@@ -257,6 +389,12 @@
     "licence": "CC BY-SA 3.0",
     "rights": "https://commons.wikimedia.org/wiki/File:1979_MXR_Distortion_%2B.jpg"
   },
+  "princetone": {
+    "file": "princetone.jpg",
+    "holder": "Drmies",
+    "licence": "public domain",
+    "rights": "https://commons.wikimedia.org/wiki/File:Fender_Princeton.jpg"
+  },
   "princetone-reverb": {
     "file": "princetone-reverb.jpg",
     "holder": "Massimo Barbieri",
@@ -269,11 +407,71 @@
     "licence": "CC BY 2.0",
     "rights": "https://commons.wikimedia.org/wiki/File:Peavey_6505_amp_%28cropped%29.jpg"
   },
+  "pvh-6160-clean": {
+    "file": "pvh-6160-clean.jpg",
+    "holder": "DaltoUprising",
+    "licence": "CC BY-SA 4.0",
+    "rights": "https://commons.wikimedia.org/wiki/File:My_amp_is_awesome!.jpg"
+  },
+  "pvh-6160-crunch": {
+    "file": "pvh-6160-crunch.jpg",
+    "holder": "DaltoUprising",
+    "licence": "CC BY-SA 4.0",
+    "rights": "https://commons.wikimedia.org/wiki/File:My_amp_is_awesome!.jpg"
+  },
+  "pvh-6160-lead": {
+    "file": "pvh-6160-lead.jpg",
+    "holder": "DaltoUprising",
+    "licence": "CC BY-SA 4.0",
+    "rights": "https://commons.wikimedia.org/wiki/File:My_amp_is_awesome!.jpg"
+  },
   "rat-distortion": {
     "file": "rat-distortion.jpg",
     "holder": "GreyCat / Michael Morel",
     "licence": "CC BY 2.0",
     "rights": "https://commons.wikimedia.org/wiki/File:ProCo_Rat_2.jpg"
+  },
+  "recto1": {
+    "file": "recto1.jpg",
+    "holder": "_Recording_Fischer",
+    "licence": "_Compound_Recordings",
+    "rights": "https://commons.wikimedia.org/wiki/File:Sovtek_Mig_60_%2B_Mesa_Boogie_Dual_Recto"
+  },
+  "recto2": {
+    "file": "recto2.jpg",
+    "holder": "_Recording_Fischer",
+    "licence": "_Compound_Recordings",
+    "rights": "https://commons.wikimedia.org/wiki/File:Sovtek_Mig_60_%2B_Mesa_Boogie_Dual_Recto"
+  },
+  "sdd-preamp": {
+    "file": "sdd-preamp.jpg",
+    "holder": "Sidebart",
+    "licence": "CC BY-SA 4.0",
+    "rights": "https://commons.wikimedia.org/wiki/File:Large_pedal_board.jpg"
+  },
+  "shiver": {
+    "file": "shiver.jpg",
+    "holder": "Serg Childed",
+    "licence": "CC BY-SA 4.0",
+    "rights": "https://commons.wikimedia.org/wiki/File:Bogner_Shiva_Amp_by_MusicTales_02.jpg"
+  },
+  "shred-distortion": {
+    "file": "shred-distortion.jpg",
+    "holder": "Frig8911",
+    "licence": "CC BY-SA 4.0",
+    "rights": "https://commons.wikimedia.org/wiki/File:Shredmaster.jpg"
+  },
+  "solo-100": {
+    "file": "solo-100.jpg",
+    "holder": "fvancini",
+    "licence": "CC BY 2.0",
+    "rights": "https://commons.wikimedia.org/wiki/File:Soldano_Decatone%2BSLO100.jpg"
+  },
+  "suhr-riot": {
+    "file": "suhr-riot.jpg",
+    "holder": "Андрей Вольский (Andrey Volskiy)",
+    "licence": "Public Domain Mark 1.0",
+    "rights": "https://www.flickr.com/photos/141965115@N04/26225433820/"
   },
   "super-od": {
     "file": "super-od.jpg",
@@ -304,6 +502,24 @@
     "holder": "ArtBrom",
     "licence": "CC BY-SA 2.0",
     "rights": "https://commons.wikimedia.org/wiki/File:Mesa_Boogie_Lone_Star_2x12%22_Combo.jpg"
+  },
+  "timothy": {
+    "file": "timothy.jpg",
+    "holder": "MXR10BandEQ",
+    "licence": "Supa-Trem",
+    "rights": "https://commons.wikimedia.org/wiki/File:Telecaster_Thinline_type_guitar_with_pedalboard_(SecretPreamp"
+  },
+  "ts9dx": {
+    "file": "ts9dx.jpg",
+    "holder": "Helterr",
+    "licence": "CC BY 2.0",
+    "rights": "https://www.flickr.com/photos/79442148@N06/7383773138/"
+  },
+  "usa-bass-400": {
+    "file": "usa-bass-400.jpg",
+    "holder": "Doktor Strange",
+    "licence": "CC BY-SA 3.0",
+    "rights": "https://commons.wikimedia.org/wiki/File:Mesaboogie_bass_400plus_front.jpg"
   },
   "usa-mk-iv": {
     "file": "usa-mk-iv.jpg",

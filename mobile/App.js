@@ -109,6 +109,27 @@ export default function App() {
     walkthroughSeen().then(setSeenWalk)
   }, [])
   const [screen, setScreen] = useState('stage')
+  /*
+   * WHICH PAGE OF SETTINGS, because Settings has pages inside it and the
+   * app could only ever open it at the top.
+   *
+   * "This screen is supposed to pull up when you tap the unit name in the
+   * top left of the screen, and it works fine on one platform, then not the
+   * other." The browser opened Phone & computer from the unit name; the
+   * phone opened the Settings list and left the last step to the thumb. Now
+   * the name opens the page, the wrong-account warning opens it too, and
+   * Settings reports the page it is on, so coming back from a screen it
+   * opened (Connect a computer, the reference sheet) lands where you were.
+   * The gear always opens the list. `visit` makes a fresh open start fresh
+   * even when Settings is already on screen.
+   */
+  const [settingsAt, setSettingsAt] = useState(null)
+  const [settingsVisit, setSettingsVisit] = useState(0)
+  const openSettings = (at = null) => {
+    setSettingsAt(at)
+    setSettingsVisit((n) => n + 1)
+    setScreen('settings')
+  }
   /* Which fix the guide opens on, and which screen Done goes back to. */
   const [fixOpen, setFixOpen] = useState(null)
   const [fixFrom, setFixFrom] = useState('settings')
@@ -573,7 +594,7 @@ export default function App() {
               setSeenWalk(true)
               setReplaying(false)
               setAuth('in')
-              setScreen('settings')
+              openSettings()
             }}
             /*
              * Out of the walkthrough and onto the sign-in screen.
@@ -733,9 +754,9 @@ export default function App() {
             */}
             <TopBar
               link={link}
-              onOpenSettings={() => setScreen('settings')}
+              onOpenSettings={() => openSettings()}
               onUnlock={() => setBuying(true)}
-              onOpenUnit={() => (demo ? setPickUnit(true) : setScreen('settings'))}
+              onOpenUnit={() => (demo ? setPickUnit(true) : openSettings('link'))}
             />
             <DemoUnit open={pickUnit} onClose={() => setPickUnit(false)} />
             {/* Over the top of whatever is on screen, and gone again on a
@@ -757,7 +778,7 @@ export default function App() {
                 only in Setup — Waking says it for itself while it is up. */}
             <WrongAccount
               active={auth === 'in' && !demo && !settling && screen === 'stage' && link.link !== 'connected'}
-              onSwitch={() => setScreen('settings')}
+              onSwitch={() => openSettings('link')}
               onTroubleshoot={openConnectFix}
             />
             {/*
@@ -785,7 +806,7 @@ export default function App() {
               <Waking
                 link={link}
                 onRetry={probeNow}
-                onSwitch={() => setScreen('settings')}
+                onSwitch={() => openSettings('link')}
                 onTroubleshoot={openConnectFix}
               />
             ) : screen === 'presets' ? (
@@ -828,6 +849,9 @@ export default function App() {
               />
             ) : screen === 'settings' ? (
               <Settings
+                key={settingsVisit}
+                startPage={settingsAt}
+                onPage={setSettingsAt}
                 onUnlock={() => setBuying(true)}
                 onSignIn={toSignIn}
                 link={link.link}

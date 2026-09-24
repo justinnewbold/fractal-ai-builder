@@ -34,6 +34,11 @@ import AccessTool from '../components/AccessTool'
 import AccountsTool from '../components/AccountsTool'
 import SalesTool from '../components/SalesTool'
 import Lamp from '../components/Lamp'
+import { ChainCards, TipCard } from '../components/Walk'
+import { linkChain } from '../lib/link-chain'
+import playIcon from '../../assets/icons/play.png'
+import laptopIcon from '../../assets/icons/laptop.png'
+import mailIcon from '../../assets/icons/mail.png'
 import Note from '../components/Note'
 import PasswordBox from '../components/PasswordBox'
 import Press from '../components/Press'
@@ -72,7 +77,11 @@ export default function Settings({
   onOpenLog,
   onOpenFixes,
   onOpenReport,
-  onSignIn
+  onSignIn,
+  /* The page to open on, and who to tell when it changes — see App.js's
+     openSettings. */
+  startPage = null,
+  onPage
 }) {
   const deviceName = useRig(ofDeviceName)
   const firmware = useRig(ofFirmware)
@@ -156,7 +165,10 @@ export default function Settings({
   const unit = useDemoUnit()
   const behind = !!hostVersion && isOlder(hostVersion, APP_VERSION) === true
 
-  const [page, setPage] = useState(null)
+  const [page, setPage] = useState(startPage)
+  useEffect(() => {
+    onPage?.(page)
+  }, [page, onPage])
   const purchase = usePurchase()
   const updates = useUpdates()
   /* Which bundle is running, asked once when Setup opens. It settles "did an
@@ -511,46 +523,42 @@ export default function Settings({
 
           <View style={{ gap: space.md }}>
             <Section>The link</Section>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-              <Lamp state={lamp} />
-              {/*
-                The far end of the chain, in the same breath as the near end.
-
-                "Connected to your computer" was the whole line, and it was
-                true on an evening when the unit was switched off — which is
-                the evening you are reading it. The unit's own state used to
-                be one door away on a row called Unit; it is here, because
-                this page is the chain and the unit is the end of it.
-              */}
-              <Text style={{ color: color.silk, fontSize: font.body, flex: 1 }}>
-                {link !== 'connected'
-                  ? `${linkWord}.`
-                  : unitState === 'missing'
-                    ? /* The usual reason besides the cable is Fractal's own
-                         editor holding the unit — named, per unit where it is
-                         known (lib/editors.js). */
-                      `Connected to ${macName || 'your computer'} — but it has no unit. Check your unit is on and its cable is in. ${quitEditor(deviceName)} This finds the unit again by itself once it is free.`
-                    : unitState === 'silent'
-                      ? `Connected to ${macName || 'your computer'} — ${deviceName || 'your unit'} isn’t answering. A frozen unit looks like this; turn it off and on. ${quitEditor(deviceName)}`
-                      : `Connected to ${macName || 'your computer'}${deviceName ? ` — ${deviceName}` : ''}`}
-              </Text>
-            </View>
-
             {/*
-              What the unit is running, under what it is.
-
-              "It definitely pulls the firmware version so I'm not sure why you
-              can't do it." It does, and this app had simply never asked for
-              it — the version lives on `/device` and both ends were reading
-              only `/device/detect`. Drawn only when the unit said one: the
-              demo has no firmware and neither has a host too old to report
-              it, and "firmware —" under a unit's name reads as a version
-              rather than as a silence.
+              THE CHAIN, AS CARDS. "I thought we updated this to a new
+              format… always make sure you're updating all the platforms."
+              The unit, the computer and this phone, each with a lamp, joined
+              by the two wires from How it works — and the words come from
+              lib/link-chain, the same file the browser's page draws from.
+              The unit's firmware and both version numbers live on the cards
+              now; they were three separate lines under a lamp.
             */}
-            {firmware ? (
-              <Text style={{ color: color.silkDim, fontSize: font.small, marginTop: space.xs }}>
-                {`Firmware ${firmware}`}
-              </Text>
+            <ChainCards
+              cards={linkChain({
+                here: 'phone',
+                demo,
+                unit: {
+                  name: demo ? DEMO_UNITS.find((u) => u.key === unit)?.name || 'FM3' : deviceName,
+                  firmware,
+                  state: unitState
+                },
+                computer: { name: macName, version: hostVersion, link },
+                phone: {
+                  version: APP_VERSION,
+                  email: account?.email && !isPairAccount(account.email) ? account.email : null
+                }
+              })}
+            />
+
+            {/* What to do about a unit that is missing or silent, under the
+                card that says so. The usual reason besides the cable is
+                Fractal's own editor holding the unit — named, per unit where
+                it is known (lib/editors.js). */}
+            {link === 'connected' && !demo && (unitState === 'missing' || unitState === 'silent') ? (
+              <Note tone="fault">
+                {unitState === 'missing'
+                  ? `${quitEditor(deviceName)} This finds the unit again by itself once it is free.`
+                  : `A frozen unit looks like this. ${quitEditor(deviceName)}`}
+              </Note>
             ) : null}
 
             {/*
@@ -605,7 +613,7 @@ export default function Settings({
                   everywhere else in this app.
                 */}
                 {purchase.unlocked ? (
-                  <Press label="Exit demo" tone="signal" onPress={() => setDemo(false)} />
+                  <TipCard icon={playIcon} label="EXIT DEMO" body="Back to your own rig" onPress={() => setDemo(false)} />
                 ) : null}
               </>
             ) : purchase.unlocked ? (
@@ -637,7 +645,7 @@ export default function Settings({
                 would be a sentence I wrote rather than one he did, and the
                 button already says what it does.
               */
-              <Press label="Demo" onPress={() => setDemo(true)} />
+              <TipCard icon={playIcon} label="DEMO" onPress={() => setDemo(true)} />
             ) : null}
 
             {/*
@@ -650,14 +658,6 @@ export default function Settings({
               being slow. The number was already being sent and nobody looked at
               it.
             */}
-            {link === 'connected' && !demo ? (
-              <Text style={{ color: color.silkDim, fontSize: font.small }}>
-                {hostVersion
-                  ? `The app on the computer is v${hostVersion}. This phone is v${APP_VERSION}.`
-                  : `The computer didn’t say which version it is running: its app is older than 7.205.0, or it could not write its name for the phone. This phone is v${APP_VERSION}.`}
-              </Text>
-            ) : null}
-
             {link === 'connected' && !demo && behind ? (
               <Note tone="warn">
                 The app on the computer is behind this one. Update it there — it is the part that
@@ -667,7 +667,8 @@ export default function Settings({
             ) : null}
             {link === 'connected' && !demo && !hostVersion ? (
               <Note>
-                If the computer is on 7.295.0 or newer, its menu bar icon has a line saying what the
+                The computer didn’t say which version it is running: its app is older than 7.205.0, or
+                it could not write its name for the phone. If the computer is on 7.295.0 or newer, its menu bar icon has a line saying what the
                 phones hear about its version, and that line says what is wrong.
               </Note>
             ) : null}
@@ -705,7 +706,7 @@ export default function Settings({
               to add is one they add on an evening when the first one works.
             */}
             {onOpenConnect ? (
-              <Press label="How do I connect a computer?" onPress={onOpenConnect} />
+              <TipCard icon={laptopIcon} label="CONNECT A COMPUTER" body="How do I connect a computer?" onPress={onOpenConnect} />
             ) : null}
 
             {/*
@@ -820,9 +821,10 @@ export default function Settings({
             ) : (
               /* The way in to the password: the account line itself, with a
                  gear, rather than a box sitting open on the page. */
-              <Press
-                label={`⚙  ${account.email}`}
-                sub="Signed in · tap for password options"
+              <TipCard
+                icon={mailIcon}
+                label="SIGNED IN"
+                body={`${account.email}\nTap for password options`}
                 onPress={() => {
                   setNote(null)
                   setError(null)

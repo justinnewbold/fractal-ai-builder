@@ -1,6 +1,9 @@
 import arrowIcon from '../../mobile/assets/icons/arrow.png'
 import chevronIcon from '../../mobile/assets/icons/chevron.png'
 import gearIcon from '../../mobile/assets/icons/setup.png'
+import ampIcon from '../../mobile/assets/icons/amp.png'
+import laptopIcon from '../../mobile/assets/icons/laptop.png'
+import phoneIcon from '../../mobile/assets/icons/phone.png'
 
 /*
  * THE LOOK OF EVERY WALKTHROUGH PAGE, FROM HIS "HERE'S THE APP" MOCKUP.
@@ -48,16 +51,21 @@ export function Tile({ icon, children }) {
   return <span className="walk-tile">{icon ? <Pic src={icon} /> : children}</span>
 }
 
-/** A card: the tile, an amber label, a line under it, and a chevron when it goes somewhere. */
-export function TipCard({ icon, tile, label, body, onClick }) {
+/**
+ * A card: the tile, an amber label, a line under it, and on the right a
+ * chevron when it goes somewhere (or whatever `right` is, such as a lamp).
+ */
+export function TipCard({ icon, tile, label, body, onClick, right, small }) {
   const inner = (
     <>
-      <Tile icon={icon}>{tile}</Tile>
+      <span className={small ? 'walk-tile-sm' : undefined}>
+        <Tile icon={icon}>{tile}</Tile>
+      </span>
       <span className="walk-card-words">
         <span className="walk-card-label">{label}</span>
         {body ? <span className="walk-card-body">{body}</span> : null}
       </span>
-      {onClick ? <Pic src={chevronIcon} className="walk-chevron" /> : null}
+      {right || (onClick ? <Pic src={chevronIcon} className="walk-chevron" /> : null)}
     </>
   )
   return onClick ? (
@@ -103,6 +111,39 @@ export function FootRow({ text, onClick }) {
       ) : (
         <div className="walk-foot-row">{inner}</div>
       )}
+    </div>
+  )
+}
+
+const CHAIN_ICONS = { unit: ampIcon, computer: laptopIcon, phone: phoneIcon }
+
+/**
+ * The unit, the computer and the phone, joined by their two wires, each with
+ * a lamp: the top of Phone & computer. The words come from
+ * shared/link-chain.mjs, and the phone draws the same three cards from the
+ * same words (mobile/src/components/Walk.js).
+ */
+export function ChainCards({ cards }) {
+  return (
+    <div className="walk-chain">
+      {cards.map((card) => (
+        <div key={card.key}>
+          <TipCard
+            small
+            icon={CHAIN_ICONS[card.key]}
+            label={card.label}
+            body={card.body}
+            right={<span className="walk-lamp" data-tone={card.tone} aria-label={card.tone === 'good' ? 'answering' : card.tone === 'bad' ? 'not answering' : 'waiting'} />}
+          />
+          {card.wire ? (
+            <div className={`walk-wire${card.lit ? ' lit' : ''}`} aria-hidden="true">
+              <span className="walk-wire-line" />
+              <span className="walk-wire-label">{card.wire}</span>
+              <span className="walk-wire-line" />
+            </div>
+          ) : null}
+        </div>
+      ))}
     </div>
   )
 }
