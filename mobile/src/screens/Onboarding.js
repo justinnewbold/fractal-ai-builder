@@ -6,7 +6,6 @@ import { color, font, mono, radius, space, TAP } from '../lib/theme'
 import { Platform } from 'react-native'
 import { UNITS } from '../lib/demoUnits'
 import { setDemo, setDemoUnit } from '../lib/demo'
-import { useRig } from '../lib/rig'
 import { tick } from '../lib/feedback'
 /* An ES import rather than require(): Metro resolves both, but require is not
    a name this app has anywhere, and a test is right to refuse it. */
@@ -30,6 +29,12 @@ import { sendDownloadLink, DOWNLOADS_URL } from '../lib/downloadLink'
 import CopyAddress from '../components/CopyAddress'
 import Note from '../components/Note'
 import Press from '../components/Press'
+import playIcon from '../../assets/icons/play.png'
+import slidersIcon from '../../assets/icons/sliders.png'
+import saveIcon from '../../assets/icons/save.png'
+import arrowIcon from '../../assets/icons/arrow.png'
+import gearIcon from '../../assets/icons/setup.png'
+import chevronIcon from '../../assets/icons/chevron.png'
 
 /**
  * The first minute, on the phone.
@@ -58,7 +63,7 @@ import Press from '../components/Press'
  */
 const face = Platform.select(mono)
 
-export default function Onboarding({ onEnterDemo, onAccount, onUnlock, replay, onClose }) {
+export default function Onboarding({ onEnterDemo, onSettings, onAccount, onUnlock, replay, onClose }) {
   const [at, setAt] = useState('welcome')
   const [unit, setUnit] = useState(UNITS[0].key)
   /* The box under Connect my real rig. Unlock stays grey until it is ticked. */
@@ -71,19 +76,6 @@ export default function Onboarding({ onEnterDemo, onAccount, onUnlock, replay, o
   const [needsApp, setNeedsApp] = useState(false)
 
   const unitName = UNITS.find((u) => u.key === unit)?.name || UNITS[0].name
-
-  /*
-   * THE UNIT THAT ACTUALLY ANSWERED, once one has.
-   *
-   * `unitName` above is the DEMO picker's choice and defaults to FM3. It was
-   * also what the last two screens printed after a real pairing — so somebody
-   * who had just connected an FM9 was told "Connection verified · FM3" and
-   * then "FM3 · ONLINE", about hardware they do not own. The store learns the
-   * real name from the computer a moment after the pairing lands; until then
-   * this is the same guess it always was, and it corrects itself in place.
-   */
-  const detected = useRig((st) => st.deviceName)
-  const provenUnit = detected || unitName
 
   /*
    * ONE WAY BETWEEN STEPS, AND IT CLEARS THE LAST SCREEN'S NOTES.
@@ -295,7 +287,7 @@ export default function Onboarding({ onEnterDemo, onAccount, onUnlock, replay, o
             pipeline, nothing native — so a screen that reads like a product
             shot still ships over the air and costs no build.
           */}
-          <Progress count={P2.count} at={0} of={2} />
+          <Steps at={0} of={3} label={P2.count} />
           <Head>{P2.head}</Head>
           <View style={{ gap: 0 }}>
             {CHAIN.map((box, i) => (
@@ -306,13 +298,13 @@ export default function Onboarding({ onEnterDemo, onAccount, onUnlock, replay, o
             ))}
           </View>
           <Note>{P2.foot}</Note>
-          <Press label={`${P2.go}  ›`} tone="signal" on height={TAP} onPress={() => go('mode')} />
+          <Cta label={P2.go} onPress={() => go('mode')} />
         </>
       ) : null}
 
       {at === 'mode' ? (
         <>
-          <Progress count={P3.count} at={1} of={2} title={P3.title} />
+          <Steps at={1} of={3} label={P3.count} />
           <Head>{P3.head}</Head>
           <Sub>{P3.sub}</Sub>
 
@@ -333,7 +325,7 @@ export default function Onboarding({ onEnterDemo, onAccount, onUnlock, replay, o
             body={P3.demo.body}
             art={<UnitShot />}
           >
-            <Press label={P3.demo.go} tone="signal" on height={TAP} onPress={() => go('pick')} />
+            <Cta label={P3.demo.go} onPress={() => go('pick')} />
           </Choice>
 
           <Choice
@@ -396,26 +388,20 @@ export default function Onboarding({ onEnterDemo, onAccount, onUnlock, replay, o
 
       {at === 'pick' ? (
         <>
-          <Eyebrow>{P4.tag}</Eyebrow>
+          <Steps at={1} of={3} label={P3.count} />
           <Eyebrow>{P4.eyebrow}</Eyebrow>
           <Head>{P4.head}</Head>
           <Sub>{P4.sub}</Sub>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+          {/* Two to a row, big enough to read from arm's length, the lit one
+              amber-edged like the tiles on the last screen. */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
             {UNITS.map((u) => (
-              <Press
-                key={u.key}
-                label={u.name}
-                tone="signal"
-                on={u.key === unit}
-                height={44}
-                style={{ paddingHorizontal: space.md }}
-                onPress={() => setUnit(u.key)}
-              />
+              <UnitTile key={u.key} name={u.name} on={u.key === unit} onPress={() => setUnit(u.key)} />
             ))}
           </View>
           {/* Named by whichever is lit, so the button says what pressing it
               gets you rather than "continue". */}
-          <Press label={P4.go(unitName)} tone="signal" on height={TAP} onPress={intoDemo} />
+          <Cta label={P4.go(unitName)} onPress={intoDemo} />
           {/*
             A WAY BACK, because this screen was a one-way door.
 
@@ -431,6 +417,7 @@ export default function Onboarding({ onEnterDemo, onAccount, onUnlock, replay, o
 
       {at === 'app' ? (
         <>
+          <Steps at={1} of={3} label={P3.count} />
           <Head>{P6.head}</Head>
           {/*
             The one way on from here. An account is the only thing that joins
@@ -438,13 +425,7 @@ export default function Onboarding({ onEnterDemo, onAccount, onUnlock, replay, o
             label says so, where it used to promise a scanner that no longer
             exists.
           */}
-          <Press
-            label={P6.yes}
-            tone="signal"
-            on
-            height={TAP}
-            onPress={() => onAccount?.()}
-          />
+          <Cta label={P6.yes} onPress={() => onAccount?.()} />
           {/*
             HIDDEN UNTIL ASKED FOR. "Hide information on how to download the
             computer app until they click no." Somebody who already has it
@@ -512,24 +493,26 @@ export default function Onboarding({ onEnterDemo, onAccount, onUnlock, replay, o
       */}
       {at === 'connected' ? (
         <>
-          <Eyebrow>{P9.tag(provenUnit)}</Eyebrow>
-          {/* The same three tips either way. Only the two lines above them
-              change, because "You're connected" and "through your computer"
-              are both false in the demo. */}
-          {/* The demo's words, because the demo is the only way here now.
-              The paired version of this screen went with the unlock step. */}
+          {/*
+            HIS "HERE'S THE APP" MOCKUP, which every other page now copies.
+
+            The unit's name and "simulated" came off the top: the mockup
+            puts the one sentence that matters there instead — this app
+            needs a computer with the unit on its USB. The demo's words,
+            because the demo is the only way here now.
+
+            Each card goes into the app, the same as the button; the row at
+            the foot goes in and straight to Settings, where the walkthrough
+            can be shown again.
+          */}
+          <Steps at={2} of={3} label={P9.count} />
           <Head>{P9.demo.head}</Head>
-          <Sub>{P9.demo.status(provenUnit)}</Sub>
+          <Sub>{P9.demo.sub}</Sub>
           {P9.tips.map((tip) => (
-            <Card key={tip.key}>
-              <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.2 }}>
-                {tip.label}
-              </Text>
-              <Text style={{ color: color.silkDim, fontSize: font.small }}>{tip.body}</Text>
-            </Card>
+            <TipCard key={tip.key} icon={TIP_ICONS[tip.key]} label={tip.label} body={tip.body} onPress={onEnterDemo} />
           ))}
-          <Press label={P9.go} tone="signal" on height={TAP} onPress={onEnterDemo} />
-          <Note>{P9.foot}</Note>
+          <Cta label={P9.go} onPress={onEnterDemo} />
+          <FootRow text={P9.foot} onPress={onSettings || onEnterDemo} />
         </>
       ) : null}
     </ScrollView>
@@ -582,63 +565,176 @@ function Contours() {
   )
 }
 
+/*
+ * THE LOOK OF EVERY PAGE, FROM HIS "HERE'S THE APP" MOCKUP.
+ *
+ * "Update this screen across all platforms to look like this. And actually,
+ * if you could go through all pages of any tutorials and onboarding type
+ * stuff so that we can make them all look more robust like this." So these
+ * few pieces are the whole of it, and every page is built from them: the
+ * step dots, a big heading with a quiet line under it, cards with an amber
+ * picture tile, one amber button with its arrow, and the settings row at the
+ * foot. The browser's walkthrough and the computer's are drawn the same.
+ */
 const Head = ({ children }) => (
-  <Text accessibilityRole="header" style={{ color: color.silk, fontSize: font.title, fontWeight: '700' }}>
+  <Text
+    accessibilityRole="header"
+    style={{ color: color.silk, fontSize: font.hero, fontWeight: '800', lineHeight: font.hero * 1.15 }}
+  >
     {children}
   </Text>
 )
 
 const Sub = ({ children }) => (
-  <Text style={{ color: color.silkDim, fontSize: font.body, lineHeight: font.body * 1.45 }}>
-    {children}
-  </Text>
+  <Text style={{ color: color.silkDim, fontSize: font.lead, lineHeight: font.lead * 1.4 }}>{children}</Text>
+)
+
+/** Dots joined by lines, the reached ones amber, and "2 of 3" under them. */
+const Steps = ({ at, of, label }) => (
+  <View style={{ alignItems: 'center', gap: space.sm, paddingTop: space.sm }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      {Array.from({ length: of }, (_, i) => (
+        <View key={i} style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {i ? <View style={{ width: 56, height: 1, backgroundColor: i <= at ? color.signal : color.rule }} /> : null}
+          <View
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: 5,
+              marginHorizontal: space.sm,
+              backgroundColor: i <= at ? color.signal : color.rule
+            }}
+          />
+        </View>
+      ))}
+    </View>
+    <Text style={{ color: color.silkDim, fontSize: font.small }}>{label || `${Math.min(at, of - 1) + 1} of ${of}`}</Text>
+  </View>
+)
+
+/** The amber picture tile a card leads with. */
+const Tile = ({ icon, size = 64 }) => (
+  <View
+    style={{
+      width: size,
+      height: size,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: tint(color.signal, 0.35),
+      backgroundColor: tint(color.signal, 0.14),
+      alignItems: 'center',
+      justifyContent: 'center'
+    }}
+  >
+    <Image source={icon} style={{ width: size * 0.5, height: size * 0.5, tintColor: color.signal }} />
+  </View>
+)
+
+/** A card: the tile, an amber label, a line under it, and a chevron when it goes somewhere. */
+const TipCard = ({ icon, label, body, onPress }) => (
+  <Pressable
+    accessibilityRole={onPress ? 'button' : undefined}
+    disabled={!onPress}
+    onPress={onPress}
+    style={({ pressed }) => ({
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space.lg,
+      padding: space.lg,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: color.rule,
+      backgroundColor: pressed ? color.panelHi : color.panel
+    })}
+  >
+    <Tile icon={icon} />
+    <View style={{ flex: 1, gap: space.xs }}>
+      <Text style={{ color: color.signal, fontSize: font.lead, fontWeight: '800', letterSpacing: 1 }}>{label}</Text>
+      <Text style={{ color: color.silkDim, fontSize: font.body + 1, lineHeight: 22 }}>{body}</Text>
+    </View>
+    {onPress ? <Image source={chevronIcon} style={{ width: 16, height: 16, tintColor: color.silkDim }} /> : null}
+  </Pressable>
+)
+
+/** The one amber button: the words on the left, the arrow at the far end. */
+const Cta = ({ label, onPress, disabled }) => (
+  <Pressable
+    accessibilityRole="button"
+    accessibilityLabel={label}
+    disabled={disabled}
+    onPress={() => {
+      tick()
+      onPress?.()
+    }}
+    style={({ pressed }) => ({
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      minHeight: TAP + 16,
+      paddingHorizontal: space.xl,
+      borderRadius: radius.lg,
+      backgroundColor: color.signal,
+      opacity: disabled ? 0.45 : pressed ? 0.8 : 1,
+      shadowColor: color.signal,
+      shadowOpacity: 0.35,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 6
+    })}
+  >
+    <Text style={{ color: color.onSignal, fontSize: font.title - 2, fontWeight: '800' }}>{label}</Text>
+    <Image source={arrowIcon} style={{ width: 26, height: 26, tintColor: color.onSignal }} />
+  </Pressable>
+)
+
+/** The foot: a hairline, then the gear, a quiet line, and a chevron. */
+const FootRow = ({ text, onPress }) => (
+  <View style={{ gap: space.lg, marginTop: space.sm }}>
+    <View style={{ height: 1, backgroundColor: color.rule }} />
+    <Pressable
+      accessibilityRole={onPress ? 'button' : undefined}
+      disabled={!onPress}
+      onPress={onPress}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.sm }}
+    >
+      <Image source={gearIcon} style={{ width: 26, height: 26, tintColor: color.silkDim }} />
+      <Text style={{ flex: 1, color: color.silkDim, fontSize: font.body }}>{text}</Text>
+      {onPress ? <Image source={chevronIcon} style={{ width: 14, height: 14, tintColor: color.silkDim }} /> : null}
+    </Pressable>
+  </View>
+)
+
+const TIP_ICONS = { play: playIcon, edit: slidersIcon, save: saveIcon }
+
+/** One of the units to simulate: a big card, the lit one amber-edged. */
+const UnitTile = ({ name, on, onPress }) => (
+  <Pressable
+    accessibilityRole="button"
+    accessibilityState={{ selected: !!on }}
+    onPress={() => {
+      tick()
+      onPress?.()
+    }}
+    style={({ pressed }) => ({
+      width: '47%',
+      flexGrow: 1,
+      minHeight: TAP + 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.lg,
+      borderWidth: on ? 2 : 1,
+      borderColor: on ? color.signal : color.rule,
+      backgroundColor: on ? tint(color.signal, 0.14) : pressed ? color.panelHi : color.panel
+    })}
+  >
+    <Text style={{ color: on ? color.signal : color.silk, fontSize: font.lead, fontWeight: '800' }}>{name}</Text>
+  </Pressable>
 )
 
 const Eyebrow = ({ children }) => (
   <Text style={{ color: color.silkFaint, fontSize: font.micro, letterSpacing: 1.5 }}>
     {children}
   </Text>
-)
-
-const Count = ({ children }) => (
-  <Text style={{ color: color.signal, fontSize: font.micro, letterSpacing: 1.5 }}>{children}</Text>
-)
-
-/**
- * Which step this is, as a number and as dots.
- *
- * His mockup puts both in the corner: "1 OF 2" beside two dots with the
- * current one lit. The number is what you read; the dots are what you see
- * without reading, which is the point of having both.
- */
-const Progress = ({ count, at, of, title }) => (
-  <View style={{ gap: space.md }}>
-    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-      <View style={{ flex: 1 }} />
-      {title ? (
-        <Text style={{ color: color.silk, fontSize: font.body, fontWeight: '700' }}>{title}</Text>
-      ) : null}
-      <View style={{ flex: 1, alignItems: 'flex-end' }}>
-        <Count>{count}</Count>
-      </View>
-    </View>
-    {/* Bars rather than dots, from the later mockup. A bar reads as ground
-        covered; a dot only reads as a position. Filled means reached, so at
-        the last step both are lit — which is what his 2 of 2 shows. */}
-    <View style={{ flexDirection: 'row', gap: space.xs, justifyContent: 'center' }}>
-      {Array.from({ length: of }, (_, i) => (
-        <View
-          key={i}
-          style={{
-            width: 64,
-            height: 4,
-            borderRadius: 2,
-            backgroundColor: i <= at ? color.signal : color.rule
-          }}
-        />
-      ))}
-    </View>
-  </View>
 )
 
 /**
@@ -843,13 +939,12 @@ const ChainBox = ({ n, title, body, kind }) => (
         width: 34,
         height: 34,
         borderRadius: 17,
-        borderWidth: 1.5,
-        borderColor: color.signal,
+        backgroundColor: color.signal,
         alignItems: 'center',
         justifyContent: 'center'
       }}
     >
-      <Text style={{ color: color.signal, fontSize: font.body, fontWeight: '700' }}>{n}</Text>
+      <Text style={{ color: color.onSignal, fontSize: font.body, fontWeight: '800' }}>{n}</Text>
     </View>
     <View style={{ flex: 1, gap: 2 }}>
       <Text style={{ color: color.silk, fontSize: font.body, fontWeight: '700', letterSpacing: 0.6 }}>
@@ -884,21 +979,6 @@ const Wire = ({ label }) => (
       <Text style={{ color: color.signal, fontSize: font.micro, letterSpacing: 1.2 }}>{label}</Text>
     </View>
     <View style={{ width: 2, height: 14, backgroundColor: color.signal }} />
-  </View>
-)
-
-const Card = ({ children }) => (
-  <View
-    style={{
-      gap: space.sm,
-      padding: space.lg,
-      borderRadius: radius.lg,
-      borderWidth: 1,
-      borderColor: color.rule,
-      backgroundColor: color.panel
-    }}
-  >
-    {children}
   </View>
 )
 

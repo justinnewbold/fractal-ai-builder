@@ -263,7 +263,9 @@ export const P1 = {
 
 /** P2 — the same three boxes, down a phone. */
 export const P2 = {
-  count: '1 OF 2',
+  /* Three steps now, from his "Here's the app" mockup: how it works, the
+     choice, and the app. Written the way the mockup writes it. */
+  count: '1 of 3',
   /*
    * HIS WORDS, and only a heading. "On my phone's web browser I can't see the
    * Guide button at the bottom so people might not know they need to scroll.
@@ -312,7 +314,7 @@ export const P2 = {
  * and the way in for somebody with an account.
  */
 export const P3 = {
-  count: '2 OF 2',
+  count: '2 of 3',
   /* The flow's own name, in the header his mockups put it in. */
   title: 'Get started',
   /*
@@ -553,10 +555,14 @@ export const P9 = {
      * the tip named a limit the app has not had for a while, on the screen a
      * new person reads first. MY WORDING for the replacement.
      */
-    { key: 'save', label: 'SAVE', body: 'Changes are live. Save writes them into the slot on your unit.' }
+    /* And now his mockup's, shorter: "Changes write to the slot on your unit." */
+    { key: 'save', label: 'SAVE', body: 'Changes write to the slot on your unit.' }
   ],
   go: 'Open Play',
-  foot: 'Replay this anytime in Settings → Show the walkthrough.',
+  /* His mockup: a row with the gear, and this. */
+  foot: 'Show walkthrough later in Settings.',
+  /* The last of the three steps, under the dots. */
+  count: '3 of 3',
   /*
    * THE SAME LAST SCREEN, FOR SOMEBODY WHO CHOSE THE DEMO.
    *
@@ -575,6 +581,8 @@ export const P9 = {
    */
   demo: {
     head: 'Here’s the app.',
+    /* His mockup puts this under the heading, where the unit's name was. */
+    sub: 'This app works with a computer connected to your Fractal guitar processor by USB.',
     /** FM3 · simulated */
     status: (unit) => `${unit}  ·  simulated`
   }

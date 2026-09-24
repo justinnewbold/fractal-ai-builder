@@ -10273,25 +10273,31 @@ input.gig-volume-slider:focus-visible {
 input.gig-volume-slider::-webkit-slider-runnable-track {
   height: 6px;
   border-radius: var(--r-1);
-  background: linear-gradient(to right, var(--signal) 0 var(--vol), var(--panel-hi) var(--vol) 100%);
+  background: linear-gradient(to right, var(--signal) 0 var(--vol), color-mix(in srgb, var(--silk) 22%, transparent) var(--vol) 100%);
 }
 
+/*
+ * THE iOS KNOB. "Make the volume slider more iOS type looking, where it's
+ * more like a pill shaped with rounded edges. Update it on all platforms."
+ * A round white knob with a soft shadow and no ring, on the thin rounded
+ * track, drawn the same on the phone (mobile/src/components/Volume.js).
+ */
 input.gig-volume-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 22px;
-  height: 22px;
-  margin-top: -8px; /* (22 − 6) / 2: centred on the track */
+  width: 26px;
+  height: 26px;
+  margin-top: -10px; /* (26 − 6) / 2: centred on the track */
   border-radius: 50%;
-  background: var(--silk);
-  border: 2px solid var(--chassis);
-  box-shadow: var(--e-1);
+  background: #fff;
+  border: 0;
+  box-shadow: var(--e-2);
 }
 
 input.gig-volume-slider::-moz-range-track {
   height: 6px;
   border-radius: var(--r-1);
-  background: var(--panel-hi);
+  background: color-mix(in srgb, var(--silk) 22%, transparent);
 }
 
 input.gig-volume-slider::-moz-range-progress {
@@ -10301,12 +10307,12 @@ input.gig-volume-slider::-moz-range-progress {
 }
 
 input.gig-volume-slider::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  background: var(--silk);
-  border: 2px solid var(--chassis);
-  box-shadow: var(--e-1);
+  background: #fff;
+  border: 0;
+  box-shadow: var(--e-2);
 }
 
 /* At Smallest the meter above it goes; the slider stays, because it is a
@@ -10342,6 +10348,11 @@ input.gig-volume-slider::-moz-range-thumb {
 
 .gig .gig-signal,
 .gig .gig-signal-fill {
+  border-radius: var(--r-3);
+}
+
+/* The − and + beside the volume, round like the iOS knob between them. */
+.gig button.gig-volume-step {
   border-radius: var(--r-3);
 }
 
@@ -10938,8 +10949,7 @@ button.setup-back {
   text-align: center;
 }
 
-.onb-eyebrow,
-.onb-step {
+.onb-eyebrow {
   margin: 0;
   letter-spacing: 0.14em;
   font-size: var(--onb-step);
@@ -11098,34 +11108,17 @@ button.setup-back {
   line-height: 1.6;
 }
 
-.onb-why {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--s-3);
-  width: 100%;
-  margin-top: var(--s-3);
-}
-
-.onb-why-item {
-  flex: 1 1 clamp(200px, 17vw, 320px);
-  min-width: 190px;
-  max-width: clamp(240px, 21vw, 360px);
-  text-align: left;
-  padding: var(--onb-pad);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-2);
-  background: var(--panel);
-  font-size: var(--onb-body);
-}
-
 .onb-waiting {
   margin: 0;
   font-size: var(--onb-sub);
   color: var(--signal);
 }
 
-.onb-tips {
+/*
+ * THE CARDS, the phone walkthrough's (Walk.jsx) at this screen's size: one
+ * column down the middle, each with its amber picture tile.
+ */
+.onb-cards {
   display: flex;
   flex-direction: column;
   gap: var(--s-3);
@@ -11133,14 +11126,23 @@ button.setup-back {
   max-width: min(820px, 66vw);
   margin-top: var(--s-3);
 }
-
-.onb-tip {
-  text-align: left;
+.onb .walk-card {
   padding: var(--onb-pad);
+}
+.onb .walk-card-label {
+  font-size: var(--onb-title);
+}
+.onb .walk-card-body {
   font-size: var(--onb-body);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-2);
-  background: var(--panel);
+}
+.onb .walk-count {
+  font-size: var(--onb-step);
+  letter-spacing: 0.14em;
+}
+.onb .onb-acts .walk-cta {
+  width: auto;
+  min-width: min(420px, 100%);
+  font-size: var(--onb-title);
 }
 
 .onb-acts {
@@ -11153,23 +11155,6 @@ button.setup-back {
 
 .onb-foot {
   margin: 0;
-}
-
-.onb-dots {
-  display: flex;
-  gap: var(--s-2);
-  margin-top: var(--s-5);
-}
-
-.onb-dot {
-  width: clamp(26px, 2.2vw, 44px);
-  height: 3px;
-  border-radius: var(--r-1);
-  background: var(--rule);
-}
-
-.onb-dot.on {
-  background: var(--signal);
 }
 
 /*
@@ -11499,9 +11484,9 @@ button.setup-back {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  border: 1.5px solid var(--signal);
-  color: var(--signal);
-  font-weight: 700;
+  background: var(--signal);
+  color: var(--on-signal);
+  font-weight: 800;
   font-size: var(--f-4);
 }
 .pw-box-words {
@@ -11675,6 +11660,198 @@ button.setup-back {
   display: flex;
   flex-wrap: wrap;
   gap: var(--s-2);
+}
+/*
+ * THE WALKTHROUGH'S PIECES, FROM HIS "HERE'S THE APP" MOCKUP (Walk.jsx): the
+ * step dots, cards with an amber tile, the amber button with its arrow, and
+ * the settings row at the foot. The browser's walkthrough and the computer's
+ * setup both draw with these.
+ */
+.walk-pic {
+  display: inline-block;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  background: currentColor;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+.walk-steps {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  padding-top: var(--s-2);
+}
+.walk-dots {
+  display: flex;
+  align-items: center;
+}
+.walk-dot-wrap {
+  display: flex;
+  align-items: center;
+}
+.walk-dot {
+  width: 10px;
+  height: 10px;
+  margin: 0 var(--s-2);
+  border-radius: 50%;
+  background: var(--rule);
+}
+.walk-line {
+  width: 56px;
+  height: 1px;
+  background: var(--rule);
+}
+.walk-dot.on,
+.walk-line.on {
+  background: var(--signal);
+}
+.walk-count {
+  color: var(--silk-dim);
+  font-size: var(--f-3);
+}
+.walk-tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border: 1px solid color-mix(in srgb, var(--signal) 35%, transparent);
+  border-radius: var(--r-2);
+  background: color-mix(in srgb, var(--signal) 14%, transparent);
+  color: var(--signal);
+}
+.walk-tile .walk-pic {
+  width: 32px;
+  height: 32px;
+}
+.walk-card {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  width: 100%;
+  padding: var(--s-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2);
+  background: var(--panel);
+  color: var(--silk);
+  text-align: left;
+  font: inherit;
+}
+button.walk-card {
+  cursor: pointer;
+}
+button.walk-card:hover {
+  border-color: color-mix(in srgb, var(--signal) 45%, var(--rule));
+}
+.walk-card-words {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+}
+.walk-card-label {
+  color: var(--signal);
+  font-size: var(--f-4);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+.walk-card-body {
+  color: var(--silk-dim);
+  font-size: var(--f-4);
+  line-height: 1.45;
+}
+.walk-chevron {
+  width: 16px;
+  height: 16px;
+  color: var(--silk-dim);
+}
+.walk-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  width: 100%;
+  min-height: 64px;
+  padding: 0 var(--s-5);
+  border: 0;
+  border-radius: var(--r-2);
+  background: var(--signal);
+  color: var(--on-signal);
+  font: inherit;
+  font-size: var(--f-5);
+  font-weight: 800;
+  cursor: pointer;
+  /* A halo, not a lift: the mockup's button glows where it sits. */
+  box-shadow: 0 0 20px color-mix(in srgb, var(--signal) 35%, transparent);
+}
+.walk-cta:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.walk-arrow {
+  width: 26px;
+  height: 26px;
+}
+.walk-foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  margin-top: var(--s-2);
+}
+.walk-hair {
+  height: 1px;
+  background: var(--rule);
+}
+.walk-foot-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  padding: 0 var(--s-2);
+  border: 0;
+  background: none;
+  color: var(--silk-dim);
+  font: inherit;
+  font-size: var(--f-4);
+  text-align: left;
+}
+button.walk-foot-row {
+  cursor: pointer;
+}
+.walk-gear {
+  width: 26px;
+  height: 26px;
+}
+.walk-foot-text {
+  flex: 1 1 auto;
+}
+.walk-units {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-3);
+}
+.walk-unit {
+  min-height: 64px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2);
+  background: var(--panel);
+  color: var(--silk);
+  font: inherit;
+  font-size: var(--f-5);
+  font-weight: 800;
+  cursor: pointer;
+}
+.walk-unit.on {
+  border: 2px solid var(--signal);
+  background: color-mix(in srgb, var(--signal) 14%, transparent);
+  color: var(--signal);
 }
 .pw-card {
   display: flex;
