@@ -2623,6 +2623,27 @@ export function run(test) {
     assert.equal((rigSrc.match(/followComputerNames\(\)\n/g) || []).length, 2, 'a preset load does not go back for the names the computer is still reading')
     assert.match(rigSrc, /export const COMPUTER_NAMES_AFTER_MS = \[4000, 9000, 18000\]/)
     assert.match(rigSrc, /if \(state\.preset\?\.number !== number \|\| named\(\)\) return/, 'a late answer lands on the wrong preset, or over names already there')
+
+    /*
+     * AND THE PHONE CAN ASK FOR THEM ITSELF. "Keep having issues showing the
+     * scene names on the AM4... have a way to refresh them. Some of them work
+     * some of them don't." The names came only from the computer's window
+     * having opened that preset. GET /presets/{n}/scenes reads them off the
+     * unit through the relay, whenever nothing is kept, and on Refresh names.
+     */
+    assert.match(device, /export async function unitSceneNames\(number\) \{[\s\S]*?remoteRequest\(`\/presets\/\$\{number\}\/scenes`\)/, 'the phone has no way to read an AM4\'s scene names itself')
+    assert.match(device, /if \(Number\.isInteger\(res\?\.number\) && res\.number !== number\) return null/, 'an answer for another slot is believed')
+    assert.match(rigSrc, /if \(!names\.length && state\.preset\?\.number === number\) names = \(await device\.unitSceneNames\(number\)\) \|\| \[\]/, 'a preset with nothing kept does not ask the unit')
+    assert.match(rigSrc, /export async function rereadSceneNames\(\)/)
+    assert.match(rigSrc, /if \(fromUnit === null\) return 'failed'[\s\S]*?if \(!names\.length\) return 'none'/, 'Refresh names cannot tell unnamed scenes from a failed read')
+    const stage = read('mobile/src/screens/Stage.js')
+    assert.match(stage, /<Label>Scenes<\/Label>\s*<RefreshNames \/>/, 'Refresh names is not beside the Scenes heading')
+    assert.match(stage, /await refreshAll\(\)\s*\/\*[^*]*\*\/\s*await rereadSceneNames\(\)/, 'pulling down does not read the scene names fresh')
+    assert.match(stage, /none: 'No names on the unit'/)
+    assert.match(stage, /failed: "Couldn't read them"/)
+    const web = read('src/lib/forgefx.js')
+    assert.ok(web.indexOf('request(`/presets/${number}/scenes`)') > -1 && web.indexOf('request(`/presets/${number}/scenes`)') < web.indexOf('const dump = await backupPreset(number)'), 'the browser does not try the relay-safe read before the backup')
+    assert.match(read('desktop/forgefx.lock.json'), /\+am4scenes/, 'the computer app does not carry the device server that answers /presets/{n}/scenes')
     assert.match(
       device,
       /export async function presetBlocks\(\) \{[\s\S]*?return list\.filter\(\(b\) => b\?\.slug\)\s*\}/,

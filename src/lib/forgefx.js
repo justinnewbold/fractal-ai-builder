@@ -2279,6 +2279,32 @@ export async function readSceneNames(number) {
     }
   }
 
+  /*
+   * The unit's own dump, as a read. "Some of them work some of them don't."
+   * GET /presets/{n}/scenes returns only the names, and a GET crosses the
+   * relay where the backup below does not — so a browser away from the
+   * computer can read an AM4's names too. An older computer app answers 404,
+   * and the backup is still there for it.
+   */
+  if (typeof number === 'number') {
+    try {
+      const res = await request(`/presets/${number}/scenes`)
+      const names = res?.names
+      if (wrongSlot(number, res?.number)) {
+        traceStep(`scenes: answered for ${res?.number}, not ${number} — ignored`)
+      } else if (Array.isArray(names) && names.some((n) => (n || '').trim())) {
+        const clean = names.map((n) => (n || '').trim())
+        rememberSceneNames(number, clean)
+        traceStep('scenes: found names')
+        return clean
+      } else if (Array.isArray(names)) {
+        traceStep('scenes: the unit answered, and every scene is unnamed')
+      }
+    } catch (err) {
+      traceStep(`scenes: ${err?.status === 404 || err?.status === 501 ? 'not on this computer app' : `failed — ${err.message}`}`)
+    }
+  }
+
   try {
     const dump = await backupPreset(number)
     const names = dump?.sceneNames
