@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { AppState } from 'react-native'
 
 import { logDebug } from './debugLog'
 
@@ -42,7 +43,9 @@ let state = {
   /** Which bundle is running: 'embedded' (as built) or 'update'. */
   source: null,
   /** When the running bundle was published, if it was. */
-  publishedAt: null
+  publishedAt: null,
+  /** The ready banner was put away with its ✕ — until the next launch. */
+  dismissed: false
 }
 
 const watchers = new Set()
@@ -137,6 +140,48 @@ export const applyNow = async () => {
     logDebug(`updates: reload failed (${err?.message || err})`)
     set({ error: 'Could not restart. Close the app fully and open it again.' })
     return false
+  }
+}
+
+/** Put the ready banner away. The Updates row in Settings still offers the restart. */
+export const dismissReady = () => set({ dismissed: true })
+
+/*
+ * ASKED WITHOUT BEING ASKED, AND OFFERED RATHER THAN FORCED.
+ *
+ * "On the web app it actually will pop up a banner at the top of the screen
+ * that says update available. Is it possible to do that once the phone
+ * actually downloads an update so that they could just click that to restart
+ * it?" — and, the answer before, "I don't want it to pause for a few seconds
+ * every time they open the app."
+ *
+ * So nothing waits. A few seconds after the app is up it asks in the
+ * background, and again whenever it comes back from the background after a
+ * while — the case of somebody who never closes an app, who would otherwise
+ * carry an old version for as long as the phone keeps it alive. A download
+ * that lands turns the phase to 'ready', and the banner (UpdateReady) offers
+ * the restart. It never restarts on its own: a reload mid-song is the one
+ * thing worse than an old version.
+ */
+const FIRST_ASK_MS = 5000
+const ASK_AGAIN_MS = 30 * 60 * 1000
+let lastAsked = 0
+
+const askQuietly = () => {
+  if (['checking', 'downloading', 'ready', 'off'].includes(state.phase)) return
+  lastAsked = Date.now()
+  checkNow().catch(() => {})
+}
+
+/** Start asking. Returns the stop, for the effect that calls it. */
+export function watchForUpdates() {
+  const first = setTimeout(askQuietly, FIRST_ASK_MS)
+  const sub = AppState.addEventListener?.('change', (status) => {
+    if (status === 'active' && Date.now() - lastAsked > ASK_AGAIN_MS) askQuietly()
+  })
+  return () => {
+    clearTimeout(first)
+    sub?.remove?.()
   }
 }
 

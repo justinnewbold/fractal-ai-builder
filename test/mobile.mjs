@@ -5080,6 +5080,28 @@ export function run(test) {
     assert.match(read('shared/link-word.mjs'), /'no computer' : 'no phone'/, 'the bar still says NO MAC')
   })
 
+  test('a downloaded update is offered as a restart, and never taken on its own', () => {
+    /*
+     * "Is it possible to do that once the phone actually downloads an update
+     * so that they could just click that to restart it?" — and before it, "I
+     * don't want it to pause for a few seconds every time they open the app."
+     */
+    const updates = read('mobile/src/lib/updates.js')
+    const watch = updates.slice(updates.indexOf('const askQuietly'), updates.indexOf('export const updateState'))
+    assert.ok(watch.length > 100, 'watchForUpdates is gone')
+    assert.ok(!/applyNow|reloadAsync/.test(watch), 'the background check restarts the app by itself')
+    assert.match(watch, /status === 'active' && Date\.now\(\) - lastAsked > ASK_AGAIN_MS/, 'coming back from the background never asks again')
+    assert.match(read('mobile/app.json'), /"fallbackToCacheTimeout": 0/, 'the app waits on a download at launch')
+
+    const banner = read('mobile/src/components/UpdateReady.js')
+    assert.match(banner, /updates\.phase !== 'ready'/, 'the banner offers an update that has not downloaded')
+    assert.match(banner, /onPress=\{\(\) => applyNow\(\)\}/, 'the banner has no restart')
+    assert.match(banner, /onDismiss=\{dismissReady\}/, 'the banner cannot be put away')
+    const app = read('mobile/App.js')
+    assert.match(app, /useEffect\(\(\) => watchForUpdates\(\), \[\]\)/, 'nothing starts the background check')
+    assert.match(app, /<UpdateReady \/>/, 'the banner is drawn nowhere')
+  })
+
   test('a new version number does not cost a build', async () => {
     /*
      * EAS Update only ever reaches a build whose runtime version matches, and
