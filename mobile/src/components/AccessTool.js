@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Text, TextInput, View } from 'react-native'
+import { Keyboard, Text, TextInput, View } from 'react-native'
 
 import { color, font, radius, space, TAP } from '../lib/theme'
 import { DEFAULT_PROJECT } from '../lib/project'
@@ -34,6 +34,8 @@ export default function AccessTool() {
       setSaid({ ok: false, message: 'Type the email address they signed up with.' })
       return
     }
+    /* The answer sits under the field, and a keyboard left up covers it. */
+    Keyboard.dismiss()
     setBusy(action)
     setSaid(null)
     try {
@@ -77,6 +79,18 @@ export default function AccessTool() {
           fontSize: font.body
         }}
       />
+      {/*
+        The answer, right under the address it is about. It used to sit below
+        all three buttons, which on a phone is below the keyboard: "there was no
+        confirmation that it added them" -- the server had answered, three
+        times, that no account used that address, and none of it was on screen.
+        An address with no account is not a success, so it reads as a warning.
+      */}
+      {said ? (
+        <Note tone={said.ok && said.found !== false ? undefined : 'fault'} strong size={font.body}>
+          {said.message}
+        </Note>
+      ) : null}
       <Press label={busy === 'check' ? 'Checking…' : 'Check'} height={TAP} disabled={!!busy} onPress={() => run('check')} />
       <Press
         label={busy === 'grant' ? 'Giving access…' : 'Give access'}
@@ -87,7 +101,6 @@ export default function AccessTool() {
         onPress={() => run('grant')}
       />
       <Press label={busy === 'revoke' ? 'Taking it back…' : 'Take it back'} height={TAP} disabled={!!busy} onPress={() => run('revoke')} />
-      {said ? <Note tone={said.ok ? undefined : 'fault'}>{said.message}</Note> : null}
       <Facts rows={lookupRows(said)} />
     </View>
   )

@@ -55,6 +55,13 @@ export default function AccessTool() {
         autoCorrect="off"
         spellCheck={false}
       />
+      {/* The answer under the address it is about, and an address with no
+          account as a warning: it is not a success. Same as the phone's. */}
+      {said ? (
+        <p className={said.ok && said.found !== false ? 'hint access-said' : 'save-error access-said'} role="status">
+          {said.message}
+        </p>
+      ) : null}
       <div className="history-actions">
         <button type="button" className="chip" disabled={!!busy} onClick={() => run('check')}>
           {busy === 'check' ? 'Checking…' : 'Check'}
@@ -66,7 +73,6 @@ export default function AccessTool() {
           {busy === 'revoke' ? 'Taking it back…' : 'Take it back'}
         </button>
       </div>
-      {said ? <p className={said.ok ? 'hint' : 'save-error'} role="status">{said.message}</p> : null}
       <Facts rows={lookupRows(said)} />
     </div>
   )

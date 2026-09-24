@@ -319,7 +319,7 @@ Deno.serve(async (req: Request) => {
         ok: true,
         found: false,
         email,
-        message: `No account uses ${email}. They need to create one first (Create Account, in the app or on the website), with this same email.`
+        message: `Nobody was added: no account uses ${email} yet. They need to tap Create Account in the app or on the website, with this same email, and then you press Give access again.`
       })
     }
     const entitlement = await entitlementId()

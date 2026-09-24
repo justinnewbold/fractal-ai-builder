@@ -3489,6 +3489,20 @@ export function run(test) {
     assert.match(server, /<b>\$\{shown\}<\/b>/, 'the address goes into the email unescaped')
     assert.match(grant, /already had the unlock, so no email was sent/, 'pressing Give twice does not say why no email went')
     assert.match(grant, /did not go out, so let them know yourself/, 'a failed email is reported as sent')
+
+    /*
+     * "There was no confirmation that it added them." The server had said,
+     * three times, that no account used the address; the answer sat under all
+     * three buttons, below the phone's keyboard. It goes under the field now,
+     * and an address with no account reads as a warning, not a success.
+     */
+    assert.match(server, /Nobody was added: no account uses/, 'an address with no account does not say plainly that nobody was added')
+    for (const file of ['mobile/src/components/AccessTool.js', 'src/components/AccessTool.jsx']) {
+      const ui = read(file)
+      assert.ok(ui.indexOf('said.message') < ui.indexOf("run('check')"), `${file}: the answer is below the buttons again`)
+      assert.match(ui, /said\.ok && said\.found !== false/, `${file}: no account reads as a success`)
+    }
+    assert.match(read('mobile/src/components/AccessTool.js'), /Keyboard\.dismiss\(\)/, 'the keyboard is left covering the answer')
   })
 
   test('the advice to close Fractal’s own software names it, per unit where the unit is known', async () => {
