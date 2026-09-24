@@ -38,6 +38,20 @@ export const UPDATER = 'Fractal-Bot'
 /** Every editor, for when the unit is not known. */
 export const ALL_EDITORS = 'FM3-Edit, FM9-Edit, Axe-Edit III, Axe-Edit, AM4-Edit, VP4-Edit'
 
+/**
+ * Fractal's USB driver, which Windows needs and a Mac does not.
+ *
+ * "Might as well add that line to it, but also let them know if they've
+ * already installed the Axe-Fx edit apps they already have it." Every Fractal
+ * unit needs Fractal's own USB driver on Windows before any program can see it
+ * over USB, this one included. Most people who own one have it already,
+ * because Fractal's editors install it and do not work without it either, so
+ * that is said first: it is the answer for nearly everybody.
+ */
+export const FRACTAL_DOWNLOADS = 'https://www.fractalaudio.com/downloads/'
+
+export const WINDOWS_DRIVER = `Windows only: your Fractal unit needs Fractal's own USB driver before any program can see it. If you have already installed one of Fractal's editors on this PC (${ALL_EDITORS.replace(/, (?=[^,]*$)/, ' or ')}), you already have it. If not, it is a free download on Fractal's website, on your unit's downloads page.`
+
 /** The editor for a unit named like "FM3" or "Axe-Fx III", or null. */
 export function editorFor(unit) {
   if (typeof unit !== 'string' || !unit.trim()) return null

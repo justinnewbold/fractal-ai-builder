@@ -208,6 +208,35 @@ export async function sceneNames(number) {
   }
 }
 
+/**
+ * One preset's scene names, read off the unit by the computer.
+ *
+ * "Keep having issues showing the scene names on the AM4. Some of them work
+ * some of them don't." An AM4's names are only inside a full preset dump, and
+ * until now the only way to get one was a backup, which the host rightly will
+ * not run for a phone. So the phone saw names only for presets the computer's
+ * own window had happened to open. GET /presets/{n}/scenes is that dump as a
+ * read that returns only the names, and the relay carries it.
+ *
+ * Three answers, never a throw: the names; an empty list when the unit
+ * answered and its scenes are unnamed; null when nothing could be read — an
+ * older computer app has no such route, or the unit did not answer. An answer
+ * for another slot is null too: the last song's names must not land on this
+ * song's tiles.
+ */
+export async function unitSceneNames(number) {
+  if (!Number.isInteger(number) || number < 0 || demoDevice()) return null
+  try {
+    const res = await remoteRequest(`/presets/${number}/scenes`)
+    if (!Array.isArray(res?.names)) return null
+    if (Number.isInteger(res?.number) && res.number !== number) return null
+    const names = res.names.map((n) => (typeof n === 'string' ? n.trim() : ''))
+    return names.some((n) => n) ? names : []
+  } catch {
+    return null
+  }
+}
+
 /** Which scene is live. Bypass states are per-scene, so this changes what else is true. */
 export const getScene = () => remoteRequest('/scene')
 

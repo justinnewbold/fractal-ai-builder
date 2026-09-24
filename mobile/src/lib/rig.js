@@ -672,7 +672,10 @@ export async function refreshTempo() {
 export async function refreshSceneNames() {
   const number = state.preset?.number
   if (!Number.isInteger(number)) return
-  const names = await device.sceneNames(number)
+  /* The summary first — a gen-3 carries them there — and the unit's own dump
+     when it does not, which on an AM4 is always. See device.unitSceneNames. */
+  let names = await device.sceneNames(number)
+  if (!names.length && state.preset?.number === number) names = (await device.unitSceneNames(number)) || []
   /* Still the same preset: a slow read that lands after the next tap would
      otherwise put the last song's names on this song's tiles. */
   if (!names.length || state.preset?.number !== number) return
@@ -682,6 +685,37 @@ export async function refreshSceneNames() {
   const slug = state.deviceSlug
   rememberSceneNames(device.nameOwner(slug), number, names)
   device.keepSceneNames(slug, number, names)
+}
+
+/**
+ * READ THEM AGAIN, NOW, whatever is remembered.
+ *
+ * "The presets have a way to refresh — have a way to refresh them." Names are
+ * kept once read, on this phone and on the computer, which is what makes a
+ * preset change instant — and what makes a wrong or missing copy stick. This
+ * goes past both to the unit, and writes what it finds over them.
+ *
+ * 'found' with names, 'none' when the unit answered and every scene is
+ * unnamed, 'failed' when nothing could be read (an older computer app, a unit
+ * that did not answer). Only a real answer replaces what is on the tiles.
+ */
+export async function rereadSceneNames() {
+  const number = state.preset?.number
+  if (!Number.isInteger(number)) return 'failed'
+  let names = await device.sceneNames(number)
+  if (!names.length && state.preset?.number === number) {
+    const fromUnit = await device.unitSceneNames(number)
+    if (fromUnit === null) return 'failed'
+    names = fromUnit
+  }
+  if (state.preset?.number !== number) return 'failed'
+  if (!names.length) return 'none'
+  set({ sceneNames: names })
+  const slug = state.deviceSlug
+  rememberSceneNames(device.nameOwner(slug), number, names)
+  device.keepSceneNames(slug, number, names)
+  logDebug('scenes', `re-read the scene names for ${number} off the unit`)
+  return 'found'
 }
 
 /**

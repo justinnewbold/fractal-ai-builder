@@ -19,7 +19,7 @@
  * says what went wrong and offers nothing to do about it is where this started.
  */
 import { isOlder } from './versions.js'
-import { quitEditor } from './editors.js'
+import { WINDOWS_DRIVER, quitEditor } from './editors.js'
 
 export const FIXES = [
   {
@@ -41,6 +41,8 @@ export const FIXES = [
       'Try a different USB port, straight into the computer rather than through a hub.',
       /* The other common one: Fractal's own editor already has the unit. */
       quitEditor(null),
+      /* The one a new Windows user can hit before any of the above. */
+      WINDOWS_DRIVER,
       'Make sure the computer app is actually running. It lives in the menu bar, not the Dock.',
       'If the phone cannot reach the computer, check both are on the same wifi, and that a firewall or a VPN on the computer is not blocking it.'
     ]

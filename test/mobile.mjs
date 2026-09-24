@@ -2623,6 +2623,27 @@ export function run(test) {
     assert.equal((rigSrc.match(/followComputerNames\(\)\n/g) || []).length, 2, 'a preset load does not go back for the names the computer is still reading')
     assert.match(rigSrc, /export const COMPUTER_NAMES_AFTER_MS = \[4000, 9000, 18000\]/)
     assert.match(rigSrc, /if \(state\.preset\?\.number !== number \|\| named\(\)\) return/, 'a late answer lands on the wrong preset, or over names already there')
+
+    /*
+     * AND THE PHONE CAN ASK FOR THEM ITSELF. "Keep having issues showing the
+     * scene names on the AM4... have a way to refresh them. Some of them work
+     * some of them don't." The names came only from the computer's window
+     * having opened that preset. GET /presets/{n}/scenes reads them off the
+     * unit through the relay, whenever nothing is kept, and on Refresh names.
+     */
+    assert.match(device, /export async function unitSceneNames\(number\) \{[\s\S]*?remoteRequest\(`\/presets\/\$\{number\}\/scenes`\)/, 'the phone has no way to read an AM4\'s scene names itself')
+    assert.match(device, /if \(Number\.isInteger\(res\?\.number\) && res\.number !== number\) return null/, 'an answer for another slot is believed')
+    assert.match(rigSrc, /if \(!names\.length && state\.preset\?\.number === number\) names = \(await device\.unitSceneNames\(number\)\) \|\| \[\]/, 'a preset with nothing kept does not ask the unit')
+    assert.match(rigSrc, /export async function rereadSceneNames\(\)/)
+    assert.match(rigSrc, /if \(fromUnit === null\) return 'failed'[\s\S]*?if \(!names\.length\) return 'none'/, 'Refresh names cannot tell unnamed scenes from a failed read')
+    const stage = read('mobile/src/screens/Stage.js')
+    assert.match(stage, /<Label>Scenes<\/Label>\s*<RefreshNames \/>/, 'Refresh names is not beside the Scenes heading')
+    assert.match(stage, /await refreshAll\(\)\s*\/\*[^*]*\*\/\s*await rereadSceneNames\(\)/, 'pulling down does not read the scene names fresh')
+    assert.match(stage, /none: 'No names on the unit'/)
+    assert.match(stage, /failed: "Couldn't read them"/)
+    const web = read('src/lib/forgefx.js')
+    assert.ok(web.indexOf('request(`/presets/${number}/scenes`)') > -1 && web.indexOf('request(`/presets/${number}/scenes`)') < web.indexOf('const dump = await backupPreset(number)'), 'the browser does not try the relay-safe read before the backup')
+    assert.match(read('desktop/forgefx.lock.json'), /\+am4scenes/, 'the computer app does not carry the device server that answers /presets/{n}/scenes')
     assert.match(
       device,
       /export async function presetBlocks\(\) \{[\s\S]*?return list\.filter\(\(b\) => b\?\.slug\)\s*\}/,
@@ -3579,6 +3600,19 @@ export function run(test) {
     assert.equal(editorFor('Axe-Fx II'), 'Axe-Edit', 'the Axe-Fx II is taken for a III, or the other way round')
     assert.equal(editorFor('II XL+'), 'Axe-Edit', 'an XL+ by its short name')
     assert.equal(editorFor('II XL'), 'Axe-Edit', 'an XL by its short name')
+
+    /* "Let them know if they've already installed the Axe-Fx edit apps they already have it." */
+    const { WINDOWS_DRIVER, FRACTAL_DOWNLOADS } = await import('../shared/editors.mjs')
+    assert.match(WINDOWS_DRIVER, /^Windows only: /, 'the driver line does not say it is for Windows')
+    assert.match(WINDOWS_DRIVER, /already installed one of Fractal's editors on this PC \(FM3-Edit, .*Axe-Edit, AM4-Edit or VP4-Edit\), you already have it/, 'the driver line does not say an editor already brought it')
+    assert.equal(FRACTAL_DOWNLOADS, 'https://www.fractalaudio.com/downloads/')
+    const waysSrc = read('shared/ways-in.mjs')
+    const win = waysSrc.slice(waysSrc.indexOf("id: 'windows-app'"), waysSrc.indexOf("id: 'linux-app'"))
+    assert.ok(win.indexOf('WINDOWS_DRIVER') > -1 && win.indexOf('WINDOWS_DRIVER') < win.indexOf('Plug your unit'), 'the Windows steps do not mention the driver before the cable goes in')
+    assert.match(win, /url: FRACTAL_DOWNLOADS/, "the Windows steps do not link Fractal's downloads")
+    const trouble = await import('../shared/troubleshooting.mjs')
+    assert.ok(trouble.fixById('connect').steps.includes(WINDOWS_DRIVER), "It will not connect does not mention Windows' driver")
+    assert.doesNotMatch(read('shared/ways-in.mjs').slice(read('shared/ways-in.mjs').indexOf("id: 'mac-app'"), read('shared/ways-in.mjs').indexOf("id: 'windows-app'")), /WINDOWS_DRIVER/, 'the Mac is told to install a Windows driver')
     assert.equal(editorFor('AM4'), 'AM4-Edit')
     assert.equal(editorFor('VP4'), 'VP4-Edit')
     assert.equal(editorFor(null), null)

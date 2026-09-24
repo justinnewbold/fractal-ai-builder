@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Image, RefreshControl, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native'
+import { Image, Pressable, RefreshControl, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native'
 import { useKeepAwake } from 'expo-keep-awake'
 
 import { color, font, space, TAP } from '../lib/theme'
@@ -20,6 +20,7 @@ import {
   clearError,
   loadPreset,
   refreshAll,
+  rereadSceneNames,
   tapTempo,
   useRig,
   writeBypass,
@@ -297,6 +298,8 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
     setRefreshing(true)
     try {
       await refreshAll()
+      /* Pulling down reads the scene names fresh too, past anything kept. */
+      await rereadSceneNames()
     } catch {
       // refreshAll puts what it learned in the store, including the failure.
       // Nothing to add here that the screen is not already showing.
@@ -501,7 +504,15 @@ export default function Stage({ onOpenPresets, onOpenSetlists, onOpenEdit, onOpe
       */}
       {scenes.hasScenes ? (
         <View style={{ gap: space.sm }}>
-          <Label>Scenes</Label>
+          {/*
+            "Keep having issues showing the scene names on the AM4. Have a way to
+            refresh them." Beside the heading, the size of the heading: a thing
+            reached for now and then, not a control on the stage.
+          */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Label>Scenes</Label>
+            <RefreshNames />
+          </View>
           <View
             onLayout={(e) => {
               setGrid(e.nativeEvent.layout.width)
@@ -846,6 +857,48 @@ function ChannelSheet({ block, channels, onClose, onPick }) {
         plays.
       </Text>
     </Sheet>
+  )
+}
+
+/** What the Refresh names link says, before and after a press. */
+export const REFRESH_NAMES = {
+  idle: 'Refresh names',
+  reading: 'Reading…',
+  found: 'Names updated',
+  none: 'No names on the unit',
+  failed: "Couldn't read them"
+}
+
+function RefreshNames() {
+  const [said, setSaid] = useState('idle')
+  const timer = useRef(null)
+  useEffect(() => () => clearTimeout(timer.current), [])
+  const press = async () => {
+    if (said === 'reading') return
+    clearTimeout(timer.current)
+    setSaid('reading')
+    const out = await rereadSceneNames().catch(() => 'failed')
+    setSaid(out)
+    timer.current = setTimeout(() => setSaid('idle'), 4000)
+  }
+  return (
+    <Pressable
+      onPress={press}
+      hitSlop={{ top: 14, bottom: 14, left: 14, right: 8 }}
+      accessibilityRole="button"
+      accessibilityLabel="Refresh scene names"
+    >
+      <Text
+        style={{
+          color: said === 'failed' ? color.fault : said === 'idle' ? color.silkDim : color.silk,
+          fontSize: font.micro,
+          letterSpacing: 1.5,
+          textTransform: 'uppercase'
+        }}
+      >
+        {REFRESH_NAMES[said] || REFRESH_NAMES.idle}
+      </Text>
+    </Pressable>
   )
 }
 
