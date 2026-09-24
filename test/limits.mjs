@@ -778,7 +778,9 @@ export function run(test) {
     const { photoFor } = await import('../src/lib/gearPhotos.js')
     const one = photoFor('1959SLP Treble')
     assert.ok(one?.src && one?.credit && one?.rights, 'photoFor no longer returns the credit with the picture')
-    assert.equal(photoFor('Recto2 Orange Vintage'), null, 'a model with no photograph is being given one')
+    /* A Dumble-style amp: the searches have never found an openly licensed
+       photo of one, so it is the safest example of a model with none. */
+    assert.equal(photoFor('Bludojai Clean'), null, 'a model with no photograph is being given one')
     assert.equal(photoFor(''), null)
     assert.equal(photoFor(), null, 'photoFor throws rather than answering for a missing name')
 
