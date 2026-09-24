@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { photoFor } from '../lib/gearPhotos'
 import { descriptionFor, paragraphsOf, specsFor } from '../lib/lineage'
 
@@ -24,7 +25,57 @@ import { descriptionFor, paragraphsOf, specsFor } from '../lib/lineage'
  * showing it at all, so there is no arrangement of this component that draws
  * one without the other. photoFor hands back both together for that reason.
  */
-export default function GearCard({ entry, onBack }) {
+/*
+ * ONE MODEL AT A TIME, AND THE NEXT ONE A SWIPE OR AN ARROW AWAY.
+ *
+ * "Make it so swiping left or right on the screen takes you forward or
+ * backwards to the next amp model. Also have little arrow buttons on each
+ * side of the screen." The phone's gear page does it with the same words
+ * (mobile/src/components/GearCard.js): the page follows the finger and
+ * slides off as the next one comes in, the arrows do the same, and so do
+ * the keyboard's left and right arrows. The list wraps round at both ends.
+ */
+const OUT_MS = 170
+const IN_MS = 220
+
+export default function GearCard({ entry, entries = [], onGo, onBack }) {
+  const list = entries.length ? entries : entry ? [entry] : []
+  const at = Math.max(0, list.findIndex((e) => e === entry || (e.name === entry?.name && e.slug === entry?.slug)))
+  const many = list.length > 1
+  const [dx, setDx] = useState(0)
+  const [slide, setSlide] = useState(null)
+  const touch = useRef(null)
+  const box = useRef(null)
+  const live = useRef({})
+  live.current = { list, at, many, onGo, slide }
+
+  const turn = (dir) => {
+    const { list: l, at: i, many: m, onGo: go, slide: busy } = live.current
+    if (!m || busy) return
+    setSlide({ to: -dir * 100, ms: OUT_MS })
+    setTimeout(() => {
+      go?.(l[(i + dir + l.length) % l.length])
+      setDx(0)
+      setSlide({ to: dir * 100, ms: 0 })
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          setSlide({ to: 0, ms: IN_MS })
+          setTimeout(() => setSlide(null), IN_MS)
+        })
+      )
+    }, OUT_MS)
+  }
+
+  useEffect(() => {
+    const key = (e) => {
+      if (e.target?.closest?.('input, textarea, select')) return
+      if (e.key === 'ArrowRight') turn(1)
+      else if (e.key === 'ArrowLeft') turn(-1)
+    }
+    window.addEventListener('keydown', key)
+    return () => window.removeEventListener('keydown', key)
+  })
+
   if (!entry) return null
   const photo = photoFor(entry.name)
   const about = paragraphsOf(descriptionFor(entry.slug, entry.name))
@@ -43,11 +94,63 @@ export default function GearCard({ entry, onBack }) {
         ? `Based on ${entry.gear}`
         : null
 
+  const onTouchStart = (e) => {
+    const t = e.touches[0]
+    touch.current = { x: t.clientX, y: t.clientY, side: null }
+  }
+  const onTouchMove = (e) => {
+    const t0 = touch.current
+    if (!t0 || !many || slide) return
+    const t = e.touches[0]
+    const mx = t.clientX - t0.x
+    const my = t.clientY - t0.y
+    if (!t0.side && Math.abs(mx) > 12) t0.side = Math.abs(mx) > Math.abs(my) * 1.5 ? 'x' : 'y'
+    if (t0.side === 'x') setDx(mx)
+  }
+  const onTouchEnd = () => {
+    const t0 = touch.current
+    touch.current = null
+    if (!t0 || t0.side !== 'x') return
+    const w = box.current?.offsetWidth || 360
+    if (dx < -w * 0.22) turn(1)
+    else if (dx > w * 0.22) turn(-1)
+    else setDx(0)
+  }
+  const style = slide
+    ? { transform: `translateX(${slide.to}%)`, transition: slide.ms ? `transform ${slide.ms}ms ease` : 'none' }
+    : dx
+      ? { transform: `translateX(${dx}px)`, transition: 'none' }
+      : { transform: 'translateX(0)', transition: 'transform 200ms ease' }
+
   return (
-    <div className="gear-card">
-      <button type="button" className="setup-back" onClick={onBack}>
-        &lsaquo; All models
-      </button>
+    <div className="gear-card" ref={box} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
+      <div className="gear-card-top">
+        <button type="button" className="setup-back" onClick={onBack}>
+          &lsaquo; All models
+        </button>
+        {many ? <span className="hint">{`${at + 1} of ${list.length}`}</span> : null}
+      </div>
+      {many ? (
+        <>
+          <button
+            type="button"
+            className="gear-arrow left"
+            aria-label={`Previous: ${list[(at - 1 + list.length) % list.length]?.name}`}
+            onClick={() => turn(-1)}
+          >
+            &lsaquo;
+          </button>
+          <button
+            type="button"
+            className="gear-arrow right"
+            aria-label={`Next: ${list[(at + 1) % list.length]?.name}`}
+            onClick={() => turn(1)}
+          >
+            &rsaquo;
+          </button>
+        </>
+      ) : null}
+      <div className="gear-card-slide" style={style}>
       <p className="gear-card-name">{entry.name}</p>
       {lineage ? <p className="gear-card-gear">{lineage}</p> : null}
 
@@ -96,6 +199,7 @@ export default function GearCard({ entry, onBack }) {
           who owns the real thing.
         </p>
       ) : null}
+      </div>
     </div>
   )
 }

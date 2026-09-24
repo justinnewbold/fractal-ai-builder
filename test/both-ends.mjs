@@ -1362,4 +1362,29 @@ export function run(test) {
     assert.match(bar, /setSaying\(\(open\) => !open\)/, 'the phone’s CONNECTED is a label again')
     assert.match(bar, /`Connected to \$\{where\}\.`/, 'the phone’s CONNECTED note does not name the computer')
   })
+
+  /*
+   * THE MODEL PAGE TURNS TO THE NEXT MODEL, at both ends.
+   *
+   * "Make it so swiping left or right on the screen takes you forward or
+   * backwards to the next amp model. Also have little arrow buttons on each
+   * side of the screen." Each end gets the tab's list, arrows either side,
+   * a swipe, and a "3 of 24", and neither lets a sideways swipe leave the page.
+   */
+  test('the amp and pedal page steps to the next model with a swipe or an arrow, at both ends', () => {
+    const phone = read('mobile/src/components/GearCard.js')
+    const web = read('src/components/GearCard.jsx')
+    for (const [end, src] of [['phone', phone], ['browser', web]]) {
+      assert.match(src, /export default function GearCard\(\{ entry, entries = \[\], onGo, onBack \}\)/, `the ${end}’s model page has no list to step through`)
+      assert.match(src, /`\$\{at \+ 1\} of \$\{list\.length\}`/, `the ${end} does not say where in the list you are`)
+      assert.match(src, /Previous: /, `the ${end} has no back arrow`)
+      assert.match(src, /Next: /, `the ${end} has no forward arrow`)
+      assert.match(src, /\(i \+ dir \+ l\.length\) % l\.length/, `the ${end}’s list stops at its ends instead of wrapping`)
+    }
+    assert.match(phone, /PanResponder\.create/, 'the phone’s page does not follow a swipe')
+    assert.match(phone, /onPanResponderTerminationRequest: \(\) => false/, 'a swipe on the phone’s model page can still be taken by the back gesture')
+    assert.match(phone, /BackHandler\.addEventListener\('hardwareBackPress'/, 'Android’s back leaves the app from the model page')
+    assert.match(web, /onTouchMove=\{onTouchMove\}/, 'the browser’s page does not follow a swipe')
+    assert.match(web, /e\.key === 'ArrowRight'/, 'the keyboard’s arrows do not step through the models')
+  })
 }

@@ -7096,7 +7096,7 @@ export function run(test) {
      */
     const gear = read('mobile/src/screens/Gear.js')
     assert.match(gear, /onPress=\{\(\) => setOpen\(item\)\}/, 'the phone\u2019s rows still cannot be opened')
-    assert.match(gear, /if \(open\) return <GearCard entry=\{open\} onBack=\{\(\) => setOpen\(null\)\} \/>/, 'there is nothing behind a row')
+    assert.match(gear, /if \(open\) return <GearCard entry=\{open\} entries=\{rows\} onGo=\{setOpen\} onBack=\{\(\) => setOpen\(null\)\} \/>/, 'there is nothing behind a row')
     assert.match(gear, /accessibilityRole="button"/, 'a row that opens a page does not say it is a button')
 
     const card = read('mobile/src/components/GearCard.js')

@@ -1,10 +1,25 @@
-import { Image, Linking, ScrollView, Text, View } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import {
+  Animated,
+  BackHandler,
+  Easing,
+  Image,
+  Linking,
+  PanResponder,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  useWindowDimensions
+} from 'react-native'
 
 import { color, font, radius, space } from '../lib/theme'
 import { photoFor } from '../lib/gearPhotos'
 import { descriptionFor, paragraphsOf, specsFor } from '../lib/lineage'
 import { HOSTED_ORIGIN } from '../lib/pairing'
 import Press from './Press'
+import { tick } from '../lib/feedback'
+import chevronIcon from '../../assets/icons/chevron.png'
 
 /**
  * One model, on a page of its own.
@@ -31,7 +46,93 @@ import Press from './Press'
  * and naming the photographer is a condition of showing it at all, so there
  * is no arrangement of this screen that draws one without the other.
  */
-export default function GearCard({ entry, onBack }) {
+/*
+ * ONE MODEL AT A TIME, AND THE NEXT ONE A SWIPE AWAY.
+ *
+ * "Make it so swiping left or right on the screen takes you forward or
+ * backwards to the next amp model. Also have little arrow buttons on each
+ * side of the screen… Have the All models button take them back." And
+ * smoothly: the page follows the finger, then slides off as the next one
+ * slides in, the way a phone's own photo viewer does. It is the core
+ * Animated library, so it costs no build.
+ *
+ * `entries` is the list the page was opened from (the tab and the search as
+ * they were), and it wraps round at both ends, so the arrows never go dead.
+ *
+ * The swipe is claimed here, deeper than the app's swipe-from-the-edge back
+ * gesture, so a sideways swipe on this page always means "next model" and
+ * never "leave". Android's own back gesture comes to All models too, rather
+ * than out of the app.
+ */
+const SWIPE = 0.22 // of the screen's width, dragged far enough to turn
+const FLICK = 0.45 // or thrown fast enough
+
+export default function GearCard({ entry, entries = [], onGo, onBack }) {
+  const { width } = useWindowDimensions()
+  const x = useRef(new Animated.Value(0)).current
+  const [moving, setMoving] = useState(false)
+  const list = entries.length ? entries : entry ? [entry] : []
+  const at = Math.max(0, list.findIndex((e) => e === entry || (e.name === entry?.name && e.slug === entry?.slug)))
+  const many = list.length > 1
+
+  /* The live values, for a gesture made once and kept. */
+  const live = useRef({})
+  live.current = { list, at, many, width, onGo, moving }
+
+  /* Out one side, swap, in from the other. */
+  const turn = (dir) => {
+    const { list: l, at: i, many: m, width: w, onGo: go, moving: busy } = live.current
+    if (!m || busy) return
+    setMoving(true)
+    Animated.timing(x, { toValue: -dir * w, duration: 170, easing: Easing.in(Easing.quad), useNativeDriver: true }).start(() => {
+      go?.(l[(i + dir + l.length) % l.length])
+      x.setValue(dir * w)
+      Animated.timing(x, { toValue: 0, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start(() =>
+        setMoving(false)
+      )
+    })
+  }
+  const turnRef = useRef(turn)
+  turnRef.current = turn
+
+  const pan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+      /* Nothing above this takes the gesture away mid-swipe. */
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderMove: (_e, g) => {
+        if (live.current.many && !live.current.moving) x.setValue(g.dx)
+      },
+      onPanResponderRelease: (_e, g) => {
+        const w = live.current.width
+        if (g.dx < -w * SWIPE || g.vx < -FLICK) return turnRef.current(1)
+        if (g.dx > w * SWIPE || g.vx > FLICK) return turnRef.current(-1)
+        Animated.spring(x, { toValue: 0, useNativeDriver: true, bounciness: 6 }).start()
+      },
+      onPanResponderTerminate: () => Animated.spring(x, { toValue: 0, useNativeDriver: true }).start()
+    })
+  ).current
+
+  /* Android's back gesture and button: to All models, not out of the app. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onBack?.()
+      return true
+    })
+    return () => sub.remove()
+  }, [onBack])
+
+  /* The neighbours' photographs fetched ahead, so a swipe lands on a picture
+     rather than on a blank box that fills in a moment later. */
+  useEffect(() => {
+    if (!many) return
+    for (const d of [1, -1]) {
+      const next = list[(at + d + list.length) % list.length]
+      const p = next && photoFor(next.name, `${HOSTED_ORIGIN}/gear`)
+      if (p) Image.prefetch(p.src).catch(() => {})
+    }
+  }, [at, many, list])
+
   if (!entry) return null
   const photo = photoFor(entry.name, `${HOSTED_ORIGIN}/gear`)
   const about = paragraphsOf(descriptionFor(entry.slug, entry.name))
@@ -60,10 +161,15 @@ export default function GearCard({ entry, onBack }) {
         }}
       >
         <Press label="‹ All models" height={40} onPress={onBack} />
+        {many ? (
+          <Text style={{ color: color.silkDim, fontSize: font.small }}>{`${at + 1} of ${list.length}`}</Text>
+        ) : null}
       </View>
 
+      <View style={{ flex: 1 }} {...pan.panHandlers}>
+      <Animated.View style={{ flex: 1, transform: [{ translateX: x }] }}>
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space.xxl, gap: space.md }}
+        contentContainerStyle={{ paddingHorizontal: space.lg + (many ? 40 : 0), paddingBottom: space.xxl, gap: space.md }}
       >
         <View>
           <Text
@@ -134,6 +240,53 @@ export default function GearCard({ entry, onBack }) {
           </Text>
         ) : null}
       </ScrollView>
+      </Animated.View>
+      {many ? (
+        <>
+          <Arrow side="left" onPress={() => turn(-1)} label={`Previous: ${list[(at - 1 + list.length) % list.length]?.name}`} />
+          <Arrow side="right" onPress={() => turn(1)} label={`Next: ${list[(at + 1) % list.length]?.name}`} />
+        </>
+      ) : null}
+      </View>
     </View>
+  )
+}
+
+/** A round arrow at the side of the page, held still while the page slides. */
+function Arrow({ side, onPress, label }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      hitSlop={8}
+      onPress={() => {
+        tick()
+        onPress()
+      }}
+      style={({ pressed }) => ({
+        position: 'absolute',
+        top: 120,
+        [side]: space.xs,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: color.rule,
+        backgroundColor: pressed ? color.panelHi : color.panel
+      })}
+    >
+      <Image
+        source={chevronIcon}
+        accessible={false}
+        style={{
+          width: 16,
+          height: 16,
+          tintColor: color.silk,
+          transform: side === 'left' ? [{ scaleX: -1 }] : []
+        }}
+      />
+    </Pressable>
   )
 }

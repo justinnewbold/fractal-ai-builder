@@ -7569,6 +7569,44 @@ button.gig-bar-btn:disabled {
 
 /* ---------- one model, on a page of its own ---------- */
 
+/* The model page slides: the arrows stay put at the sides while the page
+   moves, and the page is inset so its words never sit under them. */
+.gear-card {
+  position: relative;
+  overflow-x: hidden;
+  touch-action: pan-y;
+}
+.gear-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.gear-card:has(.gear-arrow) .gear-card-slide {
+  padding: 0 var(--s-7);
+}
+.gear-arrow {
+  position: absolute;
+  top: 140px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--silk);
+  font-size: var(--f-5);
+  line-height: 1;
+  cursor: pointer;
+}
+.gear-arrow.left {
+  left: 0;
+}
+.gear-arrow.right {
+  right: 0;
+}
 .gear-card-name {
   font-size: var(--f-4);
   font-weight: 700;
