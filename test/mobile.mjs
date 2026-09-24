@@ -3303,7 +3303,9 @@ export function run(test) {
       assert.ok(!/P2\.(eyebrow|sub)/.test(read(file)), `${file} still draws a line that is gone`)
     }
     const web = read('src/components/PhoneWalkthrough.jsx').replace(/\s+/g, ' ')
-    assert.match(web, /className="primary pw-go pw-stick" onClick=\{\(\) => setAt\('mode'\)\}/, 'the browser’s Got it can scroll off the bottom again')
+    /* The amber button from his "Here's the app" mockup now, still held. */
+    assert.match(web, /<Cta stick label=\{P2\.go\} onClick=\{\(\) => setAt\('mode'\)\} \/>/, 'the browser’s Got it can scroll off the bottom again')
+    assert.match(read('src/components/Walk.jsx'), /stick \? ' pw-stick' : ''/, 'the amber button forgot how to stay on screen')
     const css = read('src/styles.css').replace(/\s+/g, ' ')
     assert.match(css, /\.pw-stick \{ position: sticky; bottom: var\(--s-3\);/, 'the browser’s Got it is not held to the bottom')
   })
@@ -8332,15 +8334,10 @@ export function run(test) {
     assert.match(block.mode, /label: P3\.restore[^]{0,80}restore\('app'\)/, 'there is no way to restore a purchase from the first screen')
     assert.match(block.mode, /label: P3\.signIn[^]{0,80}onAccount\?\.\(\)/, 'there is no way to sign in from the first screen')
 
-    /*
-     * AND THE LAST TWO SCREENS NAME THE UNIT THAT ANSWERED. `unitName` is the
-     * DEMO picker's choice and defaults to FM3, so somebody who had just
-     * paired an FM9 was told "Connection verified · FM3".
-     */
-    assert.match(src, /const detected = useRig\(\(st\) => st\.deviceName\)/, 'the walkthrough cannot see which unit actually answered')
-    assert.match(src, /const provenUnit = detected \|\| unitName/, 'a real pairing has no name to fall back from')
-    assert.match(block.connected, /P9\.tag\(provenUnit\)/, 'the connected line names the demo picker’s unit')
-    assert.match(block.connected, /P9\.demo\.status\(provenUnit\)/, 'the status line names the demo picker’s unit')
+    /* The last screen names no unit at all now: his "Here's the app"
+       mockup puts the line about the computer and the USB cable there. */
+    assert.ok(!/P9\.tag|P9\.demo\.status/.test(block.connected), 'the last screen names a unit again, over his mockup')
+    assert.match(block.connected, /<Sub>\{P9\.demo\.sub\}<\/Sub>/, 'the last screen lost the line about the computer')
     /* The picker itself still names what is lit, which is the one place the
        demo choice IS the answer. */
     assert.match(block.pick, /P4\.go\(unitName\)/, 'the demo picker stopped naming the unit you picked')

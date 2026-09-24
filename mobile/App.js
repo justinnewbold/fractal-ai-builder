@@ -566,6 +566,15 @@ export default function App() {
               setReplaying(false)
               setAuth('in')
             }}
+            /* The same, and straight on to Settings, where the walkthrough
+               can be shown again: the row at the foot of the last page. */
+            onSettings={() => {
+              markWalkthrough()
+              setSeenWalk(true)
+              setReplaying(false)
+              setAuth('in')
+              setScreen('settings')
+            }}
             /*
              * Out of the walkthrough and onto the sign-in screen.
              *

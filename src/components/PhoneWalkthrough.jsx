@@ -19,6 +19,10 @@ import featureTempo from '../../mobile/assets/welcome/tempo.png'
 import pieceUnit from '../../mobile/assets/piece-unit.png'
 import pieceComputer from '../../mobile/assets/piece-computer.png'
 import piecePhone from '../../mobile/assets/piece-phone.png'
+import playIcon from '../../mobile/assets/icons/play.png'
+import slidersIcon from '../../mobile/assets/icons/sliders.png'
+import saveIcon from '../../mobile/assets/icons/save.png'
+import { Cta, FootRow, Steps, TipCard } from './Walk'
 
 const PIECES = { unit: pieceUnit, computer: pieceComputer, phone: piecePhone }
 
@@ -135,7 +139,7 @@ export default function PhoneWalkthrough({ open, replay = false, computer = fals
 
         {at === 'how' ? (
           <>
-            <Progress count={P2.count} at={0} of={2} />
+            <Steps at={0} of={3} label={P2.count} />
             <h1 className="pw-head">{P2.head}</h1>
             <div className="pw-chain">
               {CHAIN.map((box, i) => (
@@ -162,15 +166,13 @@ export default function PhoneWalkthrough({ open, replay = false, computer = fals
             {/* Held at the bottom of the screen while the boxes scroll under
                 it, so a phone too short for the whole page still shows the
                 way on. */}
-            <button type="button" className="primary pw-go pw-stick" onClick={() => setAt('mode')}>
-              {`${P2.go}  ›`}
-            </button>
+            <Cta stick label={P2.go} onClick={() => setAt('mode')} />
           </>
         ) : null}
 
         {at === 'mode' ? (
           <>
-            <Progress count={P3.count} at={1} of={2} title={P3.title} />
+            <Steps at={1} of={3} label={P3.count} />
             <h1 className="pw-head">{P3.head}</h1>
             <p className="pw-sub">{computer ? C3.sub : P3.sub}</p>
 
@@ -185,9 +187,7 @@ export default function PhoneWalkthrough({ open, replay = false, computer = fals
                   </div>
                   <img className="pw-unit-shot" src={pieceComputer} alt="" />
                 </div>
-                <button type="button" className="primary pw-go" onClick={() => onHere?.()}>
-                  {C3.here.go}
-                </button>
+                <Cta label={C3.here.go} onClick={() => onHere?.()} />
               </div>
             ) : null}
 
@@ -203,9 +203,13 @@ export default function PhoneWalkthrough({ open, replay = false, computer = fals
                 </div>
                 <img className="pw-unit-shot" src={unitShot} alt="" />
               </div>
-              <button type="button" className={computer ? 'chip pw-go' : 'primary pw-go'} onClick={() => setAt('pick')}>
-                {P3.demo.go}
-              </button>
+              {computer ? (
+                <button type="button" className="chip pw-go" onClick={() => setAt('pick')}>
+                  {P3.demo.go}
+                </button>
+              ) : (
+                <Cta label={P3.demo.go} onClick={() => setAt('pick')} />
+              )}
             </div>
 
             <div className="pw-choice">
@@ -241,16 +245,16 @@ export default function PhoneWalkthrough({ open, replay = false, computer = fals
 
         {at === 'pick' ? (
           <>
-            <p className="pw-eyebrow">{P4.tag}</p>
+            <Steps at={1} of={3} label={P3.count} />
             <p className="pw-eyebrow">{P4.eyebrow}</p>
             <h1 className="pw-head">{P4.head}</h1>
             <p className="pw-sub">{P4.sub}</p>
-            <div className="pw-units">
+            <div className="walk-units">
               {UNITS.map((u) => (
                 <button
                   type="button"
                   key={u.key}
-                  className={`chip${u.key === unit ? ' active' : ''}`}
+                  className={`walk-unit${u.key === unit ? ' on' : ''}`}
                   aria-pressed={u.key === unit}
                   onClick={() => setUnit(u.key)}
                 >
@@ -258,9 +262,7 @@ export default function PhoneWalkthrough({ open, replay = false, computer = fals
                 </button>
               ))}
             </div>
-            <button type="button" className="primary pw-go" onClick={() => setAt('connected')}>
-              {P4.go(unitName)}
-            </button>
+            <Cta label={P4.go(unitName)} onClick={() => setAt('connected')} />
             <button type="button" className="chip pw-go" onClick={() => setAt('mode')}>
               {P4.back}
             </button>
@@ -269,19 +271,19 @@ export default function PhoneWalkthrough({ open, replay = false, computer = fals
 
         {at === 'connected' ? (
           <>
-            <p className="pw-eyebrow">{P9.tag(unitName)}</p>
+            {/* His "Here's the app" mockup, which every page now copies.
+                The unit's name came off the top for the one sentence that
+                matters: the app needs a computer with the unit on USB. The
+                foot row says where the walkthrough lives afterwards; the
+                browser reloads into the demo, so it has nowhere to go. */}
+            <Steps at={2} of={3} label={P9.count} />
             <h1 className="pw-head">{P9.demo.head}</h1>
-            <p className="pw-sub">{P9.demo.status(unitName)}</p>
+            <p className="pw-sub">{P9.demo.sub}</p>
             {P9.tips.map((tip) => (
-              <div className="pw-card" key={tip.key}>
-                <p className="pw-card-label">{tip.label}</p>
-                <p className="pw-card-body">{tip.body}</p>
-              </div>
+              <TipCard key={tip.key} icon={TIP_ICONS[tip.key]} label={tip.label} body={tip.body} onClick={intoDemo} />
             ))}
-            <button type="button" className="primary pw-go pw-stick" onClick={intoDemo}>
-              {P9.go}
-            </button>
-            <p className="pw-note">{P9.foot}</p>
+            <Cta stick label={P9.go} onClick={intoDemo} />
+            <FootRow text={P9.foot} />
           </>
         ) : null}
       </div>
@@ -289,25 +291,9 @@ export default function PhoneWalkthrough({ open, replay = false, computer = fals
   )
 }
 
-/* Bars rather than dots, as on the phone: a bar reads as ground covered. */
-function Progress({ count, at, of, title }) {
-  return (
-    <div className="pw-progress">
-      <div className="pw-progress-top">
-        <span />
-        {title ? <span className="pw-progress-title">{title}</span> : <span />}
-        <span className="pw-count">{count}</span>
-      </div>
-      <div className="pw-bars">
-        {Array.from({ length: of }, (_, i) => (
-          <span key={i} className={`pw-bar${i <= at ? ' on' : ''}`} />
-        ))}
-      </div>
-    </div>
-  )
-}
+/* The three cards' pictures, by tip. */
+const TIP_ICONS = { play: playIcon, edit: slidersIcon, save: saveIcon }
 
-/* The five tiles' pictures, by the label under each. */
 const FEATURE_PICTURES = {
   PRESETS: featurePresets,
   SCENES: featureScenes,

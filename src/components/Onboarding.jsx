@@ -3,6 +3,15 @@ import { useEffect, useState } from 'react'
 import { CHAIN, D1, D2, D2B, D3, D4, D5 } from '../../shared/onboarding.mjs'
 import { firmwareOf } from '../../shared/firmware.mjs'
 import { slotCount } from '../lib/slots'
+import { Cta, Steps, TipCard } from './Walk'
+import playIcon from '../../mobile/assets/icons/play.png'
+import slidersIcon from '../../mobile/assets/icons/sliders.png'
+import saveIcon from '../../mobile/assets/icons/save.png'
+import tunerIcon from '../../mobile/assets/icons/tuner.png'
+import laptopIcon from '../../mobile/assets/icons/laptop.png'
+
+/* The cards' pictures, in the phone's walkthrough style (see Walk.jsx). */
+const ICONS = { stage: playIcon, rack: tunerIcon, anywhere: laptopIcon, play: playIcon, edit: slidersIcon, save: saveIcon }
 
 /**
  * The first minute, on the machine that holds the cable.
@@ -46,9 +55,6 @@ export const markOnboarded = () => {
     /* Costs the next load, and nothing else. */
   }
 }
-
-/** The three steps that have a place in the order. Welcome and the end do not. */
-const STEPS = ['unit', 'phone', 'pair']
 
 export default function Onboarding({
   open,
@@ -115,7 +121,6 @@ export default function Onboarding({
    * in" is not.
    */
   const stuck = !found && (faultReason === 'no-answer' || faultReason === 'unreadable')
-  const stepNo = STEPS.indexOf(at) + 1
 
   return (
     <div className="onb" role="dialog" aria-modal="true" aria-label={D1.eyebrow}>
@@ -145,9 +150,7 @@ export default function Onboarding({
             </div>
             <p className="onb-note">{D1.foot}</p>
             <div className="onb-acts">
-              <button className="primary" onClick={() => setAt('unit')}>
-                {D1.go}
-              </button>
+              <Cta label={D1.go} onClick={() => setAt('unit')} />
               <button className="chip" onClick={finish}>
                 {D1.skip}
               </button>
@@ -157,7 +160,7 @@ export default function Onboarding({
 
         {at === 'unit' ? (
           <>
-            <p className="onb-step mono">{stuck ? D2B.step : D2.step}</p>
+            <Steps at={0} of={3} label={stuck ? D2B.step : D2.step} />
             <h1 className="onb-head">{stuck ? D2B.head : D2.head}</h1>
             <p className="onb-sub">{stuck ? D2B.sub : D2.sub}</p>
 
@@ -198,13 +201,9 @@ export default function Onboarding({
 
             <div className="onb-acts">
               {found ? (
-                <button className="primary" onClick={() => setAt('phone')}>
-                  {D2.next}
-                </button>
+                <Cta label={D2.next} onClick={() => setAt('phone')} />
               ) : (
-                <button className="primary" onClick={() => onLookAgain?.()}>
-                  {D2B.again}
-                </button>
+                <Cta label={D2B.again} onClick={() => onLookAgain?.()} />
               )}
               <button className="chip" onClick={() => setAt('phone')}>
                 {stuck ? D2B.without : D2.later}
@@ -215,25 +214,17 @@ export default function Onboarding({
 
         {at === 'phone' ? (
           <>
-            <p className="onb-step mono">{D3.step}</p>
+            <Steps at={1} of={3} label={D3.step} />
             <h1 className="onb-head">{D3.head}</h1>
             <p className="onb-sub">{D3.sub}</p>
-            <div className="onb-why">
+            <div className="onb-cards">
               {D3.why.map((why) => (
-                <div key={why.key} className="onb-why-item">
-                  <span className="onb-badge" aria-hidden="true">
-                    {why.badge}
-                  </span>
-                  <p className="onb-n mono">{why.label}</p>
-                  <p className="hint">{why.body}</p>
-                </div>
+                <TipCard key={why.key} icon={ICONS[why.key]} label={why.label} body={why.body} />
               ))}
             </div>
             <p className="onb-note">{D3.note}</p>
             <div className="onb-acts">
-              <button className="primary" onClick={() => setAt('pair')}>
-                {D3.pair}
-              </button>
+              <Cta label={D3.pair} onClick={() => setAt('pair')} />
               <button className="chip" onClick={finish}>
                 {D3.not}
               </button>
@@ -244,7 +235,7 @@ export default function Onboarding({
 
         {at === 'pair' ? (
           <>
-            <p className="onb-step mono">{D4.step}</p>
+            <Steps at={2} of={3} label={D4.step} />
             <h1 className="onb-head">{D4.head}</h1>
             <p className="onb-sub">{D4.sub}</p>
             {/*
@@ -279,9 +270,7 @@ export default function Onboarding({
                 the one Settings opens for the phone remote, so it is that one.
               */}
               {onSignIn && link?.link === 'signed-out' ? (
-                <button className="primary" onClick={onSignIn}>
-                  Sign in
-                </button>
+                <Cta label="Sign in" onClick={onSignIn} />
               ) : null}
               {/*
                 SIGNED IN WITHOUT THE UNLOCK: say so, and offer it. The relay
@@ -289,9 +278,7 @@ export default function Onboarding({
                 "Waiting for your phone…" would wait for ever.
               */}
               {onUnlock && link?.account?.email && paid === false ? (
-                <button className="primary" onClick={() => { finish(); onUnlock() }}>
-                  {D4.unlock}
-                </button>
+                <Cta label={D4.unlock} onClick={() => { finish(); onUnlock() }} />
               ) : null}
               <button className="chip" onClick={finish}>
                 {D4.skip}
@@ -302,32 +289,23 @@ export default function Onboarding({
 
         {at === 'done' ? (
           <>
+            <Steps at={2} of={3} />
             <h1 className="onb-head">{D5.head}</h1>
             {/* Only what is actually true: no unit means the line says less
                 rather than claiming one. */}
             <p className="onb-sub mono">{D5.status({ unit: unitName, phone: paired })}</p>
-            <div className="onb-tips">
+            <div className="onb-cards">
               {D5.tips.map((tip) => (
-                <div key={tip.key} className="onb-tip">
-                  <p className="onb-n mono">{tip.label}</p>
-                  <p className="hint">{tip.body}</p>
-                </div>
+                <TipCard key={tip.key} icon={ICONS[tip.key]} label={tip.label} body={tip.body} />
               ))}
             </div>
             <div className="onb-acts">
-              <button className="primary" onClick={finish}>
-                {D5.go}
-              </button>
+              <Cta label={D5.go} onClick={finish} />
             </div>
             <p className="hint onb-foot">{D5.foot}</p>
           </>
         ) : null}
 
-        <div className="onb-dots" aria-hidden="true">
-          {STEPS.map((name, i) => (
-            <span key={name} className={i < stepNo ? 'onb-dot on' : 'onb-dot'} />
-          ))}
-        </div>
       </div>
     </div>
   )
