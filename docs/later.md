@@ -50,3 +50,10 @@ a real one yet — a friend of Justin's is the first tester. After that:
 - **RevenueCat's sample products.** The test store still holds the three
   sample packages RevenueCat starts every project with. They need deleting
   in the RevenueCat dashboard.
+- **Expo 57.0.25, at the next phone build.** Expo shipped a patch while the
+  phone was on 57.0.24, and `expo-doctor` in CI started failing on the
+  mismatch. Taking the patch moves the fingerprint, which means a new build,
+  so `mobile/package.json` tells the doctor to skip the `expo` version check
+  (`expo.install.exclude`) instead. When a build is being made anyway, run
+  `npx expo install expo@~57.0.25` in `mobile/`, delete that exclude, and let
+  the build carry it.
