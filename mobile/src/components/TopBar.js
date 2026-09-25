@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Image, Platform, Pressable, Text, View } from 'react-native'
+import { Alert, Image, Platform, Pressable, Text, View } from 'react-native'
 import { BlurView } from 'expo-blur'
 
 import { color, font, mono, radius, space, isDark } from '../lib/theme'
@@ -16,6 +16,7 @@ import { idOf } from '../lib/device'
 import Lamp from './Lamp'
 import Volume from './Volume'
 import { probeNow } from '../lib/link'
+import { useSaveToSlot } from './SaveToSlot'
 
 const face = Platform.select(mono)
 
@@ -42,7 +43,7 @@ const face = Platform.select(mono)
  * The words come from shared/link-word.mjs rather than from here, so the two
  * apps cannot drift into saying different things about the same link.
  */
-export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
+export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock, saveHere = true }) {
   const unit = useRig(ofDeviceName)
   const unitState = useRig(ofUnitState)
   const blocks = useRig(ofAllBlocks)
@@ -50,6 +51,27 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
   const [failed, setFailed] = useState(null)
   /* Whether the note under CONNECTED is open: which computer, as the browser says. */
   const [saying, setSaying] = useState(false)
+  /*
+   * SAVE, HERE, AS SOON AS THERE IS SOMETHING TO SAVE.
+   *
+   * "If you could hit the save button after you have turned the block on or
+   * off or switch the scene, that way it doesn't revert… add a save to the top
+   * menu bar anytime that changes are made, kind of like we already have with
+   * the edit screen." A block turned on or off, or a channel changed, on Play
+   * is in the unit's edit buffer and gone at the next preset change; the only
+   * Save was two screens away in Edit. The browser has had one in its bar all
+   * along. It shows only while the preset has unsaved changes, asks before it
+   * overwrites, and stays out of the way on Edit, which has its own.
+   */
+  const saveTo = useSaveToSlot()
+  const preset = useRig(ofPreset)
+  const unsaved = useRig(ofUnsaved)
+  const canSave = saveHere && !!unsaved && unsaved.number === preset?.number && saveTo.can
+  const askSave = () =>
+    Alert.alert('Save preset?', 'This will overwrite the current preset.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Save', onPress: () => saveTo.write() }
+    ])
   const purchase = usePurchase()
   /*
    * The demo says DEMO, not CONNECTED.
@@ -246,18 +268,23 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
         `flex: 1` so it takes the slack: the bar has a fixed left and a fixed
         right, and the gap between them is the one thing that can give.
       */}
-      <Text
-        numberOfLines={1}
-        style={{
-          flex: 1,
-          color: color.silkFaint,
-          fontSize: font.micro,
-          fontFamily: face,
-          letterSpacing: 1
-        }}
-      >
-        {`v${APP_VERSION}`}
-      </Text>
+      {/* Out of the way while Save needs the room; it is in Settings too. */}
+      {canSave ? (
+        <View style={{ flex: 1 }} />
+      ) : (
+        <Text
+          numberOfLines={1}
+          style={{
+            flex: 1,
+            color: color.silkFaint,
+            fontSize: font.micro,
+            fontFamily: face,
+            letterSpacing: 1
+          }}
+        >
+          {`v${APP_VERSION}`}
+        </Text>
+      )}
 
       {/*
         The word carries the state as well as saying it — and in the demo it
@@ -420,6 +447,30 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
         </Pressable>
       ) : null}
 
+      {canSave ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Save the preset"
+          onPress={() => {
+            tick()
+            askSave()
+          }}
+          hitSlop={8}
+          disabled={saveTo.saving}
+          style={({ pressed }) => ({
+            paddingHorizontal: space.md,
+            paddingVertical: 4,
+            borderRadius: radius.pill,
+            backgroundColor: pressed ? color.signalWash : color.signal,
+            opacity: saveTo.saving ? 0.6 : 1
+          })}
+        >
+          <Text style={{ color: color.onSignal, fontSize: font.micro, fontWeight: '700', letterSpacing: 0.6 }}>
+            {saveTo.saving ? 'Saving…' : 'Save'}
+          </Text>
+        </Pressable>
+      ) : null}
+
       {hasOutput ? (
         <Pressable
           accessibilityRole="button"
@@ -479,11 +530,14 @@ export default function TopBar({ link, onOpenSettings, onOpenUnit, onUnlock }) {
       <Volume blocks={blocks} open={volume} onClose={() => setVolume(false)} onError={setFailed} />
       {failed ? <Reported said={failed} onClear={() => setFailed(null)} /> : null}
       {saying && !demo ? <Which link={link} onClose={() => setSaying(false)} /> : null}
+      {saveTo.said && saveHere ? <Saved said={saveTo.said} onClear={saveTo.dismiss} /> : null}
     </BlurView>
   )
 }
 
 const ofDeviceName = (s) => s.deviceName
+const ofPreset = (s) => s.preset
+const ofUnsaved = (s) => s.unsaved
 const ofUnitState = (s) => s.unit
 const ofAllBlocks = (s) => s.allBlocks
 
@@ -542,6 +596,31 @@ function Which({ link, onClose }) {
           <Text style={{ color: color.silk, fontSize: font.body }}>Try now</Text>
         </Pressable>
       ) : null}
+    </Pressable>
+  )
+}
+
+/** What a save from the bar came to, under the bar; a tap puts it away. */
+function Saved({ said, onClear }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${said.text} Dismiss`}
+      onPress={onClear}
+      style={{
+        position: 'absolute',
+        left: space.lg,
+        right: space.lg,
+        top: '100%',
+        zIndex: 2,
+        borderLeftWidth: 3,
+        borderLeftColor: said.tone === 'warn' ? color.fault : color.ok,
+        backgroundColor: color.panelHi,
+        paddingVertical: space.sm,
+        paddingHorizontal: space.md
+      }}
+    >
+      <Text style={{ color: color.silk, fontSize: font.small }}>{`${said.text}  ✕`}</Text>
     </Pressable>
   )
 }

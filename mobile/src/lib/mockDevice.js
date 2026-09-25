@@ -33,6 +33,7 @@ import cabTypes from '../data/cab-types.json' with { type: 'json' }
 import ampParams from '../data/amp-params.json' with { type: 'json' }
 import blockParams from '../data/block-params.json' with { type: 'json' }
 import demoPresets from '../data/demo-presets.json' with { type: 'json' }
+import fm3Blocks from '../data/blocks.json' with { type: 'json' }
 import { nameFor, scenesFor, presetsFor } from './factoryPresets.js'
 import { unitByKey, DEFAULT_UNIT } from './demoUnits.js'
 import { fromNormalized } from './scale.js'
@@ -771,10 +772,24 @@ export function createMockDevice(unitKey = DEFAULT_UNIT) {
      */
     ports: () => clone(midiCarried() ? MIDI_PORTS : SERIAL_PORTS),
 
-    /* Only what this unit could place: no amp on a VP4, and no separate cab
-       on a unit whose amp carries its own — the AM4 and the VP4. */
+    /*
+     * Only what this unit could place: no amp on a VP4, and no separate cab
+     * on a unit whose amp carries its own — the AM4 and the VP4.
+     *
+     * AND EVERYTHING A GRID UNIT OFFERS, not just what the demo chain holds.
+     * "When editing a chain and you go to the bottom it only shows the current
+     * blocks that are in the chain… is there a way to put all available
+     * blocks at the bottom?" On a real FM3 the list is the unit's own, sixty
+     * odd blocks long; the demo offered the seven it had already placed. The
+     * grid units now offer the FM3's real list (src/data/blocks.json, read off
+     * the unit), less the inputs and outputs the chain already has.
+     */
     blockCatalog: () =>
-      LAYOUT.filter(
+      unit.grid
+        ? fm3Blocks
+            .filter((b) => !['input', 'output'].includes(b.family) && !(b.family === 'amp' && !unit.amps))
+            .map((b) => ({ ...b }))
+        : LAYOUT.filter(
         (l) =>
           !['input', 'output'].includes(l.slug) &&
           !(l.slug === 'amp' && !unit.amps) &&
@@ -795,7 +810,8 @@ export function createMockDevice(unitKey = DEFAULT_UNIT) {
         if (existing >= 0) state.blocks.splice(existing, 1)
         return { ok: true }
       }
-      const known = LAYOUT.find((l) => l.effectId === blockId)
+      const listed = fm3Blocks.find((b) => b.page === blockId)
+      const known = LAYOUT.find((l) => l.effectId === blockId) || (listed && { slug: listed.family, name: listed.name })
       const block = {
         slug: known?.slug || 'unknown',
         name: known?.name || `Block ${blockId}`,

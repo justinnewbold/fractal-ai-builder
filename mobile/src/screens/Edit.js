@@ -1079,10 +1079,21 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
     if (lane && to !== index) reorder(lane, index, to)
   }
 
+  /*
+   * EVERY KIND OF BLOCK, ONE BUTTON EACH.
+   *
+   * "Is there a way to put all available blocks at the bottom there so that
+   * you could quickly just add one of the other available ones… I know
+   * there's a lot available, like Drive 1, Drive 2." So one button per kind,
+   * and it is the next one the chain has not used: Drive 2 when Drive 1 is
+   * already in, and no Drive button once both are. A search still shows every
+   * block that matches, numbers and all.
+   */
   const needle = hunt.trim().toLowerCase()
-  const offered = (palette || [])
-    .filter((b) => !needle || (b.name || '').toLowerCase().includes(needle))
-    .slice(0, 30)
+  const used = new Set((blocks || []).map((b) => idOf(b)).filter(Number.isInteger))
+  const offered = needle
+    ? (palette || []).filter((b) => (b.name || '').toLowerCase().includes(needle)).slice(0, 40)
+    : nextOfEachKind(palette || [], used)
   const picked = (palette || []).find((b) => b.page === Number(choice))
 
   const paletteBox = (onPick, hint) => (
@@ -1743,4 +1754,17 @@ function confirmRemove(name, go) {
       { text: 'Remove', style: 'destructive', onPress: go }
     ]
   )
+}
+
+/** The first block of each kind the chain has not used, in the unit's order. */
+function nextOfEachKind(palette, used) {
+  const seen = new Set()
+  const out = []
+  for (const b of palette) {
+    const kind = b.family || b.slug || b.name
+    if (seen.has(kind) || used.has(b.page)) continue
+    seen.add(kind)
+    out.push(b)
+  }
+  return out
 }

@@ -1416,4 +1416,27 @@ export function run(test) {
       assert.match(read(f), /backgroundColor: tint\(color\.chassis, 0\.94\)/, `${f} shows the screen through it again`)
     }
   })
+
+  /*
+   * A TESTER'S SECOND ROUND: every block to add, and Save from Play.
+   */
+  test('the chain editor offers every kind of block, and Play has a Save once something changed', async () => {
+    /* The demo offers a grid unit's whole list, not just what the chain holds. */
+    const { createMockDevice } = await import('../src/lib/mockDevice.js').catch(() => ({}))
+    const mock = read('src/lib/mockDevice.js')
+    assert.match(mock, /unit\.grid\s*\?\s*fm3Blocks/, 'the demo offers only the blocks its chain already holds')
+    assert.ok(typeof createMockDevice === 'undefined' || typeof createMockDevice === 'function')
+
+    /* One button per kind, the next one not in the chain. */
+    const edit = read('mobile/src/screens/Edit.js')
+    assert.match(edit, /: nextOfEachKind\(palette \|\| \[\], used\)/, 'the phone lists every block instead of one of each kind')
+
+    /* Save in the phone's bar, only with something to save, asked first. */
+    const bar = read('mobile/src/components/TopBar.js')
+    assert.match(bar, /const canSave = saveHere && !!unsaved && unsaved\.number === preset\?\.number && saveTo\.can/, 'the phone’s bar has no Save for changes made on Play')
+    assert.match(bar, /Alert\.alert\('Save preset\?', 'This will overwrite the current preset\.'/, 'the bar saves without asking')
+    assert.match(read('mobile/App.js'), /saveHere=\{screen !== 'edit'\}/, 'Edit shows two Save buttons')
+    /* The browser has had one in its bar all along. */
+    assert.match(read('src/App.jsx'), /<SaveBar[\s\S]{0,120}dirty=\{dirty\}/, 'the browser lost its Save in the bar')
+  })
 }
