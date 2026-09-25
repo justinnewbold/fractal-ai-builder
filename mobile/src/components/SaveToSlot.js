@@ -36,12 +36,9 @@ export function useSaveToSlot() {
   const [saving, setSaving] = useState(false)
   const [said, setSaid] = useState(null)
 
-  const save = async () => {
-    if (!armed) {
-      setArmed(true)
-      setSaid(null)
-      return
-    }
+  /* The write itself, for a caller that has already asked "are you sure" its
+     own way — the top bar asks in a pop-up rather than with a second tap. */
+  const write = async () => {
     setArmed(false)
     setSaving(true)
     setSaid({ tone: 'hint', text: 'Asked the computer to save it. The computer writes it; this says so the moment it lands.' })
@@ -57,12 +54,22 @@ export function useSaveToSlot() {
     setSaid(res.ok ? { tone: 'hint', text: `Saved to slot ${res.slot}.` } : { tone: 'warn', text: res.error })
   }
 
+  const save = async () => {
+    if (!armed) {
+      setArmed(true)
+      setSaid(null)
+      return
+    }
+    await write()
+  }
+
   return {
     slot: Number.isInteger(preset?.number) ? preset.number : null,
     armed,
     saving,
     said,
     save,
+    write,
     can: !saving && Number.isInteger(preset?.number),
     disarm: () => setArmed(false),
     dismiss: () => setSaid(null)

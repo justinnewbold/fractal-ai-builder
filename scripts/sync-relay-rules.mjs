@@ -274,6 +274,8 @@ export const FILES = [
   { source: '../src/data/drive-types.json', target: '../mobile/src/data/drive-types.json', raw: true },
   { source: '../src/data/amp-lineage.json', target: '../mobile/src/data/amp-lineage.json', raw: true },
   { source: '../src/data/gear-photos.json', target: '../mobile/src/data/gear-photos.json', raw: true },
+  /* The FM3's block list, for the demo's chain editor to offer every block. */
+  { source: '../src/data/blocks.json', target: '../mobile/src/data/blocks.json', raw: true },
   /*
    * And the rule that turns a model name into one of those files. The phone
    * shows the same photographs on the same models, and a second copy of the

@@ -797,6 +797,8 @@ export default function App() {
               onOpenSettings={() => openSettings()}
               onUnlock={() => setBuying(true)}
               onOpenUnit={() => (demo ? setPickUnit(true) : openSettings('link'))}
+              /* Edit has its own Save; two on one screen would be one too many. */
+              saveHere={screen !== 'edit'}
             />
             <DemoUnit open={pickUnit} onClose={() => setPickUnit(false)} />
             {/* Over the top of whatever is on screen, and gone again on a
