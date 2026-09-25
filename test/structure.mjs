@@ -1034,7 +1034,7 @@ export function run(test) {
      */
     const rows = code.slice(code.indexOf('gear-list'))
     assert.match(rows, /<button type="button" className="gear-row" onClick=\{\(\) => setOpen\(e\)\}>/, 'the rows cannot be opened')
-    assert.match(code, /if \(open\) return <GearCard entry=\{open\} onBack=\{\(\) => setOpen\(null\)\} \/>/, 'there is nothing behind a row')
+    assert.match(code, /if \(open\) return <GearCard entry=\{open\} entries=\{current\.hits\} onGo=\{setOpen\} onBack=\{\(\) => setOpen\(null\)\} \/>/, 'there is nothing behind a row')
 
     /*
      * And the page is the three things that were missing, in the order the

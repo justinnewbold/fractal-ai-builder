@@ -572,9 +572,19 @@ export default function GridEditor({ blocks, capabilities, busy, onError, onChan
                           </button>
                         )}
                         {picker(() => add(lane.row, item.col), 'Replace', `add:${at}`)}
+                        {/* Red, and asked first — the phone does the same. A block
+                            taken out loses its settings and there is no undo. */}
                         <button
-                          className="chip"
-                          onClick={() => remove(lane.row, item.col, b.name)}
+                          className="chip chip-remove"
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `Remove ${b.name || 'this block'}? Its settings go with it. Adding it again brings it back with every knob at its default.`
+                              )
+                            ) {
+                              remove(lane.row, item.col, b.name)
+                            }
+                          }}
                           disabled={busy || !!working}
                         >
                           {working === 'clearing' ? 'Removing…' : 'Remove'}

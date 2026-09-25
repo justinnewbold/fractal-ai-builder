@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Modal, Platform, Pressable, Text, View, useWindowDimensions } from 'react-native'
 import { BlurView } from 'expo-blur'
+import { at as tint } from '../lib/vivid'
 
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
 import Note from './Note'
@@ -84,7 +85,20 @@ export default function Tuner({ reading, on, onClose }) {
           intensity={70}
           tint="dark"
           experimentalBlurMethod="dimezisBlurView"
-          style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.xl }}
+          /*
+           * NEARLY SOLID BEHIND IT. "Overlay opacity is too low for me. Is
+           * there a need to see things behind the tuner? Maybe 0% so the
+           * tuner is focused?" There is no need: on an Android phone the blur
+           * often draws as barely anything, and scene names showed through
+           * the middle of the reading. The screen behind goes almost black.
+           */
+          style={{
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: space.xl,
+            backgroundColor: tint(color.chassis, 0.94)
+          }}
         >
           <View
             style={{
@@ -98,7 +112,7 @@ export default function Tuner({ reading, on, onClose }) {
                  of glass read as a pane rather than as a stain. */
               borderWidth: 1,
               borderColor: 'rgba(255,255,255,0.14)',
-              backgroundColor: 'rgba(255,255,255,0.04)',
+              backgroundColor: color.panel,
               overflow: 'hidden'
             }}
           >

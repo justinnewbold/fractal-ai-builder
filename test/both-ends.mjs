@@ -1362,4 +1362,58 @@ export function run(test) {
     assert.match(bar, /setSaying\(\(open\) => !open\)/, 'the phone’s CONNECTED is a label again')
     assert.match(bar, /`Connected to \$\{where\}\.`/, 'the phone’s CONNECTED note does not name the computer')
   })
+
+  /*
+   * THE MODEL PAGE TURNS TO THE NEXT MODEL, at both ends.
+   *
+   * "Make it so swiping left or right on the screen takes you forward or
+   * backwards to the next amp model. Also have little arrow buttons on each
+   * side of the screen." Each end gets the tab's list, arrows either side,
+   * a swipe, and a "3 of 24", and neither lets a sideways swipe leave the page.
+   */
+  test('the amp and pedal page steps to the next model with a swipe or an arrow, at both ends', () => {
+    const phone = read('mobile/src/components/GearCard.js')
+    const web = read('src/components/GearCard.jsx')
+    for (const [end, src] of [['phone', phone], ['browser', web]]) {
+      assert.match(src, /export default function GearCard\(\{ entry, entries = \[\], onGo, onBack \}\)/, `the ${end}’s model page has no list to step through`)
+      assert.match(src, /`\$\{at \+ 1\} of \$\{list\.length\}`/, `the ${end} does not say where in the list you are`)
+      assert.match(src, /Previous: /, `the ${end} has no back arrow`)
+      assert.match(src, /Next: /, `the ${end} has no forward arrow`)
+      assert.match(src, /\(i \+ dir \+ l\.length\) % l\.length/, `the ${end}’s list stops at its ends instead of wrapping`)
+    }
+    assert.match(phone, /PanResponder\.create/, 'the phone’s page does not follow a swipe')
+    assert.match(phone, /onPanResponderTerminationRequest: \(\) => false/, 'a swipe on the phone’s model page can still be taken by the back gesture')
+    assert.match(phone, /BackHandler\.addEventListener\('hardwareBackPress'/, 'Android’s back leaves the app from the model page')
+    assert.match(web, /onTouchMove=\{onTouchMove\}/, 'the browser’s page does not follow a swipe')
+    assert.match(web, /e\.key === 'ArrowRight'/, 'the keyboard’s arrows do not step through the models')
+  })
+
+  /*
+   * A TESTER'S NOTES, held so they stay fixed.
+   *
+   * Android's back button closed the app from any screen with a Done button;
+   * back on the demo's Play screen gave no "Exit demo?"; a block could be
+   * removed with one tap and no way back; and the tuner and volume showed the
+   * scenes through them.
+   */
+  test('Android back steps back, removing a block asks first, and the tuner is not see-through', () => {
+    const app = read('mobile/App.js')
+    assert.match(app, /BackHandler\.addEventListener\('hardwareBackPress'/, 'Android back still closes the app from any screen')
+    assert.match(app, /setScreen\(BACK_TO\[screen\] \|\| 'stage'\)/, 'Android back does not step back a screen')
+    assert.match(app, /Alert\.alert\('Exit demo\?'/, 'back on the demo’s Play screen does not offer to leave the demo')
+    assert.match(read('mobile/src/screens/Settings.js'), /BackHandler\.addEventListener\('hardwareBackPress', \(\) => \{\s*goBack\(\)/, 'Android back skips Settings’ own pages')
+
+    /* Asked first, at both ends, in the same words. */
+    const phone = read('mobile/src/screens/Edit.js')
+    const web = read('src/components/GridEditor.jsx')
+    assert.match(phone, /onRemove=\{\(\) => confirmRemove\(/, 'the phone removes a block with no question')
+    assert.match(web, /window\.confirm\(/, 'the browser removes a block with no question')
+    for (const src of [phone, web]) {
+      assert.ok(src.includes('Its settings go with it. Adding it again brings it back with every knob at its default.'), 'the two ends word the question differently')
+    }
+
+    for (const f of ['mobile/src/components/Tuner.js', 'mobile/src/components/Volume.js']) {
+      assert.match(read(f), /backgroundColor: tint\(color\.chassis, 0\.94\)/, `${f} shows the screen through it again`)
+    }
+  })
 }

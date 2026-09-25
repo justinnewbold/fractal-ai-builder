@@ -65,7 +65,9 @@ export default function GearNames() {
    * search, the tabs and the scroll position are all still here underneath,
    * so coming back lands where you left.
    */
-  if (open) return <GearCard entry={open} onBack={() => setOpen(null)} />
+  /* The tab's list as it stands, so the arrows and a swipe go to the next
+     model in it — the phone's gear page does the same. */
+  if (open) return <GearCard entry={open} entries={current.hits} onGo={setOpen} onBack={() => setOpen(null)} />
 
   return (
     <div className="gear-names">

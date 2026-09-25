@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Linking, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { BackHandler, Linking, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 
 import { color, font, mono, radius, space, TAP, MODES, getMode, setMode } from '../lib/theme'
 import { APP_VERSION } from '../lib/version'
@@ -241,6 +241,16 @@ export default function Settings({
   /* One step up, whatever that means from where you are standing. The swipe
      and the Back button are the same errand, so they ask the same function. */
   const goBack = () => (page === null ? onBack?.() : setPage(upFrom(page)))
+  /* Android's back, one page up, the same as the swipe and the Back button —
+     heard here before App.js hears it, because only this screen knows it has
+     pages inside it. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      goBack()
+      return true
+    })
+    return () => sub.remove()
+  })
 
   return (
     <EdgeBack onBack={goBack}>

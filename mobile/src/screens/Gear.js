@@ -112,7 +112,8 @@ export default function Gear({ onBack }) {
    * underneath, so closing the page lands back where it was opened from —
    * which matters on a list four hundred rows long.
    */
-  if (open) return <GearCard entry={open} onBack={() => setOpen(null)} />
+  /* The tab's list as it stands, so a swipe goes to the next model in it. */
+  if (open) return <GearCard entry={open} entries={rows} onGo={setOpen} onBack={() => setOpen(null)} />
 
   return (
     <View style={{ flex: 1 }}>

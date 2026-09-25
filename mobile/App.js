@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { ActivityIndicator, Appearance, Text, View } from 'react-native'
+import { ActivityIndicator, Alert, Appearance, BackHandler, Text, View } from 'react-native'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 
@@ -171,6 +171,46 @@ export default function App() {
     fixes: fixFrom
   }
   const backFrom = BACK_TO[screen] ? () => setScreen(BACK_TO[screen]) : null
+
+  /*
+   * ANDROID'S BACK BUTTON, AND ITS BACK GESTURE.
+   *
+   * "When pressing Android back button on every screen that has a Done
+   * button, it exits the app. Maybe it would be advantageous to close that
+   * window and go back to the previous screen." Nothing was listening, so
+   * Android did its default, which is to close the app.
+   *
+   * Now it goes one step back, the same place the swipe from the edge goes,
+   * or to Play from a screen with only Done. Settings and the amp and pedal
+   * page listen for themselves first, because they have pages inside them.
+   *
+   * On Play itself, in the demo: "have a little pop-up that says Exit demo?
+   * If yes, same action as the exit demo button." Only for somebody who has
+   * the Exit demo button, which is somebody who has paid. Everywhere else on
+   * Play, back does what Android always does and leaves the app.
+   */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (buying) {
+        setBuying(false)
+        return true
+      }
+      if (auth !== 'in') return false
+      if (screen !== 'stage') {
+        setScreen(BACK_TO[screen] || 'stage')
+        return true
+      }
+      if (demo && purchase.unlocked) {
+        Alert.alert('Exit demo?', 'Back to your own rig.', [
+          { text: 'Stay', style: 'cancel' },
+          { text: 'Exit demo', onPress: () => setDemo(false) }
+        ])
+        return true
+      }
+      return false
+    })
+    return () => sub.remove()
+  })
   /** The last "picked up 2 setlists from your Mac", until it has been read. */
   const [picked, setPicked] = useState(null)
   /** Whether the five units are up, from the name in the corner. */

@@ -956,7 +956,7 @@ export function run(test) {
 
     assert.match(flat, /const pick = \(eid, paramId\) => \{ Keyboard\.dismiss\(\) setQuery\(''\) onPick\(eid, paramId\) \}/, 'a tap on a result leaves the keyboard and the results in the way')
     assert.match(edit, /onPress=\{\(\) => pick\(idOf\(block\), param\.id\)\}/, 'the result rows do not go through pick')
-    assert.match(edit, /import \{ Keyboard, /, 'Keyboard is not imported')
+    assert.match(edit, /import \{ [^}]*\bKeyboard, /, 'Keyboard is not imported')
     assert.match(edit, /<ScrollView\s+ref=\{page\}/, 'the page has no handle to scroll it by')
     assert.match(flat, /<View onLayout=\{panelLaid\}> <BlockPanel/, 'the block panel does not report where it landed')
     assert.match(flat, /page\.current\?\.scrollTo\(\{ y, animated: true \}\)/, 'nothing scrolls to the opened block')
@@ -7096,7 +7096,7 @@ export function run(test) {
      */
     const gear = read('mobile/src/screens/Gear.js')
     assert.match(gear, /onPress=\{\(\) => setOpen\(item\)\}/, 'the phone\u2019s rows still cannot be opened')
-    assert.match(gear, /if \(open\) return <GearCard entry=\{open\} onBack=\{\(\) => setOpen\(null\)\} \/>/, 'there is nothing behind a row')
+    assert.match(gear, /if \(open\) return <GearCard entry=\{open\} entries=\{rows\} onGo=\{setOpen\} onBack=\{\(\) => setOpen\(null\)\} \/>/, 'there is nothing behind a row')
     assert.match(gear, /accessibilityRole="button"/, 'a row that opens a page does not say it is a button')
 
     const card = read('mobile/src/components/GearCard.js')
