@@ -280,7 +280,20 @@ export default function Volume({ blocks, open, onClose, onError }) {
           intensity={70}
           tint="dark"
           experimentalBlurMethod="dimezisBlurView"
-          style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.xl }}
+          /*
+           * NEARLY SOLID BEHIND IT. "Overlay opacity is too low for me. Is
+           * there a need to see things behind the tuner? Maybe 0% so the
+           * tuner is focused?" There is no need: on an Android phone the blur
+           * often draws as barely anything, and scene names showed through
+           * the middle of the reading. The screen behind goes almost black.
+           */
+          style={{
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: space.xl,
+            backgroundColor: tint(color.chassis, 0.94)
+          }}
         >
           {/*
             The panel swallows presses so a thumb that slips off the slider does
@@ -296,7 +309,7 @@ export default function Volume({ blocks, open, onClose, onError }) {
               borderRadius: radius.lg * 2,
               borderWidth: 1,
               borderColor: 'rgba(255,255,255,0.14)',
-              backgroundColor: 'rgba(255,255,255,0.04)'
+              backgroundColor: color.panel
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>

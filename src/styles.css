@@ -12007,3 +12007,9 @@ button.walk-foot-row {
   color: var(--silk-dim);
   font-size: var(--f-3);
 }
+
+/* The chain editor's Remove, in the fault red, as on the phone. */
+.chip.chip-remove {
+  border-color: var(--fault);
+  background: color-mix(in srgb, var(--fault) 16%, var(--panel));
+}

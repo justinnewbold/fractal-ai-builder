@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Keyboard, PanResponder, Platform, ScrollView, Text, TextInput, View } from 'react-native'
+import { Alert, Keyboard, PanResponder, Platform, ScrollView, Text, TextInput, View } from 'react-native'
+import { at as tint } from '../lib/vivid'
 
 import { color, font, mono, radius, space, TAP } from '../lib/theme'
 import {
@@ -1214,7 +1215,7 @@ function ChainEditor({ blocks, caps, onError, onScrollLock }) {
                         setAddAfter(null)
                       }}
                       onAdd={() => setAddAfter(addAfter === `${lane.row}:${item.col}` ? null : `${lane.row}:${item.col}`)}
-                      onRemove={() => remove(lane.row, item.col)}
+                      onRemove={() => confirmRemove(item.block?.name, () => remove(lane.row, item.col))}
                       onDragStart={() => dragStart(lane.row, index)}
                       onDragMove={(dy) => dragMove(lane.row, index, dy)}
                       onDragEnd={() => dragEnd(lane.row, index)}
@@ -1294,8 +1295,25 @@ function BlockCard({
       </View>
       {acting ? (
         <View style={{ flexDirection: 'row', gap: space.sm }}>
-          <Press grow label="Add" sub="A new block after this one" height={48} disabled={busy} onPress={onAdd} />
-          <Press grow label="Remove" sub="Delete this block" height={48} disabled={busy} onPress={onRemove} />
+          {/* Green to add, red to take away: "color these red green maybe?" */}
+          <Press
+            grow
+            label="Add"
+            sub="A new block after this one"
+            height={48}
+            disabled={busy}
+            onPress={onAdd}
+            style={{ borderColor: color.ok, backgroundColor: tint(color.ok, 0.16) }}
+          />
+          <Press
+            grow
+            label="Remove"
+            sub="Delete this block"
+            height={48}
+            disabled={busy}
+            onPress={onRemove}
+            style={{ borderColor: color.fault, backgroundColor: tint(color.fault, 0.16) }}
+          />
         </View>
       ) : null}
       {acting && adding ? adding : null}
@@ -1705,5 +1723,24 @@ function Label({ children }) {
     >
       {children}
     </Text>
+  )
+}
+
+/*
+ * ASKED FIRST, because there is no taking it back.
+ *
+ * "How can I undo? Accidentally removed a block, can't get it back." A block
+ * taken out loses its settings with it, and the unit has no undo to offer, so
+ * the one safe place to stop a slip is before it happens. Re-adding it gives
+ * the same block with every knob back at its default.
+ */
+function confirmRemove(name, go) {
+  Alert.alert(
+    `Remove ${name || 'this block'}?`,
+    'Its settings go with it. Adding it again brings it back with every knob at its default.',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: go }
+    ]
   )
 }

@@ -956,7 +956,7 @@ export function run(test) {
 
     assert.match(flat, /const pick = \(eid, paramId\) => \{ Keyboard\.dismiss\(\) setQuery\(''\) onPick\(eid, paramId\) \}/, 'a tap on a result leaves the keyboard and the results in the way')
     assert.match(edit, /onPress=\{\(\) => pick\(idOf\(block\), param\.id\)\}/, 'the result rows do not go through pick')
-    assert.match(edit, /import \{ Keyboard, /, 'Keyboard is not imported')
+    assert.match(edit, /import \{ [^}]*\bKeyboard, /, 'Keyboard is not imported')
     assert.match(edit, /<ScrollView\s+ref=\{page\}/, 'the page has no handle to scroll it by')
     assert.match(flat, /<View onLayout=\{panelLaid\}> <BlockPanel/, 'the block panel does not report where it landed')
     assert.match(flat, /page\.current\?\.scrollTo\(\{ y, animated: true \}\)/, 'nothing scrolls to the opened block')

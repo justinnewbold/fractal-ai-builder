@@ -1387,4 +1387,33 @@ export function run(test) {
     assert.match(web, /onTouchMove=\{onTouchMove\}/, 'the browser’s page does not follow a swipe')
     assert.match(web, /e\.key === 'ArrowRight'/, 'the keyboard’s arrows do not step through the models')
   })
+
+  /*
+   * A TESTER'S NOTES, held so they stay fixed.
+   *
+   * Android's back button closed the app from any screen with a Done button;
+   * back on the demo's Play screen gave no "Exit demo?"; a block could be
+   * removed with one tap and no way back; and the tuner and volume showed the
+   * scenes through them.
+   */
+  test('Android back steps back, removing a block asks first, and the tuner is not see-through', () => {
+    const app = read('mobile/App.js')
+    assert.match(app, /BackHandler\.addEventListener\('hardwareBackPress'/, 'Android back still closes the app from any screen')
+    assert.match(app, /setScreen\(BACK_TO\[screen\] \|\| 'stage'\)/, 'Android back does not step back a screen')
+    assert.match(app, /Alert\.alert\('Exit demo\?'/, 'back on the demo’s Play screen does not offer to leave the demo')
+    assert.match(read('mobile/src/screens/Settings.js'), /BackHandler\.addEventListener\('hardwareBackPress', \(\) => \{\s*goBack\(\)/, 'Android back skips Settings’ own pages')
+
+    /* Asked first, at both ends, in the same words. */
+    const phone = read('mobile/src/screens/Edit.js')
+    const web = read('src/components/GridEditor.jsx')
+    assert.match(phone, /onRemove=\{\(\) => confirmRemove\(/, 'the phone removes a block with no question')
+    assert.match(web, /window\.confirm\(/, 'the browser removes a block with no question')
+    for (const src of [phone, web]) {
+      assert.ok(src.includes('Its settings go with it. Adding it again brings it back with every knob at its default.'), 'the two ends word the question differently')
+    }
+
+    for (const f of ['mobile/src/components/Tuner.js', 'mobile/src/components/Volume.js']) {
+      assert.match(read(f), /backgroundColor: tint\(color\.chassis, 0\.94\)/, `${f} shows the screen through it again`)
+    }
+  })
 }
