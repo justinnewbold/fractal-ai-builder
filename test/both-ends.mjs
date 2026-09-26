@@ -1439,4 +1439,78 @@ export function run(test) {
     /* The browser has had one in its bar all along. */
     assert.match(read('src/App.jsx'), /<SaveBar[\s\S]{0,120}dirty=\{dirty\}/, 'the browser lost its Save in the bar')
   })
+
+  /*
+   * "Can we set it up for demos to actually save on their phone when they do
+   * changes?" Save in the demo said "The demo has no answer for PUT
+   * /store/config/fractal.pendingSave.axefxiii". Now it keeps the preset on
+   * the device, and a fresh start opens it as saved.
+   */
+  test('a save in the demo is kept on the device and opens as saved next time', async () => {
+    const had = 'localStorage' in globalThis
+    const before = globalThis.localStorage
+    const disk = new Map()
+    globalThis.localStorage = {
+      getItem: (k) => (disk.has(k) ? disk.get(k) : null),
+      setItem: (k, v) => disk.set(k, String(v)),
+      removeItem: (k) => disk.delete(k)
+    }
+    try {
+      const { createMockDevice } = await import('../src/lib/mockDevice.js')
+      const { savedPresets } = await import('../src/lib/demoMemory.js')
+
+      const unit = createMockDevice('axefx3')
+      const slot = unit.preset().number
+      const block = unit.presetBlocks().find((b) => !['input', 'output'].includes(b.slug))
+      const wasOff = block.bypassed
+      unit.setBypass(block.effectId, !wasOff)
+      const knob = unit.blockParams(block.effectId).named[0]
+      unit.setParam(block.effectId, knob.id, 0.9)
+      const turned = unit.blockParams(block.effectId).named[0].value
+      unit.setPresetName('My Tone')
+      const res = unit.storePreset(slot)
+      assert.equal(res.ok, true)
+      assert.equal(res.kept, true, 'the save was not written to the device')
+
+      /* Closing the app and opening it again is a new simulated unit. */
+      const again = createMockDevice('axefx3')
+      again.selectPreset(slot)
+      assert.equal(again.preset().name, 'My Tone', 'the saved name did not come back')
+      const back = again.presetBlocks().find((b) => b.effectId === block.effectId)
+      assert.ok(back, 'the saved chain did not come back')
+      assert.equal(back.bypassed, !wasOff, 'the block went back to how it shipped')
+      assert.equal(again.blockParams(block.effectId).named[0].value, turned, 'the knob went back to how it shipped')
+      assert.equal(again.storedNames()[slot], 'My Tone', 'the preset list still shows the old name')
+
+      /* Another demo unit's slot is its own. */
+      const other = createMockDevice('am4')
+      assert.notEqual(other.storedNames()[slot], 'My Tone', 'a save on one demo unit showed up on another')
+      assert.deepEqual(Object.keys(savedPresets('am4')), [])
+
+      /* Saved over another slot, that slot becomes this preset. */
+      again.storePreset(slot + 7)
+      const third = createMockDevice('axefx3')
+      third.selectPreset(slot + 7)
+      assert.equal(third.preset().name, 'My Tone')
+      assert.equal(third.presetBlocks().find((b) => b.effectId === block.effectId)?.bypassed, !wasOff)
+
+      /* And a saved preset the demo cannot read opens as it shipped. */
+      disk.set(`fractal.demo.saved.axefx3.${slot}`, 'not json')
+      const fresh = createMockDevice('axefx3')
+      assert.ok(fresh.presetBlocks().length, 'a broken save broke the demo')
+    } finally {
+      if (had) globalThis.localStorage = before
+      else delete globalThis.localStorage
+    }
+
+    /* The phone keeps it in its own store, reads that before opening a preset,
+       and its Save goes to the simulated unit rather than to a computer. */
+    const demo = read('mobile/src/lib/demo.js')
+    assert.match(demo, /useDemoStorage\(sync\)/, 'the phone demo keeps its saves nowhere')
+    assert.ok(demo.indexOf('await hydrate()') > -1 && demo.indexOf('await hydrate()') < demo.indexOf('mock = createMockDevice(unit)\n      announce()'), 'the demo opens before its saves are read')
+    const saver = read('mobile/src/components/SaveToSlot.js')
+    assert.ok(saver.indexOf('if (isDemo())') > -1 && saver.indexOf('if (isDemo())') < saver.indexOf('askComputerToSave({'), 'the demo still asks a computer that is not there')
+    assert.match(saver, /await saveInDemo\(preset\?\.number\)/)
+    assert.doesNotMatch(read('src/lib/demoMemory.js'), /\blocalStorage\.(get|set)Item/, 'the demo reaches for a localStorage the phone does not have')
+  })
 }

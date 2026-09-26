@@ -47,6 +47,14 @@ export function createSceneState({ count = 8, seeds = {}, channels = {} } = {}) 
       for (const c of chan) c.delete(String(effectId))
     },
     /** The pattern for one scene, for a test or a scene map. */
-    snapshot: (scene) => [...off[clamp(scene)]].sort((a, b) => a - b)
+    snapshot: (scene) => [...off[clamp(scene)]].sort((a, b) => a - b),
+    /**
+     * Every scene, in the shape this function takes — so a saved demo preset
+     * comes back through the front door rather than through a second reader.
+     */
+    dump: () => ({
+      seeds: Object.fromEntries(off.map((s, i) => [i, [...s].sort((a, b) => a - b)])),
+      channels: Object.fromEntries(chan.map((c, i) => [i, Object.fromEntries(c)]))
+    })
   }
 }

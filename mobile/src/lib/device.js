@@ -372,6 +372,23 @@ export function parkSave(slug, request) {
   })
 }
 
+/**
+ * Save in the demo, which has no computer to ask: the simulated unit keeps the
+ * preset on this phone.
+ *
+ * Handed to the simulated unit directly rather than sent as POST
+ * /preset/store: that route is refused from a phone, rightly, and a phone
+ * that asks for it anywhere is a phone with a Save that dies on a real rig.
+ * On a rig, askComputerToSave is the way.
+ */
+export async function saveInDemo(slot) {
+  const demo = demoDevice()
+  if (!demo) throw new Error('Only the demo saves on the phone.')
+  const res = demo.storePreset(slot)
+  if (res && res.kept === false) throw new Error('This phone would not keep it. It is saved until the app is closed.')
+  return Number.isInteger(res?.slot) ? res.slot : slot
+}
+
 export async function readSaveResult(slug) {
   if (!slug) return null
   const doc = await remoteRequest(`/store/config/${encodeURIComponent(`fractal.saveResult.${slug}`)}`)
