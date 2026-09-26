@@ -38,7 +38,7 @@ import { nameFor, scenesFor, presetsFor } from './factoryPresets.js'
 import { unitByKey, DEFAULT_UNIT } from './demoUnits.js'
 import { fromNormalized } from './scale.js'
 import { createSceneState } from './sceneState.js'
-import { storedSceneNames, keepSceneNames, DEFAULT_SCENE_NAMES } from './demoMemory.js'
+import { storedSceneNames, keepSceneNames, DEFAULT_SCENE_NAMES, savedPresets, savedRig, keepSavedPreset } from './demoMemory.js'
 import { createTunerStream } from './tunerStream.js'
 
 const GRID = { rows: 4, cols: 12 }
@@ -311,6 +311,8 @@ export function createMockDevice(unitKey = DEFAULT_UNIT) {
         .map((p) => [p.number, p.name])
         .concat([...rigSeeds.values()].map((seed) => [seed.number, seed.name]))
         .concat([[500, 'DEMO']])
+        /* And what was saved in the demo on this unit wins over all of it. */
+        .concat(Object.entries(savedPresets(unit.key)).map(([n, name]) => [Number(n), name]))
     )
   }
 
@@ -324,6 +326,8 @@ export function createMockDevice(unitKey = DEFAULT_UNIT) {
   const rigs = new Map()
 
   function buildRig(number) {
+    const kept = restoreRig(number)
+    if (kept) return kept
     const seed = rigSeeds.get(number)
     const blocks = seed
       ? chainOf(seed)
@@ -399,6 +403,36 @@ export function createMockDevice(unitKey = DEFAULT_UNIT) {
     }
     return rig
   }
+
+  /**
+   * A preset saved in the demo, as its rig — or null for one never saved, or
+   * saved in a shape this cannot read, which then builds as it always has.
+   */
+  function restoreRig(number) {
+    const rig = savedRig(unit.key, number)
+    if (!rig || !Array.isArray(rig.blocks) || !Array.isArray(rig.params) || !rig.scenes) return null
+    try {
+      return {
+        blocks: clone(rig.blocks),
+        params: new Map(clone(rig.params)),
+        models: new Map(Array.isArray(rig.models) ? rig.models : []),
+        scenes: createSceneState({ count: unit.scenes, seeds: rig.scenes.seeds, channels: rig.scenes.channels }),
+        /* A scene renamed since the save is kept by its own key, as before. */
+        sceneNames: storedSceneNames(number) || (Array.isArray(rig.sceneNames) ? rig.sceneNames.slice() : DEFAULT_SCENE_NAMES.slice(0, unit.scenes))
+      }
+    } catch {
+      return null
+    }
+  }
+
+  /** The rig the unit is playing, written down: what Save keeps. */
+  const dumpRig = () => ({
+    blocks: clone(state.blocks),
+    params: clone([...state.params]),
+    models: [...state.models],
+    scenes: state.scenes.dump(),
+    sceneNames: state.sceneNames.slice()
+  })
 
   /** Point the live state at a preset's rig, building it if this is the first visit. */
   function loadRig(number) {
@@ -664,9 +698,24 @@ export function createMockDevice(unitKey = DEFAULT_UNIT) {
       return { ok: true }
     },
 
+    /*
+     * SAVE, AND IN THE DEMO IT STAYS.
+     *
+     * The slot takes the name and the whole rig the unit is playing — every
+     * block, knob, model, and what each scene switches — and it is written to
+     * the device, so closing the app and opening it again finds the preset as
+     * it was saved. Saved to another slot, that slot becomes this rig too.
+     */
     storePreset: (number) => {
-      state.stored.set(number, state.presetName)
-      return { ok: true }
+      const slot = Number.isInteger(number) ? number : state.presetNumber
+      state.stored.set(slot, state.presetName)
+      const rig = dumpRig()
+      const kept = keepSavedPreset(unit.key, slot, state.presetName, rig)
+      if (slot !== state.presetNumber) {
+        rigs.delete(slot)
+        keepSceneNames(slot, state.sceneNames.slice())
+      }
+      return { ok: true, slot, kept }
     },
 
     setEnum: (eid, paramId, ordinal) => {
@@ -860,7 +909,7 @@ export function createMockDevice(unitKey = DEFAULT_UNIT) {
       /* A factory slot nobody has built a rig for: the name is real and the
          block list is genuinely unknown until it is loaded, which is what an
          empty array says. */
-      if (!rigSeeds.has(n)) return { number: n, name, blocks: [] }
+      if (!rigSeeds.has(n) && !rigs.has(n) && !(String(n) in savedPresets(unit.key))) return { number: n, name, blocks: [] }
       /* Another slot, so there is no scene to be in: scene one, the one it
          would load on. */
       if (!rigs.has(n)) rigs.set(n, buildRig(n))

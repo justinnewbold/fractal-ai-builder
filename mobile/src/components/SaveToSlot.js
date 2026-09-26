@@ -2,7 +2,8 @@ import { useState } from 'react'
 
 import { font } from '../lib/theme'
 import { logDebug } from '../lib/debugLog'
-import { parkSave, readSaveResult } from '../lib/device'
+import { parkSave, readSaveResult, saveInDemo } from '../lib/device'
+import { isDemo } from '../lib/demo'
 import { askComputerToSave } from '../lib/saveViaComputer'
 import { savedToSlot, useRig } from '../lib/rig'
 import Note from './Note'
@@ -41,6 +42,26 @@ export function useSaveToSlot() {
   const write = async () => {
     setArmed(false)
     setSaving(true)
+    /*
+     * THE DEMO SAVES ON THE PHONE. There is no computer in the demo to leave
+     * the request for, and asking one said "The demo has no answer for PUT
+     * /store/config/fractal.pendingSave…". So the simulated unit keeps the
+     * preset here instead, and it is still there next time the app opens.
+     */
+    if (isDemo()) {
+      let said
+      try {
+        const slot = await saveInDemo(preset?.number)
+        savedToSlot(slot)
+        said = { tone: 'hint', text: `Saved to slot ${slot} on this phone.` }
+      } catch (err) {
+        said = { tone: 'warn', text: err?.message || String(err) }
+      }
+      setSaving(false)
+      logDebug('write', `demo save to slot ${preset?.number}`, said.tone === 'hint' ? 'saved' : `failed — ${said.text}`)
+      setSaid(said)
+      return
+    }
     setSaid({ tone: 'hint', text: 'Asked the computer to save it. The computer writes it; this says so the moment it lands.' })
     const res = await askComputerToSave({
       park: (req) => parkSave(slug, req),

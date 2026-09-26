@@ -3,6 +3,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 
 import { createMockDevice } from './mockDevice'
 import { DEFAULT_UNIT, UNIT_KEYS } from './demoUnits'
+import { useDemoStorage } from './demoMemory'
+import { hydrate, sync } from './store'
+
+/* What the demo saves — presets and scene names — is kept in the phone's own
+   store, so it is still there at the next launch. See demoMemory. */
+useDemoStorage(sync)
 
 const KEY = 'fractal.demo'
 const UNIT_KEY = 'fractal.demoUnit'
@@ -89,6 +95,9 @@ export function setDemo(on) {
  */
 export async function restoreDemo() {
   try {
+    /* The saved presets have to be in memory before the simulated unit opens
+       its first one, or that one opens as it shipped rather than as saved. */
+    await hydrate()
     const saved = await AsyncStorage.getItem(UNIT_KEY)
     if (UNIT_KEYS.includes(saved)) unit = saved
     if ((await AsyncStorage.getItem(KEY)) === '1' && !mock) {
